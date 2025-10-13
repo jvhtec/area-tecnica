@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface SignUpFormProps {
   onBack?: () => void;
@@ -33,6 +34,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
     flexUrl: "",
   });
   const [isFetchingFlex, setIsFetchingFlex] = useState(false);
+  const [sendOnboarding, setSendOnboarding] = useState<boolean>(true);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +63,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
 
     if (preventAutoLogin) {
       // Management creates user via Edge Function; no password needed here
-      await createUserAsAdmin({
+      const created = await createUserAsAdmin({
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -73,6 +75,24 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
         // @ts-ignore - allowed as extra prop for the function body
         flex_resource_id: formData.flexResourceId || undefined,
       });
+      // Optionally send onboarding email
+      if (created && sendOnboarding) {
+        try {
+          const { data, error } = await supabase.functions.invoke('send-onboarding-email', {
+            body: {
+              email: formData.email,
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              department: formData.department,
+            }
+          });
+          if (error) throw error;
+          if (!data?.success) throw new Error('Failed to send onboarding email');
+          toast({ title: 'Onboarding enviado', description: `Se envió el email a ${formData.email}.` });
+        } catch (e: any) {
+          toast({ title: 'No se pudo enviar el onboarding', description: e?.message || 'Error desconocido', variant: 'destructive' });
+        }
+      }
       return;
     } else {
       await signUp({
@@ -307,6 +327,10 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
             <p className="text-xs text-muted-foreground">
               Example: https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact/4b0d98e0-e700-11ea-97d0-2a0a4490a7fb/phone
             </p>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <Checkbox id="sendOnboarding" checked={sendOnboarding} onCheckedChange={(v) => setSendOnboarding(!!v)} />
+            <Label htmlFor="sendOnboarding">Enviar email de bienvenida (onboarding)</Label>
           </div>
         </div>
       )}

@@ -10,6 +10,7 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 interface TechnicianRowProps {
   technician: {
@@ -39,6 +40,8 @@ const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianR
   const [metrics, setMetrics] = React.useState<{ monthConfirmed: number; yearConfirmed: number }>({ monthConfirmed: 0, yearConfirmed: 0 });
   const [residencia, setResidencia] = React.useState<string | null>(null);
   const [residenciaLoading, setResidenciaLoading] = React.useState(false);
+  const [sendingOnboarding, setSendingOnboarding] = React.useState(false);
+  const { toast } = useToast();
 
   const loadMetrics = React.useCallback(async () => {
     try {
@@ -271,6 +274,35 @@ const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianR
 
             {isManagementUser && (
               <div className="pt-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="gap-2 h-8 w-full mb-2"
+                  disabled={sendingOnboarding || !technician.email}
+                  onClick={async () => {
+                    if (!technician.email) return;
+                    try {
+                      setSendingOnboarding(true);
+                      const { data, error } = await supabase.functions.invoke('send-onboarding-email', {
+                        body: {
+                          email: technician.email,
+                          firstName: technician.first_name,
+                          lastName: technician.last_name,
+                          department: technician.department,
+                        }
+                      });
+                      if (error) throw error;
+                      if (!data?.success) throw new Error('Failed to send onboarding email');
+                      toast({ title: 'Onboarding enviado', description: `Se envió a ${technician.email}.` });
+                    } catch (e: any) {
+                      toast({ title: 'No se pudo enviar el onboarding', description: e?.message || 'Error desconocido', variant: 'destructive' });
+                    } finally {
+                      setSendingOnboarding(false);
+                    }
+                  }}
+                >
+                  <Mail className="h-4 w-4" /> {sendingOnboarding ? 'Enviando…' : 'Enviar Onboarding'}
+                </Button>
                 <Button variant={isFridge ? 'secondary' : 'destructive'} size="sm" onClick={toggleFridge} className="gap-2 h-8" disabled={togglingFridge}>
                   <Refrigerator className="h-4 w-4" />
                   {isFridge ? 'Descongelar' : 'A la nevera'}

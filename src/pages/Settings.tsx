@@ -8,6 +8,8 @@ import { FilterBar } from "@/components/users/filters/FilterBar";
 import { ImportUsersDialog } from "@/components/users/import/ImportUsersDialog";
 import { CompanyLogoUploader } from "@/components/CompanyLogoUploader";
 import { EquipmentModelsList } from "@/components/equipment/EquipmentModelsList";
+import { DepartmentProvider } from "@/contexts/DepartmentContext";
+import type { Department } from "@/types/equipment";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 const Settings = () => {
@@ -16,6 +18,8 @@ const Settings = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
+  // Department selector for Equipment Models card
+  const [modelsDepartment, setModelsDepartment] = useState<Department>('sound');
   
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
@@ -69,12 +73,12 @@ const Settings = () => {
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Company Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Company Settings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
                 <h3 className="text-sm font-medium">Company Logo</h3>
                 <p className="text-sm text-muted-foreground">
                   Upload your company logo. This will be used in the Memoria Técnica PDFs and other documents.
@@ -91,10 +95,26 @@ const Settings = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
                     Manage equipment models used in festival forms and gear setup.
-                  </p>
-                  <EquipmentModelsList />
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Department</span>
+                      <select
+                        className="border rounded px-2 py-1 text-sm"
+                        value={modelsDepartment}
+                        onChange={(e) => setModelsDepartment(e.target.value as Department)}
+                      >
+                        <option value="sound">Sound</option>
+                        <option value="lights">Lights</option>
+                        <option value="video">Video</option>
+                      </select>
+                    </div>
+                  </div>
+                  <DepartmentProvider department={modelsDepartment}>
+                    <EquipmentModelsList />
+                  </DepartmentProvider>
                 </div>
               </CardContent>
             </Card>
