@@ -1,6 +1,6 @@
 
 import { format, parseISO, startOfDay, endOfDay } from "date-fns";
-import { toZonedTime, fromZonedTime, formatInTimeZone } from "date-fns-tz";
+import { toZonedTime, fromZonedTime, formatInTimeZone, zonedTimeToUtc } from "date-fns-tz";
 
 /**
  * Convert a UTC date to a specific timezone
@@ -65,9 +65,8 @@ export const isJobOnDate = (
  * Convert datetime-local input value to UTC date considering job timezone
  */
 export const localInputToUTC = (localDateTimeString: string, timezone: string = 'Europe/Madrid'): Date => {
-  // Parse the local datetime string as if it's in the job's timezone
-  const localDate = new Date(localDateTimeString);
-  return fromJobTimezone(localDate, timezone);
+  // Interpret the provided datetime string as a wall-clock time in the job's timezone
+  return zonedTimeToUtc(localDateTimeString, timezone);
 };
 
 /**
