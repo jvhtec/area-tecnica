@@ -37,7 +37,7 @@ export function RatesCenterHeader({ overview, isLoading }: RatesCenterHeaderProp
             {!isLoading && pendingTours.map((tour) => (
               <div key={tour.id} className="flex items-center justify-between rounded-lg border p-3">
                 <div className="space-y-1">
-                  <div className="font-medium leading-tight">{tour.title}</div>
+                  <div className="font-medium leading-tight">{tour.name}</div>
                   <div className="text-xs text-muted-foreground">
                     {tour.start_date ? format(new Date(tour.start_date), 'PPP') : 'No start date'}
                   </div>

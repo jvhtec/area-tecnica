@@ -38,9 +38,9 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
               </TableHeader>
               <TableBody>
                 {rows.map((row) => (
-                  <TableRow key={row.id}>
+                <TableRow key={row.id}>
                     <TableCell>
-                      <div className="font-medium leading-tight">{row.title}</div>
+                      <div className="font-medium leading-tight">{row.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {row.endDate ? `Ends ${format(new Date(row.endDate), 'PPP')}` : 'End date TBD'}
                       </div>

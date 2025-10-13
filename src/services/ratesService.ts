@@ -13,7 +13,7 @@ export interface RatesOverview {
     extras: number;
     houseOverrides: number;
   };
-  pendingTours: Array<{ id: string; title: string; start_date: string | null; rates_approved: boolean }>;
+  pendingTours: Array<{ id: string; name: string; start_date: string | null; rates_approved: boolean }>;
   extrasCatalog: RateExtraRow[];
   baseRates: TourBaseRateRow[];
   recentOverrides: Array<{ profileId: string; profileName: string; baseDayEur: number | null; updatedAt: string | null }>;
@@ -29,7 +29,7 @@ export interface HouseTechOverrideListItem {
 
 export interface RatesApprovalRow {
   id: string;
-  title: string;
+  name: string;
   startDate: string | null;
   endDate: string | null;
   ratesApproved: boolean;
@@ -44,7 +44,7 @@ export async function fetchRatesOverview(): Promise<RatesOverview> {
   const [toursResult, extrasResult, baseRatesResult, overridesResult] = await Promise.all([
     supabase
       .from('tours')
-      .select('id, title, start_date, rates_approved')
+      .select('id, name, start_date, rates_approved')
       .order('start_date', { ascending: true })
       .eq('rates_approved', false)
       .limit(5),
@@ -100,7 +100,7 @@ export async function fetchRatesOverview(): Promise<RatesOverview> {
     },
     pendingTours: (toursResult.data || []) as Array<{
       id: string;
-      title: string;
+      name: string;
       start_date: string | null;
       rates_approved: boolean;
     }>,
@@ -157,7 +157,7 @@ export async function fetchHouseTechOverrides(): Promise<HouseTechOverrideListIt
 export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
   const { data: tours, error: toursError } = await supabase
     .from('tours')
-    .select('id, title, start_date, end_date, rates_approved')
+    .select('id, name, start_date, end_date, rates_approved')
     .order('start_date', { ascending: true })
     .limit(25);
 
@@ -192,7 +192,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
     if (jobIds.length > 0) {
       const { data: assignments, error: assignmentsError } = await supabase
         .from('job_assignments')
-        .select('id, job_id')
+        .select('job_id')
         .in('job_id', jobIds);
 
       if (assignmentsError) throw assignmentsError;
@@ -226,7 +226,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
 
     return {
       id: tour.id,
-      title: tour.title,
+      name: tour.name,
       startDate: tour.start_date ?? null,
       endDate: tour.end_date ?? null,
       ratesApproved: Boolean(tour.rates_approved),
