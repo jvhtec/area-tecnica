@@ -15,7 +15,9 @@ export const findClosestFestival = (festivals: any[]) => {
   today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
 
   let closestFestival = festivals[0];
-  let smallestDifference = Math.abs(new Date(festivals[0].start_time).getTime() - today.getTime());
+  const initialFestivalDate = new Date(festivals[0].start_time);
+  initialFestivalDate.setHours(0, 0, 0, 0);
+  let smallestDifference = Math.abs(initialFestivalDate.getTime() - today.getTime());
 
   festivals.forEach(festival => {
     const festivalDate = new Date(festival.start_time);
