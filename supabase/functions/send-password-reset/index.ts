@@ -37,11 +37,11 @@ const handler = async (req: Request): Promise<Response> => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check if user exists by email (more reliable than paginated listUsers)
-    const { data: { user }, error: userError } = await supabase.auth.admin.getUserByEmail(email.toLowerCase());
+    // List users and find by email (works for small-medium user bases)
+    const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
 
-    if (userError) {
-      console.error("[Password Reset] Error checking user:", userError);
+    if (listError) {
+      console.error("[Password Reset] Error listing users:", listError);
       // Don't reveal error - return success
       return new Response(
         JSON.stringify({ 
@@ -54,6 +54,9 @@ const handler = async (req: Request): Promise<Response> => {
         }
       );
     }
+
+    // Find user by email
+    const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
     if (!user) {
       console.log(`[Password Reset] User not found for: ${email}`);
@@ -69,6 +72,8 @@ const handler = async (req: Request): Promise<Response> => {
         }
       );
     }
+
+    console.log(`[Password Reset] User found: ${email}`);
 
     // Generate recovery link using admin API
     // Get origin from request headers for dynamic URL detection
@@ -98,7 +103,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`[Password Reset] Generated recovery link for: ${email}`);
 
     // Get user name for personalization
-    const userName = user.user_metadata?.first_name || email.split('@')[0];
+    const userName = user.user_metadata?.first_name || user.email?.split('@')[0] || 'User';
 
     // Create email HTML template
     const htmlContent = `
