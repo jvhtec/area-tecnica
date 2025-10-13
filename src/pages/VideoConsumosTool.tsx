@@ -23,11 +23,9 @@ const videoComponentDatabase = [
   { id: 4, name: 'LED Screen', watts: 700 }
 ];
 
-const VOLTAGE_3PHASE = 400;
-const POWER_FACTOR = 0.85;
-const PHASES = 3;
-
-const PDU_TYPES = ['CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE125A 3P+N+G', 'CEE400A 3P+N+G'];
+const SQRT3 = Math.sqrt(3);
+const PDU_TYPES_THREE = ['CEE16A 3P+N+G', 'CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE125A 3P+N+G'];
+const PDU_TYPES_SINGLE = ['Schuko 16A', 'CEE32A 1P+N+G', 'CEE63A 1P+N+G'];
 
 interface TableRow {
   quantity: string;
@@ -81,16 +79,22 @@ const VideoConsumosTool: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
-  const [safetyMargin, setSafetyMargin] = useState(0);
-  const [selectedPduType, setSelectedPduType] = useState<string>('default');
-  const [customPduType, setCustomPduType] = useState('');
-  const [includesHoist, setIncludesHoist] = useState(false);
+  const [fohSchukoRequired, setFohSchukoRequired] = useState<boolean>(true);
+  const [safetyMargin, setSafetyMargin] = useState(20);
+  const [phaseMode, setPhaseMode] = useState<'single' | 'three'>('three');
+  const [pf, setPf] = useState<number>(0.9);
+  const [voltage, setVoltage] = useState<number>(400);
   const [tourName, setTourName] = useState<string>('');
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
   });
+
+  // Auto-adjust voltage based on supply type
+  useEffect(() => {
+    setVoltage(phaseMode === 'single' ? 230 : 400);
+  }, [phaseMode]);
 
   // Preselect job from query param and fetch details if not in the list
   useEffect(() => {
@@ -148,7 +152,10 @@ const VideoConsumosTool: React.FC = () => {
         table_name: table.name,
         table_data: {
           rows: table.rows,
-          safetyMargin: safetyMargin
+          safetyMargin,
+          pf,
+          phaseMode,
+          voltage
         },
         table_type: 'power',
         total_value: table.totalWatts || 0,
@@ -156,7 +163,10 @@ const VideoConsumosTool: React.FC = () => {
           current_per_phase: table.currentPerPhase,
           pdu_type: table.customPduType || table.pduType,
           custom_pdu_type: table.customPduType,
-          safetyMargin: safetyMargin
+          safetyMargin,
+          pf,
+          phaseMode,
+          voltage
         }
       });
 
@@ -209,18 +219,26 @@ const VideoConsumosTool: React.FC = () => {
     setSelectedJob(job);
   };
 
-  const calculatePhaseCurrents = (totalWatts: number) => {
+  const calculateLineCurrent = (totalWatts: number) => {
     const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
-    const wattsPerPhase = adjustedWatts / PHASES;
-    const currentPerPhase = wattsPerPhase / (VOLTAGE_3PHASE * POWER_FACTOR);
-    return { wattsPerPhase, currentPerPhase, adjustedWatts };
+    const currentLine = phaseMode === 'single'
+      ? adjustedWatts / (voltage * pf)
+      : adjustedWatts / (SQRT3 * voltage * pf);
+    return { adjustedWatts, currentLine };
   };
 
-  const recommendPDU = (current: number) => {
-    if (current <= 32) return 'CEE32A 3P+N+G';
-    if (current <= 63) return 'CEE63A 3P+N+G';
-    if (current <= 125) return 'CEE125A 3P+N+G';
-    return 'CEE400A 3P+N+G';
+  const PDU_TYPES = phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE;
+  const planningLimit = (amps: number) => amps * 0.8;
+  const recommendPDU = (currentLine: number) => {
+    if (phaseMode === 'single') {
+      if (currentLine <= planningLimit(16)) return PDU_TYPES_SINGLE[0];
+      if (currentLine <= planningLimit(32)) return PDU_TYPES_SINGLE[1];
+      return PDU_TYPES_SINGLE[2];
+    }
+    if (currentLine <= planningLimit(16)) return PDU_TYPES_THREE[0];
+    if (currentLine <= planningLimit(32)) return PDU_TYPES_THREE[1];
+    if (currentLine <= planningLimit(63)) return PDU_TYPES_THREE[2];
+    return PDU_TYPES_THREE[3];
   };
 
   const savePowerRequirementTable = async (table: Table) => {
@@ -257,9 +275,10 @@ const VideoConsumosTool: React.FC = () => {
           table_name: table.name,
           total_watts: table.totalWatts || 0,
           current_per_phase: table.currentPerPhase || 0,
-          pdu_type: selectedPduType === 'default' ? table.pduType : selectedPduType,
-          custom_pdu_type: customPduType,
-          includes_hoist: includesHoist
+          pdu_type: table.customPduType || table.pduType || '',
+          custom_pdu_type: table.customPduType,
+          includes_hoist: table.includesHoist || false,
+          metadata: { pf, phaseMode, voltage, safetyMargin }
         });
 
       if (error) throw error;
@@ -302,18 +321,18 @@ const VideoConsumosTool: React.FC = () => {
     });
 
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    const { currentPerPhase, adjustedWatts } = calculatePhaseCurrents(totalWatts);
-    const pduSuggestion = recommendPDU(currentPerPhase);
+    const { adjustedWatts, currentLine } = calculateLineCurrent(totalWatts);
+    const pduSuggestion = recommendPDU(currentLine);
 
     const newTable = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
       adjustedWatts,
-      currentPerPhase,
-      pduType: selectedPduType === 'default' ? pduSuggestion : selectedPduType,
-      customPduType: customPduType,
-      includesHoist,
+      currentPerPhase: currentLine,
+      pduType: pduSuggestion,
+      customPduType: undefined,
+      includesHoist: false,
       id: Date.now(),
     };
 
@@ -330,14 +349,8 @@ const VideoConsumosTool: React.FC = () => {
   };
 
   const resetCurrentTable = () => {
-    setCurrentTable({
-      name: '',
-      rows: [{ quantity: '', componentId: '', watts: '' }],
-    });
+    setCurrentTable({ name: '', rows: [{ quantity: '', componentId: '', watts: '' }] });
     setTableName('');
-    setSelectedPduType('default');
-    setCustomPduType('');
-    setIncludesHoist(false);
   };
 
   const removeTable = (tableId: number | string) => {
@@ -394,27 +407,18 @@ const VideoConsumosTool: React.FC = () => {
         undefined,
         powerSummary,
         safetyMargin,
-        logoUrl
+        logoUrl,
+        fohSchukoRequired
       );
 
       const fileName = `Video Power Report - ${jobToUse.title}.pdf`;
       
       if (!isTourDefaults && selectedJobId) {
-        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-        const filePath = `video/${selectedJobId}/${crypto.randomUUID()}.pdf`;
-
-        const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
-        if (uploadError) throw uploadError;
-
-        toast({
-          title: 'Success',
-          description: 'PDF has been generated and uploaded successfully.',
-        });
+        const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
+        await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/consumos');
+        toast({ title: 'Success', description: 'PDF has been generated and uploaded successfully.' });
       } else {
-        toast({
-          title: 'Success',
-          description: 'PDF has been generated successfully.',
-        });
+        toast({ title: 'Success', description: 'PDF has been generated successfully.' });
       }
 
       // Also provide download to user
@@ -572,6 +576,37 @@ const VideoConsumosTool: React.FC = () => {
             </div>
           )}
 
+          {/* Supply / Voltage / PF controls to match sound tool */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Supply</Label>
+              <Select value={phaseMode} onValueChange={(v) => setPhaseMode(v as 'single' | 'three')}>
+                <SelectTrigger><SelectValue placeholder="Select supply" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single">Monofásico (230 V)</SelectItem>
+                  <SelectItem value="three">Trifásico (400 V LL)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Voltage</Label>
+              <Input type="number" value={voltage} onChange={(e) => setVoltage(Number(e.target.value) || 0)} />
+              <p className="text-xs text-muted-foreground">230 V (1φ) o 400 V LL (3φ) por defecto</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Power Factor (PF)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0.1"
+                max="1"
+                value={pf}
+                onChange={(e) => setPf(Math.max(0.1, Math.min(1, Number(e.target.value) || 0.85)))}
+              />
+              <p className="text-xs text-muted-foreground">Usa 0.9 como referencia</p>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="safetyMargin">Safety Margin</Label>
             <Select
@@ -609,6 +644,11 @@ const VideoConsumosTool: React.FC = () => {
             </div>
           )}
 
+          <div className="flex items-center space-x-2">
+            <Checkbox id="foh-schuko" checked={fohSchukoRequired} onCheckedChange={(c) => setFohSchukoRequired(!!c)} />
+            <Label htmlFor="foh-schuko">Se requiere potencia de 16A en formato schuko hembra en posicion FoH</Label>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="tableName">
               {isTourDefaults ? 'Default Name' : 'Table Name'}
@@ -621,40 +661,7 @@ const VideoConsumosTool: React.FC = () => {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>PDU Type Override</Label>
-            <Select value={selectedPduType} onValueChange={setSelectedPduType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Use recommended PDU type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">Use recommended PDU type</SelectItem>
-                {PDU_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-                <SelectItem value="custom">Custom PDU Type</SelectItem>
-              </SelectContent>
-            </Select>
-            {selectedPduType === 'custom' && (
-              <Input
-                placeholder="Enter custom PDU type"
-                value={customPduType}
-                onChange={(e) => setCustomPduType(e.target.value)}
-                className="mt-2"
-              />
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="hoistPower"
-              checked={includesHoist}
-              onCheckedChange={(checked) => setIncludesHoist(checked as boolean)}
-            />
-            <Label htmlFor="hoistPower">Requires additional hoist power (CEE32A 3P+N+G)</Label>
-          </div>
+          
 
           <div className="border rounded-lg overflow-hidden">
             <table className="w-full">
@@ -739,7 +746,51 @@ const VideoConsumosTool: React.FC = () => {
                   </Button>
                 )}
               </div>
-              
+              <div className="p-4 bg-muted/50 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`hoist-${table.id}`}
+                      checked={table.includesHoist}
+                      onCheckedChange={(checked) => {
+                        setTables(prev => prev.map(t => t.id === table.id ? { ...t, includesHoist: !!checked } : t));
+                      }}
+                    />
+                    <Label htmlFor={`hoist-${table.id}`}>Requires additional hoist power (CEE32A 3P+N+G)</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label>PDU Type Override:</Label>
+                    <Select
+                      value={table.customPduType ? ((phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE).includes(table.customPduType) ? table.customPduType : 'custom') : 'default'}
+                      onValueChange={(value) => {
+                        setTables(prev => prev.map(t => {
+                          if (t.id !== table.id) return t;
+                          if (value === 'default') return { ...t, customPduType: undefined };
+                          if (value === 'custom') return { ...t, customPduType: '' };
+                          return { ...t, customPduType: value };
+                        }));
+                      }}
+                    >
+                      <SelectTrigger className="w-[220px]"><SelectValue placeholder="Use recommended PDU type" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Use recommended ({table.pduType})</SelectItem>
+                        {(phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE).map((type) => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                        <SelectItem value="custom">Custom PDU Type</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {table.customPduType !== undefined && !((phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE).includes(table.customPduType || '')) && (
+                      <Input
+                        placeholder="Enter custom PDU type"
+                        value={table.customPduType || ''}
+                        onChange={(e) => setTables(prev => prev.map(t => t.id === table.id ? { ...t, customPduType: e.target.value } : t))}
+                        className="w-[220px]"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>

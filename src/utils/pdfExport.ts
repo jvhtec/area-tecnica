@@ -49,7 +49,8 @@ export const exportToPDF = (
   summaryRows?: SummaryRow[],
   powerSummary?: { totalSystemWatts: number; totalSystemAmps: number },
   safetyMargin?: number,
-  customLogoUrl?: string
+  customLogoUrl?: string,
+  fohSchukoRequired?: boolean
 ): Promise<Blob> => {
   return new Promise<Blob>((resolve) => {
     const doc = new jsPDF();
@@ -272,6 +273,14 @@ export const exportToPDF = (
           doc.addPage(); yPosition = 20;
         }
       });
+
+      // Global FOH schuko note for power reports
+      if (type === 'power' && fohSchukoRequired) {
+        const need = 12; checkPageBreak(need);
+        doc.setFontSize(10); doc.setTextColor(80, 80, 80); doc.setFont(undefined, 'italic');
+        doc.text('Se requiere potencia de 16A en formato schuko hembra en posicion FoH', 14, yPosition);
+        yPosition += 10; doc.setFont(undefined, 'normal');
+      }
 
       // Summary data
       let generatedSummaryRows: SummaryRow[] = [];

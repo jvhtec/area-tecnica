@@ -71,6 +71,7 @@ const ConsumosTool: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
+  const [fohSchukoRequired, setFohSchukoRequired] = useState<boolean>(true);
   const [safetyMargin, setSafetyMargin] = useState(20); // sensible default for live shows
   const [editingOverride, setEditingOverride] = useState<string | null>(null);
 
@@ -500,7 +501,8 @@ const ConsumosTool: React.FC = () => {
         undefined,
         powerSummary,
         safetyMargin,
-        logoUrl
+        logoUrl,
+        fohSchukoRequired
       );
 
       const fileName = isTourDefaults 
@@ -635,6 +637,10 @@ const ConsumosTool: React.FC = () => {
 
       <CardContent>
         <div className="space-y-6">
+          <div className="flex items-center space-x-2">
+            <Checkbox id="foh-schuko" checked={fohSchukoRequired} onCheckedChange={(c) => setFohSchukoRequired(!!c)} />
+            <Label htmlFor="foh-schuko">Se requiere potencia de 16A en formato schuko hembra en posicion FoH</Label>
+          </div>
           {isTourDefaults && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
