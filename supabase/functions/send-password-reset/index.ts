@@ -41,9 +41,35 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Generate recovery link using admin API
-    // Get origin from request headers for dynamic URL detection
-    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('?')[0].replace(/\/$/, '');
-    const baseUrl = origin || Deno.env.get('PUBLIC_CONFIRM_BASE') || 'http://localhost:3000';
+    // Prefer explicit env base over Origin/Referer to avoid localhost in prod
+    const pickEnvBase = () => {
+      const candidates = [
+        Deno.env.get('PUBLIC_APP_URL'),
+        Deno.env.get('PUBLIC_SITE_URL'),
+        Deno.env.get('NEXT_PUBLIC_SITE_URL'),
+        Deno.env.get('SITE_URL'),
+        Deno.env.get('PUBLIC_CONFIRM_BASE'),
+      ];
+      for (const val of candidates) {
+        if (val && val.trim()) return val.trim();
+      }
+      return undefined;
+    };
+    const toOrigin = (input?: string) => {
+      if (!input) return undefined;
+      try {
+        const u = new URL(input);
+        return `${u.protocol}//${u.host}`;
+      } catch {
+        return input.replace(/\/$/, '');
+      }
+    };
+    const envBaseRaw = pickEnvBase();
+    const envBase = toOrigin(envBaseRaw);
+    const rawOrigin = req.headers.get('origin') || req.headers.get('referer');
+    const originBase = rawOrigin ? toOrigin(rawOrigin.split('?')[0]) : undefined;
+    const baseUrl = envBase || originBase || 'http://localhost:3000';
+    console.log('[Password Reset] Using baseUrl:', baseUrl, '(envRaw:', envBaseRaw, ')');
     const redirectUrl = `${baseUrl}/auth?type=recovery`;
     
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
@@ -70,79 +96,87 @@ const handler = async (req: Request): Promise<Response> => {
     // Basic personalization without metadata lookup
     const userName = normalizedEmail.split('@')[0] || 'User';
 
-    // Create email HTML template
+    // Branding assets (same defaults as staffing function)
+    const COMPANY_LOGO_URL = Deno.env.get('COMPANY_LOGO_URL_W') || `${supabaseUrl}/storage/v1/object/public/company-assets/sectorlogow.png`;
+    const AT_LOGO_URL = Deno.env.get('AT_LOGO_URL') || `${supabaseUrl}/storage/v1/object/public/company-assets/area-tecnica-logo.png`;
+
+    // Create email HTML template (branded like staffing emails)
     const htmlContent = `
       <!DOCTYPE html>
       <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Restablece tu contraseña</title>
-        </head>
-        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
-            <tr>
-              <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                  <!-- Header -->
-                  <tr>
-                    <td style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 40px 20px; text-align: center;">
-                      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">Restablecer Contraseña</h1>
-                    </td>
-                  </tr>
-                  
-                  <!-- Body -->
-                  <tr>
-                    <td style="padding: 40px 30px;">
-                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                        Hola <strong>${userName}</strong>,
-                      </p>
-                      
-                      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                        Has solicitado restablecer tu contraseña. Haz clic en el botón de abajo para crear una nueva contraseña:
-                      </p>
-                      
-                      <!-- CTA Button -->
-                      <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
-                        <tr>
-                          <td align="center">
-                            <a href="${resetLink}" style="display: inline-block; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 6px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
-                              Restablecer Contraseña
-                            </a>
-                          </td>
-                        </tr>
-                      </table>
-                      
-                      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 20px 0; padding: 15px; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
-                        <strong>⏰ Este enlace expira en 24 horas</strong>
-                      </p>
-                      
-                      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 20px 0 0 0;">
-                        Si no solicitaste restablecer tu contraseña, puedes ignorar este correo de forma segura. Tu contraseña no cambiará hasta que crees una nueva.
-                      </p>
-                      
-                      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-                      
-                      <p style="color: #999999; font-size: 12px; line-height: 1.5; margin: 0;">
-                        Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
-                        <a href="${resetLink}" style="color: #3b82f6; word-break: break-all;">${resetLink}</a>
-                      </p>
-                    </td>
-                  </tr>
-                  
-                  <!-- Footer -->
-                  <tr>
-                    <td style="background-color: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
-                      <p style="color: #999999; font-size: 12px; margin: 0;">
-                        Este es un correo automático, por favor no respondas a este mensaje.
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Restablece tu contraseña</title>
+      </head>
+      <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f7fb;padding:24px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.06);">
+                <tr>
+                  <td style="padding:16px 20px;background:#0b0b0b;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td align="left" style="vertical-align:middle;">
+                          <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
+                        </td>
+                        <td align="right" style="vertical-align:middle;">
+                          <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:24px 24px 8px 24px;">
+                    <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${userName},</h2>
+                    <p style="margin:0;color:#374151;line-height:1.55;">
+                      Has solicitado restablecer tu contraseña. Haz clic en el botón de abajo para crear una nueva.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 24px 0 24px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;">
+                      <tr>
+                        <td align="center" style="padding:8px 0;">
+                          <a href="${resetLink}" style="display:inline-block;background:#3b82f6;color:#ffffff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:600;">Restablecer contraseña</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 24px;">
+                    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;color:#374151;font-size:14px;">
+                      <b>⏰ Este enlace expira en 24 horas.</b>
+                    </div>
+                    <p style="margin:16px 0 0 0;color:#6b7280;font-size:13px;line-height:1.55;">
+                      Si no solicitaste restablecer tu contraseña, puedes ignorar este correo de forma segura. Tu contraseña no cambiará hasta que crees una nueva.
+                    </p>
+                    <p style="margin:16px 0 0 0;color:#6b7280;font-size:12px;line-height:1.55;">
+                      Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>
+                      <a href="${resetLink}" style="color:#3b82f6;text-decoration:underline;word-break:break-all;">${resetLink}</a>
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 24px;background:#f9fafb;color:#6b7280;font-size:12px;line-height:1.5;border-top:1px solid #e5e7eb;">
+                    <div style="margin-bottom:8px;">
+                      Este correo es confidencial y puede contener información privilegiada. Si no eres el destinatario, por favor notifícanos y elimina este mensaje.
+                    </div>
+                    <div>
+                      Sector Pro · <a href="https://www.sector-pro.com" style="color:#6b7280;text-decoration:underline;">www.sector-pro.com</a>
+                      &nbsp;|&nbsp; Área Técnica · <a href="https://area-tecnica.lovable.app" style="color:#6b7280;text-decoration:underline;">area-tecnica.lovable.app</a>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
       </html>
     `;
 
