@@ -7,19 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { Euro, Wrench, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX } from 'lucide-react';
+import { Euro, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useTourJobRateQuotesForManager } from '@/hooks/useTourJobRateQuotesForManager';
-import { useRateExtrasCatalog, useSaveRateExtra } from '@/hooks/useRateExtrasCatalog';
-import { useTourBaseRates, useSaveTourBaseRate } from '@/hooks/useTourBaseRates';
 import { useSaveHouseTechRate } from '@/hooks/useHouseTechRates';
 import { JobExtrasEditor } from '@/components/jobs/JobExtrasEditor';
 import { formatCurrency } from '@/lib/utils';
 import { useTourRatesApproval } from '@/hooks/useTourRatesApproval';
+import { ExtrasCatalogEditor, BaseRatesEditor } from '@/features/rates/components/CatalogEditors';
 
 type TourRatesManagerDialogProps = {
   open: boolean;
@@ -328,90 +326,5 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
         </Tabs>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function ExtrasCatalogEditor() {
-  const { data: rows = [] } = useRateExtrasCatalog();
-  const save = useSaveRateExtra();
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Wrench className="h-4 w-4" /> Extras Catalog (2025)
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <Alert>
-          <AlertDescription>
-            Define unit amounts for travel and rest day extras. Managers can adjust these at any time.
-          </AlertDescription>
-        </Alert>
-        {rows.map((r) => (
-          <div key={r.extra_type} className="flex items-center gap-3">
-            <Label className="w-40 capitalize">{r.extra_type.replace('_', ' ')}</Label>
-            <Input
-              type="number"
-              defaultValue={r.amount_eur}
-              className="w-40"
-              onBlur={(e) => {
-                const v = parseFloat(e.target.value);
-                if (!isNaN(v) && v !== r.amount_eur) {
-                  save.mutate({ extra_type: r.extra_type as any, amount_eur: v });
-                }
-              }}
-            />
-            <span className="text-xs text-muted-foreground">EUR</span>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-function BaseRatesEditor() {
-  const { data: rows = [] } = useTourBaseRates();
-  const save = useSaveTourBaseRate();
-  const categories: Array<{ key: 'tecnico' | 'especialista' | 'responsable'; label: string }> = [
-    { key: 'tecnico', label: 'Técnico' },
-    { key: 'especialista', label: 'Especialista' },
-    { key: 'responsable', label: 'Responsable' },
-  ];
-
-  const map = useMemo(() => Object.fromEntries(rows.map(r => [r.category, r.base_day_eur])) as Record<string, number>, [rows]);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Euro className="h-4 w-4" /> Tour Base Rates (2025)
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <Alert>
-          <AlertDescription>
-            Set daily base amounts per category. Weekly multipliers apply when technicians are on the tour team.
-          </AlertDescription>
-        </Alert>
-        {categories.map(c => (
-          <div key={c.key} className="flex items-center gap-3">
-            <Label className="w-40">{c.label}</Label>
-            <Input
-              type="number"
-              defaultValue={map[c.key] ?? ''}
-              className="w-40"
-              onBlur={(e) => {
-                const v = parseFloat(e.target.value);
-                if (!isNaN(v)) {
-                  save.mutate({ category: c.key, base_day_eur: v });
-                }
-              }}
-            />
-            <span className="text-xs text-muted-foreground">EUR</span>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
   );
 }
