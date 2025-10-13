@@ -341,7 +341,8 @@ export const exportToPDF = (
         doc.setFontSize(10);
         doc.text(`Generado: ${new Date().toLocaleDateString('en-GB')}`, 14, 60);
 
-        let yPosition = 70;
+        // Reuse the outer yPosition to keep page-break checks in sync
+        yPosition = 70;
 
         if (type === 'power' && tables[0]?.toolType === 'consumos') {
           doc.setFontSize(16);
