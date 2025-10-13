@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { RATES_QUERY_KEYS } from '@/constants/ratesQueryKeys';
 
 export interface HouseTechRate {
   profile_id: string;
@@ -21,7 +22,7 @@ export interface HouseTechRateInput {
 
 export function useHouseTechRate(profileId: string) {
   return useQuery({
-    queryKey: ['house-tech-rate', profileId],
+    queryKey: RATES_QUERY_KEYS.houseTechRate(profileId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('house_tech_rates')
@@ -57,7 +58,7 @@ export function useSaveHouseTechRate() {
       return data;
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['house-tech-rate', variables.profile_id] });
+      queryClient.invalidateQueries({ queryKey: RATES_QUERY_KEYS.houseTechRate(variables.profile_id) });
       toast.success('House tech rate saved successfully');
     },
     onError: (error) => {

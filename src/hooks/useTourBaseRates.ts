@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { RATES_QUERY_KEYS } from '@/constants/ratesQueryKeys';
 
 export type TourCategory = 'tecnico' | 'especialista' | 'responsable';
 
@@ -11,7 +12,7 @@ export interface TourBaseRateRow {
 
 export function useTourBaseRates() {
   return useQuery({
-    queryKey: ['tour-base-rates-2025'],
+    queryKey: RATES_QUERY_KEYS.baseRates,
     queryFn: async (): Promise<TourBaseRateRow[]> => {
       const { data, error } = await supabase
         .from('rate_cards_tour_2025')
@@ -37,7 +38,7 @@ export function useSaveTourBaseRate() {
       return data as TourBaseRateRow;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-base-rates-2025'] });
+      queryClient.invalidateQueries({ queryKey: RATES_QUERY_KEYS.baseRates });
       toast.success('Tour base rate saved');
     },
     onError: (err: any) => {

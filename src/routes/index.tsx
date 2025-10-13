@@ -10,6 +10,7 @@ import { FestivalManagementWrapper } from "@/components/festival/FestivalManagem
 import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper";
 import Auth from "@/pages/Auth";
 import { RequireAuth } from "@/components/RequireAuth";
+import RatesCenterPage from "@/pages/RatesCenterPage";
 
 // Create a placeholder for missing pages
 const Placeholder = () => (
@@ -52,6 +53,10 @@ const router = createBrowserRouter([
       {
         path: "/vacation-management",
         element: <VacationManagement />,
+      },
+      {
+        path: "/management/rates",
+        element: <RatesCenterPage />,
       },
       {
         path: "/jobs",
