@@ -1,23 +1,19 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { getDashboardPath } from '@/utils/roleBasedRouting';
+import { UserRole } from '@/types/user';
 
-export function useRoleGuard(allowed: string[]) {
+export function useRoleGuard(allowedRoles: UserRole[]) {
+  const { userRole, isLoading } = useOptimizedAuth();
   const navigate = useNavigate();
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      let role: string | null = (user?.app_metadata as any)?.role || (user?.user_metadata as any)?.role || null;
-      // Fallback to profiles.role if not present in JWT metadata
-      if (!role && user?.id) {
-        const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-        role = prof?.role ?? null;
-      }
-      if (!cancelled && (!user || !role || !allowed.includes(role))) {
-        navigate('/auth');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [navigate, allowed]);
+    if (isLoading) return;
+    
+    if (!userRole || !allowedRoles.includes(userRole as UserRole)) {
+      const dashboardPath = getDashboardPath(userRole as UserRole | null);
+      navigate(dashboardPath, { replace: true });
+    }
+  }, [userRole, isLoading, allowedRoles, navigate]);
 }
