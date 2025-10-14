@@ -161,8 +161,8 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
 
         {/* Timesheets entry removed; now available under Rates & Extras */}
 
-        {/* Department Pages - Show for Management and House Techs */}
-        {(isManagementUser || userRole === 'house_tech') && (
+        {/* Department Pages - Management sees all three departments */}
+        {isManagementUser && (
           <>
             {/* Sound Department */}
             <Link to="/sound">
@@ -202,56 +202,11 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
                 <span>Video</span>
               </Button>
             </Link>
-
-            {/* Tours - Only show for management users and house techs from sound department */}
-            {(isManagementUser || isSoundHouseTech) && (
-              <Link to="/tours">
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start gap-2 ${
-                    location.pathname === "/tours" ? "bg-accent" : ""
-                  }`}
-                >
-                  <MapPin className="h-4 w-4" />
-                  <span>Tours</span>
-                </Button>
-              </Link>
-            )}
-            
-            {/* Festivals - Only show for management users and house techs from sound department */}
-            {(isManagementUser || isSoundHouseTech) && (
-              <Link to="/festivals">
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start gap-2 ${
-                    location.pathname === "/festivals" ? "bg-accent" : ""
-                  }`}
-                >
-                  <Tent className="h-4 w-4" />
-                  <span>Festivals</span>
-                </Button>
-              </Link>
-            )}
-            
-            {/* Disponibilidad - single entry, routes based on user's department */}
-            {(isManagementUser || userRole === 'house_tech') && (
-              <Link to="/disponibilidad">
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start gap-2 ${
-                    location.pathname === "/disponibilidad" ? "bg-accent" : ""
-                  }`}
-                >
-                  <CalendarCheck className="h-4 w-4" />
-                  <span>Disponibilidad</span>
-                </Button>
-              </Link>
-            )}
           </>
         )}
 
-        {/* Department Page for House Techs - specific to their department */}
-        {userRole === 'house_tech' && userDepartment && !isManagementUser && (
+        {/* House Tech - Only see their own department page */}
+        {userRole === 'house_tech' && userDepartment && (
           <Link to={`/${userDepartment.toLowerCase()}`}>
             <Button
               variant="ghost"
@@ -261,6 +216,51 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
             >
               {getDepartmentIcon(userDepartment)}
               <span>{userDepartment}</span>
+            </Button>
+          </Link>
+        )}
+
+        {/* Tours - Management and all house techs */}
+        {(isManagementUser || userRole === 'house_tech') && (
+          <Link to="/tours">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === "/tours" ? "bg-accent" : ""
+              }`}
+            >
+              <MapPin className="h-4 w-4" />
+              <span>Tours</span>
+            </Button>
+          </Link>
+        )}
+        
+        {/* Festivals - Management and all house techs */}
+        {(isManagementUser || userRole === 'house_tech') && (
+          <Link to="/festivals">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === "/festivals" ? "bg-accent" : ""
+              }`}
+            >
+              <Tent className="h-4 w-4" />
+              <span>Festivals</span>
+            </Button>
+          </Link>
+        )}
+        
+        {/* Disponibilidad - Management and house techs */}
+        {(isManagementUser || userRole === 'house_tech') && (
+          <Link to="/disponibilidad">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === "/disponibilidad" ? "bg-accent" : ""
+              }`}
+            >
+              <CalendarCheck className="h-4 w-4" />
+              <span>Disponibilidad</span>
             </Button>
           </Link>
         )}
