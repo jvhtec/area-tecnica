@@ -10,6 +10,7 @@ import { FestivalManagementWrapper } from "@/components/festival/FestivalManagem
 import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper";
 import Auth from "@/pages/Auth";
 import { RequireAuth } from "@/components/RequireAuth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import RatesCenterPage from "@/pages/RatesCenterPage";
 
 // Create a placeholder for missing pages
@@ -28,11 +29,27 @@ const router = createBrowserRouter([
     children: [
       { 
         path: "/", 
-        element: <Dashboard /> 
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}>
+            <Dashboard />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: "/dashboard",
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}>
+            <Dashboard />
+          </ProtectedRoute>
+        )
       },
       {
         path: "/technician-dashboard",
-        element: <TechnicianDashboard />
+        element: (
+          <ProtectedRoute allowedRoles={['technician', 'house_tech']}>
+            <TechnicianDashboard />
+          </ProtectedRoute>
+        )
       },
       {
         path: "/personal",
@@ -40,23 +57,43 @@ const router = createBrowserRouter([
       },
       {
         path: "/tours",
-        element: <Tours />
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}>
+            <Tours />
+          </ProtectedRoute>
+        )
       },
       { 
         path: "/festival-management/:festivalId", 
-        element: <FestivalManagementWrapper /> 
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}>
+            <FestivalManagementWrapper />
+          </ProtectedRoute>
+        )
       },
       {
         path: "/tour-management/:tourId",
-        element: <TourManagementWrapper />
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}>
+            <TourManagementWrapper />
+          </ProtectedRoute>
+        )
       },
       {
         path: "/vacation-management",
-        element: <VacationManagement />,
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'management']}>
+            <VacationManagement />
+          </ProtectedRoute>
+        )
       },
       {
         path: "/management/rates",
-        element: <RatesCenterPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'management']}>
+            <RatesCenterPage />
+          </ProtectedRoute>
+        )
       },
       {
         path: "/jobs",
@@ -132,7 +169,11 @@ const router = createBrowserRouter([
       },
       {
         path: "/settings",
-        element: <Placeholder />,
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'management']}>
+            <Placeholder />
+          </ProtectedRoute>
+        )
       },
       {
         path: "/users",

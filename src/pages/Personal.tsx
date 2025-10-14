@@ -75,6 +75,9 @@ const Personal = () => {
     );
   };
 
+  // House techs have read-only access (can't mark dates)
+  const canEditDates = userRole === 'admin' || userRole === 'management';
+
   return (
     <div className="w-full mx-auto px-2 sm:px-4 py-6 space-y-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
@@ -86,11 +89,13 @@ const Personal = () => {
         <MobilePersonalCalendar 
           date={date}
           onDateSelect={setDate}
+          readOnly={!canEditDates}
         />
       ) : (
         <PersonalCalendar 
           date={date}
           onDateSelect={setDate}
+          readOnly={!canEditDates}
         />
       )}
 

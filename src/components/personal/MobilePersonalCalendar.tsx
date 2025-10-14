@@ -14,11 +14,13 @@ import { TechDetailModal } from "./TechDetailModal";
 interface MobilePersonalCalendarProps {
   date: Date;
   onDateSelect: (date: Date) => void;
+  readOnly?: boolean;
 }
 
 export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   date,
   onDateSelect,
+  readOnly = false,
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
@@ -420,8 +422,8 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
                     key={tech.id}
                     technician={tech}
                     date={currentDate}
-                     onAvailabilityChange={(techId, status, date) => handleAvailabilityChange(techId, status, date)}
-                     onAvailabilityRemove={handleAvailabilityRemove}
+                    onAvailabilityChange={readOnly ? undefined : (techId, status, date) => handleAvailabilityChange(techId, status, date)}
+                    onAvailabilityRemove={readOnly ? undefined : handleAvailabilityRemove}
                   >
                     <div
                       className="border rounded-md p-3 flex items-start justify-between gap-3 hover:bg-accent/50 transition-colors cursor-pointer"

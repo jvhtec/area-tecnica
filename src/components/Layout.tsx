@@ -28,6 +28,8 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { HeaderStatus } from "./ui/header-status";
 import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
+import { getDashboardPath } from "@/utils/roleBasedRouting";
+import { UserRole } from "@/types/user";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -81,6 +83,7 @@ const Layout = () => {
     await queryClient.refetchQueries();
   };
 
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -92,6 +95,14 @@ const Layout = () => {
   if (!session) {
     console.log("No session found in Layout, redirecting to auth");
     return <Navigate to="/auth" replace />;
+  }
+
+  // Redirect to role-specific dashboard if on root or generic /dashboard
+  if (location.pathname === '/' || location.pathname === '/dashboard') {
+    const dashboardPath = getDashboardPath(userRole as UserRole | null);
+    if (dashboardPath !== location.pathname) {
+      return <Navigate to={dashboardPath} replace />;
+    }
   }
 
   return (

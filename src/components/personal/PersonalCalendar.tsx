@@ -22,11 +22,13 @@ import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 interface PersonalCalendarProps {
   date: Date;
   onDateSelect: (date: Date) => void;
+  readOnly?: boolean;
 }
 
 export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   date,
   onDateSelect,
+  readOnly = false,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -281,8 +283,8 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                     date={day}
                     compact={true}
                     availabilityStatus={availabilityStatus === 'unavailable' ? null : availabilityStatus}
-                    onAvailabilityChange={handleAvailabilityChange}
-                    onAvailabilityRemove={handleAvailabilityRemove}
+                    onAvailabilityChange={readOnly ? undefined : handleAvailabilityChange}
+                    onAvailabilityRemove={readOnly ? undefined : handleAvailabilityRemove}
                   />
                 );
               })}
