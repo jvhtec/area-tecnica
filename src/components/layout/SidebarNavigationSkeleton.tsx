@@ -15,11 +15,7 @@ export const SidebarNavigationSkeleton = () => {
         <Skeleton className="h-4 w-32" />
       </div>
       
-      {/* Timesheets skeleton */}
-      <div className="flex items-center gap-2 px-2 py-2">
-        <Skeleton className="h-4 w-4" />
-        <Skeleton className="h-4 w-28" />
-      </div>
+      {/* Removed timesheets skeleton (moved under Rates & Extras) */}
       
       {/* Department pages skeleton */}
       <div className="flex items-center gap-2 px-2 py-2">

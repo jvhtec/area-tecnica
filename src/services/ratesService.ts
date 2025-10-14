@@ -36,6 +36,9 @@ export interface RatesApprovalRow {
   jobCount: number;
   assignmentCount: number;
   pendingIssues: string[];
+  entityType: 'tour' | 'job';
+  jobType?: string | null;
+  status?: string | null;
 }
 
 const DEFAULT_CATEGORY = 'tecnico';
@@ -155,18 +158,20 @@ export async function fetchHouseTechOverrides(): Promise<HouseTechOverrideListIt
 }
 
 export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
+  // 1) Fetch tours excluding cancelled
   const { data: tours, error: toursError } = await supabase
     .from('tours')
-    .select('id, name, start_date, end_date, rates_approved')
-    .order('start_date', { ascending: true })
-    .limit(25);
+    .select('id, name, start_date, end_date, rates_approved, status')
+    .neq('status', 'cancelled')
+    .order('start_date', { ascending: true });
 
   if (toursError) throw toursError;
 
   const tourList = tours || [];
   const tourIds = tourList.map((tour) => tour.id).filter(Boolean) as string[];
 
-  const jobCounts: Record<string, { jobCount: number; jobIds: string[]; assignmentCount: number }> = {};
+  // Build counts for tour dates and their assignments
+  const tourCounts: Record<string, { jobCount: number; jobIds: string[]; assignmentCount: number }> = {};
 
   if (tourIds.length > 0) {
     const { data: jobs, error: jobsError } = await supabase
@@ -177,23 +182,23 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
 
     if (jobsError) throw jobsError;
 
-    const jobIds: string[] = [];
+    const tourDateIds: string[] = [];
 
     (jobs || []).forEach((job) => {
       if (!job.tour_id) return;
-      if (!jobCounts[job.tour_id]) {
-        jobCounts[job.tour_id] = { jobCount: 0, jobIds: [], assignmentCount: 0 };
+      if (!tourCounts[job.tour_id]) {
+        tourCounts[job.tour_id] = { jobCount: 0, jobIds: [], assignmentCount: 0 };
       }
-      jobCounts[job.tour_id].jobCount += 1;
-      jobCounts[job.tour_id].jobIds.push(job.id);
-      jobIds.push(job.id);
+      tourCounts[job.tour_id].jobCount += 1;
+      tourCounts[job.tour_id].jobIds.push(job.id);
+      tourDateIds.push(job.id);
     });
 
-    if (jobIds.length > 0) {
+    if (tourDateIds.length > 0) {
       const { data: assignments, error: assignmentsError } = await supabase
         .from('job_assignments')
         .select('job_id')
-        .in('job_id', jobIds);
+        .in('job_id', tourDateIds);
 
       if (assignmentsError) throw assignmentsError;
 
@@ -204,14 +209,14 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
         assignmentCountByJob[assignment.job_id] = (assignmentCountByJob[assignment.job_id] || 0) + 1;
       });
 
-      Object.values(jobCounts).forEach((info) => {
+      Object.values(tourCounts).forEach((info) => {
         info.assignmentCount = info.jobIds.reduce((acc, jobId) => acc + (assignmentCountByJob[jobId] || 0), 0);
       });
     }
   }
 
-  return tourList.map((tour) => {
-    const counts = jobCounts[tour.id] || { jobCount: 0, jobIds: [], assignmentCount: 0 };
+  const tourRows: RatesApprovalRow[] = tourList.map((tour) => {
+    const counts = tourCounts[tour.id] || { jobCount: 0, jobIds: [], assignmentCount: 0 };
     const pendingIssues: string[] = [];
 
     if (!tour.rates_approved) {
@@ -233,8 +238,89 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
       jobCount: counts.jobCount,
       assignmentCount: counts.assignmentCount,
       pendingIssues,
+      entityType: 'tour',
+      jobType: 'tour',
+      status: tour.status ?? null,
     };
   });
+
+  // 2) Fetch standalone jobs (exclude dry hire and tour dates; exclude cancelled)
+  const { data: jobsList, error: jobsError2 } = await supabase
+    .from('jobs')
+    .select('id, title, start_time, end_time, job_type, status, rates_approved')
+    .neq('job_type', 'tourdate')
+    .neq('job_type', 'dryhire')
+    .neq('status', 'Cancelado')
+    .order('start_time', { ascending: true });
+
+  if (jobsError2) throw jobsError2;
+
+  const standaloneJobs = (jobsList || []).filter((j) => (j.job_type ?? '').toLowerCase() !== 'tour');
+  const jobIds = standaloneJobs.map((j) => j.id);
+
+  let assignmentCountByJob: Record<string, number> = {};
+  let timesheetInfoByJob: Record<string, { total: number; approved: number }> = {};
+  if (jobIds.length > 0) {
+    const { data: assignments2, error: assignmentsError2 } = await supabase
+      .from('job_assignments')
+      .select('job_id')
+      .in('job_id', jobIds);
+    if (assignmentsError2) throw assignmentsError2;
+    (assignments2 || []).forEach((a) => {
+      if (!a.job_id) return;
+      assignmentCountByJob[a.job_id] = (assignmentCountByJob[a.job_id] || 0) + 1;
+    });
+
+    // Fetch timesheet statuses for these jobs
+    const { data: timesheets, error: timesheetsError } = await supabase
+      .from('timesheets')
+      .select('job_id, status')
+      .in('job_id', jobIds);
+    if (timesheetsError) throw timesheetsError;
+    (timesheets || []).forEach((t: any) => {
+      if (!t.job_id) return;
+      const bucket = (timesheetInfoByJob[t.job_id] ||= { total: 0, approved: 0 });
+      bucket.total += 1;
+      if (String(t.status) === 'approved') bucket.approved += 1;
+    });
+  }
+
+  const jobRows: RatesApprovalRow[] = standaloneJobs.map((job) => {
+    const pendingIssues: string[] = [];
+    const assignmentCount = assignmentCountByJob[job.id] || 0;
+    if (!job.rates_approved) pendingIssues.push('Approval required');
+    if (assignmentCount === 0) pendingIssues.push('No assignments');
+    const tInfo = timesheetInfoByJob[job.id] || { total: 0, approved: 0 };
+    if (tInfo.total === 0) {
+      pendingIssues.push('No timesheets');
+    } else if (tInfo.approved < tInfo.total) {
+      pendingIssues.push('Timesheets pending');
+    }
+
+    return {
+      id: job.id,
+      name: job.title,
+      startDate: job.start_time ?? null,
+      endDate: job.end_time ?? null,
+      ratesApproved: Boolean(job.rates_approved),
+      jobCount: 1,
+      assignmentCount,
+      pendingIssues,
+      entityType: 'job',
+      jobType: job.job_type ?? null,
+      status: job.status ?? null,
+    };
+  });
+
+  // 3) Merge and sort by start date
+  const allRows = [...tourRows, ...jobRows];
+  allRows.sort((a, b) => {
+    const aDate = a.startDate ? new Date(a.startDate).getTime() : 0;
+    const bDate = b.startDate ? new Date(b.startDate).getTime() : 0;
+    return aDate - bDate;
+  });
+
+  return allRows;
 }
 
 export function invalidateRatesContext(queryClient: QueryClient) {

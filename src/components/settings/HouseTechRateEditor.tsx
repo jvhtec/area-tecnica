@@ -79,12 +79,12 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Euro className="h-5 w-5" />
-            House Tech Rates
+            Tarifas internas
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center p-4">
-            Loading...
+            Cargando...
           </div>
         </CardContent>
       </Card>
@@ -96,14 +96,14 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Euro className="h-5 w-5" />
-          House Tech Rates
-          <Badge variant="secondary">Management Only</Badge>
+          Tarifas internas
+          <Badge variant="secondary">Solo gestión</Badge>
         </CardTitle>
         <div className="flex items-start gap-2 text-sm text-muted-foreground">
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <div>
-            These values are hidden from technicians and override category defaults in timesheet calculations.
-            Effective immediately on recalculation.
+            Estos valores están ocultos para los técnicos y sobrescriben los valores por defecto de la categoría en los cálculos de partes.
+            Se aplican inmediatamente al recalcular.
           </div>
         </div>
       </CardHeader>
@@ -111,11 +111,11 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
         {/* Category defaults for context */}
         {categoryDefaults && (
           <div className="bg-muted/50 p-4 rounded-lg">
-            <h4 className="text-sm font-medium mb-2">Current Category Defaults ({category})</h4>
+            <h4 className="text-sm font-medium mb-2">Valores por defecto de la categoría ({category})</h4>
             <div className="grid grid-cols-3 gap-4 text-sm text-muted-foreground">
-              <div>Base day: €{categoryDefaults.base_day_eur}</div>
-              <div>10-12h plus: €{categoryDefaults.plus_10_12_eur}</div>
-              <div>Overtime: €{categoryDefaults.overtime_hour_eur}/h</div>
+              <div>Día base: €{categoryDefaults.base_day_eur}</div>
+              <div>Plus 10-12h: €{categoryDefaults.plus_10_12_eur}</div>
+              <div>Horas extra: €{categoryDefaults.overtime_hour_eur}/h</div>
             </div>
           </div>
         )}
@@ -125,7 +125,7 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
         {/* Rate override form */}
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="base-day">Base Day Rate (€) *</Label>
+            <Label htmlFor="base-day">Tarifa día base (€) *</Label>
             <Input
               id="base-day"
               type="number"
@@ -133,15 +133,15 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
               min="0"
               value={baseDayEur}
               onChange={(e) => setBaseDayEur(e.target.value)}
-              placeholder="Enter base day rate"
+              placeholder="Introduce la tarifa de día base"
             />
             <p className="text-xs text-muted-foreground">
-              Used for shifts up to 10 hours
+              Se usa para turnos de hasta 10 horas
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="plus-1012">10-12h Plus (€)</Label>
+            <Label htmlFor="plus-1012">Plus 10-12h (€)</Label>
             <Input
               id="plus-1012"
               type="number"
@@ -152,12 +152,12 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
               placeholder="30"
             />
             <p className="text-xs text-muted-foreground">
-              Additional amount for 10-12 hour shifts (default: €30)
+              Importe adicional para turnos de 10-12 horas (por defecto: €30)
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="overtime">Overtime Rate (€/hour)</Label>
+            <Label htmlFor="overtime">Tarifa horas extra (€/hora)</Label>
             <Input
               id="overtime"
               type="number"
@@ -165,10 +165,10 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
               min="0"
               value={overtimeHourEur}
               onChange={(e) => setOvertimeHourEur(e.target.value)}
-              placeholder={`Default: €${categoryDefaults?.overtime_hour_eur || '20'}/h`}
+              placeholder={`Por defecto: €${categoryDefaults?.overtime_hour_eur || '20'}/h`}
             />
             <p className="text-xs text-muted-foreground">
-              Per hour rate for hours above 12 (leave empty to use category default)
+              Precio por hora por encima de 12 (dejar vacío para usar el valor por defecto de la categoría)
             </p>
           </div>
         </div>
@@ -180,18 +180,18 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
             className="flex items-center gap-2"
           >
             <Save className="h-4 w-4" />
-            {saveRateMutation.isPending ? 'Saving...' : 'Save Rate'}
+            {saveRateMutation.isPending ? 'Guardando...' : 'Guardar tarifa'}
           </Button>
         </div>
 
         {/* Rate calculation tiers explanation */}
         <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg">
-          <h4 className="text-sm font-medium mb-2">Rate Calculation Tiers</h4>
+          <h4 className="text-sm font-medium mb-2">Tramos de cálculo de tarifa</h4>
           <div className="space-y-1 text-sm text-muted-foreground">
-            <div>• Up to 10h: Base day rate</div>
-            <div>• 10-12h: Base day rate + 10-12h plus</div>
-            <div>• Over 12h: Base day rate + 10-12h plus + (overtime × hours over 12)</div>
-            <div>• 30-minute rounding: Next hour starts at ≥ 30 minutes</div>
+            <div>• Hasta 10h: Tarifa día base</div>
+            <div>• 10-12h: Tarifa base + plus 10-12h</div>
+            <div>• Más de 12h: Tarifa base + plus 10-12h + (horas extra × horas por encima de 12)</div>
+            <div>• Redondeo a 30 minutos: La siguiente hora empieza a los ≥ 30 minutos</div>
           </div>
         </div>
       </CardContent>

@@ -12,6 +12,7 @@ import { Euro, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX } from 'luci
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useTourJobRateQuotesForManager } from '@/hooks/useTourJobRateQuotesForManager';
 import { useSaveHouseTechRate } from '@/hooks/useHouseTechRates';
 import { JobExtrasEditor } from '@/components/jobs/JobExtrasEditor';
@@ -120,11 +121,11 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="flex items-center gap-2">
               <Euro className="h-5 w-5" />
-              Rates & Extras Manager
+              Gestor de Tarifas y Extras
             </DialogTitle>
             <div className="flex items-center gap-2">
               <Badge variant={approved ? 'default' : 'secondary'} className="hidden sm:inline-flex">
-                {approved ? 'Rates Approved' : 'Approval Required'}
+                {approved ? 'Tarifas aprobadas' : 'Se requiere aprobación'}
               </Badge>
               {approved ? (
                 <Button
@@ -141,7 +142,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                   }}
                   className="flex items-center gap-1"
                 >
-                  <ShieldX className="h-4 w-4" /> Revoke Approval
+                  <ShieldX className="h-4 w-4" /> Revocar aprobación
                 </Button>
               ) : (
                 <Button
@@ -160,7 +161,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                   }}
                   className="flex items-center gap-1"
                 >
-                  <ShieldCheck className="h-4 w-4" /> Approve Rates
+                  <ShieldCheck className="h-4 w-4" /> Aprobar tarifas
                 </Button>
               )}
             </div>
@@ -169,9 +170,9 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
-            <TabsTrigger value="by-date">By Date</TabsTrigger>
-            <TabsTrigger value="extras">Extras Catalog</TabsTrigger>
-            <TabsTrigger value="base">Base Rates</TabsTrigger>
+            <TabsTrigger value="by-date">Por fecha</TabsTrigger>
+            <TabsTrigger value="extras">Catálogo de extras</TabsTrigger>
+            <TabsTrigger value="base">Tarifas base</TabsTrigger>
           </TabsList>
 
           {/* By Date Tab */}
@@ -179,23 +180,23 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <Calendar className="h-4 w-4" /> Select Tour Date
+                  <Calendar className="h-4 w-4" /> Seleccionar fecha de gira
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 <Select value={selectedJobId} onValueChange={(v) => setSelectedJobId(v)}>
-                  <SelectTrigger className="min-w-[260px]"><SelectValue placeholder="Choose date" /></SelectTrigger>
+                  <SelectTrigger className="min-w-[260px]"><SelectValue placeholder="Elegir fecha" /></SelectTrigger>
                   <SelectContent>
                     {tourJobs.map((j: any) => (
                       <SelectItem key={j.id} value={j.id}>
-                        {format(new Date(j.start_time), 'MMM d, yyyy')} • {j.title}
+                        {format(new Date(j.start_time), 'PPP', { locale: es })} • {j.title}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <Badge variant="outline" className="ml-auto w-fit">
                   <Users className="h-3 w-3 mr-1" />
-                  {quotes.length} assignments
+                  {quotes.length} asignaciones
                 </Badge>
               </CardContent>
             </Card>
@@ -203,7 +204,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
             {/* Quotes list */}
             <div className="space-y-3">
               {quotesLoading && (
-                <div className="text-sm text-muted-foreground">Loading rates…</div>
+                <div className="text-sm text-muted-foreground">Cargando tarifas…</div>
               )}
               {!quotesLoading && quotes.map((q) => {
                 const name = getTechName(q.technician_id);
@@ -217,9 +218,9 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium">{name}</span>
-                          {house && <Badge variant="secondary">House Tech</Badge>}
+                          {house && <Badge variant="secondary">Técnico en plantilla</Badge>}
                           {q.is_tour_team_member && q.multiplier > 1 && (
-                            <Badge variant="outline">×{q.multiplier} week multiplier</Badge>
+                            <Badge variant="outline">×{q.multiplier} multiplicador semanal</Badge>
                           )}
                           {q.category && !house && (
                             <Badge variant="outline">{q.category}</Badge>
@@ -238,14 +239,14 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                         <div className="flex flex-col gap-2 p-3 rounded-lg border bg-amber-50 border-amber-200">
                           <div className="flex items-center gap-2 text-amber-800 text-sm">
                             <AlertTriangle className="h-4 w-4" />
-                            <span className="font-medium">Issue:</span>
-                            <span>{errorCode === 'category_missing' && 'Missing category'}{errorCode === 'house_rate_missing' && 'Missing house tech rate'}{errorCode === 'tour_base_missing' && 'Missing tour base rate for category'}</span>
+                            <span className="font-medium">Problema:</span>
+                            <span>{errorCode === 'category_missing' && 'Falta categoría'}{errorCode === 'house_rate_missing' && 'Falta tarifa de house tech'}{errorCode === 'tour_base_missing' && 'Falta tarifa base de gira para la categoría'}</span>
                           </div>
                           {errorCode === 'category_missing' && (
                             <div className="flex items-center gap-2">
-                              <Label className="text-xs">Set category:</Label>
+                              <Label className="text-xs">Establecer categoría:</Label>
                               <Select onValueChange={(val: any) => fixCategoryMutation.mutate({ technicianId: q.technician_id, category: val })}>
-                                <SelectTrigger className="w-48"><SelectValue placeholder="Choose" /></SelectTrigger>
+                                <SelectTrigger className="w-48"><SelectValue placeholder="Elegir" /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="tecnico">Técnico</SelectItem>
                                   <SelectItem value="especialista">Especialista</SelectItem>
@@ -253,13 +254,13 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                                 </SelectContent>
                               </Select>
                               <Button variant="outline" size="sm" disabled={fixCategoryMutation.isPending}>
-                                Apply
+                                Aplicar
                               </Button>
                             </div>
                           )}
                           {errorCode === 'house_rate_missing' && (
                             <div className="flex items-center gap-2">
-                              <Label className="text-xs min-w-[120px]">House base day:</Label>
+                              <Label className="text-xs min-w-[120px]">Día base (en plantilla):</Label>
                               <Input
                                 type="number"
                                 placeholder="EUR"
@@ -281,15 +282,15 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                                   await saveHouseRate.mutateAsync({ profile_id: q.technician_id, base_day_eur: val, plus_10_12_eur: null, overtime_hour_eur: null });
                                   queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
                                 }
-                              }}>Save</Button>
+                              }}>Guardar</Button>
                               {houseRateMap[q.technician_id] !== undefined && (
-                                <span className="text-xs text-muted-foreground ml-2">Current: {formatCurrency(houseRateMap[q.technician_id])}</span>
+                                <span className="text-xs text-muted-foreground ml-2">Actual: {formatCurrency(houseRateMap[q.technician_id])}</span>
                               )}
                             </div>
                           )}
                           {errorCode === 'tour_base_missing' && (
                             <div className="text-xs text-amber-800">
-                              Set the base rate for this category in the Base Rates tab.
+                              Define la tarifa base para esta categoría en la pestaña "Tarifas base".
                             </div>
                           )}
                         </div>

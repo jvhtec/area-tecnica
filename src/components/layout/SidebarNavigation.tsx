@@ -20,7 +20,6 @@ import {
   CalendarCheck,
   Euro
 } from "lucide-react";
-import { TimesheetSidebarTrigger } from "@/components/timesheet/TimesheetSidebarTrigger";
 import { SidebarNavigationSkeleton } from './SidebarNavigationSkeleton';
 
 interface SidebarNavigationProps {
@@ -160,10 +159,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
           </Link>
         )}
 
-        {/* Timesheets - Available for all users except technicians */}
-        {userRole !== 'technician' && (
-          <TimesheetSidebarTrigger userRole={userRole} />
-        )}
+        {/* Timesheets entry removed; now available under Rates & Extras */}
 
         {/* Department Pages - Show for Management and House Techs */}
         {(isManagementUser || userRole === 'house_tech') && (

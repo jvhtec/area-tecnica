@@ -7,6 +7,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { HouseTechRateEditor } from '@/components/settings/HouseTechRateEditor';
 import { useRatesHouseTechList } from '@/features/rates/hooks/useRatesHouseTechList';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 
 export function HouseTechOverridesPanel() {
@@ -25,9 +26,9 @@ export function HouseTechOverridesPanel() {
     <Card>
       <CardHeader>
         <CardTitle className="flex flex-col gap-2 text-base sm:flex-row sm:items-end sm:justify-between">
-          <span>House tech overrides</span>
+          <span>Tarifas internas</span>
           <Input
-            placeholder="Search house techs"
+            placeholder="Buscar técnicos en plantilla"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="sm:w-64"
@@ -37,7 +38,7 @@ export function HouseTechOverridesPanel() {
       <CardContent>
         {isLoading && <Skeleton className="h-32 w-full" />}
         {!isLoading && filtered.length === 0 && (
-          <p className="text-sm text-muted-foreground">No house techs found with that name.</p>
+          <p className="text-sm text-muted-foreground">No se encontraron técnicos en plantilla con ese nombre.</p>
         )}
         {!isLoading && filtered.length > 0 && (
           <Accordion type="single" collapsible className="space-y-2">
@@ -48,18 +49,18 @@ export function HouseTechOverridesPanel() {
                     <div>
                       <div className="font-medium leading-tight">{tech.profileName}</div>
                       <div className="text-xs text-muted-foreground">
-                        Default category: {tech.defaultCategory ?? '—'}
+                        Categoría por defecto: {tech.defaultCategory ?? '—'}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {tech.overrideBaseDay ? (
-                        <Badge variant="secondary">Override: {formatCurrency(tech.overrideBaseDay)}</Badge>
+                        <Badge variant="secondary">Tarifa interna: {formatCurrency(tech.overrideBaseDay)}</Badge>
                       ) : (
-                        <Badge variant="outline">Using default</Badge>
+                        <Badge variant="outline">Usando valor por defecto</Badge>
                       )}
                       {tech.overrideUpdatedAt && (
                         <span className="text-xs text-muted-foreground">
-                          Updated {format(new Date(tech.overrideUpdatedAt), 'PPP')}
+                          Actualizado {format(new Date(tech.overrideUpdatedAt), 'PPP', { locale: es })}
                         </span>
                       )}
                     </div>

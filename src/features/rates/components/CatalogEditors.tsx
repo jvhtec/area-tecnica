@@ -20,17 +20,17 @@ export function ExtrasCatalogEditor({ className }: CatalogEditorProps) {
     <Card className={cn(className)}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Wrench className="h-4 w-4" /> Extras Catalog (2025)
+          <Wrench className="h-4 w-4" /> Catálogo de extras (2025)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <Alert>
           <AlertDescription>
-            Define unit amounts for travel and rest day extras. Managers can adjust these at any time.
+            Define importes unitarios para extras de viaje y días de descanso. Los managers pueden ajustarlos en cualquier momento.
           </AlertDescription>
         </Alert>
         {isLoading && (
-          <div className="text-sm text-muted-foreground">Loading extras catalog…</div>
+          <div className="text-sm text-muted-foreground">Cargando catálogo de extras…</div>
         )}
         {!isLoading && rows.map((r) => (
           <div key={r.extra_type} className="flex items-center gap-3">
@@ -45,7 +45,7 @@ export function ExtrasCatalogEditor({ className }: CatalogEditorProps) {
                   save.mutate({ extra_type: r.extra_type as any, amount_eur: v });
                 }
               }}
-              aria-label={`Amount for ${r.extra_type}`}
+              aria-label={`Importe para ${r.extra_type}`}
             />
             <span className="text-xs text-muted-foreground">EUR</span>
           </div>
@@ -73,17 +73,17 @@ export function BaseRatesEditor({ className }: CatalogEditorProps) {
     <Card className={cn(className)}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Euro className="h-4 w-4" /> Tour Base Rates (2025)
+          <Euro className="h-4 w-4" /> Tarifas base de gira (2025)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <Alert>
           <AlertDescription>
-            Set daily base amounts per category. Weekly multipliers apply when technicians are on the tour team.
+            Establece importes diarios por categoría. Se aplican multiplicadores semanales cuando los técnicos están en el equipo de gira.
           </AlertDescription>
         </Alert>
         {isLoading && (
-          <div className="text-sm text-muted-foreground">Loading base rates…</div>
+          <div className="text-sm text-muted-foreground">Cargando tarifas base…</div>
         )}
         {!isLoading && categories.map(c => (
           <div key={c.key} className="flex items-center gap-3">
@@ -98,7 +98,7 @@ export function BaseRatesEditor({ className }: CatalogEditorProps) {
                   save.mutate({ category: c.key, base_day_eur: v });
                 }
               }}
-              aria-label={`Base rate for ${c.label}`}
+              aria-label={`Tarifa base para ${c.label}`}
             />
             <span className="text-xs text-muted-foreground">EUR</span>
           </div>

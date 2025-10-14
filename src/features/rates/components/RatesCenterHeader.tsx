@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RatesOverview } from '@/services/ratesService';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 
 interface RatesCenterHeaderProps {
@@ -18,50 +19,50 @@ export function RatesCenterHeader({ overview, isLoading }: RatesCenterHeaderProp
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard title="Pending approvals" value={totals?.pendingTours} isLoading={isLoading} />
-        <SummaryCard title="Base rate categories" value={totals?.baseRates} isLoading={isLoading} />
-        <SummaryCard title="Extras configured" value={totals?.extras} isLoading={isLoading} />
-        <SummaryCard title="House overrides" value={totals?.houseOverrides} isLoading={isLoading} />
+        <SummaryCard title="Aprobaciones pendientes" value={totals?.pendingTours} isLoading={isLoading} />
+        <SummaryCard title="Categorías de tarifa base" value={totals?.baseRates} isLoading={isLoading} />
+        <SummaryCard title="Extras configurados" value={totals?.extras} isLoading={isLoading} />
+        <SummaryCard title="Tarifas internas" value={totals?.houseOverrides} isLoading={isLoading} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Upcoming approvals</CardTitle>
+            <CardTitle className="text-base">Próximas aprobaciones</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {isLoading && <Skeleton className="h-20 w-full" />}
             {!isLoading && pendingTours.length === 0 && (
-              <p className="text-muted-foreground">All tours are approved. Great job!</p>
+              <p className="text-muted-foreground">Todas las giras están aprobadas. ¡Buen trabajo!</p>
             )}
             {!isLoading && pendingTours.map((tour) => (
               <div key={tour.id} className="flex items-center justify-between rounded-lg border p-3">
                 <div className="space-y-1">
                   <div className="font-medium leading-tight">{tour.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    {tour.start_date ? format(new Date(tour.start_date), 'PPP') : 'No start date'}
+                    {tour.start_date ? format(new Date(tour.start_date), 'PPP', { locale: es }) : 'Sin fecha de inicio'}
                   </div>
                 </div>
-                <Badge variant="secondary">Approval required</Badge>
+                <Badge variant="secondary">Se requiere aprobación</Badge>
               </div>
             ))}
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Recent house overrides</CardTitle>
+            <CardTitle className="text-base">Tarifas internas recientes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {isLoading && <Skeleton className="h-20 w-full" />}
             {!isLoading && recentOverrides.length === 0 && (
-              <p className="text-muted-foreground">No overrides recorded yet.</p>
+              <p className="text-muted-foreground">Sin tarifas internas registradas.</p>
             )}
             {!isLoading && recentOverrides.map((override) => (
               <div key={`${override.profileId}-${override.updatedAt}`} className="flex items-center justify-between rounded-lg border p-3">
                 <div className="space-y-1">
                   <div className="font-medium leading-tight">{override.profileName}</div>
                   <div className="text-xs text-muted-foreground">
-                    {override.updatedAt ? format(new Date(override.updatedAt), 'PPP p') : 'Fecha desconocida'}
+                    {override.updatedAt ? format(new Date(override.updatedAt), 'PPP p', { locale: es }) : 'Fecha desconocida'}
                   </div>
                 </div>
                 <Badge variant="outline">
