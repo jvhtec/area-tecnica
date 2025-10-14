@@ -51,6 +51,7 @@ export interface Timesheet {
   approved_by_manager?: boolean;
   technician?: {
     first_name: string;
+    nickname?: string | null;
     last_name: string;
     email: string;
     department: string;

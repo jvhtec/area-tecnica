@@ -40,6 +40,7 @@ interface OptimizedAssignmentMatrixProps {
   technicians: Array<{
     id: string;
     first_name: string;
+    nickname?: string | null;
     last_name: string;
     email: string;
     phone?: string | null;

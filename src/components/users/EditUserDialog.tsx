@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HouseTechRateEditor } from "@/components/settings/HouseTechRateEditor";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { formatUserName } from "@/utils/userName";
 
 interface EditUserDialogProps {
   user: Profile | null;
@@ -62,6 +63,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     const updatedData: Partial<Profile> = {
       id: user.id,
       first_name: formData.get('firstName') as string,
+      nickname: formData.get('nickname') as string,
       last_name: formData.get('lastName') as string,
       phone: formData.get('phone') as string,
       department: formData.get('department') as Department,
@@ -90,6 +92,15 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
                 id="firstName"
                 name="firstName"
                 defaultValue={user?.first_name || ''}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nickname">Nickname</Label>
+              <Input
+                id="nickname"
+                name="nickname"
+                defaultValue={user?.nickname || ''}
+                placeholder="Optional"
               />
             </div>
             <div className="space-y-2">
@@ -240,7 +251,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
               <Separator />
               <HouseTechRateEditor
                 profileId={user.id}
-                profileName={`${user.first_name} ${user.last_name}`}
+                profileName={formatUserName(user.first_name, user.nickname, user.last_name) || ''}
                 category={user.role === 'house_tech' ? 'tecnico' : 'tecnico'}
               />
             </>

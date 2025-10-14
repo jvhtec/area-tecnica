@@ -9,6 +9,7 @@ export interface Assignment {
   video_role: string | null;
   profiles: {
     first_name: string;
+    nickname?: string | null;
     last_name: string;
     email: string;
     department: string;

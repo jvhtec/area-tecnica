@@ -70,6 +70,7 @@ export const Profile = () => {
         .from('profiles')
         .update({
           first_name: profile.first_name,
+          nickname: profile.nickname,
           last_name: profile.last_name,
           phone: profile.phone,
           department: profile.department,
@@ -227,6 +228,15 @@ export const Profile = () => {
                       id="firstName"
                       value={profile.first_name || ''}
                       onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nickname">Nickname</Label>
+                    <Input
+                      id="nickname"
+                      value={profile.nickname || ''}
+                      onChange={(e) => setProfile({ ...profile, nickname: e.target.value })}
+                      placeholder="Optional"
                     />
                   </div>
                   <div className="space-y-2">

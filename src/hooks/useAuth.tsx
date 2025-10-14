@@ -30,6 +30,7 @@ interface SignUpData {
   email: string;
   password: string;
   firstName: string;
+  nickname?: string;
   lastName: string;
   phone?: string;
   department?: string;
@@ -253,6 +254,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         options: {
           data: {
             first_name: userData.firstName,
+            nickname: userData.nickname,
             last_name: userData.lastName,
             phone: userData.phone,
             department: userData.department,

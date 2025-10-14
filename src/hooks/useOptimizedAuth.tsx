@@ -34,6 +34,7 @@ interface SignUpData {
   email: string;
   password: string;
   firstName: string;
+  nickname?: string;
   lastName: string;
   phone?: string;
   department?: string;
@@ -355,6 +356,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         options: {
           data: {
             first_name: userData.firstName,
+            nickname: userData.nickname,
             last_name: userData.lastName,
             phone: userData.phone,
             department: userData.department,
@@ -417,6 +419,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         body: {
           email: userData.email.toLowerCase(),
           firstName: userData.firstName,
+          nickname: userData.nickname,
           lastName: userData.lastName,
           phone: userData.phone,
           department: userData.department,

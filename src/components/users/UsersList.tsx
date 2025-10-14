@@ -81,7 +81,7 @@ export const UsersList = ({
       try {
         let query = supabase
           .from('profiles')
-          .select('id, first_name, last_name, email, role, phone, department, dni, residencia, assignable_as_tech, flex_resource_id', { count: 'exact' });
+          .select('id, first_name, nickname, last_name, email, role, phone, department, dni, residencia, assignable_as_tech, flex_resource_id', { count: 'exact' });
 
         // Apply filters
         if (roleFilter) {
@@ -93,7 +93,7 @@ export const UsersList = ({
         }
 
         if (searchQuery) {
-          query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+          query = query.or(`first_name.ilike.%${searchQuery}%,nickname.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
         }
 
         // Apply sorting

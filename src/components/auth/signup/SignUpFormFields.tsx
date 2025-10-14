@@ -10,6 +10,7 @@ interface SignUpFormData {
   email: string;
   password: string;
   firstName: string;
+  nickname: string;
   lastName: string;
   phone: string;
   department: Department;
@@ -30,6 +31,7 @@ export const SignUpFormFields = ({ onSubmit, error, isLoading, hidePassword = fa
     email: "",
     password: "",
     firstName: "",
+    nickname: "",
     lastName: "",
     phone: "",
     department: "sound",
@@ -84,6 +86,16 @@ export const SignUpFormFields = ({ onSubmit, error, isLoading, hidePassword = fa
           value={formData.firstName}
           onChange={(e) => handleChange("firstName", e.target.value)}
           required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="nickname">Nickname</Label>
+        <Input
+          id="nickname"
+          type="text"
+          value={formData.nickname}
+          onChange={(e) => handleChange("nickname", e.target.value)}
+          placeholder="Optional"
         />
       </div>
 

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Profile } from "./types";
 import { AlertTriangle, Pencil, Trash2, Award } from "lucide-react";
+import { formatUserName } from "@/utils/userName";
 
 interface UserCardProps {
   user: Profile;
@@ -14,7 +15,7 @@ interface UserCardProps {
 }
 
 export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, onManageSkills }: UserCardProps) => {
-  const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+  const fullName = formatUserName(user.first_name, user.nickname, user.last_name);
 
   return (
     <div className="group flex items-center justify-between p-3 border rounded-lg hover:bg-accent/5 transition-colors">

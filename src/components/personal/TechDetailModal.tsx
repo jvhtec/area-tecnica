@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { formatInJobTimezone } from '@/utils/timezoneUtils';
 import { MapPin, Clock, User, Phone, Briefcase, Calendar, Plane, Stethoscope, Home, X, Warehouse } from 'lucide-react';
 import { labelForCode } from '@/utils/roles';
+import { formatUserName } from '@/utils/userName';
 
 interface TechDetailModalProps {
   open: boolean;
@@ -14,6 +15,7 @@ interface TechDetailModalProps {
   technician: {
     id: string;
     first_name: string | null;
+    nickname?: string | null;
     last_name: string | null;
     department: string | null;
     phone: string | null;
@@ -51,7 +53,8 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
   onAvailabilityRemove,
 }) => {
   const getFullName = () => {
-    return `${technician.first_name || ''} ${technician.last_name || ''}`.trim() || 'Unknown';
+    const name = formatUserName(technician.first_name, technician.nickname, technician.last_name);
+    return name || 'Unknown';
   };
 
   const getRole = () => {

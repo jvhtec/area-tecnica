@@ -23,6 +23,7 @@ export interface ShiftAssignment {
   profiles?: {
     id: string;
     first_name: string;
+    nickname?: string | null;
     last_name: string;
     email: string;
     department: string;
@@ -37,6 +38,7 @@ export interface ShiftWithAssignments extends FestivalShift {
 export interface Technician {
   id: string;
   first_name: string;
+  nickname?: string | null;
   last_name: string;
   email: string;
   department: string;

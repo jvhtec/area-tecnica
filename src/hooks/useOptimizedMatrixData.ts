@@ -33,7 +33,7 @@ interface AssignmentWithJob {
 }
 
 interface OptimizedMatrixDataProps {
-  technicians: Array<{ id: string; first_name: string; last_name: string; email: string; department: string; role: string; }>;
+  technicians: Array<{ id: string; first_name: string; nickname?: string | null; last_name: string; email: string; department: string; role: string; }>;
   dates: Date[];
   jobs: MatrixJob[];
 }
@@ -267,7 +267,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       queryFn: async () => {
         const { data, error } = await supabase
           .from('profiles')
-          .select('first_name, last_name, department')
+          .select('first_name, nickname, last_name, department')
           .eq('id', technicianId)
           .single();
 

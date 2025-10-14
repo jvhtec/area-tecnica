@@ -29,7 +29,7 @@ export const ImportUsersDialog = ({ open, onOpenChange }: ImportUsersDialogProps
   };
 
   const downloadTemplate = () => {
-    const template = "email,firstName,lastName,role,department,phone,dni,residencia\n";
+    const template = "email,firstName,nickname,lastName,role,department,phone,dni,residencia\n";
     const blob = new Blob([template], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
