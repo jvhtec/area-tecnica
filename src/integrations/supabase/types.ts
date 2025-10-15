@@ -2861,6 +2861,88 @@ export type Database = {
           },
         ]
       }
+      job_required_roles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department: string
+          id: string
+          job_id: string
+          notes: string | null
+          quantity: number
+          role_code: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department: string
+          id?: string
+          job_id: string
+          notes?: string | null
+          quantity?: number
+          role_code: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          id?: string
+          job_id?: string
+          notes?: string | null
+          quantity?: number
+          role_code?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_required_roles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_required_roles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_required_roles_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_required_roles_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_required_roles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_required_roles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_whatsapp_group_requests: {
         Row: {
           created_at: string
@@ -5643,6 +5725,15 @@ export type Database = {
           equipment_name: string | null
           rental_boost: number | null
           total_available: number | null
+        }
+        Relationships: []
+      }
+      job_required_roles_summary: {
+        Row: {
+          department: string | null
+          job_id: string | null
+          roles: Json | null
+          total_required: number | null
         }
         Relationships: []
       }
