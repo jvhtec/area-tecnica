@@ -11,6 +11,7 @@ const corsHeaders = {
 interface CSVUserData {
   email: string;
   firstName: string;
+  nickname?: string;
   lastName: string;
   role: string;
   department: string;
@@ -55,6 +56,7 @@ serve(async (req) => {
           email_confirm: true,
           user_metadata: {
             first_name: record.firstName,
+            nickname: record.nickname,
             last_name: record.lastName,
             phone: record.phone,
             department: record.department,
@@ -69,7 +71,7 @@ serve(async (req) => {
         // Update role in profiles table
         const { error: profileError } = await supabase
           .from('profiles')
-          .update({ role: record.role })
+          .update({ role: record.role, nickname: record.nickname ?? null })
           .eq('id', authData.user.id);
 
         if (profileError) throw profileError;

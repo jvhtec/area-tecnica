@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ManageSkillsDialog } from "@/components/users/ManageSkillsDialog";
+import { formatUserName } from "@/utils/userName";
 
 interface UsersListContentProps {
   users: Profile[];
@@ -72,7 +73,7 @@ export const UsersListContent = ({ users, groupBy, isManagementUser = false }: U
         {/* Skills management dialog */}
         <ManageSkillsDialog
           profileId={skillsUser?.id || null}
-          fullName={[skillsUser?.first_name, skillsUser?.last_name].filter(Boolean).join(' ')}
+          fullName={formatUserName(skillsUser?.first_name, skillsUser?.nickname, skillsUser?.last_name) || ''}
           open={!!skillsUser}
           onOpenChange={(open) => !open && setSkillsUser(null)}
         />
@@ -134,7 +135,7 @@ export const UsersListContent = ({ users, groupBy, isManagementUser = false }: U
       {/* Skills dialog for grouped view */}
       <ManageSkillsDialog
         profileId={skillsUser?.id || null}
-        fullName={[skillsUser?.first_name, skillsUser?.last_name].filter(Boolean).join(' ')}
+        fullName={formatUserName(skillsUser?.first_name, skillsUser?.nickname, skillsUser?.last_name) || ''}
         open={!!skillsUser}
         onOpenChange={(open) => !open && setSkillsUser(null)}
       />

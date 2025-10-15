@@ -9,6 +9,7 @@ const corsHeaders = {
 interface CreateUserBody {
   email: string;
   firstName: string;
+  nickname?: string;
   lastName: string;
   department?: string;
   phone?: string;
@@ -74,6 +75,7 @@ serve(async (req) => {
       email_confirm: true,
       user_metadata: {
         first_name: body.firstName,
+        nickname: body.nickname,
         last_name: body.lastName,
         phone: body.phone,
         department: body.department,
@@ -88,6 +90,7 @@ serve(async (req) => {
     // Optionally set role and flex_resource_id if provided
     const updates: Record<string, any> = {};
     if (body.role) updates.role = body.role;
+    if (body.nickname) updates.nickname = body.nickname;
     if (body.flex_resource_id) updates.flex_resource_id = body.flex_resource_id;
     if (Object.keys(updates).length > 0) {
       const { error: updErr } = await supabaseAdmin

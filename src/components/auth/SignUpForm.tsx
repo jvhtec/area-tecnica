@@ -25,6 +25,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
     password: "",
     confirmPassword: "",
     firstName: "",
+    nickname: "",
     lastName: "",
     phone: "",
     department: "",
@@ -66,6 +67,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
       const created = await createUserAsAdmin({
         email: formData.email,
         firstName: formData.firstName,
+        nickname: formData.nickname,
         lastName: formData.lastName,
         phone: formData.phone,
         department: formData.department,
@@ -99,6 +101,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
         email: formData.email,
         password: formData.password,
         firstName: formData.firstName,
+        nickname: formData.nickname,
         lastName: formData.lastName,
         phone: formData.phone,
         department: formData.department,
@@ -132,6 +135,16 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
             value={formData.firstName}
             onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
             required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="nickname">Nickname</Label>
+          <Input
+            id="nickname"
+            type="text"
+            value={formData.nickname}
+            onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
+            placeholder="Optional"
           />
         </div>
         <div className="space-y-2">

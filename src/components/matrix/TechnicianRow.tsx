@@ -11,11 +11,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { formatUserName } from '@/utils/userName';
 
 interface TechnicianRowProps {
   technician: {
     id: string;
     first_name: string;
+    nickname?: string | null;
     last_name: string;
     email: string;
     phone?: string | null;
@@ -131,8 +133,14 @@ const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianR
     }
   };
   const getInitials = () => {
-    return `${technician.first_name?.[0] || ''}${technician.last_name?.[0] || ''}`.toUpperCase();
+    const firstInitial = technician.first_name?.[0] ?? '';
+    const secondSource = technician.nickname || technician.last_name || '';
+    const secondInitial = secondSource?.[0] ?? '';
+    const initials = `${firstInitial}${secondInitial}`.trim();
+    return initials ? initials.toUpperCase() : 'T';
   };
+
+  const displayName = formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Technician';
 
   const getDepartmentColor = (department: string) => {
     switch (department?.toLowerCase()) {
@@ -175,7 +183,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianR
             
             <div className="flex-1 min-w-0">
               <div className="font-medium text-sm truncate">
-                {technician.first_name} {technician.last_name}
+                {displayName}
                 {isFridge && (
                   <Refrigerator className="inline-block h-3.5 w-3.5 ml-1 text-sky-600" />
                 )}
@@ -209,7 +217,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianR
             </Avatar>
             <div>
               <div className="font-semibold">
-                {technician.first_name} {technician.last_name}
+                {displayName}
               </div>
               <div className="text-sm text-muted-foreground">
                 {technician.role === 'house_tech' ? 'House Technician' : 'Technician'}
@@ -357,7 +365,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianR
     {isManagementUser && (
       <ManageSkillsDialog
         profileId={technician.id}
-        fullName={`${technician.first_name} ${technician.last_name}`}
+        fullName={displayName}
         open={skillsOpen}
         onOpenChange={handleSkillsOpenChange}
       />

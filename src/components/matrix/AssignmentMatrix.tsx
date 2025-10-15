@@ -16,6 +16,7 @@ interface AssignmentMatrixProps {
   technicians: Array<{
     id: string;
     first_name: string;
+    nickname?: string | null;
     last_name: string;
     email: string;
     department: string;
@@ -75,6 +76,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
           *,
           profiles (
             first_name,
+            nickname,
             last_name,
             department
           ),

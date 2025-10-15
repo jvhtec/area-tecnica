@@ -9,6 +9,7 @@ interface HouseTechBadgeProps {
   technician: {
     id: string;
     first_name: string | null;
+    nickname?: string | null;
     last_name: string | null;
     department: string | null;
     phone: string | null;
@@ -49,8 +50,10 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
 
   const getInitials = () => {
     const first = technician.first_name?.[0] || '';
-    const last = technician.last_name?.[0] || '';
-    return (first + last).toUpperCase() || 'HT';
+    const secondSource = technician.nickname || technician.last_name || '';
+    const second = secondSource?.[0] || '';
+    const combined = `${first}${second}`.trim();
+    return combined ? combined.toUpperCase() : 'HT';
   };
 
   const getRole = () => {

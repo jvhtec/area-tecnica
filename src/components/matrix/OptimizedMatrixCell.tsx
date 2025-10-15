@@ -11,12 +11,14 @@ import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staff
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
+import { formatUserName } from '@/utils/userName';
 import { pickTextColor, rgbaFromHex } from '@/utils/color';
 
 interface OptimizedMatrixCellProps {
   technician: {
     id: string;
     first_name: string;
+    nickname?: string | null;
     last_name: string;
     department: string;
   };
@@ -72,6 +74,7 @@ export const OptimizedMatrixCell = memo(({
   const confirmedBg = hasAssignment && assignment.status === 'confirmed' ? (assignment?.job?.color || null) : null;
   const confirmedTextColor = confirmedBg ? pickTextColor(confirmedBg) : undefined;
   const confirmedSubTextColor = confirmedTextColor ? (rgbaFromHex(confirmedTextColor, 0.9) || confirmedTextColor) : undefined;
+  const displayName = formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Technician';
 
   // Staffing status: use provided batched data exclusively for performance
   const staffingStatusByJob = staffingStatusProvided;
@@ -118,7 +121,7 @@ export const OptimizedMatrixCell = memo(({
     // Availability path: open job selection; preselect only if assignment provides it
     const targetJobId = jobId || assignment?.job_id || undefined;
     onClick('select-job-for-staffing', targetJobId);
-  }, [jobId, assignment?.job_id, technician.id, technician.first_name, technician.last_name, hasAssignment, assignment, date, onClick, staffingStatusByDate]);
+  }, [jobId, assignment?.job_id, technician.id, technician.first_name, technician.nickname, technician.last_name, hasAssignment, assignment, date, onClick, staffingStatusByDate]);
 
   const handleMouseEnter = useCallback(() => {
     // Prefetch data when hovering over cell
@@ -543,7 +546,7 @@ export const OptimizedMatrixCell = memo(({
             <DialogHeader>
               <DialogTitle>{pendingCancel.phase === 'availability' ? 'Cancel availability request?' : 'Cancel offer?'}</DialogTitle>
               <DialogDescription>
-                This will mark the {pendingCancel.phase} as cancelled (expired) for {technician.first_name} {technician.last_name}.
+                This will mark the {pendingCancel.phase} as cancelled (expired) for {displayName}.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -576,7 +579,7 @@ export const OptimizedMatrixCell = memo(({
             <DialogHeader>
               <DialogTitle>Remove assignment?</DialogTitle>
               <DialogDescription>
-                This will remove the assignment of {technician.first_name} {technician.last_name} from this job.
+                This will remove the assignment of {displayName} from this job.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -609,7 +612,7 @@ export const OptimizedMatrixCell = memo(({
       >
         <div className="space-y-1 text-sm">
           <div className="font-semibold">
-            {technician.first_name} {technician.last_name}
+            {displayName}
           </div>
           <div className="text-muted-foreground">
             {technician.department}
