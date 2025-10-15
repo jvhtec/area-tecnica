@@ -21,6 +21,7 @@ import {
   Calendar
 } from "lucide-react";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PlacesRestaurantService } from "@/utils/hoja-de-ruta/services/places-restaurant-service";
@@ -285,13 +286,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   };
 
   const formatDateTime = (dateTime: string | null | undefined) => {
-    if (!dateTime) return 'Not set';
+    if (!dateTime) return 'Sin definir';
     try {
       const date = new Date(dateTime);
-      if (isNaN(date.getTime())) return 'Invalid date';
-      return format(date, 'PPp');
+      if (isNaN(date.getTime())) return 'Fecha no válida';
+      return format(date, 'PPPp', { locale: es });
     } catch (error) {
-      return 'Invalid date';
+      return 'Fecha no válida';
     }
   };
 
@@ -313,19 +314,19 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            {jobDetails?.title || 'Job Details'}
+            {jobDetails?.title || 'Detalles del trabajo'}
           </DialogTitle>
         </DialogHeader>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
           <TabsList className={`grid w-full ${jobDetails?.job_type === 'tourdate' ? (showExtrasTab ? 'grid-cols-7' : 'grid-cols-6') : (showExtrasTab ? 'grid-cols-6' : 'grid-cols-5')}`}>
-            <TabsTrigger value="info">Info</TabsTrigger>
-            <TabsTrigger value="location">Location</TabsTrigger>
-            <TabsTrigger value="personnel">Personnel</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="restaurants">Restaurants</TabsTrigger>
+            <TabsTrigger value="info">Información</TabsTrigger>
+            <TabsTrigger value="location">Ubicación</TabsTrigger>
+            <TabsTrigger value="personnel">Personal</TabsTrigger>
+            <TabsTrigger value="documents">Documentos</TabsTrigger>
+            <TabsTrigger value="restaurants">Restaurantes</TabsTrigger>
             {jobDetails?.job_type === 'tourdate' && (
-              <TabsTrigger value="tour-rates">Tour Rates</TabsTrigger>
+              <TabsTrigger value="tour-rates">Tarifas de gira</TabsTrigger>
             )}
             {showExtrasTab && <TabsTrigger value="extras">Extras</TabsTrigger>}
           </TabsList>
@@ -345,13 +346,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm font-medium">Start Time</p>
+                      <p className="text-sm font-medium">Hora de inicio</p>
                       <p className="text-sm text-muted-foreground">
                         {formatDateTime(jobDetails?.start_time)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium">End Time</p>
+                      <p className="text-sm font-medium">Hora de finalización</p>
                       <p className="text-sm text-muted-foreground">
                         {formatDateTime(jobDetails?.end_time)}
                       </p>
@@ -359,7 +360,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   </div>
 
                   <div>
-                    <p className="text-sm font-medium mb-2">Job Type</p>
+                    <p className="text-sm font-medium mb-2">Tipo de trabajo</p>
                     <Badge variant="outline">{jobDetails?.job_type}</Badge>
                   </div>
 
@@ -367,9 +368,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
                       <div className="flex items-center gap-2">
                         <Badge variant={jobDetails?.rates_approved ? 'default' : 'secondary'}>
-                          {jobDetails?.rates_approved ? 'Rates Approved' : 'Approval Required'}
+                          {jobDetails?.rates_approved ? 'Tarifas aprobadas' : 'Aprobación necesaria'}
                         </Badge>
-                        <span className="text-xs text-muted-foreground">Controls technician visibility of per-job payouts</span>
+                        <span className="text-xs text-muted-foreground">Controla la visibilidad de los pagos por trabajo para los técnicos</span>
                       </div>
                       <div>
                         {jobDetails?.rates_approved ? (
@@ -384,7 +385,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               queryClient.invalidateQueries({ queryKey: ['job-details', job.id] });
                             }}
                           >
-                            Revoke
+                            Revocar
                           </Button>
                         ) : (
                           <Button
@@ -398,7 +399,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               queryClient.invalidateQueries({ queryKey: ['job-details', job.id] });
                             }}
                           >
-                            Approve
+                            Aprobar
                           </Button>
                         )}
                       </div>
@@ -407,7 +408,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
                       {jobDetails?.locations && (
                         <div>
-                          <p className="text-sm font-medium">Venue</p>
+                          <p className="text-sm font-medium">Recinto</p>
                           <p className="text-sm text-muted-foreground">
                             {jobDetails.locations.name}
                           </p>
@@ -426,16 +427,16 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               <Card className="p-4">
                 {jobDetails?.locations ? (
                   <div className="space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold">{jobDetails.locations.name}</h3>
-                        {jobDetails.locations.formatted_address && (
-                          <p className="text-muted-foreground">{jobDetails.locations.formatted_address}</p>
-                        )}
-                      </div>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-semibold">{jobDetails.locations.name}</h3>
+                          {jobDetails.locations.formatted_address && (
+                            <p className="text-muted-foreground">{jobDetails.locations.formatted_address}</p>
+                          )}
+                        </div>
                       <Button onClick={openGoogleMaps} size="sm">
                         <MapPin className="h-4 w-4 mr-2" />
-                        Open Maps
+                        Abrir mapas
                       </Button>
                     </div>
 
@@ -443,16 +444,16 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                       <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
                         <div className="text-center">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                          <p className="text-sm text-muted-foreground">Loading map preview...</p>
+                          <p className="text-sm text-muted-foreground">Cargando vista previa del mapa...</p>
                         </div>
                       </div>
                     )}
                     {!isMapLoading && mapPreviewUrl && (
                       <div className="rounded-lg overflow-hidden border">
-                        <img src={mapPreviewUrl} alt="Venue Map" className="w-full h-auto" />
+                        <img src={mapPreviewUrl} alt="Mapa del recinto" className="w-full h-auto" />
                         <div className="p-2 flex justify-end">
                           <Button onClick={openGoogleMaps} size="sm">
-                            View directions
+                            Ver indicaciones
                           </Button>
                         </div>
                       </div>
@@ -461,9 +462,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                       <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
                         <div className="text-center">
                           <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">Map preview unavailable</p>
+                          <p className="text-sm text-muted-foreground">Vista previa del mapa no disponible</p>
                           <Button onClick={openGoogleMaps} size="sm" className="mt-2">
-                            Open Google Maps
+                            Abrir Google Maps
                           </Button>
                         </div>
                       </div>
@@ -474,7 +475,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                       <div>
                         <h4 className="font-semibold mb-2 flex items-center gap-2">
                           <Truck className="h-4 w-4" />
-                          Logistics
+                          Logística
                         </h4>
                         <div className="space-y-2">
                           {jobDetails.logistics_events.map((event: any) => (
@@ -486,7 +487,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 </span>
                               </div>
                               <div className="text-sm text-muted-foreground">
-                                {event.event_date ? format(new Date(event.event_date), 'PP') : 'No date'} at {event.event_time || 'No time'}
+                                {event.event_date ? format(new Date(event.event_date), 'PPP', { locale: es }) : 'Sin fecha'} a las {event.event_time || 'sin hora'}
                               </div>
                             </div>
                           ))}
@@ -497,7 +498,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 ) : (
                   <div className="text-center py-8">
                     <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-muted-foreground">No location information available</p>
+                    <p className="text-muted-foreground">No hay información de ubicación disponible</p>
                   </div>
                 )}
               </Card>
@@ -507,38 +508,38 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               <Card className="p-4">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  Assigned Personnel
+                  Personal asignado
                 </h3>
-                
+
                 {jobDetails?.job_assignments && jobDetails.job_assignments.length > 0 ? (
                   <div className="space-y-3">
                     {jobDetails.job_assignments.map((assignment: any) => (
                       <div key={assignment.technician_id} className="flex items-center justify-between p-3 bg-muted rounded">
                         <div>
                           <p className="font-medium">
-                            {assignment.profiles 
+                            {assignment.profiles
                               ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
-                              : assignment.external_technician_name || 'Unknown'
+                              : assignment.external_technician_name || 'Desconocido'
                             }
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {assignment.profiles?.department || 'External'}
+                            {assignment.profiles?.department || 'Externo'}
                           </p>
                         </div>
                         <div className="flex gap-1">
                           {assignment.sound_role && (
                             <Badge variant="outline" className="text-xs">
-                              Sound: {labelForCode(assignment.sound_role)}
+                              Sonido: {labelForCode(assignment.sound_role)}
                             </Badge>
                           )}
                           {assignment.lights_role && (
                             <Badge variant="outline" className="text-xs">
-                              Lights: {labelForCode(assignment.lights_role)}
+                              Luces: {labelForCode(assignment.lights_role)}
                             </Badge>
                           )}
                           {assignment.video_role && (
                             <Badge variant="outline" className="text-xs">
-                              Video: {labelForCode(assignment.video_role)}
+                              Vídeo: {labelForCode(assignment.video_role)}
                             </Badge>
                           )}
                         </div>
@@ -548,7 +549,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 ) : (
                   <div className="text-center py-8">
                     <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-muted-foreground">No personnel assigned yet</p>
+                    <p className="text-muted-foreground">No hay personal asignado aún</p>
                   </div>
                 )}
               </Card>
@@ -558,9 +559,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               <Card className="p-4">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  Job Documents
+                  Documentos del trabajo
                 </h3>
-                
+
                 {jobDetails?.job_documents && jobDetails.job_documents.length > 0 ? (
                   <div className="space-y-2">
                     {jobDetails.job_documents.map((doc: any) => (
@@ -568,25 +569,25 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                         <div>
                           <p className="font-medium">{doc.file_name}</p>
                           <p className="text-sm text-muted-foreground">
-                            {doc.uploaded_at ? `Uploaded ${format(new Date(doc.uploaded_at), 'PP')}` : 'Upload date unknown'}
+                            {doc.uploaded_at ? `Subido el ${format(new Date(doc.uploaded_at), 'PPP', { locale: es })}` : 'Fecha de subida desconocida'}
                           </p>
                         </div>
                         <div className="flex gap-2">
-                          <Button 
+                          <Button
                             onClick={() => handleViewDocument(doc)}
                             size="sm"
                             variant="outline"
                           >
                             <Eye className="h-4 w-4 mr-2" />
-                            View
+                            Ver
                           </Button>
-                          <Button 
+                          <Button
                             onClick={() => handleDownloadDocument(doc)}
                             size="sm"
                             variant="outline"
                           >
                             <Download className="h-4 w-4 mr-2" />
-                            Download
+                            Descargar
                           </Button>
                         </div>
                       </div>
@@ -595,7 +596,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 ) : (
                   <div className="text-center py-8">
                     <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-muted-foreground">No documents uploaded yet</p>
+                    <p className="text-muted-foreground">No se han subido documentos</p>
                   </div>
                 )}
               </Card>
@@ -603,24 +604,24 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               <Card className="p-4">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  Artist Riders
+                  Riders de artistas
                 </h3>
                 {isRidersLoading ? (
-                  <div className="text-center py-4 text-muted-foreground">Loading riders…</div>
+                  <div className="text-center py-4 text-muted-foreground">Cargando riders…</div>
                 ) : riderFiles.length > 0 ? (
                   <div className="space-y-2">
                     {riderFiles.map((file) => (
                       <div key={file.id} className="flex items-center justify-between p-3 bg-muted rounded">
                         <div>
                           <p className="font-medium">{file.file_name}</p>
-                          <p className="text-sm text-muted-foreground">Artist: {artistNameMap.get(file.artist_id) || 'Unknown'}</p>
+                          <p className="text-sm text-muted-foreground">Artista: {artistNameMap.get(file.artist_id) || 'Desconocido'}</p>
                         </div>
                         <div className="flex gap-2">
                           <Button size="sm" variant="outline" onClick={() => viewRider(file)}>
-                            <Eye className="h-4 w-4 mr-1" /> View
+                            <Eye className="h-4 w-4 mr-1" /> Ver
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => downloadRider(file)}>
-                            <Download className="h-4 w-4 mr-1" /> Download
+                            <Download className="h-4 w-4 mr-1" /> Descargar
                           </Button>
                         </div>
                       </div>
@@ -629,7 +630,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 ) : (
                   <div className="text-center py-8">
                     <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-muted-foreground">No artist riders uploaded yet</p>
+                    <p className="text-muted-foreground">No se han subido riders de artistas</p>
                   </div>
                 )}
               </Card>
@@ -639,13 +640,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               <Card className="p-4">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
                   <UtensilsCrossed className="h-4 w-4" />
-                  Nearby Restaurants
+                  Restaurantes cercanos
                 </h3>
-                
+
                 {isRestaurantsLoading ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                    <p className="text-muted-foreground">Finding nearby restaurants...</p>
+                    <p className="text-muted-foreground">Buscando restaurantes cercanos...</p>
                   </div>
                 ) : restaurants && restaurants.length > 0 ? (
                   <div className="space-y-3">
@@ -669,7 +670,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               )}
                               {restaurant.distance && (
                                 <Badge variant="outline" className="text-xs">
-                                  {Math.round(restaurant.distance)}m away
+                                  A {Math.round(restaurant.distance)} m
                                 </Badge>
                               )}
                             </div>
@@ -699,9 +700,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   <div className="text-center py-8">
                     <UtensilsCrossed className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {jobDetails?.locations?.formatted_address 
-                        ? "No restaurants found nearby" 
-                        : "No venue address available to search for restaurants"
+                      {jobDetails?.locations?.formatted_address
+                        ? "No se encontraron restaurantes cercanos"
+                        : "No hay dirección del recinto para buscar restaurantes"
                       }
                     </p>
                   </div>

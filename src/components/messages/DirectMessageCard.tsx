@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, MessageSquare, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { DirectMessage } from "./types";
 
 interface DirectMessageCardProps {
@@ -21,7 +22,7 @@ export const DirectMessageCard = ({
   const showMarkAsRead = isRecipient && message.status === 'unread';
 
   const handleDelete = () => {
-    if (window.confirm('Are you sure you want to permanently delete this message?')) {
+    if (window.confirm('¿Seguro que deseas eliminar este mensaje de forma permanente?')) {
       onDelete(message.id);
     }
   };
@@ -37,13 +38,13 @@ export const DirectMessageCard = ({
                 {message.sender.first_name} {message.sender.last_name}
               </span>
               <span className="text-sm text-muted-foreground">
-                to {message.recipient.first_name} {message.recipient.last_name}
+                para {message.recipient.first_name} {message.recipient.last_name}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
-              {format(new Date(message.created_at), 'PPp')}
+              {format(new Date(message.created_at), 'PPp', { locale: es })}
             </span>
             {showMarkAsRead && (
               <Button
@@ -53,7 +54,7 @@ export const DirectMessageCard = ({
                 className="flex items-center gap-2"
               >
                 <CheckCircle className="h-4 w-4" />
-                Mark as Read
+                Marcar como leído
               </Button>
             )}
             {(currentUserId === message.sender_id || currentUserId === message.recipient_id) && (
@@ -61,7 +62,7 @@ export const DirectMessageCard = ({
                 variant="ghost"
                 size="icon"
                 onClick={handleDelete}
-                title="Delete message"
+                title="Eliminar mensaje"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

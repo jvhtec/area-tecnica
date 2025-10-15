@@ -188,7 +188,7 @@ const TechnicianDashboard = () => {
         return transformedJobs || [];
       } catch (error) {
         console.error("Error fetching assignments:", error);
-        toast.error("Failed to load assignments");
+        toast.error("No se pudieron cargar las asignaciones");
         return [];
       }
     },
@@ -213,10 +213,10 @@ const TechnicianDashboard = () => {
       setIsRefreshing(true);
       console.log("Manually refreshing assignments data");
       await refetch();
-      toast.success("Assignments refreshed successfully");
+      toast.success("Asignaciones actualizadas correctamente");
     } catch (error) {
       console.error("Error refreshing assignments:", error);
-      toast.error("Failed to refresh assignments");
+      toast.error("No se pudieron actualizar las asignaciones");
     } finally {
       setIsRefreshing(false);
     }
@@ -234,14 +234,14 @@ const TechnicianDashboard = () => {
   return (
     <div className="w-full max-w-full space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-xl md:text-2xl font-semibold">Technician Dashboard</h1>
+        <h1 className="text-xl md:text-2xl font-semibold">Panel de Técnicos</h1>
         <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <Button
             variant="outline"
             size="icon"
             onClick={handleRefresh}
             disabled={isLoading || isRefreshing}
-            title="Refresh assignments"
+            title="Actualizar asignaciones"
             className="shrink-0"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
@@ -253,7 +253,7 @@ const TechnicianDashboard = () => {
               onClick={() => setViewMode('upcoming')}
               className="text-xs sm:text-sm"
             >
-              Upcoming
+              Próximas
             </Button>
             <Button
               variant={viewMode === 'past' ? 'default' : 'outline'}
@@ -261,7 +261,7 @@ const TechnicianDashboard = () => {
               onClick={() => setViewMode('past')}
               className="text-xs sm:text-sm"
             >
-              Past
+              Pasadas
             </Button>
           </div>
           <div className="flex items-center gap-2">
@@ -289,15 +289,15 @@ const TechnicianDashboard = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            My Availability
+            Mi disponibilidad
           </CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-between gap-3">
           <div className="text-sm text-muted-foreground">
-            Manage your unavailability blocks so managers don’t assign overlapping jobs.
+            Gestiona tus bloques de indisponibilidad para que los gestores no asignen trabajos solapados.
           </div>
           <Button onClick={() => navigate('/dashboard/unavailability')}>
-            Manage Unavailability
+            Gestionar indisponibilidad
           </Button>
         </CardContent>
       </Card>
@@ -306,7 +306,7 @@ const TechnicianDashboard = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            My {viewMode === 'upcoming' ? 'Upcoming' : 'Past'} Assignments
+            Mis asignaciones {viewMode === 'upcoming' ? 'próximas' : 'pasadas'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -318,7 +318,7 @@ const TechnicianDashboard = () => {
                   assignments={assignments}
                   loading={isLoading}
                   onRefresh={handleRefresh}
-                  techName={userDepartment ? `${userDepartment} Technician` : 'Technician'}
+                  techName={userDepartment ? `Técnico de ${userDepartment}` : 'Técnico'}
                 />
               </div>
               {/* Mobile view */}
@@ -327,7 +327,7 @@ const TechnicianDashboard = () => {
                   assignments={assignments} 
                   loading={isLoading} 
                   onRefresh={handleRefresh}
-                  techName={userDepartment ? `${userDepartment} Technician` : 'Technician'}
+                  techName={userDepartment ? `Técnico de ${userDepartment}` : 'Técnico'}
                 />
               </div>
             </>
@@ -336,7 +336,7 @@ const TechnicianDashboard = () => {
               assignments={assignments} 
               loading={isLoading} 
               onRefresh={handleRefresh}
-              techName={userDepartment ? `${userDepartment} Technician` : 'Technician'}
+              techName={userDepartment ? `Técnico de ${userDepartment}` : 'Técnico'}
             />
           )}
         </CardContent>

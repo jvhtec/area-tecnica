@@ -90,7 +90,7 @@ export const DirectMessagesList = () => {
       console.error("Error in fetchMessages:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch messages",
+        description: "No se pudieron obtener los mensajes",
         variant: "destructive",
       });
     } finally {
@@ -132,14 +132,14 @@ export const DirectMessagesList = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between pb-2">
-        <h3 className="text-lg font-medium">Direct Messages</h3>
+        <h3 className="text-lg font-medium">Mensajes directos</h3>
         <SubscriptionIndicator tables={['direct_messages']} variant="compact" />
       </div>
-      
+
       {loading ? (
-        <p className="text-muted-foreground">Loading messages...</p>
+        <p className="text-muted-foreground">Cargando mensajes...</p>
       ) : messages.length === 0 ? (
-        <p className="text-muted-foreground">No direct messages.</p>
+        <p className="text-muted-foreground">No hay mensajes directos.</p>
       ) : (
         messages.map((message) => (
           <DirectMessageCard
