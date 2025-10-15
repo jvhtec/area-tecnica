@@ -13,7 +13,8 @@ import { sanitizeLogData } from "@/lib/enhanced-security-config";
 export const useOptimizedJobs = (
   department?: Department,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  includeDryhire: boolean = false
 ) => {
   const queryClient = useQueryClient();
 
@@ -84,7 +85,8 @@ export const useOptimizedJobs = (
           folder_type
         )
       `)
-      .in('job_type', ['single', 'festival', 'tourdate'])
+      // Include relevant job types; optionally include dryhire
+      .in('job_type', includeDryhire ? ['single', 'festival', 'tourdate', 'dryhire'] : ['single', 'festival', 'tourdate'])
       .order('start_time', { ascending: true });
 
     // Apply filters efficiently using indexes
@@ -177,7 +179,7 @@ export const useOptimizedJobs = (
   };
 
   return useQuery({
-    queryKey: ['optimized-jobs', department, startDate?.toISOString(), endDate?.toISOString()],
+    queryKey: ['optimized-jobs', department, startDate?.toISOString(), endDate?.toISOString(), includeDryhire],
     queryFn: fetchOptimizedJobs,
     staleTime: 1000 * 60 * 5, // 5 minutes - increased for better caching
     gcTime: 1000 * 60 * 10, // 10 minutes - cache jobs longer

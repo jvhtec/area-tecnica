@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { UserPlus } from 'lucide-react';
 import { CreateUserDialog } from '@/components/users/CreateUserDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
@@ -92,6 +92,8 @@ export const OptimizedAssignmentMatrix = ({
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const qc = useQueryClient();
+  // Sorting focus by job
+  const [sortJobId, setSortJobId] = useState<string | null>(null);
   
   // Performance monitoring
   const { startRenderTimer, endRenderTimer, incrementCellRender } = usePerformanceMonitor('AssignmentMatrix');
@@ -118,6 +120,44 @@ export const OptimizedAssignmentMatrix = ({
     invalidateAssignmentQueries,
     isLoading
   } = useOptimizedMatrixData({ technicians, dates, jobs });
+
+  // Technician IDs for queries
+  const allTechIds = useMemo(() => technicians.map(t => t.id), [technicians]);
+
+  // When sorting by a job, fetch statuses for that job across all technicians (batched)
+  const { data: sortJobStatuses } = useQuery({
+    queryKey: ['matrix-sort-job-statuses', sortJobId, allTechIds.join(',')],
+    queryFn: async () => {
+      if (!sortJobId || !allTechIds.length) return new Map<string, { availability_status: string | null; offer_status: string | null }>();
+      // Batch the call to RPC to avoid payload limits
+      const chunk = <T,>(arr: T[], size: number) => {
+        const out: T[][] = [];
+        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+        return out;
+      };
+      const batches = chunk(allTechIds, 30);
+      const map = new Map<string, { availability_status: string | null; offer_status: string | null }>();
+      for (const b of batches) {
+        const { data, error } = await supabase
+          .rpc('get_assignment_matrix_staffing')
+          .eq('job_id', sortJobId)
+          .in('profile_id', b);
+        if (error) {
+          console.warn('Sort job statuses RPC error', error);
+          continue;
+        }
+        (data || []).forEach((r: any) => {
+          const av = r.availability_status === 'pending' ? 'requested' : (r.availability_status === 'expired' ? null : r.availability_status);
+          const of = r.offer_status === 'pending' ? 'sent' : (r.offer_status === 'expired' ? null : r.offer_status);
+          map.set(r.profile_id, { availability_status: av, offer_status: of });
+        });
+      }
+      return map;
+    },
+    enabled: !!sortJobId,
+    staleTime: 2_000,
+    gcTime: 60_000,
+  });
 
   // Listen for assignment updates and refresh data
   useEffect(() => {
@@ -431,7 +471,8 @@ export const OptimizedAssignmentMatrix = ({
     updateAssignmentOptimistically(technicianId, jobId, status);
   }, [updateAssignmentOptimistically]);
 
-  // Improved auto-scroll to today with retry mechanism
+  // Improved auto-scroll to today with retry mechanism (run once)
+  const autoScrolledRef = useRef(false);
   const scrollToToday = useCallback(() => {
     if (!mainScrollRef.current || dates.length === 0) {
       return false;
@@ -464,8 +505,9 @@ export const OptimizedAssignmentMatrix = ({
     return true;
   }, [dates, CELL_WIDTH, matrixWidth]);
 
-  // Auto-scroll to today with retry mechanism
+  // Auto-scroll to today with retry mechanism (only first render)
   useEffect(() => {
+    if (autoScrolledRef.current) return;
     if (isLoading || dates.length === 0) return;
 
     const attemptScroll = () => {
@@ -475,6 +517,7 @@ export const OptimizedAssignmentMatrix = ({
         setTimeout(attemptScroll, 100 * (scrollAttempts + 1)); // Increasing delay
       } else if (success) {
         setScrollAttempts(0);
+        autoScrolledRef.current = true;
       } else {
         // give up
       }
@@ -489,12 +532,80 @@ export const OptimizedAssignmentMatrix = ({
     updateVisibleWindow();
   }, [technicians.length, dates.length, scheduleVisibleWindowUpdate]);
 
+  // Keep scroll position stable when dates expand before/after
+  const prevDatesRef = useRef<Date[] | null>(null);
+  useEffect(() => {
+    const prev = prevDatesRef.current;
+    if (!prev || prev.length === 0 || dates.length === 0) {
+      prevDatesRef.current = dates.slice();
+      return;
+    }
+    const prevFirst = prev[0];
+    const prevLast = prev[prev.length - 1];
+    const nextFirst = dates[0];
+    const nextLast = dates[dates.length - 1];
+
+    // If new range extends earlier than before, adjust scrollLeft to compensate added columns on the left
+    if (nextFirst < prevFirst) {
+      const daysAddedLeft = Math.round((prevFirst.getTime() - nextFirst.getTime()) / (1000 * 60 * 60 * 24));
+      const delta = daysAddedLeft * CELL_WIDTH;
+      if (delta > 0) {
+        if (dateHeadersRef.current) dateHeadersRef.current.scrollLeft += delta;
+        if (mainScrollRef.current) mainScrollRef.current.scrollLeft += delta;
+      }
+    }
+    // If only extended to the right, no adjustment needed.
+    prevDatesRef.current = dates.slice();
+  }, [dates]);
+
   // Batched staffing statuses for visible window
+  const orderedTechnicians = useMemo(() => {
+    if (!sortJobId) return technicians;
+    const baseOrder = new Map<string, number>();
+    technicians.forEach((t, i) => baseOrder.set(t.id, i));
+    // Build engagement scores for current sort job
+    // Pull data via queries in a synchronous manner using cache, or compute fallbacks
+    // We'll compute from cached assignment/query sources where possible
+    const scoreMap = new Map<string, number>();
+    // Prefer using allAssignments (confirmed assignment) for the job
+    (allAssignments as any[])?.forEach((a: any) => {
+      if (a.job_id !== sortJobId) return;
+      const cur = scoreMap.get(a.technician_id) || 0;
+      const status = (a.status || '').toLowerCase();
+      const add = status === 'confirmed' ? 3 : (status === 'invited' ? 1 : 0);
+      scoreMap.set(a.technician_id, Math.max(cur, add));
+    });
+    // Use fetched statuses for all technicians to boost scores consistently
+    if (sortJobStatuses && sortJobStatuses.size) {
+      technicians.forEach(t => {
+        const s = sortJobStatuses.get(t.id);
+        if (!s) return;
+        const cur = scoreMap.get(t.id) || 0;
+        let add = 0;
+        if (s.offer_status === 'confirmed') add = Math.max(add, 2);
+        else if (s.offer_status === 'sent') add = Math.max(add, 1.5);
+        if (s.availability_status === 'confirmed') add = Math.max(add, 1.2);
+        else if (s.availability_status === 'requested') add = Math.max(add, 1);
+        if (add > 0) scoreMap.set(t.id, Math.max(cur, add));
+      });
+    }
+    // Note: sorting relies on confirmed assignments and aggregated job statuses for the selected job.
+    // Sort by score desc, then original order
+    const arr = [...technicians];
+    arr.sort((a, b) => {
+      const sa = scoreMap.get(a.id) || 0;
+      const sb = scoreMap.get(b.id) || 0;
+      if (sb !== sa) return sb - sa;
+      return (baseOrder.get(a.id)! - baseOrder.get(b.id)!);
+    });
+    return arr;
+  }, [technicians, sortJobId, allAssignments, sortJobStatuses]);
+
   const visibleTechIds = useMemo(() => {
     const start = Math.max(0, visibleRows.start - 10);
-    const end = Math.min(technicians.length - 1, visibleRows.end + 10);
-    return technicians.slice(start, end + 1).map(t => t.id);
-  }, [technicians, visibleRows.start, visibleRows.end]);
+    const end = Math.min(orderedTechnicians.length - 1, visibleRows.end + 10);
+    return orderedTechnicians.slice(start, end + 1).map(t => t.id);
+  }, [orderedTechnicians, visibleRows.start, visibleRows.end]);
   // Fetch staffing statuses for ALL currently loaded dates and jobs for the visible technicians
   // This avoids re-fetching when scrolling horizontally, making badges render immediately.
   const allJobsLite = useMemo(() => jobs.map(j => ({ id: j.id, start_time: j.start_time, end_time: j.end_time })), [jobs]);
@@ -562,6 +673,10 @@ export const OptimizedAssignmentMatrix = ({
               date={date}
               width={CELL_WIDTH}
               jobs={getJobsForDate(date)}
+              technicianIds={technicians.map(t => t.id)}
+              onJobClick={(jobId) => {
+                setSortJobId(prev => (prev === jobId ? null : jobId));
+              }}
             />
           ))}
           {/* Trailing spacer to fill remaining width */}
@@ -586,7 +701,7 @@ export const OptimizedAssignmentMatrix = ({
           <div style={{ height: matrixHeight, position: 'relative' }}>
             {/* Leading spacer for virtualized rows */}
             <div style={{ height: visibleRows.start * CELL_HEIGHT }} />
-            {technicians.slice(visibleRows.start, visibleRows.end + 1).map((technician) => (
+            {orderedTechnicians.slice(visibleRows.start, visibleRows.end + 1).map((technician) => (
               <TechnicianRow
                 key={technician.id}
                 technician={technician}
@@ -621,7 +736,7 @@ export const OptimizedAssignmentMatrix = ({
               height: matrixHeight
             }}
           >
-            {technicians.slice(visibleRows.start, visibleRows.end + 1).map((technician, idx) => {
+            {orderedTechnicians.slice(visibleRows.start, visibleRows.end + 1).map((technician, idx) => {
               const techIndex = visibleRows.start + idx;
               return (
               <div 

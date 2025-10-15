@@ -3,13 +3,15 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, FileText, Filter, CheckCircle } from "lucide-react";
+import { Loader2, CheckCircle, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
-import { startOfMonth, endOfMonth, addMonths, isToday } from "date-fns";
+import { startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { MonthNavigation } from "@/components/project-management/MonthNavigation";
 import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
 import { StatusFilter } from "@/components/project-management/StatusFilter";
+import { JobTypeFilter } from "@/components/project-management/JobTypeFilter";
+import { Input } from "@/components/ui/input";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
@@ -23,12 +25,13 @@ const ProjectManagement = () => {
   const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [selectedJobType, setSelectedJobType] = useState("All");
+  const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
   const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>(["Confirmado", "Tentativa"]);
   const [allJobTypes, setAllJobTypes] = useState<string[]>([]);
   const [allJobStatuses, setAllJobStatuses] = useState<string[]>([]);
   const [highlightToday, setHighlightToday] = useState(false);
   const [isAutoCompleting, setIsAutoCompleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { forceSubscribe } = useSubscriptionContext();
 
   const startDate = startOfMonth(currentDate);
@@ -46,11 +49,15 @@ const ProjectManagement = () => {
     ]);
   }, [forceSubscribe]);
 
+  // When searching, override month pagination by removing date bounds
+  const isSearching = searchQuery.trim().length > 0;
+
   // Use optimized jobs hook with built-in filtering and caching
   const { data: optimizedJobs = [], isLoading: jobsLoading, error: jobsError } = useOptimizedJobs(
     selectedDepartment,
-    startDate,
-    endDate
+    isSearching ? undefined : startDate,
+    isSearching ? undefined : endDate,
+    true // include dryhire jobs in project management
   );
 
   // Check user permissions early
@@ -83,9 +90,18 @@ const ProjectManagement = () => {
 
   // Filter jobs by selected job type and statuses with database-level optimization
   const jobs = (optimizedJobs || []).filter((job: any) => {
-    const matchesType = selectedJobType === "All" || job.job_type?.toLowerCase() === selectedJobType.toLowerCase();
+    const matchesType = isSearching
+      ? true // search overrides type filter
+      : (selectedJobTypes.length === 0 ||
+        selectedJobTypes.map(t => t.toLowerCase()).includes(String(job.job_type || '').toLowerCase()));
     const matchesStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
-    return matchesType && matchesStatus;
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      q.length === 0 ||
+      [job.title, job.client, job.location?.name, job.location?.formatted_address]
+        .filter(Boolean)
+        .some((s: string) => s.toLowerCase().includes(q));
+    return matchesType && matchesStatus && matchesSearch;
   });
 
   // Highlight today's jobs when page loads
@@ -257,6 +273,12 @@ const ProjectManagement = () => {
     saveUserPreferences(newStatuses);
   };
 
+  const toggleJobType = (type: string) => {
+    setSelectedJobTypes(prev => (
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    ));
+  };
+
   return (
     <div className="container mx-auto px-4 space-y-6">
       <Card>
@@ -264,25 +286,24 @@ const ProjectManagement = () => {
           <CardTitle>Project Management</CardTitle>
           <div className="flex gap-2 flex-wrap">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <select
-                  value={selectedJobType}
-                  onChange={(e) => setSelectedJobType(e.target.value)}
-                  className="border border-gray-300 rounded-md py-1 px-2 text-sm"
-                >
-                  <option value="All">All Types</option>
-                  {allJobTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <JobTypeFilter
+                allJobTypes={allJobTypes}
+                selectedJobTypes={selectedJobTypes}
+                onTypeToggle={toggleJobType}
+              />
               <StatusFilter
                 allJobStatuses={allJobStatuses}
                 selectedJobStatuses={selectedJobStatuses}
                 onStatusSelection={handleJobStatusSelection}
+              />
+            </div>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search projects..."
+                className="pl-8 h-8 w-[220px]"
               />
             </div>
             {canCreateItems && (
