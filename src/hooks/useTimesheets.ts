@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Timesheet } from "@/types/timesheet";
 import { toast } from "sonner";
@@ -107,6 +107,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         .select(`
           start_time, 
           end_time,
+          job_type,
           job_date_types(type, date)
         `)
         .eq("id", jobId)
@@ -116,6 +117,14 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
 
       if (jobError || !job) {
         console.error("Error fetching job:", jobError);
+        setIsLoading(false);
+        return;
+      }
+
+      // Skip if this job type should not create timesheets automatically
+      const jtype = String(job.job_type || '').toLowerCase();
+      if (jtype === 'dryhire' || jtype === 'dry_hire' || jtype === 'tourdate') {
+        console.log('Job type excludes auto timesheets:', jtype);
         setIsLoading(false);
         return;
       }
@@ -197,6 +206,22 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       setIsLoading(false);
     }
   }, [jobId, fetchTimesheets]);
+
+  // Attempt auto-create exactly once per job when appropriate
+  const autoCreateAttemptedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Only management can trigger auto-creation; avoid for technicians/house tech
+    const allowAuto = opts?.userRole === 'admin' || opts?.userRole === 'management';
+    if (!jobId || !allowAuto) return;
+    // Only attempt once per job to avoid loops
+    if (autoCreateAttemptedFor.current === jobId) return;
+    // If loading finished and no timesheets found, try to backfill
+    if (!isLoading && timesheets.length === 0) {
+      autoCreateAttemptedFor.current = jobId;
+      autoCreateTimesheets();
+    }
+  }, [jobId, opts?.userRole, isLoading, timesheets.length, autoCreateTimesheets]);
 
   useEffect(() => {
     console.log("useTimesheets useEffect triggered with jobId:", jobId);
