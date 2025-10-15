@@ -10,6 +10,7 @@ import { Department } from "@/types/department";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { useNavigate } from "react-router-dom";
 import { useDeletionState } from "@/hooks/useDeletionState";
+import { formatUserName } from "@/utils/userName";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 import { 
@@ -174,7 +175,7 @@ export function JobCardNew({
         try {
           const { data, error } = await supabase
             .from('job_assignments')
-            .select(`*, profiles(first_name, last_name)`) 
+            .select(`*, profiles(first_name, nickname, last_name)`) 
             .eq('job_id', job.id);
           if (!error) {
             setAssignments(data || []);
@@ -224,7 +225,13 @@ export function JobCardNew({
           if (!role) return null;
           return {
             id: assignment.technician_id,
-            name: `${assignment.profiles?.first_name || ""} ${assignment.profiles?.last_name || ""}`.trim(),
+            name: assignment.profiles 
+              ? formatUserName(
+                  assignment.profiles.first_name,
+                  (assignment.profiles as any).nickname,
+                  assignment.profiles.last_name
+                )
+              : '',
             role
           };
         })

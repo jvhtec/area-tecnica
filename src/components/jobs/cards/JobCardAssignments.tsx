@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users } from "lucide-react";
 import { Department } from "@/types/department";
 import { labelForCode } from '@/utils/roles';
+import { formatUserName } from '@/utils/userName';
 
 interface JobCardAssignmentsProps {
   assignments: any[];
@@ -34,7 +35,11 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
       
       // Handle both direct assignments and tour-sourced assignments
       const name = assignment.profiles
-        ? `${assignment.profiles.first_name || ""} ${assignment.profiles.last_name || ""}`.trim()
+        ? formatUserName(
+            assignment.profiles.first_name,
+            (assignment.profiles as any).nickname,
+            assignment.profiles.last_name
+          )
         : assignment.external_technician_name || 'Unknown';
       
       const isFromTour = assignment.assignment_source === 'tour';

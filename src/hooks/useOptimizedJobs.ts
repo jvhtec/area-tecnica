@@ -64,6 +64,7 @@ export const useOptimizedJobs = (
           profiles!inner(
             id,
             first_name,
+            nickname,
             last_name,
             department
           )

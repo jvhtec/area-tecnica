@@ -152,7 +152,7 @@ export const exportToPDF = (
 
           if (supportRows.length > 0) {
             autoTable(doc, {
-              head: [['Punto de Montaje', 'Reacción (kg)', 'Polipasto Sugerido']],
+              head: [['Punto de Montaje', 'Reacción (kg)', 'Motor Sugerido']],
               body: supportRows,
               startY: yPosition, theme: 'grid',
               styles: { fontSize: 10, cellPadding: 5 },
@@ -264,7 +264,7 @@ export const exportToPDF = (
           if (table.includesHoist) {
             checkPageBreak(20);
             doc.setFontSize(10); doc.setTextColor(51, 51, 51); doc.setFont(undefined, 'italic');
-            doc.text(`Potencia adicional para polipasto requerida para ${table.name}: CEE32A 3P+N+G`, 14, yPosition);
+            doc.text(`Potencia adicional para motores requerida para ${table.name}: CEE32A 3P+N+G`, 14, yPosition);
             yPosition += 10; doc.setFont(undefined, 'normal');
           }
         }
@@ -372,7 +372,7 @@ export const exportToPDF = (
 
             if (table.includesHoist) {
               doc.setTextColor(80, 80, 80);
-              doc.text(`*Potencia adicional para polipasto requerida para ${table.name}: CEE32A 3P+N+G`, 14, yPosition);
+              doc.text(`*Potencia adicional para motores requerida para ${table.name}: CEE32A 3P+N+G`, 14, yPosition);
               yPosition += 7;
             }
             yPosition += 3;

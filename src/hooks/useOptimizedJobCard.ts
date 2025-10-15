@@ -61,7 +61,7 @@ export const useOptimizedJobCard = (
         try {
           const { data, error } = await supabase
             .from('job_assignments')
-            .select(`*, profiles(first_name, last_name)`) 
+            .select(`*, profiles(first_name, nickname, last_name)`) 
             .eq('job_id', job.id);
           if (!error) {
             setAssignments(data || []);
