@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { businessRoleIdFor, inferTierFromRoleCode } from './flexBusinessRoles.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -205,11 +206,6 @@ serve(async (req) => {
       // Attempt to set business-role for SOUND department after adding
       try {
         if (department === 'sound' && (effectiveLineItemId)) {
-          const FLEX_SOUND_BUSINESS_ROLES: Record<'responsable'|'especialista'|'tecnico', string> = {
-            responsable: '2916b300-c515-11ea-a087-2a0a4490a7fb',
-            especialista: 'b18a5bcc-59fa-4956-917f-0d1816d7d9b3',
-            tecnico: '2f6cf050-c5c1-11ea-a087-2a0a4490a7fb',
-          };
           const { data: ja } = await supabase
             .from('job_assignments')
             .select('sound_role')
@@ -217,8 +213,8 @@ serve(async (req) => {
             .eq('technician_id', technician_id)
             .maybeSingle();
           const role = ja?.sound_role ?? null;
-          const tier = role ? (role.includes('-R') ? 'responsable' : role.includes('-E') ? 'especialista' : role.includes('-T') ? 'tecnico' : null) : null;
-          const roleId = tier ? FLEX_SOUND_BUSINESS_ROLES[tier] : null;
+          const tier = inferTierFromRoleCode(role);
+          const roleId = businessRoleIdFor('sound', tier);
           if (roleId) {
             const rowDataUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crewCall.flex_element_id)}/row-data/`;
             const setRes = await fetch(rowDataUrl, {

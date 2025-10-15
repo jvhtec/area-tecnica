@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { businessRoleIdFor, inferTierFromRoleCode } from "./flexBusinessRoles.ts";
 
 type Dept = "sound" | "lights" | "video";
 
@@ -76,6 +77,24 @@ serve(async (req: Request) => {
       "Accept": "*/*"
     };
 
+    async function setBusinessRoleIfNeeded(
+      args: { dept: Dept; crew_call_flex_id: string; lineItemId: string; role: string | null },
+      headers: Record<string, string>
+    ): Promise<boolean> {
+      const { dept, crew_call_flex_id, lineItemId, role } = args;
+      // Determine tier from our role code suffix (e.g., -R/-E/-T)
+      const tier = inferTierFromRoleCode(role);
+      const roleId = businessRoleIdFor(dept, tier);
+      if (!roleId) return false;
+      const rowDataUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crew_call_flex_id)}/row-data/`;
+      const res = await fetch(rowDataUrl, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ lineItemId, fieldType: "business-role", payloadValue: roleId })
+      });
+      return res.ok;
+    }
+
     for (const dept of depts) {
       // Crew call mapping
       const { data: crewCallRow } = await supabase
@@ -113,7 +132,14 @@ serve(async (req: Request) => {
           if (dept === "video") return !!r.video_role || r.profiles?.department === "video";
           return false;
         })
-        .map((r: any) => ({ technician_id: r.technician_id as string, flex_resource_id: r.profiles.flex_resource_id as string }));
+        .map((r: any) => ({
+          technician_id: r.technician_id as string,
+          flex_resource_id: r.profiles.flex_resource_id as string,
+          role: (dept === "sound") ? (r.sound_role ?? null)
+              : (dept === "lights") ? (r.lights_role ?? null)
+              : (dept === "video") ? (r.video_role ?? null)
+              : null,
+        }));
 
       const desiredIds = new Set(desired.map((d) => d.technician_id));
       const desiredResourceIds = new Set(desired.map((d) => d.flex_resource_id));
@@ -200,9 +226,9 @@ serve(async (req: Request) => {
         await supabase.from("flex_crew_assignments").insert({ crew_call_id, technician_id: add.technician_id, flex_line_item_id: lineItemId });
         added += 1;
 
-        // Apply business-role for SOUND if mappable
+        // Apply business-role if mappable (SOUND supported; LIGHTS/VIDEO when IDs provided)
         try {
-          const ok = await setBusinessRoleIfNeeded({ dept, crew_call_flex_id: flex_crew_call_id, lineItemId, role: (add as any).role ?? null });
+          const ok = await setBusinessRoleIfNeeded({ dept, crew_call_flex_id: flex_crew_call_id, lineItemId, role: (add as any).role ?? null }, flexHeaders);
           if (ok) rolesSet += 1;
         } catch (_) { /* ignore */ }
       }
