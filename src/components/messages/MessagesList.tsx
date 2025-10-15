@@ -42,16 +42,16 @@ export const MessagesList = () => {
   const { handleDeleteMessage, handleMarkAsRead } = useMessageOperations(messages, setMessages, toast);
 
   if (loading) {
-    return <div>Loading messages...</div>;
+    return <div>Cargando mensajes...</div>;
   }
 
   return (
     <div className="space-y-4">
       {isFetching && !loading && (
-        <div className="text-xs text-muted-foreground mb-2">Refreshing messages...</div>
+        <div className="text-xs text-muted-foreground mb-2">Actualizando mensajes...</div>
       )}
       {messages.length === 0 ? (
-        <p className="text-muted-foreground">No messages in this department.</p>
+        <p className="text-muted-foreground">No hay mensajes en este departamento.</p>
       ) : (
         messages.map((message) => (
           <MessageCard

@@ -15,12 +15,12 @@ export const MessageManagementDialog = ({ department, trigger = true }: MessageM
   const content = (
     <DialogContent className="max-w-2xl">
       <DialogHeader>
-        <DialogTitle>Messages</DialogTitle>
+        <DialogTitle>Mensajes</DialogTitle>
       </DialogHeader>
       <Tabs defaultValue="department" className="w-full">
         <TabsList className="w-full">
-          <TabsTrigger value="department" className="flex-1">Department Messages</TabsTrigger>
-          <TabsTrigger value="direct" className="flex-1">Direct Messages</TabsTrigger>
+          <TabsTrigger value="department" className="flex-1">Mensajes del departamento</TabsTrigger>
+          <TabsTrigger value="direct" className="flex-1">Mensajes directos</TabsTrigger>
         </TabsList>
         <TabsContent value="department" className="space-y-4">
           {department && <SendMessage department={department} />}
@@ -42,7 +42,7 @@ export const MessageManagementDialog = ({ department, trigger = true }: MessageM
       <DialogTrigger asChild>
         <Button className="gap-2">
           <MessageSquare className="h-4 w-4" />
-          Message Management
+          Gestión de mensajes
         </Button>
       </DialogTrigger>
       {content}

@@ -44,14 +44,14 @@ export const SendMessage = ({ department }: SendMessageProps) => {
       console.log("Message sent successfully");
       setMessage("");
       toast({
-        title: "Message sent",
-        description: "Your message has been sent to management.",
+        title: "Mensaje enviado",
+        description: "Tu mensaje se ha enviado a la dirección.",
       });
     } catch (error) {
       console.error("Error sending message:", error);
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again.",
+        description: "No se pudo enviar el mensaje. Inténtalo de nuevo.",
         variant: "destructive",
       });
     } finally {
@@ -64,16 +64,16 @@ export const SendMessage = ({ department }: SendMessageProps) => {
       <Textarea
         value={message}
         onChange={(e) => setMessage(e.target.value)}
-        placeholder="Type your message here..."
+        placeholder="Escribe tu mensaje aquí..."
         className="min-h-[100px]"
       />
       <Button type="submit" disabled={sending || !message.trim()} className="w-full">
         {sending ? (
-          "Sending..."
+          "Enviando..."
         ) : (
           <>
             <Send className="mr-2 h-4 w-4" />
-            Send Message
+            Enviar mensaje
           </>
         )}
       </Button>

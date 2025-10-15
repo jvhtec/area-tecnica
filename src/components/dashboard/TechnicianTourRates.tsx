@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Euro, Info, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { format, getISOWeek, getISOWeekYear, startOfWeek, endOfWeek } from "date-fns";
+import { es } from "date-fns/locale";
 import { useTechnicianTourRateQuotes } from "@/hooks/useTourJobRateQuotes";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useTourRatesApprovalMap } from "@/hooks/useTourRatesApproval";
@@ -24,6 +25,11 @@ export const TechnicianTourRates: React.FC = () => {
       currency: 'EUR',
       minimumFractionDigits: 2,
     }).format(amount);
+  };
+
+  const formatDatesBadge = (count: number) => {
+    if (count === 1) return '1 fecha esta semana';
+    return `${count} fechas esta semana`;
   };
 
   const weekGroups = useMemo(() => {
@@ -87,15 +93,15 @@ export const TechnicianTourRates: React.FC = () => {
         <div className="flex items-center gap-2">
           <CardTitle className="flex items-center gap-2">
             <Euro className="h-5 w-5" />
-            Your Tour Rates
+            Tus tarifas de gira
           </CardTitle>
-          <Badge variant="outline">{selectedQuotes.length} dates this week</Badge>
+          <Badge variant="outline">{formatDatesBadge(selectedQuotes.length)}</Badge>
         </div>
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setExpanded((prev) => !prev)}
-          aria-label={expanded ? 'Collapse tour rates' : 'Expand tour rates'}
+          aria-label={expanded ? 'Contraer tarifas de gira' : 'Expandir tarifas de gira'}
         >
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </Button>
@@ -110,7 +116,7 @@ export const TechnicianTourRates: React.FC = () => {
           ) : error ? (
             <Alert variant="destructive">
               <AlertDescription>
-                Failed to load your tour rates: {(error as any).message}
+                No se pudieron cargar tus tarifas de gira: {(error as any).message}
               </AlertDescription>
             </Alert>
           ) : (
@@ -119,13 +125,13 @@ export const TechnicianTourRates: React.FC = () => {
                 <Info className="h-4 w-4" />
                 <AlertDescription>
                   {isHouseTech
-                    ? "As a house technician, you receive your profile-specific base rate. Weekly multipliers apply when you're assigned to the tour team."
-                    : "Tour rates use your category base. Weekly multipliers only apply if you're on the tour team for that routing."}
+                    ? "Como técnico residente, recibes la tarifa base específica de tu perfil. Los multiplicadores semanales se aplican cuando formas parte del equipo de la gira."
+                    : "Las tarifas de gira usan tu tarifa base de categoría. Los multiplicadores semanales solo se aplican si estás en el equipo de la gira para ese itinerario."}
                 </AlertDescription>
               </Alert>
 
               {(!quotes || quotes.length === 0) && (
-                <div className="text-muted-foreground">You have no upcoming tour date assignments.</div>
+                <div className="text-muted-foreground">No tienes asignaciones de fechas de gira próximas.</div>
               )}
 
           {allowedWeekKeys.length > 0 && activeWeekKey && (
@@ -136,7 +142,7 @@ export const TechnicianTourRates: React.FC = () => {
                   const sampleDate = selectedQuotes[0] ? new Date(selectedQuotes[0].start_time) : new Date();
                   const weekStart = startOfWeek(sampleDate, { weekStartsOn: 1 });
                   const weekEnd = endOfWeek(sampleDate, { weekStartsOn: 1 });
-                  return `Week ${week} of ${year} (${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')})`;
+                  return `Semana ${week} de ${year} (${format(weekStart, "d 'de' MMM", { locale: es })} - ${format(weekEnd, "d 'de' MMM", { locale: es })})`;
                 })()}
               </div>
               <div className="flex items-center gap-2">
@@ -145,7 +151,7 @@ export const TechnicianTourRates: React.FC = () => {
                   size="icon"
                   onClick={() => activeWeekIndex > 0 && setActiveWeekKey(allowedWeekKeys[activeWeekIndex - 1])}
                   disabled={activeWeekIndex <= 0}
-                  aria-label="Previous week"
+                  aria-label="Semana anterior"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -157,7 +163,7 @@ export const TechnicianTourRates: React.FC = () => {
                   size="icon"
                   onClick={() => activeWeekIndex >= 0 && activeWeekIndex < allowedWeekKeys.length - 1 && setActiveWeekKey(allowedWeekKeys[activeWeekIndex + 1])}
                   disabled={activeWeekIndex === allowedWeekKeys.length - 1}
-                  aria-label="Next week"
+                  aria-label="Semana siguiente"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -178,20 +184,20 @@ export const TechnicianTourRates: React.FC = () => {
                         </Badge>
                       )}
                       {quote.is_house_tech && (
-                        <Badge variant="secondary" className="text-xs">House Rate</Badge>
+                        <Badge variant="secondary" className="text-xs">Tarifa fija</Badge>
                       )}
                       {quote.is_tour_team_member && quote.multiplier > 1 && (
                         <Badge variant="outline" className="text-xs">
-                          Week multiplier ×{quote.multiplier}
+                          Multiplicador semanal ×{quote.multiplier}
                         </Badge>
                       )}
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      {format(new Date(quote.start_time), 'EEEE, MMM d, yyyy')}
+                      {format(new Date(quote.start_time), "EEEE, d 'de' MMM, yyyy", { locale: es })}
                     </div>
                     {!quote.is_tour_team_member && (
                       <div className="text-xs text-muted-foreground mt-2">
-                        Tour multiplier not applied — you are not on the tour team for this routing.
+                        Multiplicador de gira no aplicado: no formas parte del equipo de la gira para este recorrido.
                       </div>
                     )}
                   </div>
@@ -200,7 +206,7 @@ export const TechnicianTourRates: React.FC = () => {
                     <div className="text-xs text-muted-foreground">
                       Base {formatCurrency(quote.base_day_eur)}
                       {quote.is_tour_team_member && quote.multiplier > 1 && (
-                        <span> × {quote.multiplier} ({quote.week_count} dates)</span>
+                        <span> × {quote.multiplier} ({quote.week_count} {quote.week_count === 1 ? 'fecha' : 'fechas'})</span>
                       )}
                     </div>
                   </div>
@@ -208,13 +214,13 @@ export const TechnicianTourRates: React.FC = () => {
               ))
             ) : (
               <div className="text-sm text-muted-foreground">
-                {pendingQuotes.length > 0 ? 'Rates for this week are pending approval.' : 'No tour rate entries for this week.'}
+                {pendingQuotes.length > 0 ? 'Las tarifas de esta semana están pendientes de aprobación.' : 'No hay tarifas de gira registradas para esta semana.'}
               </div>
             )}
           </div>
 
           <div className="border-t pt-3 text-xs text-muted-foreground">
-            Amounts shown are per tour date. Use pagination to review past or upcoming routings.
+            Los importes mostrados son por fecha de gira. Usa la paginación para revisar recorridos pasados o futuros.
           </div>
             </>
           )}

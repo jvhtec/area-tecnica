@@ -137,7 +137,7 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground">
                     <FileText className="h-3 w-3" />
-                    {jobData.job_documents.length} doc{jobData.job_documents.length !== 1 ? 's' : ''}
+                    {jobData.job_documents.length} documento{jobData.job_documents.length !== 1 ? 's' : ''}
                     {expandedDocuments ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                   </Button>
                 </CollapsibleTrigger>

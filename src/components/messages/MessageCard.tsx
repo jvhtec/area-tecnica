@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { MessageSquare, Trash2, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,20 +33,20 @@ export const MessageCard = ({
                 {message.sender.first_name} {message.sender.last_name}
               </span>
               <span className="text-sm text-muted-foreground">
-                Department: {message.department}
+                Departamento: {message.department}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
-              {format(new Date(message.created_at), 'PPp')}
+              {format(new Date(message.created_at), 'PPp', { locale: es })}
             </span>
             {showMarkAsRead && onMarkAsRead && (
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => onMarkAsRead(message.id)}
-                title="Mark as read"
+                title="Marcar como leído"
               >
                 <CheckCircle className="h-4 w-4" />
               </Button>
@@ -55,7 +56,7 @@ export const MessageCard = ({
                 variant="ghost"
                 size="icon"
                 onClick={() => onDelete(message.id)}
-                title="Delete message"
+                title="Eliminar mensaje"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
