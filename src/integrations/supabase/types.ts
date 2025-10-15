@@ -5872,8 +5872,8 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          nickname: string
           phone: string
-          residencia: string
           role: Database["public"]["Enums"]["user_role"]
           skills: Json
         }[]
