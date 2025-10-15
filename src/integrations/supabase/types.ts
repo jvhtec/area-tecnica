@@ -3667,8 +3667,8 @@ export type Database = {
           created_by: string | null
           department: string
           id: string
-          job_id: string | null
           is_template: boolean | null
+          job_id: string | null
           name: string
           tour_id: string | null
           updated_at: string | null
@@ -3679,8 +3679,8 @@ export type Database = {
           created_by?: string | null
           department?: string
           id?: string
-          job_id?: string | null
           is_template?: boolean | null
+          job_id?: string | null
           name: string
           tour_id?: string | null
           updated_at?: string | null
@@ -3691,8 +3691,8 @@ export type Database = {
           created_by?: string | null
           department?: string
           id?: string
-          job_id?: string | null
           is_template?: boolean | null
+          job_id?: string | null
           name?: string
           tour_id?: string | null
           updated_at?: string | null
@@ -3700,17 +3700,24 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "presets_tour_id_fkey"
-            columns: ["tour_id"]
+            foreignKeyName: "presets_job_id_fkey"
+            columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: "tours"
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "presets_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: "jobs"
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "presets_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
             referencedColumns: ["id"]
           },
         ]
@@ -3785,6 +3792,7 @@ export type Database = {
           id: string
           last_activity: string | null
           last_name: string | null
+          nickname: string | null
           phone: string | null
           residencia: string | null
           role: Database["public"]["Enums"]["user_role"]
@@ -3812,6 +3820,7 @@ export type Database = {
           id: string
           last_activity?: string | null
           last_name?: string | null
+          nickname?: string | null
           phone?: string | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -3839,6 +3848,7 @@ export type Database = {
           id?: string
           last_activity?: string | null
           last_name?: string | null
+          nickname?: string | null
           phone?: string | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -5618,6 +5628,7 @@ export type Database = {
         Row: {
           category: Database["public"]["Enums"]["equipment_category"] | null
           current_quantity: number | null
+          department: string | null
           equipment_id: string | null
           equipment_name: string | null
         }
@@ -5627,6 +5638,7 @@ export type Database = {
         Row: {
           base_quantity: number | null
           category: Database["public"]["Enums"]["equipment_category"] | null
+          department: string | null
           equipment_id: string | null
           equipment_name: string | null
           rental_boost: number | null
@@ -5798,6 +5810,10 @@ export type Database = {
       can_manage_users: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      clear_tour_preset_assignments: {
+        Args: { _preset_id: string; _tour_id: string }
+        Returns: undefined
       }
       compute_timesheet_amount_2025: {
         Args: { _persist?: boolean; _timesheet_id: string }
@@ -5996,6 +6012,10 @@ export type Database = {
       resolve_visibility: {
         Args: { _actor_id: string; _code: string; _job_id: string }
         Returns: Database["public"]["Enums"]["activity_visibility"]
+      }
+      sync_preset_assignments_for_tour: {
+        Args: { _preset_id: string; _tour_id: string }
+        Returns: undefined
       }
       update_tour_dates: {
         Args: Record<PropertyKey, never>
