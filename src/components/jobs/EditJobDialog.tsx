@@ -27,6 +27,7 @@ import { JobType } from "@/types/job";
 import { utcToLocalInput, localInputToUTC } from "@/utils/timezoneUtils";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
+import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
 
 interface EditJobDialogProps {
   open: boolean;
@@ -45,6 +46,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const [isVenueBusy, setIsVenueBusy] = useState(false);
+  const [requirementsOpen, setRequirementsOpen] = useState(false);
   
   // Venue-related state
   const [venueName, setVenueName] = useState("");
@@ -247,6 +249,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const departments: Department[] = ["sound", "lights", "video"];
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
         <DialogHeader>
@@ -374,6 +377,13 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                 </div>
               ))}
             </div>
+            {jobType !== 'dryhire' && (
+              <div className="pt-2">
+                <Button type="button" variant="outline" onClick={() => setRequirementsOpen(true)}>
+                  Manage Requirements
+                </Button>
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-2">
             <Button
@@ -390,5 +400,14 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         </form>
       </DialogContent>
     </Dialog>
+    {requirementsOpen && (
+      <JobRequirementsEditor
+        open={requirementsOpen}
+        onOpenChange={setRequirementsOpen}
+        jobId={job.id}
+        departments={selectedDepartments}
+      />
+    )}
+    </>
   );
 };

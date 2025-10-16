@@ -5,6 +5,7 @@ import { useTheme } from 'next-themes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { createQueryKey } from '@/lib/optimized-react-query';
+import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 
 export const useOptimizedJobCard = (
   job: any,
@@ -108,6 +109,48 @@ export const useOptimizedJobCard = (
       canCreateFlexFolders
     };
   }, [userRole]);
+
+  // Required roles summary for this job
+  const { data: reqSummary = [], byDepartment: reqByDept } = useRequiredRoleSummary(job?.id);
+
+  // Compute assigned counts per department and per role code (for comparisons)
+  const assignedMetrics = useMemo(() => {
+    const countsByDept: Record<string, number> = { sound: 0, lights: 0, video: 0 } as any;
+    const countsByRole: Record<string, number> = {};
+    const rows = Array.isArray(assignments) ? assignments : [];
+    for (const a of rows) {
+      if (a.sound_role) {
+        countsByDept.sound = (countsByDept.sound || 0) + 1;
+        countsByRole[a.sound_role] = (countsByRole[a.sound_role] || 0) + 1;
+      }
+      if (a.lights_role) {
+        countsByDept.lights = (countsByDept.lights || 0) + 1;
+        countsByRole[a.lights_role] = (countsByRole[a.lights_role] || 0) + 1;
+      }
+      if (a.video_role) {
+        countsByDept.video = (countsByDept.video || 0) + 1;
+        countsByRole[a.video_role] = (countsByRole[a.video_role] || 0) + 1;
+      }
+    }
+    return { countsByDept, countsByRole };
+  }, [assignments]);
+
+  // Compute shortages per department/role
+  const requiredVsAssigned = useMemo(() => {
+    const byDept: Record<string, { required: number; assigned: number; roles: Array<{ role_code: string; required: number; assigned: number }> }> = {};
+    for (const dept of ['sound', 'lights', 'video']) {
+      const sum = reqByDept.get?.(dept as any) || (reqSummary.find(r => r.department === dept) ?? null);
+      const required = sum?.total_required ?? 0;
+      const roles = (sum?.roles || []).map((r) => ({
+        role_code: r.role_code,
+        required: r.quantity,
+        assigned: assignedMetrics.countsByRole[r.role_code] || 0,
+      }));
+      const assigned = assignedMetrics.countsByDept[dept] || 0;
+      byDept[dept] = { required, assigned, roles };
+    }
+    return byDept;
+  }, [reqSummary, reqByDept, assignedMetrics]);
 
   // Optimized sound tasks query with proper key
   const { data: soundTasks } = useQuery({
@@ -257,6 +300,8 @@ export const useOptimizedJobCard = (
     collapsed,
     assignments,
     documents,
+    reqSummary,
+    requiredVsAssigned,
     soundTaskDialogOpen,
     lightsTaskDialogOpen,
     videoTaskDialogOpen,

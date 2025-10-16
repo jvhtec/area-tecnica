@@ -43,6 +43,7 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
+import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 
 interface JobAssignmentDialogProps {
   isOpen: boolean;
@@ -81,7 +82,7 @@ const formatAvailableTechnicianName = (technician: { first_name: string; last_na
 
 export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
-  const { user } = useOptimizedAuth();
+  const { user, userRole } = useOptimizedAuth();
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [soundRole, setSoundRole] = useState<string>("none");
   const [lightsRole, setLightsRole] = useState<string>("none");
@@ -130,6 +131,28 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   // Fetch crew call data for the current job and department
   const { data: crewCallData, isLoading: isLoadingCrewCall } = useCrewCallData(jobId, currentDepartment);
 
+  // Required roles summary for this job + department
+  const { data: reqSummary = [] } = useRequiredRoleSummary(jobId);
+  const reqForDept = React.useMemo(() => (reqSummary || []).find(r => r.department === currentDepartment) || null, [reqSummary, currentDepartment]);
+  const assignedByRole = React.useMemo(() => {
+    const m = new Map<string, number>();
+    (assignments || []).forEach((a: any) => {
+      const code = currentDepartment === 'sound' ? a.sound_role : currentDepartment === 'lights' ? a.lights_role : a.video_role;
+      if (code) m.set(code, (m.get(code) || 0) + 1);
+    });
+    return m;
+  }, [assignments, currentDepartment]);
+  const remainingByRole = React.useMemo(() => {
+    const m = new Map<string, number>();
+    const roles = reqForDept?.roles || [];
+    for (const r of roles) {
+      const have = assignedByRole.get(r.role_code) || 0;
+      const left = (r.quantity || 0) - have;
+      m.set(r.role_code, left);
+    }
+    return m;
+  }, [reqForDept, assignedByRole]);
+
   const handleAddTechnician = async () => {
     if (!selectedTechnician) {
       toast({
@@ -142,6 +165,16 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     setIsAdding(true);
 
     try {
+      // Guard against over-assignment when requirements exist and no override
+      const selectedCode = currentDepartment === 'sound' ? soundRole : currentDepartment === 'lights' ? lightsRole : 'none';
+      if (reqForDept && selectedCode && selectedCode !== 'none' && !['admin','management'].includes(userRole || '')) {
+        const left = remainingByRole.get(selectedCode) ?? 0;
+        if (left <= 0) {
+          toast({ title: 'Role full', description: 'No remaining slots for this role', variant: 'destructive' });
+          setIsAdding(false);
+          return;
+        }
+      }
       await addAssignment(selectedTechnician, soundRole, lightsRole);
 
       toast({
@@ -269,7 +302,18 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     }
   };
 
-  const getDepartmentRoleOptions = () => roleOptionsForDiscipline(currentDepartment);
+  const getDepartmentRoleOptions = () => {
+    const all = roleOptionsForDiscipline(currentDepartment);
+    if (reqForDept && !['admin','management'].includes(userRole || '')) {
+      const remainingSet = new Set(
+        Array.from(remainingByRole.entries())
+          .filter(([, left]) => left > 0)
+          .map(([code]) => code)
+      );
+      if (remainingSet.size > 0) return all.filter(opt => remainingSet.has(opt.code));
+    }
+    return all;
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -308,6 +352,11 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
             {crewCallData?.flex_element_id && (
               <span className="block text-sm text-muted-foreground mt-1">
                 Crew call available for {currentDepartment} department.
+              </span>
+            )}
+            {reqForDept && (
+              <span className="block text-sm text-muted-foreground mt-1">
+                Coverage: {(Array.from(assignedByRole.values()).reduce((a,b)=>a+b,0))}/{reqForDept.total_required} required
               </span>
             )}
           </DialogDescription>
@@ -351,11 +400,16 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {getDepartmentRoleOptions().map((opt) => (
-                    <SelectItem key={opt.code} value={opt.code}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
+                  {getDepartmentRoleOptions().map((opt) => {
+                    const left = remainingByRole.get(opt.code);
+                    const descr = reqForDept ? `${opt.label}${typeof left === 'number' ? ` (${Math.max(left,0)} left)` : ''}` : opt.label;
+                    const disabled = reqForDept && typeof left === 'number' && left <= 0 && !['admin','management'].includes(userRole || '');
+                    return (
+                      <SelectItem key={opt.code} value={opt.code} disabled={disabled}>
+                        {descr}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -372,11 +426,16 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {getDepartmentRoleOptions().map((opt) => (
-                    <SelectItem key={opt.code} value={opt.code}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
+                  {getDepartmentRoleOptions().map((opt) => {
+                    const left = remainingByRole.get(opt.code);
+                    const descr = reqForDept ? `${opt.label}${typeof left === 'number' ? ` (${Math.max(left,0)} left)` : ''}` : opt.label;
+                    const disabled = reqForDept && typeof left === 'number' && left <= 0 && !['admin','management'].includes(userRole || '');
+                    return (
+                      <SelectItem key={opt.code} value={opt.code} disabled={disabled}>
+                        {descr}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

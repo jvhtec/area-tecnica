@@ -308,6 +308,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     );
   }
 
+  const isDryhire = (jobDetails?.job_type || job?.job_type) === 'dryhire';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh]">
@@ -319,16 +321,16 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         </DialogHeader>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-          <TabsList className={`grid w-full ${jobDetails?.job_type === 'tourdate' ? (showExtrasTab ? 'grid-cols-7' : 'grid-cols-6') : (showExtrasTab ? 'grid-cols-6' : 'grid-cols-5')}`}>
+          <TabsList className={`grid w-full ${isDryhire ? 'grid-cols-1' : (jobDetails?.job_type === 'tourdate' ? (showExtrasTab ? 'grid-cols-7' : 'grid-cols-6') : (showExtrasTab ? 'grid-cols-6' : 'grid-cols-5'))}`}>
             <TabsTrigger value="info">Información</TabsTrigger>
-            <TabsTrigger value="location">Ubicación</TabsTrigger>
-            <TabsTrigger value="personnel">Personal</TabsTrigger>
-            <TabsTrigger value="documents">Documentos</TabsTrigger>
-            <TabsTrigger value="restaurants">Restaurantes</TabsTrigger>
-            {jobDetails?.job_type === 'tourdate' && (
+            {!isDryhire && <TabsTrigger value="location">Ubicación</TabsTrigger>}
+            {!isDryhire && <TabsTrigger value="personnel">Personal</TabsTrigger>}
+            {!isDryhire && <TabsTrigger value="documents">Documentos</TabsTrigger>}
+            {!isDryhire && <TabsTrigger value="restaurants">Restaurantes</TabsTrigger>}
+            {!isDryhire && jobDetails?.job_type === 'tourdate' && (
               <TabsTrigger value="tour-rates">Tarifas de gira</TabsTrigger>
             )}
-            {showExtrasTab && <TabsTrigger value="extras">Extras</TabsTrigger>}
+            {!isDryhire && showExtrasTab && <TabsTrigger value="extras">Extras</TabsTrigger>}
           </TabsList>
 
           <ScrollArea className="h-[500px] mt-4">
@@ -364,7 +366,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     <Badge variant="outline">{jobDetails?.job_type}</Badge>
                   </div>
 
-                  {isManager && (
+                  {isManager && !isDryhire && (
                     <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
                       <div className="flex items-center gap-2">
                         <Badge variant={jobDetails?.rates_approved ? 'default' : 'secondary'}>
@@ -423,6 +425,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               </Card>
             </TabsContent>
 
+            {!isDryhire && (
             <TabsContent value="location" className="space-y-4">
               <Card className="p-4">
                 {jobDetails?.locations ? (
@@ -503,7 +506,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 )}
               </Card>
             </TabsContent>
+            )}
 
+            {!isDryhire && (
             <TabsContent value="personnel" className="space-y-4">
               <Card className="p-4">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -554,7 +559,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 )}
               </Card>
             </TabsContent>
+            )}
 
+            {!isDryhire && (
             <TabsContent value="documents" className="space-y-4">
               <Card className="p-4">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -635,7 +642,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 )}
               </Card>
             </TabsContent>
+            )}
 
+            {!isDryhire && (
             <TabsContent value="restaurants" className="space-y-4">
               <Card className="p-4">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -709,14 +718,15 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 )}
               </Card>
             </TabsContent>
+            )}
 
-            {jobDetails?.job_type === 'tourdate' && (
+            {!isDryhire && jobDetails?.job_type === 'tourdate' && (
               <TabsContent value="tour-rates" className="space-y-4">
                 <TourRatesPanel jobId={jobDetails.id} />
               </TabsContent>
             )}
 
-            {showExtrasTab && (
+            {!isDryhire && showExtrasTab && (
               <TabsContent value="extras" className="space-y-4">
                 <JobExtrasManagement 
                   jobId={jobIdForExtras}

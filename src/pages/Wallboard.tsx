@@ -39,7 +39,7 @@ const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?
             {j.departments.map(d => (
               <div key={d} className="flex items-center gap-2">
                 <span className="text-2xl">{d==='sound'?'🎧':d==='lights'?'💡':'📹'}</span>
-                <span className="tabular-nums">{j.crewAssigned[d] || 0}/?</span>
+                <span className="tabular-nums">{(j.crewAssigned as any)[d] || 0}/{(j.crewNeeded as any)[d] ?? 0}</span>
               </div>
             ))}
           </div>
@@ -146,6 +146,12 @@ const Ticker: React.FC<{ messages: string[]; bottomOffset?: number }>=({ message
     const cw = containerRef.current?.offsetWidth || 0;
     setPosX(cw);
   }, [text]);
+
+  // Also reset to right edge on initial mount to avoid mid-screen starts
+  useEffect(() => {
+    const cw = containerRef.current?.offsetWidth || 0;
+    setPosX(cw);
+  }, []);
 
   // Smooth, endless loop: track translateX decreases; wrap by one copy width
   useEffect(() => {
@@ -257,7 +263,7 @@ export default function Wallboard() {
       // 1) Fetch jobs (base fields only)
       const { data: jobs, error: jobsError } = await supabase
         .from('jobs')
-        .select('id,title,start_time,end_time,status,location_id,job_type,tour_id')
+        .select('id,title,start_time,end_time,status,location_id,job_type,tour_id,timezone')
         .in('job_type', ['single','festival','tourdate','dryhire'])
         .in('status', ['Confirmado','Tentativa'])
         .lte('start_time', endISO)
@@ -310,6 +316,19 @@ export default function Wallboard() {
         assignsByJob.set(a.job_id, list);
       });
 
+      // Fetch required-role summaries for these jobs
+      const { data: reqRows, error: reqErr } = jobIds.length
+        ? await supabase
+            .from('job_required_roles_summary')
+            .select('job_id, department, total_required')
+            .in('job_id', jobIds)
+        : { data: [], error: null } as any;
+      if (reqErr) console.error('Wallboard job_required_roles_summary error:', reqErr);
+      const needByJobDept = new Map<string, number>();
+      (reqRows || []).forEach((r:any) => {
+        needByJobDept.set(`${r.job_id}:${r.department}`, Number(r.total_required || 0));
+      });
+
       // 4) Fetch locations for names
       const { data: locRows, error: locErr } = locationIds.length
         ? await supabase.from('locations').select('id,name').in('id', locationIds)
@@ -357,10 +376,30 @@ export default function Wallboard() {
             if (a.lights_role) crewAssigned.lights++;
             if (a.video_role) crewAssigned.video++;
           });
-          const present = depts.map(d=>crewAssigned[d]);
-          const hasAny = present.some(n=>n>0);
-          const allHave = depts.length>0 && present.every(n=>n>0);
-          const status: 'green'|'yellow'|'red' = allHave ? 'green' : hasAny ? 'yellow' : 'red';
+          const crewNeeded: any = { sound: 0, lights: 0, video: 0 };
+          depts.forEach(d => {
+            crewNeeded[d] = needByJobDept.get(`${j.id}:${d}`) || 0;
+          });
+          // Status by coverage when requirements exist
+          let status: 'green'|'yellow'|'red';
+          const hasReq = depts.some(d => (crewNeeded[d] || 0) > 0);
+          if (hasReq) {
+            const perDept = depts.map(d => {
+              const need = crewNeeded[d] || 0;
+              const have = crewAssigned[d] || 0;
+              if (need <= 0) return 1;
+              if (have >= need) return 1;
+              if (have > 0) return 0.5;
+              return 0;
+            });
+            const minCov = Math.min(...perDept);
+            status = minCov >= 1 ? 'green' : (minCov > 0 ? 'yellow' : 'red');
+          } else {
+            const present = depts.map(d=>crewAssigned[d]);
+            const hasAny = present.some(n=>n>0);
+            const allHave = depts.length>0 && present.every(n=>n>0);
+            status = allHave ? 'green' : hasAny ? 'yellow' : 'red';
+          }
           const docs: any = {};
           depts.forEach(d=>{
             const have = haveByJobDept.get(`${j.id}:${d}`) ?? 0;
@@ -375,7 +414,7 @@ export default function Wallboard() {
             location: { name: (j.location_id ? (locById.get(j.location_id) ?? null) : null) },
             departments: depts,
             crewAssigned: { ...crewAssigned, total: (crewAssigned.sound+crewAssigned.lights+crewAssigned.video) },
-            crewNeeded: { sound: 0, lights: 0, video: 0, total: 0 },
+            crewNeeded: { ...crewNeeded, total: (crewNeeded.sound + crewNeeded.lights + crewNeeded.video) },
             docs,
             status,
           };
@@ -445,9 +484,15 @@ export default function Wallboard() {
       const items: PendingActionsFeed['items'] = [];
       overviewPayload.jobs.forEach(j=>{
         if (dryhireIds.has(j.id)) return; // skip dryhire for pending
-        // Only consider sound/lights for crew checks
+        // Under-staffed alerts based on requirements where present (sound/lights only)
         j.departments.filter((d)=> d!=='video').forEach((d:Dept)=>{
-          if ((j.crewAssigned as any)[d] === 0) items.push({ severity: 'yellow', text: `${j.title} – missing crew (${d})`});
+          const need = (j.crewNeeded as any)[d] || 0;
+          const have = (j.crewAssigned as any)[d] || 0;
+          if (need > 0 && have < need) {
+            const startsInMs = new Date(j.start_time).getTime() - Date.now();
+            const within24h = startsInMs <= 24*3600*1000;
+            items.push({ severity: within24h ? 'red' : 'yellow', text: `${j.title} – ${need-have} open ${d} slot(s)`});
+          }
         });
         const ended24h = new Date(j.end_time).getTime() < Date.now() - 24*3600*1000;
         if (ended24h) {
@@ -489,7 +534,7 @@ export default function Wallboard() {
         const { data: trows } = await supabase.from('jobs').select('id,title').in('id', evtJobIds);
         (trows||[]).forEach((r:any)=> titlesByJob.set(r.id, r.title));
       }
-      const logisticsItems: LogisticsItem[] = evts.map((e:any)=>({
+      const logisticsItemsBase: LogisticsItem[] = evts.map((e:any)=>({
         id: e.id,
         date: e.event_date,
         time: e.event_time,
@@ -498,6 +543,38 @@ export default function Wallboard() {
         plate: e.license_plate ?? null,
         job_title: titlesByJob.get(e.job_id) || null,
       }));
+      // Also include confirmed dry-hire jobs as client pickups
+      // Helper to format ISO to date/time strings in the job's timezone
+      const toTZParts = (iso: string, tz?: string): { date: string; time: string } => {
+        try {
+          const d = new Date(iso);
+          const zone = tz || 'Europe/Madrid';
+          const dateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' });
+          const timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', hour12: false });
+          const date = dateFmt.format(d); // YYYY-MM-DD for en-CA
+          const time = timeFmt.format(d); // HH:mm for en-GB
+          return { date, time };
+        } catch {
+          return { date: (iso || '').slice(0,10), time: (iso || '').slice(11,16) };
+        }
+      };
+
+      const dryHireItems: LogisticsItem[] = jobArr
+        .filter((j:any)=> j.job_type==='dryhire' && (j.status==='Confirmado'))
+        .map((j:any)=>{
+          const { date, time } = toTZParts(j.start_time, j.timezone);
+          return {
+            id: `dryhire-${j.id}`,
+            date,
+            time,
+            title: j.title || 'Dry Hire',
+            transport_type: 'recogida cliente',
+            plate: null,
+            job_title: j.title || null,
+          } as LogisticsItem;
+        });
+      const logisticsItems: LogisticsItem[] = [...logisticsItemsBase, ...dryHireItems]
+        .sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
       if (!cancelled) setLogistics(logisticsItems);
     };
     fetchAll();
@@ -535,7 +612,7 @@ export default function Wallboard() {
         const messages: string[] = [];
         const now = Date.now();
         const updated = new Map(highlightJobs);
-        const HIGHLIGHT_TTL_MS = 2 * 60 * 1000; // 2 minutes
+        const HIGHLIGHT_TTL_MS = 5 * 60 * 1000; // auto-deactivate highlights after 5 minutes
         const staleIds: string[] = [];
         (data||[]).forEach((a:any) => {
           let m = a.message || '';
@@ -551,15 +628,8 @@ export default function Wallboard() {
             }
             m = m.replace(regex, '');
           }
-          // Include ticker message only if not a highlight directive or still within TTL
-          if (m.trim()) {
-            const created = a.created_at ? new Date(a.created_at).getTime() : now;
-            const expireAt = created + HIGHLIGHT_TTL_MS;
-            const isHighlight = !!match;
-            if (!isHighlight || expireAt > now) {
-              messages.push(m.trim());
-            }
-          }
+          // Always include the message body in the ticker
+          if (m.trim()) messages.push(m.trim());
         });
         // Drop expired
         for (const [jid, exp] of updated) {
@@ -569,7 +639,7 @@ export default function Wallboard() {
         setTickerMsgs(messages);
 
         // Best-effort cleanup of stale highlight announcements (DB flip to inactive)
-        if (staleIds.length && (userRole === 'admin' || userRole === 'management')) {
+        if (staleIds.length) {
           try {
             await supabase
               .from('announcements')

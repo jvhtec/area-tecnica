@@ -185,7 +185,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           {transportButtonLabel}
         </Button>
       )}
-      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && job.job_type !== 'tourdate' && (
+      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && job.job_type !== 'tourdate' && job.job_type !== 'dryhire' && (
         <Button
           variant="outline"
           size="sm"

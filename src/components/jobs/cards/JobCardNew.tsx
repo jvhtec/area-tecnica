@@ -38,6 +38,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
 import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
 import { LogisticsEventDialog } from "@/components/logistics/LogisticsEventDialog";
+import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
+import { Badge } from "@/components/ui/badge";
 
 export interface JobCardNewProps {
   job: any;
@@ -141,6 +143,7 @@ export function JobCardNew({
   const [flexLogDialogOpen, setFlexLogDialogOpen] = useState(false);
   const [transportDialogOpen, setTransportDialogOpen] = useState(false);
   const [logisticsDialogOpen, setLogisticsDialogOpen] = useState(false);
+  const [requirementsDialogOpen, setRequirementsDialogOpen] = useState(false);
   const [selectedTransportRequest, setSelectedTransportRequest] = useState<any | null>(null);
   const [logisticsInitialEventType, setLogisticsInitialEventType] = useState<'load' | 'unload' | undefined>(undefined);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
@@ -151,6 +154,8 @@ export function JobCardNew({
     collapsed,
     assignments,
     documents,
+    reqSummary,
+    requiredVsAssigned,
     soundTaskDialogOpen,
     lightsTaskDialogOpen,
     videoTaskDialogOpen,
@@ -747,7 +752,7 @@ export function JobCardNew({
 
         <div className="flex items-center justify-between px-6">
           <div className="flex items-center gap-2">
-            {isProjectManagementPage && (
+            {isProjectManagementPage && job.job_type !== 'dryhire' && (
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setRouteSheetOpen(true); }}
@@ -756,6 +761,9 @@ export function JobCardNew({
               >
                 Hoja de Ruta
               </button>
+            )}
+            {job.job_type === 'dryhire' && (
+              <Badge variant="destructive">RECOGIDA CLIENTE</Badge>
             )}
             <div className="flex-1" />
           </div>
@@ -792,13 +800,42 @@ export function JobCardNew({
             canSyncFlex={['admin','management','logistics'].includes(userRole || '')}
             onSyncFlex={syncStatusToFlex}
             onOpenFlexLogs={(e) => { e.stopPropagation(); setFlexLogDialogOpen(true); }}
-            transportButtonLabel={transportButtonLabel}
+            transportButtonLabel={job.job_type === 'dryhire' ? undefined : transportButtonLabel}
             transportButtonTone={transportButtonTone as any}
             onTransportClick={handleTransportClick}
             onCreateWhatsappGroup={handleCreateWhatsappGroup}
             whatsappDisabled={!!waGroup || !!waRequest}
           />
         </div>
+
+        {/* Required vs Assigned summary per department */}
+        {job.job_type !== 'dryhire' && Array.isArray(job.job_departments) && job.job_departments.length > 0 && (
+          <div className="px-6 mt-2 flex items-center justify-between">
+            <div className="flex gap-3 flex-wrap text-sm">
+              {job.job_departments.map((d: any) => {
+                const dept = d.department as 'sound'|'lights'|'video'
+                const stats = (requiredVsAssigned as any)[dept] || { required: 0, assigned: 0 }
+                const need = stats.required || 0
+                const have = stats.assigned || 0
+                const cls = need === 0 ? 'bg-muted text-muted-foreground' : (have >= need ? 'bg-green-500/20 text-green-700 dark:text-green-300' : (have > 0 ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300' : 'bg-red-500/20 text-red-700 dark:text-red-300'))
+                return (
+                  <div key={dept} className={`px-2 py-1 rounded ${cls}`}>
+                    <span className="capitalize">{dept}</span>: <span className="tabular-nums">{have}/{need}</span>
+                  </div>
+                )
+              })}
+            </div>
+            {['admin','management','logistics'].includes(userRole || '') && (
+              <button
+                type="button"
+                className="text-xs px-2 py-1 border rounded-md hover:bg-secondary"
+                onClick={(e) => { e.stopPropagation(); setRequirementsDialogOpen(true) }}
+              >
+                Edit requirements
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="px-6 pb-6">
           <div className="space-y-2 text-sm">
@@ -1049,6 +1086,15 @@ export function JobCardNew({
                 }
                 setLogisticsInitialEventType(undefined);
               }}
+            />
+          )}
+
+          {requirementsDialogOpen && (
+            <JobRequirementsEditor
+              open={requirementsDialogOpen}
+              onOpenChange={setRequirementsDialogOpen}
+              jobId={job.id}
+              departments={(job.job_departments || []).map((d: any) => d.department)}
             />
           )}
 

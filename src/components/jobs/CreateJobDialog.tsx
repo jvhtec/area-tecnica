@@ -20,6 +20,7 @@ import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { localInputToUTC } from "@/utils/timezoneUtils";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import type { LocationDetails } from "@/hooks/useLocationManagement";
+import { roleOptionsForDiscipline } from "@/types/roles";
 
 // Simplified schema for better performance
 const formSchema = z.object({
@@ -64,6 +65,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { getOrCreateLocationWithDetails } = useLocationManagement();
   const [locationInput, setLocationInput] = useState("");
+  const [requirements, setRequirements] = useState<Record<string, Array<{ role_code: string; quantity: number }>>>({});
 
   const formatInput = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -226,6 +228,22 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
       console.log("CreateJobDialog: Departments added successfully");
 
+      // Insert required roles if provided and not a dryhire
+      if (values.job_type !== 'dryhire') {
+        const rows: Array<{ job_id: string; department: string; role_code: string; quantity: number }>= [];
+        for (const dept of Object.keys(requirements)) {
+          for (const r of requirements[dept] || []) {
+            if (r.role_code && r.quantity > 0) rows.push({ job_id: job.id, department: dept, role_code: r.role_code, quantity: r.quantity });
+          }
+        }
+        if (rows.length > 0) {
+          const { error: reqErr } = await supabase.from('job_required_roles').insert(rows);
+          if (reqErr) {
+            console.warn('CreateJobDialog: Failed to insert required roles', reqErr);
+          }
+        }
+      }
+
       // Optimistically update the cache instead of invalidating
       queryClient.setQueryData(["jobs"], (oldData: any) => {
         if (!oldData) return oldData;
@@ -243,6 +261,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
       } catch {}
 
       reset();
+      setRequirements({});
       onOpenChange(false);
     } catch (error) {
       console.error("CreateJobDialog: Error creating job:", error);
@@ -413,6 +432,88 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
               </p>
             )}
           </div>
+
+          {/* Optional crew requirements (skip for dryhire) */}
+          {watch("job_type") !== 'dryhire' && selectedDepartments.length > 0 && (
+            <div className="space-y-2 border rounded-md p-3">
+              <Label className="font-semibold">Required Crew (optional)</Label>
+              <div className="space-y-3">
+                {selectedDepartments.map((dept) => (
+                  <div key={dept} className="space-y-2">
+                    <div className="text-sm capitalize font-medium">{dept}</div>
+                    {(requirements[dept] || []).map((r, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2">
+                        <div className="col-span-8">
+                          <Select
+                            value={r.role_code}
+                            onValueChange={(v) => {
+                              setRequirements((prev) => {
+                                const list = [...(prev[dept] || [])]
+                                list[idx] = { ...list[idx], role_code: v }
+                                return { ...prev, [dept]: list }
+                              })
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {roleOptionsForDiscipline(dept).map((opt) => (
+                                <SelectItem key={opt.code} value={opt.code}>{opt.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={r.quantity}
+                            onChange={(e) => {
+                              const val = Math.max(0, Math.floor(Number(e.target.value) || 0))
+                              setRequirements((prev) => {
+                                const list = [...(prev[dept] || [])]
+                                list[idx] = { ...list[idx], quantity: val }
+                                return { ...prev, [dept]: list }
+                              })
+                            }}
+                          />
+                        </div>
+                        <div className="col-span-1 flex items-center justify-end">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={() => setRequirements((prev) => {
+                              const list = [...(prev[dept] || [])]
+                              list.splice(idx, 1)
+                              return { ...prev, [dept]: list }
+                            })}
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setRequirements((prev) => {
+                          const list = [...(prev[dept] || [])]
+                          const first = roleOptionsForDiscipline(dept)[0]?.code || ''
+                          list.push({ role_code: first, quantity: 1 })
+                          return { ...prev, [dept]: list }
+                        })}
+                      >
+                        Add role
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="w-full flex justify-end">
             <Button type="submit" disabled={isSubmitting} className="gap-2">

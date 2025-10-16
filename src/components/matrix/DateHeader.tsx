@@ -89,6 +89,29 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
   const jobColors = getJobIndicatorColors();
   const { data: confirmedForDate } = useDateConfirmedCount(date, jobs, technicianIds);
 
+  // Aggregate open slots across jobs on this date (all departments)
+  const jobIds = React.useMemo(() => (jobs || []).map(j => j.id), [jobs]);
+  const { data: openSlots } = useQuery({
+    queryKey: ['matrix-open-slots', jobIds.join(',')],
+    queryFn: async () => {
+      if (!jobIds.length) return { required: 0, assigned: 0, open: 0 };
+      const [{ data: req }, { data: a1 }, { data: a2 }, { data: a3 }] = await Promise.all([
+        supabase.from('job_required_roles_summary').select('total_required, job_id').in('job_id', jobIds),
+        supabase.from('job_assignments').select('id,sound_role').in('job_id', jobIds),
+        supabase.from('job_assignments').select('id,lights_role').in('job_id', jobIds),
+        supabase.from('job_assignments').select('id,video_role').in('job_id', jobIds),
+      ]);
+      const required = (req || []).reduce((acc: number, r: any) => acc + (Number(r.total_required || 0)), 0);
+      const assigned = (a1 || []).filter((r:any)=> r.sound_role != null).length
+        + (a2 || []).filter((r:any)=> r.lights_role != null).length
+        + (a3 || []).filter((r:any)=> r.video_role != null).length;
+      const open = Math.max(required - assigned, 0);
+      return { required, assigned, open };
+    },
+    staleTime: 10_000,
+    enabled: hasJobs,
+  });
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -152,6 +175,11 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
               <Badge variant="default" className="text-[10px] px-1 py-0 h-4 leading-none" title="Confirmed technicians on this date">
                 {confirmedForDate ?? 0}
               </Badge>
+              {openSlots && openSlots.required > 0 && (
+                <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 leading-none" title="Open slots across jobs">
+                  {openSlots.open} open
+                </Badge>
+              )}
             </div>
           )}
         </div>
