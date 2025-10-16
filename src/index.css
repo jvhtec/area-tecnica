@@ -282,4 +282,7 @@
   .matrix-layout {
     font-size: 0.875rem;
   }
+  .matrix-row {
+    contain-intrinsic-size: 80px;
+  }
 }

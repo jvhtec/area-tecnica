@@ -28,9 +28,10 @@ interface TechnicianRowProps {
   };
   height: number;
   isFridge?: boolean;
+  compact?: boolean;
 }
 
-const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianRowProps) => {
+const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false }: TechnicianRowProps) => {
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const [skillsOpen, setSkillsOpen] = React.useState(false);
@@ -166,44 +167,63 @@ const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianR
     }
   };
 
+  const deptAbbrev = (technician.department || '').slice(0, 3).toUpperCase();
+
   return (
     <>
     <Popover open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
       <PopoverTrigger asChild>
         <div 
-          className="border-b p-3 hover:bg-accent/50 cursor-pointer transition-colors"
-          style={{ height }}
+          className="border-b hover:bg-accent/50 cursor-pointer transition-colors"
+          style={{ height, padding: compact ? '0.25rem' : '0.75rem' }}
+          title={compact ? displayName : undefined}
         >
-          <div className="flex items-center gap-3 h-full">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="text-xs">
-                {getInitials()}
-              </AvatarFallback>
-            </Avatar>
-            
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm truncate">
-                {displayName}
+          {compact ? (
+            <div className="h-full flex flex-col items-center justify-center">
+              <div className="relative">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="text-xs">
+                    {getInitials()}
+                  </AvatarFallback>
+                </Avatar>
                 {isFridge && (
-                  <Refrigerator className="inline-block h-3.5 w-3.5 ml-1 text-sky-600" />
+                  <Refrigerator className="absolute -top-1 -right-1 h-3.5 w-3.5 text-sky-600" />
                 )}
               </div>
-              <div className="flex gap-1 mt-1 flex-wrap">
-                <Badge 
-                  variant="secondary" 
-                  className={`text-xs ${getDepartmentColor(technician.department)}`}
-                >
-                  {technician.department}
-                </Badge>
-                <Badge 
-                  variant="outline" 
-                  className={`text-xs ${getRoleColor(technician.role)}`}
-                >
-                  {technician.role === 'house_tech' ? 'House Tech' : 'Technician'}
-                </Badge>
+              <div className="mt-1 text-[10px] leading-none text-muted-foreground">{deptAbbrev}</div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 h-full">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="text-xs">
+                  {getInitials()}
+                </AvatarFallback>
+              </Avatar>
+              
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm truncate">
+                  {displayName}
+                  {isFridge && (
+                    <Refrigerator className="inline-block h-3.5 w-3.5 ml-1 text-sky-600" />
+                  )}
+                </div>
+                <div className="flex gap-1 mt-1 flex-wrap">
+                  <Badge 
+                    variant="secondary" 
+                    className={`text-xs ${getDepartmentColor(technician.department)}`}
+                  >
+                    {technician.department}
+                  </Badge>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${getRoleColor(technician.role)}`}
+                  >
+                    {technician.role === 'house_tech' ? 'House Tech' : 'Technician'}
+                  </Badge>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </PopoverTrigger>
       

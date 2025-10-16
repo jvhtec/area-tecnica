@@ -39,6 +39,7 @@ interface OptimizedMatrixCellProps {
   staffingStatusProvided?: { availability_status: any; offer_status: any } | null;
   staffingStatusByDateProvided?: { availability_status: any; offer_status: any; availability_job_id?: string | null; offer_job_id?: string | null } | null;
   isFridge?: boolean;
+  mobile?: boolean;
 }
 
 export const OptimizedMatrixCell = memo(({
@@ -59,7 +60,8 @@ export const OptimizedMatrixCell = memo(({
   declinedJobIdsSet = new Set<string>(),
   staffingStatusProvided = null,
   staffingStatusByDateProvided = null,
-  isFridge = false
+  isFridge = false,
+  mobile = false
 }: OptimizedMatrixCellProps) => {
   // Track cell renders for performance monitoring
   React.useEffect(() => {
@@ -206,6 +208,9 @@ export const OptimizedMatrixCell = memo(({
 
   // Skip noisy debug logs in production
 
+  const statusBadgesPosClass = mobile ? 'absolute top-1 right-1' : 'absolute bottom-1 left-1';
+  const actionButtonsPosClass = mobile ? 'absolute bottom-1 left-1' : 'absolute top-1 right-1';
+  const actionBtnSize = mobile ? 'h-8 w-8' : 'h-5 w-5';
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -237,7 +242,7 @@ export const OptimizedMatrixCell = memo(({
       )}
       {/* Staffing Status Badges */}
       {(staffingStatus?.availability_status || staffingStatus?.offer_status) && (
-        <div className="absolute bottom-1 left-1 flex gap-1 z-10">
+        <div className={`${statusBadgesPosClass} flex gap-1 z-10`}>
           {staffingStatus.availability_status && (
             <>
               <button
@@ -334,23 +339,23 @@ export const OptimizedMatrixCell = memo(({
 
       {/* Staffing Action Buttons */}
       {(canAskAvailability || canSendOffer || canOfferFallback) && (
-        <div className="absolute top-1 right-1 flex gap-1 z-10">
+        <div className={`${actionButtonsPosClass} flex gap-1 z-10`}>
           {canAskAvailability && (
             <>
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-5 w-5 p-0 hover:bg-blue-100"
+                size={mobile ? 'default' : 'sm'}
+                className={`${actionBtnSize} p-0 hover:bg-blue-100`}
                 onClick={(e) => handleStaffingEmail(e, 'availability')}
                 disabled={isSendingEmail}
                 title="Ask availability"
               >
-                <Mail className="h-3 w-3 text-blue-600" />
+                <Mail className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-blue-600`} />
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-5 w-5 p-0 hover:bg-emerald-100"
+                size={mobile ? 'default' : 'sm'}
+                className={`${actionBtnSize} p-0 hover:bg-emerald-100`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onClick('availability-wa');
@@ -358,7 +363,7 @@ export const OptimizedMatrixCell = memo(({
                 disabled={isSendingEmail}
                 title="Ask availability via WhatsApp"
               >
-                <MessageCircle className="h-3 w-3 text-emerald-600" />
+                <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-emerald-600`} />
               </Button>
             </>
           )}
@@ -366,18 +371,18 @@ export const OptimizedMatrixCell = memo(({
             <>
               <Button
                 variant="ghost"
-                size="sm"
-                className={`h-5 w-5 p-0 ${canSendOffer ? 'hover:bg-green-100' : 'opacity-80 hover:bg-muted'}`}
+                size={mobile ? 'default' : 'sm'}
+                className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-green-100' : 'opacity-80 hover:bg-muted'}`}
                 onClick={(e) => handleStaffingEmail(e, 'offer')}
                 disabled={isSendingEmail}
                 title={canSendOffer ? 'Send offer' : 'Send offer (manual progress)'}
               >
-                <CheckCircle className={`h-3 w-3 ${canSendOffer ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <CheckCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-green-600' : 'text-muted-foreground'}`} />
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
-                className={`h-5 w-5 p-0 ${canSendOffer ? 'hover:bg-emerald-100' : 'opacity-80 hover:bg-muted'}`}
+                size={mobile ? 'default' : 'sm'}
+                className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-emerald-100' : 'opacity-80 hover:bg-muted'}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onClick('offer-details-wa', jobId || assignment?.job_id || undefined);
@@ -385,7 +390,7 @@ export const OptimizedMatrixCell = memo(({
                 disabled={isSendingEmail}
                 title={canSendOffer ? 'Send offer via WhatsApp' : 'Send offer via WhatsApp (manual progress)'}
               >
-                <MessageCircle className={`h-3 w-3 ${canSendOffer ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+                <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-emerald-600' : 'text-muted-foreground'}`} />
               </Button>
             </>
           )}

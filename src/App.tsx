@@ -57,6 +57,12 @@ import Announcements from '@/pages/Announcements';
 import RatesCenterPage from '@/pages/RatesCenterPage';
 import { useActivityPushFallback } from '@/hooks/useActivityPushFallback';
 
+// Initialize activity push fallback within auth context
+function ActivityPushFallbackInit() {
+  useActivityPushFallback();
+  return null;
+}
+
 export default function App() {
   // Initialize multi-tab coordinator
   React.useEffect(() => {
@@ -67,9 +73,6 @@ export default function App() {
     };
   }, []);
 
-  // Optional fallback: mirror new activity_log events to push notifications
-  useActivityPushFallback();
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme">
@@ -77,6 +80,7 @@ export default function App() {
           <Router>
             <OptimizedAuthProvider>
               <AppInit />
+              <ActivityPushFallbackInit />
               <div className="app">
                 <Routes>
                   <Route path="/" element={<Auth />} />

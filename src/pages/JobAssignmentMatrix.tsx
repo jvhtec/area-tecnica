@@ -17,6 +17,8 @@ import { SkillsFilter } from '@/components/matrix/SkillsFilter';
 
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -232,6 +234,25 @@ export default function JobAssignmentMatrix() {
 
   const departments = ['all', 'sound', 'lights', 'video'];
 
+  // Responsive breakpoint detection
+  React.useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth <= 768);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  // Active filters count for mobile badge
+  const activeFilterCount = React.useMemo(() => {
+    let c = 0;
+    if (selectedDepartment !== 'all') c++;
+    if (debouncedSearch) c++;
+    if (selectedSkills.length) c += selectedSkills.length;
+    if (hideFridge) c++;
+    if (allowDirectAssign) c++;
+    return c;
+  }, [selectedDepartment, debouncedSearch, selectedSkills, hideFridge, allowDirectAssign]);
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
@@ -253,19 +274,21 @@ export default function JobAssignmentMatrix() {
           </Button>
         </div>
 
-        {/* Date Range Controls */}
-        <DateRangeExpander
-          canExpandBefore={canExpandBefore}
-          canExpandAfter={canExpandAfter}
-          onExpandBefore={expandBefore}
-          onExpandAfter={expandAfter}
-          onReset={resetRange}
-          onJumpToMonth={jumpToMonth}
-          rangeInfo={rangeInfo}
-        />
+        {/* Date Range Controls - hidden on mobile (use in-header arrows instead) */}
+        <div className="hidden md:block">
+          <DateRangeExpander
+            canExpandBefore={canExpandBefore}
+            canExpandAfter={canExpandAfter}
+            onExpandBefore={expandBefore}
+            onExpandAfter={expandAfter}
+            onReset={resetRange}
+            onJumpToMonth={jumpToMonth}
+            rangeInfo={rangeInfo}
+          />
+        </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+        <div className="hidden md:flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4" />
             <span className="text-sm font-medium">Filters:</span>
@@ -344,6 +367,76 @@ export default function JobAssignmentMatrix() {
             </div>
           </div>
         </div>
+
+        {/* Mobile filter toggle + panel */}
+        <div className="md:hidden mt-2">
+          <div className="flex items-center justify-between">
+            <button
+              className="text-sm font-medium px-3 py-2 border rounded-md bg-background"
+              onClick={() => setFiltersOpen(v => !v)}
+              aria-expanded={filtersOpen}
+              aria-controls="mobile-filters"
+            >
+              Filters {activeFilterCount > 0 && <span className="ml-2 inline-flex items-center justify-center text-[10px] h-5 min-w-[20px] px-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">{activeFilterCount}</span>}
+            </button>
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <Badge variant="secondary" className="text-xs">
+                {filteredTechnicians.length} techs
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {yearJobs.length} jobs
+              </Badge>
+            </div>
+          </div>
+          {filtersOpen && (
+            <div id="mobile-filters" className="mt-2 max-h-[300px] overflow-y-auto p-2 border rounded-md bg-muted/30 space-y-2">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                <span className="text-sm font-medium">Filters</span>
+                {activeFilterCount > 0 && (
+                  <button className="ml-auto text-xs underline" onClick={() => { setSelectedDepartment('all'); setSearchTerm(''); setSelectedSkills([]); setHideFridge(false); setAllowDirectAssign(false); }}>
+                    Clear all
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map(dept => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept === 'all' ? 'All Departments' : dept.charAt(0).toUpperCase() + dept.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Input
+                placeholder="Search technicians..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <SkillsFilter selected={selectedSkills} onChange={setSelectedSkills} />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Refrigerator className="h-4 w-4" />
+                  <span className="text-sm font-medium">{hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={hideFridge} onCheckedChange={(v) => setHideFridge(Boolean(v))} aria-label={hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'} />
+                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{fridgeCount}</Badge>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Direct assign</span>
+                <Switch checked={allowDirectAssign} onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))} aria-label="Toggle direct assignment" />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Matrix Content */}
@@ -362,6 +455,11 @@ export default function JobAssignmentMatrix() {
             jobs={yearJobs}
             fridgeSet={fridgeSet}
             allowDirectAssign={allowDirectAssign}
+            mobile={isMobile}
+            cellWidth={isMobile ? 140 : undefined}
+            cellHeight={isMobile ? 80 : undefined}
+            technicianWidth={isMobile ? 110 : undefined}
+            headerHeight={isMobile ? 50 : undefined}
             onNearEdgeScroll={(direction) => {
               if (direction === 'before' && canExpandBefore) {
                 expandBefore();

@@ -68,6 +68,11 @@ interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignmentMatr
   canExpandAfter?: boolean;
   allowDirectAssign?: boolean;
   fridgeSet?: Set<string>;
+  cellWidth?: number;
+  cellHeight?: number;
+  technicianWidth?: number;
+  headerHeight?: number;
+  mobile?: boolean;
 }
 
 export const OptimizedAssignmentMatrix = ({ 
@@ -78,7 +83,12 @@ export const OptimizedAssignmentMatrix = ({
   canExpandBefore = false,
   canExpandAfter = false,
   allowDirectAssign = false,
-  fridgeSet
+  fridgeSet,
+  cellWidth,
+  cellHeight,
+  technicianWidth,
+  headerHeight,
+  mobile = false
 }: OptimizedAssignmentMatrixExtendedProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
@@ -103,11 +113,11 @@ export const OptimizedAssignmentMatrix = ({
   const { toast } = useToast();
   const { mutate: sendStaffingEmail } = useSendStaffingEmail();
   
-  // Cell dimensions
-  const CELL_WIDTH = 160;
-  const CELL_HEIGHT = 60;
-  const TECHNICIAN_WIDTH = 256;
-  const HEADER_HEIGHT = 80;
+  // Cell dimensions (overridable for mobile)
+  const CELL_WIDTH = cellWidth ?? 160;
+  const CELL_HEIGHT = cellHeight ?? 60;
+  const TECHNICIAN_WIDTH = technicianWidth ?? 256;
+  const HEADER_HEIGHT = headerHeight ?? 80;
 
   // Use optimized data hook
   const {
@@ -297,6 +307,7 @@ export const OptimizedAssignmentMatrix = ({
     if (syncInProgressRef.current) return;
     const scrollLeft = e.currentTarget.scrollLeft;
     syncScrollPositions(scrollLeft, mainScrollRef.current?.scrollTop || 0, 'dateHeaders');
+    updateNavAvailability();
   }, [syncScrollPositions]);
 
   const handleTechnicianScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -613,6 +624,49 @@ export const OptimizedAssignmentMatrix = ({
     prevDatesRef.current = dates.slice();
   }, [dates]);
 
+  // Mobile date navigation state
+  const [canNavLeft, setCanNavLeft] = useState(false);
+  const [canNavRight, setCanNavRight] = useState(true);
+  const [navStep, setNavStep] = useState(3);
+
+  // Determine step (3-4) based on header width
+  useEffect(() => {
+    if (!mobile) return;
+    const updateStep = () => {
+      const w = dateHeadersRef.current?.clientWidth || 0;
+      const cols = Math.max(3, Math.min(4, Math.floor(w / CELL_WIDTH)) || 3);
+      setNavStep(cols);
+    };
+    updateStep();
+    window.addEventListener('resize', updateStep);
+    return () => window.removeEventListener('resize', updateStep);
+  }, [mobile, CELL_WIDTH]);
+
+  const updateNavAvailability = useCallback(() => {
+    if (!mobile) return;
+    const el = dateHeadersRef.current;
+    if (!el) return;
+    const sl = el.scrollLeft;
+    const max = el.scrollWidth - el.clientWidth - 1;
+    setCanNavLeft(sl > 2);
+    setCanNavRight(sl < max);
+  }, [mobile]);
+
+  useEffect(() => {
+    if (!mobile) return;
+    updateNavAvailability();
+  }, [mobile, visibleCols, dates.length, updateNavAvailability]);
+
+  const handleMobileNav = useCallback((dir: 'left' | 'right') => {
+    const el = dateHeadersRef.current;
+    const main = mainScrollRef.current;
+    if (!el || !main) return;
+    const delta = navStep * CELL_WIDTH * (dir === 'left' ? -1 : 1);
+    const target = Math.max(0, Math.min(el.scrollLeft + delta, el.scrollWidth - el.clientWidth));
+    el.scrollTo({ left: target, behavior: 'smooth' });
+    main.scrollTo({ left: target, top: main.scrollTop, behavior: 'smooth' as ScrollBehavior });
+  }, [navStep, CELL_WIDTH]);
+
   // Batched staffing statuses for visible window
   const orderedTechnicians = useMemo(() => {
     if (!sortJobId) return technicians;
@@ -699,7 +753,9 @@ export const OptimizedAssignmentMatrix = ({
         }}
       >
         <div className="flex items-center justify-between h-full bg-card border-r border-b px-2">
-          <div className="font-semibold">Technicians</div>
+          <div className="font-semibold" aria-label={mobile ? `Techs (${technicians.length})` : 'Technicians'}>
+            {mobile ? `Techs (${technicians.length})` : 'Technicians'}
+          </div>
           {isManagementUser && (
             <Button size="sm" variant="outline" className="h-8" onClick={() => setCreateUserOpen(true)}>
               <UserPlus className="h-4 w-4 mr-1" /> Add
@@ -719,6 +775,28 @@ export const OptimizedAssignmentMatrix = ({
         }}
         onScroll={handleDateHeadersScroll}
       >
+        {mobile && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-1">
+            <button
+              aria-label="Previous dates"
+              className={`pointer-events-auto rounded-full bg-background/80 border shadow h-8 w-8 flex items-center justify-center ${canNavLeft ? 'opacity-100' : 'opacity-40'}`}
+              onClick={(e) => { e.stopPropagation(); handleMobileNav('left'); }}
+              disabled={!canNavLeft}
+            >
+              <span className="sr-only">Previous</span>
+              {'<'}
+            </button>
+            <button
+              aria-label="Next dates"
+              className={`pointer-events-auto rounded-full bg-background/80 border shadow h-8 w-8 flex items-center justify-center ${canNavRight ? 'opacity-100' : 'opacity-40'}`}
+              onClick={(e) => { e.stopPropagation(); handleMobileNav('right'); }}
+              disabled={!canNavRight}
+            >
+              <span className="sr-only">Next</span>
+              {'>'}
+            </button>
+          </div>
+        )}
         <div style={{ width: matrixWidth, height: '100%', display: 'flex', position: 'relative' }}>
           {/* Leading spacer for virtualized columns */}
           <div style={{ width: visibleCols.start * CELL_WIDTH }} />
@@ -762,6 +840,8 @@ export const OptimizedAssignmentMatrix = ({
                 technician={technician}
                 height={CELL_HEIGHT}
                 isFridge={fridgeSet?.has(technician.id) || false}
+                // @ts-ignore – optional prop for compact rendering
+                compact={mobile}
               />
             ))}
           </div>
@@ -843,6 +923,7 @@ export const OptimizedAssignmentMatrix = ({
                         staffingStatusProvided={providedByJob}
                         staffingStatusByDateProvided={providedByDate}
                         isFridge={fridgeSet?.has(technician.id) || false}
+                        mobile={mobile}
                       />
                     </div>
                   );
