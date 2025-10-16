@@ -31,6 +31,19 @@ type PushSubscriptionRow = {
   auth: string | null;
 };
 
+type PushPayload = {
+  title: string;
+  body?: string;
+  url?: string;
+  type?: string;
+  meta?: Record<string, unknown>;
+};
+
+type PushSendResult =
+  | { ok: true }
+  | { ok: false; skipped: true }
+  | { ok: false; status: number };
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
@@ -75,6 +88,43 @@ async function getUserId(client: ReturnType<typeof createClient>, token: string)
   return data.user.id;
 }
 
+async function sendPushNotification(
+  client: ReturnType<typeof createClient>,
+  subscription: PushSubscriptionRow,
+  payload: PushPayload,
+) : Promise<PushSendResult> {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return { ok: false, skipped: true };
+  }
+
+  if (!subscription.p256dh || !subscription.auth) {
+    console.warn("push missing keys for endpoint", subscription.endpoint);
+    return { ok: false, skipped: true };
+  }
+
+  try {
+    await webpush.sendNotification(
+      {
+        endpoint: subscription.endpoint,
+        keys: { p256dh: subscription.p256dh, auth: subscription.auth },
+      },
+      JSON.stringify(payload),
+      { TTL: 60 },
+    );
+
+    return { ok: true };
+  } catch (err) {
+    const status = (err as any)?.statusCode ?? (err as any)?.status ?? 500;
+    console.error("push send error", err);
+
+    if (status === 404 || status === 410) {
+      await client.from("push_subscriptions").delete().eq("endpoint", subscription.endpoint);
+    }
+
+    return { ok: false, status };
+  }
+}
+
 async function handleSubscribe(
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -104,7 +154,35 @@ async function handleSubscribe(
     return jsonResponse({ error: "Failed to persist subscription" }, 500);
   }
 
-  return jsonResponse({ status: "subscribed" });
+  const welcomeResult = await sendPushNotification(
+    client,
+    {
+      endpoint: body.subscription.endpoint,
+      p256dh: body.subscription.keys?.p256dh ?? null,
+      auth: body.subscription.keys?.auth ?? null,
+    },
+    {
+      title: "Push notifications ready",
+      body: "You'll now receive updates from Sector Pro.",
+      url: "/",
+      type: "welcome",
+    },
+  );
+
+  const notificationStatus = welcomeResult.ok
+    ? "sent"
+    : "skipped" in welcomeResult
+      ? "skipped"
+      : "failed";
+
+  return jsonResponse({
+    status: "subscribed",
+    notification: notificationStatus,
+    errorCode:
+      welcomeResult.ok || "skipped" in welcomeResult
+        ? undefined
+        : welcomeResult.status,
+  });
 }
 
 async function handleUnsubscribe(
@@ -160,29 +238,17 @@ async function handleTest(
     url: body.url ?? "/",
   };
 
-  const results: Array<{ endpoint: string; ok: boolean; status?: number }> = [];
+  const results: Array<{ endpoint: string; ok: boolean; status?: number; skipped?: boolean }> = [];
 
   await Promise.all(
     data.map(async (sub) => {
-      try {
-        await webpush.sendNotification(
-          {
-            endpoint: sub.endpoint,
-            keys: { p256dh: sub.p256dh ?? "", auth: sub.auth ?? "" },
-          },
-          JSON.stringify(payload),
-          { TTL: 60 },
-        );
-        results.push({ endpoint: sub.endpoint, ok: true });
-      } catch (err) {
-        const status = (err as any)?.statusCode ?? (err as any)?.status ?? 500;
-        console.error("push test send error", err);
-        results.push({ endpoint: sub.endpoint, ok: false, status });
-
-        if (status === 404 || status === 410) {
-          await client.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
-        }
-      }
+      const result = await sendPushNotification(client, sub, payload);
+      results.push({
+        endpoint: sub.endpoint,
+        ok: result.ok,
+        status: "status" in result ? result.status : undefined,
+        skipped: "skipped" in result ? result.skipped : undefined,
+      });
     }),
   );
 
