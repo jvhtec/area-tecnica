@@ -25,6 +25,22 @@ self.addEventListener('install', (event) => {
   )
 })
 
+self.broadcastToClients = async (type, data) => {
+  try {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    const message = { source: 'sw', type, data, ts: Date.now() }
+    for (const client of windows) {
+      try {
+        client.postMessage(message)
+      } catch (e) {
+        // ignore
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
@@ -62,7 +78,11 @@ self.addEventListener('push', (event) => {
   let payload = {}
 
   try {
+    // Basic visibility into push delivery
+    console.log('[sw] push event received', { hasData: !!event.data })
     payload = event.data ? event.data.json() : {}
+    console.log('[sw] push payload', payload)
+    event.waitUntil(self.broadcastToClients('push-received', payload))
   } catch (error) {
     console.error('Unable to parse push payload', error)
   }
@@ -80,7 +100,24 @@ self.addEventListener('push', (event) => {
     actions: [{ action: 'open', title: 'Open' }]
   }
 
-  event.waitUntil(self.registration.showNotification(title, options))
+  event.waitUntil(
+    (async () => {
+      try {
+        await self.registration.showNotification(title, options)
+        console.log('[sw] notification shown')
+        await self.broadcastToClients('notification-shown', { title, options })
+      } catch (err) {
+        console.error('[sw] showNotification failed', err)
+        await self.broadcastToClients('notification-error', { error: String(err) })
+      }
+    })()
+  )
+})
+
+// Helpful for diagnosing expiration/rotation issues on some browsers
+self.addEventListener('pushsubscriptionchange', (event) => {
+  console.warn('[sw] pushsubscriptionchange event', event)
+  event.waitUntil(self.broadcastToClients('pushsubscriptionchange', {}))
 })
 
 self.addEventListener('notificationclick', (event) => {
@@ -102,10 +139,33 @@ self.addEventListener('notificationclick', (event) => {
       })
 
       if (existingWindow) {
+        await self.broadcastToClients('notification-click', { url: targetUrl, reused: true })
         return existingWindow.focus()
       }
 
+      await self.broadcastToClients('notification-click', { url: targetUrl, reused: false })
       return clients.openWindow(targetUrl)
     })()
   )
+})
+
+// Allow page to invoke simple test notifications and ping
+self.addEventListener('message', (event) => {
+  const { type, data } = event.data || {}
+  if (type === 'sw:show-test') {
+    event.waitUntil(
+      (async () => {
+        try {
+          await self.registration.showNotification(data?.title || 'SW test', {
+            body: data?.body || 'Local SW notification',
+          })
+          await self.broadcastToClients('test-notification-shown', {})
+        } catch (e) {
+          await self.broadcastToClients('test-notification-error', { error: String(e) })
+        }
+      })()
+    )
+  } else if (type === 'sw:ping') {
+    event.source?.postMessage({ source: 'sw', type: 'sw:pong', ts: Date.now() })
+  }
 })

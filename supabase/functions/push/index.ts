@@ -126,7 +126,10 @@ async function sendPushNotification(
         keys: { p256dh: subscription.p256dh, auth: subscription.auth },
       },
       JSON.stringify(payload),
-      { TTL: 60 },
+      {
+        TTL: 3600, // allow up to 1 hour for devices to come online
+        urgency: 'high',
+      },
     );
 
     console.log('✅ Push notification sent successfully');

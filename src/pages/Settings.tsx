@@ -21,7 +21,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Bell } from "lucide-react";
+import { Bell, Bug } from "lucide-react";
+import { useEffect, useState } from 'react'
+import { usePushDebug } from '@/hooks/usePushDebug'
 
 const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -103,6 +105,15 @@ const Settings = () => {
       });
     }
   };
+
+  // Debug: surface SW messages and quick local test (helps on iOS without a Mac)
+  const { events, showLocalTest, getSubscriptionInfo } = usePushDebug()
+  const [subInfo, setSubInfo] = useState<any | null>(null)
+  useEffect(() => {
+    void (async () => {
+      setSubInfo(await getSubscriptionInfo())
+    })()
+  }, [subscription])
 
   return (
     <div className="space-y-6">
@@ -205,6 +216,46 @@ const Settings = () => {
               )}
             </CardContent>
           </Card>
+
+          {isSupported && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Bug className="h-4 w-4" /> Push diagnostics</CardTitle>
+                <CardDescription>Useful when you can’t access Safari’s Web Inspector.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-sm space-y-1">
+                  <p><span className="font-medium">Permission:</span> {permissionLabel}</p>
+                  <p><span className="font-medium">Has subscription:</span> {hasSubscription ? 'Yes' : 'No'}</p>
+                  {subInfo?.endpoint && (
+                    <p className="break-words"><span className="font-medium">Endpoint:</span> {String(subInfo.endpoint).slice(0, 64)}…</p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => void showLocalTest()} disabled={permission !== 'granted'}>
+                    Show local SW test
+                  </Button>
+                  <Button variant="outline" onClick={async () => setSubInfo(await getSubscriptionInfo())}>
+                    Refresh subscription info
+                  </Button>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  <p className="font-medium mb-1">Recent SW events</p>
+                  {events.length === 0 ? (
+                    <p>No events yet. Try Send Test or Local SW test.</p>
+                  ) : (
+                    <ul className="space-y-1 max-h-40 overflow-auto border rounded p-2 bg-muted/30">
+                      {events.slice().reverse().map((e, idx) => (
+                        <li key={idx} className="font-mono">
+                          {new Date(e.ts).toLocaleTimeString()} — {e.type}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
