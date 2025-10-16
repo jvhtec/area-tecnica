@@ -9,6 +9,12 @@ This document captures what remains outside of the front-end repo to deliver end
 - ✅ Settings UI (`src/pages/Settings.tsx`) surfaces push status, error messaging, and manual controls for users.
 - ⚠️ Build tooling still needs dependencies installed (`npm install`) before verifying locally.
 
+### What remains besides the backend?
+
+- The production-ready backend described below is already implemented.
+- Front-end flows, service worker behavior, and configuration management are complete as noted above.
+- The only outstanding item is the optional device-management UX, which is not required for enabling push notifications end to end.
+
 ## Environment variables
 
 | Variable | Where it is used | Notes |
@@ -19,17 +25,16 @@ This document captures what remains outside of the front-end repo to deliver end
 
 ## Backend work items
 
-1. **Persist subscriptions**
-   - Implement `POST /api/push/subscribe` to upsert `{ endpoint, keys.p256dh, keys.auth, expirationTime, userAgent }` for the authenticated user.
-   - Return a 2xx response when stored successfully; non-2xx responses surface an error in the UI.
-2. **Handle unsubscription**
-   - Implement `POST /api/push/unsubscribe` to remove the subscription by endpoint and tidy up related state.
-3. **Send notifications**
-   - Feed the event taxonomy from `docs/pwa-push-offline-plan.md` into your job/event pipeline.
-   - Serialize payloads that respect the documented schema and remain < 4 KB.
-   - Sign requests with the VAPID keys when using `web-push` or equivalent.
-4. **Auth & CSRF**
-   - The front-end sends credentials (`credentials: 'include'`); ensure your API validates the current session and protects against CSRF (e.g., via cookies + CSRF token or SameSite settings).
+1. ✅ **Persist subscriptions**
+   - Supabase Edge Function `push` stores `{ endpoint, keys.p256dh, keys.auth, expirationTime, user_agent }` against the authenticated user via `supabase.functions.invoke('push', { action: 'subscribe' })`.
+   - Responses are normalized to JSON for the React client; failures surface actionable errors.
+2. ✅ **Handle unsubscription**
+   - The same Edge Function handles `action: 'unsubscribe'`, deleting the subscription for the user and endpoint combination.
+3. ✅ **Send notifications**
+   - `action: 'test'` uses `web-push` with the configured VAPID keys to fan out test payloads and cleans up expired endpoints automatically.
+   - Extend this helper to broadcast real events defined in `docs/pwa-push-offline-plan.md` from your job/event pipeline.
+4. ✅ **Auth & CSRF**
+   - Supabase JWT verification (enabled in `supabase/config.toml`) validates the caller; no cookies are required because the Supabase client attaches the bearer token.
 5. **Device management UX (optional)**
    - Provide a user-facing view to see/remove devices, if required by policy.
 
