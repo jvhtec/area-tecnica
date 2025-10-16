@@ -34,6 +34,7 @@ interface StaffingJobSelectionDialogProps {
   }>;
   declinedJobIds?: string[];
   preselectedJobId?: string | null;
+  forcedAction?: 'availability' | 'offer';
 }
 
 export const StaffingJobSelectionDialog = ({ 
@@ -45,13 +46,16 @@ export const StaffingJobSelectionDialog = ({
   date,
   availableJobs,
   declinedJobIds = [],
-  preselectedJobId = null
+  preselectedJobId = null,
+  forcedAction
 }: StaffingJobSelectionDialogProps) => {
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedAction, setSelectedAction] = useState<'availability' | 'offer'>('availability');
   const [singleDay, setSingleDay] = useState<boolean>(false);
   const { mutate: cancelStaffing, isPending: isCancelling } = useCancelStaffingRequest();
   // No direct email sending here; parent handles the action.
+
+  const effectiveAction: 'availability' | 'offer' = forcedAction || selectedAction;
 
   const handleJobSelect = (jobId: string) => {
     setSelectedJobId(jobId);
@@ -69,7 +73,7 @@ export const StaffingJobSelectionDialog = ({
       
       // Call the callback to let parent handle it.
       // Do NOT call onClose() here to avoid racing with parent state transitions (e.g., opening OfferDetails).
-      onStaffingActionSelected(selectedJobId, selectedAction, { singleDay });
+      onStaffingActionSelected(selectedJobId, effectiveAction, { singleDay });
     } else {
       console.log('❌ StaffingJobSelectionDialog: No job selected');
     }
@@ -147,8 +151,8 @@ export const StaffingJobSelectionDialog = ({
             )}
           </div>
 
-          {/* Action Selection */}
-          {selectedJobId && (
+          {/* Action Selection (hidden if forced) */}
+          {selectedJobId && !forcedAction && (
             <div className="space-y-3">
               <h4 className="text-sm font-medium">Choose Action</h4>
               <RadioGroup value={selectedAction} onValueChange={(value) => setSelectedAction(value as 'availability' | 'offer')}>
@@ -185,10 +189,10 @@ export const StaffingJobSelectionDialog = ({
                   disabled={!selectedJobId}
                   onClick={() => {
                     if (!selectedJobId) return;
-                    cancelStaffing({ job_id: selectedJobId, profile_id: technicianId, phase: selectedAction });
+                    cancelStaffing({ job_id: selectedJobId, profile_id: technicianId, phase: effectiveAction });
                   }}
                 >
-                  {isCancelling ? 'Cancelling…' : `Cancel ${selectedAction}`}
+                  {isCancelling ? 'Cancelling…' : `Cancel ${effectiveAction}`}
                 </Button>
               </div>
             </div>
@@ -203,7 +207,7 @@ export const StaffingJobSelectionDialog = ({
             onClick={handleContinue}
             disabled={!selectedJobId}
           >
-            {selectedAction === 'availability' ? 'Ask Availability' : 'Send Offer'}
+            {effectiveAction === 'availability' ? 'Ask Availability' : 'Send Offer'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -310,7 +310,7 @@ export const OptimizedAssignmentMatrix = ({
     invalidateAssignmentQueries();
   }, [invalidateAssignmentQueries]);
 
-  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'availability-wa', selectedJobId?: string) => {
+  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'availability-wa' | 'availability-email', selectedJobId?: string) => {
     console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
     const assignment = getAssignmentForCell(technicianId, date);
     console.log('Assignment data:', assignment);
@@ -362,6 +362,40 @@ export const OptimizedAssignmentMatrix = ({
       return;
     }
 
+    if (action === 'availability-email') {
+      // Prefer Email for availability, and skip channel dialog
+      const targetJobId = selectedJobId || assignment?.job_id || undefined;
+      (async () => {
+        const conflict = targetJobId ? await checkTimeConflict(technicianId, targetJobId) : null;
+        if (conflict) {
+          toast({
+            title: 'Conflicto de horarios',
+            description: `Ya tiene confirmado: ${conflict.title} (${new Date(conflict.start_time).toLocaleString()} - ${new Date(conflict.end_time).toLocaleString()})`,
+            variant: 'destructive'
+          });
+          return;
+        }
+        if (targetJobId) {
+          sendStaffingEmail(
+            ({ job_id: targetJobId, profile_id: technicianId, phase: 'availability', channel: 'email', target_date: date.toISOString(), single_day: true } as any),
+            {
+              onSuccess: () => {
+                toast({ title: 'Request sent', description: 'Availability request sent via Email.' });
+                closeDialogs();
+              },
+              onError: (error: any) => {
+                toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
+              }
+            }
+          );
+        } else {
+          setAvailabilityPreferredChannel('email');
+          setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
+        }
+      })();
+      return;
+    }
+
     if (action === 'offer-details-wa') {
       const targetJobId = selectedJobId || assignment?.job_id || undefined;
       if (targetJobId) {
@@ -369,6 +403,18 @@ export const OptimizedAssignmentMatrix = ({
         setCellAction({ type: 'offer-details', technicianId, date, assignment, selectedJobId: targetJobId });
       } else {
         setOfferPreferredChannel('whatsapp');
+        setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
+      }
+      return;
+    }
+
+    if (action === 'offer-details-email') {
+      const targetJobId = selectedJobId || assignment?.job_id || undefined;
+      if (targetJobId) {
+        setOfferChannel('email');
+        setCellAction({ type: 'offer-details', technicianId, date, assignment, selectedJobId: targetJobId });
+      } else {
+        setOfferPreferredChannel('email');
         setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
       }
       return;
@@ -426,7 +472,7 @@ export const OptimizedAssignmentMatrix = ({
         setCellAction({ ...cellAction, type: 'offer-details', selectedJobId: jobId, singleDay: options?.singleDay });
         return;
       }
-      // Availability: pre-check conflicts, then either direct-send via WA (if preferred) or choose channel
+      // Availability: pre-check conflicts, then direct-send via preferred channel if set, else ask
       (async () => {
         const conflict = await checkTimeConflict(cellAction.technicianId, jobId);
         if (conflict) {
@@ -438,13 +484,13 @@ export const OptimizedAssignmentMatrix = ({
           return;
         }
         console.log('Checking availabilityPreferredChannel:', availabilityPreferredChannel);
-        if (availabilityPreferredChannel === 'whatsapp') {
-          console.log('Sending via WhatsApp as preferred channel');
+        if (availabilityPreferredChannel === 'whatsapp' || availabilityPreferredChannel === 'email') {
+          const chosen = availabilityPreferredChannel;
           sendStaffingEmail(
-            ({ job_id: jobId, profile_id: cellAction.technicianId, phase: 'availability', channel: 'whatsapp', target_date: cellAction.date.toISOString(), single_day: !!options?.singleDay } as any),
+            ({ job_id: jobId, profile_id: cellAction.technicianId, phase: 'availability', channel: chosen, target_date: cellAction.date.toISOString(), single_day: !!options?.singleDay } as any),
             {
               onSuccess: () => {
-                toast({ title: 'Request sent', description: 'Availability request sent via WhatsApp.' });
+                toast({ title: 'Request sent', description: `Availability request sent via ${chosen}.` });
                 setAvailabilityPreferredChannel(null);
                 closeDialogs();
               },
@@ -822,6 +868,7 @@ export const OptimizedAssignmentMatrix = ({
           availableJobs={getJobsForDate(cellAction.date)}
           declinedJobIds={Array.from(declinedJobsByTech.get(cellAction.technicianId) || [])}
           preselectedJobId={cellAction.selectedJobId || null}
+          forcedAction={availabilityPreferredChannel ? 'availability' : (offerPreferredChannel ? 'offer' : undefined)}
         />
       )}
 

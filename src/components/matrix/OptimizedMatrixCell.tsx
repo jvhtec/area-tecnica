@@ -29,7 +29,7 @@ interface OptimizedMatrixCellProps {
   height: number;
   isSelected: boolean;
   onSelect: (selected: boolean) => void;
-  onClick: (action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'availability-wa', selectedJobId?: string) => void;
+  onClick: (action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'offer-details-email' | 'availability-wa' | 'availability-email', selectedJobId?: string) => void;
   onPrefetch?: () => void;
   onOptimisticUpdate?: (status: string) => void;
   onRender?: () => void;
@@ -96,7 +96,8 @@ export const OptimizedMatrixCell = memo(({
     
     // For requests on empty cells, we need to select a job first
     if (phase === 'availability' && !hasAssignment && !jobId) {
-      onClick('select-job-for-staffing');
+      // For the mail icon we want to send via email directly, without channel dialog
+      onClick('availability-email');
       return;
     }
     
@@ -104,8 +105,8 @@ export const OptimizedMatrixCell = memo(({
       // Determine target job id: assignment > prop (do not auto-pick by status)
       const targetJobId = jobId || assignment?.job_id;
       if (!targetJobId) {
-        console.log('📋 No resolvable job for offer; opening job selection');
-        onClick('select-job-for-staffing');
+        console.log('📋 No resolvable job for offer; opening job selection (email-intent)');
+        onClick('offer-details-email');
         return;
       }
       // Block staffing for jobs previously declined by this technician
@@ -113,14 +114,14 @@ export const OptimizedMatrixCell = memo(({
         toast.error('This job was already declined; choose a different job.');
         return;
       }
-      // Open offer details dialog
-      onClick('offer-details', targetJobId);
+      // Open offer details dialog with email channel intent
+      onClick('offer-details-email', targetJobId);
       return;
     }
 
-    // Availability path: open job selection; preselect only if assignment provides it
+    // Availability path: direct email intent
     const targetJobId = jobId || assignment?.job_id || undefined;
-    onClick('select-job-for-staffing', targetJobId);
+    onClick('availability-email', targetJobId);
   }, [jobId, assignment?.job_id, technician.id, technician.first_name, technician.nickname, technician.last_name, hasAssignment, assignment, date, onClick, staffingStatusByDate]);
 
   const handleMouseEnter = useCallback(() => {

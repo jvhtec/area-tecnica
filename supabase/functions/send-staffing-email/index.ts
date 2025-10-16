@@ -20,6 +20,8 @@ const BREVO_FROM = Deno.env.get("BREVO_FROM")!;
 const COMPANY_LOGO_URL = Deno.env.get("COMPANY_LOGO_URL_W") || `${SUPABASE_URL}/storage/v1/object/public/company-assets/sectorlogow.png`;
 const AT_LOGO_URL = Deno.env.get("AT_LOGO_URL") || `${SUPABASE_URL}/storage/v1/object/public/company-assets/area-tecnica-logo.png`;
 const DAILY_CAP = parseInt(Deno.env.get("STAFFING_DAILY_CAP") ?? "100", 10);
+// Company-local timezone for end-user display (email/WhatsApp)
+const COMPANY_TZ = Deno.env.get('COMPANY_TZ') || 'Europe/Madrid';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -363,8 +365,8 @@ serve(async (req) => {
         : `Oferta: ${job.title}${roleLabel ? ` — ${roleLabel}` : ''}`;
 
       // Spanish date/time formatting
-      const fmtDate = (d?: string | null) => d ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'full', timeStyle: undefined }).format(new Date(d)) : 'TBD';
-      const fmtTime = (d?: string | null) => d ? new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' }).format(new Date(d)) : 'TBD';
+      const fmtDate = (d?: string | null) => d ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'full', timeStyle: undefined, timeZone: COMPANY_TZ }).format(new Date(d)) : 'TBD';
+      const fmtTime = (d?: string | null) => d ? new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: COMPANY_TZ }).format(new Date(d)) : 'TBD';
       const startDate = fmtDate(job.start_time);
       const endDate = fmtDate(job.end_time);
       const callTime = fmtTime(job.start_time);
