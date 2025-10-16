@@ -225,6 +225,23 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           .insert(toAdd.map(department => ({ job_id: job.id, department })));
       }
 
+      // Broadcast push notification about update (summarized changes)
+      try {
+        const changes: Record<string, any> = {};
+        const toISO = (v: any) => (v instanceof Date ? v.toISOString() : v);
+        if (job.title !== title) changes.title = { from: job.title, to: title };
+        if ((job.description || '') !== (description || '')) changes.description = { from: job.description, to: description };
+        if ((job.start_time || '') !== toISO(startTimeUTC)) changes.start_time = { from: job.start_time, to: toISO(startTimeUTC) };
+        if ((job.end_time || '') !== toISO(endTimeUTC)) changes.end_time = { from: job.end_time, to: toISO(endTimeUTC) };
+        if ((job.timezone || '') !== (timezone || '')) changes.timezone = { from: job.timezone, to: timezone };
+        if ((job.job_type || '') !== (jobType || '')) changes.job_type = { from: job.job_type, to: jobType };
+        if ((job.location_id || null) !== (locationId || null)) changes.location_id = { from: job.location_id, to: locationId };
+        if ((job.color || '') !== (color || '')) changes.color = { from: job.color, to: color };
+        void supabase.functions.invoke('push', {
+          body: { action: 'broadcast', type: 'job.updated', job_id: job.id, changes }
+        });
+      } catch {}
+
       toast({
         title: "Job updated successfully",
         description: "The job has been updated.",

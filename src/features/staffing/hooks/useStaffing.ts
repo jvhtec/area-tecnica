@@ -86,6 +86,19 @@ export function useSendStaffingEmail() {
       qc.invalidateQueries({ queryKey: ['assignment-matrix'] })
       qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
       try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
+      // Fan out push notification (fire-and-forget)
+      try {
+        const type = vars.phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent'
+        void supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type,
+            job_id: vars.job_id,
+            recipient_id: vars.profile_id,
+            channel: vars.channel || 'email'
+          }
+        })
+      } catch {}
     }
   })
 }
@@ -114,6 +127,18 @@ export function useCancelStaffingRequest() {
       qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
       qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
       try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
+      // Push broadcast: cancellation
+      try {
+        const type = vars.phase === 'availability' ? 'staffing.availability.cancelled' : 'staffing.offer.cancelled'
+        void supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type,
+            job_id: vars.job_id,
+            recipient_id: vars.profile_id,
+          }
+        })
+      } catch {}
     }
   })
 }

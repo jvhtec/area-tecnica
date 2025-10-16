@@ -63,6 +63,16 @@ export const JobStatusSelector = ({
         description: `Job status changed to ${JOB_STATUS_OPTIONS.find(opt => opt.value === newStatus)?.label}`
       });
 
+      // Broadcast push for key status changes
+      try {
+        const type = newStatus === 'Confirmado' ? 'job.status.confirmed' : (newStatus === 'Cancelado' ? 'job.status.cancelled' : '')
+        if (type) {
+          void supabase.functions.invoke('push', {
+            body: { action: 'broadcast', type, job_id: jobId }
+          })
+        }
+      } catch {}
+
       // Attempt to sync status with Flex via Edge Function
       const toFlexStatus = (s: JobStatus): 'tentativa' | 'confirmado' | 'cancelado' | null => {
         switch (s) {

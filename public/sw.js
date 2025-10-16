@@ -97,7 +97,10 @@ self.addEventListener('push', (event) => {
       type: payload.type,
       meta: payload.meta || {}
     },
-    actions: [{ action: 'open', title: 'Open' }]
+    actions: [{ action: 'open', title: 'Open' }],
+    tag: payload.meta?.tag || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    renotify: true,
+    silent: false,
   }
 
   event.waitUntil(

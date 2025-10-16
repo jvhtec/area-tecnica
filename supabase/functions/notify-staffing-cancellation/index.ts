@@ -91,6 +91,26 @@ serve(async (req) => {
     const callTime = fmtTime(job.start_time);
     const loc = job.locations?.formatted_address ?? 'Por confirmar';
 
+    // Push broadcast to notify cancellation (best-effort, non-blocking)
+    try {
+      const pushUrl = `${SUPABASE_URL}/functions/v1/push`;
+      const type = phase === 'availability' ? 'staffing.availability.cancelled' : 'staffing.offer.cancelled';
+      await fetch(pushUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SERVICE_ROLE}`,
+        },
+        body: JSON.stringify({
+          action: 'broadcast',
+          type,
+          job_id,
+          recipient_id: profile_id,
+          recipient_name: fullName,
+        }),
+      }).catch(() => undefined);
+    } catch (_) {}
+
     const subject = phase === 'availability' ? `Solicitud cancelada: ${job.title}` : `Oferta cancelada: ${job.title}`;
     const reason = phase === 'availability' ? 'La solicitud de disponibilidad' : 'La oferta';
 

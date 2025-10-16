@@ -75,9 +75,15 @@ export const uploadJobPdfWithCleanup = async (
         uploaded_by: userRes?.user?.id || null,
       });
     if (insertError) throw insertError;
+
+    // Broadcast push: new document uploaded (fire-and-forget)
+    try {
+      void supabase.functions.invoke('push', {
+        body: { action: 'broadcast', type: 'document.uploaded', job_id: jobId, file_name: sanitizedFileName }
+      });
+    } catch {}
   } catch (err) {
     console.error("uploadJobPdfWithCleanup error:", err);
     throw err;
   }
 };
-

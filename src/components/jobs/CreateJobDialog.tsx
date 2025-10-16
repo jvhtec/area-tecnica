@@ -255,6 +255,13 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         description: "Job created successfully",
       });
 
+      // Broadcast push notification (fire-and-forget)
+      try {
+        void supabase.functions.invoke('push', {
+          body: { action: 'broadcast', type: 'job.created', job_id: job.id }
+        });
+      } catch {}
+
       // Let parent know a job was created (for follow-up actions)
       try {
         onCreated?.(job);

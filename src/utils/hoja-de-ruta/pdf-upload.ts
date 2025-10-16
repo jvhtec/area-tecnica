@@ -84,6 +84,13 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
     }
     
     console.log('PDF uploaded successfully:', sanitizedFileName);
+
+    // Broadcast push: new Hoja de Ruta uploaded
+    try {
+      void supabase.functions.invoke('push', {
+        body: { action: 'broadcast', type: 'document.uploaded', job_id: jobId, file_name: sanitizedFileName }
+      });
+    } catch {}
   } catch (error) {
     console.error("Error uploading PDF:", error);
     throw error;

@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
-type Action = "subscribe" | "unsubscribe" | "test";
+type Action = "subscribe" | "unsubscribe" | "test" | "broadcast";
 
 type SubscribeBody = {
   action: "subscribe";
@@ -23,7 +23,26 @@ type TestBody = {
   url?: string;
 };
 
-type RequestBody = SubscribeBody | UnsubscribeBody | TestBody;
+type BroadcastBody = {
+  action: "broadcast";
+  type: string; // e.g., 'job.created', 'job.updated', 'document.uploaded', 'document.tech_visible.enabled', 'staffing.availability.sent', etc.
+  job_id?: string;
+  url?: string;
+  // Optional targeting hints
+  recipient_id?: string; // direct user to notify (e.g., technician)
+  user_ids?: string[]; // explicit recipients
+  // Optional meta for message composition
+  doc_id?: string;
+  file_name?: string;
+  actor_name?: string;
+  actor_id?: string;
+  recipient_name?: string;
+  channel?: 'email' | 'whatsapp';
+  status?: string; // confirmed | cancelled | declined
+  changes?: Record<string, { from?: unknown; to?: unknown } | unknown> | Record<string, unknown>;
+};
+
+type RequestBody = SubscribeBody | UnsubscribeBody | TestBody | BroadcastBody;
 
 type PushSubscriptionRow = {
   endpoint: string;
@@ -87,15 +106,25 @@ function ensureAuthHeader(req: Request) {
   return header.replace("Bearer ", "").trim();
 }
 
-async function getUserId(client: ReturnType<typeof createClient>, token: string) {
+async function resolveCaller(
+  client: ReturnType<typeof createClient>,
+  token: string,
+  allowService = false,
+): Promise<{ userId: string; isService: boolean }> {
+  // Try user token
   const { data, error } = await client.auth.getUser(token);
-  if (error || !data?.user) {
-    throw new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+  if (!error && data?.user?.id) {
+    return { userId: data.user.id, isService: false };
   }
-  return data.user.id;
+  // Allow service key / internal token for server-initiated broadcasts
+  const internal = Deno.env.get('PUSH_INTERNAL_TOKEN') || '';
+  if (allowService && (token === SERVICE_ROLE_KEY || (internal && token === internal))) {
+    return { userId: '00000000-0000-0000-0000-000000000000', isService: true };
+  }
+  throw new Response(JSON.stringify({ error: "Unauthorized" }), {
+    status: 401,
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
 }
 
 async function sendPushNotification(
@@ -150,6 +179,229 @@ async function sendPushNotification(
 
     return { ok: false, status };
   }
+}
+
+async function getManagementUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
+  const { data, error } = await client
+    .from('profiles')
+    .select('id')
+    .in('role', ['admin','management','logistics']);
+  if (error || !data) return [];
+  return data.map((r: any) => r.id).filter(Boolean);
+}
+
+async function getJobParticipantUserIds(client: ReturnType<typeof createClient>, jobId: string): Promise<string[]> {
+  if (!jobId) return [];
+  const { data, error } = await client
+    .from('job_assignments')
+    .select('technician_id')
+    .eq('job_id', jobId);
+  if (error || !data) return [];
+  const ids = data.map((r: any) => r.technician_id).filter(Boolean);
+  return Array.from(new Set(ids));
+}
+
+async function getJobTitle(client: ReturnType<typeof createClient>, jobId?: string): Promise<string | null> {
+  if (!jobId) return null;
+  const { data } = await client.from('jobs').select('title').eq('id', jobId).maybeSingle();
+  return data?.title ?? null;
+}
+
+async function getProfileDisplayName(client: ReturnType<typeof createClient>, userId?: string | null): Promise<string | null> {
+  if (!userId) return null;
+  const { data } = await client
+    .from('profiles')
+    .select('first_name,last_name,nickname,email')
+    .eq('id', userId)
+    .maybeSingle();
+  if (!data) return null;
+  const full = `${data.first_name || ''} ${data.last_name || ''}`.trim();
+  if (full) return full;
+  if (data.nickname) return data.nickname;
+  return data.email || null;
+}
+
+function fmtFieldEs(field: string): string {
+  switch (field) {
+    case 'title': return 'Título';
+    case 'description': return 'Descripción';
+    case 'status': return 'Estado';
+    case 'start_time': return 'Inicio';
+    case 'end_time': return 'Fin';
+    case 'timezone': return 'Zona horaria';
+    case 'job_type': return 'Tipo';
+    case 'location_id': return 'Ubicación';
+    case 'color': return 'Color';
+    default: return field;
+  }
+}
+
+function channelEs(ch?: string): string {
+  if (!ch) return '';
+  return ch === 'whatsapp' ? 'WhatsApp' : 'correo';
+}
+
+async function handleBroadcast(
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  body: BroadcastBody,
+) {
+  const type = body.type || '';
+  // Resolve job id if missing and doc_id provided
+  let jobId = body.job_id;
+  if (!jobId && body.doc_id) {
+    try {
+      const { data } = await client.from('job_documents').select('job_id').eq('id', body.doc_id).maybeSingle();
+      if (data?.job_id) jobId = data.job_id;
+    } catch (_) { /* ignore */ }
+  }
+  const jobTitle = await getJobTitle(client, jobId);
+
+  // Determine recipients
+  let recipients = new Set<string>();
+  const mgmt = new Set(await getManagementUserIds(client));
+  const participants = new Set(await getJobParticipantUserIds(client, jobId || ''));
+
+  const addUsers = (ids: (string | null | undefined)[]) => {
+    for (const id of ids) { if (id) recipients.add(id); }
+  };
+
+  // Prefer explicit recipients if provided
+  if (Array.isArray((body as any).user_ids) && (body as any).user_ids.length) {
+    addUsers(((body as any).user_ids as string[]));
+  }
+
+  // Compose Spanish title/body and choose default audience
+  let title = '';
+  let text = '';
+  let url = body.url || (jobId ? `/jobs/${jobId}` : '/');
+
+  const actor = body.actor_name || (await getProfileDisplayName(client, userId)) || 'Alguien';
+  const recipName = body.recipient_name || (await getProfileDisplayName(client, body.recipient_id)) || '';
+  const ch = channelEs(body.channel);
+
+  if (type === 'job.created') {
+    title = 'Trabajo creado';
+    text = `${actor} creó “${jobTitle || 'Trabajo'}”.`;
+    addUsers(Array.from(mgmt));
+  } else if (type === 'job.updated') {
+    title = 'Trabajo actualizado';
+    if (body.changes && typeof body.changes === 'object') {
+      const keys = Object.keys(body.changes as any);
+      const labels = keys.slice(0, 4).map(fmtFieldEs); // summarize first few
+      text = `${actor} actualizó “${jobTitle || 'Trabajo'}”. Cambios: ${labels.join(', ')}.`;
+    } else {
+      text = `${actor} actualizó “${jobTitle || 'Trabajo'}”.`;
+    }
+    addUsers(Array.from(mgmt));
+    addUsers(Array.from(participants));
+  } else if (type === 'document.uploaded') {
+    title = 'Nuevo documento';
+    const fname = body.file_name || 'documento';
+    text = `${actor} subió “${fname}” a “${jobTitle || 'Trabajo'}”.`;
+    addUsers(Array.from(mgmt));
+    addUsers(Array.from(participants));
+  } else if (type === 'document.tech_visible.enabled') {
+    title = 'Documento disponible para técnicos';
+    const fname = body.file_name || 'documento';
+    text = `Nuevo documento visible: “${fname}” en “${jobTitle || 'Trabajo'}”.`;
+    addUsers(Array.from(participants));
+  } else if (type === 'staffing.availability.sent') {
+    title = 'Solicitud de disponibilidad enviada';
+    text = `${actor} envió solicitud a ${recipName || 'técnico'} (${ch}).`;
+    addUsers(Array.from(mgmt));
+    addUsers([body.recipient_id]);
+  } else if (type === 'staffing.offer.sent') {
+    title = 'Oferta enviada';
+    text = `${actor} envió oferta a ${recipName || 'técnico'} (${ch}).`;
+    addUsers(Array.from(mgmt));
+    addUsers([body.recipient_id]);
+  } else if (type === 'staffing.availability.confirmed') {
+    title = 'Disponibilidad confirmada';
+    text = `${recipName || 'Técnico'} confirmó disponibilidad para “${jobTitle || 'Trabajo'}”.`;
+    addUsers(Array.from(mgmt));
+  } else if (type === 'staffing.availability.declined') {
+    title = 'Disponibilidad rechazada';
+    text = `${recipName || 'Técnico'} rechazó disponibilidad para “${jobTitle || 'Trabajo'}”.`;
+    addUsers(Array.from(mgmt));
+  } else if (type === 'staffing.offer.confirmed') {
+    title = 'Oferta aceptada';
+    text = `${recipName || 'Técnico'} aceptó oferta para “${jobTitle || 'Trabajo'}”.`;
+    addUsers(Array.from(mgmt));
+    addUsers(Array.from(participants));
+  } else if (type === 'staffing.offer.declined') {
+    title = 'Oferta rechazada';
+    text = `${recipName || 'Técnico'} rechazó oferta para “${jobTitle || 'Trabajo'}”.`;
+    addUsers(Array.from(mgmt));
+  } else if (type === 'staffing.availability.cancelled') {
+    title = 'Disponibilidad cancelada';
+    text = `Solicitud de disponibilidad cancelada para “${jobTitle || 'Trabajo'}”.`;
+    addUsers(Array.from(mgmt));
+    addUsers([body.recipient_id]);
+  } else if (type === 'staffing.offer.cancelled') {
+    title = 'Oferta cancelada';
+    text = `Oferta cancelada para “${jobTitle || 'Trabajo'}”.`;
+    addUsers(Array.from(mgmt));
+    addUsers([body.recipient_id]);
+  } else if (type === 'job.status.confirmed') {
+    title = 'Trabajo confirmado';
+    text = `“${jobTitle || 'Trabajo'}” ha sido confirmado.`;
+    addUsers(Array.from(mgmt));
+    addUsers(Array.from(participants));
+  } else if (type === 'job.status.cancelled') {
+    title = 'Trabajo cancelado';
+    text = `“${jobTitle || 'Trabajo'}” ha sido cancelado.`;
+    addUsers(Array.from(mgmt));
+    addUsers(Array.from(participants));
+  } else {
+    // Generic fallback
+    title = body.type || 'Actualización';
+    text = body.file_name ? `Actualización: ${body.file_name}` : 'Nueva actualización';
+    addUsers(Array.from(mgmt));
+  }
+
+  // Remove actor if included to avoid self-spam (optional)
+  recipients.delete(userId);
+
+  // Load subscriptions for recipients
+  if (recipients.size === 0) {
+    return jsonResponse({ status: 'skipped', reason: 'No recipients' });
+  }
+
+  const { data: subs, error: subsErr } = await client
+    .from('push_subscriptions')
+    .select('endpoint, p256dh, auth, user_id')
+    .in('user_id', Array.from(recipients));
+  if (subsErr) {
+    console.error('push broadcast fetch subs error', subsErr);
+    return jsonResponse({ error: 'Failed to load subscriptions' }, 500);
+  }
+  if (!subs || subs.length === 0) {
+    return jsonResponse({ status: 'skipped', reason: 'No subscriptions for recipients' });
+  }
+
+  const payload: PushPayload = {
+    title,
+    body: text,
+    url,
+    type,
+    meta: {
+      jobId: jobId,
+      actor,
+      recipient: recipName,
+      channel: ch,
+      ...('file_name' in body ? { fileName: body.file_name } : {}),
+      ...('changes' in body ? { changes: body.changes } : {}),
+    },
+  };
+
+  const results: Array<{ endpoint: string; ok: boolean; status?: number; skipped?: boolean }> = [];
+  await Promise.all(subs.map(async (sub: any) => {
+    const result = await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, payload);
+    results.push({ endpoint: sub.endpoint, ok: result.ok, status: 'status' in result ? (result as any).status : undefined, skipped: 'skipped' in result ? (result as any).skipped : undefined });
+  }));
+
+  return jsonResponse({ status: 'sent', results, count: results.length });
 }
 
 async function handleSubscribe(
@@ -306,7 +558,9 @@ serve(async (req) => {
 
   const token = ensureAuthHeader(req);
   const client = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-  const userId = await getUserId(client, token);
+  // Allow service callers only for broadcast; user token for others
+  const allowService = (body.action as Action) === 'broadcast';
+  const { userId } = await resolveCaller(client, token, allowService);
 
   switch (body.action as Action) {
     case "subscribe":
@@ -315,6 +569,8 @@ serve(async (req) => {
       return await handleUnsubscribe(client, userId, body as UnsubscribeBody);
     case "test":
       return await handleTest(client, userId, body as TestBody);
+    case "broadcast":
+      return await handleBroadcast(client, userId, body as BroadcastBody);
     default:
       return jsonResponse({ error: "Unsupported action" }, 400);
   }

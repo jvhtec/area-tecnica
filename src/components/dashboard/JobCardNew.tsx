@@ -702,6 +702,13 @@ export function JobCardNew({
         });
       if (dbError) throw dbError;
 
+      // Broadcast push: new document uploaded
+      try {
+        void supabase.functions.invoke('push', {
+          body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
+        });
+      } catch {}
+
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
 
       toast({

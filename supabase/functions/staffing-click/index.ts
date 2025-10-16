@@ -218,6 +218,29 @@ serve(async (req) => {
       }
     });
 
+    // Fire a push broadcast to management and participants using the internal service key
+    try {
+      const pushType = activityCode; // same code mapping
+      const pushUrl = `${SUPABASE_URL}/functions/v1/push`;
+      const payload = {
+        action: 'broadcast',
+        type: pushType,
+        job_id: row.job_id,
+        recipient_id: row.profile_id,
+        recipient_name: techName,
+      } as const;
+      await fetch(pushUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SERVICE_ROLE}`,
+        },
+        body: JSON.stringify(payload),
+      }).catch(() => undefined);
+    } catch (_) {
+      // non-blocking
+    }
+
     // If an offer was confirmed, auto-create/update a job assignment with role
     if (newStatus === 'confirmed' && row.phase === 'offer') {
       try {

@@ -28,6 +28,13 @@ export const uploadPdfToJob = async (
     });
 
     if (docError) throw docError;
+
+    // Broadcast push: new document uploaded
+    try {
+      void supabase.functions.invoke('push', {
+        body: { action: 'broadcast', type: 'document.uploaded', job_id: jobId, file_name: fileName }
+      });
+    } catch {}
   } catch (error) {
     console.error("Error uploading PDF:", error);
     throw error;
