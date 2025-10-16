@@ -105,6 +105,27 @@ const Settings = () => {
     }
   };
 
+  const handleBackgroundTest = async () => {
+    try {
+      toast({
+        title: 'Background test scheduled',
+        description: 'Press Home now. A test push will be sent in 5 seconds.',
+      })
+      setTimeout(async () => {
+        try {
+          const { error } = await supabase.functions.invoke('push', {
+            body: { action: 'test', url: '/settings' },
+          })
+          if (error) throw error
+        } catch (err) {
+          console.error('Background test error:', err)
+        }
+      }, 5000)
+    } catch (err) {
+      // no-op
+    }
+  }
+
   // Debug: surface SW messages and quick local test (helps on iOS without a Mac)
   const { events, showLocalTest, getSubscriptionInfo } = usePushDebug()
   const [subInfo, setSubInfo] = useState<any | null>(null)
@@ -202,14 +223,22 @@ const Settings = () => {
                     >
                       {isDisabling ? 'Disabling…' : 'Disable push'}
                     </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={handleTestNotification}
-                      disabled={!hasSubscription || isInitializing}
-                    >
-                      <Bell className="mr-2 h-4 w-4" />
-                      Send Test
-                    </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleTestNotification}
+                    disabled={!hasSubscription || isInitializing}
+                  >
+                    <Bell className="mr-2 h-4 w-4" />
+                    Send Test
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleBackgroundTest}
+                    disabled={!hasSubscription || isInitializing}
+                    title="Schedules a test push in 5s so you can background the app"
+                  >
+                    Background test (5s)
+                  </Button>
                   </div>
                 </>
               )}
