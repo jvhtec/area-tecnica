@@ -65,7 +65,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
             sound_role, lights_role, video_role, status,
             profiles(id, first_name, last_name, department, role)
           ),
-          job_documents(id, file_name, file_path, uploaded_at, file_size),
+          job_documents(id, file_name, file_path, uploaded_at, file_size, visible_to_tech),
           logistics_events(id, event_type, transport_type, event_date, event_time, license_plate)
         `)
         .eq('id', job.id)

@@ -3,6 +3,7 @@ import React from 'react';
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Eye, Download, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
 
 export interface JobDocument {
@@ -10,6 +11,7 @@ export interface JobDocument {
   file_name: string;
   file_path: string;
   uploaded_at: string;
+  visible_to_tech?: boolean;
 }
 
 interface JobCardDocumentsProps {
@@ -85,6 +87,21 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
     }
   };
 
+  const handleToggleVisibility = async (doc: JobDocument) => {
+    try {
+      const next = !Boolean(doc.visible_to_tech);
+      const { error } = await supabase
+        .from('job_documents')
+        .update({ visible_to_tech: next })
+        .eq('id', doc.id);
+      if (error) throw error;
+      // Realtime subscription in parent hook will refresh the list
+    } catch (err: any) {
+      console.error('Error toggling document visibility:', err);
+      alert(`Error updating visibility: ${err.message}`);
+    }
+  };
+
   return (
     <div className="mt-2 space-y-2">
       {showTitle && <div className="text-sm font-medium">Documents</div>}
@@ -96,12 +113,28 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col">
-              <span className="text-sm font-medium">{doc.file_name}</span>
+              <span className="text-sm font-medium flex items-center gap-2">
+                {doc.file_name}
+                {['admin','management'].includes(userRole || '') && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${doc.visible_to_tech ? 'bg-green-500/20 text-green-800 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
+                    {doc.visible_to_tech ? 'Tech-visible' : 'Hidden from tech'}
+                  </span>
+                )}
+              </span>
               <span className="text-xs text-muted-foreground">
                 Uploaded {format(new Date(doc.uploaded_at), "MMM d, yyyy")}
               </span>
             </div>
             <div className="flex gap-2">
+              {['admin','management'].includes(userRole || '') && (
+                <div className="flex items-center gap-2 pr-2">
+                  <span className="text-xs text-muted-foreground select-none">Tech can view</span>
+                  <Switch
+                    checked={Boolean(doc.visible_to_tech)}
+                    onCheckedChange={() => handleToggleVisibility(doc)}
+                  />
+                </div>
+              )}
               <Button
                 variant="ghost"
                 size="icon"

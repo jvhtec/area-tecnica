@@ -169,6 +169,15 @@ export const OptimizedAssignmentMatrix = ({
     return () => window.removeEventListener('assignment-updated', handleAssignmentUpdate);
   }, [invalidateAssignmentQueries]);
 
+  // Listen for staffing updates to refresh statuses
+  useEffect(() => {
+    const handler = () => {
+      qc.invalidateQueries({ queryKey: ['staffing-matrix'] });
+    };
+    window.addEventListener('staffing-updated', handler);
+    return () => window.removeEventListener('staffing-updated', handler);
+  }, [qc]);
+
   // Start performance monitoring
   useEffect(() => {
     startRenderTimer();

@@ -26,11 +26,13 @@ export function useStaffingStatus(jobId: string, profileId: string) {
       const mapAvailability = (s: string | null) => {
         if (!s) return null
         if (s === 'pending') return 'requested'
+        if (s === 'expired') return null
         return s
       }
       const mapOffer = (s: string | null) => {
         if (!s) return null
         if (s === 'pending') return 'sent'
+        if (s === 'expired') return null
         return s
       }
 
@@ -80,8 +82,10 @@ export function useSendStaffingEmail() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['staffing', vars.job_id, vars.profile_id] })
       qc.invalidateQueries({ queryKey: ['staffing-by-date', vars.profile_id] })
+      qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
       qc.invalidateQueries({ queryKey: ['assignment-matrix'] })
       qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
+      try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
     }
   })
 }
@@ -98,6 +102,10 @@ export function useCancelStaffingRequest() {
         .eq('phase', payload.phase)
         .eq('status', 'pending') // only cancel pending
       if (error) throw error
+      // Fire-and-forget notification via same channel used originally
+      try {
+        supabase.functions.invoke('notify-staffing-cancellation', { body: payload }).catch(() => {})
+      } catch {}
       return true
     },
     onSuccess: (_data, vars) => {
@@ -105,6 +113,7 @@ export function useCancelStaffingRequest() {
       qc.invalidateQueries({ queryKey: ['staffing-by-date', vars.profile_id] })
       qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
       qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
+      try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
     }
   })
 }

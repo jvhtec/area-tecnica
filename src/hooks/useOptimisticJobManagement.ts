@@ -38,6 +38,7 @@ export const useOptimisticJobManagement = (
           id,
           file_name,
           file_path,
+          visible_to_tech,
           uploaded_at
         ),
         flex_folders(id)

@@ -137,6 +137,7 @@ const TechnicianDashboard = () => {
                 id,
                 file_name,
                 file_path,
+                visible_to_tech,
                 uploaded_at
               )
             )

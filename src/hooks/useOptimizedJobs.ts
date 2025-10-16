@@ -76,6 +76,7 @@ export const useOptimizedJobs = (
           file_path,
           file_type,
           file_size,
+          visible_to_tech,
           uploaded_at
         ),
         flex_folders(

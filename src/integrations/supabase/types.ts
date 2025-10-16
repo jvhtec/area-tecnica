@@ -2630,6 +2630,7 @@ export type Database = {
           file_type: string | null
           id: string
           job_id: string
+          visible_to_tech: boolean
           uploaded_at: string
           uploaded_by: string | null
         }
@@ -2640,6 +2641,7 @@ export type Database = {
           file_type?: string | null
           id?: string
           job_id: string
+          visible_to_tech?: boolean
           uploaded_at?: string
           uploaded_by?: string | null
         }
@@ -2650,6 +2652,7 @@ export type Database = {
           file_type?: string | null
           id?: string
           job_id?: string
+          visible_to_tech?: boolean
           uploaded_at?: string
           uploaded_by?: string | null
         }
