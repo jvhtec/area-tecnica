@@ -192,15 +192,14 @@ const Settings = () => {
                     >
                       {isDisabling ? 'Disabling…' : 'Disable push'}
                     </Button>
-                    {hasSubscription && !isInitializing && (
-                      <Button
-                        variant="secondary"
-                        onClick={handleTestNotification}
-                      >
-                        <Bell className="mr-2 h-4 w-4" />
-                        Send Test
-                      </Button>
-                    )}
+                    <Button
+                      variant="secondary"
+                      onClick={handleTestNotification}
+                      disabled={!hasSubscription || isInitializing}
+                    >
+                      <Bell className="mr-2 h-4 w-4" />
+                      Send Test
+                    </Button>
                   </div>
                 </>
               )}
