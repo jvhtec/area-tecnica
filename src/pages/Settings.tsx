@@ -9,7 +9,6 @@ import { UserPlus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CreateUserDialog } from "@/components/users/CreateUserDialog";
 import { UsersList } from "@/components/users/UsersList";
-import { useState } from "react";
 import { FilterBar } from "@/components/users/filters/FilterBar";
 import { ImportUsersDialog } from "@/components/users/import/ImportUsersDialog";
 import { CompanyLogoUploader } from "@/components/CompanyLogoUploader";
