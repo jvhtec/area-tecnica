@@ -1,4 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
 import { UserPlus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CreateUserDialog } from "@/components/users/CreateUserDialog";
@@ -11,6 +17,8 @@ import { EquipmentModelsList } from "@/components/equipment/EquipmentModelsList"
 import { DepartmentProvider } from "@/contexts/DepartmentContext";
 import type { Department } from "@/types/equipment";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -23,6 +31,28 @@ const Settings = () => {
   
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
+  const {
+    isSupported,
+    permission,
+    subscription,
+    isInitializing,
+    isEnabling,
+    isDisabling,
+    error,
+    enable,
+    disable,
+    canEnable
+  } = usePushNotifications();
+
+  const permissionLabel =
+    permission === 'granted'
+      ? 'Granted'
+      : permission === 'denied'
+        ? 'Blocked'
+        : 'Not requested';
+  const hasSubscription = Boolean(subscription);
+  const showEnableButton = canEnable && !isInitializing;
+  const isBlocked = permission === 'denied';
 
   const handleClearFilters = () => {
     setSearchQuery("");
@@ -50,6 +80,82 @@ const Settings = () => {
         <div className="space-y-6">
           <Card>
             <CardHeader>
+              <CardTitle>Push notifications</CardTitle>
+              <CardDescription>
+                Get real-time updates about jobs, assignments, and documents directly on
+                your device.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!isSupported ? (
+                <Alert variant="info">
+                  <AlertTitle>Unsupported browser</AlertTitle>
+                  <AlertDescription>
+                    Your current browser does not support web push. Try using the latest
+                    version of Chrome, Edge, or Safari.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <>
+                  <div className="space-y-1 text-sm">
+                    <p>
+                      <span className="font-medium">Permission:</span> {permissionLabel}
+                    </p>
+                    <p>
+                      <span className="font-medium">Subscription:</span>{" "}
+                      {hasSubscription ? 'Active on this device' : 'Not active yet'}
+                    </p>
+                  </div>
+
+                  {isInitializing && (
+                    <p className="text-sm text-muted-foreground">
+                      Checking your device for an existing subscription…
+                    </p>
+                  )}
+
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertTitle>Notification error</AlertTitle>
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {isBlocked && (
+                    <Alert variant="info">
+                      <AlertTitle>Notifications blocked</AlertTitle>
+                      <AlertDescription>
+                        Enable notifications from your browser settings and reload the page to
+                        subscribe.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={() => {
+                        void enable().catch(() => undefined);
+                      }}
+                      disabled={!showEnableButton || isEnabling}
+                    >
+                      {isEnabling ? 'Enabling…' : 'Enable push'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        void disable().catch(() => undefined);
+                      }}
+                      disabled={!hasSubscription || isDisabling || isInitializing}
+                    >
+                      {isDisabling ? 'Disabling…' : 'Disable push'}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Users</CardTitle>
             </CardHeader>
             <CardContent>
@@ -73,12 +179,12 @@ const Settings = () => {
         </div>
 
         <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Company Settings</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Company Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
                 <h3 className="text-sm font-medium">Company Logo</h3>
                 <p className="text-sm text-muted-foreground">
                   Upload your company logo. This will be used in the Memoria Técnica PDFs and other documents.
@@ -97,7 +203,7 @@ const Settings = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
-                    Manage equipment models used in festival forms and gear setup.
+                      Manage equipment models used in festival forms and gear setup.
                     </p>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">Department</span>
