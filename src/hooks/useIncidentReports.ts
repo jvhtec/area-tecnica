@@ -82,7 +82,15 @@ export const useIncidentReports = () => {
 
       if (dbError) throw dbError;
     },
-    onSuccess: () => {
+    onSuccess: (_data, reportId: string) => {
+      try {
+        const report = reports.find(r => r.id === reportId);
+        if (report) {
+          void supabase.functions.invoke('push', {
+            body: { action: 'broadcast', type: 'document.deleted', job_id: report.job_id, file_name: report.file_name }
+          });
+        }
+      } catch {}
       queryClient.invalidateQueries({ queryKey: ["incident-reports"] });
       toast({
         title: "Reporte eliminado",

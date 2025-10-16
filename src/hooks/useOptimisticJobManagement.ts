@@ -102,6 +102,13 @@ export const useOptimisticJobManagement = (
 
       if (dbError) throw dbError;
 
+      // Broadcast push: document deleted (fire-and-forget)
+      try {
+        void supabase.functions.invoke('push', {
+          body: { action: 'broadcast', type: 'document.deleted', job_id: jobId, file_name: document.file_name }
+        });
+      } catch {}
+
       toast({
         title: "Document deleted",
         description: "The document has been successfully deleted."

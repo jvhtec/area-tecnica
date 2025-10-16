@@ -235,6 +235,13 @@ export const useOptimizedJobCard = (
       if (inserted) {
         setDocuments(prev => Array.isArray(prev) ? [...prev, inserted] : [inserted]);
       }
+
+      // Broadcast push: new document uploaded
+      try {
+        void supabase.functions.invoke('push', {
+          body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
+        });
+      } catch {}
     } catch (err: any) {
       console.error('Upload error:', err);
     }
@@ -259,6 +266,13 @@ export const useOptimizedJobCard = (
 
       // Update local documents state immediately
       setDocuments(prev => Array.isArray(prev) ? prev.filter((d: any) => d.id !== doc.id) : prev);
+
+      // Broadcast push: document deleted
+      try {
+        void supabase.functions.invoke('push', {
+          body: { action: 'broadcast', type: 'document.deleted', job_id: job.id, file_name: doc.file_name }
+        });
+      } catch {}
     } catch (err: any) {
       console.error('Delete error:', err);
     }

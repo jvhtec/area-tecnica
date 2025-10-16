@@ -762,6 +762,13 @@ export function JobCardNew({
         throw dbError;
       }
 
+      // Broadcast push: document deleted
+      try {
+        void supabase.functions.invoke('push', {
+          body: { action: 'broadcast', type: 'document.deleted', job_id: job.id, file_name: doc.file_name }
+        });
+      } catch {}
+
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
 
       toast({

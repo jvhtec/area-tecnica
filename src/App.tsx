@@ -55,6 +55,7 @@ import IncidentReports from '@/pages/IncidentReports';
 import Wallboard from '@/pages/Wallboard';
 import Announcements from '@/pages/Announcements';
 import RatesCenterPage from '@/pages/RatesCenterPage';
+import { useActivityPushFallback } from '@/hooks/useActivityPushFallback';
 
 export default function App() {
   // Initialize multi-tab coordinator
@@ -65,6 +66,9 @@ export default function App() {
       coordinator.destroy();
     };
   }, []);
+
+  // Optional fallback: mirror new activity_log events to push notifications
+  useActivityPushFallback();
 
   return (
     <QueryClientProvider client={queryClient}>

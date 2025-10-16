@@ -271,6 +271,9 @@ async function handleBroadcast(
     addUsers(((body as any).user_ids as string[]));
   }
 
+  // Always include the actor so they receive pushes across their own devices
+  addUsers([userId]);
+
   // Compose Spanish title/body and choose default audience
   let title = '';
   let text = '';
@@ -360,17 +363,18 @@ async function handleBroadcast(
     addUsers(Array.from(mgmt));
     addUsers(Array.from(participants));
   } else {
-    // Generic fallback
-    title = body.type || 'Actualización';
-    text = body.file_name ? `Actualización: ${body.file_name}` : 'Nueva actualización';
+    // Generic fallback using activity catalog label if available
+    try {
+      const { data: cat } = await client.from('activity_catalog').select('label').eq('code', type).maybeSingle();
+      title = (cat?.label as string) || body.type || 'Nueva actividad';
+    } catch (_) {
+      title = body.type || 'Nueva actividad';
+    }
+    text = jobTitle ? `${actor} — ${title} en “${jobTitle}”.` : `${actor} — ${title}.`;
     addUsers(Array.from(mgmt));
   }
 
-  // Remove actor if included to avoid self-spam when others will receive it.
-  // If the actor is the only recipient (common in tests or small teams), keep it so they can see the push.
-  if (recipients.size > 1) {
-    recipients.delete(userId);
-  }
+  // Do not remove the actor: users expect to receive pushes on their own devices
 
   // Load subscriptions for recipients
   if (recipients.size === 0) {
