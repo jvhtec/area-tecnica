@@ -1,3 +1,5 @@
+import { supabase } from '@/lib/supabase'
+
 const base64Padding = (base64: string): string =>
   base64 + '='.repeat((4 - (base64.length % 4 || 4)) % 4)
 
@@ -64,17 +66,15 @@ export const enablePush = async (
     })
   }
 
-  const response = await fetch('/api/push/subscribe', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(subscription.toJSON()),
-    credentials: 'include'
+  const { error } = await supabase.functions.invoke('push', {
+    body: {
+      action: 'subscribe',
+      subscription: subscription.toJSON()
+    }
   })
 
-  if (!response.ok) {
-    throw new Error('Failed to persist push subscription')
+  if (error) {
+    throw new Error(error.message || 'Failed to persist push subscription')
   }
 
   return subscription
@@ -96,17 +96,15 @@ export const disablePush = async (): Promise<void> => {
     return
   }
 
-  const response = await fetch('/api/push/unsubscribe', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ endpoint: subscription.endpoint }),
-    credentials: 'include'
+  const { error } = await supabase.functions.invoke('push', {
+    body: {
+      action: 'unsubscribe',
+      endpoint: subscription.endpoint
+    }
   })
 
-  if (!response.ok) {
-    throw new Error('Failed to remove push subscription')
+  if (error) {
+    throw new Error(error.message || 'Failed to remove push subscription')
   }
 
   await subscription.unsubscribe()
