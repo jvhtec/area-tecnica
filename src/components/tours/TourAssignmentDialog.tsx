@@ -6,13 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Users, Eye, Info } from "lucide-react";
+import { Trash2, Plus, Users, Eye, Info, Target } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
+import { TourRequirementsDialog } from '@/components/tours/TourRequirementsDialog';
 
 interface TourAssignment {
   id: string;
@@ -68,6 +69,7 @@ export const TourAssignmentDialog = ({
   const [selectedTechnician, setSelectedTechnician] = useState<string>('');
   const [externalName, setExternalName] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [reqOpen, setReqOpen] = useState(false);
 
   // Fetch existing tour assignments
   const { data: assignments = [], refetch } = useQuery({
@@ -215,6 +217,7 @@ export const TourAssignmentDialog = ({
   }, {} as Record<string, TourAssignment[]>);
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -240,6 +243,12 @@ export const TourAssignmentDialog = ({
                   <p className="font-medium mb-1">Automatic Job Sync</p>
                   <p>Tour assignments are automatically applied to all jobs in this tour. When you add or remove team members here, they will be instantly assigned to or removed from all tour jobs.</p>
                 </div>
+              </div>
+              <div className="mt-3">
+                <Button variant="secondary" size="sm" onClick={() => setReqOpen(true)} className="gap-2">
+                  <Target className="h-4 w-4" />
+                  Set Tour‑wide Personnel Requirements
+                </Button>
               </div>
             </div>
           )}
@@ -425,5 +434,10 @@ export const TourAssignmentDialog = ({
         </div>
       </DialogContent>
     </Dialog>
+    {/* Tour-wide Personnel Requirements */}
+    {!readOnly && (
+      <TourRequirementsDialog open={reqOpen} onOpenChange={setReqOpen} tourId={tourId} />
+    )}
+    </>
   );
 };

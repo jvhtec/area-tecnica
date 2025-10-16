@@ -186,6 +186,7 @@ export const useOptimizedJobs = (
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     retry: 2,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000)
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+    keepPreviousData: true
   });
 };

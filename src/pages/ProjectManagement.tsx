@@ -32,6 +32,7 @@ const ProjectManagement = () => {
   const [highlightToday, setHighlightToday] = useState(false);
   const [isAutoCompleting, setIsAutoCompleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const { forceSubscribe } = useSubscriptionContext();
 
   const startDate = startOfMonth(currentDate);
@@ -49,8 +50,14 @@ const ProjectManagement = () => {
     ]);
   }, [forceSubscribe]);
 
+  // Debounce search input to avoid thrashing queries and re-renders
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   // When searching, override month pagination by removing date bounds
-  const isSearching = searchQuery.trim().length > 0;
+  const isSearching = debouncedQuery.trim().length > 0;
 
   // Use optimized jobs hook with built-in filtering and caching
   const { data: optimizedJobs = [], isLoading: jobsLoading, error: jobsError } = useOptimizedJobs(
@@ -66,7 +73,8 @@ const ProjectManagement = () => {
   // Auto-complete past jobs when data loads
   useEffect(() => {
     const handleAutoComplete = async () => {
-      if (!optimizedJobs?.length || !canCreateItems) return;
+      // Skip auto-complete while searching (prevents heavy scans over large search scopes)
+      if (!optimizedJobs?.length || !canCreateItems || isSearching) return;
       
       setIsAutoCompleting(true);
       try {
@@ -86,7 +94,7 @@ const ProjectManagement = () => {
     };
 
     handleAutoComplete();
-  }, [optimizedJobs, canCreateItems, toast]);
+  }, [optimizedJobs, canCreateItems, isSearching, toast]);
 
   // Filter jobs by selected job type and statuses with database-level optimization
   const jobs = (optimizedJobs || []).filter((job: any) => {
@@ -95,7 +103,7 @@ const ProjectManagement = () => {
       : (selectedJobTypes.length === 0 ||
         selectedJobTypes.map(t => t.toLowerCase()).includes(String(job.job_type || '').toLowerCase()));
     const matchesStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
-    const q = searchQuery.trim().toLowerCase();
+    const q = debouncedQuery.trim().toLowerCase();
     const matchesSearch =
       q.length === 0 ||
       [job.title, job.client, job.location?.name, job.location?.formatted_address]
@@ -224,7 +232,7 @@ const ProjectManagement = () => {
     }
   }, [optimizedJobs]);
 
-  if (loading || jobsLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -305,6 +313,9 @@ const ProjectManagement = () => {
                 placeholder="Search projects..."
                 className="pl-8 h-8 w-[220px]"
               />
+              {(jobsLoading) && (
+                <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
             </div>
             {canCreateItems && (
               <>
