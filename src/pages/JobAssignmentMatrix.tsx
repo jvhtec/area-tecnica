@@ -368,9 +368,9 @@ export default function JobAssignmentMatrix() {
           </div>
         </div>
 
-        {/* Mobile filter toggle + panel */}
+        {/* Mobile quick controls + filter toggle */}
         <div className="md:hidden mt-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <button
               className="text-sm font-medium px-3 py-2 border rounded-md bg-background"
               onClick={() => setFiltersOpen(v => !v)}
@@ -379,6 +379,15 @@ export default function JobAssignmentMatrix() {
             >
               Filters {activeFilterCount > 0 && <span className="ml-2 inline-flex items-center justify-center text-[10px] h-5 min-w-[20px] px-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">{activeFilterCount}</span>}
             </button>
+            {/* Quick direct assign toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs">Direct</span>
+              <Switch
+                checked={allowDirectAssign}
+                onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))}
+                aria-label="Toggle direct assignment"
+              />
+            </div>
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               <Badge variant="secondary" className="text-xs">

@@ -753,13 +753,21 @@ export const OptimizedAssignmentMatrix = ({
         }}
       >
         <div className="flex items-center justify-between h-full bg-card border-r border-b px-2">
-          <div className="font-semibold" aria-label={mobile ? `Techs (${technicians.length})` : 'Technicians'}>
-            {mobile ? `Techs (${technicians.length})` : 'Technicians'}
-          </div>
+          {mobile ? (
+            <div className="font-semibold text-sm" aria-label="Technicians">Techs</div>
+          ) : (
+            <div className="font-semibold" aria-label="Technicians">Technicians</div>
+          )}
           {isManagementUser && (
-            <Button size="sm" variant="outline" className="h-8" onClick={() => setCreateUserOpen(true)}>
-              <UserPlus className="h-4 w-4 mr-1" /> Add
-            </Button>
+            mobile ? (
+              <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => setCreateUserOpen(true)} aria-label="Add user">
+                <UserPlus className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" className="h-8" onClick={() => setCreateUserOpen(true)}>
+                <UserPlus className="h-4 w-4 mr-1" /> Add
+              </Button>
+            )
           )}
         </div>
       </div>
