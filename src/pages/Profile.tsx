@@ -2,16 +2,17 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Department } from "@/types/department";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Save, UserCircle, AlertTriangle } from "lucide-react";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 export const Profile = () => {
   const { toast } = useToast();
@@ -26,6 +27,29 @@ export const Profile = () => {
     newPassword: '',
     confirmPassword: ''
   });
+  const {
+    isSupported,
+    permission,
+    subscription,
+    isInitializing,
+    isEnabling,
+    isDisabling,
+    error: pushError,
+    enable,
+    disable,
+    canEnable,
+  } = usePushNotifications();
+
+  const permissionLabel =
+    permission === 'granted'
+      ? 'Granted'
+      : permission === 'denied'
+        ? 'Blocked'
+        : 'Not requested';
+  const hasSubscription = Boolean(subscription);
+  const showEnableButton = canEnable && !isInitializing;
+  const isBlocked = permission === 'denied';
+  const showPushControls = ['technician', 'house_tech'].includes(profile?.role);
 
   // Fetch user profile on component mount
   useEffect(() => {
@@ -319,6 +343,81 @@ export const Profile = () => {
               </form>
             </CardContent>
           </Card>
+
+          {showPushControls && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Push notifications</CardTitle>
+                <CardDescription>
+                  Manage push notifications for this device.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!isSupported ? (
+                  <Alert variant="info">
+                    <AlertTitle>Unsupported browser</AlertTitle>
+                    <AlertDescription>
+                      Your current browser does not support web push. Try using the latest version of Chrome, Edge, or Safari.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <>
+                    <div className="space-y-1 text-sm">
+                      <p>
+                        <span className="font-medium">Permission:</span> {permissionLabel}
+                      </p>
+                      <p>
+                        <span className="font-medium">Subscription:</span>{' '}
+                        {hasSubscription ? 'Active on this device' : 'Not active yet'}
+                      </p>
+                    </div>
+
+                    {isInitializing && (
+                      <p className="text-sm text-muted-foreground">
+                        Checking your device for an existing subscription…
+                      </p>
+                    )}
+
+                    {pushError && (
+                      <Alert variant="destructive">
+                        <AlertTitle>Notification error</AlertTitle>
+                        <AlertDescription>{pushError}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {isBlocked && (
+                      <Alert variant="info">
+                        <AlertTitle>Notifications blocked</AlertTitle>
+                        <AlertDescription>
+                          Enable notifications from your browser settings and reload the page to subscribe.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => {
+                          void enable().catch(() => undefined);
+                        }}
+                        disabled={!showEnableButton || isEnabling}
+                      >
+                        {isEnabling ? 'Enabling…' : 'Enable push'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          void disable().catch(() => undefined);
+                        }}
+                        disabled={!hasSubscription || isDisabling || isInitializing}
+                      >
+                        {isDisabling ? 'Disabling…' : 'Disable push'}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
