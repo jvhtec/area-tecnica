@@ -234,6 +234,13 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
         title: "Document deleted",
         description: "The document has been successfully deleted."
       });
+
+      // Broadcast push: document deleted
+      try {
+        void supabase.functions.invoke('push', {
+          body: { action: 'broadcast', type: 'document.deleted', job_id: job.id, file_name: doc.file_name }
+        });
+      } catch {}
     } catch (err: any) {
       console.error("Error in handleDeleteDocument:", err);
       toast({

@@ -301,6 +301,12 @@ async function handleBroadcast(
     text = `${actor} subió “${fname}” a “${jobTitle || 'Trabajo'}”.`;
     addUsers(Array.from(mgmt));
     addUsers(Array.from(participants));
+  } else if (type === 'document.deleted') {
+    title = 'Documento eliminado';
+    const fname = body.file_name || 'documento';
+    text = `${actor} eliminó “${fname}” de “${jobTitle || 'Trabajo'}”.`;
+    addUsers(Array.from(mgmt));
+    addUsers(Array.from(participants));
   } else if (type === 'document.tech_visible.enabled') {
     title = 'Documento disponible para técnicos';
     const fname = body.file_name || 'documento';
@@ -360,8 +366,11 @@ async function handleBroadcast(
     addUsers(Array.from(mgmt));
   }
 
-  // Remove actor if included to avoid self-spam (optional)
-  recipients.delete(userId);
+  // Remove actor if included to avoid self-spam when others will receive it.
+  // If the actor is the only recipient (common in tests or small teams), keep it so they can see the push.
+  if (recipients.size > 1) {
+    recipients.delete(userId);
+  }
 
   // Load subscriptions for recipients
   if (recipients.size === 0) {
