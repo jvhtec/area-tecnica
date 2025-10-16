@@ -50,8 +50,18 @@ const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 const CONTACT_EMAIL = Deno.env.get("PUSH_CONTACT_EMAIL") ?? "mailto:dev@sectorpro.com";
 
+console.log('🔐 VAPID keys loaded:', {
+  publicKeyPresent: !!VAPID_PUBLIC_KEY,
+  privateKeyPresent: !!VAPID_PRIVATE_KEY,
+  publicKeyLength: VAPID_PUBLIC_KEY?.length || 0,
+  privateKeyLength: VAPID_PRIVATE_KEY?.length || 0
+});
+
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(CONTACT_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  console.log('✅ VAPID details configured for webpush');
+} else {
+  console.error('❌ Missing VAPID keys - push notifications will be skipped');
 }
 
 const corsHeaders = {
@@ -94,13 +104,20 @@ async function sendPushNotification(
   payload: PushPayload,
 ) : Promise<PushSendResult> {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    console.warn('⚠️ Skipping push - VAPID keys not configured');
     return { ok: false, skipped: true };
   }
 
   if (!subscription.p256dh || !subscription.auth) {
-    console.warn("push missing keys for endpoint", subscription.endpoint);
+    console.warn("⚠️ Push missing keys for endpoint", subscription.endpoint);
     return { ok: false, skipped: true };
   }
+
+  console.log('📤 Sending push notification:', {
+    endpoint: subscription.endpoint.substring(0, 50) + '...',
+    title: payload.title,
+    hasBody: !!payload.body
+  });
 
   try {
     await webpush.sendNotification(
@@ -112,12 +129,19 @@ async function sendPushNotification(
       { TTL: 60 },
     );
 
+    console.log('✅ Push notification sent successfully');
     return { ok: true };
   } catch (err) {
     const status = (err as any)?.statusCode ?? (err as any)?.status ?? 500;
-    console.error("push send error", err);
+    console.error('❌ Push send error:', {
+      status,
+      message: (err as any)?.message,
+      body: (err as any)?.body,
+      error: err
+    });
 
     if (status === 404 || status === 410) {
+      console.log('🗑️ Cleaning up expired subscription');
       await client.from("push_subscriptions").delete().eq("endpoint", subscription.endpoint);
     }
 

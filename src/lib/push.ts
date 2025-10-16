@@ -80,7 +80,7 @@ export const enablePush = async (
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: base64ToUint8(vapidPublicKey)
+      applicationServerKey: base64ToUint8(vapidPublicKey) as BufferSource
     })
   }
 

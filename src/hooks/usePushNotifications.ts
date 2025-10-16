@@ -108,6 +108,9 @@ export const usePushNotifications = (): PushState => {
 
       if (nextSubscription) {
         setSubscription(nextSubscription)
+        console.log('✅ Push subscription successful. You should receive a welcome notification.')
+      } else {
+        console.warn('⚠️ Push permission denied or subscription failed')
       }
 
       return nextSubscription
@@ -116,6 +119,7 @@ export const usePushNotifications = (): PushState => {
         err instanceof Error
           ? err.message
           : 'Unable to enable push notifications at this time.'
+      console.error('❌ Push enable error:', err)
       setError(message)
       throw err instanceof Error ? err : new Error(message)
     } finally {

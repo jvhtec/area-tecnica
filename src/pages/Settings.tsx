@@ -19,6 +19,9 @@ import type { Department } from "@/types/equipment";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { Bell } from "lucide-react";
 
 const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -58,6 +61,47 @@ const Settings = () => {
     setSearchQuery("");
     setSelectedRole("all");
     setSelectedDepartment("all");
+  };
+
+  const handleTestNotification = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('push', {
+        body: { action: 'test', url: '/settings' }
+      });
+
+      if (error) throw error;
+
+      const result = data as { status: string; results?: Array<{ ok: boolean; skipped?: boolean }> };
+      
+      if (result.status === 'sent') {
+        const allSkipped = result.results?.every(r => r.skipped);
+        if (allSkipped) {
+          toast({
+            title: "Test notification skipped",
+            description: "Push notifications are configured but the server doesn't have VAPID keys set up yet.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Test notification sent",
+            description: "Check your device for the notification!"
+          });
+        }
+      } else {
+        toast({
+          title: "No subscriptions found",
+          description: "Enable push notifications first before testing.",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error('Test notification error:', err);
+      toast({
+        title: "Failed to send test",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -148,6 +192,15 @@ const Settings = () => {
                     >
                       {isDisabling ? 'Disabling…' : 'Disable push'}
                     </Button>
+                    {hasSubscription && !isInitializing && (
+                      <Button
+                        variant="secondary"
+                        onClick={handleTestNotification}
+                      >
+                        <Bell className="mr-2 h-4 w-4" />
+                        Send Test
+                      </Button>
+                    )}
                   </div>
                 </>
               )}
