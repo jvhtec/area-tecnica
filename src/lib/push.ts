@@ -55,7 +55,25 @@ export const enablePush = async (
     return null
   }
 
-  const registration = await navigator.serviceWorker.ready
+  let registration = await navigator.serviceWorker.getRegistration('/')
+
+  if (!registration) {
+    try {
+      registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    } catch (error) {
+      console.error('Failed to register service worker for push', error)
+      throw new Error(
+        'Unable to register the service worker required for push notifications. Reload the page and try again.'
+      )
+    }
+  }
+
+  try {
+    registration = await navigator.serviceWorker.ready
+  } catch (error) {
+    console.error('Service worker failed to become ready for push', error)
+    throw new Error('The service worker failed to initialize. Reload the page and try again.')
+  }
 
   let subscription = await registration.pushManager.getSubscription()
 
@@ -85,7 +103,14 @@ export const getExistingPushSubscription = async (): Promise<PushSubscription | 
     return null
   }
 
-  const registration = await navigator.serviceWorker.ready
+  const registration =
+    (await navigator.serviceWorker.getRegistration('/')) ||
+    (await navigator.serviceWorker.ready.catch(() => undefined))
+
+  if (!registration) {
+    return null
+  }
+
   return registration.pushManager.getSubscription()
 }
 
