@@ -18,11 +18,8 @@ import { UserInfo } from "./layout/UserInfo";
 import { SidebarNavigation } from "./layout/SidebarNavigation";
 import { AboutCard } from "./layout/AboutCard";
 import { LazyNotificationBadge } from "./layout/LazyNotificationBadge";
-import { useToast } from "@/hooks/use-toast";
 import { ReloadButton } from "./ui/reload-button";
 import { useQueryClient } from "@tanstack/react-query";
-import { useKonamiCode } from "@/hooks/useKonamiCode";
-import { WolfensteinDialog } from "./doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { HeaderStatus } from "./ui/header-status";
@@ -33,10 +30,8 @@ import { UserRole } from "@/types/user";
 
 const Layout = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const queryClient = useQueryClient();
-  const { triggered: doomTriggered, reset: resetDoom, handleLogoTap, tapCount } = useKonamiCode();
   const isMobile = useIsMobile();
   const location = useLocation();
   
@@ -137,22 +132,13 @@ const Layout = () => {
             </Button>
             <AboutCard />
             <SidebarSeparator />
-            <div 
-              className="px-2 py-4 cursor-pointer transition-opacity"
-              onClick={handleLogoTap}
-              style={{ opacity: tapCount > 0 ? 0.5 + (tapCount * 0.1) : 1 }}
-            >
+            <div className="px-2 py-4">
               <img
                 src="/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png"
                 alt="Sector Pro Logo"
                 className="h-6 w-auto dark:invert"
                 draggable="false"
               />
-              {isMobile && tapCount > 0 && (
-                <div className="text-xs text-center mt-1 text-muted-foreground">
-                  {5 - tapCount} more taps...
-                </div>
-              )}
             </div>
           </SidebarFooter>
         </Sidebar>
@@ -171,10 +157,6 @@ const Layout = () => {
           </main>
         </div>
       </div>
-      <WolfensteinDialog 
-        open={doomTriggered} 
-        onOpenChange={(open) => !open && resetDoom()} 
-      />
     </SidebarProvider>
   );
 };

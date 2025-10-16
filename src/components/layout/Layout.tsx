@@ -17,11 +17,8 @@ import { UserInfo } from "@/components/layout/UserInfo";
 import { SidebarNavigation } from "@/components/layout/SidebarNavigation";
 import { AboutCard } from "@/components/layout/AboutCard";
 import { NotificationBadge } from "@/components/layout/NotificationBadge";
-import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { ReloadButton } from "@/components/ui/reload-button";
-import { useKonamiCode } from "@/hooks/useKonamiCode";
-import { WolfensteinDialog } from "@/components/doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { HeaderStatus } from "@/components/ui/header-status";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
@@ -31,10 +28,8 @@ import { HelpButton } from "@/components/layout/HelpButton";
 const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const queryClient = useQueryClient();
-  const { triggered: doomTriggered, reset: resetDoom, handleLogoTap, tapCount } = useKonamiCode();
   const isMobile = useIsMobile();
   
   const {
@@ -123,22 +118,13 @@ const Layout = () => {
             </Button>
             <AboutCard userRole={userRole} userEmail={session?.user?.email || undefined} />
             <SidebarSeparator />
-            <div 
-              className="px-2 py-4 cursor-pointer transition-opacity"
-              onClick={handleLogoTap}
-              style={{ opacity: tapCount > 0 ? 0.5 + (tapCount * 0.1) : 1 }}
-            >
+            <div className="px-2 py-4">
               <img
                 src="/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png"
                 alt="Sector Pro Logo"
                 className="h-6 w-auto dark:invert"
                 draggable="false"
               />
-              {isMobile && tapCount > 0 && (
-                <div className="text-xs text-center mt-1 text-muted-foreground">
-                  {5 - tapCount} more taps...
-                </div>
-              )}
             </div>
           </SidebarFooter>
         </Sidebar>
@@ -157,15 +143,8 @@ const Layout = () => {
             <Outlet />
           </main>
         </div>
-      </div>
-      {/* Feature gate with env var; defaults to enabled unless explicitly set to false */}
-      {((import.meta as any).env?.VITE_ENABLE_WOLFENSTEIN === undefined || String((import.meta as any).env?.VITE_ENABLE_WOLFENSTEIN).toLowerCase() !== 'false') && (
-        <WolfensteinDialog 
-          open={doomTriggered} 
-          onOpenChange={(open) => !open && resetDoom()} 
-        />
-      )}
-    </SidebarProvider>
+        </div>
+      </SidebarProvider>
   );
 };
 
