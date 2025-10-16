@@ -33,7 +33,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Job } from "@/types/job";
 import { User } from "@/types/user";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
@@ -133,8 +133,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   // Required roles summary for this job + department
   const { data: reqSummary = [] } = useRequiredRoleSummary(jobId);
-  const reqForDept = React.useMemo(() => (reqSummary || []).find(r => r.department === currentDepartment) || null, [reqSummary, currentDepartment]);
-  const assignedByRole = React.useMemo(() => {
+  const reqForDept = useMemo(() => (reqSummary || []).find(r => r.department === currentDepartment) || null, [reqSummary, currentDepartment]);
+  const assignedByRole = useMemo(() => {
     const m = new Map<string, number>();
     (assignments || []).forEach((a: any) => {
       const code = currentDepartment === 'sound' ? a.sound_role : currentDepartment === 'lights' ? a.lights_role : a.video_role;
@@ -142,7 +142,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     });
     return m;
   }, [assignments, currentDepartment]);
-  const remainingByRole = React.useMemo(() => {
+  const remainingByRole = useMemo(() => {
     const m = new Map<string, number>();
     const roles = reqForDept?.roles || [];
     for (const r of roles) {
