@@ -30,7 +30,7 @@ export default function JobAssignmentMatrix() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [allowDirectAssign, setAllowDirectAssign] = useState(false);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [hideFridge, setHideFridge] = useState<boolean>(false);
+  const [hideFridge, setHideFridge] = useState<boolean>(true);
   const specialtyOptions = ['foh','monitores','sistemas','rf','escenario','PA'] as const;
   const toggleSpecialty = (name: (typeof specialtyOptions)[number]) => {
     setSelectedSkills(prev => prev.includes(name) ? prev.filter(s => s !== name) : [...prev, name]);
