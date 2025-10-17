@@ -239,6 +239,14 @@ serve(async (req) => {
     // Public logos base for remote images (matches how logos are loaded)
     const PUBLIC_LOGOS_BASE = `${SUPABASE_URL}/storage/v1/object/public/public%20logos`;
 
+    // Push notifications walkthrough images (exact filenames from the bucket)
+    const PUSH_IMG_PROFILE = `${PUBLIC_LOGOS_BASE}/profile.jpeg`;
+    const PUSH_IMG_PUSH = `${PUBLIC_LOGOS_BASE}/push.jpeg`;
+    const PUSH_IMG_ALLOW = `${PUBLIC_LOGOS_BASE}/allow.jpeg`;
+    const PUSH_IMG_TEST = `${PUBLIC_LOGOS_BASE}/test.jpeg`;
+    const PUSH_IMG_FOCUS_1 = `${PUBLIC_LOGOS_BASE}/focus.jpeg`;
+    const PUSH_IMG_FOCUS_2 = `${PUBLIC_LOGOS_BASE}/${encodeURIComponent('focus 2.jpeg')}`;
+
     // New dark-themed HTML content with header logos and remote images
     const htmlContent = `<!DOCTYPE html>
 <html lang="es">
@@ -343,6 +351,26 @@ serve(async (req) => {
         </p>
         <p style="color:#cfe1ff;">Vista simplificada de la gestión de tiempos:</p>
         <img src="${PUBLIC_LOGOS_BASE}/timesheet.png" alt="Gestión de tiempos" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
+      </div>
+
+      <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
+        <h2 class="accent" style="color:#00bcd4;font-weight:bold;margin:0 0 8px 0;">Activar notificaciones push</h2>
+        <p style="color:#cfe1ff;">
+          Para recibir avisos en tu dispositivo (asignaciones, cambios, recordatorios), activa las notificaciones push desde tu perfil.
+        </p>
+        <ol style="color:#cfe1ff;padding-left:20px;margin:0 0 10px 0;">
+          <li style="margin-bottom:6px;"><strong>Abre tu Perfil</strong> y localiza la sección de <strong>Notificaciones push</strong>.</li>
+          <li style="margin-bottom:6px;">Pulsa <strong>Activar notificaciones</strong> y, si aparece el mensaje del sistema, toca <strong>Permitir</strong>.</li>
+          <li style="margin-bottom:6px;">Usa <strong>Probar notificación</strong> para verificar que llegan correctamente.</li>
+          <li style="margin-bottom:6px;">Si usas <strong>Enfoque/No molestar</strong>, añade la app a las excepciones para que puedan entrar las alertas.</li>
+        </ol>
+        <p style="color:#cfe1ff;">Referencias visuales:</p>
+        <img src="${PUSH_IMG_PROFILE}" alt="Dónde está el ajuste de push" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px auto;" />
+        <img src="${PUSH_IMG_PUSH}" alt="Botones para activar y probar" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px auto;" />
+        <img src="${PUSH_IMG_ALLOW}" alt="Solicitud del sistema para permitir" width="280" style="display:block;width:100%;max-width:280px;height:auto;border-radius:6px;margin:10px auto;" />
+        <img src="${PUSH_IMG_TEST}" alt="Ejemplo de notificación recibida" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px auto;" />
+        <img src="${PUSH_IMG_FOCUS_1}" alt="Permitir en Enfoque/No molestar (paso 1)" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px auto;" />
+        <img src="${PUSH_IMG_FOCUS_2}" alt="Permitir en Enfoque/No molestar (paso 2)" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px auto;" />
       </div>
 
       <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
