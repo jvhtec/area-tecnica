@@ -40,6 +40,8 @@ type BroadcastBody = {
   channel?: 'email' | 'whatsapp';
   status?: string; // confirmed | cancelled | declined
   changes?: Record<string, { from?: unknown; to?: unknown } | unknown> | Record<string, unknown>;
+  message_preview?: string;
+  message_id?: string;
 };
 
 type RequestBody = SubscribeBody | UnsubscribeBody | TestBody | BroadcastBody;
@@ -285,35 +287,35 @@ async function handleBroadcast(
 
   if (type === 'job.created') {
     title = 'Trabajo creado';
-    text = `${actor} creó “${jobTitle || 'Trabajo'}”.`;
+    text = `${actor} creó "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(mgmt));
   } else if (type === 'job.updated') {
     title = 'Trabajo actualizado';
     if (body.changes && typeof body.changes === 'object') {
       const keys = Object.keys(body.changes as any);
       const labels = keys.slice(0, 4).map(fmtFieldEs); // summarize first few
-      text = `${actor} actualizó “${jobTitle || 'Trabajo'}”. Cambios: ${labels.join(', ')}.`;
+      text = `${actor} actualizó "${jobTitle || 'Trabajo'}". Cambios: ${labels.join(', ')}.`;
     } else {
-      text = `${actor} actualizó “${jobTitle || 'Trabajo'}”.`;
+      text = `${actor} actualizó "${jobTitle || 'Trabajo'}".`;
     }
     addUsers(Array.from(mgmt));
     addUsers(Array.from(participants));
   } else if (type === 'document.uploaded') {
     title = 'Nuevo documento';
     const fname = body.file_name || 'documento';
-    text = `${actor} subió “${fname}” a “${jobTitle || 'Trabajo'}”.`;
+    text = `${actor} subió "${fname}" a "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(mgmt));
     addUsers(Array.from(participants));
   } else if (type === 'document.deleted') {
     title = 'Documento eliminado';
     const fname = body.file_name || 'documento';
-    text = `${actor} eliminó “${fname}” de “${jobTitle || 'Trabajo'}”.`;
+    text = `${actor} eliminó "${fname}" de "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(mgmt));
     addUsers(Array.from(participants));
   } else if (type === 'document.tech_visible.enabled') {
     title = 'Documento disponible para técnicos';
     const fname = body.file_name || 'documento';
-    text = `Nuevo documento visible: “${fname}” en “${jobTitle || 'Trabajo'}”.`;
+    text = `Nuevo documento visible: "${fname}" en "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(participants));
   } else if (type === 'staffing.availability.sent') {
     title = 'Solicitud de disponibilidad enviada';
@@ -327,41 +329,49 @@ async function handleBroadcast(
     addUsers([body.recipient_id]);
   } else if (type === 'staffing.availability.confirmed') {
     title = 'Disponibilidad confirmada';
-    text = `${recipName || 'Técnico'} confirmó disponibilidad para “${jobTitle || 'Trabajo'}”.`;
+    text = `${recipName || 'Técnico'} confirmó disponibilidad para "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(mgmt));
   } else if (type === 'staffing.availability.declined') {
     title = 'Disponibilidad rechazada';
-    text = `${recipName || 'Técnico'} rechazó disponibilidad para “${jobTitle || 'Trabajo'}”.`;
+    text = `${recipName || 'Técnico'} rechazó disponibilidad para "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(mgmt));
   } else if (type === 'staffing.offer.confirmed') {
     title = 'Oferta aceptada';
-    text = `${recipName || 'Técnico'} aceptó oferta para “${jobTitle || 'Trabajo'}”.`;
+    text = `${recipName || 'Técnico'} aceptó oferta para "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(mgmt));
     addUsers(Array.from(participants));
   } else if (type === 'staffing.offer.declined') {
     title = 'Oferta rechazada';
-    text = `${recipName || 'Técnico'} rechazó oferta para “${jobTitle || 'Trabajo'}”.`;
+    text = `${recipName || 'Técnico'} rechazó oferta para "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(mgmt));
   } else if (type === 'staffing.availability.cancelled') {
     title = 'Disponibilidad cancelada';
-    text = `Solicitud de disponibilidad cancelada para “${jobTitle || 'Trabajo'}”.`;
+    text = `Solicitud de disponibilidad cancelada para "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(mgmt));
     addUsers([body.recipient_id]);
   } else if (type === 'staffing.offer.cancelled') {
     title = 'Oferta cancelada';
-    text = `Oferta cancelada para “${jobTitle || 'Trabajo'}”.`;
+    text = `Oferta cancelada para "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(mgmt));
     addUsers([body.recipient_id]);
   } else if (type === 'job.status.confirmed') {
     title = 'Trabajo confirmado';
-    text = `“${jobTitle || 'Trabajo'}” ha sido confirmado.`;
+    text = `"${jobTitle || 'Trabajo'}" ha sido confirmado.`;
     addUsers(Array.from(mgmt));
     addUsers(Array.from(participants));
   } else if (type === 'job.status.cancelled') {
     title = 'Trabajo cancelado';
-    text = `“${jobTitle || 'Trabajo'}” ha sido cancelado.`;
+    text = `"${jobTitle || 'Trabajo'}" ha sido cancelado.`;
     addUsers(Array.from(mgmt));
     addUsers(Array.from(participants));
+  } else if (type === 'message.received') {
+    title = 'Nuevo mensaje';
+    const preview = body.message_preview || '';
+    text = `${actor}: ${preview}`;
+    url = body.url || '/messages';
+    // Only notify the recipient, not the sender
+    recipients.clear();
+    addUsers([body.recipient_id]);
   } else {
     // Generic fallback using activity catalog label if available
     try {
@@ -370,7 +380,7 @@ async function handleBroadcast(
     } catch (_) {
       title = body.type || 'Nueva actividad';
     }
-    text = jobTitle ? `${actor} — ${title} en “${jobTitle}”.` : `${actor} — ${title}.`;
+    text = jobTitle ? `${actor} — ${title} en "${jobTitle}".` : `${actor} — ${title}.`;
     addUsers(Array.from(mgmt));
   }
 
@@ -405,6 +415,8 @@ async function handleBroadcast(
       channel: ch,
       ...('file_name' in body ? { fileName: body.file_name } : {}),
       ...('changes' in body ? { changes: body.changes } : {}),
+      ...('message_preview' in body ? { messagePreview: body.message_preview } : {}),
+      ...('message_id' in body ? { messageId: body.message_id } : {}),
     },
   };
 

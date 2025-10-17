@@ -2630,9 +2630,9 @@ export type Database = {
           file_type: string | null
           id: string
           job_id: string
-          visible_to_tech: boolean
           uploaded_at: string
           uploaded_by: string | null
+          visible_to_tech: boolean
         }
         Insert: {
           file_name: string
@@ -2641,9 +2641,9 @@ export type Database = {
           file_type?: string | null
           id?: string
           job_id: string
-          visible_to_tech?: boolean
           uploaded_at?: string
           uploaded_by?: string | null
+          visible_to_tech?: boolean
         }
         Update: {
           file_name?: string
@@ -2652,9 +2652,9 @@ export type Database = {
           file_type?: string | null
           id?: string
           job_id?: string
-          visible_to_tech?: boolean
           uploaded_at?: string
           uploaded_by?: string | null
+          visible_to_tech?: boolean
         }
         Relationships: [
           {
@@ -3943,6 +3943,42 @@ export type Database = {
           timezone?: string | null
           tours_expanded?: boolean | null
           waha_endpoint?: string | null
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string | null
+          created_at: string
+          endpoint: string
+          expiration_time: number | null
+          id: string
+          last_seen_at: string
+          p256dh: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth?: string | null
+          created_at?: string
+          endpoint: string
+          expiration_time?: number | null
+          id?: string
+          last_seen_at?: string
+          p256dh?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string | null
+          created_at?: string
+          endpoint?: string
+          expiration_time?: number | null
+          id?: string
+          last_seen_at?: string
+          p256dh?: string | null
+          user_agent?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -5738,7 +5774,22 @@ export type Database = {
           roles: Json | null
           total_required: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "job_required_roles_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_required_roles_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
+        ]
       }
       v_job_tech_payout_2025: {
         Row: {
