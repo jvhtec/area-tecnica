@@ -523,10 +523,11 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
             >
               {/* Mobile horizontal section tabs */}
               <div className="md:hidden -mx-4 px-4 mb-3 sticky top-[68px] z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40">
-                <nav aria-label="Secciones de Hoja de Ruta" role="tablist" className="flex items-center gap-2 py-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <nav aria-label="Secciones de Hoja de Ruta" role="tablist" className="flex items-center gap-2.5 py-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {tabConfig.map((tab) => {
                     const Icon = tab.icon;
                     const active = activeTab === tab.id;
+                    const iconClass = active ? 'text-primary-foreground' : 'text-foreground/70';
                     return (
                       <button
                         key={tab.id}
@@ -534,13 +535,13 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                         aria-selected={active}
                         aria-controls={`panel-${tab.id}`}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center h-10 px-3 rounded-full border text-sm min-w-[44px] ${
+                        className={`shrink-0 inline-flex items-center h-9 px-3 rounded-full border text-[13px] leading-none min-w-[44px] transition-colors ${
                           active
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-background text-foreground border-border'
+                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                            : 'bg-muted/60 text-foreground border-border/60 hover:bg-muted'
                         }`}
                       >
-                        <Icon className={`w-4 h-4 mr-1.5 ${tab.color}`} />
+                        <Icon className={`w-4 h-4 mr-1.5 ${iconClass}`} />
                         {tab.label}
                       </button>
                     );
