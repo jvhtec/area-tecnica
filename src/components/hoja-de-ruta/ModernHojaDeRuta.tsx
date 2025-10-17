@@ -362,25 +362,27 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
         animate={{ opacity: 1, y: 0 }}
         className="sticky top-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border/40"
       >
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+        {/* Use custom max width + responsive padding to avoid double container padding and overflow on mobile */}
+        <div className="max-w-screen-2xl mx-auto px-4 md:px-6 py-3 md:py-4">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/60 rounded-xl flex items-center justify-center">
                 <FileText className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent leading-tight">
                   Hoja de Ruta
                 </h1>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs md:text-sm text-muted-foreground">
                   Sistema integral de gestión de eventos
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Actions compact on mobile */}
+            <div className="flex items-center gap-2 md:gap-3">
               {/* Status and Data Source Indicators */}
-              <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2">
                 {hojaDeRuta && (
                   <Badge variant="outline" className="flex items-center gap-1 border-2">
                     <StatusIcon className="w-3 h-3" />
@@ -397,8 +399,9 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                   </Badge>
                 )}
               </div>
-
-              <ModernProgressTracker progress={completionProgress} />
+              <div className="hidden md:block">
+                <ModernProgressTracker progress={completionProgress} />
+              </div>
               
               {/* Action Buttons */}
 
@@ -408,7 +411,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                 disabled={!selectedJobId || !isInitialized || isSaving}
                 variant="outline"
                 size="sm"
-                className="border-2 border-green-500 text-green-600 hover:bg-green-50"
+                aria-label="Guardar hoja de ruta"
+                className="h-11 min-w-[44px] border-2 border-green-500 text-green-600 hover:bg-green-50"
               >
                 {isSaving ? (
                   <>
@@ -418,7 +422,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                 ) : (
                   <>
                     <Save className="w-4 h-4 mr-2" />
-                    Guardar
+                    <span className="hidden sm:inline">Guardar</span>
                   </>
                 )}
               </Button>
@@ -426,7 +430,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
               <Button
                 onClick={handleGeneratePDF}
                 disabled={isGenerating || !selectedJobId}
-                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                aria-label="Generar PDF"
+                className="h-11 min-w-[44px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
               >
                 {isGenerating ? (
                   <motion.div
@@ -438,13 +443,13 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                 ) : (
                   <Download className="w-4 h-4 mr-2" />
                 )}
-                Generar PDF
+                <span className="hidden sm:inline">Generar PDF</span>
               </Button>
             </div>
           </div>
 
           {/* Enhanced Status Messages */}
-          <div className="mt-3 text-xs text-muted-foreground flex items-center gap-4">
+          <div className="mt-2 md:mt-3 text-[11px] md:text-xs text-muted-foreground flex items-center gap-3 md:gap-4 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {!selectedJobId && (
               <span className="text-amber-600 font-medium">
                 ⚠️ Selecciona un trabajo para comenzar
@@ -475,10 +480,10 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
       </motion.div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-6 py-8">
-        <div className="grid grid-cols-12 gap-6">
-          {/* Sidebar with Templates */}
-          <div className="col-span-3">
+      <div className="max-w-screen-2xl mx-auto px-4 md:px-6 py-4 md:py-8">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+          {/* Sidebar with Templates (hidden on mobile, replaced by horizontal nav) */}
+          <div className="hidden md:block md:col-span-3">
             <div className="sticky top-24 space-y-4">
               {/* Quick Navigation */}
               <Card className="border-2">
@@ -510,12 +515,43 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
           </div>
 
           {/* Main Content Area */}
-          <div className="col-span-9">
+          <div className="md:col-span-9">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
+              {/* Mobile horizontal section tabs */}
+              <div className="md:hidden -mx-4 px-4 mb-3 sticky top-[68px] z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40">
+                <nav aria-label="Secciones de Hoja de Ruta" role="tablist" className="flex items-center gap-2 py-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {tabConfig.map((tab) => {
+                    const Icon = tab.icon;
+                    const active = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        role="tab"
+                        aria-selected={active}
+                        aria-controls={`panel-${tab.id}`}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center h-10 px-3 rounded-full border text-sm min-w-[44px] ${
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background text-foreground border-border'
+                        }`}
+                      >
+                        <Icon className={`w-4 h-4 mr-1.5 ${tab.color}`} />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+                {/* Mobile progress below tabs */}
+                <div className="py-2">
+                  <ModernProgressTracker progress={completionProgress} />
+                </div>
+              </div>
+
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 {/* Tab Contents */}
                 <AnimatePresence mode="wait">
@@ -526,7 +562,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <TabsContent value="event" className="mt-0">
+                    <TabsContent value="event" className="mt-0" id="panel-event" role="tabpanel">
                       <ModernEventSection
                         eventData={eventData}
                         setEventData={setEventData}
@@ -540,7 +576,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                       />
                     </TabsContent>
 
-                    <TabsContent value="venue" className="mt-0">
+                    <TabsContent value="venue" className="mt-0" id="panel-venue" role="tabpanel">
                       <ModernVenueSection
                         eventData={eventData}
                         setEventData={setEventData}
@@ -559,14 +595,14 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                       />
                     </TabsContent>
 
-                    <TabsContent value="weather" className="mt-0">
+                    <TabsContent value="weather" className="mt-0" id="panel-weather" role="tabpanel">
                       <ModernWeatherSection
                         eventData={eventData}
                         setEventData={setEventData}
                       />
                     </TabsContent>
 
-                    <TabsContent value="contacts" className="mt-0">
+                    <TabsContent value="contacts" className="mt-0" id="panel-contacts" role="tabpanel">
                       <ModernContactsSection
                         eventData={eventData}
                         onContactChange={handleContactChange}
@@ -574,7 +610,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                       />
                     </TabsContent>
 
-                    <TabsContent value="staff" className="mt-0">
+                    <TabsContent value="staff" className="mt-0" id="panel-staff" role="tabpanel">
                       <ModernStaffSection
                         eventData={eventData}
                         onStaffChange={handleStaffChange}
@@ -582,7 +618,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                       />
                     </TabsContent>
 
-                    <TabsContent value="travel" className="mt-0">
+                    <TabsContent value="travel" className="mt-0" id="panel-travel" role="tabpanel">
                       <ModernTravelSection
                         travelArrangements={travelArrangements}
                         onUpdate={updateTravelArrangement}
@@ -591,7 +627,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                       />
                     </TabsContent>
 
-                    <TabsContent value="accommodation" className="mt-0">
+                    <TabsContent value="accommodation" className="mt-0" id="panel-accommodation" role="tabpanel">
                        <ModernAccommodationSection
                          accommodations={accommodations}
                          eventData={eventData}
@@ -610,7 +646,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                        />
                     </TabsContent>
 
-                     <TabsContent value="logistics" className="mt-0">
+                     <TabsContent value="logistics" className="mt-0" id="panel-logistics" role="tabpanel">
                        <ModernLogisticsSection
                          eventData={eventData}
                          setEventData={setEventData}
@@ -620,14 +656,14 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                        />
                      </TabsContent>
 
-                    <TabsContent value="schedule" className="mt-0">
+                    <TabsContent value="schedule" className="mt-0" id="panel-schedule" role="tabpanel">
                       <ModernScheduleSection
                         eventData={eventData}
                         setEventData={setEventData}
                       />
                     </TabsContent>
 
-                    <TabsContent value="restaurants" className="mt-0">
+                    <TabsContent value="restaurants" className="mt-0" id="panel-restaurants" role="tabpanel">
                       <ModernRestaurantSection
                         eventData={eventData}
                         onUpdateEventData={setEventData}
