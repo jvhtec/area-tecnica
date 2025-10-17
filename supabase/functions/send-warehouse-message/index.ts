@@ -88,8 +88,17 @@ serve(async (req: Request) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers['X-API-Key'] = apiKey;
 
-    const sendUrl = `${base}/api/sendText`;
-    const payload = { chatId: WAREHOUSE_SOUND_GROUP, text: msg, session, linkPreview: false } as const;
+    const basePayload = { chatId: WAREHOUSE_SOUND_GROUP, text: msg, linkPreview: false } as const;
+    const attempts = [
+      {
+        url: `${base}/api/${encodeURIComponent(session)}/sendText`,
+        body: { ...basePayload },
+      },
+      {
+        url: `${base}/api/sendText`,
+        body: { ...basePayload, session },
+      },
+    ] as const;
 
     // Fetch with timeout + Cloudflare 524 awareness
     const timeoutMs = Number(Deno.env.get('WAHA_FETCH_TIMEOUT_MS') || 15000);
@@ -110,20 +119,121 @@ serve(async (req: Request) => {
       return { rayId: ray };
     };
 
-    try {
-      const res = await fetchWithTimeout(sendUrl, { method: 'POST', headers, body: JSON.stringify(payload) }, timeoutMs);
-      if (!res.ok) {
-        const txt = await res.text().catch(() => '');
-        if (res.status === 524) {
-          const cf = parseCF524(txt);
-          console.warn('WAHA sendText timeout via Cloudflare (524)', { status: res.status, rayId: cf?.rayId || null });
-        } else {
-          console.warn('WAHA sendText returned non-OK', { status: res.status, body: txt });
+    const truncate = (value: string | null | undefined, max = 2000) => {
+      if (!value) return value ?? '';
+      return value.length > max ? `${value.slice(0, max)}…` : value;
+    };
+
+    type AttemptError = {
+      url: string;
+      step: 'http' | 'fetch' | 'api';
+      status?: number;
+      body?: string;
+      json?: Record<string, unknown> | null;
+      message?: string;
+      cloudflareRayId?: string | null;
+    };
+
+    const attemptErrors: AttemptError[] = [];
+    let waSendOk = false;
+
+    const interpretResponse = (payload: unknown): { ok: boolean; reason?: string } => {
+      if (!payload || typeof payload !== 'object') return { ok: true };
+      const obj = payload as Record<string, unknown>;
+      if (obj.success === false) return { ok: false, reason: typeof obj.message === 'string' ? obj.message : 'WAHA reported success=false' };
+      if (obj.error && typeof obj.error === 'string') return { ok: false, reason: obj.error };
+      if (Array.isArray(obj.errors) && obj.errors.length) return { ok: false, reason: obj.errors.map((e) => String(e)).join(', ') };
+      if (typeof obj.status === 'string') {
+        const lowered = obj.status.toLowerCase();
+        if (['error', 'fail', 'failed'].includes(lowered)) {
+          return { ok: false, reason: typeof obj.message === 'string' ? obj.message : obj.status };
         }
+        if (['success', 'ok'].includes(lowered)) return { ok: true };
       }
-    } catch (e) {
-      console.warn('WAHA sendText fetch error (timeout/abort or network):', String(e));
-      // Do not fail the whole function if WAHA fetch throws (edge runtime quirks)
+      if (obj.success === true) return { ok: true };
+      if ('result' in obj && obj.result !== undefined) return { ok: true };
+      if ('data' in obj && obj.data !== undefined) return { ok: true };
+      if ('id' in obj || 'messageId' in obj) return { ok: true };
+      return { ok: true };
+    };
+
+    for (const attempt of attempts) {
+      try {
+        const res = await fetchWithTimeout(attempt.url, { method: 'POST', headers, body: JSON.stringify(attempt.body) }, timeoutMs);
+        const contentType = res.headers.get('content-type') || '';
+        let parsedJson: Record<string, unknown> | null = null;
+        let bodyText: string | null = null;
+        if (/application\/json/i.test(contentType)) {
+          parsedJson = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+        } else {
+          bodyText = await res.text().catch(() => null);
+        }
+
+        if (!res.ok) {
+          const body = parsedJson ? JSON.stringify(parsedJson) : bodyText || '';
+          const cf = res.status === 524 && body ? parseCF524(body) : null;
+          console.warn('WAHA sendText returned non-OK', {
+            url: attempt.url,
+            status: res.status,
+            body: truncate(body || ''),
+            rayId: cf?.rayId || null,
+          });
+          attemptErrors.push({
+            url: attempt.url,
+            step: 'http',
+            status: res.status,
+            body: body ? truncate(body) : undefined,
+            cloudflareRayId: cf?.rayId || null,
+          });
+          continue;
+        }
+
+        const interpretation = interpretResponse(parsedJson);
+        if (interpretation.ok) {
+          waSendOk = true;
+          break;
+        }
+
+        const serialized = parsedJson ? JSON.stringify(parsedJson) : bodyText || '';
+        console.warn('WAHA sendText reported failure', {
+          url: attempt.url,
+          status: res.status,
+          body: truncate(serialized || ''),
+          reason: interpretation.reason || null,
+        });
+        attemptErrors.push({
+          url: attempt.url,
+          step: 'api',
+          status: res.status,
+          json: parsedJson,
+          body: bodyText ? truncate(bodyText) : undefined,
+          message: interpretation.reason,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        console.warn('WAHA sendText fetch error (timeout/abort or network)', { url: attempt.url, message });
+        attemptErrors.push({ url: attempt.url, step: 'fetch', message });
+      }
+    }
+
+    if (!waSendOk) {
+      const errorPayload: Record<string, unknown> = {
+        error: 'Failed to send WhatsApp message',
+        attempts: attemptErrors.map((err) => ({
+          url: err.url,
+          step: err.step,
+          status: err.status,
+          message: err.message,
+          cloudflareRayId: err.cloudflareRayId,
+          body: err.body,
+          json: err.json ? err.json : undefined,
+        })),
+      };
+
+      return new Response(JSON.stringify(errorPayload), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // If message equals the default phrase for this job, create an announcement with a highlight directive
