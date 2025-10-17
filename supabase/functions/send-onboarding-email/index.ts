@@ -364,13 +364,31 @@ serve(async (req) => {
           <li style="margin-bottom:6px;">Usa <strong>Probar notificación</strong> para verificar que llegan correctamente.</li>
           <li style="margin-bottom:6px;">Si usas <strong>Enfoque/No molestar</strong>, añade la app a las excepciones para que puedan entrar las alertas.</li>
         </ol>
-        <p style="color:#cfe1ff;">Referencias visuales:</p>
-        <img src="${PUSH_IMG_PROFILE}" alt="Dónde está el ajuste de push" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px auto;" />
-        <img src="${PUSH_IMG_PUSH}" alt="Botones para activar y probar" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px auto;" />
-        <img src="${PUSH_IMG_ALLOW}" alt="Solicitud del sistema para permitir" width="280" style="display:block;width:100%;max-width:280px;height:auto;border-radius:6px;margin:10px auto;" />
-        <img src="${PUSH_IMG_TEST}" alt="Ejemplo de notificación recibida" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px auto;" />
-        <img src="${PUSH_IMG_FOCUS_1}" alt="Permitir en Enfoque/No molestar (paso 1)" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px auto;" />
-        <img src="${PUSH_IMG_FOCUS_2}" alt="Permitir en Enfoque/No molestar (paso 2)" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px auto;" />
+        <p style="color:#cfe1ff;margin:0 0 8px;">Referencias visuales:</p>
+        <table role="presentation" cellspacing="0" cellpadding="0" align="center" style="width:100%;max-width:560px;margin:0 auto 8px auto;">
+          <tr>
+            <td align="center" style="padding:4px;">
+              <img src="${PUSH_IMG_PROFILE}" alt="Ajuste de push en Perfil" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+            </td>
+            <td align="center" style="padding:4px;">
+              <img src="${PUSH_IMG_PUSH}" alt="Botones Activar y Probar" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+            </td>
+            <td align="center" style="padding:4px;">
+              <img src="${PUSH_IMG_ALLOW}" alt="Permitir notificaciones del sistema" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:4px;">
+              <img src="${PUSH_IMG_TEST}" alt="Notificación de prueba recibida" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+            </td>
+            <td align="center" style="padding:4px;">
+              <img src="${PUSH_IMG_FOCUS_1}" alt="Permitir en Enfoque (1)" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+            </td>
+            <td align="center" style="padding:4px;">
+              <img src="${PUSH_IMG_FOCUS_2}" alt="Permitir en Enfoque (2)" width="170" style="display:block;width:100%;max-width:170px;height:auto;border-radius:6px;" />
+            </td>
+          </tr>
+        </table>
       </div>
 
       <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
