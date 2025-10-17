@@ -87,6 +87,72 @@ self.addEventListener('push', (event) => {
     console.error('Unable to parse push payload', error)
   }
 
+  const deriveBadgeDetails = () => {
+    const badgeSources = [
+      payload.badgeCount,
+      payload.unreadCount,
+      payload.badge,
+      payload?.meta?.badgeCount,
+      payload?.meta?.unreadCount,
+      payload?.meta?.badge,
+    ]
+
+    for (const candidate of badgeSources) {
+      if (typeof candidate === 'number') {
+        if (Number.isFinite(candidate) && candidate > 0) {
+          return { type: 'count', value: Math.floor(candidate) }
+        }
+
+        if (candidate === 0) {
+          return { type: 'clear' }
+        }
+      }
+
+      if (typeof candidate === 'string') {
+        const normalized = candidate.toLowerCase()
+        if (normalized === 'dot') {
+          return { type: 'dot' }
+        }
+        if (normalized === 'clear' || normalized === 'none') {
+          return { type: 'clear' }
+        }
+      }
+    }
+
+    return null
+  }
+
+  const badgeDetails = deriveBadgeDetails()
+
+  if (badgeDetails && (self.registration.setAppBadge || self.registration.clearAppBadge)) {
+    event.waitUntil(
+      (async () => {
+        try {
+          if (badgeDetails.type === 'count' && self.registration.setAppBadge) {
+            await self.registration.setAppBadge(badgeDetails.value)
+            return
+          }
+
+          if (badgeDetails.type === 'dot' && self.registration.setAppBadge) {
+            await self.registration.setAppBadge()
+            return
+          }
+
+          if (self.registration.clearAppBadge) {
+            await self.registration.clearAppBadge()
+            return
+          }
+
+          if (self.registration.setAppBadge) {
+            await self.registration.setAppBadge(0)
+          }
+        } catch (error) {
+          console.warn('[sw] Unable to update app badge', error)
+        }
+      })()
+    )
+  }
+
   const title = payload.title || 'Update'
   const options = {
     body: payload.body || '',
