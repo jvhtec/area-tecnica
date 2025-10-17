@@ -10,6 +10,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import { HouseTechRateEditor } from "@/components/settings/HouseTechRateEditor";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { formatUserName } from "@/utils/userName";
@@ -27,6 +29,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const [flexUrl, setFlexUrl] = useState<string>("");
   const [flexResourceId, setFlexResourceId] = useState<string>(user?.flex_resource_id || "");
+  const [isSendingOnboarding, setIsSendingOnboarding] = useState(false);
 
   useEffect(() => {
     setAssignableAsTech(!!user?.assignable_as_tech);
@@ -76,6 +79,31 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
 
     console.log("Submitting user update with data:", updatedData);
     onSave(updatedData);
+  };
+
+  const handleSendOnboarding = async () => {
+    if (!user?.email) {
+      toast({ title: "Missing email", description: "This user has no email set.", variant: "destructive" });
+      return;
+    }
+    try {
+      setIsSendingOnboarding(true);
+      const { error } = await supabase.functions.invoke('send-onboarding-email', {
+        body: {
+          email: user.email,
+          firstName: user.first_name || undefined,
+          lastName: user.last_name || undefined,
+          department: user.department || undefined,
+        },
+      });
+      if (error) throw error;
+      toast({ title: "Onboarding email sent", description: `Sent to ${user.email}`, variant: "success" });
+    } catch (err) {
+      console.error('send-onboarding-email error', err);
+      toast({ title: "Failed to send onboarding", description: err instanceof Error ? err.message : 'Unknown error', variant: "destructive" });
+    } finally {
+      setIsSendingOnboarding(false);
+    }
   };
 
   return (
@@ -239,6 +267,17 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
               <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
+              {isManagementUser && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void handleSendOnboarding()}
+                  disabled={isSendingOnboarding}
+                  title="Send the onboarding email with instructions and screenshots"
+                >
+                  {isSendingOnboarding ? 'Sending…' : 'Send Onboarding Email'}
+                </Button>
+              )}
               <Button type="submit">
                 Save Changes
               </Button>
