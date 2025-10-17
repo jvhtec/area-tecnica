@@ -36,12 +36,16 @@ export const useMessageOperations = (
   const handleMarkAsRead = async (messageId: string) => {
     try {
       console.log("Marking message as read:", messageId);
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('messages')
         .update({ status: 'read' })
-        .eq('id', messageId);
+        .eq('id', messageId)
+        .select('id');
 
       if (error) throw error;
+      if (!updated || updated.length === 0) {
+        throw new Error('No rows updated. You may not have permission to update this message.');
+      }
 
       toast({
         title: "Message marked as read",
@@ -51,6 +55,13 @@ export const useMessageOperations = (
       setMessages(messages.map(msg => 
         msg.id === messageId ? { ...msg, status: 'read' } : msg
       ));
+
+      // Proactively notify other UI (e.g., sidebar badge) to refresh
+      try {
+        window.dispatchEvent(new Event('messages_invalidated'));
+      } catch (_) {
+        // no-op in non-browser environments
+      }
     } catch (error) {
       console.error("Error marking message as read:", error);
       toast({

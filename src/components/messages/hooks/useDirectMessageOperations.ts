@@ -25,6 +25,12 @@ export const useDirectMessageOperations = (
       if (error) throw error;
 
       setMessages(messages.filter(message => message.id !== messageId));
+      // Notify other UI to refresh direct messages state
+      try {
+        window.dispatchEvent(new Event('direct_messages_invalidated'));
+      } catch (_) {
+        // no-op in non-browser environments
+      }
       toast({
         title: "Success",
         description: "Message deleted successfully",
@@ -42,18 +48,28 @@ export const useDirectMessageOperations = (
   const handleMarkAsRead = async (messageId: string) => {
     try {
       console.log("Marking direct message as read:", messageId);
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('direct_messages')
         .update({ status: 'read' })
-        .eq('id', messageId);
+        .eq('id', messageId)
+        .select('id');
 
       if (error) throw error;
+      if (!updated || updated.length === 0) {
+        throw new Error('No rows updated. You may not have permission to update this direct message.');
+      }
 
       setMessages(messages.map(message =>
         message.id === messageId
           ? { ...message, status: 'read' }
           : message
       ));
+      // Notify other UI to refresh direct messages state
+      try {
+        window.dispatchEvent(new Event('direct_messages_invalidated'));
+      } catch (_) {
+        // no-op in non-browser environments
+      }
       
       toast({
         title: "Success",

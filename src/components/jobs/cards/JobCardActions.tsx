@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
-import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle } from "lucide-react";
+import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -10,6 +10,7 @@ import { TechnicianIncidentReportDialog } from "@/components/incident-reports/Te
 import { Department } from "@/types/department";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { useFlexUuid } from "@/hooks/useFlexUuid";
 
 interface JobCardActionsProps {
   job: any;
@@ -25,6 +26,7 @@ interface JobCardActionsProps {
   department?: Department;
   isCreatingFolders?: boolean;
   isCreatingLocalFolders?: boolean;
+  folderStateLoading?: boolean;
   currentFolderStep?: string;
   techName?: string;
   onRefreshData: (e: React.MouseEvent) => void;
@@ -65,6 +67,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   department,
   isCreatingFolders = false,
   isCreatingLocalFolders = false,
+  folderStateLoading = false,
   techName,
   onRefreshData,
   onEditButtonClick,
@@ -150,6 +153,32 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       return "Creating folders...";
     }
     return foldersAreCreated ? "Folders already exist" : "Create Flex folders";
+  };
+
+  // When folders exist, enable "Open in Flex" behavior by resolving UUID
+  const { flexUuid, isLoading: isFlexLoading, error: flexError } = useFlexUuid(foldersAreCreated ? job.id : "");
+
+  const handleOpenFlex = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (folderStateLoading || isCreatingFolders || isFlexLoading) {
+      toast({
+        title: "Loading",
+        description: isCreatingFolders
+          ? "Creating Flex folders, please wait..."
+          : "Please wait while we load the Flex folder...",
+      });
+      return;
+    }
+    if (flexUuid) {
+      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+      window.open(flexUrl, '_blank', 'noopener');
+      return;
+    }
+    if (flexError) {
+      toast({ title: 'Error', description: flexError, variant: 'destructive' });
+    } else {
+      toast({ title: 'Info', description: 'Flex folder not available for this job' });
+    }
   };
 
   const handleManageJob = (e: React.MouseEvent) => {
@@ -349,24 +378,42 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         </>
       )}
       {canCreateFlexFolders && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onCreateFlexFolders}
-          disabled={foldersAreCreated || isCreatingFolders}
-          title={getFlexButtonTitle()}
-          className={
-            foldersAreCreated || isCreatingFolders
-              ? "opacity-50 cursor-not-allowed"
-              : "hover:bg-accent/50"
-          }
-        >
-          {isCreatingFolders ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
-          )}
-        </Button>
+        foldersAreCreated ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenFlex}
+            disabled={folderStateLoading || isCreatingFolders || isFlexLoading}
+            className="gap-2"
+            title={isFlexLoading || isCreatingFolders || folderStateLoading ? 'Loading…' : 'Open in Flex'}
+          >
+            {(isFlexLoading || isCreatingFolders || folderStateLoading) ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ExternalLink className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline">Open Flex</span>
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onCreateFlexFolders}
+            disabled={folderStateLoading || isCreatingFolders}
+            title={getFlexButtonTitle()}
+            className={
+              folderStateLoading || isCreatingFolders
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-accent/50"
+            }
+          >
+            {isCreatingFolders ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
+            )}
+          </Button>
+        )
       )}
       <Button
         variant="ghost"

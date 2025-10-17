@@ -364,6 +364,13 @@ async function handleBroadcast(
     text = `"${jobTitle || 'Trabajo'}" ha sido cancelado.`;
     addUsers(Array.from(mgmt));
     addUsers(Array.from(participants));
+  } else if (type === 'flex.folders.created') {
+    title = 'Carpetas Flex creadas';
+    text = jobTitle
+      ? `Se han creado las carpetas de Flex para "${jobTitle}".`
+      : 'Se han creado carpetas de Flex.';
+    addUsers(Array.from(mgmt));
+    addUsers(Array.from(participants));
   } else if (type === 'message.received') {
     title = 'Nuevo mensaje';
     const preview = body.message_preview || '';

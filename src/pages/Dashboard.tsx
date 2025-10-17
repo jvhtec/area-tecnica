@@ -20,6 +20,7 @@ import { isJobOnDate } from "@/utils/timezoneUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
+import { useOptimizedMessagesSubscriptions } from "@/hooks/useOptimizedSubscriptions";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -55,6 +56,8 @@ const Dashboard = () => {
   const { data: jobs, isLoading } = useOptimizedJobs();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  // Ensure realtime updates for messages are wired
+  useOptimizedMessagesSubscriptions(userId || '');
   
   // No manual subscriptions needed - useOptimizedJobs handles job-related subscriptions
 

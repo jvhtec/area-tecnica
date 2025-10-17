@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Department } from "@/types/department";
 import { JobType } from "@/types/job";
@@ -66,6 +67,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
   const { getOrCreateLocationWithDetails } = useLocationManagement();
   const [locationInput, setLocationInput] = useState("");
   const [requirements, setRequirements] = useState<Record<string, Array<{ role_code: string; quantity: number }>>>({});
+  const navigate = useNavigate();
 
   const formatInput = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -262,10 +264,15 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         });
       } catch {}
 
-      // Let parent know a job was created (for follow-up actions)
+      // Redirect to management page
       try {
-        onCreated?.(job);
+        const dest = job.job_type === 'dryhire'
+          ? `/job-management/${job.id}`
+          : `/festival-management/${job.id}`;
+        navigate(dest);
       } catch {}
+
+      // We navigate to management; skip parent callbacks to avoid state updates on unmounted pages
 
       reset();
       setRequirements({});
@@ -280,7 +287,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, getOrCreateLocationWithDetails, queryClient, toast, reset, onOpenChange, onCreated]);
+  }, [isSubmitting, getOrCreateLocationWithDetails, queryClient, toast, reset, onOpenChange, onCreated, navigate]);
 
   const departments: Department[] = ["sound", "lights", "video"];
   const selectedDepartments = watch("departments") || [];

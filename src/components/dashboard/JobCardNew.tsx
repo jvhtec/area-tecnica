@@ -507,6 +507,13 @@ export function JobCardNew({
 
       await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
 
+      // Broadcast push: Flex folders created for job
+      try {
+        void supabase.functions.invoke('push', {
+          body: { action: 'broadcast', type: 'flex.folders.created', job_id: job.id }
+        });
+      } catch {}
+
       toast({
         title: "Success!",
         description: "Flex folders have been created successfully with proper configuration."

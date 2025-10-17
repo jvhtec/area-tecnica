@@ -63,8 +63,18 @@ export const useMessagesQuery = (userRole: string | null, userDepartment: string
   }, [data]);
 
   // Set up real-time subscription
-  const userId = supabase.auth.getUser().then(res => res.data.user?.id);
-  useMessagesSubscription(userId ? String(userId) : undefined, () => {
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (mounted) setCurrentUserId(user?.id);
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  useMessagesSubscription(currentUserId, () => {
     if (data) {
       setMessages(data);
     }

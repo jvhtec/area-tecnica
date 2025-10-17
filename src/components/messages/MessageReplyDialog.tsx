@@ -31,23 +31,34 @@ export const MessageReplyDialog = ({ message, open, onOpenChange }: MessageReply
       console.log("Sending reply...");
 
       // Mark original message as read
-      const { error: updateError } = await supabase
+      const { data: updated, error: updateError } = await supabase
         .from('messages')
         .update({ status: 'read' })
-        .eq('id', message.id);
+        .eq('id', message.id)
+        .select('id');
 
       if (updateError) throw updateError;
+      if (!updated || updated.length === 0) {
+        throw new Error('No rows updated while marking message as read');
+      }
+      try { window.dispatchEvent(new Event('messages_invalidated')); } catch {}
 
       // Send reply message
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        throw new Error('No authenticated user');
+      }
+
       const { error: sendError } = await supabase
         .from('messages')
         .insert({
           content: reply,
           department: message.department,
-          sender_id: message.sender_id,
+          sender_id: session.user.id,
         });
 
       if (sendError) throw sendError;
+      try { window.dispatchEvent(new Event('messages_invalidated')); } catch {}
 
       toast({
         title: "Reply sent",

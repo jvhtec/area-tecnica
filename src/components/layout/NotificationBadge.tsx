@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { BellDot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
@@ -16,10 +16,16 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const refreshQueuedRef = useRef(false);
+  const debounceTimerRef = useRef<number | null>(null);
   const navigate = useNavigate();
 
   const fetchUnreadMessages = useCallback(async () => {
-    if (isLoading) return; // Prevent concurrent requests
+    // If a fetch is already in progress, queue another refresh to run right after
+    if (isLoading) {
+      refreshQueuedRef.current = true;
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -76,6 +82,12 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
       console.error("Error checking unread messages:", error);
     } finally {
       setIsLoading(false);
+      // If a refresh was requested while we were loading, run it now
+      if (refreshQueuedRef.current) {
+        refreshQueuedRef.current = false;
+        // Use microtask to avoid deep recursion
+        Promise.resolve().then(() => fetchUnreadMessages());
+      }
     }
   }, [userId, userRole, userDepartment, isLoading]);
 
@@ -84,6 +96,18 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
     const timeoutId = setTimeout(() => {
       fetchUnreadMessages();
     }, 500);
+
+    // Listen for local invalidation events to refresh immediately
+    const handleInvalidate = () => {
+      if (debounceTimerRef.current) {
+        window.clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = window.setTimeout(() => {
+        fetchUnreadMessages();
+      }, 50);
+    };
+    window.addEventListener('messages_invalidated', handleInvalidate);
+    window.addEventListener('direct_messages_invalidated', handleInvalidate);
 
     // Set up real-time subscription for both tables  
     const channel = supabase
@@ -97,8 +121,13 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
         },
         (payload) => {
           console.log("Messages table changed:", payload);
-          // Debounce the fetch to avoid too many calls
-          setTimeout(fetchUnreadMessages, 200);
+          // Debounce the fetch to avoid too many calls and ensure we don't drop updates while loading
+          if (debounceTimerRef.current) {
+            window.clearTimeout(debounceTimerRef.current);
+          }
+          debounceTimerRef.current = window.setTimeout(() => {
+            fetchUnreadMessages();
+          }, 200);
         }
       )
       .on(
@@ -110,8 +139,13 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
         },
         (payload) => {
           console.log("Direct messages changed:", payload);
-          // Debounce the fetch to avoid too many calls
-          setTimeout(fetchUnreadMessages, 200);
+          // Debounce the fetch to avoid too many calls and ensure we don't drop updates while loading
+          if (debounceTimerRef.current) {
+            window.clearTimeout(debounceTimerRef.current);
+          }
+          debounceTimerRef.current = window.setTimeout(() => {
+            fetchUnreadMessages();
+          }, 200);
         }
       )
       .subscribe((status) => {
@@ -121,7 +155,13 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
     return () => {
       clearTimeout(timeoutId);
       console.log("Cleaning up realtime subscription");
+      if (debounceTimerRef.current) {
+        window.clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       supabase.removeChannel(channel);
+      window.removeEventListener('messages_invalidated', handleInvalidate);
+      window.removeEventListener('direct_messages_invalidated', handleInvalidate);
     };
   }, [fetchUnreadMessages]);
 

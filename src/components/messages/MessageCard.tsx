@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { MessageSquare, Trash2, CheckCircle } from "lucide-react";
+import { MessageSquare, Trash2, CheckCircle, Reply } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Message } from "./types";
+import { DirectMessageDialog } from "./DirectMessageDialog";
 
 interface MessageCardProps {
   message: Message;
@@ -20,7 +22,9 @@ export const MessageCard = ({
   onMarkAsRead,
   isManagement
 }: MessageCardProps) => {
+  const [isReplyOpen, setIsReplyOpen] = useState(false);
   const showMarkAsRead = isManagement && message.status === 'unread';
+  const canReply = isManagement && !!message.sender_id; // only management replies to department messages
 
   return (
     <Card key={message.id}>
@@ -41,6 +45,18 @@ export const MessageCard = ({
             <span className="text-sm text-muted-foreground">
               {format(new Date(message.created_at), 'PPp', { locale: es })}
             </span>
+            {canReply && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsReplyOpen(true)}
+                title="Responder al remitente"
+                className="gap-2"
+              >
+                <Reply className="h-4 w-4" />
+                Reply
+              </Button>
+            )}
             {showMarkAsRead && onMarkAsRead && (
               <Button
                 variant="ghost"
@@ -64,6 +80,14 @@ export const MessageCard = ({
           </div>
         </div>
         <p className="mt-2">{message.content}</p>
+        {canReply && (
+          <DirectMessageDialog
+            open={isReplyOpen}
+            onOpenChange={setIsReplyOpen}
+            recipientId={message.sender_id}
+            recipientName={`${message.sender.first_name} ${message.sender.last_name}`}
+          />
+        )}
       </CardContent>
     </Card>
   );

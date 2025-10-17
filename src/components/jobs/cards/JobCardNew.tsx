@@ -770,7 +770,8 @@ export function JobCardNew({
           <JobCardActions
             job={job}
             userRole={userRole || null}
-            foldersAreCreated={foldersAreCreated || isFoldersLoading}
+            foldersAreCreated={foldersAreCreated}
+            folderStateLoading={isFoldersLoading}
             isProjectManagementPage={isProjectManagementPage}
             isHouseTech={isHouseTech}
             showUpload={showUpload}
