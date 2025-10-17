@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
-import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle, ExternalLink } from "lucide-react";
+import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle, ExternalLink, Info, ListChecks, Settings, ScrollText } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -199,7 +199,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           className="gap-2"
           title="Tasks"
         >
-          <FileText className="h-4 w-4" />
+          <ListChecks className="h-4 w-4" />
           <span className="hidden sm:inline">Tasks</span>
         </Button>
       )}
@@ -251,7 +251,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           onClick={onJobDetailsClick}
           className="gap-2"
         >
-          <FileText className="h-4 w-4" />
+          <Info className="h-4 w-4" />
           <span className="hidden sm:inline">View Details</span>
         </Button>
       )}
@@ -276,7 +276,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           className="hover:bg-accent/50"
           title={userRole === 'technician' || userRole === 'house_tech' ? 'View Job' : 'Manage Job'}
         >
-          <FileText className="h-4 w-4 mr-1" />
+          <Settings className="h-4 w-4 mr-1" />
           <span className="hidden sm:inline">{userRole === 'technician' || userRole === 'house_tech' ? 'View Job' : 'Manage Job'}</span>
         </Button>
       )}
@@ -454,7 +454,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           className="gap-2"
           title="Sync Logs"
         >
-          <FileText className="h-4 w-4" />
+          <ScrollText className="h-4 w-4" />
           <span className="hidden sm:inline">Sync Logs</span>
         </Button>
       )}
