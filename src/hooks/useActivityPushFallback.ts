@@ -19,6 +19,7 @@ const COVERED_CODES = new Set<string>([
   'staffing.offer.cancelled',
   'job.status.confirmed',
   'job.status.cancelled',
+  'flex.tourdate_folder.created',
 ])
 
 export function useActivityPushFallback() {
@@ -46,14 +47,27 @@ export function useActivityPushFallback() {
         if (COVERED_CODES.has(code)) return
 
         try {
-          await supabase.functions.invoke('push', {
-            body: {
-              action: 'broadcast',
-              type: code,
-              job_id: row.job_id || null,
-              actor_name: row.actor_name || undefined,
+          const payload: any = {
+            action: 'broadcast',
+            type: code,
+            job_id: row.job_id || null,
+            actor_name: row.actor_name || undefined,
+          };
+
+          // Enrich tourdate events with context
+          if (code && code.startsWith('tourdate.')) {
+            const p = (row as any).payload || {};
+            const tourId = p.tour_id || (p.diff && p.diff.tour_id && (p.diff.tour_id.to || p.diff.tour_id));
+            if (tourId) {
+              payload.tour_id = tourId;
+              payload.url = `/tours/${tourId}`;
             }
-          })
+            if (p.diff) {
+              payload.changes = p.diff;
+            }
+          }
+
+          await supabase.functions.invoke('push', { body: payload })
         } catch {}
       })
       .subscribe()
@@ -63,4 +77,3 @@ export function useActivityPushFallback() {
     }
   }, [enabled, userRole])
 }
-

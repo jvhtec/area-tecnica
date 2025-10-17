@@ -42,6 +42,11 @@ type BroadcastBody = {
   changes?: Record<string, { from?: unknown; to?: unknown } | unknown> | Record<string, unknown>;
   message_preview?: string;
   message_id?: string;
+  // Tour/Tourdate optional hints
+  tour_id?: string;
+  tour_date_id?: string;
+  tour_name?: string;
+  dates_count?: number;
 };
 
 type RequestBody = SubscribeBody | UnsubscribeBody | TestBody | BroadcastBody;
@@ -230,9 +235,12 @@ function fmtFieldEs(field: string): string {
     case 'status': return 'Estado';
     case 'start_time': return 'Inicio';
     case 'end_time': return 'Fin';
+    case 'start_date': return 'Inicio';
+    case 'end_date': return 'Fin';
     case 'timezone': return 'Zona horaria';
     case 'job_type': return 'Tipo';
     case 'location_id': return 'Ubicación';
+    case 'tour_date_type': return 'Tipo de fecha';
     case 'color': return 'Color';
     default: return field;
   }
@@ -371,6 +379,21 @@ async function handleBroadcast(
       : 'Se han creado carpetas de Flex.';
     addUsers(Array.from(mgmt));
     addUsers(Array.from(participants));
+  } else if (type === 'flex.tourdate_folder.created') {
+    title = 'Carpeta de fecha creada';
+    const tn = body.tour_name || '';
+    const count = (body as any).dates_count as number | undefined;
+    if (tn && count && count > 1) {
+      text = `Se han creado ${count} carpetas de fecha para "${tn}".`;
+    } else if (tn) {
+      text = `Se ha creado carpeta de fecha para "${tn}".`;
+    } else if (count && count > 1) {
+      text = `Se han creado ${count} carpetas de fecha.`;
+    } else {
+      text = 'Se ha creado carpeta de fecha.';
+    }
+    url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
+    addUsers(Array.from(mgmt));
   } else if (type === 'message.received') {
     title = 'Nuevo mensaje';
     const preview = body.message_preview || '';
@@ -379,6 +402,29 @@ async function handleBroadcast(
     // Only notify the recipient, not the sender
     recipients.clear();
     addUsers([body.recipient_id]);
+  } else if (type === 'tourdate.created') {
+    title = 'Fecha de tour creada';
+    const tn = body.tour_name || '';
+    text = tn ? `${actor} creó una fecha en "${tn}".` : `${actor} creó una nueva fecha de tour.`;
+    url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
+    addUsers(Array.from(mgmt));
+  } else if (type === 'tourdate.updated') {
+    title = 'Fecha de tour actualizada';
+    if (body.changes && typeof body.changes === 'object') {
+      const keys = Object.keys(body.changes as any);
+      const labels = keys.slice(0, 4).map(fmtFieldEs);
+      text = `${actor} actualizó una fecha de tour. Cambios: ${labels.join(', ')}.`;
+    } else {
+      text = `${actor} actualizó una fecha de tour.`;
+    }
+    url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
+    addUsers(Array.from(mgmt));
+  } else if (type === 'tourdate.deleted') {
+    title = 'Fecha de tour eliminada';
+    const tn = body.tour_name || '';
+    text = tn ? `${actor} eliminó una fecha de "${tn}".` : `${actor} eliminó una fecha de tour.`;
+    url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
+    addUsers(Array.from(mgmt));
   } else {
     // Generic fallback using activity catalog label if available
     try {

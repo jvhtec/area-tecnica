@@ -43,6 +43,24 @@ async function resolveActorId(supabase: ReturnType<typeof createClient>, req: Re
   }
 }
 
+async function resolveActorName(supabase: ReturnType<typeof createClient>, actorId: string | null): Promise<string | null> {
+  if (!actorId) return null;
+  try {
+    const { data } = await supabase
+      .from('profiles')
+      .select('first_name,last_name,nickname,email')
+      .eq('id', actorId)
+      .maybeSingle();
+    if (!data) return null;
+    const full = `${data.first_name || ''} ${data.last_name || ''}`.trim();
+    if (full) return full;
+    if ((data as any).nickname) return (data as any).nickname as string;
+    return data.email || null;
+  } catch (_err) {
+    return null;
+  }
+}
+
 async function createFlexFolder(payload: FlexFolderPayload, authToken: string): Promise<FlexFolderResponse> {
   console.log("Creating Flex folder with payload:", payload);
   
@@ -135,6 +153,7 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
     const actorId = await resolveActorId(supabase, req)
+    const actorName = await resolveActorName(supabase, actorId)
     const activityEvents: Array<{ payload: Record<string, unknown>; visibility?: 'management' | 'job_participants' | 'house_plus_job' | 'actor_only' }> = []
 
     // Get tour information
@@ -293,22 +312,48 @@ serve(async (req) => {
         },
         visibility: 'management',
       })
+
+      // Fire push broadcast explicitly for tourdate folder creation
+      try {
+        const pushUrl = `${supabaseUrl}/functions/v1/push`;
+        await fetch(pushUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({
+            action: 'broadcast',
+            type: 'flex.tourdate_folder.created',
+            url: `/tours/${tourId}`,
+            tour_id: tourId,
+            tour_name: tour.name,
+            dates_count: createdDateCount,
+            actor_name: actorName || undefined,
+          })
+        }).catch(() => undefined);
+      } catch (_err) {
+        // non-blocking
+      }
     }
 
     if (activityEvents.length) {
       try {
         await Promise.all(
-          activityEvents.map((event) =>
-            supabase.rpc('log_activity_as', {
+          activityEvents.map((event) => {
+            const code = (event.payload as any)?.scope === 'dates'
+              ? 'flex.tourdate_folder.created'
+              : 'flex.folders.created';
+            return supabase.rpc('log_activity_as', {
               _actor_id: actorId,
-              _code: 'flex.folders.created',
+              _code: code,
               _job_id: null,
               _entity_type: 'flex',
               _entity_id: tourId,
               _payload: event.payload,
               _visibility: event.visibility ?? 'management',
             })
-          )
+          })
         )
       } catch (activityError) {
         console.warn('[create-flex-folders] Failed to log activity event', activityError)
