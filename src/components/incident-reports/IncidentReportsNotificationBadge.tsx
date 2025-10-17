@@ -3,6 +3,7 @@ import { ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
+import { useAppBadgeSource } from "@/hooks/useAppBadgeSource";
 
 interface IncidentReportsNotificationBadgeProps {
   userRole: string;
@@ -106,8 +107,15 @@ export const IncidentReportsNotificationBadge = ({
     setNewReportsCount(0);
   };
 
+  const isEligibleForBadge = ['management', 'admin'].includes(userRole);
+
+  useAppBadgeSource('incident-reports', {
+    count: newReportsCount,
+    enabled: isEligibleForBadge && newReportsCount > 0,
+  });
+
   // Only show for management and admin users
-  if (!['management', 'admin'].includes(userRole)) {
+  if (!isEligibleForBadge) {
     return null;
   }
 

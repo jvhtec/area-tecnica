@@ -4,6 +4,7 @@ import { BellDot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
+import { useAppBadgeSource } from "@/hooks/useAppBadgeSource";
 
 interface NotificationBadgeProps {
   userId: string;
@@ -13,6 +14,7 @@ interface NotificationBadgeProps {
 
 export const NotificationBadge = ({ userId, userRole, userDepartment }: NotificationBadgeProps) => {
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -26,9 +28,8 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
       // Check for unread department messages with optimized query
       let deptQuery = supabase
         .from('messages')
-        .select('id') // Only select ID to minimize data transfer
-        .eq('status', 'unread')
-        .limit(1); // We only need to know if any exist
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'unread');
 
       if (userRole === 'management') {
         deptQuery = deptQuery.eq('department', userDepartment);
@@ -39,10 +40,9 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
       // Check for unread direct messages with optimized query
       const directQuery = supabase
         .from('direct_messages')
-        .select('id') // Only select ID to minimize data transfer
+        .select('id', { count: 'exact', head: true })
         .eq('recipient_id', userId)
-        .eq('status', 'unread')
-        .limit(1); // We only need to know if any exist
+        .eq('status', 'unread');
 
       const [deptMessages, directMessages] = await Promise.all([
         deptQuery,
@@ -59,14 +59,19 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
         return;
       }
 
-      const hasUnread = deptMessages.data.length > 0 || directMessages.data.length > 0;
+      const departmentCount = deptMessages.count ?? 0;
+      const directCount = directMessages.count ?? 0;
+      const totalUnread = departmentCount + directCount;
+
       console.log("Unread messages status:", {
-        departmentMessages: deptMessages.data.length,
-        directMessages: directMessages.data.length,
-        hasUnread
+        departmentMessages: departmentCount,
+        directMessages: directCount,
+        hasUnread: totalUnread > 0,
+        totalUnread
       });
-      
-      setHasUnreadMessages(hasUnread);
+
+      setUnreadCount(totalUnread);
+      setHasUnreadMessages(totalUnread > 0);
     } catch (error) {
       console.error("Error checking unread messages:", error);
     } finally {
@@ -127,6 +132,8 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
       navigate('/technician-dashboard?showMessages=true');
     }
   };
+
+  useAppBadgeSource('messages', unreadCount > 0 ? { count: unreadCount } : null);
 
   if (!hasUnreadMessages) return null;
 
