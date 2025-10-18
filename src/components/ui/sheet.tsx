@@ -4,6 +4,7 @@ import { X } from "lucide-react"
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { GlassSurface, type GlassSurfaceProps } from "@/components/ui/glass"
 
 const Sheet = SheetPrimitive.Root
 
@@ -49,27 +50,70 @@ const sheetVariants = cva(
 
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-  VariantProps<typeof sheetVariants> { }
+    VariantProps<typeof sheetVariants> {
+  glass?: boolean
+  glassSurfaceProps?: Partial<GlassSurfaceProps>
+}
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
-  <SheetPortal>
-    <SheetOverlay />
-    <SheetPrimitive.Content
-      ref={ref}
-      className={cn(sheetVariants({ side }), className)}
-      {...props}
-    >
-      {children}
-      <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </SheetPrimitive.Close>
-    </SheetPrimitive.Content>
-  </SheetPortal>
-))
+>(({ side = "right", className, children, glass = false, glassSurfaceProps, ...props }, ref) => {
+  const {
+    className: surfaceClassName,
+    contentClassName: surfaceContentClassName,
+    mobileOptions,
+    displacementScale,
+    blurAmount,
+    cornerRadius,
+    variant,
+    disabled,
+    ...surfaceRest
+  } = glassSurfaceProps ?? {}
+
+  return (
+    <SheetPortal>
+      <SheetOverlay />
+      <SheetPrimitive.Content
+        ref={ref}
+        className={cn(
+          sheetVariants({ side }),
+          glass && "border-0 bg-transparent p-0 shadow-none",
+          className,
+        )}
+        {...props}
+      >
+        {glass ? (
+          <GlassSurface
+            {...surfaceRest}
+            variant={variant ?? "dark"}
+            displacementScale={displacementScale ?? 0.5}
+            blurAmount={blurAmount ?? 24}
+            cornerRadius={cornerRadius ?? (side === "bottom" || side === "top" ? 24 : 28)}
+            mobileOptions={{ allowDesktop: true, ...mobileOptions }}
+            className={cn("h-full w-full", surfaceClassName)}
+            contentClassName={cn("relative flex h-full w-full flex-col gap-4 p-6", surfaceContentClassName)}
+            disabled={disabled}
+          >
+            {children}
+            <SheetPrimitive.Close className="absolute right-4 top-4 inline-flex size-8 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </SheetPrimitive.Close>
+          </GlassSurface>
+        ) : (
+          <>
+            {children}
+            <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </SheetPrimitive.Close>
+          </>
+        )}
+      </SheetPrimitive.Content>
+    </SheetPortal>
+  )
+})
 SheetContent.displayName = SheetPrimitive.Content.displayName
 
 const SheetHeader = ({

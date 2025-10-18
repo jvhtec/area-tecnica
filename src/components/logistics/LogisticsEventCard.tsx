@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Package, PackageCheck, Truck } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { GlassSurface } from "@/components/ui/glass";
 
 interface LogisticsEventCardProps {
   event: any;
@@ -42,25 +43,39 @@ export const LogisticsEventCard = ({
   };
 
   return (
-    <div
+    <GlassSurface
       onClick={onClick}
-      style={{
-        borderColor: borderColor,
-        backgroundColor: getBgColor(),
-      }}
       className={cn(
-        "p-2 bg-card border rounded-md cursor-pointer hover:shadow-md transition-shadow",
+        "relative cursor-pointer overflow-hidden border border-white/10",
+        variant === "calendar" ? "rounded-lg px-3 py-2" : "rounded-xl",
         className
       )}
+      contentClassName={cn(
+        "relative z-[1]",
+        variant === "calendar" ? "flex items-center gap-2" : "flex flex-col gap-2 p-3"
+      )}
+      mobileOptions={{ featureFlag: "mobile_glass_ui", minimumDeviceMemory: 3 }}
+      displacementScale={compact ? 0.18 : variant === "calendar" ? 0.2 : 0.32}
+      blurAmount={compact ? 10 : variant === "calendar" ? 12 : 18}
+      fallbackClassName={cn(
+        "relative overflow-hidden border",
+        variant === "calendar" ? "rounded-lg px-3 py-2" : "rounded-xl p-3"
+      )}
+      style={{
+        backgroundImage: getBgColor() ? `linear-gradient(135deg, ${getBgColor()}, transparent)` : undefined,
+      }}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-2 left-0 w-1 rounded-full"
+        style={{ backgroundColor: borderColor }}
+      />
       {variant === "calendar" ? (
-        <div className="flex items-center gap-2">
-          <span className="text-xs">{event.title || event.job?.title}</span>
-        </div>
+        <span className="text-xs font-medium">{event.title || event.job?.title}</span>
       ) : (
         <>
           <div className="flex items-center justify-between gap-2">
-            <Badge 
+            <Badge
               variant={event.event_type === 'load' ? 'default' : 'secondary'}
               className="flex items-center gap-1"
             >
@@ -76,19 +91,19 @@ export const LogisticsEventCard = ({
               <span className="capitalize">{event.transport_type}</span>
             </Badge>
           </div>
-          
-          <h3 className="font-medium mt-2">{event.title || event.job?.title}</h3>
-          <div className="text-sm text-muted-foreground mt-1">
+
+          <h3 className="mt-2 font-medium">{event.title || event.job?.title}</h3>
+          <div className="mt-1 text-sm text-muted-foreground">
             {format(new Date(`2000-01-01T${event.event_time}`), 'HH:mm')}
           </div>
 
           {event.license_plate && (
-            <div className="text-sm text-muted-foreground mt-1">
+            <div className="mt-1 text-sm text-muted-foreground">
               {event.license_plate}
             </div>
           )}
 
-          <div className="flex flex-wrap gap-1 mt-1">
+          <div className="mt-1 flex flex-wrap gap-1">
             {event.departments?.map((dept: any) => (
               <Badge key={dept.department} variant="secondary" className="text-xs">
                 {dept.department}
@@ -97,12 +112,12 @@ export const LogisticsEventCard = ({
           </div>
 
           {event.loading_bay && (
-            <div className="text-sm text-muted-foreground mt-2">
+            <div className="mt-2 text-sm text-muted-foreground">
               Loading Bay: {event.loading_bay}
             </div>
           )}
         </>
       )}
-    </div>
+    </GlassSurface>
   );
 };

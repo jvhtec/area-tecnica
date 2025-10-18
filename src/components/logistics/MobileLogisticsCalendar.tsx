@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GlassButton, GlassCard } from "@/components/ui/glass";
 import { Calendar, ChevronLeft, ChevronRight, Plus, Printer } from "lucide-react";
 import { PrintDialog, PrintSettings } from "@/components/dashboard/PrintDialog";
 import { format, addDays, subDays, isToday, isSameDay, isValid } from "date-fns";
@@ -120,60 +120,86 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   };
 
   return (
-    <Card className="h-full flex flex-col">
+    <GlassCard
+      className="h-full flex flex-col"
+      glassSurfaceClassName="h-full"
+      glassContentClassName="flex flex-col"
+      mobileOptions={{ featureFlag: "mobile_glass_ui" }}
+    >
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-bold">Logistics</CardTitle>
-          <Button
+          <GlassButton
             onClick={handleAddEvent}
             size="sm"
             className="flex items-center gap-2"
+            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
           >
             <Plus className="h-4 w-4" />
             Add Event
-          </Button>
+          </GlassButton>
         </div>
-        
+
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={navigateToPrevious}>
+          <GlassButton
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={navigateToPrevious}
+            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
+          >
             <ChevronLeft className="h-4 w-4" />
-          </Button>
-          
+          </GlassButton>
+
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 mr-1" />
-            <span className={cn(
-              "font-medium",
-              isToday(currentDate) && "text-primary"
-                        )}>
+            <span
+              className={cn(
+                "font-medium",
+                isToday(currentDate) && "text-primary"
+              )}
+            >
               {format(currentDate, "EEE, MMM d")}
             </span>
           </div>
-          
-          <Button variant="ghost" size="icon" onClick={navigateToNext}>
+
+          <GlassButton
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={navigateToNext}
+            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
+          >
             <ChevronRight className="h-4 w-4" />
-          </Button>
+          </GlassButton>
         </div>
-        
+
         {/* Action buttons */}
         <div className="flex items-center justify-between">
           <div /> {/* Spacer */}
-          
-          <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)}>
+
+          <GlassButton
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPrintDialog(true)}
+            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
+          >
             <Printer className="h-4 w-4 mr-1" />
             Print
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
+          </GlassButton>
+
+          <GlassButton
+            variant="outline"
+            size="sm"
             onClick={navigateToToday}
             className={cn(
               isToday(currentDate) && "bg-primary text-primary-foreground"
             )}
+            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
           >
             <Calendar className="h-4 w-4 mr-1" />
             Today
-          </Button>
+          </GlassButton>
         </div>
       </CardHeader>
 
@@ -219,6 +245,6 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
         currentMonth={currentDate}
         selectedJobTypes={[]}
       />
-    </Card>
+    </GlassCard>
   );
 };

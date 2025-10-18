@@ -2,6 +2,7 @@ import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
+import { GlassSurface, type GlassSurfaceProps } from "@/components/ui/glass"
 
 const Drawer = ({
   shouldScaleBackground = true,
@@ -32,25 +33,62 @@ const DrawerOverlay = React.forwardRef<
 ))
 DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName
 
+interface DrawerContentProps
+  extends React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content> {
+  glass?: boolean
+  glassSurfaceProps?: Partial<GlassSurfaceProps>
+}
+
 const DrawerContent = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DrawerPortal>
-    <DrawerOverlay />
-    <DrawerPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
-        className
-      )}
-      {...props}
-    >
-      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
-      {children}
-    </DrawerPrimitive.Content>
-  </DrawerPortal>
-))
+  DrawerContentProps
+>(({ className, children, glass = false, glassSurfaceProps, ...props }, ref) => {
+  const {
+    className: surfaceClassName,
+    contentClassName: surfaceContentClassName,
+    mobileOptions,
+    displacementScale,
+    blurAmount,
+    cornerRadius,
+    variant,
+    disabled,
+    ...surfaceRest
+  } = glassSurfaceProps ?? {}
+
+  return (
+    <DrawerPortal>
+      <DrawerOverlay />
+      <DrawerPrimitive.Content
+        ref={ref}
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
+          glass && "border-0 bg-transparent shadow-none",
+          className,
+        )}
+        {...props}
+      >
+        <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
+        {glass ? (
+          <GlassSurface
+            {...surfaceRest}
+            variant={variant ?? "dark"}
+            displacementScale={displacementScale ?? 0.48}
+            blurAmount={blurAmount ?? 22}
+            cornerRadius={cornerRadius ?? 28}
+            mobileOptions={{ allowDesktop: true, ...mobileOptions }}
+            className={cn("mt-2 h-full w-full", surfaceClassName)}
+            contentClassName={cn("relative flex h-full w-full flex-col gap-4 p-6", surfaceContentClassName)}
+            disabled={disabled}
+          >
+            {children}
+          </GlassSurface>
+        ) : (
+          children
+        )}
+      </DrawerPrimitive.Content>
+    </DrawerPortal>
+  )
+})
 DrawerContent.displayName = "DrawerContent"
 
 const DrawerHeader = ({
