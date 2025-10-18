@@ -203,6 +203,8 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
       signatureStatus = 'Failed';
     } else if (timesheet.status === 'approved') {
       signatureStatus = 'Pending';
+    } else if (timesheet.status === 'rejected') {
+      signatureStatus = 'Rejected';
     }
 
     const row = [

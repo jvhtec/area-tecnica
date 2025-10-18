@@ -1,13 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Timesheet } from "@/types/timesheet";
 import { toast } from "sonner";
+import { RATES_QUERY_KEYS } from "@/constants/ratesQueryKeys";
 
 export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }) => {
   console.log("useTimesheets hook called with jobId:", jobId);
   const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
+  const queryClient = useQueryClient();
+
+  const invalidateApprovalContext = useCallback(() => {
+    if (!jobId) return;
+    queryClient.invalidateQueries({ queryKey: ['job-approval-status', jobId] });
+    queryClient.invalidateQueries({ queryKey: RATES_QUERY_KEYS.approvals });
+  }, [jobId, queryClient]);
 
   const fetchTimesheets = useCallback(async () => {
     try {
@@ -321,6 +330,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       if (!skipRefetch) {
         await fetchTimesheets();
         toast.success("Timesheet updated successfully");
+        invalidateApprovalContext();
       }
       
       return data;
@@ -338,7 +348,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
   const approveTimesheet = async (timesheetId: string) => {
     const currentUser = (await supabase.auth.getUser()).data.user;
     // Mark as approved (manager) and recompute
-    const updated = await updateTimesheet(timesheetId, { 
+    const updated = await updateTimesheet(timesheetId, {
       status: 'approved',
       approved_by_manager: true,
       approved_by: currentUser?.id,
@@ -347,9 +357,35 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
     try {
       await supabase.rpc('compute_timesheet_amount_2025', { _timesheet_id: timesheetId, _persist: true });
       await fetchTimesheets();
+      invalidateApprovalContext();
     } catch (e) {
       console.warn('Recompute on approve failed (non-fatal):', e);
     }
+    return updated;
+  };
+
+  const rejectTimesheet = async (timesheetId: string, reason?: string) => {
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    const updated = await updateTimesheet(
+      timesheetId,
+      {
+        status: 'rejected',
+        approved_by_manager: false,
+        approved_by: null,
+        approved_at: null,
+        rejected_at: new Date().toISOString(),
+        rejected_by: currentUser?.id,
+        rejection_reason: reason ?? null
+      },
+      true
+    );
+
+    if (updated) {
+      await fetchTimesheets();
+      toast.success('Timesheet rejected');
+      invalidateApprovalContext();
+    }
+
     return updated;
   };
 
@@ -375,6 +411,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
 
       await fetchTimesheets();
       toast.success("Timesheet deleted successfully");
+      invalidateApprovalContext();
     } catch (error) {
       console.error("Error in deleteTimesheet:", error);
       toast.error("Failed to delete timesheet");
@@ -397,6 +434,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
 
       await fetchTimesheets();
       toast.success(`${timesheetIds.length} timesheets deleted successfully`);
+      invalidateApprovalContext();
     } catch (error) {
       console.error("Error in deleteTimesheets:", error);
       toast.error("Failed to delete timesheets");
@@ -431,6 +469,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
     updateTimesheet,
     submitTimesheet,
     approveTimesheet,
+    rejectTimesheet,
     signTimesheet,
     deleteTimesheet,
     deleteTimesheets,

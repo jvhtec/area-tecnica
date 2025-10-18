@@ -272,12 +272,14 @@ export function JobCardNew({
     };
   }, [job.id, job.job_type, isJobBeingDeleted, queryClient]);
 
-  const getTechTimesheetState = (techId: string): 'none' | 'draft' | 'partial' | 'submitted' | 'approved' => {
+  const getTechTimesheetState = (techId: string): 'none' | 'draft' | 'partial' | 'submitted' | 'approved' | 'rejected' => {
     const list = (jobTimesheets || []).filter(t => t.technician_id === techId);
     if (list.length === 0) return 'none';
+    const anyRejected = list.some(t => t.status === 'rejected');
     const anyApproved = list.some(t => t.status === 'approved');
     const anySubmitted = list.some(t => t.status === 'submitted');
     const allSubmittedOrApproved = list.every(t => t.status === 'submitted' || t.status === 'approved');
+    if (anyRejected) return 'rejected';
     if (anyApproved && allSubmittedOrApproved) return 'approved';
     if (allSubmittedOrApproved) return 'submitted';
     if (anySubmitted || anyApproved) return 'partial';
@@ -292,6 +294,8 @@ export function JobCardNew({
         return 'bg-green-500/15 text-green-700 border-green-500/30';
       case 'partial':
         return 'bg-yellow-500/15 text-yellow-700 border-yellow-500/30';
+      case 'rejected':
+        return 'bg-red-500/15 text-red-700 border-red-500/30';
       default:
         return '';
     }

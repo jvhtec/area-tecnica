@@ -9,12 +9,15 @@ export interface Timesheet {
   overtime_hours: number;
   notes?: string;
   ends_next_day?: boolean;
-  status: 'draft' | 'submitted' | 'approved';
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
   signature_data?: string;
   signed_at?: string;
   created_by?: string;
   approved_by?: string;
   approved_at?: string;
+  rejected_at?: string;
+  rejected_by?: string;
+  rejection_reason?: string | null;
   created_at: string;
   updated_at: string;
   // New 2025 rate calculator fields

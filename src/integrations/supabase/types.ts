@@ -2810,7 +2810,14 @@ export type Database = {
           amount_override_eur: number | null
           extra_type: Database["public"]["Enums"]["job_extra_type"]
           job_id: string
+          pending_quantity: number | null
           quantity: number
+          status: string | null
+          submitted_at: string | null
+          submitted_by: string | null
+          approved_at: string | null
+          approved_by: string | null
+          rejection_reason: string | null
           technician_id: string
           updated_at: string
           updated_by: string | null
@@ -2819,7 +2826,14 @@ export type Database = {
           amount_override_eur?: number | null
           extra_type: Database["public"]["Enums"]["job_extra_type"]
           job_id: string
+          pending_quantity?: number | null
           quantity?: number
+          status?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          rejection_reason?: string | null
           technician_id: string
           updated_at?: string
           updated_by?: string | null
@@ -2828,7 +2842,14 @@ export type Database = {
           amount_override_eur?: number | null
           extra_type?: Database["public"]["Enums"]["job_extra_type"]
           job_id?: string
+          pending_quantity?: number | null
           quantity?: number
+          status?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          rejection_reason?: string | null
           technician_id?: string
           updated_at?: string
           updated_by?: string | null

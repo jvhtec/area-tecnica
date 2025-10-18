@@ -123,12 +123,15 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
                           <Badge variant="outline">Listo</Badge>
                         ) : (
                           row.pendingIssues.map((issue) => {
-                            const isCritical = issue === 'Approval required';
+                            const isCritical = issue === 'Approval required' || issue === 'Timesheets rejected' || issue === 'Extras rejected';
                             const translated = issue === 'Approval required' ? 'Se requiere aprobación'
                               : issue === 'No tour dates' ? 'Sin fechas de gira'
                               : issue === 'No assignments' ? 'Sin asignaciones'
                               : issue === 'No timesheets' ? 'Sin partes'
                               : issue === 'Timesheets pending' ? 'Partes pendientes'
+                              : issue === 'Timesheets rejected' ? 'Partes rechazados'
+                              : issue === 'Extras pending' ? 'Extras pendientes'
+                              : issue === 'Extras rejected' ? 'Extras rechazados'
                               : issue;
                             return (
                               <Badge key={issue} variant={isCritical ? 'destructive' : 'secondary'}>
