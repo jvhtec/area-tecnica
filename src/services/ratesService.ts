@@ -162,12 +162,14 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
   const { data: tours, error: toursError } = await supabase
     .from('tours')
     .select('id, name, start_date, end_date, rates_approved, status')
-    .neq('status', 'cancelled')
     .order('start_date', { ascending: true });
 
   if (toursError) throw toursError;
 
-  const tourList = tours || [];
+  const tourList = (tours || []).filter((tour) => {
+    const status = String(tour.status ?? '').toLowerCase();
+    return status !== 'cancelled' && status !== 'cancelado';
+  });
   const tourIds = tourList.map((tour) => tour.id).filter(Boolean) as string[];
 
   // Build counts for tour dates and their assignments
@@ -223,12 +225,16 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
     .select('id, title, start_time, end_time, job_type, status, rates_approved')
     .neq('job_type', 'tourdate')
     .neq('job_type', 'dryhire')
-    .neq('status', 'Cancelado')
     .order('start_time', { ascending: true });
 
   if (jobsError2) throw jobsError2;
 
-  const standaloneJobs = (jobsList || []).filter((j) => (j.job_type ?? '').toLowerCase() !== 'tour');
+  const standaloneJobs = (jobsList || [])
+    .filter((j) => (j.job_type ?? '').toLowerCase() !== 'tour')
+    .filter((job) => {
+      const status = String(job.status ?? '').toLowerCase();
+      return status !== 'cancelled' && status !== 'cancelado';
+    });
   const jobIds = standaloneJobs.map((j) => j.id);
   jobIds.forEach((id) => jobReviewIds.add(id));
 
