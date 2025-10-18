@@ -121,6 +121,7 @@ const TechnicianDashboard = () => {
             lights_role,
             video_role,
             assigned_at,
+            category_assignment,
             jobs (
               id,
               title,
@@ -181,6 +182,7 @@ const TechnicianDashboard = () => {
               technician_id: assignment.technician_id,
               department,
               role: assignment.sound_role || assignment.lights_role || assignment.video_role || "Assigned",
+              category_assignment: assignment.category_assignment,
               jobs: assignment.jobs
             };
           });
