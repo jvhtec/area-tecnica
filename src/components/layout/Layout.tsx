@@ -24,7 +24,6 @@ import { HeaderStatus } from "@/components/ui/header-status";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useActivityRealtime } from "@/features/activity/hooks/useActivityRealtime";
 import { HelpButton } from "@/components/layout/HelpButton";
-import { GlassSurface } from "@/components/ui/glass";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -130,25 +129,15 @@ const Layout = () => {
           </SidebarFooter>
         </Sidebar>
         <div className="flex-1">
-          <header className="sticky top-0 z-40">
-            <GlassSurface
-              cornerRadius={0}
-              className="border-b border-transparent px-3 pb-3 pt-[max(1rem,env(safe-area-inset-top))] md:px-6 md:pb-4"
-              contentClassName="flex w-full items-center justify-between gap-3 md:gap-4"
-              fallbackClassName="bg-background/95 supports-[backdrop-filter]:bg-background/70"
-              displacementScale={0.35}
-              blurAmount={26}
-              aberrationIntensity={0.05}
-            >
-              <div className="flex items-center gap-2">
-                <SidebarTrigger className="h-9 w-9" />
-              </div>
-              <div className="flex items-center gap-1.5 md:gap-2">
-                <HeaderStatus />
-                <HelpButton />
-                <ReloadButton onReload={handleReload} className="ml-1" />
-              </div>
-            </GlassSurface>
+          <header className="border-b p-4 pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center bg-background">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger />
+            </div>
+            <div className="flex items-center gap-2">
+              <HeaderStatus className="mr-3" />
+              <HelpButton />
+              <ReloadButton onReload={handleReload} />
+            </div>
           </header>
           <main className="p-6">
             <Outlet />

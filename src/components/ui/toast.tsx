@@ -4,7 +4,6 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { GlassSurface, type GlassSurfaceProps } from "@/components/ui/glass"
 
 const ToastProvider = ToastPrimitives.Provider
 
@@ -39,64 +38,17 @@ const toastVariants = cva(
   }
 )
 
-interface ToastPropsInternal
-  extends React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root>,
-    VariantProps<typeof toastVariants> {
-  glass?: boolean
-  glassSurfaceProps?: Partial<GlassSurfaceProps>
-}
-
 const Toast = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Root>,
-  ToastPropsInternal
->(({ className, variant, glass = false, glassSurfaceProps, children, ...props }, ref) => {
-  const {
-    className: surfaceClassName,
-    contentClassName: surfaceContentClassName,
-    mobileOptions,
-    displacementScale,
-    blurAmount,
-    cornerRadius,
-    variant: surfaceVariant,
-    disabled,
-    ...surfaceRest
-  } = glassSurfaceProps ?? {}
-
-  if (!glass) {
-    return (
-      <ToastPrimitives.Root
-        ref={ref}
-        className={cn(toastVariants({ variant }), className)}
-        {...props}
-      >
-        {children}
-      </ToastPrimitives.Root>
-    )
-  }
-
+  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
+    VariantProps<typeof toastVariants>
+>(({ className, variant, ...props }, ref) => {
   return (
     <ToastPrimitives.Root
       ref={ref}
-      className={cn(
-        "pointer-events-auto relative w-full border-0 bg-transparent p-0 shadow-none",
-        className,
-      )}
+      className={cn(toastVariants({ variant }), className)}
       {...props}
-    >
-      <GlassSurface
-        {...surfaceRest}
-        variant={surfaceVariant ?? "dark"}
-        displacementScale={displacementScale ?? 0.48}
-        blurAmount={blurAmount ?? 20}
-        cornerRadius={cornerRadius ?? 20}
-        mobileOptions={{ allowDesktop: true, ...mobileOptions }}
-        className={cn("w-full", surfaceClassName)}
-        contentClassName={cn("relative flex w-full items-start gap-3 p-4", surfaceContentClassName)}
-        disabled={disabled}
-      >
-        {children}
-      </GlassSurface>
-    </ToastPrimitives.Root>
+    />
   )
 })
 Toast.displayName = ToastPrimitives.Root.displayName

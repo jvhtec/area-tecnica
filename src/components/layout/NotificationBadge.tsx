@@ -1,7 +1,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { BellDot } from "lucide-react";
-import { GlassButton } from "@/components/ui/glass";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { useAppBadgeSource } from "@/hooks/useAppBadgeSource";
@@ -178,17 +178,14 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
   if (!hasUnreadMessages) return null;
 
   return (
-    <GlassButton
+    <Button
       variant="ghost"
       className="w-full justify-start gap-2 text-yellow-500"
-      glassSurfaceClassName="w-full"
       onClick={handleMessageNotificationClick}
       disabled={isLoading}
     >
-      <BellDot className="h-4 w-4 shrink-0" />
-      <span className="truncate">
-        New Messages{unreadCount > 0 ? ` (${unreadCount})` : ''}
-      </span>
-    </GlassButton>
+      <BellDot className="h-4 w-4" />
+      <span>New Messages</span>
+    </Button>
   );
 };

@@ -2,12 +2,12 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { formatInJobTimezone } from '@/utils/timezoneUtils';
 import { MapPin, Clock, User, Phone, Briefcase, Calendar, Plane, Stethoscope, Home, X, Warehouse } from 'lucide-react';
 import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
-import { GlassButton } from '@/components/ui/glass';
 
 interface TechDetailModalProps {
   open: boolean;
@@ -104,15 +104,7 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-sm"
-        glass
-        glassSurfaceProps={{
-          mobileOptions: { featureFlag: "mobile_glass_ui", minimumDeviceMemory: 3 },
-          displacementScale: 0.36,
-          blurAmount: 20,
-        }}
-      >
+      <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-4 w-4 text-primary" />
@@ -151,15 +143,14 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
                 <p className="text-sm text-muted-foreground">
                   {getAvailabilityStatusText()} on {format(date, 'MMM d, yyyy')}
                 </p>
-                <GlassButton
+                <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleRemoveAvailability}
-                  className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                  mobileOptions={{ featureFlag: "mobile_glass_ui" }}
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                 >
                   <X className="h-3 w-3" />
-                </GlassButton>
+                </Button>
               </div>
               <p className="text-xs text-orange-600">Not available for assignment</p>
             </div>
@@ -224,56 +215,51 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
             <div className="border-t pt-3">
               <h5 className="font-medium text-sm mb-2">Mark as Unavailable</h5>
               <div className="grid grid-cols-1 gap-2">
-                <GlassButton
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleUnavailableClick('vacation')}
                   className="justify-start"
-                  mobileOptions={{ featureFlag: "mobile_glass_ui" }}
                 >
                   <Calendar className="mr-2 h-3 w-3" />
                   Vacation
-                </GlassButton>
-                <GlassButton
+                </Button>
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleUnavailableClick('travel')}
                   className="justify-start"
-                  mobileOptions={{ featureFlag: "mobile_glass_ui" }}
                 >
                   <Plane className="mr-2 h-3 w-3" />
                   Travel
-                </GlassButton>
-                <GlassButton
+                </Button>
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleUnavailableClick('sick')}
                   className="justify-start"
-                  mobileOptions={{ featureFlag: "mobile_glass_ui" }}
                 >
                   <Stethoscope className="mr-2 h-3 w-3" />
                   Sick Day
-                </GlassButton>
-                <GlassButton
+                </Button>
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleUnavailableClick('day_off')}
                   className="justify-start"
-                  mobileOptions={{ featureFlag: "mobile_glass_ui" }}
                 >
                   <Home className="mr-2 h-3 w-3" />
                   Day Off
-                </GlassButton>
-                <GlassButton
+                </Button>
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleUnavailableClick('warehouse')}
                   className="justify-start"
-                  mobileOptions={{ featureFlag: "mobile_glass_ui" }}
                 >
                   <Warehouse className="mr-2 h-3 w-3" />
                   Mark as In Warehouse
-                </GlassButton>
+                </Button>
               </div>
             </div>
           )}

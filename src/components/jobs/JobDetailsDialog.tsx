@@ -321,15 +321,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   if (isJobLoading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          className="max-w-4xl max-h-[80vh]"
-          glass
-          glassSurfaceProps={{
-            mobileOptions: { featureFlag: "mobile_glass_ui", minimumDeviceMemory: 3 },
-            displacementScale: 0.32,
-            blurAmount: 20,
-          }}
-        >
+        <DialogContent className="max-w-4xl max-h-[80vh]">
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
@@ -352,15 +344,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-4xl max-h-[80vh]"
-        glass
-        glassSurfaceProps={{
-          mobileOptions: { featureFlag: "mobile_glass_ui", minimumDeviceMemory: 3 },
-          displacementScale: 0.32,
-          blurAmount: 20,
-        }}
-      >
+      <DialogContent className="max-w-4xl max-h-[80vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />

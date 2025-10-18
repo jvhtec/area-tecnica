@@ -317,15 +317,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="sm:max-w-[625px]"
-        glass
-        glassSurfaceProps={{
-          mobileOptions: { featureFlag: "mobile_glass_ui", minimumDeviceMemory: 3 },
-          displacementScale: 0.36,
-          blurAmount: 18,
-        }}
-      >
+      <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Manage {currentDepartment} Assignments</span>

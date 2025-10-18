@@ -1,7 +1,7 @@
+import { Button } from "@/components/ui/button";
 import { HelpCircle } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { GlassButton } from "@/components/ui/glass";
 
 // Mapping of routes to their manual section anchors
 const routeToSection: Record<string, string> = {
@@ -147,16 +147,14 @@ export const HelpButton = () => {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <GlassButton
+          <Button
             variant="ghost"
             size="icon"
             onClick={handleHelpClick}
             className="h-9 w-9"
-            glassSurfaceClassName="h-9 w-9"
-            aria-label={`Open help for ${pageName}`}
           >
             <HelpCircle className="h-4 w-4" />
-          </GlassButton>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>
           <p>Help: {pageName}</p>

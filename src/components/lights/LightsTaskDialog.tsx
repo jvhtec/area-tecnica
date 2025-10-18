@@ -281,15 +281,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="p-4 w-[95vw] max-w-[800px] max-h-[80vh] overflow-y-auto"
-        glass
-        glassSurfaceProps={{
-          mobileOptions: { featureFlag: "mobile_glass_ui", minimumDeviceMemory: 3 },
-          displacementScale: 0.36,
-          blurAmount: 20,
-        }}
-      >
+      <DialogContent className="p-4 w-[95vw] max-w-[800px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Table className="h-5 w-5" />

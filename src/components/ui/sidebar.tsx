@@ -5,8 +5,10 @@ import { PanelLeft } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -14,7 +16,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { GlassButton, GlassSheetContent, Sheet } from "@/components/ui/glass"
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -192,17 +193,10 @@ const Sidebar = React.forwardRef<
     if (isMobile) {
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-          <GlassSheetContent
+          <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] p-0 [&>button]:hidden"
-            glassSurfaceClassName="bg-sidebar/85 text-sidebar-foreground"
-            glassContentClassName="flex"
-            glassSurfaceProps={{
-              displacementScale: 0.45,
-              blurAmount: 24,
-              mobileOptions: { allowDesktop: true },
-            }}
+            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -213,7 +207,7 @@ const Sidebar = React.forwardRef<
             <div className="flex h-full w-full flex-col pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
               {children}
             </div>
-          </GlassSheetContent>
+          </SheetContent>
         </Sheet>
       )
     }
@@ -266,28 +260,27 @@ const Sidebar = React.forwardRef<
 Sidebar.displayName = "Sidebar"
 
 const SidebarTrigger = React.forwardRef<
-  React.ElementRef<typeof GlassButton>,
-  React.ComponentProps<typeof GlassButton>
+  React.ElementRef<typeof Button>,
+  React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
   const { toggleSidebar } = useSidebar()
 
   return (
-    <GlassButton
+    <Button
       ref={ref}
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-9 w-9 text-sidebar-foreground", className)}
-      glassSurfaceClassName="h-9 w-9"
+      className={cn("h-7 w-7", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
       }}
       {...props}
     >
-      <PanelLeft className="h-4 w-4" />
+      <PanelLeft />
       <span className="sr-only">Toggle Sidebar</span>
-    </GlassButton>
+    </Button>
   )
 })
 SidebarTrigger.displayName = "SidebarTrigger"

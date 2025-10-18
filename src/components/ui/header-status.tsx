@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { Wifi, WifiOff, AlertCircle, RefreshCw, Loader2, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { GlassButton } from "@/components/ui/glass";
+import { Button } from "./button";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -155,54 +155,43 @@ export function HeaderStatus({ className }: { className?: string }) {
     );
   };
   
-  const statusTone =
-    connectionStatus === 'connecting'
-      ? 'text-blue-500'
-      : connectionStatus !== 'connected'
-        ? 'text-red-500'
-        : isStale || !isFullySubscribed
-          ? 'text-amber-500'
-          : 'text-muted-foreground';
-
   return (
     <TooltipProvider>
-      <div className={cn('flex items-center gap-1.5', className)}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <GlassButton
-              variant="ghost"
-              size="sm"
-              className={cn('gap-1 px-2 text-xs font-medium transition-transform', statusTone)}
-              glassSurfaceClassName="h-8"
-              glassContentClassName="items-center"
-              onClick={isStale ? handleRefresh : undefined}
-              disabled={isRefreshing && isStale}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div 
+            className={cn(
+              "flex items-center gap-1.5 text-xs cursor-pointer",
+              isStale || !isFullySubscribed ? "text-amber-500" : (
+                connectionStatus === 'connected' ? "text-muted-foreground" : "text-red-500"
+              ),
+              className
+            )}
+            onClick={isStale ? handleRefresh : undefined}
+          >
+            {getStatusIcon()}
+            <span className="hidden sm:inline">
+              {getStatusText()}
+            </span>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-5 w-5 ml-0.5 hidden sm:flex" 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRefresh();
+              }}
+              disabled={isRefreshing || connectionStatus === 'connecting'}
             >
-              <span className="flex items-center gap-1">
-                {getStatusIcon()}
-                <span className="hidden sm:inline">{getStatusText()}</span>
-              </span>
-            </GlassButton>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">
-            {getTooltipContent()}
-          </TooltipContent>
-        </Tooltip>
-        <GlassButton
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0"
-          glassSurfaceClassName="h-8 w-8"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleRefresh();
-          }}
-          disabled={isRefreshing || connectionStatus === 'connecting'}
-          aria-label="Refresh real-time status"
-        >
-          <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
-        </GlassButton>
-      </div>
+              <RefreshCw className={`h-2.5 w-2.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="sr-only">Refresh</span>
+            </Button>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          {getTooltipContent()}
+        </TooltipContent>
+      </Tooltip>
     </TooltipProvider>
   );
 }

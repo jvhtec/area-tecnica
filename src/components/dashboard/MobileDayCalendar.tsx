@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +51,6 @@ import {
 import { formatInJobTimezone, isJobOnDate } from "@/utils/timezoneUtils";
 import { useMobileDayCalendarSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { GlassButton, GlassCard, GlassSurface } from "@/components/ui/glass";
 
 interface MobileDayCalendarProps {
   date: Date | undefined;
@@ -254,24 +255,13 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
   };
 
   return (
-    <GlassCard
-      className="h-full flex flex-col"
-      glassSurfaceClassName="h-full"
-      glassContentClassName="flex flex-col"
-      mobileOptions={{ featureFlag: "mobile_glass_ui" }}
-    >
+    <Card className="h-full flex flex-col">
       <CardContent className="flex-grow p-4">
         {/* Header with navigation */}
         <div className="flex items-center justify-between mb-4">
-          <GlassButton
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9"
-            onClick={navigateToPrevious}
-            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
-          >
+          <Button variant="ghost" size="sm" onClick={navigateToPrevious} className="p-2">
             <ChevronLeft className="h-4 w-4" />
-          </GlassButton>
+          </Button>
           
           <div className="text-center flex-1">
             <div className="text-lg font-semibold">
@@ -286,59 +276,36 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           </div>
           
           <div className="flex gap-1">
-            <GlassButton
-              variant="outline"
-              size="sm"
-              onClick={navigateToToday}
-              mobileOptions={{ featureFlag: "mobile_glass_ui" }}
-            >
+            <Button variant="outline" size="sm" onClick={navigateToToday}>
               <Target className="h-4 w-4" />
-            </GlassButton>
-
+            </Button>
+            
             <Popover>
               <PopoverTrigger asChild>
-                <GlassButton
-                  variant="outline"
-                  size="sm"
-                  mobileOptions={{ featureFlag: "mobile_glass_ui" }}
-                >
+                <Button variant="outline" size="sm">
                   <Calendar className="h-4 w-4" />
-                </GlassButton>
+                </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto border-0 bg-transparent p-0 shadow-none" align="end">
-                <GlassSurface
+              <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
+                <CalendarComponent
+                  mode="single"
+                  selected={currentDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      setCurrentDate(date);
+                      onDateSelect(date);
+                    }
+                  }}
+                  initialFocus
                   className="pointer-events-auto"
-                  contentClassName="p-2"
-                  mobileOptions={{ featureFlag: "mobile_glass_ui" }}
-                  displacementScale={0.38}
-                  blurAmount={18}
-                >
-                  <CalendarComponent
-                    mode="single"
-                    selected={currentDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        setCurrentDate(date);
-                        onDateSelect(date);
-                      }
-                    }}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
-                </GlassSurface>
+                />
               </PopoverContent>
             </Popover>
           </div>
-
-          <GlassButton
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9"
-            onClick={navigateToNext}
-            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
-          >
+          
+          <Button variant="ghost" size="sm" onClick={navigateToNext} className="p-2">
             <ChevronRight className="h-4 w-4" />
-          </GlassButton>
+          </Button>
         </div>
 
         {/* Action buttons */}
@@ -347,12 +314,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
             {distinctJobTypes.length > 0 && onJobTypeSelection ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <GlassButton
-                    variant="outline"
-                    size="sm"
-                    className="min-w-[92px]"
-                    mobileOptions={{ featureFlag: "mobile_glass_ui" }}
-                  >
+                  <Button variant="outline" size="sm">
                     <Filter className="h-4 w-4 mr-1" />
                     Types
                     {selectedJobTypes.length > 0 && selectedJobTypes.length < distinctJobTypes.length && (
@@ -360,31 +322,23 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
                         {selectedJobTypes.length}
                       </Badge>
                     )}
-                  </GlassButton>
+                  </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  className="z-50 w-52 border-0 bg-transparent p-0 shadow-none"
-                  sideOffset={6}
+                <DropdownMenuContent 
+                  align="start" 
+                  className="w-48 z-50 bg-background border shadow-lg"
+                  sideOffset={4}
                 >
-                  <GlassSurface
-                    className="overflow-hidden"
-                    contentClassName="flex flex-col py-2"
-                    mobileOptions={{ featureFlag: "mobile_glass_ui" }}
-                    displacementScale={0.32}
-                    blurAmount={16}
-                  >
-                    {distinctJobTypes.map((type) => (
-                      <DropdownMenuCheckboxItem
-                        key={type}
-                        checked={selectedJobTypes.length === 0 || selectedJobTypes.includes(type)}
-                        onCheckedChange={() => onJobTypeSelection(type)}
-                        className="capitalize px-3"
-                      >
-                        {type}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </GlassSurface>
+                  {distinctJobTypes.map((type) => (
+                    <DropdownMenuCheckboxItem
+                      key={type}
+                      checked={selectedJobTypes.length === 0 || selectedJobTypes.includes(type)}
+                      onCheckedChange={() => onJobTypeSelection(type)}
+                      className="capitalize"
+                    >
+                      {type}
+                    </DropdownMenuCheckboxItem>
+                  ))}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
@@ -392,12 +346,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
             {distinctJobStatuses.length > 0 && onJobStatusSelection ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <GlassButton
-                    variant="outline"
-                    size="sm"
-                    className="min-w-[92px]"
-                    mobileOptions={{ featureFlag: "mobile_glass_ui" }}
-                  >
+                  <Button variant="outline" size="sm">
                     <Filter className="h-4 w-4 mr-1" />
                     Status
                     {selectedJobStatuses.length > 0 && selectedJobStatuses.length < distinctJobStatuses.length && (
@@ -405,45 +354,32 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
                         {selectedJobStatuses.length}
                       </Badge>
                     )}
-                  </GlassButton>
+                  </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  className="z-50 w-52 border-0 bg-transparent p-0 shadow-none"
-                  sideOffset={6}
+                <DropdownMenuContent 
+                  align="start" 
+                  className="w-48 z-50 bg-background border shadow-lg"
+                  sideOffset={4}
                 >
-                  <GlassSurface
-                    className="overflow-hidden"
-                    contentClassName="flex flex-col py-2"
-                    mobileOptions={{ featureFlag: "mobile_glass_ui" }}
-                    displacementScale={0.32}
-                    blurAmount={16}
-                  >
-                    {distinctJobStatuses.map((status) => (
-                      <DropdownMenuCheckboxItem
-                        key={status}
-                        checked={selectedJobStatuses.length === 0 || selectedJobStatuses.includes(status)}
-                        onCheckedChange={() => onJobStatusSelection(status)}
-                        className="capitalize px-3"
-                      >
-                        {status}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </GlassSurface>
+                  {distinctJobStatuses.map((status) => (
+                    <DropdownMenuCheckboxItem
+                      key={status}
+                      checked={selectedJobStatuses.length === 0 || selectedJobStatuses.includes(status)}
+                      onCheckedChange={() => onJobStatusSelection(status)}
+                      className="capitalize"
+                    >
+                      {status}
+                    </DropdownMenuCheckboxItem>
+                  ))}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
           </div>
-
-          <GlassButton
-            variant="outline"
-            size="sm"
-            onClick={() => setShowPrintDialog(true)}
-            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
-          >
+          
+          <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)}>
             <Printer className="h-4 w-4 mr-1" />
             Print
-          </GlassButton>
+          </Button>
         </div>
 
         {/* Jobs area */}
@@ -471,6 +407,6 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           selectedJobTypes={selectedJobTypes}
         />
       </CardContent>
-    </GlassCard>
+    </Card>
   );
 };

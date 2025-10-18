@@ -382,15 +382,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
 
    return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="w-full max-w-4xl h-[90vh] flex flex-col p-0"
-        glass
-        glassSurfaceProps={{
-          mobileOptions: { featureFlag: "mobile_glass_ui", minimumDeviceMemory: 3 },
-          displacementScale: 0.38,
-          blurAmount: 22,
-        }}
-      >
+      <DialogContent className="w-full max-w-4xl h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-4 py-2 flex flex-row items-center justify-between border-b">
           <DialogTitle className="flex items-center gap-2">
             <Table className="h-5 w-5" />
