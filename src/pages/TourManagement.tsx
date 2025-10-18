@@ -109,11 +109,13 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
 
   const getSortedTourDates = () => {
     if (!tour?.tour_dates) return [];
-    
-    return [...tour.tour_dates].sort((a, b) => 
+
+    return [...tour.tour_dates].sort((a, b) =>
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
   };
+
+  const sortedTourDates = getSortedTourDates();
 
   const openWaDialog = () => {
     const sorted = getSortedTourDates();
@@ -334,6 +336,159 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       });
     }
   };
+
+  if (isTechnicianView) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-start gap-4">
+            {tourLogoUrl && (
+              <div className="flex-shrink-0">
+                <img
+                  src={tourLogoUrl}
+                  alt={`${tour.name} logo`}
+                  className="w-16 h-16 object-contain rounded-lg border border-border"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <Button variant="ghost" onClick={handleBackToTechnicianDashboard} className="p-0 h-auto">
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Back to Dashboard
+                </Button>
+                <Badge variant="outline" className="ml-2">
+                  <Eye className="h-3 w-3 mr-1" />
+                  Technician View
+                </Badge>
+              </div>
+              <h1 className="text-3xl font-bold">{tour.name}</h1>
+              {tour.description && (
+                <p className="text-muted-foreground mt-1">{tour.description}</p>
+              )}
+              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                {tour.start_date && tour.end_date && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>
+                      {format(new Date(tour.start_date), 'MMM d')} - {format(new Date(tour.end_date), 'MMM d, yyyy')}
+                    </span>
+                  </div>
+                )}
+                <Badge variant="outline" style={{ borderColor: tour.color, color: tour.color }}>
+                  {totalDates} dates
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setIsAssignmentsOpen(true)}>
+              <Users className="h-4 w-4 mr-2" />
+              View Assignments
+            </Button>
+            <Button variant="outline" onClick={() => setIsDatesOpen(true)}>
+              <Calendar className="h-4 w-4 mr-2" />
+              View Full Schedule
+            </Button>
+            <Button onClick={() => setIsDocumentsOpen(true)}>
+              <FileText className="h-4 w-4 mr-2" />
+              Open Documents
+            </Button>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">Scheduled Tour Dates</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Review confirmed dates and locations for this tour.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {sortedTourDates.length > 0 ? (
+              <div className="space-y-3">
+                {sortedTourDates.map((date: any) => {
+                  const eventDate = date?.date ? new Date(date.date) : null;
+
+                  return (
+                    <div
+                      key={date.id}
+                      className="p-4 border rounded-lg flex flex-col gap-2 bg-muted/30"
+                    >
+                      {eventDate ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">
+                              {format(eventDate, 'EEEE, MMMM d, yyyy')}
+                            </span>
+                          </div>
+                          <Badge variant="outline">
+                            {format(eventDate, 'HH:mm')}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          <span>Date not available</span>
+                        </div>
+                      )}
+                      {date.location?.name && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <MapPin className="h-4 w-4" />
+                          <span>{date.location.name}</span>
+                        </div>
+                      )}
+                      {date.notes && (
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {date.notes}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <TourDateFlexButton tourDateId={date.id} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-10 text-muted-foreground">
+                No scheduled dates available for this tour yet.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <TourDateManagementDialog
+          open={isDatesOpen}
+          onOpenChange={setIsDatesOpen}
+          tourId={tour.id}
+          tourDates={sortedTourDates}
+          readOnly
+        />
+
+        <TourAssignmentDialog
+          open={isAssignmentsOpen}
+          onOpenChange={setIsAssignmentsOpen}
+          tourId={tour.id}
+          readOnly
+        />
+
+        <TourDocumentsDialog
+          open={isDocumentsOpen}
+          onOpenChange={setIsDocumentsOpen}
+          tourId={tour.id}
+          tourName={tour.name}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -618,7 +773,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         open={isDatesOpen}
         onOpenChange={setIsDatesOpen}
         tourId={tour.id}
-        tourDates={getSortedTourDates()}
+        tourDates={sortedTourDates}
         readOnly={isTechnicianView}
       />
 
@@ -679,7 +834,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                 value={waSelectedDateId || ''}
                 onChange={(e) => setWaSelectedDateId(e.target.value || null)}
               >
-                {getSortedTourDates().map((d: any) => (
+                {sortedTourDates.map((d: any) => (
                   <option key={d.id} value={d.id}>
                     {format(new Date(d.date), 'PPPP')}{d.location?.name ? ` · ${d.location.name}` : ''}
                   </option>
