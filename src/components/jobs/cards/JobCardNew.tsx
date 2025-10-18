@@ -40,6 +40,8 @@ import { TransportRequestDialog } from "@/components/logistics/TransportRequestD
 import { LogisticsEventDialog } from "@/components/logistics/LogisticsEventDialog";
 import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
 import { Badge } from "@/components/ui/badge";
+import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
+import { CreateFoldersOptions } from "@/utils/flex-folders";
 
 export interface JobCardNewProps {
   job: any;
@@ -80,6 +82,8 @@ export function JobCardNew({
   // Add folder creation loading state
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
   const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
+  const [flexPickerOpen, setFlexPickerOpen] = useState(false);
+  const [flexPickerOptions, setFlexPickerOptions] = useState<CreateFoldersOptions | undefined>(undefined);
   // Collapsible sections (collapsed by default)
   const [docsCollapsed, setDocsCollapsed] = useState(true);
   const [ridersCollapsed, setRidersCollapsed] = useState(true);
@@ -493,15 +497,13 @@ export function JobCardNew({
     }
   };
 
-  const createFlexFoldersHandler = async (e: React.MouseEvent) => {
+  const createFlexFoldersHandler = (e: React.MouseEvent) => {
     e.stopPropagation();
-
+    
     if (isCreatingFolders) {
       console.log("JobCardNew: Folder creation already in progress");
       return;
     }
-
-    console.log("JobCardNew: Starting folder creation for job:", job.id);
 
     if (actualFoldersExist) {
       console.log("JobCardNew: Folders actually exist, preventing creation");
@@ -513,9 +515,20 @@ export function JobCardNew({
       return;
     }
 
+    // Open the modal instead of creating immediately
+    console.log("JobCardNew: Opening folder picker modal for job:", job.id);
+    setFlexPickerOpen(true);
+  };
+
+  const handleFlexPickerConfirm = async (options?: CreateFoldersOptions) => {
+    console.log("JobCardNew: Flex picker confirmed with options:", options);
+    setFlexPickerOptions(options);
+    setFlexPickerOpen(false);
+
     try {
       setIsCreatingFolders(true);
 
+      // Double-check folders don't exist
       const { data: existingFolders } = await supabase
         .from("flex_folders")
         .select("id")
@@ -543,7 +556,8 @@ export function JobCardNew({
         description: "Setting up Flex folder structure for this job."
       });
 
-      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
+      // Pass options to the creation function
+      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber, options);
 
       const { error: updateError } = await supabase
         .from('jobs')
@@ -559,8 +573,12 @@ export function JobCardNew({
         description: "Flex folders have been created successfully."
       });
 
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["folder-existence", job.id] }),
+        queryClient.invalidateQueries({ queryKey: ["folder-existence"] }),
+      ]);
 
     } catch (error: any) {
       console.error("JobCardNew: Error creating flex folders:", error);
@@ -1098,6 +1116,13 @@ export function JobCardNew({
               departments={(job.job_departments || []).map((d: any) => d.department)}
             />
           )}
+
+          <FlexFolderPicker
+            open={flexPickerOpen}
+            onOpenChange={setFlexPickerOpen}
+            onConfirm={handleFlexPickerConfirm}
+            initialOptions={flexPickerOptions}
+          />
 
         </>
       )}

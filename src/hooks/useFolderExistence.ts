@@ -25,7 +25,10 @@ export const useFolderExistence = (jobId: string) => {
       return exists;
     },
     enabled: !!jobId,
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    staleTime: 1000 * 30, // 30 seconds instead of 2 minutes
+    gcTime: 1000 * 60 * 5, // 5 minutes garbage collection
+    refetchOnMount: 'always', // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
     retry: 1
   });
 };
