@@ -71,7 +71,18 @@ const DEPARTMENT_SECTIONS: Record<DepartmentKey, DepartmentSection> = {
   },
   comercial: {
     label: "Comercial",
-    items: [],
+    items: [
+      {
+        key: "extrasSound",
+        label: "Extras Sonido",
+        description: "Genera el presupuesto de extras para el equipo de sonido.",
+      },
+      {
+        key: "extrasLights",
+        label: "Extras Luces",
+        description: "Genera el presupuesto de extras para el equipo de luces.",
+      },
+    ],
   },
 };
 
@@ -92,7 +103,7 @@ const DEFAULT_SELECTIONS: Record<DepartmentKey, SubfolderKey[]> = {
     "hojaGastos",
   ],
   personnel: ["gastosDePersonal", "crewCallSound", "crewCallLights"],
-  comercial: [],
+  comercial: ["extrasSound", "extrasLights"],
 };
 
 const departmentEntries = Object.entries(DEPARTMENT_SECTIONS) as [
