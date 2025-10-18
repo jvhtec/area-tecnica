@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   MapPin, 
   Users, 
@@ -18,7 +19,8 @@ import {
   Download,
   Eye,
   ExternalLink,
-  Calendar
+  Calendar,
+  AlertTriangle
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -32,6 +34,7 @@ import { JobExtrasManagement } from '@/components/jobs/JobExtrasManagement';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 import { useJobExtras } from '@/hooks/useJobExtras';
+import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 
 interface JobDetailsDialogProps {
   open: boolean;
@@ -49,6 +52,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const [selectedTab, setSelectedTab] = useState('info');
   const { userRole, user } = useOptimizedAuth();
   const isManager = ['admin','management'].includes(userRole || '');
+  const isTechnicianRole = ['technician', 'house_tech'].includes(userRole || '');
   const queryClient = useQueryClient();
 
   // Fetch comprehensive job data
@@ -96,9 +100,24 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const artistNameMap = React.useMemo(() => new Map(jobArtists.map(a => [a.id, a.name])), [jobArtists]);
 
   // Extras setup and visibility
-  const jobIdForExtras = (jobDetails?.id as string) || job.id;
-  const { data: jobExtras = [] } = useJobExtras(jobIdForExtras);
-  const showExtrasTab = !!(jobDetails?.rates_approved) && (jobExtras.length > 0);
+  const resolvedJobId = (jobDetails?.id as string) || job.id;
+  const { data: jobExtras = [] } = useJobExtras(resolvedJobId);
+  const { data: jobRatesApproval } = useJobRatesApproval(resolvedJobId);
+  const jobRatesApproved = jobRatesApproval?.rates_approved ?? !!jobDetails?.rates_approved;
+  const isDryhire = (jobDetails?.job_type || job?.job_type) === 'dryhire';
+  const showExtrasTab = jobRatesApproved && (jobExtras.length > 0);
+  const showTourRatesTab = !isDryhire
+    && jobDetails?.job_type === 'tourdate'
+    && (isManager || jobRatesApproved);
+
+  useEffect(() => {
+    if (!showTourRatesTab && selectedTab === 'tour-rates') {
+      setSelectedTab('info');
+    }
+    if (!showExtrasTab && selectedTab === 'extras') {
+      setSelectedTab('info');
+    }
+  }, [showTourRatesTab, showExtrasTab, selectedTab]);
 
   // Rider files for the artists of this job (2-step to be RLS-friendly)
   const { data: riderFiles = [], isLoading: isRidersLoading } = useQuery({
@@ -308,7 +327,17 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     );
   }
 
-  const isDryhire = (jobDetails?.job_type || job?.job_type) === 'dryhire';
+  const gridColsClass = isDryhire
+    ? 'grid-cols-1'
+    : showExtrasTab
+      ? (showTourRatesTab ? 'grid-cols-7' : 'grid-cols-6')
+      : (showTourRatesTab ? 'grid-cols-6' : 'grid-cols-5');
+
+  const showPendingRatesNotice = !isDryhire
+    && jobDetails?.job_type === 'tourdate'
+    && !isManager
+    && isTechnicianRole
+    && !jobRatesApproved;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -321,13 +350,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         </DialogHeader>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-          <TabsList className={`grid w-full ${isDryhire ? 'grid-cols-1' : (jobDetails?.job_type === 'tourdate' ? (showExtrasTab ? 'grid-cols-7' : 'grid-cols-6') : (showExtrasTab ? 'grid-cols-6' : 'grid-cols-5'))}`}>
+          <TabsList className={`grid w-full ${gridColsClass}`}>
             <TabsTrigger value="info">Información</TabsTrigger>
             {!isDryhire && <TabsTrigger value="location">Ubicación</TabsTrigger>}
             {!isDryhire && <TabsTrigger value="personnel">Personal</TabsTrigger>}
             {!isDryhire && <TabsTrigger value="documents">Documentos</TabsTrigger>}
             {!isDryhire && <TabsTrigger value="restaurants">Restaurantes</TabsTrigger>}
-            {!isDryhire && jobDetails?.job_type === 'tourdate' && (
+            {showTourRatesTab && (
               <TabsTrigger value="tour-rates">Tarifas de gira</TabsTrigger>
             )}
             {!isDryhire && showExtrasTab && <TabsTrigger value="extras">Extras</TabsTrigger>}
@@ -369,22 +398,25 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   {isManager && !isDryhire && (
                     <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
                       <div className="flex items-center gap-2">
-                        <Badge variant={jobDetails?.rates_approved ? 'default' : 'secondary'}>
-                          {jobDetails?.rates_approved ? 'Tarifas aprobadas' : 'Aprobación necesaria'}
+                        <Badge variant={jobRatesApproved ? 'default' : 'secondary'}>
+                          {jobRatesApproved ? 'Tarifas aprobadas' : 'Aprobación necesaria'}
                         </Badge>
                         <span className="text-xs text-muted-foreground">Controla la visibilidad de los pagos por trabajo para los técnicos</span>
                       </div>
                       <div>
-                        {jobDetails?.rates_approved ? (
+                        {jobRatesApproved ? (
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={async () => {
+                              if (!resolvedJobId) return;
                               await supabase
                                 .from('jobs')
                                 .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
-                                .eq('id', job.id);
-                              queryClient.invalidateQueries({ queryKey: ['job-details', job.id] });
+                                .eq('id', resolvedJobId);
+                              queryClient.invalidateQueries({ queryKey: ['job-details', resolvedJobId] });
+                              queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
+                              queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
                             }}
                           >
                             Revocar
@@ -393,12 +425,15 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                           <Button
                             size="sm"
                             onClick={async () => {
+                              if (!resolvedJobId) return;
                               const { data: u } = await supabase.auth.getUser();
                               await supabase
                                 .from('jobs')
                                 .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: u?.user?.id || null } as any)
-                                .eq('id', job.id);
-                              queryClient.invalidateQueries({ queryKey: ['job-details', job.id] });
+                                .eq('id', resolvedJobId);
+                              queryClient.invalidateQueries({ queryKey: ['job-details', resolvedJobId] });
+                              queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
+                              queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
                             }}
                           >
                             Aprobar
@@ -406,6 +441,15 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                         )}
                       </div>
                     </div>
+                  )}
+
+                  {showPendingRatesNotice && (
+                    <Alert variant="default" className="border-amber-200 bg-amber-50">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription className="text-sm">
+                        Las tarifas de este trabajo están pendientes de aprobación y no son visibles por el momento.
+                      </AlertDescription>
+                    </Alert>
                   )}
 
                       {jobDetails?.locations && (
@@ -720,16 +764,16 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
             </TabsContent>
             )}
 
-            {!isDryhire && jobDetails?.job_type === 'tourdate' && (
+            {showTourRatesTab && resolvedJobId && (
               <TabsContent value="tour-rates" className="space-y-4">
-                <TourRatesPanel jobId={jobDetails.id} />
+                <TourRatesPanel jobId={resolvedJobId} />
               </TabsContent>
             )}
 
             {!isDryhire && showExtrasTab && (
               <TabsContent value="extras" className="space-y-4">
-                <JobExtrasManagement 
-                  jobId={jobIdForExtras}
+                <JobExtrasManagement
+                  jobId={resolvedJobId}
                   isManager={isManager}
                   technicianId={isManager ? undefined : (user?.id || undefined)}
                 />
