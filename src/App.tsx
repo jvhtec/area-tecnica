@@ -57,6 +57,7 @@ import Announcements from '@/pages/Announcements';
 import RatesCenterPage from '@/pages/RatesCenterPage';
 import { useActivityPushFallback } from '@/hooks/useActivityPushFallback';
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
+import { GlassMotionProvider } from "@/providers/GlassMotionProvider";
 
 // Initialize activity push fallback within auth context
 function ActivityPushFallbackInit() {
@@ -79,7 +80,8 @@ export default function App() {
       <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme">
         <SubscriptionProvider>
           <AppBadgeProvider>
-            <Router>
+            <GlassMotionProvider>
+              <Router>
               <OptimizedAuthProvider>
                 <AppInit />
                 <ActivityPushFallbackInit />
@@ -174,7 +176,8 @@ export default function App() {
                   <SonnerToaster richColors position="top-right" />
                 </div>
               </OptimizedAuthProvider>
-            </Router>
+              </Router>
+            </GlassMotionProvider>
           </AppBadgeProvider>
         </SubscriptionProvider>
       </ThemeProvider>

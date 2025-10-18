@@ -91,6 +91,14 @@
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
     --sidebar-border: 214.3 31.8% 91.4%;
     --sidebar-ring: 222.2 84% 4.9%;
+    --glass-surface: 210 40% 98%;
+    --glass-surface-dark: 226 54% 14%;
+    --glass-border: 215 33% 82%;
+    --glass-highlight: 210 100% 95%;
+    --glass-shadow: 219 54% 28%;
+    --glass-foreground: 222.2 47.4% 11.2%;
+    --glass-foreground-dark: 210 40% 96%;
+    --glass-motion-intensity: 0.7;
   }
 
   .dark {
@@ -126,6 +134,37 @@
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217.2 32.6% 17.5%;
     --sidebar-ring: 212.7 26.8% 83.9%;
+    --glass-surface: 222 28% 18%;
+    --glass-surface-dark: 220 34% 12%;
+    --glass-border: 220 34% 32%;
+    --glass-highlight: 210 82% 72%;
+    --glass-shadow: 210 50% 6%;
+    --glass-foreground: 210 40% 96%;
+    --glass-foreground-dark: 210 40% 98%;
+    --glass-motion-intensity: 0.55;
+  }
+}
+
+@layer components {
+  .glass-surface-base {
+    @apply relative overflow-hidden rounded-2xl border border-glass-border bg-glass-surface text-glass-foreground shadow-glass-light backdrop-blur-xl transition-[transform,opacity] duration-300 ease-out;
+  }
+
+  .dark .glass-surface-base {
+    @apply bg-glass-surface-dark text-glass-foreground-dark border-glass-border-strong shadow-glass-dark;
+  }
+
+  .glass-surface-highlight::before {
+    content: "";
+    @apply pointer-events-none absolute inset-0 opacity-60;
+    background: linear-gradient(135deg, hsl(var(--glass-highlight) / 0.55), transparent 55%);
+  }
+
+  .glass-surface-noise::after {
+    content: "";
+    @apply pointer-events-none absolute inset-0 opacity-20 mix-blend-soft-light;
+    background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.35) 1px, transparent 0);
+    background-size: 3px 3px;
   }
 }
 
