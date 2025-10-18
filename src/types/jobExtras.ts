@@ -5,6 +5,13 @@ export interface JobExtra {
   technician_id: string;
   extra_type: JobExtraType;
   quantity: number;
+  pending_quantity?: number | null;
+  status?: 'pending' | 'approved' | 'rejected';
+  submitted_at?: string | null;
+  submitted_by?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  rejection_reason?: string | null;
   amount_override_eur?: number;
   updated_by?: string;
   updated_at: string;

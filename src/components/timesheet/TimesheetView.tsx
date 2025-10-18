@@ -17,6 +17,17 @@ import { JobTotalAmounts } from "./JobTotalAmounts";
 import { MyJobTotal } from "./MyJobTotal";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface TimesheetViewProps {
   jobId: string;
@@ -27,7 +38,7 @@ interface TimesheetViewProps {
 export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetViewProps) => {
   // Ensure userRole is initialized before passing into hooks that depend on it
   const { user, userRole } = useOptimizedAuth();
-  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, refetch } = useTimesheets(jobId, { userRole });
+  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, refetch } = useTimesheets(jobId, { userRole });
   const { assignments } = useJobAssignmentsRealtime(jobId);
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -53,6 +64,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     ends_next_day: false,
     category: undefined
   });
+  const [timesheetBeingRejected, setTimesheetBeingRejected] = useState<Timesheet | null>(null);
+  const [rejectionNotes, setRejectionNotes] = useState("");
 
   // Filter timesheets based on user role
   const filteredTimesheets = useMemo(() => {
@@ -72,6 +85,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       case 'draft': return 'secondary';
       case 'submitted': return 'default';
       case 'approved': return 'outline';
+      case 'rejected': return 'destructive';
       default: return 'secondary';
     }
   };
@@ -117,7 +131,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
 
   const calculateHours = (startTime: string, endTime: string, breakMinutes: number, endsNextDay?: boolean) => {
     if (!startTime || !endTime) return 0;
-    
+
     const start = new Date(`2000-01-01T${startTime}`);
     const end = new Date(`2000-01-01T${endTime}`);
     let diffMs = end.getTime() - start.getTime();
@@ -128,6 +142,22 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     const workingHours = diffHours - (breakMinutes / 60);
     
     return Math.max(0, workingHours);
+  };
+
+  const openRejectDialog = (timesheet: Timesheet) => {
+    setTimesheetBeingRejected(timesheet);
+    setRejectionNotes(timesheet.rejection_reason ?? '');
+  };
+
+  const closeRejectDialog = () => {
+    setTimesheetBeingRejected(null);
+    setRejectionNotes('');
+  };
+
+  const confirmRejectTimesheet = async () => {
+    if (!timesheetBeingRejected) return;
+    await rejectTimesheet(timesheetBeingRejected.id, rejectionNotes.trim() || undefined);
+    closeRejectDialog();
   };
 
   const handleBulkAction = async (action: 'submit' | 'approve' | 'delete') => {
@@ -489,13 +519,15 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           </CardHeader>
           <CardContent className="space-y-4">
             {dayTimesheets.map((timesheet) => {
-              const canEditTimesheet = isTechnician 
-                ? (timesheet.technician_id === user?.id && timesheet.status === 'draft')
-                : (isManagementUser && timesheet.status === 'draft');
-                
-              const canSubmitTimesheet = isTechnician 
-                ? (timesheet.technician_id === user?.id && timesheet.status === 'draft')
-                : (isManagementUser && timesheet.status === 'draft');
+              const editableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
+              const canEditTimesheet = isTechnician
+                ? (timesheet.technician_id === user?.id && editableStatuses.includes(timesheet.status))
+                : (isManagementUser && editableStatuses.includes(timesheet.status));
+
+              const submittableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
+              const canSubmitTimesheet = isTechnician
+                ? (timesheet.technician_id === user?.id && submittableStatuses.includes(timesheet.status))
+                : (isManagementUser && submittableStatuses.includes(timesheet.status));
               
               console.log('Timesheet permission check:', {
                 timesheetId: timesheet.id,
@@ -560,13 +592,23 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       
                       {/* Only management can approve submitted timesheets */}
                       {isManagementUser && timesheet.status === 'submitted' && (
-                        <Button
-                          size="sm"
-                          onClick={() => approveTimesheet(timesheet.id)}
-                          disabled={isBulkUpdating}
-                        >
-                          Approve
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => approveTimesheet(timesheet.id)}
+                            disabled={isBulkUpdating}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openRejectDialog(timesheet)}
+                            disabled={isBulkUpdating}
+                          >
+                            Reject
+                          </Button>
+                        </>
                       )}
                       
                       {/* Delete button - only for management */}
@@ -582,6 +624,20 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       )}
                     </div>
                   </div>
+
+                  {timesheet.status === 'rejected' && (
+                    <Alert variant="destructive">
+                      <AlertTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        Timesheet rejected
+                      </AlertTitle>
+                      <AlertDescription>
+                        {timesheet.rejection_reason?.length
+                          ? timesheet.rejection_reason
+                          : 'Please review the hours and resubmit for approval.'}
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
                   {editingTimesheet === timesheet.id ? (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -776,7 +832,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                     );
                   })()}
 
-                  {(timesheet.status === 'draft' || timesheet.status === 'submitted') && (
+                  {(timesheet.status === 'draft' || timesheet.status === 'submitted' || timesheet.status === 'rejected') && (
                     <TimesheetSignature
                       timesheetId={timesheet.id}
                       currentSignature={timesheet.signature_data}
@@ -790,6 +846,37 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           </CardContent>
         </Card>
       ))}
+
+      <AlertDialog open={!!timesheetBeingRejected} onOpenChange={(open) => {
+        if (!open) closeRejectDialog();
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject timesheet</AlertDialogTitle>
+            <AlertDialogDescription>
+              Provide a short note so the technician knows what needs to be corrected before resubmitting.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rejection-notes" className="text-sm font-medium">
+              Rejection notes
+            </Label>
+            <Textarea
+              id="rejection-notes"
+              placeholder="Missing break, please adjust the end time..."
+              value={rejectionNotes}
+              onChange={(event) => setRejectionNotes(event.target.value)}
+              minLength={0}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={closeRejectDialog}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRejectTimesheet} disabled={!timesheetBeingRejected}>
+              Reject timesheet
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

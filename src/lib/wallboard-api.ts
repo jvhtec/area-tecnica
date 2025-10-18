@@ -23,7 +23,7 @@ export interface CrewAssignmentsFeed {
       name: string;
       role: string;
       dept: Dept | null;
-      timesheetStatus: 'submitted' | 'draft' | 'missing' | 'approved';
+      timesheetStatus: 'submitted' | 'draft' | 'missing' | 'approved' | 'rejected';
     }>;
   }>;
 }
