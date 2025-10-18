@@ -18,6 +18,13 @@ export default function TechnicianUnavailability() {
   const [end, setEnd] = React.useState<string>('');
   // Reasonless flow; defaults to day_off in DB
 
+  const statusLabels: Record<string, string> = {
+    vacation: 'Vacaciones',
+    travel: 'Viaje',
+    sick: 'Baja médica',
+    day_off: 'Día libre',
+  };
+
   const { data: blocks = [], isLoading } = useQuery({
     queryKey: ['my-unavailability', user?.id],
     queryFn: async () => {
@@ -50,13 +57,13 @@ export default function TechnicianUnavailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Unavailability created');
+      toast.success('Bloqueo de disponibilidad creado');
       qc.invalidateQueries({ queryKey: ['my-unavailability'] });
       setOpen(false);
       setStart('');
       setEnd('');
     },
-    onError: (e: any) => toast.error(e?.message || 'Failed to create block'),
+    onError: (e: any) => toast.error(e?.message || 'No se pudo crear el bloqueo'),
   });
 
   const deleteMutation = useMutation({
@@ -65,33 +72,33 @@ export default function TechnicianUnavailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Unavailability removed');
+      toast.success('Bloqueo eliminado');
       qc.invalidateQueries({ queryKey: ['my-unavailability'] });
     },
-    onError: (e: any) => toast.error(e?.message || 'Failed to delete block'),
+    onError: (e: any) => toast.error(e?.message || 'No se pudo eliminar el bloqueo'),
   });
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">My Unavailability</h1>
-        <Button onClick={() => setOpen(true)}>Add Block</Button>
+        <h1 className="text-xl font-semibold">Mis bloqueos de disponibilidad</h1>
+        <Button onClick={() => setOpen(true)}>Añadir bloqueo</Button>
       </div>
 
       {isLoading ? (
-        <div className="text-muted-foreground">Loading…</div>
+        <div className="text-muted-foreground">Cargando…</div>
       ) : (
         <div className="space-y-3">
           {blocks.length === 0 && (
-            <div className="text-muted-foreground">No unavailability blocks yet. Add one to block assignments during that time.</div>
+            <div className="text-muted-foreground">Todavía no tienes bloqueos de disponibilidad. Añade uno para evitar asignaciones durante esas fechas.</div>
           )}
           {blocks.map((b: any) => (
             <div key={b.id} className="flex items-center justify-between border rounded-md p-3">
               <div>
-                <div className="font-medium">{new Date(b.date).toLocaleDateString()}</div>
-                <div className="text-sm text-muted-foreground">{b.status}</div>
+                <div className="font-medium">{new Date(b.date).toLocaleDateString('es-ES', { dateStyle: 'long' })}</div>
+                <div className="text-sm text-muted-foreground">{statusLabels[b.status as keyof typeof statusLabels] || b.status}</div>
               </div>
-              <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate(b.id)}>Delete</Button>
+              <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate(b.id)}>Eliminar</Button>
             </div>
           ))}
         </div>
@@ -100,39 +107,39 @@ export default function TechnicianUnavailability() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Unavailability</DialogTitle>
+            <DialogTitle>Añadir bloqueo de disponibilidad</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="flex items-center space-x-2">
               <Switch checked={allDay} onCheckedChange={(v) => setAllDay(Boolean(v))} id="allDay" />
-              <Label htmlFor="allDay">All day</Label>
+              <Label htmlFor="allDay">Todo el día</Label>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <Label>Start{allDay ? ' (date)' : ' (datetime)'}</Label>
+                <Label>Inicio{allDay ? ' (fecha)' : ' (fecha y hora)'}</Label>
                 <Input type={allDay ? 'date' : 'datetime-local'} value={start} onChange={(e) => setStart(e.target.value)} />
               </div>
               <div>
-                <Label>End{allDay ? ' (date)' : ' (datetime)'}</Label>
+                <Label>Fin{allDay ? ' (fecha)' : ' (fecha y hora)'}</Label>
                 <Input type={allDay ? 'date' : 'datetime-local'} value={end} onChange={(e) => setEnd(e.target.value)} />
               </div>
             </div>
             {/* Reason removed; defaults to day_off */}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={() => {
               try {
-                if (!start || !end) { toast.error('Start and end required'); return; }
+                if (!start || !end) { toast.error('Las fechas de inicio y fin son obligatorias'); return; }
                 const normalize = (v: string) => (v.includes('T') ? v.slice(0,10) : v);
                 const s = normalize(start);
                 const e = normalize(end);
-                if (s.length !== 10 || e.length !== 10) { toast.error('Invalid date'); return; }
+                if (s.length !== 10 || e.length !== 10) { toast.error('Fecha no válida'); return; }
                 createMutation.mutate({ startDate: s, endDate: e, status: 'day_off' });
               } catch (e) {
-                toast.error('Invalid date');
+                toast.error('Fecha no válida');
               }
-            }} disabled={createMutation.isPending || !start || !end}>Create</Button>
+            }} disabled={createMutation.isPending || !start || !end}>Crear</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

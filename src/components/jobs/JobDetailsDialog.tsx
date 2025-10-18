@@ -444,9 +444,12 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   )}
 
                   {showPendingRatesNotice && (
-                    <Alert variant="default" className="border-amber-200 bg-amber-50">
+                    <Alert
+                      variant="default"
+                      className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50"
+                    >
                       <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription className="text-sm">
+                      <AlertDescription className="text-sm text-amber-800 dark:text-amber-100">
                         Las tarifas de este trabajo están pendientes de aprobación y no son visibles por el momento.
                       </AlertDescription>
                     </Alert>

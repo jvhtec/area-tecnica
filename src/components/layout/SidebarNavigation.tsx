@@ -67,6 +67,12 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
     }
   };
 
+  const departmentLabelMap: Record<string, string> = {
+    sound: 'Sonido',
+    lights: 'Luces',
+    video: 'Vídeo',
+  };
+
   return (
     <div className="space-y-2">
       <div>
@@ -80,7 +86,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <LayoutDashboard className="h-4 w-4" />
-              <span>Dashboard</span>
+              <span>Panel principal</span>
             </Button>
           </Link>
         )}
@@ -95,7 +101,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <LayoutDashboard className="h-4 w-4" />
-              <span>Technician Dashboard</span>
+              <span>Panel técnico</span>
             </Button>
           </Link>
         )}
@@ -110,7 +116,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <Clock className="h-4 w-4" />
-              <span>My Unavailability</span>
+              <span>Mis bloqueos de disponibilidad</span>
             </Button>
           </Link>
         )}
@@ -125,7 +131,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <Calendar className="h-4 w-4" />
-              <span>Personal Calendar</span>
+              <span>Agenda personal</span>
             </Button>
           </Link>
         )}
@@ -140,7 +146,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <Grid3X3 className="h-4 w-4" />
-              <span>Assignment Matrix</span>
+              <span>Matriz de asignaciones</span>
             </Button>
           </Link>
         )}
@@ -154,7 +160,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <Euro className="h-4 w-4" />
-              <span>Rates &amp; Extras</span>
+              <span>Tarifas y extras</span>
             </Button>
           </Link>
         )}
@@ -173,7 +179,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
                 }`}
               >
                 <Music2 className="h-4 w-4" />
-                <span>Sound</span>
+                <span>Sonido</span>
               </Button>
             </Link>
 
@@ -186,7 +192,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
                 }`}
               >
                 <Lightbulb className="h-4 w-4" />
-                <span>Lights</span>
+                <span>Luces</span>
               </Button>
             </Link>
 
@@ -199,7 +205,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
                 }`}
               >
                 <Video className="h-4 w-4" />
-                <span>Video</span>
+                <span>Vídeo</span>
               </Button>
             </Link>
           </>
@@ -215,7 +221,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               {getDepartmentIcon(userDepartment)}
-              <span>{userDepartment}</span>
+              <span>{departmentLabelMap[userDepartment.toLowerCase()] || userDepartment}</span>
             </Button>
           </Link>
         )}
@@ -230,7 +236,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <MapPin className="h-4 w-4" />
-              <span>Tours</span>
+              <span>Giras</span>
             </Button>
           </Link>
         )}
@@ -245,7 +251,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <Tent className="h-4 w-4" />
-              <span>Festivals</span>
+              <span>Festivales</span>
             </Button>
           </Link>
         )}
@@ -275,7 +281,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <ClipboardList className="h-4 w-4" />
-              <span>Project Management</span>
+              <span>Gestión de proyectos</span>
             </Button>
           </Link>
         )}
@@ -290,7 +296,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <Truck className="h-4 w-4" />
-              <span>Logistics</span>
+              <span>Logística</span>
             </Button>
           </Link>
         )}
@@ -304,7 +310,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
             }`}
           >
             <UserCircle className="h-4 w-4" />
-            <span>Profile</span>
+            <span>Perfil</span>
           </Button>
         </Link>
 
@@ -319,7 +325,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
                 }`}
               >
                 <Megaphone className="h-4 w-4" />
-                <span>Announcements</span>
+                <span>Anuncios</span>
               </Button>
             </Link>
 
@@ -331,7 +337,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
                 }`}
               >
                 <FileText className="h-4 w-4" />
-                <span>Incident Reports</span>
+                <span>Partes de incidencias</span>
               </Button>
             </Link>
 
@@ -343,10 +349,10 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
                 }`}
               >
                 <Activity className="h-4 w-4" />
-                <span>Activity</span>
+                <span>Actividad</span>
               </Button>
             </Link>
-            
+
             <Link to="/settings">
               <Button
                 variant="ghost"
@@ -355,7 +361,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
                 }`}
               >
                 <Settings className="h-4 w-4" />
-                <span>Settings</span>
+                <span>Ajustes</span>
               </Button>
             </Link>
           </>
