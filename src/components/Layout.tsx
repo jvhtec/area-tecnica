@@ -27,6 +27,7 @@ import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { UserRole } from "@/types/user";
+import { GlassSurface } from "@/components/ui/glass";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -143,14 +144,24 @@ const Layout = () => {
           </SidebarFooter>
         </Sidebar>
         <div className="flex-1 min-w-0">
-          <header className="border-b p-2 md:p-4 pt-[max(0.5rem,env(safe-area-inset-top))] md:pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center bg-background">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger />
-            </div>
-            <div className="flex items-center gap-1 md:gap-2">
-              <HeaderStatus className="mr-1 md:mr-3" />
-              <ReloadButton onReload={handleReload} />
-            </div>
+          <header className="sticky top-0 z-40">
+            <GlassSurface
+              cornerRadius={0}
+              className="border-b border-transparent px-2 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] md:px-4 md:pb-4 md:pt-[max(1rem,env(safe-area-inset-top))]"
+              contentClassName="flex w-full items-center justify-between gap-2 md:gap-4"
+              fallbackClassName="bg-background/95 supports-[backdrop-filter]:bg-background/70"
+              displacementScale={0.35}
+              blurAmount={26}
+              aberrationIntensity={0.05}
+            >
+              <div className="flex items-center gap-2">
+                <SidebarTrigger className="h-9 w-9" />
+              </div>
+              <div className="flex items-center gap-1.5 md:gap-2">
+                <HeaderStatus />
+                <ReloadButton onReload={handleReload} className="ml-1" />
+              </div>
+            </GlassSurface>
           </header>
           <main className="p-2 md:p-6">
             <Outlet />
