@@ -19,7 +19,9 @@ export type SubfolderKey =
   | "pullSheetPA" // PA pull sheet (sound, hidden by tour-pack-only)
   | "gastosDePersonal" // Personnel: “Gastos de Personal - ${job.title}”
   | "crewCallSound" // Personnel: Crew Call Sonido
-  | "crewCallLights"; // Personnel: Crew Call Luces
+  | "crewCallLights" // Personnel: Crew Call Luces
+  | "extrasSound" // Comercial extras for sound
+  | "extrasLights"; // Comercial extras for lights
 
 export type CreateFoldersOptions = Partial<Record<DepartmentKey, SubfolderKey[]>>;
 

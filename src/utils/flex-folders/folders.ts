@@ -118,6 +118,42 @@ export async function createAllFoldersForJob(
   documentNumber: string,
   options?: CreateFoldersOptions
 ) {
+  const createComercialExtras = async (
+    parentElementId: string,
+    parentName: string,
+    parentDocumentNumber?: string
+  ) => {
+    const parentDoc = parentDocumentNumber ?? "";
+    const deptLabel = "Comercial";
+    const replacements = [
+      { key: "extrasSound" as const, label: "Sonido", dept: "sound" as const, suffix: "SQT" },
+      { key: "extrasLights" as const, label: "Luces", dept: "lights" as const, suffix: "LQT" },
+    ];
+
+    for (const extra of replacements) {
+      if (!shouldCreateItem("comercial", extra.key, options)) continue;
+
+      const baseName = parentName.replace(/Comercial/gi, extra.label);
+      const extrasName = `Extras ${baseName} - ${deptLabel}`;
+
+      const extrasPayload = {
+        definitionId: FLEX_FOLDER_IDS.presupuesto,
+        parentElementId,
+        open: true,
+        locked: false,
+        name: extrasName,
+        plannedStartDate: formattedStartDate,
+        plannedEndDate: formattedEndDate,
+        locationId: FLEX_FOLDER_IDS.location,
+        departmentId: DEPARTMENT_IDS[extra.dept as Department],
+        documentNumber: `${parentDoc}${extra.suffix}`,
+        personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept as Department],
+      };
+
+      await createFlexFolder(extrasPayload);
+    }
+  };
+
   if (job.job_type === "dryhire") {
     console.log("Dryhire job type detected. Creating dryhire folder...");
 
@@ -255,12 +291,14 @@ export async function createAllFoldersForJob(
         continue;
       }
 
+      const deptLabel = dept.charAt(0).toUpperCase() + dept.slice(1);
+
       const tourDateFolderPayload = {
         definitionId: FLEX_FOLDER_IDS.subFolder,
         parentElementId: parentFolderId,
         open: true,
         locked: false,
-        name: `${locationName} - ${formattedDate} - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+        name: `${locationName} - ${formattedDate} - ${deptLabel}`,
         plannedStartDate: formattedStartDate,
         plannedEndDate: formattedEndDate,
         locationId: FLEX_FOLDER_IDS.location,
@@ -288,6 +326,10 @@ export async function createAllFoldersForJob(
         continue;
       }
 
+      const deptFolderId = childRow.element_id;
+      const parentName = tourDateFolderPayload.name;
+      const parentDocumentNumber = tourDateFolderPayload.documentNumber;
+
       // Create department-specific hojaInfo elements for sound, lights, and video
       if (
         ["sound", "lights", "video"].includes(dept) &&
@@ -303,7 +345,7 @@ export async function createAllFoldersForJob(
         
         const hojaInfoPayload = {
           definitionId: hojaInfoType,
-          parentElementId: childRow.element_id,
+          parentElementId: deptFolderId,
           open: true,
           locked: false,
           name: `Hoja de Información - ${locationName} - ${formattedDate}`,
@@ -323,19 +365,19 @@ export async function createAllFoldersForJob(
         const subfolders = [
           {
             definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
-            name: `${tourData.name} - ${locationName} - ${formattedDate} - Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            name: `${tourData.name} - ${locationName} - ${formattedDate} - Documentación Técnica - ${deptLabel}`,
             suffix: "DT",
             key: "documentacionTecnica" as const,
           },
           {
             definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
-            name: `${tourData.name} - ${locationName} - ${formattedDate} - Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            name: `${tourData.name} - ${locationName} - ${formattedDate} - Presupuestos Recibidos - ${deptLabel}`,
             suffix: "PR",
             key: "presupuestosRecibidos" as const,
           },
           {
             definitionId: FLEX_FOLDER_IDS.hojaGastos,
-            name: `${tourData.name} - ${locationName} - ${formattedDate} - Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            name: `${tourData.name} - ${locationName} - ${formattedDate} - Hoja de Gastos - ${deptLabel}`,
             suffix: "HG",
             key: "hojaGastos" as const,
           },
@@ -345,7 +387,7 @@ export async function createAllFoldersForJob(
           if (!shouldCreateItem(dept, sf.key, options)) continue;
           const subPayload = {
             definitionId: sf.definitionId,
-            parentElementId: childRow.element_id,
+            parentElementId: deptFolderId,
             open: true,
             locked: false,
             name: sf.name,
@@ -359,6 +401,8 @@ export async function createAllFoldersForJob(
 
           await createFlexFolder(subPayload);
         }
+      } else if (dept === "comercial") {
+        await createComercialExtras(deptFolderId, parentName, parentDocumentNumber);
       }
       if (dept === "sound") {
         // Check if this is a tour pack only date
@@ -378,7 +422,7 @@ export async function createAllFoldersForJob(
         for (const sf of soundSubfolders) {
           const subPayload = {
             definitionId: FLEX_FOLDER_IDS.pullSheet,
-            parentElementId: childRow.element_id,
+            parentElementId: deptFolderId,
             open: true,
             locked: false,
             name: sf.name,
@@ -402,7 +446,7 @@ export async function createAllFoldersForJob(
         for (const sf of personnelSubfolders) {
           const subPayload = {
             definitionId: FLEX_FOLDER_IDS.hojaGastos,
-            parentElementId: childRow.element_id,
+            parentElementId: deptFolderId,
             open: true,
             locked: false,
             name: sf.name,
@@ -428,7 +472,7 @@ export async function createAllFoldersForJob(
         for (const sf of personnelcrewCall) {
           const subPayload = {
             definitionId: FLEX_FOLDER_IDS.crewCall,
-            parentElementId: childRow.element_id,
+            parentElementId: deptFolderId,
             open: true,
             locked: false,
             name: sf.name,
@@ -493,12 +537,13 @@ export async function createAllFoldersForJob(
       continue;
     }
 
+    const deptLabel = dept.charAt(0).toUpperCase() + dept.slice(1);
     const deptPayload = {
       definitionId: FLEX_FOLDER_IDS.subFolder,
       parentElementId: topFolderId,
       open: true,
       locked: false,
-      name: `${job.title} - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+      name: `${job.title} - ${deptLabel}`,
       plannedStartDate: formattedStartDate,
       plannedEndDate: formattedEndDate,
       locationId: FLEX_FOLDER_IDS.location,
@@ -527,6 +572,8 @@ export async function createAllFoldersForJob(
     }
 
     const deptFolderId = childRow.element_id;
+    const parentName = deptPayload.name;
+    const parentDocumentNumber = deptPayload.documentNumber;
 
     // Create department-specific hojaInfo elements for sound, lights, and video
     if (
@@ -563,19 +610,19 @@ export async function createAllFoldersForJob(
       const subfolders = [
         {
           definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
-          name: `${job.title} - Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          name: `${job.title} - Documentación Técnica - ${deptLabel}`,
           suffix: "DT",
           key: "documentacionTecnica" as const,
         },
         {
           definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
-          name: `${job.title} - Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          name: `${job.title} - Presupuestos Recibidos - ${deptLabel}`,
           suffix: "PR",
           key: "presupuestosRecibidos" as const,
         },
         {
           definitionId: FLEX_FOLDER_IDS.hojaGastos,
-          name: `${job.title} - Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          name: `${job.title} - Hoja de Gastos - ${deptLabel}`,
           suffix: "HG",
           key: "hojaGastos" as const,
         },
@@ -599,6 +646,8 @@ export async function createAllFoldersForJob(
 
         await createFlexFolder(subPayload);
       }
+    } else if (dept === "comercial") {
+      await createComercialExtras(deptFolderId, parentName, parentDocumentNumber);
     } else if (dept === "personnel") {
       const personnelSubfolders = [
         { name: `Crew Call Sonido - ${job.title}`, suffix: "CCS", key: "crewCallSound" as const },
