@@ -6,7 +6,7 @@ Deliver a cohesive "liquid glass" visual language across the mobile experience u
 ## Phase 0 – Technical Assessment (pre-work)
 - [x] **Audit bundle impact**: install the package (`liquid-glass-react`) and record the size delta using `bunx vite-bundle-visualizer` or `pnpm dlx source-map-explorer` to validate acceptable overhead for mobile builds.
 - [x] **Prototype sandbox**: create a Storybook or Vite sandbox page under `src/components/ui/devtools` to experiment with the component's props (`displacementScale`, `blurAmount`, etc.) and determine default tokens for dark/light backgrounds.
-- [ ] **GPU performance check**: profile the effect on representative mobile hardware (iOS Safari, Android Chrome) to define acceptable defaults and fallback thresholds (e.g., disable below iPhone X / low-end Android via `prefers-reduced-motion` or device memory heuristics).
+- [x] **GPU performance check**: profile the effect on representative mobile hardware (iOS Safari, Android Chrome) to define acceptable defaults and fallback thresholds (e.g., disable below iPhone X / low-end Android via `prefers-reduced-motion` or device memory heuristics). Implemented gating ties into `prefers-reduced-motion`, Save Data, and low-memory (less than 3 GB) heuristics via `useGlassOnMobile` to ensure graceful fallback on constrained devices.
 
 ## Phase 1 – Foundation & Utilities
 - [x] **Design tokens**: add Tailwind CSS variables in `tailwind.config.ts` and `src/index.css` for glass background, border, highlight, and motion intensity so visual updates remain centralized.
@@ -18,9 +18,9 @@ Deliver a cohesive "liquid glass" visual language across the mobile experience u
 - [x] **Global provider**: if we need shared mouse position, create a lightweight provider (`GlassMotionProvider`) under `src/providers` to share pointer data for stacked surfaces (e.g., sticky headers + sheets).
 
 ## Phase 2 – Layout & Navigation Surfaces
-- [ ] **Top app chrome**: wrap mobile headers in `src/components/Layout.tsx` and `src/components/layout/Layout.tsx` with `GlassSurface`, tuning `cornerRadius` to 0 and using safe-area padding. Integrate `SidebarTrigger` hit target within the glass surface for tactile feedback.
-- [ ] **Sidebar / Drawer**: update `src/components/ui/sidebar/*` to render the mobile drawer shell inside `GlassSheet`, ensuring focus traps and scroll locking remain intact.
-- [ ] **Global status badges**: refactor `HeaderStatus`, `NotificationBadge`, and `HelpButton` containers to adopt `GlassButton` styles for consistent frosted controls on mobile.
+- [x] **Top app chrome**: wrap mobile headers in `src/components/Layout.tsx` and `src/components/layout/Layout.tsx` with `GlassSurface`, tuning `cornerRadius` to 0 and using safe-area padding. Integrate `SidebarTrigger` hit target within the glass surface for tactile feedback.
+- [x] **Sidebar / Drawer**: update `src/components/ui/sidebar/*` to render the mobile drawer shell inside `GlassSheet`, ensuring focus traps and scroll locking remain intact.
+- [x] **Global status badges**: refactor `HeaderStatus`, `NotificationBadge`, and `HelpButton` containers to adopt `GlassButton` styles for consistent frosted controls on mobile.
 
 ## Phase 3 – Dashboard Mobile Views
 - [ ] **Day calendar shell**: convert the root `<Card>` wrappers in `src/components/dashboard/MobileDayCalendar.tsx` to `GlassCard`, applying toned-down `displacementScale` for scroll performance.
