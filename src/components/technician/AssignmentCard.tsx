@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import { formatInTimeZone } from "date-fns-tz";
 import { es } from "date-fns/locale";
-import { RefreshCw, Clock, Eye, Download, FileText, ChevronDown, ChevronRight, Info } from "lucide-react";
+import { RefreshCw, Clock, Eye, Download, FileText, ChevronDown, ChevronRight, Info, Dice5 } from "lucide-react";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { useNavigate } from "react-router-dom";
@@ -13,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { labelForCode } from '@/utils/roles';
 import { createSignedUrl } from '@/utils/jobDocuments';
 import { supabase } from '@/lib/supabase';
+import { OBLIQUE_STRATEGIES } from "./obliqueStrategies";
 
 type Assignment = any;
 
@@ -27,6 +29,45 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
   const [expandedDocuments, setExpandedDocuments] = useState<boolean>(false);
   const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [strategyOpen, setStrategyOpen] = useState(false);
+  const [currentStrategyIndex, setCurrentStrategyIndex] = useState<number | null>(null);
+  const [lastStrategyIndex, setLastStrategyIndex] = useState<number | null>(null);
+  const [showSpanish, setShowSpanish] = useState(false);
+
+  const assignmentCategory = assignment.category_assignment ?? assignment.category;
+
+  const pickRandomStrategyIndex = () => {
+    if (OBLIQUE_STRATEGIES.length === 0) {
+      return null;
+    }
+
+    if (OBLIQUE_STRATEGIES.length === 1) {
+      return 0;
+    }
+
+    let index = Math.floor(Math.random() * OBLIQUE_STRATEGIES.length);
+    if (lastStrategyIndex !== null) {
+      while (index === lastStrategyIndex) {
+        index = Math.floor(Math.random() * OBLIQUE_STRATEGIES.length);
+      }
+    }
+    return index;
+  };
+
+  const handleStrategyClick = () => {
+    const nextIndex = pickRandomStrategyIndex();
+    if (nextIndex === null) {
+      return;
+    }
+
+    setCurrentStrategyIndex(nextIndex);
+    setLastStrategyIndex(nextIndex);
+    setShowSpanish(false);
+    setStrategyOpen(true);
+  };
+
+  const currentStrategy =
+    currentStrategyIndex !== null ? OBLIQUE_STRATEGIES[currentStrategyIndex] : null;
 
   const jobData = assignment.jobs || assignment.festival_jobs;
   if (!jobData) return null;
@@ -120,6 +161,19 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
             Detalles
           </Button>
 
+          {assignmentCategory === 'responsable' && (
+            <Button
+              onClick={handleStrategyClick}
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              title="Oblique Strategy"
+              aria-label="Oblique Strategy"
+            >
+              <Dice5 className="h-4 w-4" />
+            </Button>
+          )}
+
           {jobData.job_type !== "dryhire" && jobData.job_type !== "tourdate" && (
             <Button onClick={() => handleTimesheetClick(jobData.id)} variant="outline" size="sm" className="gap-2">
               <Clock className="h-3 w-3" />
@@ -167,6 +221,32 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
       </div>
 
       <JobDetailsDialog open={detailsOpen} onOpenChange={setDetailsOpen} job={{ id: jobData.id }} />
+      <Dialog open={strategyOpen} onOpenChange={setStrategyOpen}>
+        <DialogContent className="space-y-4">
+          <DialogHeader>
+            <DialogTitle>Oblique Strategy</DialogTitle>
+          </DialogHeader>
+          {currentStrategy && (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setShowSpanish((prev) => !prev)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setShowSpanish((prev) => !prev);
+                }
+              }}
+              className="cursor-pointer select-none rounded-md bg-secondary/30 p-4 text-center text-base font-medium leading-relaxed focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {showSpanish ? currentStrategy.spanish : currentStrategy.english}
+            </div>
+          )}
+          <DialogFooter className="text-xs text-muted-foreground">
+            Oblique Strategies © 1975, 1978, 1979 Brian Eno/Peter Schmidt.
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
