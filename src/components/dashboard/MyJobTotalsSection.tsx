@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -10,17 +10,61 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTourRatesApprovalMap } from '@/hooks/useTourRatesApproval';
 import { useJobRatesApprovalMap } from '@/hooks/useJobRatesApproval';
+import type { TourJobRateQuote } from '@/types/tourRates';
 
 export function MyJobTotalsSection() {
   const { userRole } = useOptimizedAuth();
   const { data: payoutTotals = [], isLoading: isLoadingPayouts } = useMyJobPayoutTotals();
   const { data: tourQuotes = [], isLoading: isLoadingTours } = useTechnicianTourRateQuotes();
 
+  const tourIds = useMemo(
+    () => Array.from(new Set((tourQuotes || []).map(q => q.tour_id).filter(Boolean))) as string[],
+    [tourQuotes]
+  );
+  const tourJobIds = useMemo(
+    () => Array.from(new Set((tourQuotes || []).map(q => q.job_id).filter(Boolean))) as string[],
+    [tourQuotes]
+  );
+  const regularJobIds = useMemo(
+    () => Array.from(new Set(payoutTotals.map(p => p.job_id))),
+    [payoutTotals]
+  );
+  const jobIdsForApproval = useMemo(
+    () => Array.from(new Set([...regularJobIds, ...tourJobIds])),
+    [regularJobIds, tourJobIds]
+  );
+
+  const { data: tourApprovalMap } = useTourRatesApprovalMap(tourIds);
+  const { data: jobApprovalMap } = useJobRatesApprovalMap(jobIdsForApproval);
+
   const isLoading = isLoadingPayouts || isLoadingTours;
 
   const isTech = ['technician', 'house_tech'].includes(userRole || '');
-  const tourIds = Array.from(new Set((tourQuotes || []).map(q => q.tour_id).filter(Boolean))) as string[];
-  const { data: approvalMap } = useTourRatesApprovalMap(tourIds);
+
+  const quoteHasExtras = (quote: TourJobRateQuote) => {
+    if ((quote.extras_total_eur ?? 0) > 0) {
+      return true;
+    }
+    return quote.extras?.items?.some(item => item.quantity > 0 && item.amount_eur > 0) ?? false;
+  };
+
+  const isTourQuoteApproved = (quote: TourJobRateQuote) => {
+    const tourApproved = !quote.tour_id || (tourApprovalMap?.get(quote.tour_id) ?? false);
+    if (!tourApproved) {
+      return false;
+    }
+
+    const extrasPresent = quoteHasExtras(quote);
+    if (!extrasPresent) {
+      return true;
+    }
+
+    if (!quote.job_id) {
+      return false;
+    }
+
+    return jobApprovalMap?.get(quote.job_id) ?? false;
+  };
 
   if (isLoading) {
     return (
@@ -39,9 +83,8 @@ export function MyJobTotalsSection() {
   }
 
   const hasAnyTotals = payoutTotals.length > 0 || tourQuotes.length > 0;
-
-  const approvedTourQuotes = tourQuotes.filter(q => !q.tour_id || (approvalMap?.get(q.tour_id) ?? false));
-  const pendingTourQuotes = tourQuotes.filter(q => q.tour_id && !(approvalMap?.get(q.tour_id) ?? false));
+  const approvedTourQuotes = tourQuotes.filter((quote) => isTourQuoteApproved(quote));
+  const pendingTourQuotes = tourQuotes.filter((quote) => !isTourQuoteApproved(quote));
 
   if (!hasAnyTotals) {
     return (
@@ -60,12 +103,13 @@ export function MyJobTotalsSection() {
   }
 
   // Calculate totals
-  const jobIds = Array.from(new Set(payoutTotals.map(p => p.job_id)));
-  const { data: jobApprovalMap } = useJobRatesApprovalMap(jobIds);
   const approvedPayouts = payoutTotals.filter(p => jobApprovalMap?.get(p.job_id) ?? false);
   const pendingPayouts = payoutTotals.filter(p => !(jobApprovalMap?.get(p.job_id) ?? false));
   const totalNonTourAmount = approvedPayouts.reduce((sum, payout) => sum + payout.total_eur, 0);
-  const totalTourAmount = approvedTourQuotes.reduce((sum, quote) => sum + (quote.total_with_extras_eur || quote.total_eur), 0);
+  const totalTourAmount = approvedTourQuotes.reduce((sum, quote) => {
+    const base = quote.total_with_extras_eur ?? quote.total_eur ?? 0;
+    return sum + base;
+  }, 0);
   const grandTotal = totalNonTourAmount + totalTourAmount;
 
   return (
@@ -143,7 +187,7 @@ export function MyJobTotalsSection() {
                       {quote.title || `Job ${quote.job_id.substring(0, 8)}...`}
                     </span>
                     <div className="text-xs text-muted-foreground">
-                      Base: {formatCurrency(quote.total_eur)}
+                      Base: {formatCurrency(quote.total_eur ?? 0)}
                       {quote.extras_total_eur && quote.extras_total_eur > 0 && (
                         <> + Extras: {formatCurrency(quote.extras_total_eur)}</>
                       )}
@@ -157,7 +201,7 @@ export function MyJobTotalsSection() {
                     )}
                   </div>
                   <Badge variant="outline">
-                    {formatCurrency(quote.total_with_extras_eur || quote.total_eur)}
+                    {formatCurrency((quote.total_with_extras_eur ?? quote.total_eur ?? 0))}
                   </Badge>
                 </div>
               ))}
@@ -175,7 +219,7 @@ export function MyJobTotalsSection() {
         {pendingTourQuotes.length > 0 && (
           <Alert>
             <AlertDescription>
-              Some tour amounts are hidden until management approves rates for those tours.
+              Some tour amounts are hidden until management finalizes the tour base rates and approves per-date extras.
             </AlertDescription>
           </Alert>
         )}
