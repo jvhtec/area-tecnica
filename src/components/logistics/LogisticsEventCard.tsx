@@ -43,9 +43,9 @@ export const LogisticsEventCard = ({
   };
 
   return (
-    <GlassSurface
-      onClick={onClick}
-      className={cn(
+    <div onClick={onClick}>
+      <GlassSurface
+        className={cn(
         "relative cursor-pointer overflow-hidden border border-white/10",
         variant === "calendar" ? "rounded-lg px-3 py-2" : "rounded-xl",
         className
@@ -119,5 +119,6 @@ export const LogisticsEventCard = ({
         </>
       )}
     </GlassSurface>
+    </div>
   );
 };

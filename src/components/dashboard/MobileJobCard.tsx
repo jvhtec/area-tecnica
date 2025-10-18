@@ -500,6 +500,7 @@ export function MobileJobCard({
             ))}
           </div>
         </div>
+        </div>
       </GlassCard>
 
       {/* Date Type Dialog */}

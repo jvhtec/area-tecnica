@@ -20,7 +20,7 @@ export function useJobExtras(jobId: string, technicianId?: string) {
       const { data, error } = await query;
       
       if (error) throw error;
-      return data || [];
+      return (data || []) as JobExtra[];
     },
     enabled: !!jobId,
     staleTime: 30 * 1000, // 30 seconds
@@ -49,7 +49,7 @@ export function useUpsertJobExtra() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ jobId, technicianId, extraType, approvedQuantity, requestedQuantity }: SubmitJobExtraPayload) => {
+    mutationFn: async ({ jobId, technicianId, extraType, approvedQuantity, requestedQuantity, hasExistingRow }: SubmitJobExtraPayload) => {
       const { data: auth } = await supabase.auth.getUser();
       const now = new Date().toISOString();
       const hasChange = approvedQuantity !== requestedQuantity;
