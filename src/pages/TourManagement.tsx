@@ -342,8 +342,8 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-start gap-4">
-            {tourLogoUrl && (
-              <div className="flex-shrink-0">
+            <div className="flex-shrink-0">
+              {tourLogoUrl ? (
                 <img
                   src={tourLogoUrl}
                   alt={`${tour.name} logo`}
@@ -353,8 +353,12 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                     target.style.display = 'none';
                   }}
                 />
-              </div>
-            )}
+              ) : (
+                <div className="w-16 h-16 flex items-center justify-center rounded-lg border border-border bg-muted">
+                  <Calendar className="h-8 w-8 text-muted-foreground" />
+                </div>
+              )}
+            </div>
 
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
@@ -391,10 +395,6 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
             <Button variant="outline" onClick={() => setIsAssignmentsOpen(true)}>
               <Users className="h-4 w-4 mr-2" />
               View Assignments
-            </Button>
-            <Button variant="outline" onClick={() => setIsDatesOpen(true)}>
-              <Calendar className="h-4 w-4 mr-2" />
-              View Full Schedule
             </Button>
             <Button onClick={() => setIsDocumentsOpen(true)}>
               <FileText className="h-4 w-4 mr-2" />
@@ -450,9 +450,6 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                           {date.notes}
                         </p>
                       )}
-                      <div className="flex flex-wrap gap-2">
-                        <TourDateFlexButton tourDateId={date.id} />
-                      </div>
                     </div>
                   );
                 })}
@@ -743,7 +740,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                       <span>{date.location.name}</span>
                     </div>
                   )}
-                  <TourDateFlexButton tourDateId={date.id} />
+                  {!isTechnicianView && <TourDateFlexButton tourDateId={date.id} />}
                 </CardContent>
               </Card>
             ))}
