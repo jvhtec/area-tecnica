@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { Euro, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,7 +17,9 @@ import { useSaveHouseTechRate } from '@/hooks/useHouseTechRates';
 import { JobExtrasEditor } from '@/components/jobs/JobExtrasEditor';
 import { formatCurrency } from '@/lib/utils';
 import { useTourRatesApproval } from '@/hooks/useTourRatesApproval';
+import { useJobRatesApproval, useJobRatesApprovalMap } from '@/hooks/useJobRatesApproval';
 import { ExtrasCatalogEditor, BaseRatesEditor } from '@/features/rates/components/CatalogEditors';
+import { invalidateRatesContext } from '@/services/ratesService';
 
 type TourRatesManagerDialogProps = {
   open: boolean;
@@ -53,6 +54,13 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
 
   // Manager view: compute quotes for all tour assignments regardless of auth.uid()
   const { data: quotes = [], isLoading: quotesLoading } = useTourJobRateQuotesForManager(selectedJobId, tourId);
+
+  const jobIds = useMemo(() => tourJobs.map((job: any) => job.id).filter(Boolean), [tourJobs]);
+  const { data: jobApprovalMap } = useJobRatesApprovalMap(jobIds);
+  const { data: jobApprovalRow } = useJobRatesApproval(selectedJobId);
+  const selectedJobApproved = selectedJobId
+    ? !!(jobApprovalRow?.rates_approved ?? jobApprovalMap?.get(selectedJobId))
+    : false;
 
   // Fetch profiles for names
   const { data: profiles = [] } = useQuery({
@@ -107,12 +115,51 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles-for-rates-manager'] });
       queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager'] });
     }
   });
 
   const [activeTab, setActiveTab] = useState('by-date');
   const { data: approvalRow, refetch: refetchApproval } = useTourRatesApproval(tourId);
   const approved = !!approvalRow?.rates_approved;
+
+  const toggleJobApproval = useMutation({
+    mutationFn: async ({ jobId, approve }: { jobId: string; approve: boolean }) => {
+      if (!jobId) return;
+
+      if (approve) {
+        const { data: user } = await supabase.auth.getUser();
+        const approver = user?.user?.id || null;
+        const { error } = await supabase
+          .from('jobs')
+          .update({
+            rates_approved: true,
+            rates_approved_at: new Date().toISOString(),
+            rates_approved_by: approver,
+          } as any)
+          .eq('id', jobId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('jobs')
+          .update({
+            rates_approved: false,
+            rates_approved_at: null,
+            rates_approved_by: null,
+          } as any)
+          .eq('id', jobId);
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_, { jobId }) => {
+      invalidateRatesContext(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['job-rates-approval', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
+      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager', jobId, tourId] });
+      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager'] });
+    },
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,7 +172,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
             </DialogTitle>
             <div className="flex items-center gap-2">
               <Badge variant={approved ? 'default' : 'secondary'} className="hidden sm:inline-flex">
-                {approved ? 'Tarifas aprobadas' : 'Se requiere aprobación'}
+                {approved ? 'Tarifas base liberadas' : 'Aprobación base pendiente'}
               </Badge>
               {approved ? (
                 <Button
@@ -142,7 +189,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                   }}
                   className="flex items-center gap-1"
                 >
-                  <ShieldX className="h-4 w-4" /> Revocar aprobación
+                  <ShieldX className="h-4 w-4" /> Revocar base
                 </Button>
               ) : (
                 <Button
@@ -161,11 +208,15 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                   }}
                   className="flex items-center gap-1"
                 >
-                  <ShieldCheck className="h-4 w-4" /> Aprobar tarifas
+                  <ShieldCheck className="h-4 w-4" /> Liberar tarifas base
                 </Button>
               )}
             </div>
           </div>
+          <p className="text-sm text-muted-foreground">
+            La aprobación de la gira libera las tarifas base para todo el equipo. Cada fecha también puede liberar el pago final
+            (base + extras) para que los responsables finalicen importes desde un único lugar.
+          </p>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -188,8 +239,15 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                   <SelectTrigger className="min-w-[260px]"><SelectValue placeholder="Elegir fecha" /></SelectTrigger>
                   <SelectContent>
                     {tourJobs.map((j: any) => (
-                      <SelectItem key={j.id} value={j.id}>
-                        {format(new Date(j.start_time), 'PPP', { locale: es })} • {j.title}
+                      <SelectItem
+                        key={j.id}
+                        value={j.id}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span>{format(new Date(j.start_time), 'PPP', { locale: es })} • {j.title}</span>
+                        <Badge variant={jobApprovalMap?.get(j.id) ? 'default' : 'secondary'}>
+                          {jobApprovalMap?.get(j.id) ? 'Pago final liberado' : 'Pendiente'}
+                        </Badge>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -271,6 +329,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                                     if (!isNaN(val)) {
                                       await saveHouseRate.mutateAsync({ profile_id: q.technician_id, base_day_eur: val, plus_10_12_eur: null, overtime_hour_eur: null });
                                       queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
+                                      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager'] });
                                     }
                                   }
                                 }}
@@ -281,6 +340,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                                 if (!isNaN(val)) {
                                   await saveHouseRate.mutateAsync({ profile_id: q.technician_id, base_day_eur: val, plus_10_12_eur: null, overtime_hour_eur: null });
                                   queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
+                                  queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager'] });
                                 }
                               }}>Guardar</Button>
                               {houseRateMap[q.technician_id] !== undefined && (
@@ -297,9 +357,36 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                       )}
 
                       {/* Extras editor */}
-                      <div className="p-3 rounded-lg border">
-                        <div className="text-xs font-medium mb-2">Extras</div>
-                        <JobExtrasEditor 
+                      <div className="p-3 rounded-lg border space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={selectedJobApproved ? 'default' : 'secondary'}>
+                              {selectedJobApproved ? 'Pago final liberado (base + extras)' : 'Pendiente liberar base + extras'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              El pago final muestra a los técnicos la suma de la tarifa base y los extras asignados.
+                            </span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={selectedJobApproved ? 'outline' : 'default'}
+                            disabled={toggleJobApproval.isPending || !selectedJobId}
+                            onClick={() => selectedJobId && toggleJobApproval.mutate({ jobId: selectedJobId, approve: !selectedJobApproved })}
+                            className="flex items-center gap-1"
+                          >
+                            {selectedJobApproved ? (
+                              <>
+                                <ShieldX className="h-4 w-4" /> Revocar pago final
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="h-4 w-4" /> Liberar pago final
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                        <div className="text-xs font-medium">Extras</div>
+                        <JobExtrasEditor
                           jobId={q.job_id}
                           technicianId={q.technician_id}
                           technicianName={name}
