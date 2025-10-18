@@ -10,6 +10,7 @@ export const FLEX_FOLDER_IDS = {
   documentacionTecnica: "3787806c-af2d-11df-b8d5-00e08175e43e",
   presupuestosRecibidos: "3787806c-af2d-11df-b8d5-00e08175e43e",
   presupuesto: "9bfb850c-b117-11df-b8d5-00e08175e43e",
+  presupuestoDryHire: "fb8b82c9-41d6-4b8f-99b6-4ab8276d06aa",
   hojaGastos: "566d32e0-1a1e-11e0-a472-00e08175e43e",
   hojaInfoSx: "702029c3-ba89-4304-98fe-fbc6fc695eb0",
   hojaInfoLx: "4db54bad-b5fa-4c1f-85d4-525d991d7b62",

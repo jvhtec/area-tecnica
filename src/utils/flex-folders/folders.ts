@@ -170,6 +170,7 @@ export async function createAllFoldersForJob(
       throw new Error(`No parent folder found for month ${monthKey}`);
     }
 
+    const parentDocumentNumber = `${documentNumber}${DEPARTMENT_SUFFIXES[department as Department]}`;
     const dryHireFolderPayload = {
       definitionId: FLEX_FOLDER_IDS.subFolder,
       parentElementId: parentFolderId,
@@ -180,12 +181,27 @@ export async function createAllFoldersForJob(
       plannedEndDate: formattedEndDate,
       locationId: FLEX_FOLDER_IDS.location,
       departmentId: DEPARTMENT_IDS[department as Department],
-      documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[department as Department]}`,
+      documentNumber: parentDocumentNumber,
       personResponsibleId: RESPONSIBLE_PERSON_IDS[department as Department],
     };
 
     console.log("Creating dryhire folder with payload:", dryHireFolderPayload);
     const dryHireFolder = await createFlexFolder(dryHireFolderPayload);
+
+    const dryHireDocumentSuffix = department === "sound" ? "SDH" : "LDH";
+    await createFlexFolder({
+      definitionId: FLEX_FOLDER_IDS.presupuestoDryHire,
+      parentElementId: dryHireFolder.elementId,
+      open: true,
+      locked: false,
+      name: dryHireFolderPayload.name,
+      plannedStartDate: dryHireFolderPayload.plannedStartDate,
+      plannedEndDate: dryHireFolderPayload.plannedEndDate,
+      locationId: dryHireFolderPayload.locationId,
+      departmentId: dryHireFolderPayload.departmentId,
+      documentNumber: `${parentDocumentNumber}${dryHireDocumentSuffix}`,
+      personResponsibleId: dryHireFolderPayload.personResponsibleId,
+    });
 
     await supabase
       .from("flex_folders")
