@@ -42,10 +42,10 @@ export const Profile = () => {
 
   const permissionLabel =
     permission === 'granted'
-      ? 'Granted'
+      ? 'Concedido'
       : permission === 'denied'
-        ? 'Blocked'
-        : 'Not requested';
+        ? 'Bloqueado'
+        : 'No solicitado';
   const hasSubscription = Boolean(subscription);
   const showEnableButton = canEnable && !isInitializing;
   const isBlocked = permission === 'denied';
@@ -70,7 +70,7 @@ export const Profile = () => {
         console.error('Error fetching profile:', error);
         toast({
           title: "Error",
-          description: "Failed to load profile data",
+          description: "Error al cargar los datos del perfil",
           variant: "destructive",
         });
         return;
@@ -108,14 +108,14 @@ export const Profile = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Profile updated successfully",
+        title: "Perfil actualizado",
+        description: "Los cambios se guardaron correctamente",
       });
     } catch (error: any) {
       console.error('Error updating profile:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update profile",
+        description: error.message || "No se pudo actualizar el perfil",
         variant: "destructive",
       });
     } finally {
@@ -137,14 +137,14 @@ export const Profile = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Folder structure saved successfully",
+        title: "Estructura guardada",
+        description: "Se guardó la estructura de carpetas correctamente",
       });
     } catch (error: any) {
       console.error('Error saving folder structure:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save folder structure",
+        description: error.message || "No se pudo guardar la estructura de carpetas",
         variant: "destructive",
       });
     } finally {
@@ -156,7 +156,7 @@ export const Profile = () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast({
         title: "Error",
-        description: "New passwords do not match",
+        description: "Las contraseñas nuevas no coinciden",
         variant: "destructive",
       });
       return;
@@ -171,7 +171,7 @@ export const Profile = () => {
       });
 
       if (signInError) {
-        throw new Error('Current password is incorrect');
+        throw new Error('La contraseña actual no es correcta');
       }
 
       // Update the password
@@ -192,8 +192,8 @@ export const Profile = () => {
       }
 
       toast({
-        title: "Success",
-        description: "Password updated successfully",
+        title: "Contraseña actualizada",
+        description: "Se actualizó tu contraseña correctamente",
       });
 
       // Clear the password form
@@ -206,7 +206,7 @@ export const Profile = () => {
       console.error('Error updating password:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update password",
+        description: error.message || "No se pudo actualizar la contraseña",
         variant: "destructive",
       });
     } finally {
@@ -231,7 +231,7 @@ export const Profile = () => {
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Please change your password before continuing to use the application.
+                Por favor, cambia tu contraseña antes de seguir utilizando la aplicación.
               </AlertDescription>
             </Alert>
           )}
@@ -240,14 +240,14 @@ export const Profile = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <UserCircle className="h-6 w-6" />
-                Edit Profile
+                Editar perfil
               </CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
+                    <Label htmlFor="firstName">Nombre</Label>
                     <Input
                       id="firstName"
                       value={profile.first_name || ''}
@@ -255,16 +255,16 @@ export const Profile = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="nickname">Nickname</Label>
+                    <Label htmlFor="nickname">Apodo</Label>
                     <Input
                       id="nickname"
                       value={profile.nickname || ''}
                       onChange={(e) => setProfile({ ...profile, nickname: e.target.value })}
-                      placeholder="Optional"
+                      placeholder="Opcional"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
+                    <Label htmlFor="lastName">Apellidos</Label>
                     <Input
                       id="lastName"
                       value={profile.last_name || ''}
@@ -274,7 +274,7 @@ export const Profile = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="phone">Teléfono</Label>
                   <Input
                     id="phone"
                     value={profile.phone || ''}
@@ -283,18 +283,18 @@ export const Profile = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
+                  <Label htmlFor="department">Departamento</Label>
                   <Select
                     value={profile.department || ''}
                     onValueChange={(value) => setProfile({ ...profile, department: value as Department })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select department" />
+                      <SelectValue placeholder="Selecciona un departamento" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="sound">Sound</SelectItem>
-                      <SelectItem value="lights">Lights</SelectItem>
-                      <SelectItem value="video">Video</SelectItem>
+                      <SelectItem value="sound">Sonido</SelectItem>
+                      <SelectItem value="lights">Luces</SelectItem>
+                      <SelectItem value="video">Vídeo</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -318,7 +318,7 @@ export const Profile = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
+                  <Label htmlFor="role">Rol</Label>
                   <Input
                     id="role"
                     value={profile.role || ''}
@@ -331,12 +331,12 @@ export const Profile = () => {
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
+                      Guardando...
                     </>
                   ) : (
                     <>
                       <Save className="mr-2 h-4 w-4" />
-                      Save Changes
+                      Guardar cambios
                     </>
                   )}
                 </Button>
@@ -347,49 +347,49 @@ export const Profile = () => {
           {showPushControls && (
             <Card>
               <CardHeader>
-                <CardTitle>Push notifications</CardTitle>
+                <CardTitle>Notificaciones push</CardTitle>
                 <CardDescription>
-                  Manage push notifications for this device.
+                  Gestiona las notificaciones push para este dispositivo.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {!isSupported ? (
                   <Alert variant="info">
-                    <AlertTitle>Unsupported browser</AlertTitle>
+                    <AlertTitle>Navegador no compatible</AlertTitle>
                     <AlertDescription>
-                      Your current browser does not support web push. Try using the latest version of Chrome, Edge, or Safari.
+                      Tu navegador actual no admite notificaciones web push. Prueba con la última versión de Chrome, Edge o Safari.
                     </AlertDescription>
                   </Alert>
                 ) : (
                   <>
                     <div className="space-y-1 text-sm">
                       <p>
-                        <span className="font-medium">Permission:</span> {permissionLabel}
+                        <span className="font-medium">Permiso:</span> {permissionLabel}
                       </p>
                       <p>
-                        <span className="font-medium">Subscription:</span>{' '}
-                        {hasSubscription ? 'Active on this device' : 'Not active yet'}
+                        <span className="font-medium">Suscripción:</span>{' '}
+                        {hasSubscription ? 'Activa en este dispositivo' : 'Aún no activa'}
                       </p>
                     </div>
 
                     {isInitializing && (
                       <p className="text-sm text-muted-foreground">
-                        Checking your device for an existing subscription…
+                        Comprobando si este dispositivo ya tiene una suscripción…
                       </p>
                     )}
 
                     {pushError && (
                       <Alert variant="destructive">
-                        <AlertTitle>Notification error</AlertTitle>
+                        <AlertTitle>Error de notificaciones</AlertTitle>
                         <AlertDescription>{pushError}</AlertDescription>
                       </Alert>
                     )}
 
                     {isBlocked && (
                       <Alert variant="info">
-                        <AlertTitle>Notifications blocked</AlertTitle>
+                        <AlertTitle>Notificaciones bloqueadas</AlertTitle>
                         <AlertDescription>
-                          Enable notifications from your browser settings and reload the page to subscribe.
+                          Activa las notificaciones en la configuración de tu navegador y recarga la página para suscribirte.
                         </AlertDescription>
                       </Alert>
                     )}
@@ -401,7 +401,7 @@ export const Profile = () => {
                         }}
                         disabled={!showEnableButton || isEnabling}
                       >
-                        {isEnabling ? 'Enabling…' : 'Enable push'}
+                        {isEnabling ? 'Activando…' : 'Activar notificaciones'}
                       </Button>
                       <Button
                         variant="outline"
@@ -410,7 +410,7 @@ export const Profile = () => {
                         }}
                         disabled={!hasSubscription || isDisabling || isInitializing}
                       >
-                        {isDisabling ? 'Disabling…' : 'Disable push'}
+                        {isDisabling ? 'Desactivando…' : 'Desactivar notificaciones'}
                       </Button>
                     </div>
                   </>
@@ -421,12 +421,12 @@ export const Profile = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Change Password</CardTitle>
+              <CardTitle>Cambiar contraseña</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <Label htmlFor="currentPassword">Contraseña actual</Label>
                   <Input
                     id="currentPassword"
                     type="password"
@@ -434,9 +434,9 @@ export const Profile = () => {
                     onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
+                  <Label htmlFor="newPassword">Nueva contraseña</Label>
                   <Input
                     id="newPassword"
                     type="password"
@@ -446,7 +446,7 @@ export const Profile = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Label htmlFor="confirmPassword">Confirmar nueva contraseña</Label>
                   <Input
                     id="confirmPassword"
                     type="password"
@@ -455,18 +455,18 @@ export const Profile = () => {
                   />
                 </div>
 
-                <Button 
-                  onClick={handlePasswordChange} 
+                <Button
+                  onClick={handlePasswordChange}
                   disabled={loading || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
                   className="w-full"
                 >
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating Password...
+                      Actualizando contraseña...
                     </>
                   ) : (
-                    'Update Password'
+                    'Actualizar contraseña'
                   )}
                 </Button>
               </div>
@@ -480,53 +480,53 @@ export const Profile = () => {
           <div className="xl:col-span-2 lg:col-span-1 space-y-6">
             <Card className="h-fit">
               <CardHeader>
-                <CardTitle>Folder Structure Customization</CardTitle>
+                <CardTitle>Personalización de estructura de carpetas</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Tabs defaultValue="jobs" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="jobs">Job Folders</TabsTrigger>
-                    <TabsTrigger value="tours">Tour Folders</TabsTrigger>
+                    <TabsTrigger value="jobs">Carpetas de trabajos</TabsTrigger>
+                    <TabsTrigger value="tours">Carpetas de giras</TabsTrigger>
                   </TabsList>
-                  
+
                   <TabsContent value="jobs" className="mt-6">
                     <div className="max-h-[600px] overflow-y-auto">
                       <FolderStructureEditor
                         value={folderStructure}
                         onChange={setFolderStructure}
-                        title="Custom Job Folder Structure"
-                        description="Customize the folder structure for regular jobs/festivals."
+                        title="Estructura personalizada de carpetas para trabajos"
+                        description="Personaliza la estructura de carpetas para trabajos y festivales."
                       />
                     </div>
                   </TabsContent>
-                  
+
                   <TabsContent value="tours" className="mt-6">
                     <div className="max-h-[600px] overflow-y-auto">
                       <FolderStructureEditor
                         value={tourFolderStructure}
                         onChange={setTourFolderStructure}
-                        title="Custom Tour Folder Structure"
-                        description="Customize the folder structure specifically for tours. Use 'tourdates' element to create folders for each tour date."
+                        title="Estructura personalizada de carpetas para giras"
+                        description="Personaliza la estructura de carpetas específicamente para las giras. Usa el elemento 'tourdates' para crear carpetas por cada fecha."
                       />
                     </div>
                   </TabsContent>
                 </Tabs>
-                
+
                 <div className="pt-4 border-t">
-                  <Button 
-                    onClick={handleFolderStructureSave} 
+                  <Button
+                    onClick={handleFolderStructureSave}
                     disabled={loading}
                     className="w-full"
                   >
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
+                        Guardando...
                       </>
                     ) : (
                       <>
                         <Save className="mr-2 h-4 w-4" />
-                        Save Folder Structure
+                        Guardar estructura de carpetas
                       </>
                     )}
                   </Button>

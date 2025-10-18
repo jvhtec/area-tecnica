@@ -107,14 +107,14 @@ const Layout = () => {
                 userDepartment={userDepartment}
               />
             )}
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start gap-2" 
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2"
               onClick={handleSignOut}
               disabled={isLoggingOut}
             >
               <LogOut className="h-4 w-4" />
-              <span>{isLoggingOut ? 'Signing out...' : 'Sign Out'}</span>
+              <span>{isLoggingOut ? 'Cerrando sesión...' : 'Cerrar sesión'}</span>
             </Button>
             <AboutCard userRole={userRole} userEmail={session?.user?.email || undefined} />
             <SidebarSeparator />
