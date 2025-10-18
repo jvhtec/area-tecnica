@@ -455,7 +455,8 @@ export default function Wallboard() {
             c.name = [p?.first_name, p?.last_name].filter(Boolean).join(' ') || '';
             const s = tsByJobTech.get(j.id)?.get(c.technician_id) as any;
             const inPast = new Date(jobArr.find(x=>x.id===j.id)?.end_time||Date.now()) < new Date();
-            c.timesheetStatus = inPast && s==='approved' ? 'approved' : (s || 'missing');
+            const normalizedStatus = s === 'rejected' ? 'rejected' : s;
+            c.timesheetStatus = inPast && normalizedStatus==='approved' ? 'approved' : (normalizedStatus || 'missing');
             delete c.technician_id;
           });
         });

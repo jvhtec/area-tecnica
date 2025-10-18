@@ -35,6 +35,8 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 import { useJobExtras } from '@/hooks/useJobExtras';
 import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
+import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
+import { toast } from 'sonner';
 
 interface JobDetailsDialogProps {
   open: boolean;
@@ -104,8 +106,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const { data: jobExtras = [] } = useJobExtras(resolvedJobId);
   const { data: jobRatesApproval } = useJobRatesApproval(resolvedJobId);
   const jobRatesApproved = jobRatesApproval?.rates_approved ?? !!jobDetails?.rates_approved;
+  const { data: approvalStatus, isLoading: approvalStatusLoading } = useJobApprovalStatus(resolvedJobId);
   const isDryhire = (jobDetails?.job_type || job?.job_type) === 'dryhire';
-  const showExtrasTab = jobRatesApproved && (jobExtras.length > 0);
+  const showExtrasTab = !isDryhire && (isManager || (jobRatesApproved && jobExtras.length > 0));
   const showTourRatesTab = !isDryhire
     && jobDetails?.job_type === 'tourdate'
     && (isManager || jobRatesApproved);
@@ -417,6 +420,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               queryClient.invalidateQueries({ queryKey: ['job-details', resolvedJobId] });
                               queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
                               queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
+                              queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
                             }}
                           >
                             Revocar
@@ -424,8 +428,14 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                         ) : (
                           <Button
                             size="sm"
+                            disabled={!approvalStatusLoading && !!approvalStatus && !approvalStatus.canApprove}
                             onClick={async () => {
                               if (!resolvedJobId) return;
+                              if (approvalStatus && !approvalStatus.canApprove) {
+                                const reasons = approvalStatus.blockingReasons.join(', ');
+                                toast.error(reasons ? `No se puede aprobar: ${reasons}` : 'No se puede aprobar mientras haya elementos pendientes');
+                                return;
+                              }
                               const { data: u } = await supabase.auth.getUser();
                               await supabase
                                 .from('jobs')
@@ -434,6 +444,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               queryClient.invalidateQueries({ queryKey: ['job-details', resolvedJobId] });
                               queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
                               queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
+                              queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
                             }}
                           >
                             Aprobar
@@ -453,6 +464,12 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                         Las tarifas de este trabajo están pendientes de aprobación y no son visibles por el momento.
                       </AlertDescription>
                     </Alert>
+                  )}
+
+                  {approvalStatus && approvalStatus.blockingReasons.length > 0 && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Pendiente: {approvalStatus.blockingReasons.join(', ')}
+                    </div>
                   )}
 
                       {jobDetails?.locations && (
