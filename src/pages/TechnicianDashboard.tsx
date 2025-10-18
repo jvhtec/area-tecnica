@@ -120,6 +120,7 @@ const TechnicianDashboard = () => {
             sound_role,
             lights_role,
             video_role,
+            status,
             assigned_at,
             jobs (
               id,
@@ -143,7 +144,7 @@ const TechnicianDashboard = () => {
             )
           `)
           .eq('technician_id', user.id)
-          .eq('status', 'confirmed');
+          .or('status.is.null,status.eq.confirmed,status.eq.invited');
 
         if (viewMode === 'upcoming') {
           // Show upcoming and ongoing jobs
@@ -181,6 +182,7 @@ const TechnicianDashboard = () => {
               technician_id: assignment.technician_id,
               department,
               role: assignment.sound_role || assignment.lights_role || assignment.video_role || "Assigned",
+              status: assignment.status,
               jobs: assignment.jobs
             };
           });
