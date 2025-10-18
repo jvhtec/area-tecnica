@@ -93,7 +93,7 @@ export const useEntityMutation = <T, TVariables extends object>(
       
       // Call the original onError if it exists
       if (options?.onError) {
-        options.onError(err, variables, context);
+        options.onError(err, variables, context ?? undefined);
       }
     },
     onSuccess: (data, variables, context) => {
@@ -109,7 +109,7 @@ export const useEntityMutation = <T, TVariables extends object>(
       
       // Call the original onSuccess if it exists
       if (options?.onSuccess) {
-        options.onSuccess(data, variables, context);
+        options.onSuccess(data, variables, context ?? undefined);
       }
     },
     ...options,

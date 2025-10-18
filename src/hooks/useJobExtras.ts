@@ -49,7 +49,7 @@ export function useUpsertJobExtra() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ jobId, technicianId, extraType, approvedQuantity, requestedQuantity }: SubmitJobExtraPayload) => {
+    mutationFn: async ({ jobId, technicianId, extraType, approvedQuantity, requestedQuantity, hasExistingRow }: SubmitJobExtraPayload) => {
       const { data: auth } = await supabase.auth.getUser();
       const now = new Date().toISOString();
       const hasChange = approvedQuantity !== requestedQuantity;
@@ -134,7 +134,7 @@ export function useReviewJobExtra() {
     mutationFn: async ({ jobId, technicianId, extraType }: Omit<ReviewJobExtraPayload, 'reason'>) => {
       const { data: existing, error: fetchError } = await supabase
         .from('job_rate_extras')
-        .select('pending_quantity, quantity')
+        .select('*')
         .eq('job_id', jobId)
         .eq('technician_id', technicianId)
         .eq('extra_type', extraType)
@@ -143,8 +143,8 @@ export function useReviewJobExtra() {
       if (fetchError) throw fetchError;
       if (!existing) throw new Error('Extra not found');
 
-      const pendingQuantity = existing.pending_quantity;
-      const newQuantity = pendingQuantity ?? existing.quantity ?? 0;
+      const pendingQuantity = (existing as any).pending_quantity;
+      const newQuantity = pendingQuantity ?? (existing as any).quantity ?? 0;
 
       const { data: auth } = await supabase.auth.getUser();
       const now = new Date().toISOString();

@@ -604,6 +604,53 @@ export type Database = {
           },
         ]
       }
+      dwg_conversion_queue: {
+        Row: {
+          bucket: string
+          created_at: string
+          derivative_path: string
+          document_id: string
+          error: string | null
+          id: string
+          job_id: string
+          source_path: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bucket: string
+          created_at?: string
+          derivative_path: string
+          document_id: string
+          error?: string | null
+          id?: string
+          job_id: string
+          source_path: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          derivative_path?: string
+          document_id?: string
+          error?: string | null
+          id?: string
+          job_id?: string
+          source_path?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dwg_conversion_queue_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "job_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       equipment: {
         Row: {
           category: Database["public"]["Enums"]["equipment_category"]
@@ -2628,8 +2675,12 @@ export type Database = {
           file_path: string
           file_size: number | null
           file_type: string | null
+          has_preview: boolean
           id: string
           job_id: string
+          original_type: string | null
+          preview_generated_at: string | null
+          preview_url: string | null
           uploaded_at: string
           uploaded_by: string | null
           visible_to_tech: boolean
@@ -2639,8 +2690,12 @@ export type Database = {
           file_path: string
           file_size?: number | null
           file_type?: string | null
+          has_preview?: boolean
           id?: string
           job_id: string
+          original_type?: string | null
+          preview_generated_at?: string | null
+          preview_url?: string | null
           uploaded_at?: string
           uploaded_by?: string | null
           visible_to_tech?: boolean
@@ -2650,8 +2705,12 @@ export type Database = {
           file_path?: string
           file_size?: number | null
           file_type?: string | null
+          has_preview?: boolean
           id?: string
           job_id?: string
+          original_type?: string | null
+          preview_generated_at?: string | null
+          preview_url?: string | null
           uploaded_at?: string
           uploaded_by?: string | null
           visible_to_tech?: boolean
@@ -2810,14 +2869,8 @@ export type Database = {
           amount_override_eur: number | null
           extra_type: Database["public"]["Enums"]["job_extra_type"]
           job_id: string
-          pending_quantity: number | null
           quantity: number
-          status: string | null
-          submitted_at: string | null
-          submitted_by: string | null
-          approved_at: string | null
-          approved_by: string | null
-          rejection_reason: string | null
+          status: Database["public"]["Enums"]["job_rate_extras_status"]
           technician_id: string
           updated_at: string
           updated_by: string | null
@@ -2826,14 +2879,8 @@ export type Database = {
           amount_override_eur?: number | null
           extra_type: Database["public"]["Enums"]["job_extra_type"]
           job_id: string
-          pending_quantity?: number | null
           quantity?: number
-          status?: string | null
-          submitted_at?: string | null
-          submitted_by?: string | null
-          approved_at?: string | null
-          approved_by?: string | null
-          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["job_rate_extras_status"]
           technician_id: string
           updated_at?: string
           updated_by?: string | null
@@ -2842,14 +2889,8 @@ export type Database = {
           amount_override_eur?: number | null
           extra_type?: Database["public"]["Enums"]["job_extra_type"]
           job_id?: string
-          pending_quantity?: number | null
           quantity?: number
-          status?: string | null
-          submitted_at?: string | null
-          submitted_by?: string | null
-          approved_at?: string | null
-          approved_by?: string | null
-          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["job_rate_extras_status"]
           technician_id?: string
           updated_at?: string
           updated_by?: string | null
@@ -6226,6 +6267,7 @@ export type Database = {
       global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
       job_extra_type: "travel_half" | "travel_full" | "day_off"
+      job_rate_extras_status: "pending" | "approved" | "rejected"
       job_status: "Tentativa" | "Confirmado" | "Completado" | "Cancelado"
       job_type: "single" | "tour" | "festival" | "dryhire" | "tourdate"
       logistics_event_type: "load" | "unload"
@@ -6429,6 +6471,7 @@ export const Constants = {
       global_preset_status: ["available", "unavailable", "tentative"],
       job_date_type: ["travel", "setup", "show", "off", "rehearsal"],
       job_extra_type: ["travel_half", "travel_full", "day_off"],
+      job_rate_extras_status: ["pending", "approved", "rejected"],
       job_status: ["Tentativa", "Confirmado", "Completado", "Cancelado"],
       job_type: ["single", "tour", "festival", "dryhire", "tourdate"],
       logistics_event_type: ["load", "unload"],

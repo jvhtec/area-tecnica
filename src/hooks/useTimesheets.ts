@@ -297,7 +297,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
     try {
       const { data, error } = await supabase
         .from("timesheets")
-        .update(updates)
+        .update(updates as any)
         .eq("id", timesheetId)
         .select(`
           *,
