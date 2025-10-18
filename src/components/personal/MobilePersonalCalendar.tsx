@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, ChevronLeft, ChevronRight, Users, Warehouse, Briefcase, Sun, CalendarOff, Car, Thermometer, Printer } from "lucide-react";
 import { PrintDialog, PrintSettings } from "@/components/dashboard/PrintDialog";
 import { format, addDays, subDays, isToday, isSameDay, isWithinInterval } from "date-fns";
@@ -10,6 +9,7 @@ import { TechContextMenu } from "./TechContextMenu";
 import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 import { TechDetailModal } from "./TechDetailModal";
+import { GlassButton, GlassCard } from "@/components/ui/glass";
 
 interface MobilePersonalCalendarProps {
   date: Date;
@@ -262,7 +262,12 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
   if (houseTechs.length === 0) {
     return (
-      <Card className="h-full flex flex-col">
+      <GlassCard
+        className="h-full flex flex-col"
+        glassSurfaceClassName="h-full"
+        glassContentClassName="flex flex-col"
+        mobileOptions={{ featureFlag: "mobile_glass_ui" }}
+      >
         <CardHeader className="pb-4">
           <CardTitle className="text-lg font-bold">House Techs</CardTitle>
         </CardHeader>
@@ -273,23 +278,34 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
             Make sure there are users with the 'house_tech' role
           </p>
         </CardContent>
-      </Card>
+      </GlassCard>
     );
   }
 
   return (
     <div className="w-full max-w-[480px] mx-auto sm:max-w-lg">
-      <Card className="h-full flex flex-col">
+      <GlassCard
+        className="h-full flex flex-col"
+        glassSurfaceClassName="h-full"
+        glassContentClassName="flex flex-col"
+        mobileOptions={{ featureFlag: "mobile_glass_ui" }}
+      >
         <CardHeader className="px-2 sm:px-4 py-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-bold">House Technicians</CardTitle>
           </div>
-        
+
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={navigateToPrevious}>
+          <GlassButton
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={navigateToPrevious}
+            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
+          >
             <ChevronLeft className="h-4 w-4" />
-          </Button>
-          
+          </GlassButton>
+
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 mr-1" />
             <span className={cn(
@@ -299,40 +315,53 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
               {format(currentDate, "EEE, MMM d")}
             </span>
           </div>
-          
-          <Button variant="ghost" size="icon" onClick={navigateToNext}>
+
+          <GlassButton
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={navigateToNext}
+            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
+          >
             <ChevronRight className="h-4 w-4" />
-          </Button>
+          </GlassButton>
         </div>
-        
+
         {/* Action buttons */}
         <div className="flex items-center justify-between">
-          <Button 
-            variant="outline" 
+          <GlassButton
+            variant="outline"
             size="sm"
             onClick={() => setSelectedDepartment(null)}
             disabled={!selectedDepartment}
+            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
           >
             <Users className="h-4 w-4 mr-1" />
             {selectedDepartment ? `${selectedDepartment}` : 'All Depts'}
-          </Button>
-          
-          <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)}>
+          </GlassButton>
+
+          <GlassButton
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPrintDialog(true)}
+            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
+          >
             <Printer className="h-4 w-4 mr-1" />
             Print
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
+          </GlassButton>
+
+          <GlassButton
+            variant="outline"
+            size="sm"
             onClick={navigateToToday}
             className={cn(
               isToday(currentDate) && "bg-primary text-primary-foreground"
             )}
+            mobileOptions={{ featureFlag: "mobile_glass_ui" }}
           >
             <Calendar className="h-4 w-4 mr-1" />
             Today
-          </Button>
+          </GlassButton>
         </div>
 
         {/* Personnel Summary Section - Moved to header */}
@@ -484,7 +513,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
           onAvailabilityRemove={(techId, d) => handleAvailabilityRemove(techId, d)}
         />
       )}
-    </Card>
+      </GlassCard>
     </div>
   );
 };

@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -38,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQueryClient } from "@tanstack/react-query";
+import { GlassButton, GlassCard, GlassSurface } from "@/components/ui/glass";
 
 interface MobileJobCardProps {
   job: any;
@@ -96,7 +95,6 @@ export function MobileJobCard({
 
   const {
     appliedBorderColor,
-    appliedBgColor,
     assignments,
     documents,
     soundTaskDialogOpen,
@@ -270,185 +268,199 @@ export function MobileJobCard({
 
   return (
     <>
-      <Card
+      <GlassCard
         className={cn(
           "mb-3 transition-all duration-200",
-          !isHouseTech && !isJobBeingDeleted && "cursor-pointer hover:shadow-md",
-          isJobBeingDeleted && "opacity-50 pointer-events-none"
+          !isHouseTech && !isJobBeingDeleted && "cursor-pointer hover:-translate-y-0.5",
+          isJobBeingDeleted && "pointer-events-none opacity-60"
         )}
+        glassSurfaceClassName="relative overflow-hidden"
+        glassContentClassName="flex flex-col"
+        mobileOptions={{ featureFlag: "mobile_glass_ui", minimumDeviceMemory: 3 }}
         onClick={handleJobCardClick}
-        style={{
-          borderLeftColor: appliedBorderColor,
-          backgroundColor: appliedBgColor,
-          borderLeftWidth: '4px'
-        }}
       >
-        {isJobBeingDeleted && (
-          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 rounded">
-            <div className="bg-background px-3 py-2 rounded shadow-lg">
-              <span className="text-sm font-medium">Deleting job...</span>
-            </div>
-          </div>
-        )}
+        <div className="relative flex flex-col rounded-2xl p-4">
+          <div
+            aria-hidden
+            className="absolute left-0 top-3 bottom-3 w-1.5 rounded-full"
+            style={{ backgroundColor: appliedBorderColor || 'hsl(var(--primary))' }}
+          />
 
-        <div className="p-4">
+          {isJobBeingDeleted && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-black/30">
+              <div className="rounded-lg bg-background/80 px-3 py-2 text-sm font-medium shadow-lg">
+                Deleting job...
+              </div>
+            </div>
+          )}
+
+          <div className="relative z-[1]">
           <div className="flex items-start justify-between mb-2">
             <div className="flex items-center gap-2">
               {/* Actions menu - moved to left */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0"
+                  <GlassButton
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    mobileOptions={{ featureFlag: "mobile_glass_ui" }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <MoreVertical className="h-4 w-4" />
-                  </Button>
+                  </GlassButton>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent 
-                  align="end" 
-                  side="top" 
-                  sideOffset={-4} 
+                <DropdownMenuContent
+                  align="end"
+                  side="top"
+                  sideOffset={-4}
                   collisionPadding={-8}
                   avoidCollisions={true}
-                  className="w-48 bg-popover border shadow-md z-50"
+                  className="z-50 w-52 border-0 bg-transparent p-0 shadow-none"
                 >
-                  <DropdownMenuItem onClick={handleDateTypeBadgeClick}>
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Change Date Type
-                  </DropdownMenuItem>
+                  <GlassSurface
+                    className="overflow-hidden"
+                    contentClassName="flex flex-col py-2"
+                    mobileOptions={{ featureFlag: "mobile_glass_ui" }}
+                    displacementScale={0.35}
+                    blurAmount={18}
+                    variant="dark"
+                  >
+                    <DropdownMenuItem onClick={handleDateTypeBadgeClick}>
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Change Date Type
+                    </DropdownMenuItem>
 
-                  <DropdownMenuItem 
-                    onClick={(e) => { e.stopPropagation(); handleFlexClick(); }}
-                    disabled={isLoadingFlexUuid}
-                  >
-                    {getFlexIcon()}
-                    {getFlexMenuText()}
-                  </DropdownMenuItem>
-                  
-                  <DropdownMenuSeparator />
-                  
-                  {/* View Details - for technicians and house techs */}
-                  {(userRole === 'technician' || userRole === 'house_tech') && (
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
+                      onClick={(e) => { e.stopPropagation(); handleFlexClick(); }}
+                      disabled={isLoadingFlexUuid}
+                    >
+                      {getFlexIcon()}
+                      {getFlexMenuText()}
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator />
+
+                    {/* View Details - for technicians and house techs */}
+                    {(userRole === 'technician' || userRole === 'house_tech') && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setJobDetailsDialogOpen(true);
+                        }}
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        View Details
+                      </DropdownMenuItem>
+                    )}
+
+                    <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
-                        setJobDetailsDialogOpen(true);
+                        setAssignmentDialogOpen(true);
                       }}
                     >
-                      <FileText className="mr-2 h-4 w-4" />
-                      View Details
+                      <Users className="mr-2 h-4 w-4" />
+                      Assign Users
                     </DropdownMenuItem>
-                  )}
-                  
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAssignmentDialogOpen(true);
-                    }}
-                  >
-                    <Users className="mr-2 h-4 w-4" />
-                    Assign Users
-                  </DropdownMenuItem>
-                  
-                  <DropdownMenuItem onClick={handleTimesheetClick}>
-                    <Clock className="mr-2 h-4 w-4" />
-                    Timesheets
-                  </DropdownMenuItem>
-                  
-                  {isFestival && canManageArtists && (
-                    <DropdownMenuItem onClick={handleFestivalArtistsClick}>
-                      <Star className="mr-2 h-4 w-4" />
-                      Manage Artists
+
+                    <DropdownMenuItem onClick={handleTimesheetClick}>
+                      <Clock className="mr-2 h-4 w-4" />
+                      Timesheets
                     </DropdownMenuItem>
-                  )}
-                  
-                  <DropdownMenuSeparator />
-                  
-                  {canUploadDocuments && (
-                    <DropdownMenuItem asChild>
-                      <label className="cursor-pointer">
-                        <FileUp className="mr-2 h-4 w-4" />
-                        Upload Document
-                        <input
-                          type="file"
-                          className="hidden"
-                          multiple
-                          onChange={handleFileUpload}
-                        />
-                      </label>
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {canCreateFlexFolders && (
-                    <DropdownMenuItem 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log("MobileJobCard: Create Flex Folders clicked", { 
-                          canCreateFlexFolders, 
-                          isCreatingFolders, 
-                          isFoldersLoading, 
-                          foldersAreCreated,
-                          jobId: job.id 
-                        });
-                        createFlexFoldersHandler(e);
-                      }}
-                      disabled={isCreatingFolders || isFoldersLoading || foldersAreCreated}
-                    >
-                      {isCreatingFolders ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <FolderPlus className="mr-2 h-4 w-4" />
-                      )}
-                      {isCreatingFolders ? 'Creating...' : foldersAreCreated ? 'Flex Folders Created' : 'Create Flex Folders'}
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {!isMobile && (
-                    <DropdownMenuItem 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        createLocalFoldersHandler(e);
-                      }}
-                      disabled={isCreatingLocalFolders}
-                    >
-                      <HardDrive className="mr-2 h-4 w-4" />
-                      {isCreatingLocalFolders ? 'Creating...' : 'Create Local Folders'}
-                    </DropdownMenuItem>
-                  )}
-                  
-                  <DropdownMenuSeparator />
-                  
-                  {/* View Details - for technicians and house techs */}
-                  {(userRole === 'technician' || userRole === 'house_tech') && (
-                    <DropdownMenuItem 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setJobDetailsDialogOpen(true);
-                      }}
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      View Details
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {canEditJobs && (
-                    <DropdownMenuItem onClick={handleEditButtonClick}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit Job
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {["admin", "management"].includes(userRole || "") && (
-                    <DropdownMenuItem 
-                      onClick={handleDeleteClick}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete Job
-                    </DropdownMenuItem>
-                  )}
+
+                    {isFestival && canManageArtists && (
+                      <DropdownMenuItem onClick={handleFestivalArtistsClick}>
+                        <Star className="mr-2 h-4 w-4" />
+                        Manage Artists
+                      </DropdownMenuItem>
+                    )}
+
+                    <DropdownMenuSeparator />
+
+                    {canUploadDocuments && (
+                      <DropdownMenuItem asChild>
+                        <label className="cursor-pointer">
+                          <FileUp className="mr-2 h-4 w-4" />
+                          Upload Document
+                          <input
+                            type="file"
+                            className="hidden"
+                            multiple
+                            onChange={handleFileUpload}
+                          />
+                        </label>
+                      </DropdownMenuItem>
+                    )}
+
+                    {canCreateFlexFolders && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log("MobileJobCard: Create Flex Folders clicked", {
+                            canCreateFlexFolders,
+                            isCreatingFolders,
+                            isFoldersLoading,
+                            foldersAreCreated,
+                            jobId: job.id
+                          });
+                          createFlexFoldersHandler(e);
+                        }}
+                        disabled={isCreatingFolders || isFoldersLoading || foldersAreCreated}
+                      >
+                        {isCreatingFolders ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <FolderPlus className="mr-2 h-4 w-4" />
+                        )}
+                        {isCreatingFolders ? 'Creating...' : foldersAreCreated ? 'Flex Folders Created' : 'Create Flex Folders'}
+                      </DropdownMenuItem>
+                    )}
+
+                    {!isMobile && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          createLocalFoldersHandler(e);
+                        }}
+                        disabled={isCreatingLocalFolders}
+                      >
+                        <HardDrive className="mr-2 h-4 w-4" />
+                        {isCreatingLocalFolders ? 'Creating...' : 'Create Local Folders'}
+                      </DropdownMenuItem>
+                    )}
+
+                    <DropdownMenuSeparator />
+
+                    {(userRole === 'technician' || userRole === 'house_tech') && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setJobDetailsDialogOpen(true);
+                        }}
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        View Details
+                      </DropdownMenuItem>
+                    )}
+
+                    {canEditJobs && (
+                      <DropdownMenuItem onClick={handleEditButtonClick}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit Job
+                      </DropdownMenuItem>
+                    )}
+
+                    {["admin", "management"].includes(userRole || "") && (
+                      <DropdownMenuItem
+                        onClick={handleDeleteClick}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Job
+                      </DropdownMenuItem>
+                    )}
+                  </GlassSurface>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -488,17 +500,25 @@ export function MobileJobCard({
             ))}
           </div>
         </div>
-      </Card>
+      </GlassCard>
 
       {/* Date Type Dialog */}
       <Dialog open={dateTypeDialogOpen} onOpenChange={setDateTypeDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent
+          className="sm:max-w-md"
+          glass
+          glassSurfaceProps={{
+            mobileOptions: { featureFlag: "mobile_glass_ui" },
+            displacementScale: 0.4,
+            blurAmount: 20,
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Change Date Type</DialogTitle>
           </DialogHeader>
           <div className="grid gap-2">
             {DATE_TYPE_OPTIONS.map((option) => (
-              <Button
+              <GlassButton
                 key={option.value}
                 variant={selectedDateType === option.value ? "default" : "outline"}
                 className="justify-start"
@@ -510,7 +530,7 @@ export function MobileJobCard({
               >
                 <span className="mr-2">{option.emoji}</span>
                 {option.label}
-              </Button>
+              </GlassButton>
             ))}
           </div>
         </DialogContent>

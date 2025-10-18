@@ -15,8 +15,17 @@ export function Toaster() {
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (
-          <Toast key={id} {...props}>
-            <div className="grid gap-1">
+          <Toast
+            key={id}
+            glass
+            glassSurfaceProps={{
+              mobileOptions: { allowDesktop: true },
+              displacementScale: 0.42,
+              blurAmount: 18,
+            }}
+            {...props}
+          >
+            <div className="grid gap-1 text-sm">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
                 <ToastDescription>{description}</ToastDescription>

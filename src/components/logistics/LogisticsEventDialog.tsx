@@ -294,7 +294,15 @@ export const LogisticsEventDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
+      <DialogContent
+        className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible"
+        glass
+        glassSurfaceProps={{
+          mobileOptions: { featureFlag: "mobile_glass_ui", minimumDeviceMemory: 3 },
+          displacementScale: 0.34,
+          blurAmount: 22,
+        }}
+      >
           <DialogHeader>
             <DialogTitle>
               {selectedEvent ? "Edit Logistics Event" : "Create Logistics Event"}
