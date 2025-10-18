@@ -214,15 +214,15 @@ export function FlexFolderPicker({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] w-full max-w-2xl overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[85vh] w-full max-w-2xl flex-col gap-0">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Seleccionar estructura de Flex</DialogTitle>
           <DialogDescription>
             Marca las carpetas y elementos que deseas crear en Flex.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-shrink-0 items-center justify-between border-b pb-4">
           <span className="text-sm text-muted-foreground">
             Usa las casillas para personalizar cada departamento.
           </span>
@@ -231,7 +231,7 @@ export function FlexFolderPicker({
           </Button>
         </div>
 
-        <div className="mt-4 grid gap-6 overflow-y-auto pr-2">
+        <div className="mt-4 grid max-h-[50vh] flex-1 gap-6 overflow-y-auto pr-2">
           {selectableDepartments.map(([dept, section]) => {
             const defaultSelection = getFlexFolderDefaultSelection(dept);
             const checkedItems =
@@ -281,7 +281,7 @@ export function FlexFolderPicker({
           })}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="mt-4 flex-shrink-0 gap-2 border-t pt-4">
           <Button variant="outline" onClick={handleCancel}>
             Cancelar
           </Button>
