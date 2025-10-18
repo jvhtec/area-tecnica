@@ -19,6 +19,7 @@ import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 import { useTechnicianDashboardSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
 import { TechnicianTourRates } from "@/components/dashboard/TechnicianTourRates";
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
+import { getCategoryFromAssignment } from "@/utils/roleCategory";
 
 const TechnicianDashboard = () => {
   const [timeSpan, setTimeSpan] = useState<string>("1week");
@@ -121,7 +122,6 @@ const TechnicianDashboard = () => {
             lights_role,
             video_role,
             assigned_at,
-            category_assignment,
             jobs (
               id,
               title,
@@ -176,13 +176,16 @@ const TechnicianDashboard = () => {
             else if (assignment.lights_role) department = "lights";
             else if (assignment.video_role) department = "video";
             
+            // Determine category from the role code
+            const category = getCategoryFromAssignment(assignment);
+            
             return {
               id: `job-${assignment.job_id}`,
               job_id: assignment.job_id,
               technician_id: assignment.technician_id,
               department,
               role: assignment.sound_role || assignment.lights_role || assignment.video_role || "Assigned",
-              category_assignment: assignment.category_assignment,
+              category: category,
               jobs: assignment.jobs
             };
           });

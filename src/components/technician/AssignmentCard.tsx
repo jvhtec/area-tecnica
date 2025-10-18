@@ -15,6 +15,7 @@ import { labelForCode } from '@/utils/roles';
 import { createSignedUrl } from '@/utils/jobDocuments';
 import { supabase } from '@/lib/supabase';
 import { OBLIQUE_STRATEGIES } from "./obliqueStrategies";
+import { getCategoryFromAssignment } from '@/utils/roleCategory';
 
 type Assignment = any;
 
@@ -34,7 +35,7 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
   const [lastStrategyIndex, setLastStrategyIndex] = useState<number | null>(null);
   const [showSpanish, setShowSpanish] = useState(false);
 
-  const assignmentCategory = assignment.category_assignment ?? assignment.category;
+  const assignmentCategory = assignment.category ?? getCategoryFromAssignment(assignment);
 
   const pickRandomStrategyIndex = () => {
     if (OBLIQUE_STRATEGIES.length === 0) {
