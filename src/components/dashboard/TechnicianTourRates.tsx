@@ -101,11 +101,18 @@ export const TechnicianTourRates: React.FC = () => {
   };
 
   const isQuoteApproved = (quote: TourJobRateQuote) => {
+    // For tour dates, BOTH tour and job must be approved
     const tourApproved = !quote.tour_id || (tourApprovalMap?.get(quote.tour_id) ?? false);
     if (!tourApproved) {
       return false;
     }
 
+    // For tour dates (quotes with tour_id), we ALWAYS need job-level approval
+    if (quote.tour_id && quote.job_id) {
+      return jobApprovalMap?.get(quote.job_id) ?? false;
+    }
+
+    // For standalone jobs (no tour_id), approval depends on extras
     const extrasPresent = quoteHasExtras(quote);
     if (!extrasPresent) {
       return true;
@@ -270,7 +277,7 @@ export const TechnicianTourRates: React.FC = () => {
             {pendingQuotes.length > 0 && (
               <Alert>
                 <AlertDescription>
-                  Algunas fechas no se muestran hasta que la dirección apruebe la tarifa base del tour y los extras correspondientes.
+                  Algunas fechas no se muestran hasta que la dirección apruebe tanto la tarifa base del tour como cada fecha individual.
                 </AlertDescription>
               </Alert>
             )}
