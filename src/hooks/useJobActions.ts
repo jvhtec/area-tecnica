@@ -3,7 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDeletionState } from "@/hooks/useDeletionState";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
-import { createAllFoldersForJob } from "@/utils/flexFolders";
+import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";

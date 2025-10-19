@@ -24,7 +24,9 @@ import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { CrewCallLinkerDialog } from "@/components/jobs/CrewCallLinker";
+import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
+import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { JobPresetManagerDialog } from "@/components/jobs/JobPresetManagerDialog";
 
 interface FestivalJob {
@@ -105,6 +107,8 @@ const FestivalManagement = () => {
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
   const [isFlexLogOpen, setIsFlexLogOpen] = useState(false);
   const [isCreatingFlexFolders, setIsCreatingFlexFolders] = useState(false);
+  const [isFlexPickerOpen, setIsFlexPickerOpen] = useState(false);
+  const [flexPickerOptions, setFlexPickerOptions] = useState<CreateFoldersOptions | undefined>(undefined);
   const [isJobPresetsOpen, setIsJobPresetsOpen] = useState(false);
 
   const resolveJobDocumentBucket = useCallback((path: string) => {
@@ -495,6 +499,13 @@ const FestivalManagement = () => {
     setIsFlexLogOpen(true);
   }, []);
 
+  const handleOpenFlexPicker = useCallback(() => {
+    if (!job || isCreatingFlexFolders) {
+      return;
+    }
+    setIsFlexPickerOpen(true);
+  }, [job, isCreatingFlexFolders]);
+
   const handleRefreshAll = useCallback(() => {
     fetchJobDetails();
     fetchDocuments();
@@ -576,6 +587,80 @@ const FestivalManagement = () => {
       setIsCreatingFlexFolders(false);
     }
   }, [job, jobId, isCreatingFlexFolders, toast, refetchFlexUuid, fetchJobDetails, fetchDocuments]);
+
+  const handleFlexPickerConfirm = useCallback(
+    async (options?: CreateFoldersOptions) => {
+      if (!job || !jobId) {
+        return;
+      }
+
+      setFlexPickerOptions(options);
+      setIsFlexPickerOpen(false);
+
+      if (!job.start_time || !job.end_time) {
+        toast({
+          title: 'Missing job dates',
+          description: 'Update the job dates before adding Flex folders.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const startDate = new Date(job.start_time);
+      const endDate = new Date(job.end_time);
+
+      if (!isValid(startDate) || !isValid(endDate)) {
+        toast({
+          title: 'Invalid job dates',
+          description: 'Please verify the job dates before adding Flex folders.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      try {
+        setIsCreatingFlexFolders(true);
+
+        const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, '');
+        const formattedStartDate = startDate.toISOString().split('.')[0] + '.000Z';
+        const formattedEndDate = endDate.toISOString().split('.')[0] + '.000Z';
+
+        toast({
+          title: 'Adding Flex folders…',
+          description: 'Selected folders will be created in Flex.',
+        });
+
+        await createAllFoldersForJob(
+          job,
+          formattedStartDate,
+          formattedEndDate,
+          documentNumber,
+          options,
+        );
+
+        toast({
+          title: 'Flex folders updated',
+          description: 'Selected folders have been added successfully.',
+        });
+
+        await Promise.all([
+          refetchFlexUuid(),
+          fetchJobDetails({ silent: true }),
+          fetchDocuments(),
+        ]);
+      } catch (error: any) {
+        console.error('Error adding Flex folders:', error);
+        toast({
+          title: 'Flex folder update failed',
+          description: error.message || 'Please try again in a moment.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsCreatingFlexFolders(false);
+      }
+    },
+    [job, jobId, toast, refetchFlexUuid, fetchJobDetails, fetchDocuments],
+  );
 
   const flexStatus = useMemo(() => {
     if (isFlexLoading) {
@@ -973,6 +1058,27 @@ const FestivalManagement = () => {
                       )}
                     </Button>
                     <Button
+                      variant="secondary"
+                      onClick={handleOpenFlexPicker}
+                      disabled={
+                        !canEdit ||
+                        !job ||
+                        isCreatingFlexFolders ||
+                        isFlexLoading ||
+                        !folderExists
+                      }
+                      className="sm:flex-1"
+                    >
+                      {isCreatingFlexFolders ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Updating…
+                        </>
+                      ) : (
+                        'Add'
+                      )}
+                    </Button>
+                    <Button
                       variant="outline"
                       onClick={handleOpenFlexLogs}
                       disabled={!canEdit}
@@ -1178,6 +1284,13 @@ const FestivalManagement = () => {
           onOpenChange={setIsFlexLogOpen}
         />
       )}
+
+      <FlexFolderPicker
+        open={isFlexPickerOpen}
+        onOpenChange={setIsFlexPickerOpen}
+        onConfirm={handleFlexPickerConfirm}
+        initialOptions={flexPickerOptions}
+      />
 
       <Dialog open={isRouteSheetOpen} onOpenChange={setIsRouteSheetOpen}>
         <DialogContent className="max-w-[96vw] w-[96vw] h-[90vh] p-0 overflow-hidden">

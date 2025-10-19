@@ -19,9 +19,6 @@ The heavy lifting lives in `src/utils/flex-folders/folders.ts`. The helper orche
 
 All branches call the shared `createFlexFolder` fetch wrapper (Flex API `POST /element`) and rely on `supabase` inserts to mirror the Flex hierarchy locally.【F:src/utils/flex-folders/api.ts†L1-L28】【F:src/utils/flex-folders/folders.ts†L556-L609】
 
-### Legacy Helper
-`src/utils/flexFolders.ts` still exports a simplified `createAllFoldersForJob` that only seeds static Flex element IDs into the database without calling the Flex API. Some components (e.g., `useJobActions`) still import this legacy module, so the codebase currently mixes the old stub with the new API-driven helper.【F:src/utils/flexFolders.ts†L1-L52】【F:src/hooks/useJobActions.ts†L3-L16】
-
 ## Tour and Tour-Date Flex Folder Workflows
 
 ### Supabase Edge Function (`create-flex-folders`)
@@ -39,5 +36,5 @@ For cases where Flex access must be proxied differently, `createTourRootFoldersM
 When a user opts to generate folders for individual tour dates from the management dialog, the `useTourDateFlexFolders` hook described above executes the job helper for each date, ensuring tour-level jobs gain the same folder structure as stand-alone jobs.【F:src/hooks/useTourDateFlexFolders.ts†L13-L158】
 
 ## Observations
-* The repository still exports two differently implemented `createAllFoldersForJob` helpers (one API-driven, one legacy). Aligning all imports on the modern helper would avoid silent no-op behavior when only the database stub runs.【F:src/utils/flex-folders/folders.ts†L245-L740】【F:src/utils/flexFolders.ts†L1-L52】
+* All job-facing entry points now share the API-driven `createAllFoldersForJob` helper, ensuring consistent Flex element creation and Supabase persistence across cards, dialogs, and hooks.【F:src/components/dashboard/JobCardNew.tsx†L512-L587】【F:src/pages/FestivalManagement.tsx†L498-L600】【F:src/hooks/useJobActions.ts†L1-L122】
 * Each workflow writes to the `flex_folders` table to mirror remote structure, so any schema changes should remain backward compatible with these inserts (job, dryhire, tourdate, and tour department folder types).【F:src/utils/flex-folders/folders.ts†L232-L239】【F:supabase/functions/create-flex-folders/index.ts†L292-L301】
