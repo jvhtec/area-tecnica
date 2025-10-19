@@ -207,18 +207,32 @@ async function ensureFlexAuthToken(req: Request): Promise<string | null> {
   let token = Deno.env.get("X_AUTH_TOKEN") ?? "";
   if (token) return token;
 
+  const authorization = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  if (!authorization) {
+    console.error("sync-flex-work-orders: Authorization header missing, cannot load Flex token from secret");
+    return null;
+  }
+
   try {
     const res = await fetch(new URL(req.url).origin + "/functions/v1/get-secret", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: "X_AUTH_TOKEN" })
+      headers: {
+        "Content-Type": "application/json",
+        ...(authorization ? { Authorization: authorization } : {})
+      },
+      body: JSON.stringify({ secretName: "X_AUTH_TOKEN" })
     });
     if (res.ok) {
       const json = await res.json().catch(() => ({}));
       token = (json as any)?.X_AUTH_TOKEN ?? token;
+    } else {
+      const errTxt = await res.text().catch(() => "");
+      console.error(
+        `sync-flex-work-orders: failed to retrieve Flex token (${res.status}) ${errTxt}`.trim()
+      );
     }
-  } catch (_err) {
-    // ignore and fall through
+  } catch (err) {
+    console.error("sync-flex-work-orders: error retrieving Flex token", err);
   }
 
   return token || null;
