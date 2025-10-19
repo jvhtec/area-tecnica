@@ -5,6 +5,8 @@ import {
   CreateFoldersOptions,
   DepartmentKey,
   SubfolderKey,
+  getDepartmentCustomPullsheetMetadata,
+  getDepartmentExtrasPresupuestoMetadata,
   getSubfolderSelectionSummary,
 } from "./types";
 import { createFlexFolder } from "./api";
@@ -111,6 +113,89 @@ function shouldCreateItem(
   return keys.includes(key);
 }
 
+interface PullsheetTemplate {
+  name: string;
+  suffix: string;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+}
+
+interface PullsheetMetadataEntry {
+  name?: string;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+}
+
+const buildPullsheetTemplates = (
+  defaultEntries: PullsheetTemplate[],
+  metadataEntries: PullsheetMetadataEntry[],
+  fallbackStartDate: string,
+  fallbackEndDate: string,
+  fallbackNameForIndex: (index: number, defaultEntry?: PullsheetTemplate) => string
+): PullsheetTemplate[] => {
+  const templates: PullsheetTemplate[] = [];
+  const usedSuffixes = new Set<string>();
+
+  const getUniqueSuffix = (preferred?: string): string => {
+    const trimmed = preferred?.trim();
+    if (trimmed && !usedSuffixes.has(trimmed)) {
+      usedSuffixes.add(trimmed);
+      return trimmed;
+    }
+
+    let counter = 1;
+    while (true) {
+      const candidate = `PS${String(counter).padStart(2, "0")}`;
+      if (!usedSuffixes.has(candidate)) {
+        usedSuffixes.add(candidate);
+        return candidate;
+      }
+      counter += 1;
+    }
+  };
+
+  const sanitizedMetadata = metadataEntries.filter(entry =>
+    Boolean(entry?.name) || Boolean(entry?.plannedStartDate) || Boolean(entry?.plannedEndDate)
+  );
+
+  if (sanitizedMetadata.length > 0) {
+    sanitizedMetadata.forEach((entry, index) => {
+      const defaultEntry = defaultEntries[index];
+      const name = entry.name?.trim?.() || defaultEntry?.name || fallbackNameForIndex(index, defaultEntry);
+      const plannedStartDate =
+        entry.plannedStartDate || defaultEntry?.plannedStartDate || fallbackStartDate;
+      const plannedEndDate =
+        entry.plannedEndDate || defaultEntry?.plannedEndDate || fallbackEndDate;
+      const suffix = getUniqueSuffix(defaultEntry?.suffix);
+
+      templates.push({ name, plannedStartDate, plannedEndDate, suffix });
+    });
+
+    if (sanitizedMetadata.length < defaultEntries.length) {
+      for (let index = sanitizedMetadata.length; index < defaultEntries.length; index += 1) {
+        const defaultEntry = defaultEntries[index];
+        templates.push({
+          name: defaultEntry.name,
+          plannedStartDate: defaultEntry.plannedStartDate || fallbackStartDate,
+          plannedEndDate: defaultEntry.plannedEndDate || fallbackEndDate,
+          suffix: getUniqueSuffix(defaultEntry.suffix),
+        });
+      }
+    }
+  } else {
+    defaultEntries.forEach(defaultEntry => {
+      templates.push({
+        name: defaultEntry.name,
+        plannedStartDate: defaultEntry.plannedStartDate || fallbackStartDate,
+        plannedEndDate: defaultEntry.plannedEndDate || fallbackEndDate,
+        suffix: getUniqueSuffix(defaultEntry.suffix),
+      });
+    });
+  }
+
+  return templates;
+};
+
 /**
  * Creates all necessary folders in Flex for a job
  * @param job The job object
@@ -159,13 +244,16 @@ export async function createAllFoldersForJob(
     existingDepartmentMap.clear();
   }
 
+  const safeJobTitle = job?.title?.trim?.() || job?.title || "Sin título";
+
   const createComercialExtras = async (
     parentElementId: string,
     parentName: string,
-    parentDocumentNumber?: string
+    parentDocumentNumber: string | undefined,
+    jobTitle: string
   ) => {
     const parentDoc = parentDocumentNumber ?? "";
-    const deptLabel = "Comercial";
+    const extrasMetadata = getDepartmentExtrasPresupuestoMetadata(options?.comercial);
     const replacements = [
       {
         label: "Sonido",
@@ -183,8 +271,18 @@ export async function createAllFoldersForJob(
       },
     ];
 
+    const extrasJobTitle = jobTitle?.trim?.() || job?.title?.trim?.() || parentName;
+
     for (const extra of replacements) {
-      const baseName = parentName.replace(/Comercial/gi, extra.label);
+      const shouldCreateExtrasFolder =
+        shouldCreateItem("comercial", extra.extrasKey, options) ||
+        shouldCreateItem("comercial", extra.presupuestoKey, options);
+
+      if (!shouldCreateExtrasFolder) {
+        continue;
+      }
+
+      const extrasBaseName = `Extras ${extrasJobTitle} - ${extra.label}`;
       const sharedPayload = {
         parentElementId,
         open: true,
@@ -197,26 +295,58 @@ export async function createAllFoldersForJob(
         personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept as Department],
       };
 
-      if (shouldCreateItem("comercial", extra.extrasKey, options)) {
-        const extrasName = `Extras ${baseName} - ${deptLabel}`;
-        const extrasPayload = {
-          definitionId: FLEX_FOLDER_IDS.subFolder,
-          name: extrasName,
-          ...sharedPayload,
-        };
+      const extrasPayload = {
+        definitionId: FLEX_FOLDER_IDS.subFolder,
+        name: extrasBaseName,
+        ...sharedPayload,
+      };
 
-        await createFlexFolder(extrasPayload);
+      const extrasFolder = await createFlexFolder(extrasPayload);
+      const extrasFolderElementId = extrasFolder.elementId;
+
+      if (!extrasFolderElementId) {
+        console.warn("Unable to resolve extras folder element id for", extrasPayload);
       }
 
-      if (shouldCreateItem("comercial", extra.presupuestoKey, options)) {
-        const presupuestoName = `Presupuesto ${baseName}`;
-        const presupuestoPayload = {
+      if (!shouldCreateItem("comercial", extra.presupuestoKey, options) || !extrasFolderElementId) {
+        continue;
+      }
+
+      const presupuestoEntries = extrasMetadata.length > 0
+        ? extrasMetadata
+        : [
+            {
+              name: "",
+              plannedStartDate: formattedStartDate,
+              plannedEndDate: formattedEndDate,
+            },
+          ];
+
+      for (let index = 0; index < presupuestoEntries.length; index += 1) {
+        const entry = presupuestoEntries[index];
+        const trimmedName = entry?.name?.trim?.();
+        const childNameBase = trimmedName
+          ? `Extras ${extrasJobTitle} - ${trimmedName}`
+          : `${extrasBaseName} - Presupuesto${presupuestoEntries.length > 1 ? ` ${index + 1}` : ""}`;
+
+        const childPayload = {
           definitionId: FLEX_FOLDER_IDS.presupuesto,
-          name: presupuestoName,
-          ...sharedPayload,
+          parentElementId: extrasFolderElementId,
+          open: true,
+          locked: false,
+          name: childNameBase,
+          plannedStartDate: entry?.plannedStartDate || formattedStartDate,
+          plannedEndDate: entry?.plannedEndDate || formattedEndDate,
+          locationId: FLEX_FOLDER_IDS.location,
+          departmentId: DEPARTMENT_IDS[extra.dept as Department],
+          documentNumber:
+            presupuestoEntries.length > 1
+              ? `${sharedPayload.documentNumber}PR${String(index + 1).padStart(2, "0")}`
+              : sharedPayload.documentNumber,
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept as Department],
         };
 
-        await createFlexFolder(presupuestoPayload);
+        await createFlexFolder(childPayload);
       }
     }
   };
@@ -494,39 +624,74 @@ export async function createAllFoldersForJob(
           await createFlexFolder(subPayload);
         }
       } else if (dept === "comercial") {
-        await createComercialExtras(deptFolderId, parentName, parentDocumentNumber);
+        await createComercialExtras(
+          deptFolderId,
+          parentName,
+          parentDocumentNumber,
+          safeJobTitle
+        );
       }
-      if (dept === "sound") {
-        // Check if this is a tour pack only date
-        const isTourPackOnly = tourDateInfo?.is_tour_pack_only || false;
-        console.log(`Tour pack only setting for sound folder:`, isTourPackOnly);
+      if (["sound", "lights", "video"].includes(dept)) {
+        const metadataEntries = getDepartmentCustomPullsheetMetadata(options?.[dept]);
+        const defaultPullsheets: PullsheetTemplate[] = [];
 
-        const soundSubfolders: { name: string; suffix: string }[] = [];
-        if (shouldCreateItem("sound", "pullSheetTP", options)) {
-          soundSubfolders.push({ name: `${job.title} - Tour Pack`, suffix: "TP" });
+        if (dept === "sound") {
+          const isTourPackOnly = tourDateInfo?.is_tour_pack_only || false;
+          console.log(`Tour pack only setting for sound folder:`, isTourPackOnly);
+
+          if (shouldCreateItem("sound", "pullSheetTP", options)) {
+            defaultPullsheets.push({
+              name: `${safeJobTitle} - Tour Pack`,
+              suffix: "TP",
+              plannedStartDate: formattedStartDate,
+              plannedEndDate: formattedEndDate,
+            });
+          }
+
+          if (!isTourPackOnly && shouldCreateItem("sound", "pullSheetPA", options)) {
+            defaultPullsheets.push({
+              name: `${safeJobTitle} - PA`,
+              suffix: "PA",
+              plannedStartDate: formattedStartDate,
+              plannedEndDate: formattedEndDate,
+            });
+          }
         }
 
-        // Only add PA if not tour pack only
-        if (!isTourPackOnly && shouldCreateItem("sound", "pullSheetPA", options)) {
-          soundSubfolders.push({ name: `${job.title} - PA`, suffix: "PA" });
-        }
-
-        for (const sf of soundSubfolders) {
-          const subPayload = {
-            definitionId: FLEX_FOLDER_IDS.pullSheet,
-            parentElementId: deptFolderId,
-            open: true,
-            locked: false,
-            name: sf.name,
-            plannedStartDate: formattedStartDate,
-            plannedEndDate: formattedEndDate,
-            locationId: FLEX_FOLDER_IDS.location,
-            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
-            departmentId: DEPARTMENT_IDS[dept as Department],
-            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+        if (defaultPullsheets.length > 0 || metadataEntries.length > 0) {
+          const fallbackNameForIndex = (index: number, defaultEntry?: PullsheetTemplate) => {
+            if (defaultEntry?.name) return defaultEntry.name;
+            const base = `${parentName} - Pullsheet`;
+            return `${base}${index > 0 ? ` ${index + 1}` : ""}`;
           };
-          
-          await createFlexFolder(subPayload);
+
+          const templates = buildPullsheetTemplates(
+            defaultPullsheets,
+            metadataEntries,
+            formattedStartDate,
+            formattedEndDate,
+            fallbackNameForIndex
+          );
+
+          const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
+
+          for (const template of templates) {
+            const pullsheetPayload = {
+              definitionId: FLEX_FOLDER_IDS.pullSheet,
+              parentElementId: deptFolderId,
+              open: true,
+              locked: false,
+              name: template.name,
+              plannedStartDate: template.plannedStartDate,
+              plannedEndDate: template.plannedEndDate,
+              locationId: FLEX_FOLDER_IDS.location,
+              departmentId: DEPARTMENT_IDS[dept as Department],
+              documentNumber: `${documentPrefix}${template.suffix}`,
+              personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+            };
+
+            await createFlexFolder(pullsheetPayload);
+          }
         }
       }
       if (dept === "personnel") {
@@ -727,6 +892,67 @@ export async function createAllFoldersForJob(
       await createFlexFolder(hojaInfoPayload);
     }
 
+    if (["sound", "lights", "video"].includes(dept)) {
+      const metadataEntries = getDepartmentCustomPullsheetMetadata(options?.[dept]);
+      const defaultPullsheets: PullsheetTemplate[] = [];
+
+      if (dept === "sound") {
+        if (shouldCreateItem("sound", "pullSheetTP", options)) {
+          defaultPullsheets.push({
+            name: `${safeJobTitle} - Tour Pack`,
+            suffix: "TP",
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+          });
+        }
+
+        if (shouldCreateItem("sound", "pullSheetPA", options)) {
+          defaultPullsheets.push({
+            name: `${safeJobTitle} - PA`,
+            suffix: "PA",
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+          });
+        }
+      }
+
+      if (defaultPullsheets.length > 0 || metadataEntries.length > 0) {
+        const fallbackNameForIndex = (index: number, defaultEntry?: PullsheetTemplate) => {
+          if (defaultEntry?.name) return defaultEntry.name;
+          const base = `${safeJobTitle} - ${deptLabel} Pullsheet`;
+          return `${base}${index > 0 ? ` ${index + 1}` : ""}`;
+        };
+
+        const templates = buildPullsheetTemplates(
+          defaultPullsheets,
+          metadataEntries,
+          formattedStartDate,
+          formattedEndDate,
+          fallbackNameForIndex
+        );
+
+        const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
+
+        for (const template of templates) {
+          const pullsheetPayload = {
+            definitionId: FLEX_FOLDER_IDS.pullSheet,
+            parentElementId: deptFolderId,
+            open: true,
+            locked: false,
+            name: template.name,
+            plannedStartDate: template.plannedStartDate,
+            plannedEndDate: template.plannedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            departmentId: DEPARTMENT_IDS[dept as Department],
+            documentNumber: `${documentPrefix}${template.suffix}`,
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+          };
+
+          await createFlexFolder(pullsheetPayload);
+        }
+      }
+    }
+
     if (dept !== "personnel" && dept !== "comercial") {
       const subfolders = [
         {
@@ -768,7 +994,12 @@ export async function createAllFoldersForJob(
         await createFlexFolder(subPayload);
       }
     } else if (dept === "comercial") {
-      await createComercialExtras(deptFolderId, parentName, parentDocumentNumber);
+      await createComercialExtras(
+        deptFolderId,
+        parentName,
+        parentDocumentNumber,
+        safeJobTitle
+      );
     } else if (dept === "personnel") {
       const personnelSubfolders = [
         {
