@@ -372,6 +372,14 @@ async function handleBroadcast(
     text = `"${jobTitle || 'Trabajo'}" ha sido cancelado.`;
     addUsers(Array.from(mgmt));
     addUsers(Array.from(participants));
+  } else if (type === 'job.assignment.confirmed') {
+    title = 'Asignación confirmada';
+    if (recipName) {
+      text = `${recipName}, has sido asignado a "${jobTitle || 'Trabajo'}".`;
+    } else {
+      text = `Has sido asignado a "${jobTitle || 'Trabajo'}".`;
+    }
+    addUsers([body.recipient_id]);
   } else if (type === 'flex.folders.created') {
     title = 'Carpetas Flex creadas';
     text = jobTitle
@@ -437,7 +445,11 @@ async function handleBroadcast(
     addUsers(Array.from(mgmt));
   }
 
-  // Do not remove the actor: users expect to receive pushes on their own devices
+  if (type === 'job.assignment.confirmed') {
+    if (!body.recipient_id || body.recipient_id !== userId) {
+      recipients.delete(userId);
+    }
+  }
 
   // Load subscriptions for recipients
   if (recipients.size === 0) {

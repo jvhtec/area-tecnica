@@ -339,6 +339,24 @@ serve(async (req) => {
                 event: 'auto_assign_upsert_ok',
                 meta: { role: chosenRole, department: prof.department }
               });
+              try {
+                await fetch(`${SUPABASE_URL}/functions/v1/push`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${SERVICE_ROLE}`
+                  },
+                  body: JSON.stringify({
+                    action: 'broadcast',
+                    type: 'job.assignment.confirmed',
+                    job_id: row.job_id,
+                    recipient_id: row.profile_id,
+                    recipient_name: techName
+                  })
+                });
+              } catch (_) {
+                // non-blocking push failure
+              }
             }
 
             // 5) Try to add to Flex crew for sound/lights (best-effort)

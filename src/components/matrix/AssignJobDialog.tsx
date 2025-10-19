@@ -233,10 +233,27 @@ export const AssignJobDialog = ({
       toast.success(
         `${isReassignment ? 'Reassigned' : 'Assigned'} ${technician.first_name} ${technician.last_name} to ${selectedJob?.title} (${statusText})`
       );
-      
+
+      if (assignAsConfirmed) {
+        const recipientName = `${technician.first_name ?? ''} ${technician.last_name ?? ''}`.trim();
+        try {
+          void supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: 'job.assignment.confirmed',
+              job_id: selectedJobId,
+              recipient_id: technicianId,
+              recipient_name: recipientName || undefined
+            }
+          });
+        } catch (_) {
+          // Non-blocking push failure
+        }
+      }
+
       // Force refresh of queries by dispatching a custom event
-      window.dispatchEvent(new CustomEvent('assignment-updated', { 
-        detail: { technicianId, jobId: selectedJobId } 
+      window.dispatchEvent(new CustomEvent('assignment-updated', {
+        detail: { technicianId, jobId: selectedJobId }
       }));
       
       // Small delay to ensure the toast is visible before closing
