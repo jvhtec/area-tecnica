@@ -692,15 +692,32 @@ export async function createAllFoldersForJob(
       await createComercialExtras(deptFolderId, parentName, parentDocumentNumber);
     } else if (dept === "personnel") {
       const personnelSubfolders = [
-        { name: `Crew Call Sonido - ${job.title}`, suffix: "CCS", key: "crewCallSound" as const },
-        { name: `Crew Call Luces - ${job.title}`, suffix: "CCL", key: "crewCallLights" as const },
-        { name: `Gastos de Personal - ${job.title}`, suffix: "GP", key: "gastosDePersonal" as const },
+        {
+          name: `Crew Call Sonido - ${job.title}`,
+          suffix: "CCS",
+          key: "crewCallSound" as const,
+          definitionId: FLEX_FOLDER_IDS.crewCall,
+          crewCallDepartment: "sound" as const,
+        },
+        {
+          name: `Crew Call Luces - ${job.title}`,
+          suffix: "CCL",
+          key: "crewCallLights" as const,
+          definitionId: FLEX_FOLDER_IDS.crewCall,
+          crewCallDepartment: "lights" as const,
+        },
+        {
+          name: `Gastos de Personal - ${job.title}`,
+          suffix: "GP",
+          key: "gastosDePersonal" as const,
+          definitionId: FLEX_FOLDER_IDS.hojaGastos,
+        },
       ];
 
       for (const sf of personnelSubfolders) {
         if (!shouldCreateItem("personnel", sf.key, options)) continue;
         const subPayload = {
-          definitionId: FLEX_FOLDER_IDS.crewCall,
+          definitionId: sf.definitionId,
           parentElementId: deptFolderId,
           open: true,
           locked: false,
@@ -714,9 +731,8 @@ export async function createAllFoldersForJob(
         };
 
         const created = await createFlexFolder(subPayload);
-        if (sf.suffix === 'CCS' || sf.suffix === 'CCL') {
-          const mappedDept = sf.suffix === 'CCS' ? 'sound' : 'lights';
-          await upsertCrewCall(job.id, mappedDept, created.elementId);
+        if (sf.crewCallDepartment) {
+          await upsertCrewCall(job.id, sf.crewCallDepartment, created.elementId);
         }
       }
     }
