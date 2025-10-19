@@ -20,6 +20,36 @@ import { useTourRatesApproval } from '@/hooks/useTourRatesApproval';
 import { useJobRatesApproval, useJobRatesApprovalMap } from '@/hooks/useJobRatesApproval';
 import { ExtrasCatalogEditor, BaseRatesEditor } from '@/features/rates/components/CatalogEditors';
 import { invalidateRatesContext } from '@/services/ratesService';
+import { toast } from 'sonner';
+
+const extractFlexSyncIssues = (summary: Record<string, any> | null | undefined) => {
+  if (!summary || typeof summary !== 'object') return [] as string[];
+  const issues: string[] = [];
+  Object.values(summary as Record<string, any>).forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    if (Array.isArray(entry.errors)) {
+      issues.push(...entry.errors);
+    }
+    const rolesMissing = entry.roles?.missing;
+    if (Array.isArray(rolesMissing) && rolesMissing.length) {
+      rolesMissing.forEach((role: string) => issues.push(`Rol sin sincronizar: ${role}`));
+    }
+    const extrasMissing = entry.extras?.missing;
+    if (Array.isArray(extrasMissing) && extrasMissing.length) {
+      extrasMissing.forEach((extra: string) => issues.push(`Extra sin sincronizar: ${extra}`));
+    }
+  });
+  return issues;
+};
+
+const resolveErrorMessage = (err: any) => {
+  if (!err) return 'Error desconocido';
+  if (typeof err === 'string') return err;
+  if (err.message) return err.message;
+  if (err.error_description) return err.error_description;
+  if (err.error) return err.error;
+  return 'Error desconocido';
+};
 
 type TourRatesManagerDialogProps = {
   open: boolean;
@@ -123,11 +153,32 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   const { data: approvalRow, refetch: refetchApproval } = useTourRatesApproval(tourId);
   const approved = !!approvalRow?.rates_approved;
 
-  const toggleJobApproval = useMutation({
-    mutationFn: async ({ jobId, approve }: { jobId: string; approve: boolean }) => {
-      if (!jobId) return;
+  const toggleJobApproval = useMutation<
+    { syncSummary: Record<string, any> | null },
+    any,
+    { jobId: string; approve: boolean }
+  >({
+    mutationFn: async ({ jobId, approve }) => {
+      if (!jobId) {
+        throw new Error('Trabajo no encontrado');
+      }
+
+      let syncSummary: Record<string, any> | null = null;
 
       if (approve) {
+        const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-flex-work-orders', {
+          body: { job_id: jobId },
+        });
+
+        if (syncError || !syncData?.ok) {
+          throw {
+            message: syncError?.message ?? syncData?.error ?? 'No se pudo sincronizar con Flex.',
+            detail: syncData?.detail,
+          };
+        }
+
+        syncSummary = (syncData?.summary as Record<string, any>) ?? null;
+
         const { data: user } = await supabase.auth.getUser();
         const approver = user?.user?.id || null;
         const { error } = await supabase
@@ -150,14 +201,41 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
           .eq('id', jobId);
         if (error) throw error;
       }
+
+      return { syncSummary };
     },
-    onSuccess: (_, { jobId }) => {
+    onSuccess: (result, { jobId, approve }) => {
       invalidateRatesContext(queryClient);
       queryClient.invalidateQueries({ queryKey: ['job-rates-approval', jobId] });
       queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
       queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager', jobId] });
       queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager', jobId, tourId] });
       queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager'] });
+      if (approve) {
+        toast.success('Pago final sincronizado y liberado en Flex.');
+        const issues = extractFlexSyncIssues(result?.syncSummary);
+        if (issues.length) {
+          const preview = issues.slice(0, 3).join(' • ');
+          const suffix = issues.length > 3 ? ` y ${issues.length - 3} más` : '';
+          toast('Sincronización con incidencias', {
+            description: `${preview}${suffix}. Revisa Flex manualmente y corrige los elementos pendientes si es necesario.`,
+          });
+        }
+      } else {
+        toast.success('Pago final revocado.');
+      }
+    },
+    onError: (err, { approve }) => {
+      console.error('Error actualizando la aprobación del trabajo', err);
+      const message = resolveErrorMessage(err);
+      const detail = (err as any)?.detail;
+      const source = detail?.source ? `Origen detectado: ${detail.source}.` : '';
+      const guidance = detail?.source
+        ? 'Revisa la carpeta de órdenes de personal en Flex o solicita a Operaciones que la configure antes de reintentar.'
+        : 'Reintenta en unos segundos. Si el problema persiste, contacta con Operaciones Flex.';
+      const prefix = approve ? 'No se pudo liberar el pago final' : 'No se pudo revocar el pago final';
+      const parts = [`${prefix}: ${message}`, source, guidance].filter(Boolean);
+      toast.error(parts.join(' '));
     },
   });
 
