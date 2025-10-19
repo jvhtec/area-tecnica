@@ -37,6 +37,7 @@ import { useJobExtras } from '@/hooks/useJobExtras';
 import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { toast } from 'sonner';
+import { syncFlexWorkOrdersForJob } from '@/services/flexWorkOrders';
 
 interface JobDetailsDialogProps {
   open: boolean;
@@ -436,15 +437,40 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 toast.error(reasons ? `No se puede aprobar: ${reasons}` : 'No se puede aprobar mientras haya elementos pendientes');
                                 return;
                               }
-                              const { data: u } = await supabase.auth.getUser();
-                              await supabase
-                                .from('jobs')
-                                .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: u?.user?.id || null } as any)
-                                .eq('id', resolvedJobId);
-                              queryClient.invalidateQueries({ queryKey: ['job-details', resolvedJobId] });
-                              queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
-                              queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
-                              queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
+                              try {
+                                const { data: u } = await supabase.auth.getUser();
+                                const { error: approvalError } = await supabase
+                                  .from('jobs')
+                                  .update({
+                                    rates_approved: true,
+                                    rates_approved_at: new Date().toISOString(),
+                                    rates_approved_by: u?.user?.id || null,
+                                  } as any)
+                                  .eq('id', resolvedJobId);
+
+                                if (approvalError) throw approvalError;
+
+                                try {
+                                  const result = await syncFlexWorkOrdersForJob(resolvedJobId);
+                                  if (result.created > 0) {
+                                    toast.success(`Órdenes de trabajo creadas en Flex: ${result.created}`);
+                                  }
+                                  result.errors.forEach((message) => toast.error(message));
+                                } catch (flexError) {
+                                  console.error('[JobDetailsDialog] Flex work-order sync failed', flexError);
+                                  toast.error(
+                                    `No se pudieron generar las órdenes de trabajo en Flex: ${(flexError as Error).message}`
+                                  );
+                                }
+                              } catch (err) {
+                                console.error('[JobDetailsDialog] Job rates approval failed', err);
+                                toast.error('No se pudieron aprobar las tarifas del trabajo.');
+                              } finally {
+                                queryClient.invalidateQueries({ queryKey: ['job-details', resolvedJobId] });
+                                queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
+                                queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
+                                queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
+                              }
                             }}
                           >
                             Aprobar

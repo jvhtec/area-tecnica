@@ -1505,6 +1505,62 @@ export type Database = {
           },
         ]
       }
+      flex_work_orders: {
+        Row: {
+          created_at: string
+          flex_document_id: string
+          id: string
+          job_id: string
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          flex_document_id: string
+          id?: string
+          job_id: string
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          flex_document_id?: string
+          id?: string
+          job_id?: string
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flex_work_orders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flex_work_orders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "flex_work_orders_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flex_work_orders_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flex_crew_calls: {
         Row: {
           created_at: string | null
