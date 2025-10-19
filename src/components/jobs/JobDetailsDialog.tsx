@@ -38,6 +38,35 @@ import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { toast } from 'sonner';
 
+const extractFlexSyncIssues = (summary: Record<string, any> | null | undefined) => {
+  if (!summary || typeof summary !== 'object') return [] as string[];
+  const issues: string[] = [];
+  Object.values(summary as Record<string, any>).forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    if (Array.isArray(entry.errors)) {
+      issues.push(...entry.errors);
+    }
+    const rolesMissing = entry.roles?.missing;
+    if (Array.isArray(rolesMissing) && rolesMissing.length) {
+      rolesMissing.forEach((role: string) => issues.push(`Rol sin sincronizar: ${role}`));
+    }
+    const extrasMissing = entry.extras?.missing;
+    if (Array.isArray(extrasMissing) && extrasMissing.length) {
+      extrasMissing.forEach((extra: string) => issues.push(`Extra sin sincronizar: ${extra}`));
+    }
+  });
+  return issues;
+};
+
+const resolveErrorMessage = (err: any) => {
+  if (!err) return 'Error desconocido';
+  if (typeof err === 'string') return err;
+  if (err.message) return err.message;
+  if (err.error_description) return err.error_description;
+  if (err.error) return err.error;
+  return 'Error desconocido';
+};
+
 interface JobDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -56,6 +85,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const isManager = ['admin','management'].includes(userRole || '');
   const isTechnicianRole = ['technician', 'house_tech'].includes(userRole || '');
   const queryClient = useQueryClient();
+  const [isApprovalLoading, setIsApprovalLoading] = useState(false);
 
   // Fetch comprehensive job data
   const { data: jobDetails, isLoading: isJobLoading } = useQuery({
@@ -411,16 +441,28 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                           <Button
                             size="sm"
                             variant="outline"
+                            disabled={isApprovalLoading}
                             onClick={async () => {
-                              if (!resolvedJobId) return;
-                              await supabase
-                                .from('jobs')
-                                .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
-                                .eq('id', resolvedJobId);
-                              queryClient.invalidateQueries({ queryKey: ['job-details', resolvedJobId] });
-                              queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
-                              queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
-                              queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
+                              if (!resolvedJobId || isApprovalLoading) return;
+                              try {
+                                setIsApprovalLoading(true);
+                                const { error } = await supabase
+                                  .from('jobs')
+                                  .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
+                                  .eq('id', resolvedJobId);
+                                if (error) throw error;
+                                queryClient.invalidateQueries({ queryKey: ['job-details', resolvedJobId] });
+                                queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
+                                queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
+                                queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
+                                toast.success('Pago final revocado.');
+                              } catch (err) {
+                                console.error('Error al revocar la aprobación del trabajo', err);
+                                const message = resolveErrorMessage(err);
+                                toast.error(`No se pudo revocar el pago final: ${message}. Reintenta y, si persiste, contacta con Operaciones Flex.`);
+                              } finally {
+                                setIsApprovalLoading(false);
+                              }
                             }}
                           >
                             Revocar
@@ -428,23 +470,66 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                         ) : (
                           <Button
                             size="sm"
-                            disabled={!approvalStatusLoading && !!approvalStatus && !approvalStatus.canApprove}
+                            disabled={
+                              isApprovalLoading || (!approvalStatusLoading && !!approvalStatus && !approvalStatus.canApprove)
+                            }
                             onClick={async () => {
-                              if (!resolvedJobId) return;
+                              if (!resolvedJobId || isApprovalLoading) return;
                               if (approvalStatus && !approvalStatus.canApprove) {
                                 const reasons = approvalStatus.blockingReasons.join(', ');
                                 toast.error(reasons ? `No se puede aprobar: ${reasons}` : 'No se puede aprobar mientras haya elementos pendientes');
                                 return;
                               }
-                              const { data: u } = await supabase.auth.getUser();
-                              await supabase
-                                .from('jobs')
-                                .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: u?.user?.id || null } as any)
-                                .eq('id', resolvedJobId);
-                              queryClient.invalidateQueries({ queryKey: ['job-details', resolvedJobId] });
-                              queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
-                              queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
-                              queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
+                              try {
+                                setIsApprovalLoading(true);
+                                const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-flex-work-orders', {
+                                  body: { job_id: resolvedJobId },
+                                });
+                                if (syncError || !syncData?.ok) {
+                                  throw {
+                                    message: syncError?.message ?? syncData?.error ?? 'Fallo al sincronizar con Flex.',
+                                    detail: syncData?.detail,
+                                  };
+                                }
+
+                                const { data: u } = await supabase.auth.getUser();
+                                const { error } = await supabase
+                                  .from('jobs')
+                                  .update({
+                                    rates_approved: true,
+                                    rates_approved_at: new Date().toISOString(),
+                                    rates_approved_by: u?.user?.id || null
+                                  } as any)
+                                  .eq('id', resolvedJobId);
+                                if (error) throw error;
+
+                                queryClient.invalidateQueries({ queryKey: ['job-details', resolvedJobId] });
+                                queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
+                                queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
+                                queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
+
+                                toast.success('Pago final sincronizado y liberado en Flex.');
+                                const issues = extractFlexSyncIssues(syncData?.summary as Record<string, any> | null | undefined);
+                                if (issues.length) {
+                                  const preview = issues.slice(0, 3).join(' • ');
+                                  const suffix = issues.length > 3 ? ` y ${issues.length - 3} más` : '';
+                                  toast('Sincronización con incidencias', {
+                                    description: `${preview}${suffix}. Revisa Flex manualmente y corrige los elementos pendientes si es necesario.`,
+                                  });
+                                }
+                              } catch (err) {
+                                console.error('Error al aprobar el trabajo', err);
+                                const message = resolveErrorMessage(err);
+                                const detail = (err as any)?.detail;
+                                const source = detail?.source ? `Origen detectado: ${detail.source}.` : '';
+                                const guidance = detail?.source
+                                  ? 'Revisa la carpeta de órdenes de personal en Flex o coordina con Operaciones antes de reintentar.'
+                                  : 'Reintenta en unos segundos y, si persiste, contacta con Operaciones Flex.';
+                                const parts = [`No se pudo aprobar el pago final: ${message}`, source, guidance].filter(Boolean);
+                                toast.error(parts.join(' '));
+                              } finally {
+                                setIsApprovalLoading(false);
+                              }
                             }}
                           >
                             Aprobar
