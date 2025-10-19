@@ -240,7 +240,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
   const [{ data: job, error: jobError }] = await Promise.all([
     supabase
       .from('jobs')
-      .select('id, title, start_time, end_time, location_id')
+      .select('id, title, start_time, end_time, location_id, job_type')
       .eq('id', jobId)
       .maybeSingle(),
   ]);
@@ -263,11 +263,15 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
     console.log(`[FlexWorkOrders] No work_orders folder found for job ${jobId}, creating it now...`);
     
     // Find the personnel department folder as parent
+    // For tourdate jobs, the personnel folder has folder_type: 'tourdate'
+    // For other jobs, it has folder_type: 'department'
+    const personnelFolderType = job.job_type === 'tourdate' ? 'tourdate' : 'department';
+    
     const { data: personnelFolder, error: personnelError } = await supabase
       .from('flex_folders')
       .select('element_id')
       .eq('job_id', jobId)
-      .eq('folder_type', 'department')
+      .eq('folder_type', personnelFolderType)
       .eq('department', 'personnel')
       .maybeSingle();
     
