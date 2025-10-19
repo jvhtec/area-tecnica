@@ -21,7 +21,9 @@ export type SubfolderKey =
   | "crewCallSound" // Personnel: Crew Call Sonido
   | "crewCallLights" // Personnel: Crew Call Luces
   | "extrasSound" // Comercial extras for sound
-  | "extrasLights"; // Comercial extras for lights
+  | "extrasLights" // Comercial extras for lights
+  | "presupuestoSound" // Comercial presupuesto for sound
+  | "presupuestoLights"; // Comercial presupuesto for lights
 
 export type CreateFoldersOptions = Partial<Record<DepartmentKey, SubfolderKey[]>>;
 

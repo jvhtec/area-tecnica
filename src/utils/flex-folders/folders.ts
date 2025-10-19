@@ -126,22 +126,28 @@ export async function createAllFoldersForJob(
     const parentDoc = parentDocumentNumber ?? "";
     const deptLabel = "Comercial";
     const replacements = [
-      { key: "extrasSound" as const, label: "Sonido", dept: "sound" as const, suffix: "SQT" },
-      { key: "extrasLights" as const, label: "Luces", dept: "lights" as const, suffix: "LQT" },
+      {
+        label: "Sonido",
+        dept: "sound" as const,
+        suffix: "SQT",
+        extrasKey: "extrasSound" as const,
+        presupuestoKey: "presupuestoSound" as const,
+      },
+      {
+        label: "Luces",
+        dept: "lights" as const,
+        suffix: "LQT",
+        extrasKey: "extrasLights" as const,
+        presupuestoKey: "presupuestoLights" as const,
+      },
     ];
 
     for (const extra of replacements) {
-      if (!shouldCreateItem("comercial", extra.key, options)) continue;
-
       const baseName = parentName.replace(/Comercial/gi, extra.label);
-      const extrasName = `Extras ${baseName} - ${deptLabel}`;
-
-      const extrasPayload = {
-        definitionId: FLEX_FOLDER_IDS.subFolder,
+      const sharedPayload = {
         parentElementId,
         open: true,
         locked: false,
-        name: extrasName,
         plannedStartDate: formattedStartDate,
         plannedEndDate: formattedEndDate,
         locationId: FLEX_FOLDER_IDS.location,
@@ -150,7 +156,27 @@ export async function createAllFoldersForJob(
         personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept as Department],
       };
 
-      await createFlexFolder(extrasPayload);
+      if (shouldCreateItem("comercial", extra.extrasKey, options)) {
+        const extrasName = `Extras ${baseName} - ${deptLabel}`;
+        const extrasPayload = {
+          definitionId: FLEX_FOLDER_IDS.subFolder,
+          name: extrasName,
+          ...sharedPayload,
+        };
+
+        await createFlexFolder(extrasPayload);
+      }
+
+      if (shouldCreateItem("comercial", extra.presupuestoKey, options)) {
+        const presupuestoName = `Presupuesto ${baseName}`;
+        const presupuestoPayload = {
+          definitionId: FLEX_FOLDER_IDS.presupuesto,
+          name: presupuestoName,
+          ...sharedPayload,
+        };
+
+        await createFlexFolder(presupuestoPayload);
+      }
     }
   };
 
