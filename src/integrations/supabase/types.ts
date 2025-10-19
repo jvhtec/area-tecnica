@@ -1605,6 +1605,134 @@ export type Database = {
           },
         ]
       }
+      flex_work_order_items: {
+        Row: {
+          extra_type: Database["public"]["Enums"]["job_extra_type"] | null
+          flex_line_item_id: string
+          flex_resource_id: string
+          id: string
+          job_assignment_id: string | null
+          job_role: string | null
+          metadata: Json
+          quantity: number | null
+          role_department: string | null
+          source_type: Database["public"]["Enums"]["flex_work_order_item_source"]
+          work_order_id: string
+        }
+        Insert: {
+          extra_type?: Database["public"]["Enums"]["job_extra_type"] | null
+          flex_line_item_id: string
+          flex_resource_id: string
+          id?: string
+          job_assignment_id?: string | null
+          job_role?: string | null
+          metadata?: Json
+          quantity?: number | null
+          role_department?: string | null
+          source_type: Database["public"]["Enums"]["flex_work_order_item_source"]
+          work_order_id: string
+        }
+        Update: {
+          extra_type?: Database["public"]["Enums"]["job_extra_type"] | null
+          flex_line_item_id?: string
+          flex_resource_id?: string
+          id?: string
+          job_assignment_id?: string | null
+          job_role?: string | null
+          metadata?: Json
+          quantity?: number | null
+          role_department?: string | null
+          source_type?: Database["public"]["Enums"]["flex_work_order_item_source"]
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flex_work_order_items_job_assignment_id_fkey"
+            columns: ["job_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "job_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flex_work_order_items_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "flex_work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flex_work_orders: {
+        Row: {
+          created_at: string
+          document_name: string | null
+          document_number: string | null
+          flex_document_id: string
+          flex_element_id: string
+          flex_vendor_id: string
+          folder_element_id: string
+          id: string
+          job_id: string
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          document_name?: string | null
+          document_number?: string | null
+          flex_document_id: string
+          flex_element_id: string
+          flex_vendor_id: string
+          folder_element_id: string
+          id?: string
+          job_id: string
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_name?: string | null
+          document_number?: string | null
+          flex_document_id?: string
+          flex_element_id?: string
+          flex_vendor_id?: string
+          folder_element_id?: string
+          id?: string
+          job_id?: string
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flex_work_orders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flex_work_orders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "flex_work_orders_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flex_work_orders_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flex_status_log: {
         Row: {
           action_type: string | null
@@ -6264,6 +6392,7 @@ export type Database = {
         | "wired_mics"
         | "amplificacion"
       form_status: "pending" | "submitted" | "expired"
+      flex_work_order_item_source: "role" | "extra"
       global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
       job_extra_type: "travel_half" | "travel_full" | "day_off"
@@ -6468,6 +6597,7 @@ export const Constants = {
         "amplificacion",
       ],
       form_status: ["pending", "submitted", "expired"],
+      flex_work_order_item_source: ["role", "extra"],
       global_preset_status: ["available", "unavailable", "tentative"],
       job_date_type: ["travel", "setup", "show", "off", "rehearsal"],
       job_extra_type: ["travel_half", "travel_full", "day_off"],
