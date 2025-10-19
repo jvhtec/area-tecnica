@@ -5,6 +5,7 @@ import {
   CreateFoldersOptions,
   DepartmentKey,
   SubfolderKey,
+  getSubfolderSelectionSummary,
 } from "./types";
 import { createFlexFolder } from "./api";
 import {
@@ -104,9 +105,10 @@ function shouldCreateItem(
   options?: CreateFoldersOptions
 ): boolean {
   if (!options || options[dept] === undefined) return true;
-  const list = options[dept]?.subfolders;
-  if (!list) return true;
-  return list.includes(key);
+  const selection = options[dept];
+  const { keys, hasExplicitSelection } = getSubfolderSelectionSummary(selection);
+  if (!hasExplicitSelection) return true;
+  return keys.includes(key);
 }
 
 /**

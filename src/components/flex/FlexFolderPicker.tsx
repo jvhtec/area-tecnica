@@ -18,6 +18,10 @@ import {
   DepartmentKey,
   DepartmentSelectionOptions,
   SubfolderKey,
+  cloneDepartmentSelectionOptions,
+  getSubfolderSelectionSummary,
+  sanitizeCustomPullsheetSettings,
+  sanitizeExtrasPresupuestoSettings,
 } from "@/utils/flex-folders";
 
 type DepartmentSection = {
@@ -159,28 +163,21 @@ const cloneDepartmentSelection = (
   dept: DepartmentKey,
   selection?: DepartmentSelectionOptions
 ): DepartmentSelectionOptions => {
-  const hasProvidedSubfolders = selection?.subfolders !== undefined;
+  const base: DepartmentSelectionOptions =
+    cloneDepartmentSelectionOptions(selection) ?? {};
+  const hasProvidedSubfolders = base.subfolders !== undefined;
   const sourceSubfolders = hasProvidedSubfolders
-    ? selection!.subfolders
+    ? base.subfolders!
     : getDefaultSubfolders(dept);
   const validSubfolders = sourceSubfolders.filter(key =>
     DEPARTMENT_SECTIONS[dept].items.some(item => item.key === key)
   );
   const subfolders = sortKeysForDepartment(dept, validSubfolders);
 
-  const cloned: DepartmentSelectionOptions = {
+  return {
+    ...base,
     subfolders,
   };
-
-  if (selection?.customPullsheet) {
-    cloned.customPullsheet = { ...selection.customPullsheet };
-  }
-
-  if (selection?.extrasPresupuesto) {
-    cloned.extrasPresupuesto = { ...selection.extrasPresupuesto };
-  }
-
-  return cloned;
 };
 
 const buildDefaultOptions = (): CreateFoldersOptions => {
@@ -225,34 +222,36 @@ const prepareOptionsForSubmit = (
     const sanitized = cloneDepartmentSelection(dept, values);
     const defaultEntry = defaults[dept];
     const defaultSubfolders = defaultEntry?.subfolders ?? [];
-    const subfolders = sanitized.subfolders ?? [];
+    const { keys: subfolders } = getSubfolderSelectionSummary(sanitized);
 
     const subfoldersDiffer =
       subfolders.length !== defaultSubfolders.length ||
       subfolders.some((value, index) => value !== defaultSubfolders[index]);
 
-    const customPullsheet = sanitized.customPullsheet?.enabled
-      ? {
-          ...sanitized.customPullsheet,
-          name: sanitized.customPullsheet.name?.trim() ?? "",
-        }
-      : undefined;
+    const customPullsheet = sanitizeCustomPullsheetSettings(
+      sanitized.customPullsheet
+    );
 
+    const extrasPresupuestoSanitized = sanitizeExtrasPresupuestoSettings(
+      sanitized.extrasPresupuesto
+    );
     const extrasSelected =
       subfolders.includes("extrasSound") || subfolders.includes("extrasLights");
-    const extrasPresupuesto =
-      extrasSelected &&
-      sanitized.extrasPresupuesto &&
-      (sanitized.extrasPresupuesto.startDate ||
-        sanitized.extrasPresupuesto.endDate)
-        ? { ...sanitized.extrasPresupuesto }
-        : undefined;
+    const extrasHasDetails = Boolean(
+      extrasPresupuestoSanitized &&
+        ((extrasPresupuestoSanitized.entries?.length ?? 0) > 0 ||
+          extrasPresupuestoSanitized.startDate ||
+          extrasPresupuestoSanitized.endDate)
+    );
+    const includeExtras = extrasSelected || extrasHasDetails;
 
-    if (subfoldersDiffer || customPullsheet || extrasPresupuesto) {
+    if (subfoldersDiffer || customPullsheet || (includeExtras && extrasPresupuestoSanitized)) {
       result[dept] = {
         subfolders,
         ...(customPullsheet ? { customPullsheet } : {}),
-        ...(extrasPresupuesto ? { extrasPresupuesto } : {}),
+        ...(includeExtras && extrasPresupuestoSanitized
+          ? { extrasPresupuesto: extrasPresupuestoSanitized }
+          : {}),
       };
       hasAny = true;
     }
@@ -382,26 +381,30 @@ export function FlexFolderPicker({
   const handleExtrasDateChange = React.useCallback(
     (field: "startDate" | "endDate", value: string) => {
       updateDepartmentSelection("comercial", current => {
-        const base: DepartmentSelectionOptions = {
-          subfolders: [...current.subfolders],
-          ...(current.customPullsheet
-            ? { customPullsheet: { ...current.customPullsheet } }
-            : {}),
+        const base = cloneDepartmentSelectionOptions(current) ?? {};
+        const nextValue = value ? value : undefined;
+        const nextExtras: DepartmentSelectionOptions["extrasPresupuesto"] = {
+          ...(base.extrasPresupuesto ?? {}),
+          [field]: nextValue,
         };
 
-        const nextValue = value ? value : undefined;
-        const next = {
-          ...(current.extrasPresupuesto ?? {}),
-          [field]: nextValue,
-        } as DepartmentSelectionOptions["extrasPresupuesto"];
+        const hasEntries =
+          (base.extrasPresupuesto?.entries?.length ?? 0) > 0;
 
-        if (!next.startDate && !next.endDate) {
-          return base;
+        if (hasEntries) {
+          nextExtras.entries = base.extrasPresupuesto?.entries?.map(entry => ({
+            ...entry,
+          }));
+        }
+
+        if (!nextExtras.startDate && !nextExtras.endDate && !hasEntries) {
+          const { extrasPresupuesto, ...rest } = base;
+          return rest as DepartmentSelectionOptions;
         }
 
         return {
           ...base,
-          extrasPresupuesto: next,
+          extrasPresupuesto: nextExtras,
         };
       });
     },
@@ -450,7 +453,9 @@ export function FlexFolderPicker({
               dept,
               selection[dept]
             );
-            const checkedItems = departmentSelection.subfolders ?? [];
+            const { keys: checkedItems } = getSubfolderSelectionSummary(
+              departmentSelection
+            );
             const isTechnical = technicalDepartments.has(dept);
             const customPullsheet = departmentSelection.customPullsheet;
             const showCustomPullsheetFields =
