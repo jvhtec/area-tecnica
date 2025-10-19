@@ -248,16 +248,83 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
   if (jobError) throw jobError;
   if (!job) throw new Error('Job not found');
 
-  const { data: folders, error: foldersError } = await supabase
+  let { data: folders, error: foldersError } = await supabase
     .from('flex_folders')
     .select('element_id, department')
     .eq('job_id', jobId)
     .eq('folder_type', 'work_orders');
 
   if (foldersError) throw foldersError;
-  const parentFolder = (folders || []).find((f) => (f as any)?.department === 'personnel') || (folders?.[0] as any);
+
+  let parentFolder = (folders || []).find((f) => (f as any)?.department === 'personnel') || (folders?.[0] as any);
+
+  // Self-healing: Create work_orders folder if missing
   if (!parentFolder?.element_id) {
-    throw new Error('No work-order parent folder registered for this job in flex_folders');
+    console.log(`[FlexWorkOrders] No work_orders folder found for job ${jobId}, creating it now...`);
+    
+    // Find the personnel department folder as parent
+    const { data: personnelFolder, error: personnelError } = await supabase
+      .from('flex_folders')
+      .select('element_id')
+      .eq('job_id', jobId)
+      .eq('folder_type', 'department')
+      .eq('department', 'personnel')
+      .maybeSingle();
+    
+    if (personnelError) throw personnelError;
+    if (!personnelFolder?.element_id) {
+      throw new Error('No personnel department folder found - cannot create work orders folder');
+    }
+    
+    // Create the work orders subfolder in Flex
+    const workOrderPayload = {
+      definitionId: FLEX_FOLDER_IDS.ordenTrabajo,
+      parentElementId: personnelFolder.element_id,
+      open: true,
+      locked: false,
+      name: `Órdenes de Trabajo - ${job.title}`,
+      documentNumber: `${job.title?.slice(0, 20) || 'OT'}-Orders`,
+    };
+    
+    const flexResponse = await fetch(`${FLEX_API_BASE_URL}/element`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        accept: 'application/json',
+        'X-Auth-Token': token,
+      },
+      body: JSON.stringify(workOrderPayload),
+    });
+    
+    if (!flexResponse.ok) {
+      const errorData = await flexResponse.json().catch(() => null);
+      throw new Error(`Failed to create work orders folder in Flex: ${errorData?.exceptionMessage || flexResponse.statusText}`);
+    }
+    
+    const flexData = await flexResponse.json();
+    const newElementId = flexData?.id || flexData?.elementId || flexData?.data?.id;
+    
+    if (!newElementId) {
+      throw new Error('Flex API created folder but returned no element ID');
+    }
+    
+    // Save to flex_folders table
+    const { data: insertedFolder, error: insertError } = await supabase
+      .from('flex_folders')
+      .insert({
+        job_id: jobId,
+        parent_id: personnelFolder.element_id,
+        element_id: newElementId,
+        department: 'personnel',
+        folder_type: 'work_orders',
+      })
+      .select('element_id, department')
+      .single();
+    
+    if (insertError) throw insertError;
+    
+    parentFolder = insertedFolder;
+    console.log(`[FlexWorkOrders] Created work_orders folder: ${newElementId}`);
   }
 
   const { data: assignments, error: assignmentError } = await supabase

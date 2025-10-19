@@ -219,7 +219,7 @@ export async function createAllFoldersForJob(
   };
 
   const { data: existingFolders, error: existingFoldersError } = await supabase
-    .from<FlexFolderRow>("flex_folders")
+    .from("flex_folders")
     .select("id, element_id, parent_id, folder_type, department")
     .eq("job_id", job.id);
 
