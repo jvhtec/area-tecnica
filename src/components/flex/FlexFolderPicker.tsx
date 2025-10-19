@@ -78,9 +78,21 @@ const DEPARTMENT_SECTIONS: Record<DepartmentKey, DepartmentSection> = {
         description: "Genera el presupuesto de extras para el equipo de sonido.",
       },
       {
+        key: "presupuestoSound",
+        label: "Presupuesto Sonido",
+        description:
+          "Crea el presupuesto principal para sonido usando el nombre del departamento/fecha en lugar de Comercial.",
+      },
+      {
         key: "extrasLights",
         label: "Extras Luces",
         description: "Genera el presupuesto de extras para el equipo de luces.",
+      },
+      {
+        key: "presupuestoLights",
+        label: "Presupuesto Luces",
+        description:
+          "Crea el presupuesto principal para luces usando el nombre del departamento/fecha en lugar de Comercial.",
       },
     ],
   },
@@ -103,7 +115,12 @@ const DEFAULT_SELECTIONS: Record<DepartmentKey, SubfolderKey[]> = {
     "hojaGastos",
   ],
   personnel: ["gastosDePersonal", "crewCallSound", "crewCallLights"],
-  comercial: ["extrasSound", "extrasLights"],
+  comercial: [
+    "extrasSound",
+    "presupuestoSound",
+    "extrasLights",
+    "presupuestoLights",
+  ],
 };
 
 const departmentEntries = Object.entries(DEPARTMENT_SECTIONS) as [
