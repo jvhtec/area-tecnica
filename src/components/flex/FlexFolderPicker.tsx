@@ -71,6 +71,7 @@ const DEPARTMENT_SECTIONS: Record<DepartmentKey, DepartmentSection> = {
     label: "Personal",
     items: [
       { key: "gastosDePersonal", label: "Gastos de Personal" },
+      { key: "ordenesDeTrabajo", label: "Ordenes de trabajo" },
       { key: "crewCallSound", label: "Crew Call Sonido" },
       { key: "crewCallLights", label: "Crew Call Luces" },
     ],
@@ -120,7 +121,7 @@ const DEFAULT_SELECTIONS: Record<DepartmentKey, SubfolderKey[]> = {
     "presupuestosRecibidos",
     "hojaGastos",
   ],
-  personnel: ["gastosDePersonal", "crewCallSound", "crewCallLights"],
+  personnel: ["gastosDePersonal", "ordenesDeTrabajo", "crewCallSound", "crewCallLights"],
   comercial: [
     "extrasSound",
     "presupuestoSound",

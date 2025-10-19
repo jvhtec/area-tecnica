@@ -246,6 +246,39 @@ export async function createAllFoldersForJob(
 
   const safeJobTitle = job?.title?.trim?.() || job?.title || "Sin título";
 
+  const parseDateForTitle = (value?: string): Date | undefined => {
+    if (!value) return undefined;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  };
+
+  const formatDateLabel = (value?: Date): string | undefined => {
+    if (!value) return undefined;
+    try {
+      return format(value, "dd MMM yyyy");
+    } catch (err) {
+      console.warn("Unable to format date for job title", { value, err });
+      return undefined;
+    }
+  };
+
+  const startDateForTitle = parseDateForTitle(job?.start_time);
+  const endDateForTitle = parseDateForTitle(job?.end_time);
+  const startLabelForTitle = formatDateLabel(startDateForTitle);
+  const endLabelForTitle = formatDateLabel(endDateForTitle);
+
+  const jobTitleWithDates = (() => {
+    if (startLabelForTitle && endLabelForTitle) {
+      if (startLabelForTitle === endLabelForTitle) {
+        return `${safeJobTitle} (${startLabelForTitle})`;
+      }
+      return `${safeJobTitle} (${startLabelForTitle} - ${endLabelForTitle})`;
+    }
+
+    const singleLabel = startLabelForTitle ?? endLabelForTitle;
+    return singleLabel ? `${safeJobTitle} (${singleLabel})` : safeJobTitle;
+  })();
+
   const createComercialExtras = async (
     parentElementId: string,
     parentName: string,
@@ -695,14 +728,65 @@ export async function createAllFoldersForJob(
         }
       }
       if (dept === "personnel") {
-        const personnelSubfolders: { name: string; suffix: string }[] = [];
-        if (shouldCreateItem("personnel", "gastosDePersonal", options)) {
-          personnelSubfolders.push({ name: `Gastos de Personal - ${job.title}`, suffix: "GP" });
-        }
+        const personnelSubfolders: {
+          name: string;
+          suffix: string;
+          key: SubfolderKey;
+          definitionId: string;
+          crewCallDepartment?: "sound" | "lights";
+          persistFolderType?: "personnel_orders";
+        }[] = [
+          {
+            name: `Gastos de Personal - ${job.title}`,
+            suffix: "GP",
+            key: "gastosDePersonal",
+            definitionId: FLEX_FOLDER_IDS.hojaGastos,
+          },
+          {
+            name: `Ordenes de trabajo - ${jobTitleWithDates}`,
+            suffix: "OT",
+            key: "ordenesDeTrabajo",
+            definitionId: FLEX_FOLDER_IDS.ordenTrabajo,
+            persistFolderType: "personnel_orders",
+          },
+          {
+            name: `Crew Call Sonido - ${job.title}`,
+            suffix: "CCS",
+            key: "crewCallSound",
+            definitionId: FLEX_FOLDER_IDS.crewCall,
+            crewCallDepartment: "sound",
+          },
+          {
+            name: `Crew Call Luces - ${job.title}`,
+            suffix: "CCL",
+            key: "crewCallLights",
+            definitionId: FLEX_FOLDER_IDS.crewCall,
+            crewCallDepartment: "lights",
+          },
+        ];
 
         for (const sf of personnelSubfolders) {
+          if (!shouldCreateItem("personnel", sf.key, options)) continue;
+
+          if (sf.persistFolderType === "personnel_orders") {
+            const existingOrders = (existingFolders ?? []).find(
+              folder =>
+                folder.folder_type === sf.persistFolderType &&
+                folder.parent_id === deptFolderId
+            );
+
+            if (existingOrders) {
+              console.log(
+                "Reusing existing personnel orders folder for job:",
+                job.id,
+                existingOrders.element_id
+              );
+              continue;
+            }
+          }
+
           const subPayload = {
-            definitionId: FLEX_FOLDER_IDS.hojaGastos,
+            definitionId: sf.definitionId,
             parentElementId: deptFolderId,
             open: true,
             locked: false,
@@ -715,35 +799,29 @@ export async function createAllFoldersForJob(
             personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
           };
 
-          await createFlexFolder(subPayload);
-        }
+          const created = await createFlexFolder(subPayload);
 
-        const personnelcrewCall: { name: string; suffix: "CCS" | "CCL" }[] = [];
-        if (shouldCreateItem("personnel", "crewCallSound", options)) {
-          personnelcrewCall.push({ name: `Crew Call Sonido - ${job.title}`, suffix: "CCS" });
-        }
-        if (shouldCreateItem("personnel", "crewCallLights", options)) {
-          personnelcrewCall.push({ name: `Crew Call Luces - ${job.title}`, suffix: "CCL" });
-        }
+          if (sf.persistFolderType === "personnel_orders") {
+            if (!created.elementId) {
+              console.warn("Unable to resolve personnel orders folder element id", subPayload);
+            } else {
+              const { error: insertError } = await supabase
+                .from("flex_folders")
+                .insert({
+                  job_id: job.id,
+                  parent_id: deptFolderId,
+                  element_id: created.elementId,
+                  department: "personnel",
+                  folder_type: sf.persistFolderType,
+                });
 
-        for (const sf of personnelcrewCall) {
-          const subPayload = {
-            definitionId: FLEX_FOLDER_IDS.crewCall,
-            parentElementId: deptFolderId,
-            open: true,
-            locked: false,
-            name: sf.name,
-            plannedStartDate: formattedStartDate,
-            plannedEndDate: formattedEndDate,
-            locationId: FLEX_FOLDER_IDS.location,
-            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
-            departmentId: DEPARTMENT_IDS[dept as Department],
-            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
-          };
-
-          const cc = await createFlexFolder(subPayload);
-          const mappedDept = sf.suffix === 'CCS' ? 'sound' : 'lights';
-          await upsertCrewCall(job.id, mappedDept, cc.elementId);
+              if (insertError) {
+                console.error("Error inserting personnel orders folder row:", insertError);
+              }
+            }
+          } else if (sf.crewCallDepartment) {
+            await upsertCrewCall(job.id, sf.crewCallDepartment, created.elementId);
+          }
         }
       }
     }
@@ -1001,31 +1079,63 @@ export async function createAllFoldersForJob(
         safeJobTitle
       );
     } else if (dept === "personnel") {
-      const personnelSubfolders = [
+      const personnelSubfolders: {
+        name: string;
+        suffix: string;
+        key: SubfolderKey;
+        definitionId: string;
+        crewCallDepartment?: "sound" | "lights";
+        persistFolderType?: "personnel_orders";
+      }[] = [
+        {
+          name: `Gastos de Personal - ${job.title}`,
+          suffix: "GP",
+          key: "gastosDePersonal",
+          definitionId: FLEX_FOLDER_IDS.hojaGastos,
+        },
+        {
+          name: `Ordenes de trabajo - ${jobTitleWithDates}`,
+          suffix: "OT",
+          key: "ordenesDeTrabajo",
+          definitionId: FLEX_FOLDER_IDS.ordenTrabajo,
+          persistFolderType: "personnel_orders",
+        },
         {
           name: `Crew Call Sonido - ${job.title}`,
           suffix: "CCS",
-          key: "crewCallSound" as const,
+          key: "crewCallSound",
           definitionId: FLEX_FOLDER_IDS.crewCall,
-          crewCallDepartment: "sound" as const,
+          crewCallDepartment: "sound",
         },
         {
           name: `Crew Call Luces - ${job.title}`,
           suffix: "CCL",
-          key: "crewCallLights" as const,
+          key: "crewCallLights",
           definitionId: FLEX_FOLDER_IDS.crewCall,
-          crewCallDepartment: "lights" as const,
-        },
-        {
-          name: `Gastos de Personal - ${job.title}`,
-          suffix: "GP",
-          key: "gastosDePersonal" as const,
-          definitionId: FLEX_FOLDER_IDS.hojaGastos,
+          crewCallDepartment: "lights",
         },
       ];
 
       for (const sf of personnelSubfolders) {
         if (!shouldCreateItem("personnel", sf.key, options)) continue;
+
+        if (sf.persistFolderType === "personnel_orders") {
+          const existingOrders = (existingFolders ?? []).find(
+            folder =>
+              folder.folder_type === sf.persistFolderType &&
+              folder.parent_id === deptFolderId
+          );
+
+          if (existingOrders) {
+            console.log(
+              "Reusing existing personnel orders folder for job:",
+              job.id,
+              existingOrders.element_id
+            );
+            continue;
+          }
+        }
+
         const subPayload = {
           definitionId: sf.definitionId,
           parentElementId: deptFolderId,
@@ -1041,7 +1151,26 @@ export async function createAllFoldersForJob(
         };
 
         const created = await createFlexFolder(subPayload);
-        if (sf.crewCallDepartment) {
+
+        if (sf.persistFolderType === "personnel_orders") {
+          if (!created.elementId) {
+            console.warn("Unable to resolve personnel orders folder element id", subPayload);
+          } else {
+            const { error: insertError } = await supabase
+              .from("flex_folders")
+              .insert({
+                job_id: job.id,
+                parent_id: deptFolderId,
+                element_id: created.elementId,
+                department: "personnel",
+                folder_type: sf.persistFolderType,
+              });
+
+            if (insertError) {
+              console.error("Error inserting personnel orders folder row:", insertError);
+            }
+          }
+        } else if (sf.crewCallDepartment) {
           await upsertCrewCall(job.id, sf.crewCallDepartment, created.elementId);
         }
       }
