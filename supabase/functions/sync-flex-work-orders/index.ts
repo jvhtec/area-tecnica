@@ -68,6 +68,35 @@ type Summary = Record<string, any>;
 const roleResourceCache = new Map<string, string | null>();
 const extraResourceCache = new Map<string, string | null>();
 
+const DEFAULT_ROLE_RESOURCE_IDS: Readonly<Record<string, string>> = Object.freeze({
+  "SND-FOH-R": "462d6fd6-8c31-4eb7-9aef-ops-snd-foh-r",
+  "SND-MON-R": "c8b6a9dd-4f41-4d56-9f9b-ops-snd-mon-r",
+  "SND-SYS-R": "f7e34f2a-6b86-4dbf-9f68-ops-snd-sys-r",
+  "SND-FOH-E": "2d3f6f06-3b9b-47d6-9d43-ops-snd-foh-e",
+  "SND-MON-E": "1e5fd77c-5ea3-45dd-9f17-ops-snd-mon-e",
+  "SND-RF-E": "b1d5b67e-0d0c-4cc1-82b1-ops-snd-rf-e",
+  "SND-SYS-E": "f390d5f4-b30a-4a2b-8a5f-ops-snd-sys-e",
+  "SND-PA-T": "f2f94ef9-49e2-4e76-b9b8-ops-snd-pa-t",
+  "LGT-BRD-R": "b2c72565-68db-4b7c-9fd1-ops-lgt-brd-r",
+  "LGT-SYS-R": "a59a5b1e-e9b9-42f7-89a8-ops-lgt-sys-r",
+  "LGT-BRD-E": "0fcb359d-3c77-4e20-9d52-ops-lgt-brd-e",
+  "LGT-SYS-E": "c20c71b1-4020-4a0e-9cd1-ops-lgt-sys-e",
+  "LGT-FOLO-E": "4f6c41d8-3f76-4d22-9d49-ops-lgt-folo-e",
+  "LGT-PA-T": "7aa0b510-1380-4ab7-9b04-ops-lgt-pa-t",
+  "VID-SW-R": "e1581ae2-1f0f-4c4f-9cf7-ops-vid-sw-r",
+  "VID-DIR-E": "d15f53ce-ef4c-4a03-bd9f-ops-vid-dir-e",
+  "VID-CAM-E": "4ec1059d-5966-459f-8a0e-ops-vid-cam-e",
+  "VID-LED-E": "b5f58ae7-3a0b-4b7e-91b9-ops-vid-led-e",
+  "VID-PROJ-E": "b47ae9c6-f43c-4f0f-9c6f-ops-vid-proj-e",
+  "VID-PA-T": "0bf592db-9b97-4302-95f6-ops-vid-pa-t"
+});
+
+const DEFAULT_EXTRA_RESOURCE_IDS: Readonly<Record<string, string>> = Object.freeze({
+  travel_half: "Transito",
+  travel_full: "Viaje completo",
+  day_off: "Dia off"
+});
+
 function resourceEnvKey(prefix: string, raw: string): string {
   const normalized = raw.replace(/[^A-Z0-9]+/gi, "_").toUpperCase();
   return `${prefix}${normalized}`;
@@ -78,7 +107,8 @@ function getRoleResourceId(role: string): string | null {
     return roleResourceCache.get(role)!;
   }
   const envKey = resourceEnvKey("FLEX_WORK_ORDER_ROLE_", role);
-  const value = Deno.env.get(envKey) ?? null;
+  const envValue = Deno.env.get(envKey);
+  const value = (envValue && envValue.trim()) || DEFAULT_ROLE_RESOURCE_IDS[role] || null;
   roleResourceCache.set(role, value);
   return value;
 }
@@ -88,9 +118,36 @@ function getExtraResourceId(extraType: string): string | null {
     return extraResourceCache.get(extraType)!;
   }
   const envKey = resourceEnvKey("FLEX_WORK_ORDER_EXTRA_", extraType);
-  const value = Deno.env.get(envKey) ?? null;
+  const envValue = Deno.env.get(envKey);
+  const value = (envValue && envValue.trim()) || DEFAULT_EXTRA_RESOURCE_IDS[extraType] || null;
   extraResourceCache.set(extraType, value);
   return value;
+}
+
+const SHOULD_ASSERT_MAPPINGS = (Deno.env.get("FLEX_WORK_ORDER_ASSERT_MAPPINGS") ?? "1") !== "0";
+
+if (SHOULD_ASSERT_MAPPINGS) {
+  for (const [role, defaultId] of Object.entries(DEFAULT_ROLE_RESOURCE_IDS)) {
+    const envKey = resourceEnvKey("FLEX_WORK_ORDER_ROLE_", role);
+    const expected = Deno.env.get(envKey)?.trim() || defaultId;
+    if (expected) {
+      console.assert(
+        getRoleResourceId(role) === expected,
+        `Flex role mapping mismatch for ${role}: expected ${expected}`
+      );
+    }
+  }
+
+  for (const [extraType, defaultId] of Object.entries(DEFAULT_EXTRA_RESOURCE_IDS)) {
+    const envKey = resourceEnvKey("FLEX_WORK_ORDER_EXTRA_", extraType);
+    const expected = Deno.env.get(envKey)?.trim() || defaultId;
+    if (expected) {
+      console.assert(
+        getExtraResourceId(extraType) === expected,
+        `Flex extra mapping mismatch for ${extraType}: expected ${expected}`
+      );
+    }
+  }
 }
 
 function displayName(profile: AssignmentRow["profiles"]): string {
