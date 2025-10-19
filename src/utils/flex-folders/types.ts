@@ -18,6 +18,7 @@ export type SubfolderKey =
   | "pullSheetTP" // Tour Pack pull sheet (sound)
   | "pullSheetPA" // PA pull sheet (sound, hidden by tour-pack-only)
   | "gastosDePersonal" // Personnel: “Gastos de Personal - ${job.title}”
+  | "workOrder" // Personnel: “Orden de Trabajo - ${job.title}”
   | "crewCallSound" // Personnel: Crew Call Sonido
   | "crewCallLights" // Personnel: Crew Call Luces
   | "extrasSound" // Comercial extras for sound

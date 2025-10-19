@@ -234,14 +234,19 @@ export async function createAllFoldersForJob(
   const isLegacyMainFolder = existingMainFolder?.folder_type === "main";
 
   const existingDepartmentMap = new Map<string, FlexFolderRow>();
+  const existingWorkOrderMap = new Map<string, FlexFolderRow>();
   for (const folder of existingFolders ?? []) {
     if (folder.folder_type === "department" && folder.department) {
       existingDepartmentMap.set(folder.department, folder);
+    }
+    if (folder.folder_type === "work_orders" && folder.department) {
+      existingWorkOrderMap.set(folder.department, folder);
     }
   }
 
   if (isLegacyMainFolder) {
     existingDepartmentMap.clear();
+    existingWorkOrderMap.clear();
   }
 
   const safeJobTitle = job?.title?.trim?.() || job?.title || "Sin título";
@@ -695,14 +700,29 @@ export async function createAllFoldersForJob(
         }
       }
       if (dept === "personnel") {
-        const personnelSubfolders: { name: string; suffix: string }[] = [];
+        const personnelSubfolders: {
+          name: string;
+          suffix: string;
+          definitionId: string;
+        }[] = [];
+        if (shouldCreateItem("personnel", "workOrder", options)) {
+          personnelSubfolders.push({
+            name: `Orden de Trabajo - ${job.title}`,
+            suffix: "OT",
+            definitionId: FLEX_FOLDER_IDS.ordenTrabajo,
+          });
+        }
         if (shouldCreateItem("personnel", "gastosDePersonal", options)) {
-          personnelSubfolders.push({ name: `Gastos de Personal - ${job.title}`, suffix: "GP" });
+          personnelSubfolders.push({
+            name: `Gastos de Personal - ${job.title}`,
+            suffix: "GP",
+            definitionId: FLEX_FOLDER_IDS.hojaGastos,
+          });
         }
 
         for (const sf of personnelSubfolders) {
           const subPayload = {
-            definitionId: FLEX_FOLDER_IDS.hojaGastos,
+            definitionId: sf.definitionId,
             parentElementId: deptFolderId,
             open: true,
             locked: false,
@@ -1017,6 +1037,12 @@ export async function createAllFoldersForJob(
           crewCallDepartment: "lights" as const,
         },
         {
+          name: `Orden de Trabajo - ${job.title}`,
+          suffix: "OT",
+          key: "workOrder" as const,
+          definitionId: FLEX_FOLDER_IDS.ordenTrabajo,
+        },
+        {
           name: `Gastos de Personal - ${job.title}`,
           suffix: "GP",
           key: "gastosDePersonal" as const,
@@ -1026,6 +1052,16 @@ export async function createAllFoldersForJob(
 
       for (const sf of personnelSubfolders) {
         if (!shouldCreateItem("personnel", sf.key, options)) continue;
+        if (sf.key === "workOrder") {
+          const existingWorkOrder = existingWorkOrderMap.get(dept);
+          if (existingWorkOrder?.element_id) {
+            console.log(
+              `Reusing existing work order folder for ${dept}:`,
+              existingWorkOrder.element_id
+            );
+            continue;
+          }
+        }
         const subPayload = {
           definitionId: sf.definitionId,
           parentElementId: deptFolderId,
@@ -1043,6 +1079,29 @@ export async function createAllFoldersForJob(
         const created = await createFlexFolder(subPayload);
         if (sf.crewCallDepartment) {
           await upsertCrewCall(job.id, sf.crewCallDepartment, created.elementId);
+        }
+        if (sf.key === "workOrder") {
+          try {
+            const { data: insertedRow, error: insertError } = await supabase
+              .from("flex_folders")
+              .insert({
+                job_id: job.id,
+                parent_id: deptFolderId,
+                element_id: created.elementId,
+                department: dept,
+                folder_type: "work_orders",
+              })
+              .select("*")
+              .single();
+
+            if (insertError) {
+              console.error("Failed to persist work order Flex folder:", insertError);
+            } else if (insertedRow) {
+              existingWorkOrderMap.set(dept, insertedRow as FlexFolderRow);
+            }
+          } catch (error) {
+            console.error("Unexpected error inserting work order Flex folder:", error);
+          }
         }
       }
     }
