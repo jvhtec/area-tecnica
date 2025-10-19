@@ -75,18 +75,18 @@ const DEPARTMENT_SECTIONS: Record<DepartmentKey, DepartmentSection> = {
       {
         key: "extrasSound",
         label: "Extras Sonido",
-        description: "Genera el presupuesto de extras para el equipo de sonido.",
+        description: "Genera la carpeta de extras para el equipo de sonido.",
+      },
+      {
+        key: "extrasLights",
+        label: "Extras Luces",
+        description: "Genera la carpeta de extras para el equipo de luces.",
       },
       {
         key: "presupuestoSound",
         label: "Presupuesto Sonido",
         description:
           "Crea el presupuesto principal para sonido usando el nombre del departamento/fecha en lugar de Comercial.",
-      },
-      {
-        key: "extrasLights",
-        label: "Extras Luces",
-        description: "Genera el presupuesto de extras para el equipo de luces.",
       },
       {
         key: "presupuestoLights",
