@@ -118,6 +118,40 @@ export async function createAllFoldersForJob(
   documentNumber: string,
   options?: CreateFoldersOptions
 ) {
+  type FlexFolderRow = {
+    id: string;
+    element_id: string;
+    parent_id: string | null;
+    folder_type: string | null;
+    department: string | null;
+  };
+
+  const { data: existingFolders, error: existingFoldersError } = await supabase
+    .from<FlexFolderRow>("flex_folders")
+    .select("id, element_id, parent_id, folder_type, department")
+    .eq("job_id", job.id);
+
+  if (existingFoldersError) {
+    console.error("Failed to load existing Flex folders:", existingFoldersError);
+    throw existingFoldersError;
+  }
+
+  const existingMainFolder =
+    existingFolders?.find(folder => folder.folder_type === "main_event") ??
+    existingFolders?.find(folder => folder.folder_type === "main");
+  const isLegacyMainFolder = existingMainFolder?.folder_type === "main";
+
+  const existingDepartmentMap = new Map<string, FlexFolderRow>();
+  for (const folder of existingFolders ?? []) {
+    if (folder.folder_type === "department" && folder.department) {
+      existingDepartmentMap.set(folder.department, folder);
+    }
+  }
+
+  if (isLegacyMainFolder) {
+    existingDepartmentMap.clear();
+  }
+
   const createComercialExtras = async (
     parentElementId: string,
     parentName: string,
@@ -182,6 +216,15 @@ export async function createAllFoldersForJob(
 
   if (job.job_type === "dryhire") {
     console.log("Dryhire job type detected. Creating dryhire folder...");
+
+    const hasExistingDryhire = (existingFolders ?? []).some(
+      folder => folder.folder_type === "dryhire"
+    );
+
+    if (hasExistingDryhire) {
+      console.log("Dryhire Flex folder already exists. Skipping creation.");
+      return;
+    }
 
     const department = job.job_departments[0]?.department;
     if (!department || !["sound", "lights"].includes(department)) {
@@ -553,16 +596,31 @@ export async function createAllFoldersForJob(
     documentNumber,
   };
 
-  const topFolder = await createFlexFolder(topPayload);
-  const topFolderId = topFolder.elementId;
+  let topFolderId = !isLegacyMainFolder
+    ? existingMainFolder?.element_id ?? undefined
+    : undefined;
 
-  await supabase
-    .from("flex_folders")
-    .insert({
-      job_id: job.id,
-      element_id: topFolderId,
-      folder_type: "main_event",
-    });
+  if (!topFolderId) {
+    if (isLegacyMainFolder) {
+      console.log("Legacy Flex folder record detected; creating a new main folder instance.");
+    }
+    const topFolder = await createFlexFolder(topPayload);
+    topFolderId = topFolder.elementId;
+
+    await supabase
+      .from("flex_folders")
+      .insert({
+        job_id: job.id,
+        element_id: topFolderId,
+        folder_type: "main_event",
+      });
+  } else {
+    console.log("Reusing existing main Flex folder for job:", topFolderId);
+  }
+
+  if (!topFolderId) {
+    throw new Error("Unable to resolve main Flex folder for job");
+  }
 
   const allDepartments: DepartmentKey[] = [
     "sound",
@@ -594,26 +652,40 @@ export async function createAllFoldersForJob(
       personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
     };
 
-    console.log(`Creating department folder for ${dept}:`, deptPayload);
-    const deptFolder = await createFlexFolder(deptPayload);
+    let deptFolderId = existingDepartmentMap.get(dept)?.element_id ?? null;
 
-    const { data: [childRow], error: childErr } = await supabase
-      .from("flex_folders")
-      .insert({
-        job_id: job.id,
-        parent_id: topFolderId,
-        element_id: deptFolder.elementId,
-        department: dept,
-        folder_type: "department",
-      })
-      .select("*");
+    if (!deptFolderId) {
+      console.log(`Creating department folder for ${dept}:`, deptPayload);
+      const deptFolder = await createFlexFolder(deptPayload);
 
-    if (childErr || !childRow) {
-      console.error("Error inserting department folder row:", childErr);
-      continue;
+      const { data: [childRow], error: childErr } = await supabase
+        .from("flex_folders")
+        .insert({
+          job_id: job.id,
+          parent_id: topFolderId,
+          element_id: deptFolder.elementId,
+          department: dept,
+          folder_type: "department",
+        })
+        .select("*");
+
+      if (childErr) {
+        console.error("Error inserting department folder row:", childErr);
+      }
+
+      deptFolderId = childRow?.element_id ?? deptFolder.elementId;
+
+      if (childRow?.department) {
+        existingDepartmentMap.set(childRow.department, childRow as FlexFolderRow);
+      }
+    } else {
+      console.log(`Reusing existing department folder for ${dept}:`, deptFolderId);
     }
 
-    const deptFolderId = childRow.element_id;
+    if (!deptFolderId) {
+      console.warn(`Unable to determine Flex folder id for ${dept}, skipping subfolders.`);
+      continue;
+    }
     const parentName = deptPayload.name;
     const parentDocumentNumber = deptPayload.documentNumber;
 
