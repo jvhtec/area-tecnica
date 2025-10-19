@@ -1,7 +1,11 @@
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
-import { CreateFoldersOptions, DepartmentKey, SubfolderKey } from "./types";
+import {
+  CreateFoldersOptions,
+  DepartmentKey,
+  SubfolderKey,
+} from "./types";
 import { createFlexFolder } from "./api";
 import {
   FLEX_FOLDER_IDS,
@@ -100,7 +104,8 @@ function shouldCreateItem(
   options?: CreateFoldersOptions
 ): boolean {
   if (!options || options[dept] === undefined) return true;
-  const list = options[dept]!;
+  const list = options[dept]?.subfolders;
+  if (!list) return true;
   return list.includes(key);
 }
 
