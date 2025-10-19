@@ -20,6 +20,8 @@ import { useTourRatesApproval } from '@/hooks/useTourRatesApproval';
 import { useJobRatesApproval, useJobRatesApprovalMap } from '@/hooks/useJobRatesApproval';
 import { ExtrasCatalogEditor, BaseRatesEditor } from '@/features/rates/components/CatalogEditors';
 import { invalidateRatesContext } from '@/services/ratesService';
+import { syncFlexWorkOrdersForJob, FlexWorkOrderSyncResult } from '@/services/flexWorkOrders';
+import { toast } from 'sonner';
 
 type TourRatesManagerDialogProps = {
   open: boolean;
@@ -123,9 +125,18 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   const { data: approvalRow, refetch: refetchApproval } = useTourRatesApproval(tourId);
   const approved = !!approvalRow?.rates_approved;
 
-  const toggleJobApproval = useMutation({
+  interface ToggleJobApprovalResult {
+    jobId: string;
+    approve: boolean;
+    syncResult?: FlexWorkOrderSyncResult | null;
+    syncError?: string | null;
+  }
+
+  const toggleJobApproval = useMutation<ToggleJobApprovalResult, unknown, { jobId: string; approve: boolean }>({
     mutationFn: async ({ jobId, approve }: { jobId: string; approve: boolean }) => {
-      if (!jobId) return;
+      if (!jobId) {
+        throw new Error('Job ID requerido');
+      }
 
       if (approve) {
         const { data: user } = await supabase.auth.getUser();
@@ -139,6 +150,15 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
           } as any)
           .eq('id', jobId);
         if (error) throw error;
+        let syncResult: FlexWorkOrderSyncResult | null = null;
+        let syncError: string | null = null;
+        try {
+          syncResult = await syncFlexWorkOrdersForJob(jobId);
+        } catch (flexError) {
+          console.error('[TourRatesManagerDialog] Flex work-order sync failed', flexError);
+          syncError = (flexError as Error).message || 'Error desconocido al crear órdenes en Flex';
+        }
+        return { jobId, approve, syncResult, syncError };
       } else {
         const { error } = await supabase
           .from('jobs')
@@ -149,15 +169,29 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
           } as any)
           .eq('id', jobId);
         if (error) throw error;
+        return { jobId, approve, syncResult: null, syncError: null };
       }
     },
-    onSuccess: (_, { jobId }) => {
+    onSuccess: (data, { jobId }) => {
       invalidateRatesContext(queryClient);
       queryClient.invalidateQueries({ queryKey: ['job-rates-approval', jobId] });
       queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
       queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager', jobId] });
       queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager', jobId, tourId] });
       queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager'] });
+      if (data?.approve) {
+        if (data?.syncResult?.created) {
+          toast.success(`Órdenes de trabajo creadas en Flex: ${data.syncResult.created}`);
+        }
+        data?.syncResult?.errors?.forEach((message) => toast.error(message));
+        if (data?.syncError) {
+          toast.error(`No se pudieron generar algunas órdenes de trabajo en Flex: ${data.syncError}`);
+        }
+      }
+    },
+    onError: (error: any) => {
+      const message = error?.message || 'No se pudo actualizar la aprobación del trabajo.';
+      toast.error(message);
     },
   });
 
