@@ -16,7 +16,10 @@ export const FLEX_FOLDER_IDS = {
   hojaInfoLx: "4db54bad-b5fa-4c1f-85d4-525d991d7b62",
   hojaInfoVx: "484249f0-6307-47a3-a782-6352ee5ef493",
   crewCall: "253878cc-af31-11df-b8d5-00e08175e43e",
-  pullSheet: "a220432c-af33-11df-b8d5-00e08175e43e"
+  pullSheet: "a220432c-af33-11df-b8d5-00e08175e43e",
+  ordenCompra: "ff1a5a50-3f1d-11df-b8d5-00e08175e43e",
+  ordenSubalquiler: "7e2ae0d0-b0bc-11df-b8d5-00e08175e43e",
+  ordenTrabajo: "f6e70edc-f42d-11e0-a8de-00e08175e43e"
 };
 
 /**
