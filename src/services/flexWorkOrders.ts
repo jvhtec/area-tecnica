@@ -335,7 +335,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
     .from('job_assignments')
     .select(
       `technician_id, sound_role, lights_role, video_role, status,
-       profiles:technician_id (first_name, last_name, flex_resource_id, department)`
+       profiles!job_assignments_technician_id_fkey(first_name, last_name, flex_resource_id, department)`
     )
     .eq('job_id', jobId);
 
