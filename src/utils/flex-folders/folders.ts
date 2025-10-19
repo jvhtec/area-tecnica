@@ -137,7 +137,7 @@ export async function createAllFoldersForJob(
       const extrasName = `Extras ${baseName} - ${deptLabel}`;
 
       const extrasPayload = {
-        definitionId: FLEX_FOLDER_IDS.presupuesto,
+        definitionId: FLEX_FOLDER_IDS.subFolder,
         parentElementId,
         open: true,
         locked: false,
