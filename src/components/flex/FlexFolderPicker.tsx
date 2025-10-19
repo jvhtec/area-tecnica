@@ -10,11 +10,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   CreateFoldersOptions,
   DepartmentDefaultSelector,
   DepartmentKey,
+  DepartmentSelectionOptions,
   SubfolderKey,
 } from "@/utils/flex-folders";
 
@@ -141,23 +143,121 @@ const sortKeysForDepartment = (dept: DepartmentKey, keys: SubfolderKey[]) => {
   });
 };
 
-const cloneOptions = (
-  options?: CreateFoldersOptions
+type TechnicalDepartmentKey = "sound" | "lights" | "video";
+
+const TECHNICAL_DEPARTMENTS: TechnicalDepartmentKey[] = [
+  "sound",
+  "lights",
+  "video",
+];
+const technicalDepartments = new Set<DepartmentKey>(TECHNICAL_DEPARTMENTS);
+
+const getDefaultSubfolders = (dept: DepartmentKey) =>
+  sortKeysForDepartment(dept, [...DEFAULT_SELECTIONS[dept]]);
+
+const cloneDepartmentSelection = (
+  dept: DepartmentKey,
+  selection?: DepartmentSelectionOptions
+): DepartmentSelectionOptions => {
+  const hasProvidedSubfolders = selection?.subfolders !== undefined;
+  const sourceSubfolders = hasProvidedSubfolders
+    ? selection!.subfolders
+    : getDefaultSubfolders(dept);
+  const validSubfolders = sourceSubfolders.filter(key =>
+    DEPARTMENT_SECTIONS[dept].items.some(item => item.key === key)
+  );
+  const subfolders = sortKeysForDepartment(dept, validSubfolders);
+
+  const cloned: DepartmentSelectionOptions = {
+    subfolders,
+  };
+
+  if (selection?.customPullsheet) {
+    cloned.customPullsheet = { ...selection.customPullsheet };
+  }
+
+  if (selection?.extrasPresupuesto) {
+    cloned.extrasPresupuesto = { ...selection.extrasPresupuesto };
+  }
+
+  return cloned;
+};
+
+const buildDefaultOptions = (): CreateFoldersOptions => {
+  const result: CreateFoldersOptions = {};
+  for (const [dept] of departmentEntries) {
+    if (!hasItems(dept)) continue;
+    result[dept] = {
+      subfolders: getDefaultSubfolders(dept),
+    };
+  }
+  return result;
+};
+
+const mergeWithDefaults = (options?: CreateFoldersOptions): CreateFoldersOptions => {
+  const defaults = buildDefaultOptions();
+  if (!options) return defaults;
+  const result: CreateFoldersOptions = { ...defaults };
+
+  for (const [dept, provided] of Object.entries(options) as [
+    DepartmentKey,
+    DepartmentSelectionOptions | undefined,
+  ][]) {
+    if (!hasItems(dept) || !provided) continue;
+    result[dept] = cloneDepartmentSelection(dept, provided);
+  }
+
+  return result;
+};
+
+const prepareOptionsForSubmit = (
+  options: CreateFoldersOptions
 ): CreateFoldersOptions | undefined => {
-  if (!options) return undefined;
+  const defaults = buildDefaultOptions();
   const result: CreateFoldersOptions = {};
   let hasAny = false;
+
   for (const [dept, values] of Object.entries(options) as [
     DepartmentKey,
-    SubfolderKey[] | undefined,
+    DepartmentSelectionOptions,
   ][]) {
-    if (!hasItems(dept) || values === undefined) continue;
-    const validKeys = values.filter(key =>
-      DEPARTMENT_SECTIONS[dept].items.some(item => item.key === key)
-    );
-    result[dept] = sortKeysForDepartment(dept, validKeys);
-    hasAny = true;
+    if (!hasItems(dept)) continue;
+    const sanitized = cloneDepartmentSelection(dept, values);
+    const defaultEntry = defaults[dept];
+    const defaultSubfolders = defaultEntry?.subfolders ?? [];
+    const subfolders = sanitized.subfolders ?? [];
+
+    const subfoldersDiffer =
+      subfolders.length !== defaultSubfolders.length ||
+      subfolders.some((value, index) => value !== defaultSubfolders[index]);
+
+    const customPullsheet = sanitized.customPullsheet?.enabled
+      ? {
+          ...sanitized.customPullsheet,
+          name: sanitized.customPullsheet.name?.trim() ?? "",
+        }
+      : undefined;
+
+    const extrasSelected =
+      subfolders.includes("extrasSound") || subfolders.includes("extrasLights");
+    const extrasPresupuesto =
+      extrasSelected &&
+      sanitized.extrasPresupuesto &&
+      (sanitized.extrasPresupuesto.startDate ||
+        sanitized.extrasPresupuesto.endDate)
+        ? { ...sanitized.extrasPresupuesto }
+        : undefined;
+
+    if (subfoldersDiffer || customPullsheet || extrasPresupuesto) {
+      result[dept] = {
+        subfolders,
+        ...(customPullsheet ? { customPullsheet } : {}),
+        ...(extrasPresupuesto ? { extrasPresupuesto } : {}),
+      };
+      hasAny = true;
+    }
   }
+
   return hasAny ? result : undefined;
 };
 
@@ -177,54 +277,139 @@ export function FlexFolderPicker({
   onConfirm,
   initialOptions,
 }: FlexFolderPickerProps) {
-  const [selection, setSelection] = React.useState<
-    CreateFoldersOptions | undefined
-  >(cloneOptions(initialOptions));
+  const [selection, setSelection] = React.useState<CreateFoldersOptions>(() =>
+    mergeWithDefaults(initialOptions)
+  );
 
   React.useEffect(() => {
     if (open) {
-      setSelection(cloneOptions(initialOptions));
+      setSelection(mergeWithDefaults(initialOptions));
     }
   }, [open, initialOptions]);
 
-  const handleToggle = React.useCallback(
-    (dept: DepartmentKey, key: SubfolderKey, checked: boolean) => {
-      const section = DEPARTMENT_SECTIONS[dept];
-      if (!section) return;
+  const updateDepartmentSelection = React.useCallback(
+    (
+      dept: DepartmentKey,
+      updater: (current: DepartmentSelectionOptions) => DepartmentSelectionOptions
+    ) => {
       setSelection(prev => {
-        const defaultList = getFlexFolderDefaultSelection(dept);
-        const currentList =
-          prev && Object.prototype.hasOwnProperty.call(prev, dept)
-            ? prev[dept] ?? []
-            : defaultList;
-        const nextSet = new Set(currentList);
-        if (checked) {
-          nextSet.add(key);
-        } else {
-          nextSet.delete(key);
-        }
-        const nextList = sortKeysForDepartment(dept, Array.from(nextSet));
-        const defaultSorted = sortKeysForDepartment(dept, defaultList);
-        const sameAsDefault =
-          nextList.length === defaultSorted.length &&
-          nextList.every((value, index) => value === defaultSorted[index]);
-
-        if (sameAsDefault) {
-          if (!prev) return undefined;
-          const { [dept]: _removed, ...rest } = prev;
-          return Object.keys(rest).length ? rest : undefined;
-        }
-
-        const nextSelection = { ...(prev ?? {}) } as CreateFoldersOptions;
-        nextSelection[dept] = nextList;
-        return nextSelection;
+        const existing = prev[dept];
+        const base = cloneDepartmentSelection(dept, existing);
+        const updated = updater(base);
+        return { ...prev, [dept]: updated };
       });
     },
     []
   );
 
+  const handleToggle = React.useCallback(
+    (dept: DepartmentKey, key: SubfolderKey, checked: boolean) => {
+      updateDepartmentSelection(dept, current => {
+        const nextSet = new Set(current.subfolders);
+        if (checked) {
+          nextSet.add(key);
+        } else {
+          nextSet.delete(key);
+        }
+        return {
+          ...current,
+          subfolders: sortKeysForDepartment(dept, Array.from(nextSet)),
+        };
+      });
+    },
+    [updateDepartmentSelection]
+  );
+
+  const handleCustomPullsheetToggle = React.useCallback(
+    (dept: TechnicalDepartmentKey, enabled: boolean) => {
+      updateDepartmentSelection(dept, current => {
+        const existing = current.customPullsheet;
+        if (enabled) {
+          return {
+            ...current,
+            customPullsheet: {
+              enabled: true,
+              name: existing?.name ?? "",
+              startDate: existing?.startDate,
+              endDate: existing?.endDate,
+            },
+          };
+        }
+
+        if (!existing) {
+          return { ...current };
+        }
+
+        return {
+          ...current,
+          customPullsheet: { ...existing, enabled: false },
+        };
+      });
+    },
+    [updateDepartmentSelection]
+  );
+
+  const handleCustomPullsheetFieldChange = React.useCallback(
+    (
+      dept: TechnicalDepartmentKey,
+      field: "name" | "startDate" | "endDate",
+      value: string
+    ) => {
+      updateDepartmentSelection(dept, current => {
+        const existing = current.customPullsheet ?? {
+          enabled: true,
+          name: "",
+          startDate: undefined as string | undefined,
+          endDate: undefined as string | undefined,
+        };
+
+        const nextValue =
+          field === "name" ? value : value ? value : undefined;
+
+        return {
+          ...current,
+          customPullsheet: {
+            ...existing,
+            enabled: true,
+            [field]: nextValue,
+          },
+        };
+      });
+    },
+    [updateDepartmentSelection]
+  );
+
+  const handleExtrasDateChange = React.useCallback(
+    (field: "startDate" | "endDate", value: string) => {
+      updateDepartmentSelection("comercial", current => {
+        const base: DepartmentSelectionOptions = {
+          subfolders: [...current.subfolders],
+          ...(current.customPullsheet
+            ? { customPullsheet: { ...current.customPullsheet } }
+            : {}),
+        };
+
+        const nextValue = value ? value : undefined;
+        const next = {
+          ...(current.extrasPresupuesto ?? {}),
+          [field]: nextValue,
+        } as DepartmentSelectionOptions["extrasPresupuesto"];
+
+        if (!next.startDate && !next.endDate) {
+          return base;
+        }
+
+        return {
+          ...base,
+          extrasPresupuesto: next,
+        };
+      });
+    },
+    [updateDepartmentSelection]
+  );
+
   const handleUsePreset = React.useCallback(() => {
-    setSelection(undefined);
+    setSelection(buildDefaultOptions());
   }, []);
 
   const handleCancel = React.useCallback(() => {
@@ -232,7 +417,7 @@ export function FlexFolderPicker({
   }, [onOpenChange]);
 
   const handleConfirm = React.useCallback(() => {
-    onConfirm(cloneOptions(selection));
+    onConfirm(prepareOptionsForSubmit(selection));
     onOpenChange(false);
   }, [onConfirm, onOpenChange, selection]);
 
@@ -261,11 +446,20 @@ export function FlexFolderPicker({
 
         <div className="mt-4 grid max-h-[50vh] flex-1 gap-6 overflow-y-auto pr-2">
           {selectableDepartments.map(([dept, section]) => {
-            const defaultSelection = getFlexFolderDefaultSelection(dept);
-            const checkedItems =
-              selection && Object.prototype.hasOwnProperty.call(selection, dept)
-                ? selection[dept] ?? []
-                : defaultSelection;
+            const departmentSelection = cloneDepartmentSelection(
+              dept,
+              selection[dept]
+            );
+            const checkedItems = departmentSelection.subfolders ?? [];
+            const isTechnical = technicalDepartments.has(dept);
+            const customPullsheet = departmentSelection.customPullsheet;
+            const showCustomPullsheetFields =
+              isTechnical && (customPullsheet?.enabled ?? false);
+            const extrasSelected =
+              dept === "comercial" &&
+              (checkedItems.includes("extrasSound") ||
+                checkedItems.includes("extrasLights"));
+            const extrasPresupuesto = departmentSelection.extrasPresupuesto ?? {};
 
             return (
               <section key={dept} className="space-y-3">
@@ -304,6 +498,118 @@ export function FlexFolderPicker({
                     );
                   })}
                 </div>
+
+                {isTechnical ? (
+                  <div className="rounded-md border p-3">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`${dept}-custom-pullsheet`}
+                        checked={customPullsheet?.enabled ?? false}
+                        onCheckedChange={value =>
+                          handleCustomPullsheetToggle(dept as TechnicalDepartmentKey, value === true)
+                        }
+                      />
+                      <Label
+                        htmlFor={`${dept}-custom-pullsheet`}
+                        className="text-sm font-medium"
+                      >
+                        Pull sheet personalizado
+                      </Label>
+                    </div>
+                    {showCustomPullsheetFields ? (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div className="sm:col-span-2 space-y-1">
+                          <Label htmlFor={`${dept}-custom-pullsheet-name`}>
+                            Nombre
+                          </Label>
+                          <Input
+                            id={`${dept}-custom-pullsheet-name`}
+                            value={customPullsheet?.name ?? ""}
+                            placeholder="Nombre del pull sheet"
+                            onChange={event =>
+                              handleCustomPullsheetFieldChange(
+                                dept as TechnicalDepartmentKey,
+                                "name",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`${dept}-custom-pullsheet-start`}>
+                            Fecha de inicio
+                          </Label>
+                          <Input
+                            id={`${dept}-custom-pullsheet-start`}
+                            type="date"
+                            value={customPullsheet?.startDate ?? ""}
+                            onChange={event =>
+                              handleCustomPullsheetFieldChange(
+                                dept as TechnicalDepartmentKey,
+                                "startDate",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`${dept}-custom-pullsheet-end`}>
+                            Fecha de fin
+                          </Label>
+                          <Input
+                            id={`${dept}-custom-pullsheet-end`}
+                            type="date"
+                            value={customPullsheet?.endDate ?? ""}
+                            onChange={event =>
+                              handleCustomPullsheetFieldChange(
+                                dept as TechnicalDepartmentKey,
+                                "endDate",
+                                event.target.value
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {dept === "comercial" && extrasSelected ? (
+                  <div className="rounded-md border p-3">
+                    <h4 className="text-sm font-semibold">Extras Presupuesto</h4>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Define fechas específicas para los presupuestos de extras.
+                    </p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="extras-presupuesto-start">
+                          Fecha de inicio
+                        </Label>
+                        <Input
+                          id="extras-presupuesto-start"
+                          type="date"
+                          value={extrasPresupuesto.startDate ?? ""}
+                          onChange={event =>
+                            handleExtrasDateChange("startDate", event.target.value)
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="extras-presupuesto-end">
+                          Fecha de fin
+                        </Label>
+                        <Input
+                          id="extras-presupuesto-end"
+                          type="date"
+                          value={extrasPresupuesto.endDate ?? ""}
+                          onChange={event =>
+                            handleExtrasDateChange("endDate", event.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </section>
             );
           })}

@@ -25,7 +25,27 @@ export type SubfolderKey =
   | "presupuestoSound" // Comercial presupuesto for sound
   | "presupuestoLights"; // Comercial presupuesto for lights
 
-export type CreateFoldersOptions = Partial<Record<DepartmentKey, SubfolderKey[]>>;
+export interface CustomPullsheetSettings {
+  enabled: boolean;
+  name: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface ExtrasPresupuestoSettings {
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface DepartmentSelectionOptions {
+  subfolders: SubfolderKey[];
+  customPullsheet?: CustomPullsheetSettings;
+  extrasPresupuesto?: ExtrasPresupuestoSettings;
+}
+
+export type CreateFoldersOptions = Partial<
+  Record<DepartmentKey, DepartmentSelectionOptions>
+>;
 
 // Helper to express “all defaults for a department”
 export type DepartmentDefaultSelector = (dept: DepartmentKey) => SubfolderKey[];
