@@ -240,7 +240,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
   const [{ data: job, error: jobError }] = await Promise.all([
     supabase
       .from('jobs')
-      .select('id, title, start_time, end_time, location_id, job_type')
+      .select('id, title, start_time, end_time, location_id, job_type, tour_date_id')
       .eq('id', jobId)
       .maybeSingle(),
   ]);
@@ -248,11 +248,23 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
   if (jobError) throw jobError;
   if (!job) throw new Error('Job not found');
 
+  // Determine search criteria based on job type
+  const searchCriteria: any = { folder_type: 'work_orders', department: 'personnel' };
+
+  if (job.job_type === 'tourdate') {
+    if (!job.tour_date_id) {
+      throw new Error(`Tourdate job ${jobId} is missing tour_date_id`);
+    }
+    searchCriteria.tour_date_id = job.tour_date_id;
+  } else {
+    searchCriteria.job_id = jobId;
+  }
+
+  // Check if work_orders folder exists
   let { data: folders, error: foldersError } = await supabase
     .from('flex_folders')
     .select('element_id, department')
-    .eq('job_id', jobId)
-    .eq('folder_type', 'work_orders');
+    .match(searchCriteria);
 
   if (foldersError) throw foldersError;
 
@@ -267,17 +279,28 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
     // For other jobs, it has folder_type: 'department'
     const personnelFolderType = job.job_type === 'tourdate' ? 'tourdate' : 'department';
     
+    const personnelSearchCriteria: any = {
+      folder_type: personnelFolderType,
+      department: 'personnel'
+    };
+    
+    if (job.job_type === 'tourdate') {
+      personnelSearchCriteria.tour_date_id = job.tour_date_id;
+    } else {
+      personnelSearchCriteria.job_id = jobId;
+    }
+    
     const { data: personnelFolder, error: personnelError } = await supabase
       .from('flex_folders')
       .select('element_id')
-      .eq('job_id', jobId)
-      .eq('folder_type', personnelFolderType)
-      .eq('department', 'personnel')
+      .match(personnelSearchCriteria)
       .maybeSingle();
     
     if (personnelError) throw personnelError;
     if (!personnelFolder?.element_id) {
-      throw new Error('No personnel department folder found - cannot create work orders folder');
+      throw new Error(
+        `Personnel folder not found for ${job.job_type === 'tourdate' ? 'tour_date_id' : 'job_id'}: ${job.job_type === 'tourdate' ? job.tour_date_id : jobId}. Please create folders first.`
+      );
     }
     
     // Create the work orders subfolder in Flex
@@ -313,15 +336,22 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
     }
     
     // Save to flex_folders table
+    const insertData: any = {
+      parent_id: personnelFolder.element_id,
+      element_id: newElementId,
+      department: 'personnel',
+      folder_type: 'work_orders',
+    };
+    
+    if (job.job_type === 'tourdate') {
+      insertData.tour_date_id = job.tour_date_id;
+    } else {
+      insertData.job_id = jobId;
+    }
+    
     const { data: insertedFolder, error: insertError } = await supabase
       .from('flex_folders')
-      .insert({
-        job_id: jobId,
-        parent_id: personnelFolder.element_id,
-        element_id: newElementId,
-        department: 'personnel',
-        folder_type: 'work_orders',
-      })
+      .insert(insertData)
       .select('element_id, department')
       .single();
     
