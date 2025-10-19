@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 
 // Get the version from Vite's env variables
-const version = import.meta.env.VITE_APP_VERSION || "dev"
+const defaultVersion = import.meta.env.VITE_APP_VERSION || "dev"
 
 // An array of image URLs to choose from
 const images = [
@@ -50,10 +50,21 @@ interface AboutCardProps {
   userEmail?: string
 }
 
+const filterRecentEntries = (entries: ChangelogEntry[]) => {
+  const cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - 1)
+  return entries.filter(entry => {
+    const entryDate = new Date(entry.date)
+    if (Number.isNaN(entryDate.getTime())) return true
+    return entryDate >= cutoff
+  })
+}
+
 export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [currentImage, setCurrentImage] = useState(images[0])
   const [changelog, setChangelog] = useState<ChangelogEntry[]>([])
+  const [displayVersion, setDisplayVersion] = useState(defaultVersion)
   const [editingEntry, setEditingEntry] = useState<string | null>(null)
   const [editContent, setEditContent] = useState("")
   const [editVersion, setEditVersion] = useState("")
@@ -97,13 +108,21 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
           content: row.content,
           lastUpdated: row.last_updated
         }))
-        setChangelog(mapped)
+        setChangelog(filterRecentEntries(mapped))
       } catch (e: any) {
         console.warn('Failed to load changelog', e?.message || e)
       }
     }
     if (isOpen) void load()
   }, [isOpen])
+
+  useEffect(() => {
+    if (changelog.length > 0) {
+      setDisplayVersion(changelog[0].version)
+    } else {
+      setDisplayVersion(defaultVersion)
+    }
+  }, [changelog, defaultVersion])
 
   // Selects a random image from the images array.
   const selectRandomImage = () => {
@@ -139,17 +158,17 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
       }
       const { data, error } = await supabase
         .from('app_changelog')
-        .update({ content: editContent, version: editVersion || version, entry_date: dateStr })
+        .update({ content: editContent, version: editVersion || defaultVersion, entry_date: dateStr })
         .eq('id', editingEntry)
         .select('id, version, entry_date, content, last_updated')
         .maybeSingle()
       if (error) throw error
       if (data) {
-        setChangelog(prev => prev.map(entry =>
+        setChangelog(prev => filterRecentEntries(prev.map(entry =>
           entry.id === editingEntry
             ? { id: data.id, version: data.version, date: data.entry_date, content: data.content, lastUpdated: data.last_updated }
             : entry
-        ))
+        )))
       }
       setEditingEntry(null)
       setEditContent("")
@@ -171,7 +190,7 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
         .delete()
         .eq('id', id)
       if (error) throw error
-      setChangelog(prev => prev.filter(e => e.id !== id))
+      setChangelog(prev => filterRecentEntries(prev.filter(e => e.id !== id)))
       if (editingEntry === id) {
         setEditingEntry(null)
         setEditContent('')
@@ -188,7 +207,7 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
     try {
       const today = new Date()
       const yyyy_mm_dd = today.toISOString().slice(0,10)
-      const ver = String(version)
+      const ver = String(defaultVersion)
       const { data, error } = await supabase
         .from('app_changelog')
         .insert({ version: ver, entry_date: yyyy_mm_dd, content: '' })
@@ -199,7 +218,7 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
         const newEntry: ChangelogEntry = {
           id: data.id, version: data.version, date: data.entry_date, content: data.content, lastUpdated: data.last_updated
         }
-        setChangelog(prev => [newEntry, ...prev])
+        setChangelog(prev => filterRecentEntries([newEntry, ...prev]))
         setEditingEntry(newEntry.id)
         setEditContent('')
         setEditVersion(newEntry.version)
@@ -255,7 +274,7 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
               Created by JVH
             </p>
             <p className="text-xs text-center text-muted-foreground">
-              v{version}
+              v{displayVersion}
             </p>
           </div>
           
