@@ -129,6 +129,23 @@ export const AssignmentStatusDialog = ({
         queryClient.invalidateQueries({ queryKey: ['job-assignments', assignment.job_id] })
       ]);
 
+      if (newStatus === 'confirmed') {
+        const recipientName = `${technician?.first_name ?? ''} ${technician?.last_name ?? ''}`.trim();
+        try {
+          void supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: 'job.assignment.confirmed',
+              job_id: assignment.job_id,
+              recipient_id: technicianId,
+              recipient_name: recipientName || undefined
+            }
+          });
+        } catch (_) {
+          // Ignore push errors
+        }
+      }
+
       const statusText = action === 'confirm' ? 'confirmed' : 'declined';
       toast.success(
         `Assignment ${statusText} for ${technician?.first_name} ${technician?.last_name}`
