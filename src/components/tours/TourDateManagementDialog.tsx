@@ -1020,6 +1020,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
@@ -1030,17 +1031,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
         <ScrollArea className="h-[60vh] pr-4">
           <div className="space-y-4">
-            {!readOnly && tourDates.length > 0 && (
-              <Button
-                onClick={createAllFolders}
-                className="w-full"
-                variant="outline"
-                disabled={isCreatingFolders}
-              >
-                <FolderPlus className="h-4 w-4 mr-2" />
-                {isCreatingFolders ? 'Creating Folders...' : 'Create Folders for All Dates'}
-              </Button>
-            )}
+            {/* Bulk folders button removed; availability moved to Team Assignments */}
             
             <div className="space-y-4">
               {tourDates?.map((dateObj) => {
@@ -1253,5 +1244,6 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         </ScrollArea>
       </DialogContent>
     </Dialog>
+    </>
   );
 };

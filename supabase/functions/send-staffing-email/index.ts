@@ -68,7 +68,7 @@ serve(async (req) => {
     const body = await req.json();
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
     
-    const { job_id, profile_id, phase, role, message, channel } = body;
+    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path } = body;
     const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp') ? 'whatsapp' : 'email';
     
     // Enhanced validation logging
@@ -354,6 +354,20 @@ serve(async (req) => {
         });
       }
 
+      // Optional: generate signed URL for a tour schedule PDF
+      let tourPdfSignedUrl: string | null = null;
+      try {
+        if (typeof tour_pdf_path === 'string' && tour_pdf_path.trim()) {
+          const { data: signed, error: sigErr } = await supabase
+            .storage
+            .from('tour-documents')
+            .createSignedUrl(tour_pdf_path, 60 * 60 * 24 * 7);
+          if (!sigErr && signed?.signedUrl) tourPdfSignedUrl = signed.signedUrl;
+        }
+      } catch (e) {
+        console.warn('[send-staffing-email] Failed to sign tour_pdf_path', e);
+      }
+
       // Step 5: Build content (email or whatsapp)
       console.log('📧 BUILDING EMAIL CONTENT...');
       const confirmUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=confirm&exp=${encodeURIComponent(exp)}&t=${token}&c=${encodeURIComponent(desiredChannel)}`;
@@ -437,6 +451,15 @@ serve(async (req) => {
                     </table>
                   </td>
                 </tr>
+                ${tourPdfSignedUrl ? `
+                <tr>
+                  <td style="padding:12px 24px 0 24px;">
+                    <div style=\"background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px;\">
+                      <div style=\"font-weight:600;color:#9a3412;margin-bottom:4px;\">Calendario del tour (PDF)</div>
+                      <a href=\"${tourPdfSignedUrl}\" style=\"color:#9a3412;text-decoration:underline;\">Descargar PDF</a>
+                    </div>
+                  </td>
+                </tr>` : ''}
                 <tr>
                   <td style="padding:16px 24px 24px 24px;">
                     <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;">
@@ -488,6 +511,10 @@ serve(async (req) => {
           lines.push((message as string).trim());
         }
         lines.push('');
+        if (tourPdfSignedUrl) {
+          lines.push(`Calendario del tour (PDF): ${tourPdfSignedUrl}`);
+          lines.push('');
+        }
         lines.push(`Confirmar: ${confirmUrl}`);
         lines.push(`No estoy disponible: ${declineUrl}`);
         const text = lines.join('\n');

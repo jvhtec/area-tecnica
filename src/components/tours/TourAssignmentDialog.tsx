@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Users, Eye, Info, Target } from "lucide-react";
+import { Trash2, Plus, Users, Eye, Info, Target, Send } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 import { TourRequirementsDialog } from '@/components/tours/TourRequirementsDialog';
+import { RequestTourAvailabilityDialog } from '@/components/tours/RequestTourAvailabilityDialog';
 
 interface TourAssignment {
   id: string;
@@ -70,6 +71,7 @@ export const TourAssignmentDialog = ({
   const [externalName, setExternalName] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [reqOpen, setReqOpen] = useState(false);
+  const [requestAvailOpen, setRequestAvailOpen] = useState(false);
 
   // Fetch existing tour assignments
   const { data: assignments = [], refetch } = useQuery({
@@ -244,10 +246,14 @@ export const TourAssignmentDialog = ({
                   <p>Tour assignments are automatically applied to all jobs in this tour. When you add or remove team members here, they will be instantly assigned to or removed from all tour jobs.</p>
                 </div>
               </div>
-              <div className="mt-3">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <Button variant="secondary" size="sm" onClick={() => setReqOpen(true)} className="gap-2">
                   <Target className="h-4 w-4" />
                   Set Tour‑wide Personnel Requirements
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setRequestAvailOpen(true)} className="gap-2">
+                  <Send className="h-4 w-4" />
+                  Request Availability for Full Tour
                 </Button>
               </div>
             </div>
@@ -437,6 +443,9 @@ export const TourAssignmentDialog = ({
     {/* Tour-wide Personnel Requirements */}
     {!readOnly && (
       <TourRequirementsDialog open={reqOpen} onOpenChange={setReqOpen} tourId={tourId} />
+    )}
+    {!readOnly && (
+      <RequestTourAvailabilityDialog open={requestAvailOpen} onOpenChange={setRequestAvailOpen} tourId={tourId} />
     )}
     </>
   );
