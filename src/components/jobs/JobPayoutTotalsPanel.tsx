@@ -22,7 +22,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
       if (technicianId) q = q.eq('technician_id', technicianId);
       const { data, error } = await q;
       if (error) throw error;
-      return data || [];
+      return (data || []) as unknown as Array<{ technician_id: string; lpo_number: string | null; flex_element_id: string | null }>;
     },
     enabled: !!jobId,
     staleTime: 30_000,
