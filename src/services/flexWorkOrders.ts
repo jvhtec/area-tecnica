@@ -1,11 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
 import { FLEX_API_BASE_URL } from '@/lib/api-config';
-import { FLEX_FOLDER_IDS, RESPONSIBLE_PERSON_IDS } from '@/utils/flex-folders/constants';
-import { labelForCode } from '@/types/roles';
+import { FLEX_FOLDER_IDS, RESPONSIBLE_PERSON_IDS, DEPARTMENT_SUFFIXES } from '@/utils/flex-folders/constants';
+import { resourceIdForRole, EXTRA_RESOURCE_IDS } from '@/utils/flex-labor-resources';
 
 const WORK_ORDER_DEFINITION_ID = FLEX_FOLDER_IDS.ordenTrabajo;
 const DEFAULT_LOCATION_ID = FLEX_FOLDER_IDS.location;
 const PERSONNEL_RESPONSIBLE_ID = RESPONSIBLE_PERSON_IDS.personnel;
+const CURRENCY_EUR_ID = 'd3d53320-6926-11ea-9bb5-2a0a4490a7fb';
+const PRICING_MODEL_BASE_2025_ID = 'a4307bf9-cd39-4df1-9d6d-48932120c4bd';
 
 let cachedFlexToken: string | null = null;
 
@@ -64,12 +66,9 @@ async function createWorkOrderElement(options: {
     open: true,
     locked: false,
     name: `Orden de Trabajo - ${job.title} (${technicianName})`,
-    documentNumber: `${job.title?.slice(0, 24) || 'OT'}-${technicianName.slice(0, 12)}`,
-    plannedStartDate,
-    plannedEndDate,
-    locationId: job.location_id || DEFAULT_LOCATION_ID,
     personResponsibleId: PERSONNEL_RESPONSIBLE_ID,
-    vendorId,
+    vendorId: vendorId,
+    currencyId: CURRENCY_EUR_ID,
   };
 
   const response = await fetch(`${FLEX_API_BASE_URL}/element`, {
@@ -105,12 +104,14 @@ async function addResourceLineItem(options: {
   resourceId: string;
   quantity?: number;
   token: string;
+  managedResourceLineItemType?: string;
+  parentLineItemId?: string;
 }): Promise<string | null> {
-  const { documentId, parentElementId, resourceId, quantity = 1, token } = options;
+  const { documentId, parentElementId, resourceId, quantity = 1, token, managedResourceLineItemType = 'service-offering', parentLineItemId } = options;
   const baseUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/add-resource/${encodeURIComponent(resourceId)}`;
   const query = new URLSearchParams({
     resourceParentId: parentElementId,
-    managedResourceLineItemType: 'contact',
+    managedResourceLineItemType,
     quantity: String(quantity),
   });
 
@@ -126,7 +127,11 @@ async function addResourceLineItem(options: {
   };
 
   const headers = { accept: '*/*', 'X-Auth-Token': token } as Record<string, string>;
-  let payload = await tryRequest({ method: 'POST', headers });
+  let payload: any | null = null;
+  if (!parentLineItemId) {
+    // Try JSON path first when not nesting under a parent line
+    payload = await tryRequest({ method: 'POST', headers });
+  }
 
   if (!payload) {
     const fallbackHeaders = {
@@ -135,9 +140,9 @@ async function addResourceLineItem(options: {
     };
     const form = new URLSearchParams({
       resourceParentId: parentElementId,
-      managedResourceLineItemType: 'contact',
+      managedResourceLineItemType,
       quantity: String(quantity),
-      parentLineItemId: '',
+      parentLineItemId: parentLineItemId ?? '',
       nextSiblingId: '',
     });
     payload = await tryRequest({ method: 'POST', headers: fallbackHeaders, body: form.toString() });
@@ -150,6 +155,76 @@ async function addResourceLineItem(options: {
     payload?.data?.id ||
     (Array.isArray(payload?.addedResourceLineIds) ? payload.addedResourceLineIds[0] : null)
   );
+}
+
+async function updateLineItemDates(options: {
+  documentId: string;
+  lineItemId: string;
+  pickupDate: string; // YYYY-MM-DD
+  returnDate: string; // YYYY-MM-DD
+  token: string;
+}): Promise<boolean> {
+  const { documentId, lineItemId, pickupDate, returnDate, token } = options;
+  const url = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/bulk-update`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        accept: '*/*',
+        'X-Auth-Token': token,
+      },
+      body: JSON.stringify({
+        bulkData: [{ itemId: lineItemId, alternatePickupDate: pickupDate, alternateReturnDate: returnDate }],
+      }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[FlexWorkOrders] Failed to update line item dates', err);
+    return false;
+  }
+}
+
+async function setLineItemPricingModel(options: {
+  documentId: string;
+  lineItemId: string;
+  pricingModelId: string;
+  token: string;
+}): Promise<boolean> {
+  const { documentId, lineItemId, pricingModelId, token } = options;
+  const rowDataUrl = `${FLEX_API_BASE_URL}/line-item/${encodeURIComponent(documentId)}/row-data/`;
+  try {
+    const res = await fetch(rowDataUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', accept: 'application/json', 'X-Auth-Token': token },
+      body: JSON.stringify({ lineItemId, fieldType: 'pricing-model', payloadValue: pricingModelId }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[FlexWorkOrders] Failed to set pricing model on line item', err);
+    return false;
+  }
+}
+
+async function setLineItemTimeQty(options: {
+  documentId: string;
+  lineItemId: string;
+  timeQty: number;
+  token: string;
+}): Promise<boolean> {
+  const { documentId, lineItemId, timeQty, token } = options;
+  const rowDataUrl = `${FLEX_API_BASE_URL}/line-item/${encodeURIComponent(documentId)}/row-data/`;
+  try {
+    const res = await fetch(rowDataUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', accept: 'application/json', 'X-Auth-Token': token },
+      body: JSON.stringify({ lineItemId, fieldType: 'time-qty', payloadValue: timeQty }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[FlexWorkOrders] Failed to set time qty on line item', err);
+    return false;
+  }
 }
 
 async function addExtraNoteLineItem(options: {
@@ -304,13 +379,19 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
     }
     
     // Create the work orders subfolder in Flex
+    const plannedStartDate = formatDate(job.start_time) ?? new Date().toISOString().slice(0, 10);
+    const plannedEndDate = formatDate(job.end_time) ?? plannedStartDate;
+    const yymmdd = plannedStartDate
+      ? `${plannedStartDate.slice(2,4)}${plannedStartDate.slice(5,7)}${plannedStartDate.slice(8,10)}`
+      : new Date().toISOString().slice(2,10).replace(/-/g,'');
+    const workOrdersFolderDoc = `${yymmdd}${DEPARTMENT_SUFFIXES.personnel}-ORD`;
     const workOrderPayload = {
-      definitionId: FLEX_FOLDER_IDS.ordenTrabajo,
+      definitionId: FLEX_FOLDER_IDS.subFolder,
       parentElementId: personnelFolder.element_id,
       open: true,
       locked: false,
-      name: `Órdenes de Trabajo - ${job.title}`,
-      documentNumber: `${job.title?.slice(0, 20) || 'OT'}-Orders`,
+      name: `Órdenes de Trabajo - ${job.title} [${plannedStartDate} – ${plannedEndDate}]`,
+      documentNumber: workOrdersFolderDoc,
     };
     
     const flexResponse = await fetch(`${FLEX_API_BASE_URL}/element`, {
@@ -424,53 +505,109 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
         token,
       });
 
-      const roles: Array<{ role: string; department: string | null }> = [];
-      if (assignment.sound_role) {
-        roles.push({ role: assignment.sound_role, department: 'sound' });
-      }
-      if (assignment.lights_role) {
-        roles.push({ role: assignment.lights_role, department: 'lights' });
-      }
-      if (assignment.video_role) {
-        roles.push({ role: assignment.video_role, department: 'video' });
-      }
+      // Build role line items for SOUND and LIGHTS only (skip VIDEO)
+      const roleEntries: Array<{ dept: 'sound' | 'lights'; role: string }> = [];
+      if (assignment.sound_role) roleEntries.push({ dept: 'sound', role: assignment.sound_role });
+      if (assignment.lights_role) roleEntries.push({ dept: 'lights', role: assignment.lights_role });
 
-      for (const roleEntry of roles) {
+      for (const r of roleEntries) {
+        const laborResourceId = resourceIdForRole(r.dept, r.role);
+        if (!laborResourceId) continue;
+        const roleQty = (job.job_type && (job.job_type === 'single' || job.job_type === 'festival')) ? 3 : 1;
         const lineItemId = await addResourceLineItem({
           documentId,
           parentElementId: parentFolder.element_id,
-          resourceId: flexResourceId,
-          quantity: 1,
+          resourceId: laborResourceId,
+          quantity: roleQty,
           token,
+          managedResourceLineItemType: 'service-offering',
         });
-
         if (!lineItemId) {
-          errors.push(
-            `No se pudo añadir el line item para la función ${roleEntry.role} del técnico ${technicianId}.`
-          );
+          errors.push(`No se pudo añadir el line item de ${r.dept} (${r.role}) para el técnico ${technicianId}.`);
+        }
+        // Apply pricing model to main role line
+        if (lineItemId) {
+          await setLineItemPricingModel({ documentId, lineItemId, pricingModelId: PRICING_MODEL_BASE_2025_ID, token });
+          // Ensure time quantity is set so pricing computes
+          await setLineItemTimeQty({ documentId, lineItemId, timeQty: roleQty, token });
+        }
+        // For single/festival jobs with overtime, add child lines under SOUND and LIGHTS roles
+        if (lineItemId && job.job_type && (job.job_type === 'single' || job.job_type === 'festival') && (r.dept === 'sound' || r.dept === 'lights')) {
+          // Horas 11-12
+          const child1 = await addResourceLineItem({
+            documentId,
+            parentElementId: parentFolder.element_id,
+            resourceId: '14b84b51-2a96-4afd-a384-f86f18f039da',
+            quantity: 0,
+            token,
+            managedResourceLineItemType: 'service-offering',
+            parentLineItemId: lineItemId,
+          });
+          // Horas 13+ R
+          const child2 = await addResourceLineItem({
+            documentId,
+            parentElementId: parentFolder.element_id,
+            resourceId: '7d5eaf16-4499-45e1-b705-b5f1513ea71f',
+            quantity: 0,
+            token,
+            managedResourceLineItemType: 'service-offering',
+            parentLineItemId: lineItemId,
+          });
+          if (child1) {
+            await setLineItemPricingModel({ documentId, lineItemId: child1, pricingModelId: PRICING_MODEL_BASE_2025_ID, token });
+          }
+          if (child2) {
+            await setLineItemPricingModel({ documentId, lineItemId: child2, pricingModelId: PRICING_MODEL_BASE_2025_ID, token });
+          }
         }
       }
 
+      // Add extras as line items (approved only)
       const technicianExtras = extrasByTechnician.get(technicianId) || [];
       if (technicianExtras.length > 0) {
-        const summary = technicianExtras
-          .map((extra) => `${extra.extra_type} x${extra.quantity}`)
-          .join(' / ');
-        const label = roles.length ? labelForCode(roles[0].role) || roles[0].role : technicianName;
-        await addExtraNoteLineItem({
-          documentId,
-          note: `Extras (${label}): ${summary}`,
-          token,
-        });
+        let travelHalf = 0;
+        let travelFull = 0;
+        let dayOff = 0;
+        for (const ex of technicianExtras) {
+          if (ex.extra_type === 'travel_half') travelHalf += ex.quantity;
+          if (ex.extra_type === 'travel_full') travelFull += ex.quantity;
+          if (ex.extra_type === 'day_off') dayOff += ex.quantity;
+        }
+        const transitUnits = (travelHalf * 1) + (travelFull * 2);
+        if (transitUnits > 0) {
+          await addResourceLineItem({
+            documentId,
+            parentElementId: parentFolder.element_id,
+            resourceId: EXTRA_RESOURCE_IDS.transit,
+            quantity: transitUnits,
+            token,
+            managedResourceLineItemType: 'service-offering',
+          });
+        }
+        if (dayOff > 0) {
+          await addResourceLineItem({
+            documentId,
+            parentElementId: parentFolder.element_id,
+            resourceId: EXTRA_RESOURCE_IDS.dayOff,
+            quantity: dayOff,
+            token,
+            managedResourceLineItemType: 'service-offering',
+          });
+        }
       }
 
+      const insertPayload: any = {
+        job_id: jobId,
+        technician_id: technicianId,
+        // Store under both legacy and current column names for compatibility
+        flex_document_id: documentId,
+        flex_element_id: documentId,
+        folder_element_id: (parentFolder as any)?.element_id,
+        flex_vendor_id: flexResourceId,
+      };
       const { error: insertError } = await supabase
         .from('flex_work_orders')
-        .insert({
-          job_id: jobId,
-          technician_id: technicianId,
-          flex_document_id: documentId,
-        });
+        .insert(insertPayload);
 
       if (insertError) {
         throw insertError;

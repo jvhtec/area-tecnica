@@ -114,6 +114,64 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     && jobDetails?.job_type === 'tourdate'
     && (isManager || jobRatesApproved);
 
+  // Flex Work Orders progress (manager-only)
+  const [isSyncingWorkOrders, setIsSyncingWorkOrders] = useState(false);
+  const { data: workOrdersFolder } = useQuery({
+    queryKey: ['flex-workorders-folder', resolvedJobId, jobDetails?.job_type, jobDetails?.tour_date_id],
+    enabled: open && isManager && !!resolvedJobId,
+    queryFn: async () => {
+      const criteria: any = { folder_type: 'work_orders', department: 'personnel' };
+      if ((jobDetails?.job_type || job?.job_type) === 'tourdate') {
+        criteria.tour_date_id = jobDetails?.tour_date_id || job?.tour_date_id;
+      } else {
+        criteria.job_id = resolvedJobId;
+      }
+      const { data, error } = await supabase
+        .from('flex_folders')
+        .select('element_id')
+        .match(criteria)
+        .maybeSingle();
+      if (error) return null;
+      return data || null;
+    }
+  });
+
+  const { data: existingWorkOrders = [] } = useQuery({
+    queryKey: ['flex-workorders-rows', resolvedJobId],
+    enabled: open && isManager && !!resolvedJobId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('flex_work_orders')
+        .select(`
+          technician_id,
+          flex_element_id,
+          flex_document_id,
+          folder_element_id,
+          flex_vendor_id,
+          profiles:profiles!flex_work_orders_technician_id_fkey(first_name,last_name)
+        `)
+        .eq('job_id', resolvedJobId);
+      if (error) return [];
+      return (data || []) as Array<any>;
+    }
+  });
+
+  const desiredTechCount = React.useMemo(() => {
+    const assignments = jobDetails?.job_assignments || [];
+    return assignments.filter((a: any) => a && a.status !== 'declined').length;
+  }, [jobDetails?.job_assignments]);
+  const existingWOCount = existingWorkOrders.length;
+
+  const copyToClipboard = async (value: string | undefined | null) => {
+    try {
+      if (!value) return;
+      await navigator.clipboard.writeText(value);
+      toast.success('Copiado al portapapeles');
+    } catch (_) {
+      toast.error('No se pudo copiar');
+    }
+  };
+
   useEffect(() => {
     if (!showTourRatesTab && selectedTab === 'tour-rates') {
       setSelectedTab('info');
@@ -513,6 +571,87 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                       )}
                 </div>
               </Card>
+              {isManager && !isDryhire && (
+                <Card className="p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm">
+                      <div className="font-medium">Órdenes de Trabajo (Flex)</div>
+                      <div className="text-muted-foreground">
+                        Progreso: {existingWOCount}/{desiredTechCount} {desiredTechCount > 0 ? 'técnicos' : ''}
+                      </div>
+                      <div className="text-muted-foreground">
+                        Carpeta: {workOrdersFolder?.element_id ? 'creada' : 'no creada'}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        if (!resolvedJobId) return;
+                        setIsSyncingWorkOrders(true);
+                        try {
+                          const result = await syncFlexWorkOrdersForJob(resolvedJobId);
+                          if (result.created > 0) {
+                            toast.success(`Órdenes de trabajo creadas en Flex: ${result.created}`);
+                          } else if (result.skipped > 0) {
+                            toast(`Sin cambios. Técnicos omitidos: ${result.skipped}`);
+                          }
+                          result.errors.forEach((message) => toast.error(message));
+                        } catch (e) {
+                          toast.error(`No se pudo sincronizar con Flex: ${(e as Error).message}`);
+                        } finally {
+                          setIsSyncingWorkOrders(false);
+                          queryClient.invalidateQueries({ queryKey: ['flex-workorders-folder', resolvedJobId] });
+                          queryClient.invalidateQueries({ queryKey: ['flex-workorders-rows', resolvedJobId] });
+                        }
+                      }}
+                      disabled={isSyncingWorkOrders}
+                    >
+                      {isSyncingWorkOrders ? 'Sincronizando…' : 'Sincronizar órdenes de trabajo'}
+                    </Button>
+                  </div>
+                </Card>
+              )}
+
+              {isManager && !isDryhire && (
+                <Card className="p-3 mt-2">
+                  <div className="text-sm space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="font-medium">Mapa de LPO (depuración)</div>
+                        <div className="text-muted-foreground">
+                          Carpeta padre (work_orders): {workOrdersFolder?.element_id || '—'}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => copyToClipboard(workOrdersFolder?.element_id)}>Copiar carpeta</Button>
+                    </div>
+
+                    {existingWorkOrders && existingWorkOrders.length > 0 ? (
+                      <div className="border-t pt-2 space-y-1">
+                        {existingWorkOrders.map((row: any) => {
+                          const name = [row?.profiles?.first_name, row?.profiles?.last_name].filter(Boolean).join(' ') || row.technician_id;
+                          const elementId = row?.flex_element_id || row?.flex_document_id || '—';
+                          const vendorId = row?.flex_vendor_id || '—';
+                          return (
+                            <div key={`${row.technician_id}-${elementId}`} className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="truncate"><span className="font-medium">{name}</span></div>
+                                <div className="text-xs text-muted-foreground truncate">LPO: {elementId}</div>
+                                <div className="text-xs text-muted-foreground truncate">Vendor: {vendorId}</div>
+                              </div>
+                              <div className="flex gap-1 shrink-0">
+                                <Button size="sm" variant="outline" onClick={() => copyToClipboard(String(elementId))}>Copiar LPO</Button>
+                                <Button size="sm" variant="outline" onClick={() => copyToClipboard(String(vendorId))}>Copiar Vendor</Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">No hay LPO registrados en BD para este trabajo.</div>
+                    )}
+                  </div>
+                </Card>
+              )}
             </TabsContent>
 
             {!isDryhire && (
