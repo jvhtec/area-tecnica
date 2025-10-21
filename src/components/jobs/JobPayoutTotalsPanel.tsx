@@ -20,8 +20,9 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     queryFn: async () => {
       let q = supabase.from('flex_work_orders').select('technician_id, lpo_number, flex_element_id').eq('job_id', jobId);
       if (technicianId) q = q.eq('technician_id', technicianId);
-      const { data } = await q;
-      return (data || []) as Array<{ technician_id: string; lpo_number: string | null; flex_element_id: string | null }>;
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!jobId,
     staleTime: 30_000,
