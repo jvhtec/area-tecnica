@@ -207,11 +207,31 @@ async function setLineItemPricingModel(options: {
   token: string;
 }): Promise<boolean> {
   const { documentId, lineItemId, pricingModelId, token } = options;
-  const rowDataUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/row-data`;
+  const rowDataUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/row-data/`;
   try {
-    const res = await fetch(rowDataUrl, {
+    const headers = {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+      'X-Auth-Token': token,
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-API-Client': 'flex5-desktop',
+    } as Record<string,string>;
+    // First try dedicated update endpoint with camelCase field (per working example)
+    let ok = await updateLineItemField({ documentId, lineItemId, fieldType: 'pricingModel', payloadValue: pricingModelId, token });
+    if (ok) return true;
+
+    // Fallback to row-data camelCase
+    let res = await fetch(rowDataUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', accept: 'application/json', 'X-Auth-Token': token },
+      headers,
+      body: JSON.stringify({ lineItemId, fieldType: 'pricingModel', payloadValue: pricingModelId }),
+    });
+    if (res.ok) return true;
+
+    // Fallback to kebab-case on row-data
+    res = await fetch(rowDataUrl, {
+      method: 'POST',
+      headers,
       body: JSON.stringify({ lineItemId, fieldType: 'pricing-model', payloadValue: pricingModelId }),
     });
     return res.ok;
@@ -228,12 +248,22 @@ async function setLineItemTimeQty(options: {
   token: string;
 }): Promise<boolean> {
   const { documentId, lineItemId, timeQty, token } = options;
-  const rowDataUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/row-data`;
+  const rowDataUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/row-data/`;
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+      'X-Auth-Token': token,
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-API-Client': 'flex5-desktop',
+    } as Record<string,string>;
+    // Try dedicated update endpoint first (as per working payload)
+    let ok = await updateLineItemField({ documentId, lineItemId, fieldType: 'timeQty', payloadValue: timeQty, token });
+    if (ok) return true;
     // Try canonical camelCase key first (as seen in Flex payloads)
     let res = await fetch(rowDataUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', accept: 'application/json', 'X-Auth-Token': token },
+      headers,
       body: JSON.stringify({ lineItemId, fieldType: 'timeQty', payloadValue: timeQty }),
     });
     if (res.ok) return true;
@@ -241,7 +271,7 @@ async function setLineItemTimeQty(options: {
     // Fallback to kebab-case variant some environments expect
     res = await fetch(rowDataUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', accept: 'application/json', 'X-Auth-Token': token },
+      headers,
       body: JSON.stringify({ lineItemId, fieldType: 'time-qty', payloadValue: timeQty }),
     });
     if (res.ok) return true;
@@ -249,7 +279,7 @@ async function setLineItemTimeQty(options: {
     // Last fallback: send as string payload
     res = await fetch(rowDataUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', accept: 'application/json', 'X-Auth-Token': token },
+      headers,
       body: JSON.stringify({ lineItemId, fieldType: 'timeQty', payloadValue: String(timeQty) }),
     });
     return res.ok;
@@ -274,12 +304,106 @@ async function setLineItemTimeQtyBulk(options: {
         'Content-Type': 'application/json',
         accept: '*/*',
         'X-Auth-Token': token,
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-API-Client': 'flex5-desktop',
       },
       body: JSON.stringify({ bulkData: [{ itemId: lineItemId, timeQty }] }),
     });
     return res.ok;
   } catch (err) {
     console.warn('[FlexWorkOrders] Failed bulk-update timeQty on line item', err);
+    return false;
+  }
+}
+
+async function updateLineItemField(options: {
+  documentId: string;
+  lineItemId: string;
+  fieldType: string;
+  payloadValue: string | number;
+  token: string;
+}): Promise<boolean> {
+  const { documentId, lineItemId, fieldType, payloadValue, token } = options;
+  const url = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/update`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        accept: 'application/json',
+        'X-Auth-Token': token,
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-API-Client': 'flex5-desktop',
+      },
+      body: JSON.stringify({ lineItemId, fieldType, payloadValue }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[FlexWorkOrders] Failed update on line item field', fieldType, err);
+    return false;
+  }
+}
+
+async function setLineItemQuantityRow(options: {
+  documentId: string;
+  lineItemId: string;
+  quantity: number;
+  token: string;
+}): Promise<boolean> {
+  const { documentId, lineItemId, quantity, token } = options;
+  const rowDataUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/row-data/`;
+  try {
+    const headers = {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+      'X-Auth-Token': token,
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-API-Client': 'flex5-desktop',
+    } as Record<string,string>;
+    // Try dedicated update endpoint first
+    let ok = await updateLineItemField({ documentId, lineItemId, fieldType: 'quantity', payloadValue: quantity, token });
+    if (ok) return true;
+    let res = await fetch(rowDataUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ lineItemId, fieldType: 'quantity', payloadValue: quantity }),
+    });
+    if (res.ok) return true;
+    res = await fetch(rowDataUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ lineItemId, fieldType: 'quantity', payloadValue: String(quantity) }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[FlexWorkOrders] Failed to set quantity via row-data', err);
+    return false;
+  }
+}
+
+async function setLineItemQuantityBulk(options: {
+  documentId: string;
+  lineItemId: string;
+  quantity: number;
+  token: string;
+}): Promise<boolean> {
+  const { documentId, lineItemId, quantity, token } = options;
+  const url = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/bulk-update`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        accept: '*/*',
+        'X-Auth-Token': token,
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-API-Client': 'flex5-desktop',
+      },
+      body: JSON.stringify({ bulkData: [{ itemId: lineItemId, quantity }] }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[FlexWorkOrders] Failed bulk-update quantity on line item', err);
     return false;
   }
 }
