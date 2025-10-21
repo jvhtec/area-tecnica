@@ -148,6 +148,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
           flex_document_id,
           folder_element_id,
           flex_vendor_id,
+          lpo_number,
           profiles:profiles!flex_work_orders_technician_id_fkey(first_name,last_name)
         `)
         .eq('job_id', resolvedJobId);
@@ -631,15 +632,18 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                           const name = [row?.profiles?.first_name, row?.profiles?.last_name].filter(Boolean).join(' ') || row.technician_id;
                           const elementId = row?.flex_element_id || row?.flex_document_id || '—';
                           const vendorId = row?.flex_vendor_id || '—';
+                          const lpoNumber = row?.lpo_number || '—';
                           return (
                             <div key={`${row.technician_id}-${elementId}`} className="flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="truncate"><span className="font-medium">{name}</span></div>
                                 <div className="text-xs text-muted-foreground truncate">LPO: {elementId}</div>
                                 <div className="text-xs text-muted-foreground truncate">Vendor: {vendorId}</div>
+                                <div className="text-xs text-muted-foreground truncate">Número: {lpoNumber}</div>
                               </div>
                               <div className="flex gap-1 shrink-0">
                                 <Button size="sm" variant="outline" onClick={() => copyToClipboard(String(elementId))}>Copiar LPO</Button>
+                                <Button size="sm" variant="outline" onClick={() => copyToClipboard(String(lpoNumber))}>Copiar Nº</Button>
                                 <Button size="sm" variant="outline" onClick={() => copyToClipboard(String(vendorId))}>Copiar Vendor</Button>
                               </div>
                             </div>

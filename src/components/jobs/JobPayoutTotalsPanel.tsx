@@ -5,6 +5,8 @@ import { Separator } from '@/components/ui/separator';
 import { Euro, AlertCircle, Clock, CheckCircle } from 'lucide-react';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { formatCurrency } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface JobPayoutTotalsPanelProps {
   jobId: string;
@@ -13,6 +15,18 @@ interface JobPayoutTotalsPanelProps {
 
 export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPanelProps) {
   const { data: payoutTotals = [], isLoading, error } = useJobPayoutTotals(jobId, technicianId);
+  const { data: lpoRows = [] } = useQuery({
+    queryKey: ['flex-work-orders-by-job', jobId, technicianId],
+    queryFn: async () => {
+      let q = supabase.from('flex_work_orders').select('technician_id, lpo_number, flex_element_id').eq('job_id', jobId);
+      if (technicianId) q = q.eq('technician_id', technicianId);
+      const { data } = await q;
+      return (data || []) as Array<{ technician_id: string; lpo_number: string | null; flex_element_id: string | null }>;
+    },
+    enabled: !!jobId,
+    staleTime: 30_000,
+  });
+  const lpoMap = React.useMemo(() => new Map(lpoRows.map(r => [r.technician_id, r.lpo_number || null])), [lpoRows]);
 
   if (isLoading) {
     return (
@@ -77,6 +91,9 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
               <div>
                 <h4 className="font-medium text-base">Technician ID: {payout.technician_id}</h4>
                 <p className="text-sm text-muted-foreground">Job: {payout.job_id}</p>
+                {lpoMap.has(payout.technician_id) && (
+                  <p className="text-xs text-muted-foreground">LPO Nº: {lpoMap.get(payout.technician_id) || '—'}</p>
+                )}
               </div>
               <div className="text-right">
                 <div className="text-xl font-bold text-primary">

@@ -8,6 +8,7 @@ const DEFAULT_LOCATION_ID = FLEX_FOLDER_IDS.location;
 const PERSONNEL_RESPONSIBLE_ID = RESPONSIBLE_PERSON_IDS.personnel;
 const CURRENCY_EUR_ID = 'd3d53320-6926-11ea-9bb5-2a0a4490a7fb';
 const PRICING_MODEL_BASE_2025_ID = 'a4307bf9-cd39-4df1-9d6d-48932120c4bd';
+const PRICING_MODEL_DIA_TOUR_ID = '04c62780-c51d-11ea-a087-2a0a4490a7fb';
 
 let cachedFlexToken: string | null = null;
 
@@ -90,12 +91,26 @@ async function createWorkOrderElement(options: {
   const raw = await response.json().catch(() => ({}));
   const documentId =
     raw?.id || raw?.elementId || raw?.data?.id || raw?.data?.elementId || raw?.element?.id || null;
+  const documentNumber = raw?.documentNumber || raw?.elementNumber || raw?.number || raw?.data?.documentNumber || null;
 
   if (!documentId) {
     throw new Error('Flex work order creation succeeded without returning an element id');
   }
 
-  return { documentId, raw };
+  return { documentId, raw: { ...raw, documentNumber } };
+}
+
+async function fetchDocumentNumber(documentId: string, token: string): Promise<string | null> {
+  const url = `${FLEX_API_BASE_URL}/element/${encodeURIComponent(documentId)}/key-info/`;
+  try {
+    const res = await fetch(url, { headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token } });
+    if (!res.ok) return null;
+    const j = await res.json().catch(() => null) as any;
+    const docNum = j?.documentNumber?.data || j?.documentNumber || null;
+    return (typeof docNum === 'string' && docNum.trim()) ? docNum : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 async function addResourceLineItem(options: {
@@ -192,7 +207,7 @@ async function setLineItemPricingModel(options: {
   token: string;
 }): Promise<boolean> {
   const { documentId, lineItemId, pricingModelId, token } = options;
-  const rowDataUrl = `${FLEX_API_BASE_URL}/line-item/${encodeURIComponent(documentId)}/row-data/`;
+  const rowDataUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/row-data`;
   try {
     const res = await fetch(rowDataUrl, {
       method: 'POST',
@@ -213,16 +228,58 @@ async function setLineItemTimeQty(options: {
   token: string;
 }): Promise<boolean> {
   const { documentId, lineItemId, timeQty, token } = options;
-  const rowDataUrl = `${FLEX_API_BASE_URL}/line-item/${encodeURIComponent(documentId)}/row-data/`;
+  const rowDataUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/row-data`;
   try {
-    const res = await fetch(rowDataUrl, {
+    // Try canonical camelCase key first (as seen in Flex payloads)
+    let res = await fetch(rowDataUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', accept: 'application/json', 'X-Auth-Token': token },
+      body: JSON.stringify({ lineItemId, fieldType: 'timeQty', payloadValue: timeQty }),
+    });
+    if (res.ok) return true;
+
+    // Fallback to kebab-case variant some environments expect
+    res = await fetch(rowDataUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', accept: 'application/json', 'X-Auth-Token': token },
       body: JSON.stringify({ lineItemId, fieldType: 'time-qty', payloadValue: timeQty }),
     });
+    if (res.ok) return true;
+
+    // Last fallback: send as string payload
+    res = await fetch(rowDataUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', accept: 'application/json', 'X-Auth-Token': token },
+      body: JSON.stringify({ lineItemId, fieldType: 'timeQty', payloadValue: String(timeQty) }),
+    });
     return res.ok;
   } catch (err) {
     console.warn('[FlexWorkOrders] Failed to set time qty on line item', err);
+    return false;
+  }
+}
+
+async function setLineItemTimeQtyBulk(options: {
+  documentId: string;
+  lineItemId: string;
+  timeQty: number;
+  token: string;
+}): Promise<boolean> {
+  const { documentId, lineItemId, timeQty, token } = options;
+  const url = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/bulk-update`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        accept: '*/*',
+        'X-Auth-Token': token,
+      },
+      body: JSON.stringify({ bulkData: [{ itemId: lineItemId, timeQty }] }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[FlexWorkOrders] Failed bulk-update timeQty on line item', err);
     return false;
   }
 }
@@ -381,17 +438,12 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
     // Create the work orders subfolder in Flex
     const plannedStartDate = formatDate(job.start_time) ?? new Date().toISOString().slice(0, 10);
     const plannedEndDate = formatDate(job.end_time) ?? plannedStartDate;
-    const yymmdd = plannedStartDate
-      ? `${plannedStartDate.slice(2,4)}${plannedStartDate.slice(5,7)}${plannedStartDate.slice(8,10)}`
-      : new Date().toISOString().slice(2,10).replace(/-/g,'');
-    const workOrdersFolderDoc = `${yymmdd}${DEPARTMENT_SUFFIXES.personnel}-ORD`;
     const workOrderPayload = {
       definitionId: FLEX_FOLDER_IDS.subFolder,
       parentElementId: personnelFolder.element_id,
       open: true,
       locked: false,
       name: `Órdenes de Trabajo - ${job.title} [${plannedStartDate} – ${plannedEndDate}]`,
-      documentNumber: workOrdersFolderDoc,
     };
     
     const flexResponse = await fetch(`${FLEX_API_BASE_URL}/element`, {
@@ -497,13 +549,17 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
 
     try {
       const technicianName = technicianDisplayName(assignment.profiles || undefined);
-      const { documentId } = await createWorkOrderElement({
+      const { documentId, raw: createdRaw } = await createWorkOrderElement({
         parentElementId: parentFolder.element_id,
         job,
         technicianName,
         vendorId: flexResourceId,
         token,
       });
+      let createdNumber: string | null = (createdRaw && (createdRaw.documentNumber || createdRaw.elementNumber || createdRaw.number)) || null;
+      if (!createdNumber) {
+        createdNumber = await fetchDocumentNumber(documentId, token);
+      }
 
       // Build role line items for SOUND and LIGHTS only (skip VIDEO)
       const roleEntries: Array<{ dept: 'sound' | 'lights'; role: string }> = [];
@@ -514,6 +570,9 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
         const laborResourceId = resourceIdForRole(r.dept, r.role);
         if (!laborResourceId) continue;
         const roleQty = (job.job_type && (job.job_type === 'single' || job.job_type === 'festival')) ? 3 : 1;
+        const pricingModelId = (job.job_type && (job.job_type === 'tour' || job.job_type === 'tourdate'))
+          ? PRICING_MODEL_DIA_TOUR_ID
+          : PRICING_MODEL_BASE_2025_ID;
         const lineItemId = await addResourceLineItem({
           documentId,
           parentElementId: parentFolder.element_id,
@@ -525,11 +584,14 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
         if (!lineItemId) {
           errors.push(`No se pudo añadir el line item de ${r.dept} (${r.role}) para el técnico ${technicianId}.`);
         }
-        // Apply pricing model to main role line
+        // Apply pricing model to main role line and set quantities
         if (lineItemId) {
-          await setLineItemPricingModel({ documentId, lineItemId, pricingModelId: PRICING_MODEL_BASE_2025_ID, token });
-          // Ensure time quantity is set so pricing computes
+          await setLineItemPricingModel({ documentId, lineItemId, pricingModelId, token });
+          // Update both quantity and timeQty via row-data and bulk for reliability
+          await setLineItemQuantityRow({ documentId, lineItemId, quantity: roleQty, token });
+          await setLineItemQuantityBulk({ documentId, lineItemId, quantity: roleQty, token });
           await setLineItemTimeQty({ documentId, lineItemId, timeQty: roleQty, token });
+          await setLineItemTimeQtyBulk({ documentId, lineItemId, timeQty: roleQty, token });
         }
         // For single/festival jobs with overtime, add child lines under SOUND and LIGHTS roles
         if (lineItemId && job.job_type && (job.job_type === 'single' || job.job_type === 'festival') && (r.dept === 'sound' || r.dept === 'lights')) {
@@ -554,10 +616,10 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
             parentLineItemId: lineItemId,
           });
           if (child1) {
-            await setLineItemPricingModel({ documentId, lineItemId: child1, pricingModelId: PRICING_MODEL_BASE_2025_ID, token });
+            await setLineItemPricingModel({ documentId, lineItemId: child1, pricingModelId, token });
           }
           if (child2) {
-            await setLineItemPricingModel({ documentId, lineItemId: child2, pricingModelId: PRICING_MODEL_BASE_2025_ID, token });
+            await setLineItemPricingModel({ documentId, lineItemId: child2, pricingModelId, token });
           }
         }
       }
@@ -607,7 +669,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
       };
       const { error: insertError } = await supabase
         .from('flex_work_orders')
-        .insert(insertPayload);
+        .insert({ ...insertPayload, lpo_number: createdNumber });
 
       if (insertError) {
         throw insertError;

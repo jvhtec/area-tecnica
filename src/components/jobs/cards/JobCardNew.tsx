@@ -505,6 +505,13 @@ export function JobCardNew({
       return;
     }
 
+    // For dryhire jobs, the structure is fixed — create directly without opening the picker
+    if (job.job_type === 'dryhire') {
+      console.log("JobCardNew: Dryhire detected — creating folders directly without picker", job.id);
+      void handleFlexPickerConfirm(undefined);
+      return;
+    }
+
     if (actualFoldersExist) {
       console.log("JobCardNew: Folders actually exist, preventing creation");
       toast({
