@@ -150,11 +150,25 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       console.log('🔄 Fetching fresh profile data...');
       setIsProfileLoading(true);
 
-      const { data, error } = await supabase
+      // Prefer new flag name; alias to expected key. Fallback if column missing.
+      let { data, error } = await supabase
         .from('profiles')
-        .select('role, department, soundvision_access')
+        .select('role, department, soundvision_access:soundvision_access_enabled')
         .eq('id', userId)
         .maybeSingle();
+
+      if (error && (error as any)?.code === '42703') {
+        // Column missing in this environment; fetch without it and default to false
+        console.warn('profiles.soundvision_access_enabled missing; defaulting to false');
+        const fallback = await supabase
+          .from('profiles')
+          .select('role, department')
+          .eq('id', userId)
+          .maybeSingle();
+        data = fallback.data as any;
+        error = fallback.error as any;
+        if (data) (data as any).soundvision_access = false;
+      }
 
       if (error) {
         console.error("Error fetching user profile:", error);
@@ -162,12 +176,12 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       }
 
       if (data) {
-        const soundVisionAccess = Boolean(data.soundvision_access);
+        const soundVisionAccess = Boolean((data as any).soundvision_access);
         setUserRole(data.role);
         setUserDepartment(data.department);
         setSoundVisionAccessFlag(soundVisionAccess);
         setCachedProfile(userId, data.role, data.department, soundVisionAccess);
-        return { ...data, soundvision_access: soundVisionAccess };
+        return { ...(data as any), soundvision_access: soundVisionAccess } as any;
       } else {
         setSoundVisionAccessFlag(false);
       }

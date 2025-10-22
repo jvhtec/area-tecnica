@@ -22,7 +22,6 @@ import { useNavigate } from "react-router-dom";
 import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
 import { IncidentReport } from "@/components/sound/tools/IncidentReport";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
-import { SoundVisionDatabaseDialog } from "@/components/soundvision/SoundVisionDatabaseDialog";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 const Sound = () => {
@@ -39,7 +38,7 @@ const Sound = () => {
   const [showAmplifierTool, setShowAmplifierTool] = useState(false);
   const [showMemoriaTecnica, setShowMemoriaTecnica] = useState(false);
   const [showIncidentReport, setShowIncidentReport] = useState(false);
-  const [showSoundVisionDatabase, setShowSoundVisionDatabase] = useState(false);
+  // SoundVision now routes to a dedicated page
   const currentDepartment = "sound";
   
   const { data: jobs } = useJobs();
@@ -48,11 +47,7 @@ const Sound = () => {
 
   const { userRole, hasSoundVisionAccess } = useOptimizedAuth();
 
-  useEffect(() => {
-    if (!hasSoundVisionAccess) {
-      setShowSoundVisionDatabase(false);
-    }
-  }, [hasSoundVisionAccess]);
+  // Ensure legacy state not used; navigation used instead
 
   // Keyboard shortcut: Cmd/Ctrl+N to open (disable plain 'c')
   useEffect(() => {
@@ -270,7 +265,7 @@ const Sound = () => {
                 variant="outline"
                 size="lg"
                 className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                onClick={() => setShowSoundVisionDatabase(true)}
+                onClick={() => navigate('/soundvision-files')}
               >
                 <Database className="h-4 w-4 sm:h-6 sm:w-6" />
                 <span className="text-center leading-tight">Archivos SoundVision</span>
@@ -346,13 +341,7 @@ const Sound = () => {
           </DialogContent>
         </Dialog>
 
-        {hasSoundVisionAccess && (
-          <Dialog open={showSoundVisionDatabase} onOpenChange={setShowSoundVisionDatabase}>
-            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-              <SoundVisionDatabaseDialog />
-            </DialogContent>
-          </Dialog>
-        )}
+        {/* SoundVision dialog removed in favor of dedicated route */}
       </div>
       {/* Mobile FAB */}
       <Button 

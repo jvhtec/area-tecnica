@@ -775,6 +775,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
 
   const renderJobCard = (job: any, day: Date) => (
     <JobCard
+      key={job.id}
       job={job}
       date={day}
       dateTypes={dateTypes}

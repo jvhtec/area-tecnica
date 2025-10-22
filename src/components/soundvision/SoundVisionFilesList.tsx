@@ -282,6 +282,8 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
           </TableBody>
         </Table>
       </div>
+      </div>
+      {/* Close wrapper before rendering dialog */}
       {selectedFile && (
         <SoundVisionReviewDialog
           file={selectedFile}
