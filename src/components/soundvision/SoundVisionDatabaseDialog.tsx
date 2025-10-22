@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { SoundVisionFileUploader } from './SoundVisionFileUploader';
 import { SoundVisionFilesList } from './SoundVisionFilesList';
 import { SoundVisionSearchFilters } from './SoundVisionSearchFilters';
@@ -36,15 +35,15 @@ export const SoundVisionDatabaseDialog = () => {
   };
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>SoundVision File Database</DialogTitle>
-        <DialogDescription>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-3xl font-bold">SoundVision File Database</h1>
+        <p className="text-muted-foreground mt-2">
           Upload, browse, and download venue-specific SoundVision files
-        </DialogDescription>
-      </DialogHeader>
+        </p>
+      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="browse">Browse Files</TabsTrigger>
           <TabsTrigger value="upload">Upload New File</TabsTrigger>
@@ -78,6 +77,6 @@ export const SoundVisionDatabaseDialog = () => {
           <SoundVisionFileUploader onUploadComplete={handleUploadComplete} />
         </TabsContent>
       </Tabs>
-    </>
+    </div>
   );
 };
