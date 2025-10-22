@@ -1,4 +1,4 @@
-import { Download, Trash2, MapPin, User, Calendar, Star as StarIcon } from 'lucide-react';
+import { Download, Trash2, MapPin, User, Calendar, Star as StarIcon, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -24,7 +24,7 @@ import { canDeleteSoundVisionFiles } from '@/utils/permissions';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { StarRating } from './StarRating';
 import { SoundVisionReviewDialog } from './SoundVisionReviewDialog';
@@ -34,7 +34,9 @@ interface SoundVisionFilesListProps {
 }
 
 export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
+  const queryClient = useQueryClient();
   const [selectedFile, setSelectedFile] = useState<SoundVisionFile | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: profile } = useQuery({
     queryKey: ['current-user-profile'],
     queryFn: async () => {
@@ -71,6 +73,16 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
   const canOpenReviews = (file: SoundVisionFile) =>
     isManagement || file.hasDownloaded || file.hasReviewed;
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
+    await queryClient.refetchQueries({ queryKey: ['soundvision-files'] });
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
+
+  const filesWithCoordinates = files.filter(f => f.venue?.coordinates);
+  const filesWithoutCoordinates = files.length - filesWithCoordinates.length;
+
   if (files.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -83,12 +95,41 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
   return (
     <>
       <div className="space-y-4">
+      {/* Refresh button and info */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1">
+          {filesWithoutCoordinates > 0 && (
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <p>
+                {filesWithoutCoordinates} {filesWithoutCoordinates === 1 ? 'archivo' : 'archivos'} sin coordenadas (no {filesWithoutCoordinates === 1 ? 'aparece' : 'aparecen'} en el mapa)
+              </p>
+            </div>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="shrink-0"
+        >
+          <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Actualizar
+        </Button>
+      </div>
+
       {/* Mobile View - Cards */}
       <div className="md:hidden space-y-3">
         {files.map((file) => (
           <div key={file.id} className="border rounded-lg p-4 space-y-3">
             <div className="space-y-1">
-              <p className="font-medium">{file.file_name}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium">{file.file_name}</p>
+                {!file.venue?.coordinates && (
+                  <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                )}
+              </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <MapPin className="h-3 w-3" />
                 <span>
@@ -203,7 +244,14 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                 <TableCell>
                   {file.venue?.city}, {file.venue?.country}
                 </TableCell>
-                <TableCell className="font-mono text-sm">{file.file_name}</TableCell>
+                <TableCell className="font-mono text-sm">
+                  <div className="flex items-center gap-2">
+                    {file.file_name}
+                    {!file.venue?.coordinates && (
+                      <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell>
                   {file.uploader?.first_name} {file.uploader?.last_name}
                 </TableCell>

@@ -24,7 +24,7 @@ export interface VenueFormData {
 }
 
 interface VenueMetadataFormProps {
-  form: UseFormReturn<VenueFormData & Record<string, unknown>>;
+  form: UseFormReturn<any>;
 }
 
 interface PlaceResult {

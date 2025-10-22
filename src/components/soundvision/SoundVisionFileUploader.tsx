@@ -19,7 +19,7 @@ type SoundVisionUploadFormData = VenueFormData & {
   includeInitialReview: boolean;
   initialRating: number | null;
   initialReview: string;
-};
+} & Record<string, unknown>;
 
 export const SoundVisionFileUploader = ({ onUploadComplete }: SoundVisionFileUploaderProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

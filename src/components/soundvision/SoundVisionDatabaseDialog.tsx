@@ -5,8 +5,10 @@ import { SoundVisionFilesList } from './SoundVisionFilesList';
 import { SoundVisionSearchFilters } from './SoundVisionSearchFilters';
 import { useSoundVisionFiles } from '@/hooks/useSoundVisionFiles';
 import { Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export const SoundVisionDatabaseDialog = () => {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('browse');
   const [searchTerm, setSearchTerm] = useState('');
   const [city, setCity] = useState('');
@@ -30,8 +32,15 @@ export const SoundVisionDatabaseDialog = () => {
     setFileType('');
   };
 
-  const handleUploadComplete = () => {
-    setActiveTab('browse');
+  const handleUploadComplete = async () => {
+    // Wait for queries to refresh before switching tabs
+    await queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
+    await queryClient.refetchQueries({ queryKey: ['soundvision-files'] });
+    
+    // Small delay to ensure UI updates
+    setTimeout(() => {
+      setActiveTab('browse');
+    }, 300);
   };
 
   return (
