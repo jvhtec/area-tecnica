@@ -1,11 +1,14 @@
-// SoundVision file validation utilities
+// L-Acoustics SoundVision file validation utilities
 
-export const ALLOWED_FILE_TYPES = ['.svd', '.zip', '.pdf'];
+// L-Acoustics Soundvision file types:
+// .xmlp - Project file (full Soundvision project)
+// .xmls - Scene file (venue/geometry context)
+// .xmlc - Configuration file (exports like speaker positions)
+export const ALLOWED_FILE_TYPES = ['.xmlp', '.xmls', '.xmlc'];
 export const ALLOWED_MIME_TYPES = [
-  'application/octet-stream',
-  'application/zip',
-  'application/pdf',
-  'application/x-zip-compressed',
+  'application/xml',
+  'text/xml',
+  'application/octet-stream', // Some systems may report XML files as octet-stream
 ];
 export const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB in bytes
 
