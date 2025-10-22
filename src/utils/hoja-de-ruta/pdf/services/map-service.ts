@@ -11,14 +11,12 @@ export class MapService {
     if (!this.googleKeyPromise) {
       this.googleKeyPromise = (async () => {
         try {
-          const { data, error } = await supabase.functions.invoke('get-secret', {
-            body: { secretName: 'GOOGLE_MAPS_API_KEY' },
-          });
+          const { data, error } = await supabase.functions.invoke('get-google-maps-key');
           if (error) {
             console.error('Failed to fetch Google Maps API key:', error);
             return null;
           }
-          const key = data?.GOOGLE_MAPS_API_KEY || null;
+          const key = data?.apiKey || null;
           this.googleApiKey = key;
           return key;
         } catch (e) {
