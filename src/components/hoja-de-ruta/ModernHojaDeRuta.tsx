@@ -260,7 +260,14 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     }
 
     try {
-      await autoPopulateFromJob();
+      const autoPopulatedData = await autoPopulateFromJob();
+
+      if (autoPopulatedData?.powerRequirements) {
+        setEventData((prev) => ({
+          ...prev,
+          powerRequirements: autoPopulatedData.powerRequirements,
+        }));
+      }
     } catch (error) {
       console.error("Error loading job data:", error);
       toast({
