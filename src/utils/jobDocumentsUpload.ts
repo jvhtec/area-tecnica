@@ -73,6 +73,7 @@ export const uploadJobPdfWithCleanup = async (
         file_type: "application/pdf",
         file_size: pdfBlob.size,
         uploaded_by: userRes?.user?.id || null,
+        original_type: 'pdf',
       });
     if (insertError) throw insertError;
 

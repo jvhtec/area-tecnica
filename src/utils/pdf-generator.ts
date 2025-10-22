@@ -25,6 +25,7 @@ export const uploadPdfToJob = async (
       file_name: fileName,
       file_path: data.path,
       file_type: "application/pdf",
+      original_type: 'pdf'
     });
 
     if (docError) throw docError;

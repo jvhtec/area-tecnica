@@ -180,7 +180,8 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
           file_name: file.name,
           file_path: filePath,
           file_type: file.type,
-          file_size: file.size
+          file_size: file.size,
+          original_type: null
         });
       if (dbError) throw dbError;
 

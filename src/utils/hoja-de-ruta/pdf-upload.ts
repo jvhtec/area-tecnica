@@ -75,7 +75,8 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
         file_path: `hojas-de-ruta/${jobId}/${sanitizedFileName}`,
         file_type: 'application/pdf',
         file_size: pdfBlob.size,
-        uploaded_by: (await supabase.auth.getUser()).data.user?.id
+        uploaded_by: (await supabase.auth.getUser()).data.user?.id,
+        original_type: 'pdf'
       });
 
     if (insertError) {
