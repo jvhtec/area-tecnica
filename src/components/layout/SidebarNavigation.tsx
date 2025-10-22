@@ -121,6 +121,21 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
           </Link>
         )}
 
+        {/* SoundVision Files - for technicians/house techs */}
+        {isTechnicianOrHouseTech && (
+          <Link to="/soundvision-files">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === "/soundvision-files" ? "bg-accent" : ""
+              }`}
+            >
+              <Database className="h-4 w-4" />
+              <span>SoundVision Files</span>
+            </Button>
+          </Link>
+        )}
+
         {/* Personal Calendar - Available to all authenticated users except technicians */}
         {userRole !== 'technician' && (
           <Link to="/personal">

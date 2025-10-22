@@ -11,7 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { Calculator, PieChart, FileText, Zap, FileStack, Tent, AlertTriangle, Plus } from 'lucide-react';
+import { Calculator, PieChart, FileText, Zap, FileStack, Tent, AlertTriangle, Plus, Database } from 'lucide-react';
 import type { JobType } from "@/types/job";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { useNavigate } from "react-router-dom";
 import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
 import { IncidentReport } from "@/components/sound/tools/IncidentReport";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
+import { SoundVisionDatabaseDialog } from "@/components/soundvision/SoundVisionDatabaseDialog";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -39,6 +40,7 @@ const Sound = () => {
   const [showAmplifierTool, setShowAmplifierTool] = useState(false);
   const [showMemoriaTecnica, setShowMemoriaTecnica] = useState(false);
   const [showIncidentReport, setShowIncidentReport] = useState(false);
+  const [showSoundVisionDatabase, setShowSoundVisionDatabase] = useState(false);
   const currentDepartment = "sound";
   
   const { data: jobs } = useJobs();
@@ -279,6 +281,16 @@ const Sound = () => {
               <Tent className="h-4 w-4 sm:h-6 sm:w-6" />
               <span className="text-center leading-tight">Festivals</span>
             </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+              onClick={() => setShowSoundVisionDatabase(true)}
+            >
+              <Database className="h-4 w-4 sm:h-6 sm:w-6" />
+              <span className="text-center leading-tight">SoundVision Files</span>
+            </Button>
            </div>
          </div>
        </Card>
@@ -340,13 +352,19 @@ const Sound = () => {
          </DialogContent>
        </Dialog>
 
-       <Dialog open={showIncidentReport} onOpenChange={setShowIncidentReport}>
-         <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-           <DialogHeader>
-             <DialogTitle>Reporte de Incidencia</DialogTitle>
-           </DialogHeader>
-           <IncidentReport />
-         </DialogContent>
+        <Dialog open={showIncidentReport} onOpenChange={setShowIncidentReport}>
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Reporte de Incidencia</DialogTitle>
+            </DialogHeader>
+            <IncidentReport />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showSoundVisionDatabase} onOpenChange={setShowSoundVisionDatabase}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <SoundVisionDatabaseDialog />
+          </DialogContent>
         </Dialog>
       </div>
       {/* Mobile FAB */}

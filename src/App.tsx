@@ -57,6 +57,7 @@ import Announcements from '@/pages/Announcements';
 import RatesCenterPage from '@/pages/RatesCenterPage';
 import { useActivityPushFallback } from '@/hooks/useActivityPushFallback';
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
+import SoundVisionFiles from '@/pages/SoundVisionFiles';
 
 // Initialize activity push fallback within auth context
 function ActivityPushFallbackInit() {

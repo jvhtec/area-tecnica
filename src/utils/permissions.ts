@@ -16,3 +16,7 @@ export const canCreateFolders = (role: UserRole) => ['admin', 'management', 'log
 
 export const canManageFestivalArtists = (role: UserRole) => ['admin', 'management', 'logistics', 'technician', 'house_tech'].includes(role || '');
 
+export const canUploadSoundVisionFiles = (role: UserRole) => ['admin', 'management', 'house_tech', 'technician', 'logistics'].includes(role || '');
+
+export const canDeleteSoundVisionFiles = (role: UserRole) => ['admin', 'management'].includes(role || '');
+

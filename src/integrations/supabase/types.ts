@@ -4407,6 +4407,53 @@ export type Database = {
           },
         ]
       }
+      soundvision_files: {
+        Row: {
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id: string
+          metadata: Json | null
+          notes: string | null
+          uploaded_at: string
+          uploaded_by: string
+          venue_id: string
+        }
+        Insert: {
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id?: string
+          metadata?: Json | null
+          notes?: string | null
+          uploaded_at?: string
+          uploaded_by: string
+          venue_id: string
+        }
+        Update: {
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          metadata?: Json | null
+          notes?: string | null
+          uploaded_at?: string
+          uploaded_by?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soundvision_files_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staffing_events: {
         Row: {
           created_at: string
@@ -5774,6 +5821,48 @@ export type Database = {
           },
         ]
       }
+      venues: {
+        Row: {
+          capacity: number | null
+          city: string
+          coordinates: Json | null
+          country: string
+          created_at: string
+          full_address: string | null
+          google_place_id: string | null
+          id: string
+          name: string
+          state_region: string | null
+          updated_at: string
+        }
+        Insert: {
+          capacity?: number | null
+          city: string
+          coordinates?: Json | null
+          country: string
+          created_at?: string
+          full_address?: string | null
+          google_place_id?: string | null
+          id?: string
+          name: string
+          state_region?: string | null
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number | null
+          city?: string
+          coordinates?: Json | null
+          country?: string
+          created_at?: string
+          full_address?: string | null
+          google_place_id?: string | null
+          id?: string
+          name?: string
+          state_region?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       video_job_personnel: {
         Row: {
           camera_ops: number | null
@@ -6140,14 +6229,8 @@ export type Database = {
       }
     }
     Functions: {
-      auto_complete_past_jobs: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      can_manage_users: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      auto_complete_past_jobs: { Args: never; Returns: number }
+      can_manage_users: { Args: never; Returns: boolean }
       clear_tour_preset_assignments: {
         Args: { _preset_id: string; _tour_id: string }
         Returns: undefined
@@ -6173,7 +6256,7 @@ export type Database = {
         Returns: Json
       }
       get_assignment_matrix_staffing: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           availability_status: string
           availability_updated_at: string
@@ -6184,10 +6267,7 @@ export type Database = {
           profile_id: string
         }[]
       }
-      get_current_user_role: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_current_user_role: { Args: never; Returns: string }
       get_job_total_amounts: {
         Args: { _job_id: string; _user_role?: string }
         Returns: {
@@ -6200,7 +6280,7 @@ export type Database = {
         }[]
       }
       get_profiles_with_skills: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           assignable_as_tech: boolean
           department: string
@@ -6216,7 +6296,7 @@ export type Database = {
         }[]
       }
       get_timesheet_amounts_visible: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           amount_breakdown: Json
           amount_breakdown_visible: Json
@@ -6292,14 +6372,8 @@ export type Database = {
           job_id: string
         }[]
       }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_house_tech: {
-        Args: { _profile_id: string }
-        Returns: boolean
-      }
+      is_admin: { Args: never; Returns: boolean }
+      is_house_tech: { Args: { _profile_id: string }; Returns: boolean }
       iso_year_week_madrid: {
         Args: { ts: string }
         Returns: {
@@ -6334,10 +6408,7 @@ export type Database = {
         }
         Returns: string
       }
-      minutes_to_hours_round_30: {
-        Args: { mins: number }
-        Returns: number
-      }
+      minutes_to_hours_round_30: { Args: { mins: number }; Returns: number }
       needs_vehicle_disclaimer: {
         Args: { _profile_id: string }
         Returns: boolean
@@ -6354,9 +6425,19 @@ export type Database = {
         Args: { _preset_id: string; _tour_id: string }
         Returns: undefined
       }
-      update_tour_dates: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
+      update_tour_dates: { Args: never; Returns: undefined }
+      upsert_venue: {
+        Args: {
+          p_capacity?: number
+          p_city: string
+          p_coordinates?: Json
+          p_country: string
+          p_full_address?: string
+          p_google_place_id: string
+          p_name: string
+          p_state_region: string
+        }
+        Returns: string
       }
     }
     Enums: {
