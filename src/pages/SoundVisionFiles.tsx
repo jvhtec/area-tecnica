@@ -2,16 +2,29 @@ import { Card } from '@/components/ui/card';
 import { SoundVisionDatabaseDialog } from '@/components/soundvision/SoundVisionDatabaseDialog';
 import { SoundVisionMap } from '@/components/soundvision/SoundVisionMap';
 import { useSoundVisionFiles } from '@/hooks/useSoundVisionFiles';
-import { useRoleGuard } from '@/hooks/useRoleGuard';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getDashboardPath } from '@/utils/roleBasedRouting';
+import type { UserRole } from '@/types/user';
 import { Loader2 } from 'lucide-react';
 
 const SoundVisionFiles = () => {
-  // Protect this page - only allow sound department technicians and house techs
-  useRoleGuard(['technician', 'house_tech'], 'sound');
+  const { hasSoundVisionAccess, isLoading, userRole } = useOptimizedAuth();
+  const navigate = useNavigate();
 
-  const { data: files = [], isLoading } = useSoundVisionFiles();
+  useEffect(() => {
+    if (isLoading) return;
 
-  if (isLoading) {
+    if (!hasSoundVisionAccess) {
+      const fallbackPath = getDashboardPath(userRole ? (userRole as UserRole) : null);
+      navigate(fallbackPath, { replace: true });
+    }
+  }, [hasSoundVisionAccess, isLoading, navigate, userRole]);
+
+  const { data: files = [], isLoading: isFilesLoading } = useSoundVisionFiles();
+
+  if (isLoading || !hasSoundVisionAccess || isFilesLoading) {
     return (
       <div className="container mx-auto px-4 py-6 max-w-7xl h-[calc(100vh-6rem)] flex items-center justify-center">
         <div className="flex items-center gap-2">

@@ -26,9 +26,10 @@ import { SidebarNavigationSkeleton } from './SidebarNavigationSkeleton';
 interface SidebarNavigationProps {
   userRole: string | null;
   userDepartment?: string | null;
+  hasSoundVisionAccess: boolean;
 }
 
-export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigationProps) => {
+export const SidebarNavigation = ({ userRole, userDepartment, hasSoundVisionAccess }: SidebarNavigationProps) => {
   const location = useLocation();
   console.log('Current user role in navigation:', userRole);
   console.log('Current user department in navigation:', userDepartment);
@@ -38,16 +39,6 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
   
   // Management users have access to everything
   const isManagementUser = userRole === 'management';
-  
-  // Check if user is in sound department
-  const isSoundDepartment = userDepartment?.toLowerCase() === 'sound';
-
-  // Check if user is house tech from sound department
-  const isSoundHouseTech = userRole === 'house_tech' && isSoundDepartment;
-  
-  // Check if user is in lights department
-  const isLightsDepartment = userDepartment?.toLowerCase() === 'lights';
-  const isLightsHouseTech = userRole === 'house_tech' && isLightsDepartment;
 
   // Show skeleton instead of nothing while role loads
   if (!userRole) {
@@ -122,8 +113,8 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
           </Link>
         )}
 
-        {/* SoundVision Files - for sound department technicians/house techs only */}
-        {isTechnicianOrHouseTech && isSoundDepartment && (
+        {/* SoundVision Files - gated by dedicated access flag */}
+        {hasSoundVisionAccess && (
           <Link to="/soundvision-files">
             <Button
               variant="ghost"

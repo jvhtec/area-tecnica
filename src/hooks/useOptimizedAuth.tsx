@@ -13,6 +13,7 @@ interface AuthContextType {
   user: any | null;
   userRole: string | null;
   userDepartment: string | null;
+  hasSoundVisionAccess: boolean;
   isLoading: boolean;
   isInitialized: boolean;
   isProfileLoading: boolean;
@@ -45,8 +46,15 @@ interface SignUpData {
 interface CachedProfile {
   role: string | null;
   department: string | null;
+  soundVisionAccess?: boolean;
   userId: string;
   timestamp: number;
+}
+
+interface ProfileData {
+  role: string | null;
+  department: string | null;
+  soundvision_access?: boolean | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,6 +78,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const [user, setUser] = useState<any | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
+  const [soundVisionAccessFlag, setSoundVisionAccessFlag] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -82,7 +91,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     try {
       const cached = localStorage.getItem(PROFILE_CACHE_KEY);
       if (cached) {
-        const profile: CachedProfile = JSON.parse(cached);
+        const profile = JSON.parse(cached) as CachedProfile;
         const isExpired = Date.now() - profile.timestamp > PROFILE_CACHE_DURATION;
         if (!isExpired && profile.userId === userId) {
           console.log('✅ Using cached profile data');
@@ -95,11 +104,12 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     return null;
   }, []);
 
-  const setCachedProfile = useCallback((userId: string, role: string | null, department: string | null) => {
+  const setCachedProfile = useCallback((userId: string, role: string | null, department: string | null, soundVisionAccess: boolean) => {
     try {
       const profile: CachedProfile = {
         role,
         department,
+        soundVisionAccess,
         userId,
         timestamp: Date.now()
       };
@@ -117,9 +127,10 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     } catch (error) {
       console.error('Error clearing profile cache:', error);
     }
+    setSoundVisionAccessFlag(false);
   }, []);
 
-  const fetchUserProfile = useCallback(async (userId: string, useCache = true) => {
+  const fetchUserProfile = useCallback(async (userId: string, useCache = true): Promise<ProfileData | null> => {
     try {
       // Try cache first if enabled
       if (useCache) {
@@ -127,7 +138,12 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         if (cached) {
           setUserRole(cached.role);
           setUserDepartment(cached.department);
-          return { role: cached.role, department: cached.department };
+          setSoundVisionAccessFlag(Boolean(cached.soundVisionAccess));
+          return {
+            role: cached.role,
+            department: cached.department,
+            soundvision_access: Boolean(cached.soundVisionAccess)
+          };
         }
       }
 
@@ -136,7 +152,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('role, department')
+        .select('role, department, soundvision_access')
         .eq('id', userId)
         .maybeSingle();
 
@@ -146,12 +162,16 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       }
 
       if (data) {
+        const soundVisionAccess = Boolean(data.soundvision_access);
         setUserRole(data.role);
         setUserDepartment(data.department);
-        setCachedProfile(userId, data.role, data.department);
+        setSoundVisionAccessFlag(soundVisionAccess);
+        setCachedProfile(userId, data.role, data.department, soundVisionAccess);
+        return { ...data, soundvision_access: soundVisionAccess };
+      } else {
+        setSoundVisionAccessFlag(false);
       }
-
-      return data;
+      return data ?? null;
     } catch (error) {
       console.error("Exception in fetchUserProfile:", error);
       return null;
@@ -584,16 +604,24 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
-      window.removeEventListener('online', handleOnline);
+    window.removeEventListener('online', handleOnline);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [refreshSession, session, toast, tokenManager]);
+
+  const normalizedDepartment = userDepartment?.toLowerCase();
+  const hasSoundVisionAccess =
+    Boolean(soundVisionAccessFlag) ||
+    userRole === 'admin' ||
+    userRole === 'management' ||
+    (userRole === 'house_tech' && normalizedDepartment === 'sound');
 
   const value = {
     session,
     user,
     userRole,
     userDepartment,
+    hasSoundVisionAccess,
     isLoading,
     isInitialized,
     isProfileLoading,

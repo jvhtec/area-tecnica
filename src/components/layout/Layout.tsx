@@ -36,6 +36,7 @@ const Layout = () => {
     session,
     userRole,
     userDepartment,
+    hasSoundVisionAccess,
     isLoading,
     logout
   } = useOptimizedAuth();
@@ -93,7 +94,11 @@ const Layout = () => {
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>
-                <SidebarNavigation userRole={userRole} userDepartment={userDepartment} />
+                <SidebarNavigation
+                  userRole={userRole}
+                  userDepartment={userDepartment}
+                  hasSoundVisionAccess={hasSoundVisionAccess}
+                />
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
