@@ -22,9 +22,10 @@ interface SoundVisionReviewDialogProps {
   file: SoundVisionFile;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  currentUserRole: string | null;
 }
 
-export const SoundVisionReviewDialog = ({ file, open, onOpenChange }: SoundVisionReviewDialogProps) => {
+export const SoundVisionReviewDialog = ({ file, open, onOpenChange, currentUserRole }: SoundVisionReviewDialogProps) => {
   const {
     reviews,
     currentUserReview,
@@ -40,6 +41,10 @@ export const SoundVisionReviewDialog = ({ file, open, onOpenChange }: SoundVisio
 
   const isSaving = createReview.isPending || updateReview.isPending;
   const isDeleting = deleteReview.isPending;
+  const isManagement = currentUserRole === 'admin' || currentUserRole === 'management';
+  const canLeaveNewReview = isManagement || file.hasDownloaded;
+  const hasExistingReview = Boolean(currentUserReview);
+  const canInteractWithForm = !!userId && (hasExistingReview || canLeaveNewReview);
 
   useEffect(() => {
     if (!open) return;
@@ -81,6 +86,11 @@ export const SoundVisionReviewDialog = ({ file, open, onOpenChange }: SoundVisio
     event.preventDefault();
     if (!userId) {
       toast.error('Debes iniciar sesión para dejar una reseña.');
+      return;
+    }
+
+    if (!canLeaveNewReview && !hasExistingReview) {
+      toast.error('Descarga el archivo antes de dejar una reseña.');
       return;
     }
 
@@ -142,7 +152,7 @@ export const SoundVisionReviewDialog = ({ file, open, onOpenChange }: SoundVisio
                   <Badge variant="secondary">Última actualización {formatDistanceToNow(new Date(currentUserReview.updated_at), { addSuffix: true, locale: es })}</Badge>
                 )}
               </div>
-              <StarRating value={rating} onChange={setRating} readOnly={!userId || isSaving || isDeleting} size="lg" />
+              <StarRating value={rating} onChange={setRating} readOnly={!canInteractWithForm || isSaving || isDeleting} size="lg" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="soundvision-review-text">
@@ -153,11 +163,14 @@ export const SoundVisionReviewDialog = ({ file, open, onOpenChange }: SoundVisio
                 placeholder="Comparte detalles útiles sobre este archivo..."
                 value={reviewText}
                 onChange={(event) => setReviewText(event.target.value)}
-                disabled={!userId || isSaving || isDeleting}
+                disabled={!canInteractWithForm || isSaving || isDeleting}
                 rows={4}
               />
               {!userId && (
                 <p className="text-xs text-muted-foreground">Inicia sesión para dejar una reseña.</p>
+              )}
+              {userId && !hasExistingReview && !canLeaveNewReview && (
+                <p className="text-xs text-muted-foreground">Descarga el archivo para poder dejar una reseña.</p>
               )}
             </div>
             <DialogFooter className="flex items-center justify-between gap-4">
@@ -175,7 +188,7 @@ export const SoundVisionReviewDialog = ({ file, open, onOpenChange }: SoundVisio
               ) : (
                 <span />
               )}
-              <Button type="submit" disabled={!userId || isSaving || isDeleting}>
+              <Button type="submit" disabled={!canInteractWithForm || isSaving || isDeleting}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {currentUserReview ? 'Actualizar reseña' : 'Publicar reseña'}
               </Button>

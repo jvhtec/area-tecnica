@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 export interface SoundVisionFile {
   id: string;
@@ -18,6 +19,8 @@ export interface SoundVisionFile {
   rating_total: number;
   last_reviewed_at: string | null;
   hasReviewed: boolean;
+  hasDownloaded: boolean;
+  lastDownloadedAt: string | null;
   current_user_review: SoundVisionReviewSummary | null;
   venue?: {
     id: string;
@@ -89,6 +92,7 @@ export const useSoundVisionFiles = (filters?: SoundVisionFileFilters) => {
       );
 
       let userReviewsMap = new Map<string, SoundVisionReviewSummary>();
+      let userDownloadsMap = new Map<string, string>();
 
       if (currentUserId && filesData.length > 0) {
         const { data: reviewData, error: reviewError } = await supabase
@@ -111,6 +115,18 @@ export const useSoundVisionFiles = (filters?: SoundVisionFileFilters) => {
             } as SoundVisionReviewSummary,
           ])
         );
+
+        const { data: downloadData, error: downloadError } = await supabase
+          .from('soundvision_file_downloads')
+          .select('file_id, downloaded_at')
+          .eq('profile_id', currentUserId)
+          .in('file_id', filesData.map((file) => file.id));
+
+        if (downloadError) throw downloadError;
+
+        userDownloadsMap = new Map(
+          (downloadData || []).map(download => [download.file_id, download.downloaded_at])
+        );
       }
 
       // Combine data
@@ -118,6 +134,8 @@ export const useSoundVisionFiles = (filters?: SoundVisionFileFilters) => {
         ...file,
         uploader: profilesMap.get(file.uploaded_by) || { first_name: '', last_name: '' },
         hasReviewed: userReviewsMap.has(file.id),
+        hasDownloaded: userDownloadsMap.has(file.id),
+        lastDownloadedAt: userDownloadsMap.get(file.id) ?? null,
         current_user_review: userReviewsMap.get(file.id) || null,
       })) as SoundVisionFile[];
 
@@ -199,8 +217,18 @@ export const useDeleteSoundVisionFile = () => {
 };
 
 export const useDownloadSoundVisionFile = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (file: SoundVisionFile) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error('Debes iniciar sesión para descargar este archivo.');
+      }
+
       const { data, error } = await supabase.storage
         .from('soundvision-files')
         .download(file.file_path);
@@ -216,6 +244,39 @@ export const useDownloadSoundVisionFile = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+
+      let downloadRecordError: PostgrestError | null = null;
+
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
+
+      const { error: recordError } = await supabase
+        .from('soundvision_file_downloads')
+        .upsert(
+          {
+            file_id: file.id,
+            profile_id: user.id,
+            downloaded_at: new Date().toISOString(),
+            user_agent: userAgent,
+          },
+          { onConflict: 'file_id,profile_id' }
+        );
+
+      if (recordError) {
+        downloadRecordError = recordError;
+      }
+
+      return { downloadRecordError };
+    },
+    onSuccess: ({ downloadRecordError }) => {
+      queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
+
+      if (downloadRecordError) {
+        console.error('Error recording SoundVision download:', downloadRecordError);
+        toast.error('La descarga se realizó, pero no se pudo registrar el evento.');
+        return;
+      }
+
+      toast.success('Descarga iniciada correctamente.');
     },
     onError: (error) => {
       console.error('Error downloading file:', error);
