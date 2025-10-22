@@ -14,10 +14,12 @@ export interface SoundVisionFile {
   notes: string | null;
   metadata: any;
   venue?: {
+    id: string;
     name: string;
     city: string;
     country: string;
     state_region: string | null;
+    coordinates: { lat: number; lng: number } | null;
   };
   uploader?: {
     first_name: string;
@@ -42,7 +44,7 @@ export const useSoundVisionFiles = (filters?: SoundVisionFileFilters) => {
         .from('soundvision_files')
         .select(`
           *,
-          venue:venues(name, city, country, state_region)
+          venue:venues(id, name, city, country, state_region, coordinates)
         `)
         .order('uploaded_at', { ascending: false });
 

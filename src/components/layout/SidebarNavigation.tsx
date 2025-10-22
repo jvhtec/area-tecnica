@@ -122,8 +122,8 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
           </Link>
         )}
 
-        {/* SoundVision Files - for technicians/house techs */}
-        {isTechnicianOrHouseTech && (
+        {/* SoundVision Files - for sound department technicians/house techs only */}
+        {isTechnicianOrHouseTech && isSoundDepartment && (
           <Link to="/soundvision-files">
             <Button
               variant="ghost"
