@@ -25,6 +25,7 @@ interface EditUserDialogProps {
 export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogProps) => {
   // Keep dialog mounted even if user becomes null to avoid portal teardown race conditions
   const [assignableAsTech, setAssignableAsTech] = useState<boolean>(!!user?.assignable_as_tech);
+  const [soundvisionAccessEnabled, setSoundvisionAccessEnabled] = useState<boolean>(!!user?.soundvision_access_enabled);
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const [flexUrl, setFlexUrl] = useState<string>("");
@@ -33,9 +34,15 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
 
   useEffect(() => {
     setAssignableAsTech(!!user?.assignable_as_tech);
+    const forceSoundvisionForHouseTech = user?.department === 'sound' && user?.role === 'house_tech';
+    setSoundvisionAccessEnabled(forceSoundvisionForHouseTech ? true : !!user?.soundvision_access_enabled);
     setFlexResourceId(user?.flex_resource_id || "");
     setFlexUrl("");
   }, [user?.id]);
+
+  const isSoundTechnician = user?.department === 'sound' && user?.role === 'technician';
+  const isSoundHouseTech = user?.department === 'sound' && user?.role === 'house_tech';
+  const forceSoundvisionAccess = isSoundHouseTech;
 
   const extractFlexIdFromUrl = (url: string): string | null => {
     try {
@@ -75,6 +82,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       role: formData.get('role') as string,
       assignable_as_tech: assignableAsTech,
       flex_resource_id: (formData.get('flex_resource_id') as string || flexResourceId || '').trim() || null,
+      soundvision_access_enabled: forceSoundvisionAccess ? true : soundvisionAccessEnabled,
     };
 
     console.log("Submitting user update with data:", updatedData);
@@ -144,6 +152,24 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
                 </span>
               </div>
             </div>
+            {isManagementUser && (isSoundTechnician || isSoundHouseTech) && (
+              <div className="space-y-2">
+                <Label htmlFor="soundvisionAccess">SoundVision Access</Label>
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="soundvisionAccess"
+                    checked={forceSoundvisionAccess ? true : soundvisionAccessEnabled}
+                    onCheckedChange={(v) => !forceSoundvisionAccess && setSoundvisionAccessEnabled(!!v)}
+                    disabled={forceSoundvisionAccess}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {forceSoundvisionAccess
+                      ? 'House techs always retain SoundVision access.'
+                      : 'Allow this sound technician to access SoundVision files and tools.'}
+                  </span>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="lastName">Last Name</Label>
               <Input

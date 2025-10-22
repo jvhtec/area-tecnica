@@ -4079,6 +4079,7 @@ export type Database = {
           phone: string | null
           residencia: string | null
           role: Database["public"]["Enums"]["user_role"]
+          soundvision_access_enabled: boolean | null
           selected_job_statuses: string[] | null
           selected_job_types: string[] | null
           time_span: string | null
@@ -4107,6 +4108,7 @@ export type Database = {
           phone?: string | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          soundvision_access_enabled?: boolean | null
           selected_job_statuses?: string[] | null
           selected_job_types?: string[] | null
           time_span?: string | null
@@ -4135,6 +4137,7 @@ export type Database = {
           phone?: string | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          soundvision_access_enabled?: boolean | null
           selected_job_statuses?: string[] | null
           selected_job_types?: string[] | null
           time_span?: string | null
