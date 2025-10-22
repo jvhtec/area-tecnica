@@ -289,7 +289,7 @@ const Sound = () => {
               onClick={() => setShowSoundVisionDatabase(true)}
             >
               <Database className="h-4 w-4 sm:h-6 sm:w-6" />
-              <span className="text-center leading-tight">SoundVision Files</span>
+              <span className="text-center leading-tight">Archivos SoundVision</span>
             </Button>
            </div>
          </div>

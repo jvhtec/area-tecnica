@@ -67,12 +67,12 @@ export const VenueMetadataForm = ({ form }: VenueMetadataFormProps) => {
         name="venueName"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Venue Name *</FormLabel>
+            <FormLabel>Nombre del recinto *</FormLabel>
             <FormControl>
               <PlaceAutocomplete
                 value={field.value}
                 onSelect={handlePlaceSelect}
-                placeholder="Search for venue..."
+                placeholder="Buscar recinto..."
                 onInputChange={field.onChange}
               />
             </FormControl>
@@ -87,7 +87,7 @@ export const VenueMetadataForm = ({ form }: VenueMetadataFormProps) => {
           name="venueCity"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>City *</FormLabel>
+              <FormLabel>Ciudad *</FormLabel>
               <FormControl>
                 <Input {...field} placeholder="Madrid" />
               </FormControl>
@@ -101,7 +101,7 @@ export const VenueMetadataForm = ({ form }: VenueMetadataFormProps) => {
           name="venueStateRegion"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>State/Region</FormLabel>
+              <FormLabel>Provincia/Región</FormLabel>
               <FormControl>
                 <Input {...field} placeholder="Community of Madrid" />
               </FormControl>
@@ -116,7 +116,7 @@ export const VenueMetadataForm = ({ form }: VenueMetadataFormProps) => {
         name="venueCountry"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Country *</FormLabel>
+            <FormLabel>País *</FormLabel>
             <FormControl>
               <Input {...field} placeholder="Spain" />
             </FormControl>
@@ -130,7 +130,7 @@ export const VenueMetadataForm = ({ form }: VenueMetadataFormProps) => {
         name="venueCapacity"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Venue Capacity (optional)</FormLabel>
+            <FormLabel>Aforo del recinto (opcional)</FormLabel>
             <FormControl>
               <Input {...field} type="number" placeholder="5000" />
             </FormControl>
@@ -144,9 +144,13 @@ export const VenueMetadataForm = ({ form }: VenueMetadataFormProps) => {
         name="venueNotes"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Additional Notes (optional)</FormLabel>
+            <FormLabel>Notas adicionales (opcional)</FormLabel>
             <FormControl>
-              <Textarea {...field} placeholder="Any additional information about the venue setup..." rows={3} />
+              <Textarea
+                {...field}
+                placeholder="Información adicional sobre el montaje del recinto..."
+                rows={3}
+              />
             </FormControl>
             <FormMessage />
           </FormItem>

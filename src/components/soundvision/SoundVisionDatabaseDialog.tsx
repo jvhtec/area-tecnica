@@ -37,16 +37,16 @@ export const SoundVisionDatabaseDialog = () => {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold">SoundVision File Database</h1>
+        <h1 className="text-3xl font-bold">Base de datos de archivos SoundVision</h1>
         <p className="text-muted-foreground mt-2">
-          Upload, browse, and download venue-specific SoundVision files
+          Sube, explora y descarga archivos SoundVision específicos de cada recinto
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="browse">Browse Files</TabsTrigger>
-          <TabsTrigger value="upload">Upload New File</TabsTrigger>
+          <TabsTrigger value="browse">Explorar archivos</TabsTrigger>
+          <TabsTrigger value="upload">Subir nuevo archivo</TabsTrigger>
         </TabsList>
 
         <TabsContent value="browse" className="space-y-4 mt-4">

@@ -23,6 +23,7 @@ import { useDeleteSoundVisionFile, useDownloadSoundVisionFile, SoundVisionFile }
 import { canDeleteSoundVisionFiles } from '@/utils/permissions';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 
 interface SoundVisionFilesListProps {
@@ -54,8 +55,8 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
   if (files.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        <p className="text-lg mb-2">No files found</p>
-        <p className="text-sm">Try adjusting your search filters</p>
+        <p className="text-lg mb-2">No se encontraron archivos</p>
+        <p className="text-sm">Intenta ajustar los filtros de búsqueda</p>
       </div>
     );
   }
@@ -82,7 +83,12 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-3 w-3" />
-                <span>{formatDistanceToNow(new Date(file.uploaded_at), { addSuffix: true })}</span>
+                <span>
+                  {formatDistanceToNow(new Date(file.uploaded_at), {
+                    addSuffix: true,
+                    locale: es,
+                  })}
+                </span>
               </div>
             </div>
             <div className="flex gap-2">
@@ -94,7 +100,7 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                 className="flex-1"
               >
                 <Download className="h-4 w-4 mr-1" />
-                Download
+                Descargar
               </Button>
               {canDelete && (
                 <AlertDialog>
@@ -105,15 +111,15 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete File</AlertDialogTitle>
+                      <AlertDialogTitle>Eliminar archivo</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete "{file.file_name}"? This action cannot be undone.
+                        ¿Seguro que quieres eliminar "{file.file_name}"? Esta acción no se puede deshacer.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
                       <AlertDialogAction onClick={() => deleteFile.mutate(file.id)}>
-                        Delete
+                        Eliminar
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -129,12 +135,12 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Venue</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>File Name</TableHead>
-              <TableHead>Uploaded By</TableHead>
-              <TableHead>Upload Date</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>Recinto</TableHead>
+              <TableHead>Ubicación</TableHead>
+              <TableHead>Nombre del archivo</TableHead>
+              <TableHead>Subido por</TableHead>
+              <TableHead>Fecha de subida</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -149,7 +155,10 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                   {file.uploader?.first_name} {file.uploader?.last_name}
                 </TableCell>
                 <TableCell>
-                  {formatDistanceToNow(new Date(file.uploaded_at), { addSuffix: true })}
+                  {formatDistanceToNow(new Date(file.uploaded_at), {
+                    addSuffix: true,
+                    locale: es,
+                  })}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex gap-2 justify-end">
@@ -160,7 +169,7 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                       disabled={downloadFile.isPending}
                     >
                       <Download className="h-4 w-4 mr-1" />
-                      Download
+                      Descargar
                     </Button>
                     {canDelete && (
                       <AlertDialog>
@@ -171,15 +180,15 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Delete File</AlertDialogTitle>
+                            <AlertDialogTitle>Eliminar archivo</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Are you sure you want to delete "{file.file_name}"? This action cannot be undone.
+                              ¿Seguro que quieres eliminar "{file.file_name}"? Esta acción no se puede deshacer.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
                             <AlertDialogAction onClick={() => deleteFile.mutate(file.id)}>
-                              Delete
+                              Eliminar
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>

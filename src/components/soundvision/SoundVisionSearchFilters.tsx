@@ -52,7 +52,7 @@ export const SoundVisionSearchFilters = ({
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by venue name or file name..."
+          placeholder="Buscar por nombre de recinto o archivo..."
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-10"
@@ -63,22 +63,22 @@ export const SoundVisionSearchFilters = ({
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
         <Select value={fileType} onValueChange={onFileTypeChange}>
           <SelectTrigger>
-            <SelectValue placeholder="All Types" />
+            <SelectValue placeholder="Todos los tipos" />
           </SelectTrigger>
           <SelectContent className="bg-popover z-50">
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value=".xmlp">.xmlp (Project)</SelectItem>
-            <SelectItem value=".xmls">.xmls (Scene)</SelectItem>
-            <SelectItem value=".xmlc">.xmlc (Configuration)</SelectItem>
+            <SelectItem value="all">Todos los tipos</SelectItem>
+            <SelectItem value=".xmlp">.xmlp (Proyecto)</SelectItem>
+            <SelectItem value=".xmls">.xmls (Escena)</SelectItem>
+            <SelectItem value=".xmlc">.xmlc (Configuración)</SelectItem>
           </SelectContent>
         </Select>
 
         <Select value={city} onValueChange={onCityChange}>
           <SelectTrigger>
-            <SelectValue placeholder="All Cities" />
+            <SelectValue placeholder="Todas las ciudades" />
           </SelectTrigger>
           <SelectContent className="bg-popover z-50">
-            <SelectItem value="all">All Cities</SelectItem>
+            <SelectItem value="all">Todas las ciudades</SelectItem>
             {cities.map((c) => (
               <SelectItem key={c} value={c}>
                 {c}
@@ -89,10 +89,10 @@ export const SoundVisionSearchFilters = ({
 
         <Select value={country} onValueChange={onCountryChange}>
           <SelectTrigger>
-            <SelectValue placeholder="All Countries" />
+            <SelectValue placeholder="Todos los países" />
           </SelectTrigger>
           <SelectContent className="bg-popover z-50">
-            <SelectItem value="all">All Countries</SelectItem>
+            <SelectItem value="all">Todos los países</SelectItem>
             {countries.map((c) => (
               <SelectItem key={c} value={c}>
                 {c}
@@ -103,10 +103,10 @@ export const SoundVisionSearchFilters = ({
 
         <Select value={stateRegion} onValueChange={onStateRegionChange}>
           <SelectTrigger>
-            <SelectValue placeholder="All States/Regions" />
+            <SelectValue placeholder="Todas las provincias/regiones" />
           </SelectTrigger>
           <SelectContent className="bg-popover z-50">
-            <SelectItem value="all">All States/Regions</SelectItem>
+            <SelectItem value="all">Todas las provincias/regiones</SelectItem>
             {stateRegions.map((s) => (
               <SelectItem key={s} value={s}>
                 {s}
@@ -117,7 +117,7 @@ export const SoundVisionSearchFilters = ({
 
         {hasActiveFilters && (
           <Button variant="outline" onClick={onClearFilters} className="w-full">
-            Clear Filters
+            Limpiar filtros
           </Button>
         )}
       </div>
