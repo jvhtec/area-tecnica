@@ -9,6 +9,10 @@ export interface UploadData {
   file: File;
   venueData: VenueMetadata;
   notes?: string;
+  initialReview?: {
+    rating: number;
+    review?: string;
+  };
 }
 
 export const useSoundVisionUpload = () => {
@@ -17,7 +21,7 @@ export const useSoundVisionUpload = () => {
   const upsertVenue = useUpsertVenue();
 
   const upload = useMutation({
-    mutationFn: async ({ file, venueData, notes }: UploadData) => {
+    mutationFn: async ({ file, venueData, notes, initialReview }: UploadData) => {
       // Validate file
       const validation = validateFile(file);
       if (!validation.valid) {
@@ -52,17 +56,40 @@ export const useSoundVisionUpload = () => {
       if (!user) throw new Error('Usuario no autenticado');
 
       // Create database record
-      const { error: dbError } = await supabase.from('soundvision_files').insert({
-        venue_id: venueId,
-        file_name: file.name,
-        file_path: storagePath,
-        file_type: file.name.split('.').pop()?.toLowerCase() || '',
-        file_size: file.size,
-        uploaded_by: user.id,
-        notes: notes || null,
-      });
+      const { data: fileRecord, error: dbError } = await supabase
+        .from('soundvision_files')
+        .insert({
+          venue_id: venueId,
+          file_name: file.name,
+          file_path: storagePath,
+          file_type: file.name.split('.').pop()?.toLowerCase() || '',
+          file_size: file.size,
+          uploaded_by: user.id,
+          notes: notes || null,
+        })
+        .select('id')
+        .single();
 
       if (dbError) throw dbError;
+
+      if (!fileRecord) {
+        throw new Error('No se pudo registrar el archivo en la base de datos');
+      }
+
+      if (initialReview && initialReview.rating) {
+        const { error: reviewError } = await supabase.from('soundvision_file_reviews').insert({
+          file_id: fileRecord.id,
+          reviewer_id: user.id,
+          rating: initialReview.rating,
+          review: initialReview.review ?? null,
+          is_initial: true,
+        });
+
+        if (reviewError) throw reviewError;
+
+        queryClient.invalidateQueries({ queryKey: ['soundvision-file-reviews', fileRecord.id] });
+      }
+
       setProgress(100);
     },
     onSuccess: () => {

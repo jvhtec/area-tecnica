@@ -1,4 +1,4 @@
-import { Download, Trash2, MapPin, User, Calendar } from 'lucide-react';
+import { Download, Trash2, MapPin, User, Calendar, Star as StarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -25,12 +25,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { StarRating } from './StarRating';
+import { SoundVisionReviewDialog } from './SoundVisionReviewDialog';
 
 interface SoundVisionFilesListProps {
   files: SoundVisionFile[];
 }
 
 export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
+  const [selectedFile, setSelectedFile] = useState<SoundVisionFile | null>(null);
   const { data: profile } = useQuery({
     queryKey: ['current-user-profile'],
     queryFn: async () => {
@@ -62,7 +66,8 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
   }
 
   return (
-    <div className="space-y-4">
+    <>
+      <div className="space-y-4">
       {/* Mobile View - Cards */}
       <div className="md:hidden space-y-3">
         {files.map((file) => (
@@ -90,8 +95,33 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                   })}
                 </span>
               </div>
+              <div className="flex items-center gap-2 text-sm">
+                <StarRating value={file.average_rating ?? 0} readOnly size="sm" />
+                {file.ratings_count > 0 ? (
+                  <span className="text-muted-foreground">
+                    {(file.average_rating ?? 0).toFixed(1)} · {file.ratings_count}{' '}
+                    {file.ratings_count === 1 ? 'reseña' : 'reseñas'}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">Sin reseñas</span>
+                )}
+              </div>
+              {file.hasReviewed && file.current_user_review && (
+                <div className="text-xs text-emerald-600 font-medium">
+                  Tu valoración: {file.current_user_review.rating} ⭐
+                </div>
+              )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant={file.hasReviewed ? 'secondary' : 'outline'}
+                onClick={() => setSelectedFile(file)}
+                className="flex-1"
+              >
+                <StarIcon className="h-4 w-4 mr-1" />
+                Reseñas
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -139,6 +169,7 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
               <TableHead>Ubicación</TableHead>
               <TableHead>Nombre del archivo</TableHead>
               <TableHead>Subido por</TableHead>
+              <TableHead>Valoración</TableHead>
               <TableHead>Fecha de subida</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -155,13 +186,34 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                   {file.uploader?.first_name} {file.uploader?.last_name}
                 </TableCell>
                 <TableCell>
+                  <div className="flex items-center gap-2">
+                    <StarRating value={file.average_rating ?? 0} readOnly size="sm" />
+                    {file.ratings_count > 0 ? (
+                      <span className="text-sm text-muted-foreground">
+                        {(file.average_rating ?? 0).toFixed(1)} · {file.ratings_count}{' '}
+                        {file.ratings_count === 1 ? 'reseña' : 'reseñas'}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Sin reseñas</span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
                   {formatDistanceToNow(new Date(file.uploaded_at), {
                     addSuffix: true,
                     locale: es,
                   })}
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex gap-2 justify-end">
+                  <div className="flex gap-2 justify-end flex-wrap">
+                    <Button
+                      size="sm"
+                      variant={file.hasReviewed ? 'secondary' : 'outline'}
+                      onClick={() => setSelectedFile(file)}
+                    >
+                      <StarIcon className="h-4 w-4 mr-1" />
+                      Reseñas
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
@@ -201,6 +253,17 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
           </TableBody>
         </Table>
       </div>
-    </div>
+      {selectedFile && (
+        <SoundVisionReviewDialog
+          file={selectedFile}
+          open={Boolean(selectedFile)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedFile(null);
+            }
+          }}
+        />
+      )}
+    </>
   );
 };
