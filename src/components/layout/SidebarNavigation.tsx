@@ -113,8 +113,8 @@ export const SidebarNavigation = ({ userRole, userDepartment, hasSoundVisionAcce
           </Link>
         )}
 
-        {/* SoundVision Files - gated by dedicated access flag */}
-        {hasSoundVisionAccess && (
+        {/* SoundVision Files - gated by dedicated access flag, but not for management (they use Sound>Tools) */}
+        {hasSoundVisionAccess && !isManagementUser && (
           <Link to="/soundvision-files">
             <Button
               variant="ghost"
