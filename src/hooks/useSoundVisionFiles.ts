@@ -30,6 +30,7 @@ export interface SoundVisionFileFilters {
   city?: string;
   country?: string;
   stateRegion?: string;
+  fileType?: string;
 }
 
 export const useSoundVisionFiles = (filters?: SoundVisionFileFilters) => {
@@ -88,6 +89,12 @@ export const useSoundVisionFiles = (filters?: SoundVisionFileFilters) => {
       if (filters?.stateRegion) {
         filteredData = filteredData.filter(
           (file) => file.venue?.state_region === filters.stateRegion
+        );
+      }
+
+      if (filters?.fileType) {
+        filteredData = filteredData.filter(
+          (file) => file.file_type === filters.fileType.replace('.', '')
         );
       }
 

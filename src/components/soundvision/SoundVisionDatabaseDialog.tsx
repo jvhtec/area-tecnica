@@ -13,12 +13,14 @@ export const SoundVisionDatabaseDialog = () => {
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
   const [stateRegion, setStateRegion] = useState('');
+  const [fileType, setFileType] = useState('');
 
   const { data: files, isLoading } = useSoundVisionFiles({
     searchTerm: searchTerm || undefined,
     city: city && city !== 'all' ? city : undefined,
     country: country && country !== 'all' ? country : undefined,
     stateRegion: stateRegion && stateRegion !== 'all' ? stateRegion : undefined,
+    fileType: fileType && fileType !== 'all' ? fileType : undefined,
   });
 
   const handleClearFilters = () => {
@@ -26,6 +28,7 @@ export const SoundVisionDatabaseDialog = () => {
     setCity('');
     setCountry('');
     setStateRegion('');
+    setFileType('');
   };
 
   const handleUploadComplete = () => {
@@ -57,6 +60,8 @@ export const SoundVisionDatabaseDialog = () => {
             onCountryChange={setCountry}
             stateRegion={stateRegion}
             onStateRegionChange={setStateRegion}
+            fileType={fileType}
+            onFileTypeChange={setFileType}
             onClearFilters={handleClearFilters}
           />
 

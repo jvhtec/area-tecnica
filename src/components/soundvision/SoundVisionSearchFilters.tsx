@@ -19,6 +19,8 @@ interface SoundVisionSearchFiltersProps {
   onCountryChange: (value: string) => void;
   stateRegion: string;
   onStateRegionChange: (value: string) => void;
+  fileType: string;
+  onFileTypeChange: (value: string) => void;
   onClearFilters: () => void;
 }
 
@@ -31,6 +33,8 @@ export const SoundVisionSearchFilters = ({
   onCountryChange,
   stateRegion,
   onStateRegionChange,
+  fileType,
+  onFileTypeChange,
   onClearFilters,
 }: SoundVisionSearchFiltersProps) => {
   const { data: venues } = useVenues();
@@ -40,7 +44,7 @@ export const SoundVisionSearchFilters = ({
   const countries = [...new Set(venues?.map((v) => v.country).filter(Boolean))].sort();
   const stateRegions = [...new Set(venues?.map((v) => v.state_region).filter(Boolean))].sort();
 
-  const hasActiveFilters = city || country || stateRegion || searchTerm;
+  const hasActiveFilters = city || country || stateRegion || fileType || searchTerm;
 
   return (
     <div className="space-y-4">
@@ -56,12 +60,24 @@ export const SoundVisionSearchFilters = ({
       </div>
 
       {/* Filter Dropdowns */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <Select value={fileType} onValueChange={onFileTypeChange}>
+          <SelectTrigger>
+            <SelectValue placeholder="All Types" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover z-50">
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value=".xmlp">.xmlp (Project)</SelectItem>
+            <SelectItem value=".xmls">.xmls (Scene)</SelectItem>
+            <SelectItem value=".xmlc">.xmlc (Configuration)</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Select value={city} onValueChange={onCityChange}>
           <SelectTrigger>
             <SelectValue placeholder="All Cities" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-popover z-50">
             <SelectItem value="all">All Cities</SelectItem>
             {cities.map((c) => (
               <SelectItem key={c} value={c}>
@@ -75,7 +91,7 @@ export const SoundVisionSearchFilters = ({
           <SelectTrigger>
             <SelectValue placeholder="All Countries" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-popover z-50">
             <SelectItem value="all">All Countries</SelectItem>
             {countries.map((c) => (
               <SelectItem key={c} value={c}>
@@ -89,7 +105,7 @@ export const SoundVisionSearchFilters = ({
           <SelectTrigger>
             <SelectValue placeholder="All States/Regions" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-popover z-50">
             <SelectItem value="all">All States/Regions</SelectItem>
             {stateRegions.map((s) => (
               <SelectItem key={s} value={s}>
