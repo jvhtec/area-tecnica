@@ -157,6 +157,9 @@ export default function App() {
                       {/* Disponibilidad Route */}
                       <Route path="/disponibilidad" element={<Disponibilidad />} />
 
+                      {/* SoundVision Files Route */}
+                      <Route path="/soundvision-files" element={<SoundVisionFiles />} />
+
                       {/* Festival Management Routes */}
                       <Route path="/festival-management/:jobId" element={<FestivalManagement />} />
                       <Route path="/festival-management/:jobId/artists" element={<FestivalArtistManagement />} />

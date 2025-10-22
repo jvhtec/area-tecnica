@@ -18,7 +18,8 @@ import {
   Megaphone,
   Activity,
   CalendarCheck,
-  Euro
+  Euro,
+  Database
 } from "lucide-react";
 import { SidebarNavigationSkeleton } from './SidebarNavigationSkeleton';
 
