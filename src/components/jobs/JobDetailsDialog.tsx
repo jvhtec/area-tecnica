@@ -283,15 +283,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         // Ensure we have an API key (fetch from secrets if needed)
         let apiKey = googleStaticKey;
         if (!apiKey) {
-          const { data, error } = await supabase.functions.invoke('get-secret', {
-            body: { secretName: 'GOOGLE_MAPS_API_KEY' }
-          });
-          if (error || !data?.GOOGLE_MAPS_API_KEY) {
+          const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+          if (error || !data?.apiKey) {
             setMapPreviewUrl(null);
             setIsMapLoading(false);
             return;
           }
-          apiKey = data.GOOGLE_MAPS_API_KEY as string;
+          apiKey = data.apiKey as string;
           setGoogleStaticKey(apiKey);
         }
 

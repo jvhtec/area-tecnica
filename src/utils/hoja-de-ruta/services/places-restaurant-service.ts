@@ -11,15 +11,13 @@ export class PlacesRestaurantService {
   private static async ensureApiKey(): Promise<string | null> {
     if (this.apiKey) return this.apiKey;
     try {
-      const { data, error } = await supabase.functions.invoke('get-secret', {
-        body: { secretName: 'GOOGLE_MAPS_API_KEY' },
-      });
+      const { data, error } = await supabase.functions.invoke('get-google-maps-key');
       if (error) {
         console.error('Failed to fetch Google Maps API key:', error);
         return null;
       }
-      if (data?.GOOGLE_MAPS_API_KEY) {
-        this.apiKey = data.GOOGLE_MAPS_API_KEY as string;
+      if (data?.apiKey) {
+        this.apiKey = data.apiKey as string;
         return this.apiKey;
       }
     } catch (err) {

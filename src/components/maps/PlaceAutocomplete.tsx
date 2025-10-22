@@ -55,16 +55,14 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   // Fetch Google Maps API key securely (with retry support)
   const fetchApiKey = async (): Promise<string | null> => {
     try {
-      const { data, error } = await supabase.functions.invoke('get-secret', {
-        body: { secretName: 'GOOGLE_MAPS_API_KEY' },
-      });
+      const { data, error } = await supabase.functions.invoke('get-google-maps-key');
       if (error) {
         console.error('Failed to fetch Google Maps API key:', error);
         return null;
       }
-      if (data?.GOOGLE_MAPS_API_KEY) {
-        setApiKey(data.GOOGLE_MAPS_API_KEY);
-        return data.GOOGLE_MAPS_API_KEY as string;
+      if (data?.apiKey) {
+        setApiKey(data.apiKey);
+        return data.apiKey as string;
       }
     } catch (err) {
       console.error('Error fetching API key:', err);

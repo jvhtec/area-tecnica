@@ -40,9 +40,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
   useEffect(() => {
     const fetchApiKey = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('get-secret', {
-          body: { secretName: 'GOOGLE_MAPS_API_KEY' }
-        });
+        const { data, error } = await supabase.functions.invoke('get-google-maps-key');
         
         if (error) {
           console.error('Failed to fetch Google Maps API key:', error);
@@ -50,8 +48,8 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
           return;
         }
         
-        if (data?.GOOGLE_MAPS_API_KEY) {
-          setApiKey(data.GOOGLE_MAPS_API_KEY);
+        if (data?.apiKey) {
+          setApiKey(data.apiKey);
         } else {
           setError('Google Maps API key not found');
         }

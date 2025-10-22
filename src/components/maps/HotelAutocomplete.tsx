@@ -54,9 +54,7 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   useEffect(() => {
     const fetchApiKey = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('get-secret', {
-          body: { secretName: 'GOOGLE_MAPS_API_KEY' }
-        });
+        const { data, error } = await supabase.functions.invoke('get-google-maps-key');
         
         if (error) {
           console.error('Failed to fetch Google Maps API key:', error);
@@ -65,8 +63,8 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
         
         console.log('API key response:', data);
         
-        if (data?.GOOGLE_MAPS_API_KEY) {
-          setApiKey(data.GOOGLE_MAPS_API_KEY);
+        if (data?.apiKey) {
+          setApiKey(data.apiKey);
           console.log('Google Maps API key loaded for hotel autocomplete');
         } else {
           console.error('No Google Maps API key found in response:', data);
