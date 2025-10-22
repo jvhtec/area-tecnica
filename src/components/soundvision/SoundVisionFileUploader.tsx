@@ -63,7 +63,7 @@ export const SoundVisionFileUploader = ({ onUploadComplete }: SoundVisionFileUpl
 
   const onSubmit = (data: VenueFormData) => {
     if (!selectedFile) {
-      alert('Please select a file');
+      alert('Por favor, selecciona un archivo');
       return;
     }
 
@@ -119,21 +119,21 @@ export const SoundVisionFileUploader = ({ onUploadComplete }: SoundVisionFileUpl
               onClick={() => setSelectedFile(null)}
               disabled={isUploading}
             >
-              Remove
+              Quitar
             </Button>
           </div>
         ) : (
           <>
             <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-lg font-medium mb-2">
-              Drag and drop your SoundVision file here
+              Arrastra y suelta aquí tu archivo de SoundVision
             </p>
             <p className="text-sm text-muted-foreground mb-4">
-              Supported formats: {ALLOWED_FILE_TYPES.join(', ')} (Max 100MB)
+              Formatos admitidos: {ALLOWED_FILE_TYPES.join(', ')} (Máx. 100 MB)
             </p>
             <label htmlFor="file-input">
               <Button variant="outline" asChild>
-                <span>Browse Files</span>
+                <span>Buscar archivos</span>
               </Button>
               <input
                 id="file-input"
@@ -155,7 +155,7 @@ export const SoundVisionFileUploader = ({ onUploadComplete }: SoundVisionFileUpl
       {isUploading && (
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span>Uploading...</span>
+            <span>Subiendo...</span>
             <span>{progress}%</span>
           </div>
           <Progress value={progress} />
@@ -172,7 +172,7 @@ export const SoundVisionFileUploader = ({ onUploadComplete }: SoundVisionFileUpl
             className="w-full"
             disabled={!selectedFile || isUploading}
           >
-            Upload File
+            Subir archivo
           </Button>
         </form>
       </Form>

@@ -132,7 +132,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <Database className="h-4 w-4" />
-              <span>SoundVision Files</span>
+              <span>Archivos SoundVision</span>
             </Button>
           </Link>
         )}

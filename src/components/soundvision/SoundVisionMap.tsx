@@ -56,12 +56,12 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
 
         if (tokenError) {
           console.error('Token fetch error:', tokenError);
-          throw new Error(`Failed to fetch Mapbox token: ${tokenError.message}`);
+          throw new Error(`Error al obtener el token de Mapbox: ${tokenError.message}`);
         }
 
         if (!data?.token) {
           console.error('No token in response:', data);
-          throw new Error('Mapbox token not found in response');
+          throw new Error('No se encontró el token de Mapbox en la respuesta');
         }
 
         console.log('Mapbox token retrieved successfully');
@@ -106,9 +106,9 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
           if (!isMounted || hasShownError.current || mapHasLoaded) return;
           hasShownError.current = true;
           console.error('Mapbox error:', event.error);
-          setError('Failed to load map data. Please try again later.');
+          setError('No se pudieron cargar los datos del mapa. Inténtalo de nuevo más tarde.');
           setIsLoading(false);
-          toast.error('Failed to load map data');
+          toast.error('No se pudieron cargar los datos del mapa');
         });
 
         const handleResize = () => mapInstance.resize();
@@ -120,9 +120,9 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
       } catch (err) {
         if (!isMounted) return;
         console.error('Error initializing map:', err);
-        setError('Failed to load map. Please check your connection.');
+        setError('No se pudo cargar el mapa. Revisa tu conexión.');
         setIsLoading(false);
-        toast.error('Failed to initialize map');
+        toast.error('No se pudo iniciar el mapa');
       }
     };
 
@@ -181,6 +181,7 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
       el.style.cursor = 'pointer';
       el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
 
+      const archivosDisponibles = fileCount === 1 ? 'archivo disponible' : 'archivos disponibles';
       const popupContent = `
         <div style="padding: 8px; min-width: 200px;">
           <h3 style="font-weight: bold; margin-bottom: 4px; color: hsl(var(--foreground));">${venue.name}</h3>
@@ -188,7 +189,7 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
             ${[venue.city, venue.state_region, venue.country].filter(Boolean).join(', ')}
           </p>
           <p style="font-size: 0.875rem; color: hsl(var(--muted-foreground));">
-            <strong>${fileCount}</strong> file${fileCount !== 1 ? 's' : ''} available
+            <strong>${fileCount}</strong> ${archivosDisponibles}
           </p>
         </div>
       `;
@@ -209,7 +210,7 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
 
     if (venueMap.size === 0) {
       if (previousVenueCount.current !== 0) {
-        toast.info('No venues with coordinates to display');
+        toast.info('No hay recintos con coordenadas para mostrar');
       }
       previousVenueCount.current = 0;
       return;
@@ -220,7 +221,8 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
     }
 
     if (venueMap.size !== previousVenueCount.current) {
-      toast.success(`Map loaded with ${venueMap.size} venue location${venueMap.size === 1 ? '' : 's'}`);
+      const textoUbicaciones = venueMap.size === 1 ? 'ubicación' : 'ubicaciones';
+      toast.success(`Mapa cargado con ${venueMap.size} ${textoUbicaciones} de recintos`);
     }
 
     previousVenueCount.current = venueMap.size;
@@ -230,7 +232,7 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
     return (
       <div className="w-full h-full flex items-center justify-center bg-muted/20 rounded-lg border">
         <div className="text-center p-6">
-          <p className="text-destructive font-medium mb-2">Map Error</p>
+          <p className="text-destructive font-medium mb-2">Error del mapa</p>
           <p className="text-sm text-muted-foreground">{error}</p>
         </div>
       </div>
@@ -243,7 +245,7 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10 rounded-lg">
           <div className="flex items-center gap-2">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <span className="text-sm text-muted-foreground">Loading map...</span>
+            <span className="text-sm text-muted-foreground">Cargando mapa...</span>
           </div>
         </div>
       )}

@@ -136,11 +136,11 @@ export const useDeleteSoundVisionFile = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
-      toast.success('File deleted successfully');
+      toast.success('Archivo eliminado correctamente');
     },
     onError: (error) => {
       console.error('Error deleting file:', error);
-      toast.error('Failed to delete file');
+      toast.error('No se pudo eliminar el archivo');
     },
   });
 };
@@ -166,7 +166,7 @@ export const useDownloadSoundVisionFile = () => {
     },
     onError: (error) => {
       console.error('Error downloading file:', error);
-      toast.error('Failed to download file');
+      toast.error('No se pudo descargar el archivo');
     },
   });
 };
