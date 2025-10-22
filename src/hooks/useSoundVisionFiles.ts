@@ -122,7 +122,10 @@ export const useSoundVisionFiles = (filters?: SoundVisionFileFilters) => {
           .eq('profile_id', currentUserId)
           .in('file_id', filesData.map((file) => file.id));
 
-        if (downloadError) throw downloadError;
+        // Don't throw if table doesn't exist (42P01 is "undefined_table")
+        if (downloadError && downloadError.code !== '42P01') {
+          throw downloadError;
+        }
 
         userDownloadsMap = new Map(
           (downloadData || []).map(download => [download.file_id, download.downloaded_at])
