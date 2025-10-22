@@ -28,7 +28,6 @@ interface SoundVisionMapProps {
 interface VenueGroup {
   venue: NonNullable<SoundVisionFile['venue']>;
   fileCount: number;
-  files: SoundVisionFile[];
 }
 
 export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
@@ -37,23 +36,29 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
   const markers = useRef<mapboxgl.Marker[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const hasShownError = useRef(false);
+  const previousVenueCount = useRef<number>(0);
 
   useEffect(() => {
-    if (!mapContainer.current) return;
+    if (!mapContainer.current || map.current) return;
+
+    let isMounted = true;
+    let mapHasLoaded = false;
 
     const initMap = async () => {
       try {
         setIsLoading(true);
         setError(null);
+        hasShownError.current = false;
 
-        // Fetch Mapbox token from edge function
         const { data, error: tokenError } = await supabase.functions.invoke('get-mapbox-token');
-        
+
         if (tokenError) {
           console.error('Token fetch error:', tokenError);
           throw new Error(`Failed to fetch Mapbox token: ${tokenError.message}`);
         }
-        
+
         if (!data?.token) {
           console.error('No token in response:', data);
           throw new Error('Mapbox token not found in response');
@@ -62,8 +67,7 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
         console.log('Mapbox token retrieved successfully');
         mapboxgl.accessToken = data.token;
 
-        // Initialize map
-        map.current = new mapboxgl.Map({
+        const mapInstance = new mapboxgl.Map({
           container: mapContainer.current,
           style: 'mapbox://styles/mapbox/dark-v11',
           center: [0, 20],
@@ -71,101 +75,50 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
           projection: 'globe' as any,
         });
 
-        // Add navigation controls
-        map.current.addControl(
+        map.current = mapInstance;
+
+        mapInstance.addControl(
           new mapboxgl.NavigationControl({
             visualizePitch: true,
           }),
           'top-right'
         );
 
-        // Add fullscreen control
-        map.current.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+        mapInstance.addControl(new mapboxgl.FullscreenControl(), 'top-right');
 
-        // Add atmosphere
-        map.current.on('style.load', () => {
-          if (map.current) {
-            map.current.setFog({
-              color: 'rgb(10, 10, 20)',
-              'high-color': 'rgb(30, 30, 50)',
-              'horizon-blend': 0.1,
-            });
-          }
+        mapInstance.on('style.load', () => {
+          mapInstance.setFog({
+            color: 'rgb(10, 10, 20)',
+            'high-color': 'rgb(30, 30, 50)',
+            'horizon-blend': 0.1,
+          });
         });
 
-        // Deduplicate venues by coordinates
-        const venueMap = new Map<string, VenueGroup>();
-        
-        files.forEach(file => {
-          if (!file.venue?.coordinates) return;
-          
-          const { lat, lng } = file.venue.coordinates;
-          const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-          
-          if (!venueMap.has(key)) {
-            venueMap.set(key, {
-              venue: file.venue,
-              fileCount: 1,
-              files: [file],
-            });
-          } else {
-            const existing = venueMap.get(key)!;
-            existing.fileCount++;
-            existing.files.push(file);
-          }
+        mapInstance.on('load', () => {
+          if (!isMounted) return;
+          mapHasLoaded = true;
+          setIsLoading(false);
+          setMapLoaded(true);
+          mapInstance.resize();
         });
 
-        // Clear existing markers
-        markers.current.forEach(marker => marker.remove());
-        markers.current = [];
-
-        // Add markers for each unique venue
-        venueMap.forEach(({ venue, fileCount, files }) => {
-          if (!venue.coordinates) return;
-
-          const { lat, lng } = venue.coordinates;
-
-          // Create custom marker element
-          const el = document.createElement('div');
-          el.className = 'custom-marker';
-          el.style.width = '24px';
-          el.style.height = '24px';
-          el.style.borderRadius = '50%';
-          el.style.backgroundColor = 'hsl(var(--primary))';
-          el.style.border = '2px solid white';
-          el.style.cursor = 'pointer';
-          el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
-
-          // Create popup content
-          const popupContent = `
-            <div style="padding: 8px; min-width: 200px;">
-              <h3 style="font-weight: bold; margin-bottom: 4px; color: hsl(var(--foreground));">${venue.name}</h3>
-              <p style="font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin-bottom: 8px;">
-                ${[venue.city, venue.state_region, venue.country].filter(Boolean).join(', ')}
-              </p>
-              <p style="font-size: 0.875rem; color: hsl(var(--muted-foreground));">
-                <strong>${fileCount}</strong> file${fileCount !== 1 ? 's' : ''} available
-              </p>
-            </div>
-          `;
-
-          const popup = new mapboxgl.Popup({
-            offset: 25,
-            closeButton: true,
-            closeOnClick: false,
-          }).setHTML(popupContent);
-
-          const marker = new mapboxgl.Marker(el)
-            .setLngLat([lng, lat])
-            .setPopup(popup)
-            .addTo(map.current!);
-
-          markers.current.push(marker);
+        mapInstance.on('error', event => {
+          if (!isMounted || hasShownError.current || mapHasLoaded) return;
+          hasShownError.current = true;
+          console.error('Mapbox error:', event.error);
+          setError('Failed to load map data. Please try again later.');
+          setIsLoading(false);
+          toast.error('Failed to load map data');
         });
 
-        setIsLoading(false);
-        toast.success(`Map loaded with ${venueMap.size} venue locations`);
+        const handleResize = () => mapInstance.resize();
+        window.addEventListener('resize', handleResize);
+
+        mapInstance.once('remove', () => {
+          window.removeEventListener('resize', handleResize);
+        });
       } catch (err) {
+        if (!isMounted) return;
         console.error('Error initializing map:', err);
         setError('Failed to load map. Please check your connection.');
         setIsLoading(false);
@@ -175,13 +128,103 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
 
     initMap();
 
-    // Cleanup
     return () => {
+      isMounted = false;
       markers.current.forEach(marker => marker.remove());
       markers.current = [];
       map.current?.remove();
+      map.current = null;
     };
-  }, [files]);
+  }, []);
+
+  useEffect(() => {
+    if (!mapLoaded || !map.current) return;
+
+    const venueMap = new Map<string, VenueGroup>();
+
+    files.forEach(file => {
+      if (!file.venue?.coordinates) return;
+
+      const { lat, lng } = file.venue.coordinates;
+      const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+
+      if (!venueMap.has(key)) {
+        venueMap.set(key, {
+          venue: file.venue!,
+          fileCount: 1,
+        });
+      } else {
+        const existing = venueMap.get(key)!;
+        existing.fileCount++;
+      }
+    });
+
+    markers.current.forEach(marker => marker.remove());
+    markers.current = [];
+
+    const bounds = new mapboxgl.LngLatBounds();
+
+    venueMap.forEach(({ venue, fileCount }) => {
+      if (!venue.coordinates) return;
+
+      const { lat, lng } = venue.coordinates;
+
+      bounds.extend([lng, lat]);
+
+      const el = document.createElement('div');
+      el.className = 'custom-marker';
+      el.style.width = '24px';
+      el.style.height = '24px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = 'hsl(var(--primary))';
+      el.style.border = '2px solid white';
+      el.style.cursor = 'pointer';
+      el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+
+      const popupContent = `
+        <div style="padding: 8px; min-width: 200px;">
+          <h3 style="font-weight: bold; margin-bottom: 4px; color: hsl(var(--foreground));">${venue.name}</h3>
+          <p style="font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin-bottom: 8px;">
+            ${[venue.city, venue.state_region, venue.country].filter(Boolean).join(', ')}
+          </p>
+          <p style="font-size: 0.875rem; color: hsl(var(--muted-foreground));">
+            <strong>${fileCount}</strong> file${fileCount !== 1 ? 's' : ''} available
+          </p>
+        </div>
+      `;
+
+      const popup = new mapboxgl.Popup({
+        offset: 25,
+        closeButton: true,
+        closeOnClick: false,
+      }).setHTML(popupContent);
+
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([lng, lat])
+        .setPopup(popup)
+        .addTo(map.current!);
+
+      markers.current.push(marker);
+    });
+
+    if (venueMap.size === 0) {
+      if (previousVenueCount.current !== 0) {
+        toast.info('No venues with coordinates to display');
+      }
+      previousVenueCount.current = 0;
+      return;
+    }
+
+    if (!bounds.isEmpty()) {
+      map.current!.fitBounds(bounds, { padding: 80, maxZoom: 12, duration: 800 });
+    }
+
+    if (venueMap.size !== previousVenueCount.current) {
+      toast.success(`Map loaded with ${venueMap.size} venue location${venueMap.size === 1 ? '' : 's'}`);
+    }
+
+    previousVenueCount.current = venueMap.size;
+  }, [files, mapLoaded]);
 
   if (error) {
     return (
@@ -204,7 +247,7 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
           </div>
         </div>
       )}
-      <div ref={mapContainer} className="absolute inset-0 rounded-lg" />
+      <div ref={mapContainer} className="h-full w-full rounded-lg" />
     </div>
   );
 };
