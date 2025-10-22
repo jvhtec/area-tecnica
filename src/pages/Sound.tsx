@@ -2,11 +2,10 @@ import { useState, useEffect } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 
 import { useJobs } from "@/hooks/useJobs";
-import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
@@ -24,6 +23,7 @@ import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
 import { IncidentReport } from "@/components/sound/tools/IncidentReport";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { SoundVisionDatabaseDialog } from "@/components/soundvision/SoundVisionDatabaseDialog";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -35,7 +35,6 @@ const Sound = () => {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [userRole, setUserRole] = useState<string | null>(null);
   const [showReportGenerator, setShowReportGenerator] = useState(false);
   const [showAmplifierTool, setShowAmplifierTool] = useState(false);
   const [showMemoriaTecnica, setShowMemoriaTecnica] = useState(false);
@@ -47,29 +46,13 @@ const Sound = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const { userRole, hasSoundVisionAccess } = useOptimizedAuth();
+
   useEffect(() => {
-    const fetchUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user role:', error);
-        return;
-      }
-
-      if (data) {
-        setUserRole(data.role);
-      }
-    };
-
-    fetchUserRole();
-  }, []);
+    if (!hasSoundVisionAccess) {
+      setShowSoundVisionDatabase(false);
+    }
+  }, [hasSoundVisionAccess]);
 
   // Keyboard shortcut: Cmd/Ctrl+N to open (disable plain 'c')
   useEffect(() => {
@@ -282,15 +265,17 @@ const Sound = () => {
               <span className="text-center leading-tight">Festivals</span>
             </Button>
 
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-              onClick={() => setShowSoundVisionDatabase(true)}
-            >
-              <Database className="h-4 w-4 sm:h-6 sm:w-6" />
-              <span className="text-center leading-tight">Archivos SoundVision</span>
-            </Button>
+            {hasSoundVisionAccess && (
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+                onClick={() => setShowSoundVisionDatabase(true)}
+              >
+                <Database className="h-4 w-4 sm:h-6 sm:w-6" />
+                <span className="text-center leading-tight">Archivos SoundVision</span>
+              </Button>
+            )}
            </div>
          </div>
        </Card>
@@ -361,11 +346,13 @@ const Sound = () => {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={showSoundVisionDatabase} onOpenChange={setShowSoundVisionDatabase}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-            <SoundVisionDatabaseDialog />
-          </DialogContent>
-        </Dialog>
+        {hasSoundVisionAccess && (
+          <Dialog open={showSoundVisionDatabase} onOpenChange={setShowSoundVisionDatabase}>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+              <SoundVisionDatabaseDialog />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
       {/* Mobile FAB */}
       <Button 
