@@ -2812,9 +2812,9 @@ export type Database = {
           preview_generated_at: string | null
           preview_url: string | null
           read_only: boolean
+          template_type: string | null
           uploaded_at: string
           uploaded_by: string | null
-          template_type: string | null
           visible_to_tech: boolean
         }
         Insert: {
@@ -2829,9 +2829,9 @@ export type Database = {
           preview_generated_at?: string | null
           preview_url?: string | null
           read_only?: boolean
+          template_type?: string | null
           uploaded_at?: string
           uploaded_by?: string | null
-          template_type?: string | null
           visible_to_tech?: boolean
         }
         Update: {
@@ -2846,9 +2846,9 @@ export type Database = {
           preview_generated_at?: string | null
           preview_url?: string | null
           read_only?: boolean
+          template_type?: string | null
           uploaded_at?: string
           uploaded_by?: string | null
-          template_type?: string | null
           visible_to_tech?: boolean
         }
         Relationships: [
@@ -6419,6 +6419,7 @@ export type Database = {
         Args: { _profile_id: string }
         Returns: boolean
       }
+      normalize_text_for_match: { Args: { input: string }; Returns: string }
       resolve_category_for_timesheet: {
         Args: { _job_id: string; _tech_id: string }
         Returns: string
