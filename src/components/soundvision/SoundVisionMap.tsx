@@ -4,22 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-
-interface SoundVisionFile {
-  id: string;
-  file_name: string;
-  venue?: {
-    id: string;
-    name: string;
-    city?: string;
-    state_region?: string | null;
-    country?: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    } | null;
-  } | null;
-}
+import type { SoundVisionFile } from '@/hooks/useSoundVisionFiles';
 
 interface SoundVisionMapProps {
   files: SoundVisionFile[];
@@ -28,6 +13,8 @@ interface SoundVisionMapProps {
 interface VenueGroup {
   venue: NonNullable<SoundVisionFile['venue']>;
   fileCount: number;
+  ratingsCount: number;
+  ratingTotal: number;
 }
 
 export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
@@ -147,15 +134,21 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
 
       const { lat, lng } = file.venue.coordinates;
       const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+      const fileRatingsCount = file.ratings_count ?? 0;
+      const fileRatingTotal = file.rating_total ?? 0;
 
       if (!venueMap.has(key)) {
         venueMap.set(key, {
           venue: file.venue!,
           fileCount: 1,
+          ratingsCount: fileRatingsCount,
+          ratingTotal: fileRatingTotal,
         });
       } else {
         const existing = venueMap.get(key)!;
         existing.fileCount++;
+        existing.ratingsCount += fileRatingsCount;
+        existing.ratingTotal += fileRatingTotal;
       }
     });
 
@@ -164,7 +157,7 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
 
     const bounds = new mapboxgl.LngLatBounds();
 
-    venueMap.forEach(({ venue, fileCount }) => {
+    venueMap.forEach(({ venue, fileCount, ratingsCount, ratingTotal }) => {
       if (!venue.coordinates) return;
 
       const { lat, lng } = venue.coordinates;
@@ -182,6 +175,13 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
       el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
 
       const archivosDisponibles = fileCount === 1 ? 'archivo disponible' : 'archivos disponibles';
+      const reseñasDisponibles = ratingsCount === 1 ? 'reseña' : 'reseñas';
+      const averageRating = ratingsCount > 0 ? ratingTotal / ratingsCount : null;
+      const ratingLine = ratingsCount > 0
+        ? `<p style="font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin-top: 6px;">` +
+          `Valoración media: <strong>${averageRating?.toFixed(1)}</strong> (${ratingsCount} ${reseñasDisponibles})` +
+          `</p>`
+        : `<p style="font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin-top: 6px;">Sin reseñas registradas</p>`;
       const popupContent = `
         <div style="padding: 8px; min-width: 200px;">
           <h3 style="font-weight: bold; margin-bottom: 4px; color: hsl(var(--foreground));">${venue.name}</h3>
@@ -191,6 +191,7 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
           <p style="font-size: 0.875rem; color: hsl(var(--muted-foreground));">
             <strong>${fileCount}</strong> ${archivosDisponibles}
           </p>
+          ${ratingLine}
         </div>
       `;
 

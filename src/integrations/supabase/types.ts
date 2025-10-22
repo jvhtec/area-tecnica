@@ -4415,37 +4415,49 @@ export type Database = {
       }
       soundvision_files: {
         Row: {
+          average_rating: number | null
           file_name: string
           file_path: string
           file_size: number
           file_type: string
           id: string
+          last_reviewed_at: string | null
           metadata: Json | null
           notes: string | null
+          rating_total: number
+          ratings_count: number
           uploaded_at: string
           uploaded_by: string
           venue_id: string
         }
         Insert: {
+          average_rating?: number | null
           file_name: string
           file_path: string
           file_size: number
           file_type: string
           id?: string
+          last_reviewed_at?: string | null
           metadata?: Json | null
           notes?: string | null
+          rating_total?: number
+          ratings_count?: number
           uploaded_at?: string
           uploaded_by: string
           venue_id: string
         }
         Update: {
+          average_rating?: number | null
           file_name?: string
           file_path?: string
           file_size?: number
           file_type?: string
           id?: string
+          last_reviewed_at?: string | null
           metadata?: Json | null
           notes?: string | null
+          rating_total?: number
+          ratings_count?: number
           uploaded_at?: string
           uploaded_by?: string
           venue_id?: string
@@ -4456,6 +4468,61 @@ export type Database = {
             columns: ["venue_id"]
             isOneToOne: false
             referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      soundvision_file_reviews: {
+        Row: {
+          created_at: string
+          file_id: string
+          id: string
+          is_initial: boolean
+          rating: number
+          review: string | null
+          reviewer_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          file_id: string
+          id?: string
+          is_initial?: boolean
+          rating: number
+          review?: string | null
+          reviewer_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          file_id?: string
+          id?: string
+          is_initial?: boolean
+          rating?: number
+          review?: string | null
+          reviewer_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soundvision_file_reviews_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "soundvision_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "soundvision_file_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "soundvision_file_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -6274,6 +6341,10 @@ export type Database = {
         }[]
       }
       get_current_user_role: { Args: never; Returns: string }
+      is_management_or_admin: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       get_job_total_amounts: {
         Args: { _job_id: string; _user_role?: string }
         Returns: {

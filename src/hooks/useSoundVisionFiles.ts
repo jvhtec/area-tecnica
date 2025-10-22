@@ -13,6 +13,12 @@ export interface SoundVisionFile {
   uploaded_at: string;
   notes: string | null;
   metadata: any;
+  average_rating: number | null;
+  ratings_count: number;
+  rating_total: number;
+  last_reviewed_at: string | null;
+  hasReviewed: boolean;
+  current_user_review: SoundVisionReviewSummary | null;
   venue?: {
     id: string;
     name: string;
@@ -25,6 +31,14 @@ export interface SoundVisionFile {
     first_name: string;
     last_name: string;
   };
+}
+
+export interface SoundVisionReviewSummary {
+  id: string;
+  rating: number;
+  review: string | null;
+  is_initial: boolean;
+  updated_at: string;
 }
 
 export interface SoundVisionFileFilters {
@@ -51,21 +65,60 @@ export const useSoundVisionFiles = (filters?: SoundVisionFileFilters) => {
       const { data: filesData, error } = await query;
       if (error) throw error;
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const currentUserId = user?.id ?? null;
+
       // Get uploader info separately since uploaded_by references auth.users
       const uploaderIds = [...new Set(filesData.map(f => f.uploaded_by))];
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .in('id', uploaderIds);
+      let profilesData: { id: string; first_name: string; last_name: string }[] = [];
+
+      if (uploaderIds.length > 0) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .in('id', uploaderIds);
+
+        profilesData = data || [];
+      }
 
       const profilesMap = new Map(
-        profilesData?.map(p => [p.id, { first_name: p.first_name, last_name: p.last_name }]) || []
+        profilesData.map(p => [p.id, { first_name: p.first_name, last_name: p.last_name }])
       );
+
+      let userReviewsMap = new Map<string, SoundVisionReviewSummary>();
+
+      if (currentUserId && filesData.length > 0) {
+        const { data: reviewData, error: reviewError } = await supabase
+          .from('soundvision_file_reviews')
+          .select('id, file_id, rating, review, is_initial, updated_at')
+          .eq('reviewer_id', currentUserId)
+          .in('file_id', filesData.map((file) => file.id));
+
+        if (reviewError) throw reviewError;
+
+        userReviewsMap = new Map(
+          (reviewData || []).map(review => [
+            review.file_id,
+            {
+              id: review.id,
+              rating: review.rating,
+              review: review.review,
+              is_initial: review.is_initial,
+              updated_at: review.updated_at,
+            } as SoundVisionReviewSummary,
+          ])
+        );
+      }
 
       // Combine data
       const filesWithUploaders = filesData.map(file => ({
         ...file,
         uploader: profilesMap.get(file.uploaded_by) || { first_name: '', last_name: '' },
+        hasReviewed: userReviewsMap.has(file.id),
+        current_user_review: userReviewsMap.get(file.id) || null,
       })) as SoundVisionFile[];
 
       // Apply client-side filters

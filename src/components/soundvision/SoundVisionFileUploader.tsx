@@ -2,23 +2,32 @@ import { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { Upload, File } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Form } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { Progress } from '@/components/ui/progress';
 import { VenueMetadataForm, VenueFormData } from './VenueMetadataForm';
 import { useSoundVisionUpload } from '@/hooks/useSoundVisionUpload';
 import { validateFile, ALLOWED_FILE_TYPES } from '@/utils/soundvisionFileValidation';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { StarRating } from './StarRating';
 
 interface SoundVisionFileUploaderProps {
   onUploadComplete?: () => void;
 }
 
+type SoundVisionUploadFormData = VenueFormData & {
+  includeInitialReview: boolean;
+  initialRating: number | null;
+  initialReview: string;
+};
+
 export const SoundVisionFileUploader = ({ onUploadComplete }: SoundVisionFileUploaderProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  
+
   const { upload, isUploading, progress } = useSoundVisionUpload();
 
-  const form = useForm<VenueFormData>({
+  const form = useForm<SoundVisionUploadFormData>({
     defaultValues: {
       venueName: '',
       venueCity: '',
@@ -29,6 +38,9 @@ export const SoundVisionFileUploader = ({ onUploadComplete }: SoundVisionFileUpl
       venueNotes: '',
       googlePlaceId: '',
       coordinates: null,
+      includeInitialReview: false,
+      initialRating: null,
+      initialReview: '',
     },
   });
 
@@ -61,9 +73,14 @@ export const SoundVisionFileUploader = ({ onUploadComplete }: SoundVisionFileUpl
     setSelectedFile(file);
   };
 
-  const onSubmit = (data: VenueFormData) => {
+  const onSubmit = (data: SoundVisionUploadFormData) => {
     if (!selectedFile) {
       alert('Por favor, selecciona un archivo');
+      return;
+    }
+
+    if (data.includeInitialReview && (!data.initialRating || data.initialRating < 1)) {
+      alert('Por favor, selecciona una valoración inicial.');
       return;
     }
 
@@ -81,6 +98,13 @@ export const SoundVisionFileUploader = ({ onUploadComplete }: SoundVisionFileUpl
           capacity: data.venueCapacity ? parseInt(data.venueCapacity) : null,
         },
         notes: data.venueNotes || undefined,
+        initialReview:
+          data.includeInitialReview && data.initialRating
+            ? {
+                rating: data.initialRating,
+                review: data.initialReview.trim() ? data.initialReview.trim() : undefined,
+              }
+            : undefined,
       },
       {
         onSuccess: () => {
@@ -166,6 +190,72 @@ export const SoundVisionFileUploader = ({ onUploadComplete }: SoundVisionFileUpl
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <VenueMetadataForm form={form} />
+
+          <div className="space-y-4 rounded-lg border p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium">¿Quieres añadir una reseña inicial?</h3>
+                <p className="text-sm text-muted-foreground">
+                  Opcionalmente, puedes dejar tu valoración y comentarios al subir el archivo.
+                </p>
+              </div>
+              <FormField
+                control={form.control}
+                name="includeInitialReview"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col items-center space-y-0">
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isUploading} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {form.watch('includeInitialReview') && (
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="initialRating"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Valoración inicial *</FormLabel>
+                      <FormDescription>Selecciona una puntuación entre 1 y 5 estrellas.</FormDescription>
+                      <FormControl>
+                        <StarRating
+                          value={field.value || 0}
+                          onChange={(value) => field.onChange(value)}
+                          readOnly={isUploading}
+                        />
+                      </FormControl>
+                      <FormMessage>
+                        {field.value === null && 'Debes seleccionar una valoración.'}
+                      </FormMessage>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="initialReview"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Comentario (opcional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Describe la utilidad del archivo o contexto relevante..."
+                          rows={3}
+                          disabled={isUploading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+          </div>
 
           <Button
             type="submit"
