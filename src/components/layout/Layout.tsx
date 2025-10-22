@@ -93,7 +93,7 @@ const Layout = () => {
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>
-                <SidebarNavigation userRole={userRole} />
+                <SidebarNavigation userRole={userRole} userDepartment={userDepartment} />
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
