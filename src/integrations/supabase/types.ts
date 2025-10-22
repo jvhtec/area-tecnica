@@ -4413,6 +4413,55 @@ export type Database = {
           },
         ]
       }
+      soundvision_file_downloads: {
+        Row: {
+          downloaded_at: string
+          file_id: string
+          id: string
+          ip_address: string | null
+          profile_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          downloaded_at?: string
+          file_id: string
+          id?: string
+          ip_address?: string | null
+          profile_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          downloaded_at?: string
+          file_id?: string
+          id?: string
+          ip_address?: string | null
+          profile_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soundvision_file_downloads_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "soundvision_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "soundvision_file_downloads_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "soundvision_file_downloads_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       soundvision_files: {
         Row: {
           average_rating: number | null

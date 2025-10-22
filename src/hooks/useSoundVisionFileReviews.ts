@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 export interface SoundVisionFileReview {
   id: string;
@@ -27,6 +28,28 @@ interface ReviewsQueryResult {
 
 export const useSoundVisionFileReviews = (fileId: string | null | undefined) => {
   const queryClient = useQueryClient();
+
+  const parseReviewErrorMessage = (error: unknown, fallback: string) => {
+    if (error && typeof error === 'object') {
+      const pgError = error as Partial<PostgrestError> & { message?: string };
+      const message = pgError.message ?? '';
+      if (
+        (pgError.code && ['42501', 'P0001', '23514'].includes(pgError.code)) ||
+        message.toLowerCase().includes('soundvision_file_downloads') ||
+        message.toLowerCase().includes('row-level security')
+      ) {
+        return 'Debes descargar el archivo antes de dejar una reseña.';
+      }
+    }
+
+    if (error instanceof Error && error.message) {
+      if (error.message.toLowerCase().includes('descarga el archivo')) {
+        return error.message;
+      }
+    }
+
+    return fallback;
+  };
 
   const query = useQuery<ReviewsQueryResult>({
     queryKey: ['soundvision-file-reviews', fileId],
@@ -106,7 +129,7 @@ export const useSoundVisionFileReviews = (fileId: string | null | undefined) => 
     },
     onError: (error) => {
       console.error('Error creating review:', error);
-      toast.error(error.message || 'No se pudo guardar la reseña');
+      toast.error(parseReviewErrorMessage(error, 'No se pudo guardar la reseña'));
     },
   });
 
@@ -140,7 +163,7 @@ export const useSoundVisionFileReviews = (fileId: string | null | undefined) => 
     },
     onError: (error) => {
       console.error('Error updating review:', error);
-      toast.error(error.message || 'No se pudo actualizar la reseña');
+      toast.error(parseReviewErrorMessage(error, 'No se pudo actualizar la reseña'));
     },
   });
 

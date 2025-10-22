@@ -25,7 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StarRating } from './StarRating';
 import { SoundVisionReviewDialog } from './SoundVisionReviewDialog';
 
@@ -55,6 +55,21 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
   const downloadFile = useDownloadSoundVisionFile();
 
   const canDelete = canDeleteSoundVisionFiles(profile?.role);
+  const isManagement = useMemo(
+    () => profile?.role === 'admin' || profile?.role === 'management',
+    [profile?.role]
+  );
+
+  useEffect(() => {
+    if (!selectedFile) return;
+    const updated = files.find((file) => file.id === selectedFile.id);
+    if (updated && updated !== selectedFile) {
+      setSelectedFile(updated);
+    }
+  }, [files, selectedFile]);
+
+  const canOpenReviews = (file: SoundVisionFile) =>
+    isManagement || file.hasDownloaded || file.hasReviewed;
 
   if (files.length === 0) {
     return (
@@ -118,6 +133,8 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                 variant={file.hasReviewed ? 'secondary' : 'outline'}
                 onClick={() => setSelectedFile(file)}
                 className="flex-1"
+                disabled={!canOpenReviews(file)}
+                title={!canOpenReviews(file) ? 'Descarga el archivo para poder valorarlo.' : undefined}
               >
                 <StarIcon className="h-4 w-4 mr-1" />
                 Reseñas
@@ -132,6 +149,11 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                 <Download className="h-4 w-4 mr-1" />
                 Descargar
               </Button>
+              {!canOpenReviews(file) && (
+                <p className="w-full text-xs text-muted-foreground">
+                  Descarga el archivo para poder dejar una reseña.
+                </p>
+              )}
               {canDelete && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -210,6 +232,8 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                       size="sm"
                       variant={file.hasReviewed ? 'secondary' : 'outline'}
                       onClick={() => setSelectedFile(file)}
+                      disabled={!canOpenReviews(file)}
+                      title={!canOpenReviews(file) ? 'Descarga el archivo para poder valorarlo.' : undefined}
                     >
                       <StarIcon className="h-4 w-4 mr-1" />
                       Reseñas
@@ -223,6 +247,11 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
                       <Download className="h-4 w-4 mr-1" />
                       Descargar
                     </Button>
+                    {!canOpenReviews(file) && (
+                      <p className="text-xs text-muted-foreground w-full text-right">
+                        Descarga el archivo para poder dejar una reseña.
+                      </p>
+                    )}
                     {canDelete && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -262,6 +291,7 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
               setSelectedFile(null);
             }
           }}
+          currentUserRole={profile?.role ?? null}
         />
       )}
     </>
