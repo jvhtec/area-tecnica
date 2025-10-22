@@ -26,7 +26,7 @@ const SoundVisionFiles = () => {
     <div className="container mx-auto px-4 py-6 max-w-7xl h-[calc(100vh-6rem)]">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-full">
         {/* Map - takes 60% on desktop */}
-        <Card className="lg:col-span-3 p-4 h-full">
+        <Card className="lg:col-span-3 p-0 h-full overflow-hidden">
           <SoundVisionMap files={files} />
         </Card>
 

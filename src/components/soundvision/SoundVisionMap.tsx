@@ -49,10 +49,17 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
         // Fetch Mapbox token from edge function
         const { data, error: tokenError } = await supabase.functions.invoke('get-mapbox-token');
         
-        if (tokenError || !data?.token) {
-          throw new Error('Failed to fetch Mapbox token');
+        if (tokenError) {
+          console.error('Token fetch error:', tokenError);
+          throw new Error(`Failed to fetch Mapbox token: ${tokenError.message}`);
+        }
+        
+        if (!data?.token) {
+          console.error('No token in response:', data);
+          throw new Error('Mapbox token not found in response');
         }
 
+        console.log('Mapbox token retrieved successfully');
         mapboxgl.accessToken = data.token;
 
         // Initialize map
@@ -188,7 +195,7 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full min-h-[500px]">
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10 rounded-lg">
           <div className="flex items-center gap-2">
