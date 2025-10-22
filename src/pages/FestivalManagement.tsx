@@ -28,6 +28,7 @@ import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { JobPresetManagerDialog } from "@/components/jobs/JobPresetManagerDialog";
+import { resolveJobDocBucket } from "@/utils/jobDocuments";
 
 interface FestivalJob {
   id: string;
@@ -64,6 +65,8 @@ interface JobDocumentEntry {
   file_name: string;
   file_path: string;
   uploaded_at: string;
+  read_only?: boolean;
+  template_type?: string | null;
 }
 
 interface ArtistRiderFile {
@@ -111,11 +114,7 @@ const FestivalManagement = () => {
   const [flexPickerOptions, setFlexPickerOptions] = useState<CreateFoldersOptions | undefined>(undefined);
   const [isJobPresetsOpen, setIsJobPresetsOpen] = useState(false);
 
-  const resolveJobDocumentBucket = useCallback((path: string) => {
-    const firstSegment = (path || '').split('/')[0];
-    const knownDepartments = new Set(['sound', 'lights', 'video', 'production', 'logistics', 'administrative']);
-    return knownDepartments.has(firstSegment) ? 'job_documents' : 'job-documents';
-  }, []);
+  const resolveJobDocumentBucket = useCallback((path: string) => resolveJobDocBucket(path), []);
 
   const fetchJobDetails = useCallback(async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
@@ -299,7 +298,7 @@ const FestivalManagement = () => {
     try {
       const { data: jobDocs, error: jobDocsError } = await supabase
         .from('job_documents')
-        .select('id, file_name, file_path, uploaded_at')
+        .select('id, file_name, file_path, uploaded_at, read_only, template_type')
         .eq('job_id', jobId)
         .order('uploaded_at', { ascending: false });
 
@@ -1154,40 +1153,52 @@ const FestivalManagement = () => {
                     </h4>
                     {jobDocuments.length > 0 ? (
                       <div className="mt-3 space-y-2">
-                        {jobDocuments.map((doc) => (
-                          <div key={doc.id} className="flex items-center justify-between rounded-md border bg-card px-3 py-2">
-                            <div>
-                              <div className="text-sm font-medium text-foreground">{doc.file_name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                Uploaded {formatDateLabel(doc.uploaded_at)}
+                        {jobDocuments.map((doc) => {
+                          const isTemplate = doc.template_type === 'soundvision';
+                          const isReadOnly = Boolean(doc.read_only);
+                          return (
+                            <div key={doc.id} className="flex items-center justify-between rounded-md border bg-card px-3 py-2">
+                              <div>
+                                <div className="text-sm font-medium text-foreground flex items-center gap-2">
+                                  {doc.file_name}
+                                  {isTemplate && (
+                                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                                      Template SoundVision File
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Uploaded {formatDateLabel(doc.uploaded_at)}
+                                  {isReadOnly && <span className="ml-2 italic">Read-only</span>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleJobDocumentView(doc);
+                                  }}
+                                  title="View"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleJobDocumentDownload(doc);
+                                  }}
+                                  title="Download"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleJobDocumentView(doc);
-                                }}
-                                title="View"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleJobDocumentDownload(doc);
-                                }}
-                                title="Download"
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="mt-3 text-sm text-muted-foreground">

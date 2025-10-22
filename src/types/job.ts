@@ -3,6 +3,9 @@ export interface JobDocument {
   file_name: string;
   file_path: string;
   uploaded_at: string;
+  visible_to_tech?: boolean;
+  read_only?: boolean;
+  template_type?: string | null;
 }
 
 export type JobType = "single" | "tour" | "tourdate" | "festival" | "dryhire";

@@ -38,6 +38,7 @@ import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { toast } from 'sonner';
 import { syncFlexWorkOrdersForJob } from '@/services/flexWorkOrders';
+import { resolveJobDocBucket } from '@/utils/jobDocuments';
 
 interface JobDetailsDialogProps {
   open: boolean;
@@ -72,7 +73,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
             sound_role, lights_role, video_role, status,
             profiles(id, first_name, last_name, department, role)
           ),
-          job_documents(id, file_name, file_path, uploaded_at, file_size, visible_to_tech),
+          job_documents(id, file_name, file_path, uploaded_at, file_size, visible_to_tech, read_only, template_type),
           logistics_events(id, event_type, transport_type, event_date, event_time, license_plate)
         `)
         .eq('id', job.id)
@@ -317,15 +318,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     loadStaticMap();
   }, [open, jobDetails]);
 
-  const resolveBucket = (path: string) => {
-    const first = (path || '').split('/')[0];
-    const dept = new Set(['sound','lights','video','production','logistics','administrative']);
-    return dept.has(first) ? 'job_documents' : 'job-documents';
-  };
-
   const handleDownloadDocument = async (doc: any) => {
     try {
-      const bucket = resolveBucket(doc.file_path);
+      const bucket = resolveJobDocBucket(doc.file_path);
       const { data } = await supabase.storage
         .from(bucket)
         .createSignedUrl(doc.file_path, 3600);
@@ -345,7 +340,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   const handleViewDocument = async (doc: any) => {
     try {
-      const bucket = resolveBucket(doc.file_path);
+      const bucket = resolveJobDocBucket(doc.file_path);
       const { data, error } = await supabase.storage
         .from(bucket)
         .createSignedUrl(doc.file_path, 3600);
@@ -804,34 +799,46 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
                 {jobDetails?.job_documents && jobDetails.job_documents.length > 0 ? (
                   <div className="space-y-2">
-                    {jobDetails.job_documents.map((doc: any) => (
-                      <div key={doc.id} className="flex items-center justify-between p-3 bg-muted rounded">
-                        <div>
-                          <p className="font-medium">{doc.file_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {doc.uploaded_at ? `Subido el ${format(new Date(doc.uploaded_at), 'PPP', { locale: es })}` : 'Fecha de subida desconocida'}
-                          </p>
+                    {jobDetails.job_documents.map((doc: any) => {
+                      const isTemplate = doc.template_type === 'soundvision';
+                      const isReadOnly = Boolean(doc.read_only);
+                      return (
+                        <div key={doc.id} className="flex items-center justify-between p-3 bg-muted rounded">
+                          <div>
+                            <p className="font-medium flex items-center gap-2">
+                              {doc.file_name}
+                              {isTemplate && (
+                                <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                                  Template SoundVision File
+                                </Badge>
+                              )}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {doc.uploaded_at ? `Subido el ${format(new Date(doc.uploaded_at), 'PPP', { locale: es })}` : 'Fecha de subida desconocida'}
+                              {isReadOnly && <span className="ml-2 italic">Solo lectura</span>}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => handleViewDocument(doc)}
+                              size="sm"
+                              variant="outline"
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver
+                            </Button>
+                            <Button
+                              onClick={() => handleDownloadDocument(doc)}
+                              size="sm"
+                              variant="outline"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Descargar
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => handleViewDocument(doc)}
-                            size="sm"
-                            variant="outline"
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            Ver
-                          </Button>
-                          <Button
-                            onClick={() => handleDownloadDocument(doc)}
-                            size="sm"
-                            variant="outline"
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Descargar
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-8">

@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { JobDocument } from '@/components/jobs/cards/JobCardDocuments';
 import { Department } from '@/types/department';
 import { useDeletionState } from './useDeletionState';
+import { resolveJobDocBucket } from '@/utils/jobDocuments';
 
 export const useJobCard = (job: any, department: Department, userRole: string | null, onEditClick?: (job: any) => void, onDeleteClick?: (jobId: string) => void, onJobClick?: (jobId: string) => void) => {
   const { toast } = useToast();
@@ -206,11 +207,21 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
   };
 
   const handleDeleteDocument = async (doc: JobDocument) => {
+    if (doc.read_only) {
+      toast({
+        title: "Cannot delete read-only document",
+        description: "Template documents are attached automatically and cannot be removed manually.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!window.confirm("Are you sure you want to delete this document?")) return;
     try {
       console.log("useJobCard: Starting document deletion:", doc);
+      const bucket = resolveJobDocBucket(doc.file_path);
       const { error: storageError } = await supabase.storage
-        .from("job_documents")
+        .from(bucket)
         .remove([doc.file_path]);
       
       if (storageError) {

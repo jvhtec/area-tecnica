@@ -2811,8 +2811,10 @@ export type Database = {
           original_type: string | null
           preview_generated_at: string | null
           preview_url: string | null
+          read_only: boolean
           uploaded_at: string
           uploaded_by: string | null
+          template_type: string | null
           visible_to_tech: boolean
         }
         Insert: {
@@ -2826,8 +2828,10 @@ export type Database = {
           original_type?: string | null
           preview_generated_at?: string | null
           preview_url?: string | null
+          read_only?: boolean
           uploaded_at?: string
           uploaded_by?: string | null
+          template_type?: string | null
           visible_to_tech?: boolean
         }
         Update: {
@@ -2841,8 +2845,10 @@ export type Database = {
           original_type?: string | null
           preview_generated_at?: string | null
           preview_url?: string | null
+          read_only?: boolean
           uploaded_at?: string
           uploaded_by?: string | null
+          template_type?: string | null
           visible_to_tech?: boolean
         }
         Relationships: [
