@@ -4,6 +4,9 @@ const DEPT_PREFIXES = new Set(['sound','lights','video','production','logistics'
 
 export const resolveJobDocBucket = (path: string) => {
   const first = (path || '').split('/')[0];
+  if (first === 'soundvision-files') {
+    return 'soundvision-files';
+  }
   return DEPT_PREFIXES.has(first) ? 'job_documents' : 'job-documents';
 };
 

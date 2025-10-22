@@ -64,6 +64,9 @@ export interface JobDocument {
   file_name: string;
   file_path: string;
   uploaded_at: string;
+  visible_to_tech?: boolean;
+  read_only?: boolean;
+  template_type?: string | null;
 }
 
 export interface JobCardNewProps {
@@ -751,6 +754,14 @@ export function JobCardNew({
   };
 
   const handleDeleteDocument = async (doc: JobDocument) => {
+    if (doc.read_only) {
+      toast({
+        title: "Cannot delete read-only document",
+        description: "Template documents are attached automatically and cannot be removed manually.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!window.confirm("Are you sure you want to delete this document?")) return;
     try {
       console.log("Starting document deletion:", doc);
@@ -1149,56 +1160,66 @@ export function JobCardNew({
                   <div className="mt-4 space-y-2">
                     <div className="text-xs sm:text-sm font-medium">Documents</div>
                     <div className="space-y-2">
-                      {documents.map((doc) => (
-                        <div
-                          key={doc.id}
-                          className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="flex flex-col min-w-0 flex-1 mr-2">
-                            <span className="text-xs sm:text-sm font-medium truncate" title={doc.file_name}>
-                              {doc.file_name}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              Uploaded {format(new Date(doc.uploaded_at), "MMM d, yyyy")}
-                            </span>
-                          </div>
-                          <div className="flex gap-1 shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleViewDocument(doc)}
-                              title="View"
-                              disabled={isJobBeingDeleted}
-                              className="h-7 w-7 sm:h-8 sm:w-8"
-                            >
-                              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDownload(doc)}
-                              title="Download"
-                              disabled={isJobBeingDeleted}
-                              className="h-7 w-7 sm:h-8 sm:w-8"
-                            >
-                              <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                            {canDeleteDocuments(userRole) && (
+                      {documents.map((doc) => {
+                        const isTemplate = doc.template_type === 'soundvision';
+                        const isReadOnly = Boolean(doc.read_only);
+                        return (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="flex flex-col min-w-0 flex-1 mr-2">
+                              <span className="text-xs sm:text-sm font-medium truncate flex items-center gap-2" title={doc.file_name}>
+                                {doc.file_name}
+                                {isTemplate && (
+                                  <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                                    Template SoundVision File
+                                  </Badge>
+                                )}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                Uploaded {format(new Date(doc.uploaded_at), "MMM d, yyyy")}
+                                {isReadOnly && <span className="ml-2 italic">Read-only</span>}
+                              </span>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleDeleteDocument(doc)}
-                                title="Delete"
+                                onClick={() => handleViewDocument(doc)}
+                                title="View"
                                 disabled={isJobBeingDeleted}
                                 className="h-7 w-7 sm:h-8 sm:w-8"
                               >
-                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
                               </Button>
-                            )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDownload(doc)}
+                                title="Download"
+                                disabled={isJobBeingDeleted}
+                                className="h-7 w-7 sm:h-8 sm:w-8"
+                              >
+                                <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                              </Button>
+                              {canDeleteDocuments(userRole) && !isReadOnly && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteDocument(doc)}
+                                  title="Delete"
+                                  disabled={isJobBeingDeleted}
+                                  className="h-7 w-7 sm:h-8 sm:w-8"
+                                >
+                                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}

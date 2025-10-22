@@ -174,6 +174,9 @@ export const SoundVisionFileUploader = ({ onUploadComplete }: SoundVisionFileUpl
           >
             Subir archivo
           </Button>
+          <p className="text-xs italic text-muted-foreground text-center">
+            Por favor, sube preferiblemente archivos .xmls de SoundVision para asegurar la mejor compatibilidad y reutilización.
+          </p>
         </form>
       </Form>
     </div>

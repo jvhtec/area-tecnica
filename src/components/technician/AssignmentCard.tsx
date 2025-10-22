@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
@@ -197,22 +198,36 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-1 mt-1">
-                  {jobData.job_documents.map((doc: any) => (
-                    <div key={doc.id} className="flex items-center justify-between gap-2 p-2 bg-secondary/20 rounded text-xs">
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate font-medium">{doc.file_name}</p>
-                        <p className="text-muted-foreground text-xs">{doc.uploaded_at && format(new Date(doc.uploaded_at), "dd/MM/yyyy")}</p>
+                  {jobData.job_documents.map((doc: any) => {
+                    const isTemplate = doc.template_type === 'soundvision';
+                    const isReadOnly = Boolean(doc.read_only);
+                    return (
+                      <div key={doc.id} className="flex items-center justify-between gap-2 p-2 bg-secondary/20 rounded text-xs">
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate font-medium flex items-center gap-2">
+                            {doc.file_name}
+                            {isTemplate && (
+                              <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                                Template SoundVision File
+                              </Badge>
+                            )}
+                          </p>
+                          <p className="text-muted-foreground text-xs">
+                            {doc.uploaded_at && format(new Date(doc.uploaded_at), "dd/MM/yyyy")}
+                            {isReadOnly && <span className="ml-1 italic">Solo lectura</span>}
+                          </p>
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <Button onClick={() => handleViewDocument(doc)} variant="ghost" size="sm" className="h-6 w-6 p-0" title={`Ver ${doc.file_name}`} disabled={documentLoading.has(doc.id)}>
+                            {documentLoading.has(doc.id) ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
+                          </Button>
+                          <Button onClick={() => handleDownload(doc)} variant="ghost" size="sm" className="h-6 w-6 p-0" title={`Descargar ${doc.file_name}`} disabled={documentLoading.has(doc.id)}>
+                            {documentLoading.has(doc.id) ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <Button onClick={() => handleViewDocument(doc)} variant="ghost" size="sm" className="h-6 w-6 p-0" title={`Ver ${doc.file_name}`} disabled={documentLoading.has(doc.id)}>
-                          {documentLoading.has(doc.id) ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
-                        </Button>
-                        <Button onClick={() => handleDownload(doc)} variant="ghost" size="sm" className="h-6 w-6 p-0" title={`Descargar ${doc.file_name}`} disabled={documentLoading.has(doc.id)}>
-                          {documentLoading.has(doc.id) ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </CollapsibleContent>
               </Collapsible>
             </div>

@@ -134,13 +134,15 @@ const TechnicianDashboard = () => {
               color,
               status,
               location:locations(name),
-              job_documents(
-                id,
-                file_name,
-                file_path,
-                visible_to_tech,
-                uploaded_at
-              )
+            job_documents(
+              id,
+              file_name,
+              file_path,
+              visible_to_tech,
+              uploaded_at,
+              read_only,
+              template_type
+            )
             )
           `)
           .eq('technician_id', user.id)

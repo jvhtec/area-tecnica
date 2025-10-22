@@ -6,6 +6,7 @@ import { Department } from "@/types/department";
 import { JobDocument } from "@/types/job";
 import { useCallback } from "react";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
+import { resolveJobDocBucket } from "@/utils/jobDocuments";
 
 export const useJobManagement = (
   selectedDepartment: Department,
@@ -37,7 +38,10 @@ export const useJobManagement = (
           id,
           file_name,
           file_path,
-          uploaded_at
+          uploaded_at,
+          visible_to_tech,
+          read_only,
+          template_type
         ),
         flex_folders(id)
       `)
@@ -61,7 +65,7 @@ export const useJobManagement = (
           "for department:",
           selectedDepartment
         );
-        return doc.file_path.startsWith(`${selectedDepartment}/`);
+        return doc.file_path.startsWith(`${selectedDepartment}/`) || doc.template_type === 'soundvision';
       }),
       flex_folders_exist: job.flex_folders.length > 0,
       isProjectManagementPage
@@ -82,12 +86,21 @@ export const useJobManagement = (
   });
 
   const handleDeleteDocument = async (jobId: string, document: JobDocument) => {
+    if (document.read_only) {
+      toast({
+        title: "Cannot delete read-only document",
+        description: "Template documents are attached automatically and cannot be removed manually.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       console.log("useJobManagement: Deleting document:", document);
-      
+
       // Delete from storage
+      const bucket = resolveJobDocBucket(document.file_path);
       const { error: storageError } = await supabase.storage
-        .from("job_documents")
+        .from(bucket)
         .remove([document.file_path]);
 
       if (storageError) throw storageError;

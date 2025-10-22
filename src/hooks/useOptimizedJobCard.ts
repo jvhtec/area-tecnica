@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { createQueryKey } from '@/lib/optimized-react-query';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
+import { resolveJobDocBucket } from '@/utils/jobDocuments';
 
 export const useOptimizedJobCard = (
   job: any,
@@ -248,11 +249,15 @@ export const useOptimizedJobCard = (
   }, [job.id, department]);
 
   const handleDeleteDocument = useCallback(async (doc: any) => {
+    if (doc?.read_only) {
+      console.error('Attempted to delete read-only document', doc);
+      return;
+    }
     if (!window.confirm('Are you sure you want to delete this document?')) return;
-    
+
     try {
       const { error: storageError } = await supabase.storage
-        .from('job_documents')
+        .from(resolveJobDocBucket(doc.file_path))
         .remove([doc.file_path]);
       
       if (storageError) throw storageError;

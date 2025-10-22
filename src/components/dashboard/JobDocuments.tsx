@@ -9,12 +9,15 @@ import { Department } from "@/types/department";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
 import { useEffect, useState } from "react";
 import { useTableSubscription } from "@/hooks/useTableSubscription";
+import { resolveJobDocBucket } from "@/utils/jobDocuments";
 
 interface JobDocument {
   id: string;
   file_name: string;
   file_path: string;
   uploaded_at: string;
+  read_only?: boolean;
+  template_type?: string | null;
 }
 
 interface JobDocumentsProps {
@@ -40,18 +43,12 @@ export const JobDocuments = ({
     setLocalDocuments(documents);
   }, [documents]);
 
-  const resolveBucket = (path: string) => {
-    const first = (path || '').split('/')[0];
-    const dept = new Set(['sound','lights','video','production','logistics','administrative']);
-    return dept.has(first) ? 'job_documents' : 'job-documents';
-  };
-
   const handleDownload = async (jobDocument: JobDocument) => {
     try {
       console.log('Starting download for document:', jobDocument.file_name);
-      
+
       const { data, error } = await supabase.storage
-        .from(resolveBucket(jobDocument.file_path))
+        .from(resolveJobDocBucket(jobDocument.file_path))
         .download(jobDocument.file_path);
 
       if (error) {
@@ -84,7 +81,7 @@ export const JobDocuments = ({
       console.log('Starting view for document:', jobDocument.file_name);
       
       const { data: { signedUrl }, error } = await supabase.storage
-        .from(resolveBucket(jobDocument.file_path))
+        .from(resolveJobDocBucket(jobDocument.file_path))
         .createSignedUrl(jobDocument.file_path, 60);
 
       if (error) {
@@ -102,6 +99,12 @@ export const JobDocuments = ({
   };
 
   const handleDelete = (document: JobDocument) => {
+    if (document.read_only) {
+      toast.error("Cannot delete template", {
+        description: "Template documents are attached automatically and cannot be removed manually."
+      });
+      return;
+    }
     // Update local documents optimistically
     setLocalDocuments(current => current.filter(doc => doc.id !== document.id));
     
@@ -118,54 +121,68 @@ export const JobDocuments = ({
         <SubscriptionIndicator tables={['job_documents']} variant="compact" />
       </div>
       <div className="space-y-2">
-        {localDocuments.map((doc) => (
-          <div 
-            key={doc.id} 
-            className="flex items-center justify-between p-2 rounded-md bg-accent/20"
-          >
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">{doc.file_name}</span>
-              <span className="text-xs text-muted-foreground">
-                Uploaded {format(new Date(doc.uploaded_at), 'MMM d, yyyy')}
-              </span>
+        {localDocuments.map((doc) => {
+          const isTemplate = doc.template_type === 'soundvision';
+          const isReadOnly = Boolean(doc.read_only);
+          return (
+            <div
+              key={doc.id}
+              className="flex items-center justify-between p-2 rounded-md bg-accent/20"
+            >
+              <div className="flex flex-col">
+                <span className="text-sm font-medium flex items-center gap-2">
+                  {doc.file_name}
+                  {isTemplate && (
+                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                      Template SoundVision File
+                    </Badge>
+                  )}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Uploaded {format(new Date(doc.uploaded_at), 'MMM d, yyyy')}
+                  {isReadOnly && <span className="ml-2 italic">Read-only</span>}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleView(doc);
+                  }}
+                  title="View"
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownload(doc);
+                  }}
+                  title="Download"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+                {!isReadOnly && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(doc);
+                    }}
+                    title="Delete"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleView(doc);
-                }}
-                title="View"
-              >
-                <FileText className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDownload(doc);
-                }}
-                title="Download"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(doc);
-                }}
-                title="Delete"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
