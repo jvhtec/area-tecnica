@@ -49,7 +49,7 @@ export const useSoundVisionUpload = () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!user) throw new Error('Usuario no autenticado');
 
       // Create database record
       const { error: dbError } = await supabase.from('soundvision_files').insert({
@@ -68,12 +68,12 @@ export const useSoundVisionUpload = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
       queryClient.invalidateQueries({ queryKey: ['venues'] });
-      toast.success('File uploaded successfully');
+      toast.success('Archivo subido correctamente');
       setProgress(0);
     },
     onError: (error) => {
       console.error('Error uploading file:', error);
-      toast.error(error.message || 'Failed to upload file');
+      toast.error(error.message || 'No se pudo subir el archivo');
       setProgress(0);
     },
   });

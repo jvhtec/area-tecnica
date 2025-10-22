@@ -1,9 +1,9 @@
-// L-Acoustics SoundVision file validation utilities
+// Utilidades de validación de archivos SoundVision de L-Acoustics
 
-// L-Acoustics Soundvision file types:
-// .xmlp - Project file (full Soundvision project)
-// .xmls - Scene file (venue/geometry context)
-// .xmlc - Configuration file (exports like speaker positions)
+// Tipos de archivos SoundVision de L-Acoustics:
+// .xmlp - Archivo de proyecto (proyecto SoundVision completo)
+// .xmls - Archivo de escena (contexto de recinto/geometría)
+// .xmlc - Archivo de configuración (exportaciones como posiciones de altavoces)
 export const ALLOWED_FILE_TYPES = ['.xmlp', '.xmls', '.xmlc'];
 export const ALLOWED_MIME_TYPES = [
   'application/xml',
@@ -18,28 +18,28 @@ export interface FileValidationResult {
 }
 
 export const validateFile = (file: File): FileValidationResult => {
-  // Check file size
+  // Comprobar el tamaño del archivo
   if (file.size > MAX_FILE_SIZE) {
     return {
       valid: false,
-      error: `File size exceeds 100MB limit (${(file.size / 1024 / 1024).toFixed(2)}MB)`,
+      error: `El tamaño del archivo supera el límite de 100 MB (${(file.size / 1024 / 1024).toFixed(2)} MB)`,
     };
   }
 
-  // Check file extension
+  // Comprobar la extensión del archivo
   const extension = file.name.toLowerCase().match(/\.[^.]+$/)?.[0];
   if (!extension || !ALLOWED_FILE_TYPES.includes(extension)) {
     return {
       valid: false,
-      error: `Invalid file type. Allowed types: ${ALLOWED_FILE_TYPES.join(', ')}`,
+      error: `Tipo de archivo no válido. Tipos permitidos: ${ALLOWED_FILE_TYPES.join(', ')}`,
     };
   }
 
-  // Check MIME type (if available)
+  // Comprobar el tipo MIME (si está disponible)
   if (file.type && !ALLOWED_MIME_TYPES.includes(file.type)) {
     return {
       valid: false,
-      error: `Invalid MIME type: ${file.type}`,
+      error: `Tipo MIME no válido: ${file.type}`,
     };
   }
 
@@ -47,7 +47,7 @@ export const validateFile = (file: File): FileValidationResult => {
 };
 
 export const sanitizeFileName = (fileName: string): string => {
-  // Remove path traversal attempts
+  // Eliminar intentos de recorridos de ruta
   const sanitized = fileName
     .replace(/\.\./g, '')
     .replace(/[/\\]/g, '_')

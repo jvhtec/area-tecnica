@@ -16,7 +16,7 @@ const SoundVisionFiles = () => {
       <div className="container mx-auto px-4 py-6 max-w-7xl h-[calc(100vh-6rem)] flex items-center justify-center">
         <div className="flex items-center gap-2">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-muted-foreground">Loading SoundVision files...</span>
+          <span className="text-muted-foreground">Cargando archivos de SoundVision...</span>
         </div>
       </div>
     );
