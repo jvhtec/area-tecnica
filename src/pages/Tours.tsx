@@ -6,11 +6,13 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { TourChips } from "@/components/dashboard/TourChips";
 import { supabase } from "@/lib/supabase";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 
 const Tours = () => {
   const [showTours, setShowTours] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const { userRole } = useOptimizedAuth();
+  const isMobile = useIsMobile();
   
   // House techs have view-only access
   const readOnly = userRole === 'house_tech';
@@ -56,23 +58,24 @@ const Tours = () => {
   };
 
   return (
-    <div className="w-full max-w-full space-y-4">
+    <div className="w-full max-w-full px-2 sm:px-0 space-y-4">
       <Card className="w-full bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
-            Tours {new Date().getFullYear()}
+        <CardHeader className="flex flex-row items-center justify-between py-3 sm:py-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg md:text-xl">
+            {isMobile ? `Tours ${new Date().getFullYear()}` : `Tours ${new Date().getFullYear()}`}
           </CardTitle>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleToggleTours}
             className="h-8 w-8 p-0 shrink-0"
+            aria-label={showTours ? "Hide tours" : "Show tours"}
           >
             {showTours ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
         </CardHeader>
         {showTours && (
-          <CardContent>
+          <CardContent className="pb-4 sm:pb-6">
             <TourChips
               onTourClick={readOnly ? undefined : (tourId) => {
                 // This handles navigation to tour management (disabled for house techs)
