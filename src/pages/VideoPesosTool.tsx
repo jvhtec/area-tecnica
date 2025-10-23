@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,10 @@ import { supabase } from '@/lib/supabase';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { Badge } from '@/components/ui/badge';
+import { ToolStepFlow, type ToolStepDefinition, ToolResponsiveTable, type ToolResponsiveColumn } from '@/components/shared/tooling';
+import { VideoTouchNumericField, VideoToolHelpOverlay } from '@/components/video/Tooling';
+import { queuePdfExport } from '@/utils/pdfExportQueue';
+import { usePdfExportQueueNotifications } from '@/hooks/usePdfExportQueueNotifications';
 
 const videoComponentDatabase = [
   { id: 1, name: 'Pantalla Central', weight: 32 },
@@ -51,6 +55,8 @@ const VideoPesosTool: React.FC = () => {
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
   const jobIdFromUrl = searchParams.get('jobId');
+  usePdfExportQueueNotifications();
+  const [activeStep, setActiveStep] = useState<'context' | 'build' | 'review'>('context');
   
   // Tour override mode detection
   const tourId = searchParams.get('tourId');
@@ -146,6 +152,7 @@ const VideoPesosTool: React.FC = () => {
     setSelectedJobId(jobId);
     const job = jobs?.find((j) => j.id === jobId) || null;
     setSelectedJob(job);
+    setActiveStep('build');
   };
 
   const saveWeightTable = async (table: Table) => {
@@ -260,6 +267,7 @@ const VideoPesosTool: React.FC = () => {
       saveWeightTable(newTable);
     }
     
+    setActiveStep('review');
     resetCurrentTable();
   };
 
@@ -281,7 +289,7 @@ const VideoPesosTool: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    const jobToUse = isOverrideMode && overrideData 
+    const jobToUse = isOverrideMode && overrideData
       ? { id: 'override', title: `${overrideData.tourName} - ${overrideData.locationName}` }
       : selectedJob;
 
@@ -294,56 +302,55 @@ const VideoPesosTool: React.FC = () => {
       return;
     }
 
+    const allTables = isOverrideMode ? [...defaultTables, ...tables] : tables;
+
+    let logoUrl: string | undefined = undefined;
     try {
-      // Combine defaults and current tables for export
-      const allTables = isOverrideMode 
-        ? [...defaultTables, ...tables]
-        : tables;
-
-      let logoUrl: string | undefined = undefined;
-      try {
-        if (isOverrideMode && tourId) {
-          const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
-          logoUrl = await fetchTourLogo(tourId);
-        }
-      } catch (logoError) {
-        console.error("Error fetching logo:", logoError);
+      if (isOverrideMode && tourId) {
+        const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
+        logoUrl = await fetchTourLogo(tourId);
       }
-
-      const pdfBlob = await exportToPDF(
-        jobToUse.title,
-        allTables.map((table) => ({ ...table, toolType: 'pesos' })),
-        'weight',
-        jobToUse.title,
-        jobToUse?.start_time || new Date().toISOString(),
-        undefined,
-        undefined,
-        0,
-        logoUrl
-      );
-
-      const fileName = `Video Weight Report - ${jobToUse.title}.pdf`;
-      const url = window.URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast({
-        title: 'Success',
-        description: 'PDF has been generated successfully.',
-      });
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate the PDF.',
-        variant: 'destructive',
-      });
+    } catch (logoError) {
+      console.error('Error fetching logo:', logoError);
     }
+
+    const exportArgs: Parameters<typeof exportToPDF> = [
+      jobToUse.title,
+      allTables.map((table) => ({ ...table, toolType: 'pesos' })),
+      'weight',
+      jobToUse.title,
+      jobToUse?.start_time || new Date().toISOString(),
+      undefined,
+      undefined,
+      0,
+      logoUrl,
+    ];
+
+    const fileName = `Video Weight Report - ${jobToUse.title}.pdf`;
+
+    queuePdfExport({ args: exportArgs, metadata: { title: jobToUse.title, fileName } })
+      .then((pdfBlob) => {
+        try {
+          const url = window.URL.createObjectURL(pdfBlob);
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.download = fileName;
+          document.body.appendChild(anchor);
+          anchor.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(anchor);
+        } catch (downloadError) {
+          console.error(downloadError);
+        }
+      })
+      .catch((error) => {
+        console.error('Error exporting PDF:', error);
+        toast({
+          title: 'Export failed',
+          description: 'Failed to generate the PDF export. Please try again.',
+          variant: 'destructive',
+        });
+      });
   };
 
   // Load defaults when in override mode
