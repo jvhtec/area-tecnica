@@ -1266,7 +1266,7 @@ const PesosTool: React.FC = () => {
         <ToolStepFlow
           steps={steps}
           activeStepId={activeStep}
-          onStepChange={setActiveStep}
+          onStepChange={(stepId) => setActiveStep(stepId as 'context' | 'build' | 'review')}
         />
       </CardContent>
     </Card>
