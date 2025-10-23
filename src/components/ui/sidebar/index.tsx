@@ -1,5 +1,5 @@
-export { useSidebar, SidebarProvider } from "./sidebar-context"
-export { SidebarGroup, SidebarGroupContent } from "./sidebar-layout"
+export * from "./sidebar-context"
+export * from "./sidebar-layout"
 
 // Re-export only existing components from sidebar-menu
 export {

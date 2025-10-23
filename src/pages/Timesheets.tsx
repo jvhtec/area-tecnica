@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, Download, FileText } from "lucide-react";
 import { TimesheetView } from "@/components/timesheet/TimesheetView";
@@ -11,7 +12,6 @@ import { format } from "date-fns";
 import { es } from 'date-fns/locale';
 import { useSearchParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useIsMobile } from "@/hooks/useMediaQuery";
 
 export default function Timesheets() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -21,7 +21,6 @@ export default function Timesheets() {
   const { user, userRole } = useOptimizedAuth();
   const { data: jobs = [], isLoading: jobsLoading } = useOptimizedJobs();
   const { timesheets } = useTimesheets(selectedJobId || "", { userRole });
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (jobIdFromUrl) {
@@ -92,19 +91,19 @@ export default function Timesheets() {
   }
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3">
-            <Clock className="h-6 w-6 sm:h-8 sm:w-8" />
-            {isMobile ? 'Partes de horas' : 'Gestión de partes de horas'}
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <Clock className="h-8 w-8" />
+            Gestión de partes de horas
           </h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            Gestiona partes de horas de los técnicos
+          <p className="text-muted-foreground">
+            Gestiona partes de horas de los técnicos para los trabajos
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-          <div className="w-full sm:min-w-[240px]">
+        <div className="flex items-center gap-3">
+          <div className="min-w-[240px]">
             <Select value={selectedJobId} onValueChange={handleJobSelect}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona un trabajo" />
@@ -118,22 +117,19 @@ export default function Timesheets() {
           </div>
           {selectedJobId && canDownloadPDF && !timesheetsDisabled && (
             <>
-              {!isMobile && (
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="px-3 py-2 border rounded-md"
-                />
-              )}
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-2 border rounded-md"
+              />
               <Button
                 onClick={handleDownloadPDF}
                 variant="outline"
-                className="flex items-center gap-2 w-full sm:w-auto"
-                size={isMobile ? "default" : "default"}
+                className="flex items-center gap-2"
               >
                 <Download className="h-4 w-4" />
-                {isMobile ? 'PDF' : 'Descargar PDF'}
+                Descargar PDF
               </Button>
             </>
           )}

@@ -16,7 +16,6 @@ import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/Prin
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { FestivalsPagination } from "@/components/ui/festivals-pagination";
 import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils";
-import { useIsMobile } from "@/hooks/useMediaQuery";
 
 const ITEMS_PER_PAGE = 9; // 3x3 grid
 
@@ -34,7 +33,6 @@ const Festivals = () => {
     refetch,
     realtimeStatus
   } = useJobsRealtime();
-  const isMobile = useIsMobile();
   
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
@@ -217,50 +215,37 @@ const Festivals = () => {
   const emptyFunction = () => {};
 
   return (
-    <div className="max-w-7xl mx-auto px-2 sm:px-4 space-y-4 sm:space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       <Card>
-        <CardHeader className="pb-2 sm:pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-4">
-              <CardTitle className="text-xl sm:text-2xl font-bold">
-                {isMobile ? 'Festivals' : 'Festival Management'}
-              </CardTitle>
-              <Tent className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowCompleted(!showCompleted)}
-              >
-                {showCompleted ? <EyeOff className="h-4 w-4 mr-1 sm:mr-2" /> : <Eye className="h-4 w-4 mr-1 sm:mr-2" />}
-                <span className="hidden sm:inline">{showCompleted ? 'Hide Completed' : 'Show Completed'}</span>
-                <span className="sm:hidden">{showCompleted ? 'Hide' : 'Show'}</span>
-              </Button>
-              <SubscriptionIndicator 
-                tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types', 'festival_logos']} 
-                showRefreshButton 
-                onRefresh={handleRefreshClick}
-                showLabel={!isMobile}
-              />
-            </div>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div className="flex items-center gap-4">
+            <CardTitle className="text-2xl font-bold">Festival Management</CardTitle>
+            <Tent className="h-6 w-6 text-muted-foreground" />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCompleted(!showCompleted)}
+              className="mr-2"
+            >
+              {showCompleted ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+              {showCompleted ? 'Hide Completed' : 'Show Completed'}
+            </Button>
+            <SubscriptionIndicator 
+              tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types', 'festival_logos']} 
+              showRefreshButton 
+              onRefresh={handleRefreshClick}
+              showLabel
+            />
           </div>
         </CardHeader>
         <CardContent>
-          {!isMobile && (
-            <>
-              <p className="text-muted-foreground mb-6">
-                Access and manage all festival-type events in one place.
-              </p>
-              <Separator className="my-6" />
-            </>
-          )}
-          {isMobile && (
-            <p className="text-sm text-muted-foreground mb-4">
-              Scroll through upcoming festivals and tap to view their details.
-            </p>
-          )}
+          <p className="text-muted-foreground mb-6">
+            Access and manage all festival-type events in one place.
+          </p>
+          <Separator className="my-6" />
           
           {isLoading ? (
             <div className="flex flex-col justify-center items-center h-40">
@@ -296,8 +281,8 @@ const Festivals = () => {
               </p>
             </div>
           ) : (
-            <div className="space-y-4 sm:space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {paginatedFestivals.map((job) => (
                   <div 
                     key={job.id} 
@@ -310,7 +295,7 @@ const Festivals = () => {
                       onClick={() => handleJobClick(job.id)} 
                       className={`cursor-pointer transition-all duration-300 ${
                         highlightedFestivalId === job.id 
-                          ? 'ring-2 ring-primary ring-offset-2 shadow-lg scale-[1.02] sm:scale-105' 
+                          ? 'ring-2 ring-primary ring-offset-2 shadow-lg scale-105' 
                           : ''
                       }`}
                     >
@@ -328,7 +313,7 @@ const Festivals = () => {
                     {canPrintDocuments && (
                       <Button
                         variant="outline"
-                        size={isMobile ? "icon" : "sm"}
+                        size="sm"
                         className="absolute top-2 right-2 z-10"
                         onClick={(e) => {
                           e.stopPropagation();
