@@ -11,22 +11,27 @@ import { MonthNavigation } from "@/components/project-management/MonthNavigation
 import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
 import { StatusFilter } from "@/components/project-management/StatusFilter";
 import { JobTypeFilter } from "@/components/project-management/JobTypeFilter";
+import { MobileFilters } from "@/components/project-management/MobileFilters";
 import { Input } from "@/components/ui/input";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { autoCompleteJobs } from "@/utils/jobStatusUtils";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/useMediaQuery";
+
+const DEFAULT_JOB_STATUSES = ["Confirmado", "Tentativa"] as const;
 
 const ProjectManagement = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
-  const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>(["Confirmado", "Tentativa"]);
+  const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([...DEFAULT_JOB_STATUSES]);
   const [allJobTypes, setAllJobTypes] = useState<string[]>([]);
   const [allJobStatuses, setAllJobStatuses] = useState<string[]>([]);
   const [highlightToday, setHighlightToday] = useState(false);
@@ -287,38 +292,57 @@ const ProjectManagement = () => {
     ));
   };
 
+  const handleResetFilters = () => {
+    setSelectedJobTypes([]);
+    setSelectedJobStatuses([...DEFAULT_JOB_STATUSES]);
+    saveUserPreferences([...DEFAULT_JOB_STATUSES]);
+    setSearchQuery('');
+    setDebouncedQuery('');
+  };
+
+  const statusesChanged =
+    selectedJobStatuses.length !== DEFAULT_JOB_STATUSES.length ||
+    Array.from(DEFAULT_JOB_STATUSES).some(status => !selectedJobStatuses.includes(status));
+
+  const activeFilterCount = 
+    selectedJobTypes.length + 
+    (statusesChanged ? 1 : 0) +
+    (searchQuery.trim().length > 0 ? 1 : 0);
+
   return (
-    <div className="container mx-auto px-4 space-y-6">
+    <div className="container mx-auto px-2 sm:px-4 space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Project Management</CardTitle>
-          <div className="flex gap-2 flex-wrap">
-            <div className="flex items-center gap-4">
-              <JobTypeFilter
-                allJobTypes={allJobTypes}
-                selectedJobTypes={selectedJobTypes}
-                onTypeToggle={toggleJobType}
-              />
-              <StatusFilter
-                allJobStatuses={allJobStatuses}
-                selectedJobStatuses={selectedJobStatuses}
-                onStatusSelection={handleJobStatusSelection}
-              />
-            </div>
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search projects..."
-                className="pl-8 h-8 w-[220px]"
-              />
-              {(jobsLoading) && (
-                <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-              )}
-            </div>
-            {canCreateItems && (
-              <>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardTitle className="text-xl sm:text-2xl">Project Management</CardTitle>
+            
+            {/* Desktop filters */}
+            <div className="hidden md:flex gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <JobTypeFilter
+                  allJobTypes={allJobTypes}
+                  selectedJobTypes={selectedJobTypes}
+                  onTypeToggle={toggleJobType}
+                />
+                <StatusFilter
+                  allJobStatuses={allJobStatuses}
+                  selectedJobStatuses={selectedJobStatuses}
+                  onStatusSelection={handleJobStatusSelection}
+                />
+              </div>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search projects..."
+                  className="pl-8 h-8 w-[220px]"
+                />
+                {(jobsLoading) && (
+                  <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              {canCreateItems && (
                 <Button 
                   onClick={handleAutoCompleteAll}
                   disabled={isAutoCompleting || jobsLoading}
@@ -331,9 +355,51 @@ const ProjectManagement = () => {
                   ) : (
                     <CheckCircle className="h-4 w-4" />
                   )}
+                  <span className="hidden lg:inline">Auto-Complete Past Jobs</span>
+                  <span className="lg:hidden">Auto-Complete</span>
+                </Button>
+              )}
+            </div>
+
+            {/* Mobile filters and search */}
+            <div className="flex md:hidden gap-2 items-center flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search..."
+                  className="pl-8 h-9"
+                />
+              </div>
+              <MobileFilters
+                allJobTypes={allJobTypes}
+                selectedJobTypes={selectedJobTypes}
+                onTypeToggle={toggleJobType}
+                allJobStatuses={allJobStatuses}
+                selectedJobStatuses={selectedJobStatuses}
+                onStatusSelection={handleJobStatusSelection}
+                activeFilterCount={activeFilterCount}
+                onResetFilters={handleResetFilters}
+              />
+            </div>
+            {canCreateItems && (
+              <div className="md:hidden w-full">
+                <Button
+                  onClick={handleAutoCompleteAll}
+                  disabled={isAutoCompleting || jobsLoading}
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 w-full flex items-center justify-center gap-2"
+                >
+                  {isAutoCompleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4" />
+                  )}
                   Auto-Complete Past Jobs
                 </Button>
-              </>
+              </div>
             )}
           </div>
         </CardHeader>
