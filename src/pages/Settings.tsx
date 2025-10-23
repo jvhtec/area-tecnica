@@ -5,8 +5,9 @@ import {
   CardHeader,
   CardTitle
 } from "@/components/ui/card";
-import { UserPlus, Upload } from "lucide-react";
+import { UserPlus, Upload, Bell, Bug, Building2, Settings as SettingsIcon, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CreateUserDialog } from "@/components/users/CreateUserDialog";
 import { UsersList } from "@/components/users/UsersList";
 import { FilterBar } from "@/components/users/filters/FilterBar";
@@ -20,17 +21,17 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Bell, Bug } from "lucide-react";
 import { useEffect, useState } from 'react'
 import { usePushDebug } from '@/hooks/usePushDebug'
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Settings = () => {
+  const isMobile = useIsMobile();
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [importUsersOpen, setImportUsersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
-  // Department selector for Equipment Models card
   const [modelsDepartment, setModelsDepartment] = useState<Department>('sound');
   
   const { userRole } = useOptimizedAuth();
@@ -136,22 +137,231 @@ const Settings = () => {
   }, [subscription])
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 px-4 md:px-0">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-semibold">Settings</h1>
-        <div className="flex gap-2">
-          <Button onClick={() => setImportUsersOpen(true)} variant="outline">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button onClick={() => setImportUsersOpen(true)} variant="outline" className="w-full sm:w-auto">
             <Upload className="mr-2 h-4 w-4" />
             Import Users
           </Button>
-          <Button onClick={() => setCreateUserOpen(true)}>
+          <Button onClick={() => setCreateUserOpen(true)} className="w-full sm:w-auto">
             <UserPlus className="mr-2 h-4 w-4" />
             Add User
           </Button>
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      {isMobile ? (
+        <Accordion type="multiple" defaultValue={["push-notifications"]} className="space-y-4">
+          <AccordionItem value="push-notifications" className="border rounded-lg px-4 bg-card">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                <span className="font-semibold">Push notifications</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pt-4">
+              {!isSupported ? (
+                <Alert>
+                  <AlertTitle>Unsupported browser</AlertTitle>
+                  <AlertDescription>
+                    Your current browser does not support web push.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <>
+                  <div className="space-y-1 text-sm">
+                    <p>
+                      <span className="font-medium">Permission:</span> {permissionLabel}
+                    </p>
+                    <p>
+                      <span className="font-medium">Subscription:</span>{" "}
+                      {hasSubscription ? 'Active' : 'Inactive'}
+                    </p>
+                  </div>
+
+                  {isInitializing && (
+                    <p className="text-sm text-muted-foreground">
+                      Checking subscription…
+                    </p>
+                  )}
+
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertTitle>Error</AlertTitle>
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {isBlocked && (
+                    <Alert>
+                      <AlertTitle>Notifications blocked</AlertTitle>
+                      <AlertDescription>
+                        Enable notifications from your browser settings.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      onClick={() => void enable().catch(() => undefined)}
+                      disabled={!showEnableButton || isEnabling}
+                      className="w-full"
+                    >
+                      {isEnabling ? 'Enabling…' : 'Enable push'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => void disable().catch(() => undefined)}
+                      disabled={!hasSubscription || isDisabling || isInitializing}
+                      className="w-full"
+                    >
+                      {isDisabling ? 'Disabling…' : 'Disable push'}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={handleTestNotification}
+                      disabled={!hasSubscription || isInitializing}
+                      className="w-full"
+                    >
+                      <Bell className="mr-2 h-4 w-4" />
+                      Send Test
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={handleBackgroundTest}
+                      disabled={!hasSubscription || isInitializing}
+                      title="Schedules a test push in 5s"
+                      className="w-full"
+                    >
+                      Background test (5s)
+                    </Button>
+                  </div>
+                </>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+
+          {isSupported && (
+            <AccordionItem value="push-diagnostics" className="border rounded-lg px-4 bg-card">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Bug className="h-5 w-5" />
+                  <span className="font-semibold">Push diagnostics</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3 pt-4">
+                <div className="text-sm space-y-1">
+                  <p><span className="font-medium">Permission:</span> {permissionLabel}</p>
+                  <p><span className="font-medium">Has subscription:</span> {hasSubscription ? 'Yes' : 'No'}</p>
+                  {subInfo?.endpoint && (
+                    <p className="break-words"><span className="font-medium">Endpoint:</span> {String(subInfo.endpoint).slice(0, 64)}…</p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Button variant="secondary" onClick={() => void showLocalTest()} disabled={permission !== 'granted'} className="w-full">
+                    Show local SW test
+                  </Button>
+                  <Button variant="outline" onClick={async () => setSubInfo(await getSubscriptionInfo())} className="w-full">
+                    Refresh subscription info
+                  </Button>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  <p className="font-medium mb-1">Recent SW events</p>
+                  {events.length === 0 ? (
+                    <p>No events yet.</p>
+                  ) : (
+                    <ul className="space-y-1 max-h-40 overflow-auto border rounded p-2 bg-muted/30">
+                      {events.slice().reverse().map((e, idx) => (
+                        <li key={idx} className="font-mono text-xs">
+                          {new Date(e.ts).toLocaleTimeString()} — {e.type}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          )}
+
+          <AccordionItem value="users" className="border rounded-lg px-4 bg-card">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                <span className="font-semibold">Users</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-4">
+              <FilterBar
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                selectedRole={selectedRole}
+                onRoleChange={setSelectedRole}
+                selectedDepartment={selectedDepartment}
+                onDepartmentChange={setSelectedDepartment}
+                onClearFilters={handleClearFilters}
+              />
+              <UsersList
+                searchQuery={searchQuery}
+                roleFilter={selectedRole === "all" ? "" : selectedRole}
+                departmentFilter={selectedDepartment === "all" ? "" : selectedDepartment}
+                isManagementUser={isManagementUser}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="company" className="border rounded-lg px-4 bg-card">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                <span className="font-semibold">Company Settings</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pt-4">
+              <h3 className="text-sm font-medium">Company Logo</h3>
+              <p className="text-sm text-muted-foreground">
+                Upload your company logo for PDFs and documents.
+              </p>
+              <CompanyLogoUploader />
+            </AccordionContent>
+          </AccordionItem>
+
+          {isManagementUser && (
+            <AccordionItem value="equipment" className="border rounded-lg px-4 bg-card">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <SettingsIcon className="h-5 w-5" />
+                  <span className="font-semibold">Equipment Models</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-4">
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-muted-foreground">
+                    Manage equipment models for festival forms.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Department:</span>
+                    <select
+                      className="border rounded px-2 py-1 text-sm flex-1"
+                      value={modelsDepartment}
+                      onChange={(e) => setModelsDepartment(e.target.value as Department)}
+                    >
+                      <option value="sound">Sound</option>
+                      <option value="lights">Lights</option>
+                      <option value="video">Video</option>
+                    </select>
+                  </div>
+                </div>
+                <DepartmentProvider department={modelsDepartment}>
+                  <EquipmentModelsList />
+                </DepartmentProvider>
+              </AccordionContent>
+            </AccordionItem>
+          )}
+        </Accordion>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-6">
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -357,7 +567,8 @@ const Settings = () => {
             </Card>
           )}
         </div>
-      </div>
+        </div>
+      )}
 
       <CreateUserDialog 
         open={createUserOpen} 

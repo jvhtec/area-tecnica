@@ -10,8 +10,10 @@ import { es } from "date-fns/locale";
 import { useIncidentReports } from "@/hooks/useIncidentReports";
 import { IncidentReportsNotificationBadge } from "./IncidentReportsNotificationBadge";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export const IncidentReportsManagement = () => {
+  const isMobile = useIsMobile();
   const { reports, isLoading, deleteReport, isDeleting, downloadReport } = useIncidentReports();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<'uploaded_at' | 'file_name' | 'job_title'>('uploaded_at');
