@@ -105,22 +105,25 @@ const Personal = () => {
         onOpenChange={setIsVacationSectionOpen}
         className="space-y-4"
       >
-        <CollapsibleTrigger asChild>
-          <Button 
-            variant="ghost" 
-            className="flex items-center gap-2 text-2xl font-semibold p-0 h-auto hover:bg-transparent"
-          >
-            {isVacationSectionOpen ? (
-              <ChevronDown className="h-5 w-5" />
-            ) : (
-              <ChevronRight className="h-5 w-5" />
-            )}
-            Vacation Requests
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-4">
-          {renderVacationContent()}
-        </CollapsibleContent>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
+              <div className="flex items-center gap-2">
+                {isVacationSectionOpen ? (
+                  <ChevronDown className="h-5 w-5" />
+                ) : (
+                  <ChevronRight className="h-5 w-5" />
+                )}
+                <h2 className="text-xl md:text-2xl font-semibold">Vacation Requests</h2>
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent>
+              {renderVacationContent()}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
       </Collapsible>
     </div>
   );

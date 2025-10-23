@@ -125,15 +125,17 @@ export default function Announcements() {
 
   return (
     <div className="space-y-6 px-4 md:px-0">
-      <div>
-        <h1 className="text-2xl font-semibold">Announcements (Ticker)</h1>
-        <p className="text-muted-foreground">Messages shown in the wallboard ticker. Newest first.</p>
+      {/* Sticky header on mobile */}
+      <div className={`${isMobile ? 'sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4' : ''}`}>
+        <h1 className="text-xl md:text-2xl font-semibold">Announcements (Ticker)</h1>
+        <p className="text-sm md:text-base text-muted-foreground">Messages shown in the wallboard ticker. Newest first.</p>
       </div>
 
-      <Card>
+      {/* Add announcement form with sticky on mobile */}
+      <Card className={`${isMobile ? 'sticky top-16 z-10' : ''}`}>
         <CardHeader>
-          <CardTitle>Add Announcement</CardTitle>
-          <CardDescription>Create a new announcement for the wallboard ticker</CardDescription>
+          <CardTitle className="text-lg md:text-xl">Add Announcement</CardTitle>
+          <CardDescription className="text-sm">Create a new announcement for the wallboard ticker</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-3">

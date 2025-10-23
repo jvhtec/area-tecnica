@@ -100,6 +100,8 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
   const queryClient = useQueryClient();
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
   
   // Set up realtime subscriptions for all mobile calendar data
   useMobileDayCalendarSubscriptions();
@@ -113,6 +115,31 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
       festival: true,
     },
   });
+
+  // Swipe gesture handlers
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    if (isLeftSwipe) {
+      navigateToNext();
+    }
+    if (isRightSwipe) {
+      navigateToPrevious();
+    }
+  };
 
   const distinctJobTypes = jobs ? Array.from(new Set(jobs.map((job) => job.job_type).filter(Boolean))) : [];
   const distinctJobStatuses = jobs ? Array.from(new Set(jobs.map((job) => job.status).filter(Boolean))) : [];
@@ -256,7 +283,12 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
 
   return (
     <Card className="h-full flex flex-col">
-      <CardContent className="flex-grow p-4">
+      <CardContent 
+        className="flex-grow p-4"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         {/* Header with navigation */}
         <div className="flex items-center justify-between mb-4">
           <Button variant="ghost" size="sm" onClick={navigateToPrevious} className="p-2">
