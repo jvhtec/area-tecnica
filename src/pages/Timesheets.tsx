@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText } from "lucide-react";
+import { Clock, Download, FileText } from "lucide-react";
 import { TimesheetView } from "@/components/timesheet/TimesheetView";
 import { downloadTimesheetPDF } from "@/utils/timesheet-pdf";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
@@ -11,7 +12,6 @@ import { format } from "date-fns";
 import { es } from 'date-fns/locale';
 import { useSearchParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TimesheetsHeader } from "@/components/timesheet/TimesheetsHeader";
 
 export default function Timesheets() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -92,16 +92,49 @@ export default function Timesheets() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <TimesheetsHeader
-        jobs={relevantJobs}
-        selectedJobId={selectedJobId}
-        onSelectJob={handleJobSelect}
-        selectedDate={selectedDate}
-        onSelectDate={setSelectedDate}
-        canDownloadPDF={canDownloadPDF}
-        onDownloadPDF={handleDownloadPDF}
-        timesheetsDisabled={timesheetsDisabled}
-      />
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <Clock className="h-8 w-8" />
+            Gestión de partes de horas
+          </h1>
+          <p className="text-muted-foreground">
+            Gestiona partes de horas de los técnicos para los trabajos
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="min-w-[240px]">
+            <Select value={selectedJobId} onValueChange={handleJobSelect}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona un trabajo" />
+              </SelectTrigger>
+              <SelectContent>
+                {relevantJobs.map(job => (
+                  <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedJobId && canDownloadPDF && !timesheetsDisabled && (
+            <>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-2 border rounded-md"
+              />
+              <Button
+                onClick={handleDownloadPDF}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Descargar PDF
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
 
       {!selectedJobId && !jobsLoading && (
         <Card>
