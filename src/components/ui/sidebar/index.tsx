@@ -1,11 +1,5 @@
 export { useSidebar, SidebarProvider } from "./sidebar-context"
-export { 
-  SidebarContent as SidebarContentLayout,
-  SidebarFooter as SidebarFooterLayout,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarSeparator as SidebarSeparatorLayout
-} from "./sidebar-layout"
+export { SidebarGroup, SidebarGroupContent } from "./sidebar-layout"
 
 // Re-export only existing components from sidebar-menu
 export {
