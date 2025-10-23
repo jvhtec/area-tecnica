@@ -8,6 +8,8 @@ import { useDirectMessageOperations } from "./hooks/useDirectMessageOperations";
 import { useTableSubscription } from "@/hooks/useSubscription";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
 import { useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const DirectMessagesList = () => {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -131,26 +133,40 @@ export const DirectMessagesList = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between pb-2">
+      <div className="flex items-center justify-between pb-2 sticky top-0 bg-background z-10">
         <h3 className="text-lg font-medium">Mensajes directos</h3>
         <SubscriptionIndicator tables={['direct_messages']} variant="compact" />
       </div>
 
-      {loading ? (
-        <p className="text-muted-foreground">Cargando mensajes...</p>
-      ) : messages.length === 0 ? (
-        <p className="text-muted-foreground">No hay mensajes directos.</p>
-      ) : (
-        messages.map((message) => (
-          <DirectMessageCard
-            key={message.id}
-            message={message}
-            currentUserId={currentUserId}
-            onDelete={handleDeleteMessage}
-            onMarkAsRead={handleMarkAsRead}
-          />
-        ))
-      )}
+      <div className="space-y-3 overflow-y-auto">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index}>
+              <CardContent className="pt-6">
+                <Skeleton className="h-4 w-3/4 mb-2" />
+                <Skeleton className="h-3 w-full mb-2" />
+                <Skeleton className="h-3 w-1/2" />
+              </CardContent>
+            </Card>
+          ))
+        ) : messages.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <p className="text-muted-foreground">No hay mensajes directos.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          messages.map((message) => (
+            <DirectMessageCard
+              key={message.id}
+              message={message}
+              currentUserId={currentUserId}
+              onDelete={handleDeleteMessage}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }
