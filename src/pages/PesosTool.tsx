@@ -1172,7 +1172,7 @@ const PesosTool: React.FC = () => {
                       </div>
                     )}
 
-                    <ToolResponsiveTable<TableRow>
+                    <ToolResponsiveTable
                       data={table.rows}
                       columns={columns}
                       footer={{
