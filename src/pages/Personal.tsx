@@ -4,7 +4,7 @@ import { MobilePersonalCalendar } from '@/components/personal/MobilePersonalCale
 import { VacationRequestsTabs } from '@/components/personal/VacationRequestsTabs';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
