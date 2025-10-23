@@ -9,7 +9,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Send, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageSquare, Send } from "lucide-react";
 import { MessagesList } from "@/components/messages/MessagesList";
 import { DirectMessagesList } from "@/components/messages/DirectMessagesList";
 import { Button } from "@/components/ui/button";
@@ -21,8 +21,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useOptimizedMessagesSubscriptions } from "@/hooks/useOptimizedSubscriptions";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -41,7 +39,6 @@ const Dashboard = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [showMessages, setShowMessages] = useState(false);
-  const [showSchedule, setShowSchedule] = useState(true);
   
   // Dashboard state
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -59,7 +56,6 @@ const Dashboard = () => {
   const { data: jobs, isLoading } = useOptimizedJobs();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const isMobile = useIsMobile();
   // Ensure realtime updates for messages are wired
   useOptimizedMessagesSubscriptions(userId || '');
   
@@ -159,46 +155,43 @@ const Dashboard = () => {
       <DashboardHeader timeSpan={timeSpan} onTimeSpanChange={setTimeSpan} />
 
       {userRole === "management" && (
-        <Collapsible open={showMessages} onOpenChange={setShowMessages}>
-          <Card className="w-full">
-            <CollapsibleTrigger asChild>
-              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 cursor-pointer hover:bg-accent/50 transition-colors">
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 md:w-6 md:h-6" />
-                  Messages
-                  {showMessages ? (
-                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  )}
-                </CardTitle>
-                <div className="flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setNewMessageDialogOpen(true)}
-                    className="gap-2"
-                  >
-                    <Send className="h-4 w-4" />
-                    <span className="hidden sm:inline">New Message</span>
-                    <span className="sm:hidden">New</span>
-                  </Button>
+        <Card className="w-full">
+          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 md:w-6 md:h-6" />
+              Messages
+            </CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setNewMessageDialogOpen(true)}
+                className="gap-2"
+              >
+                <Send className="h-4 w-4" />
+                <span className="hidden sm:inline">New Message</span>
+                <span className="sm:hidden">New</span>
+              </Button>
+              <button
+                onClick={() => setShowMessages(!showMessages)}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                {showMessages ? "Hide" : "Show"}
+              </button>
+            </div>
+          </CardHeader>
+          {showMessages && (
+            <CardContent>
+              <div className="space-y-4 md:space-y-6">
+                <MessagesList />
+                <div className="border-t pt-4 md:pt-6">
+                  <h3 className="text-base md:text-lg font-medium mb-4">Direct Messages</h3>
+                  <DirectMessagesList />
                 </div>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="pt-0">
-                <div className="space-y-4 md:space-y-6">
-                  <MessagesList />
-                  <div className="border-t pt-4 md:pt-6">
-                    <h3 className="text-base md:text-lg font-medium mb-4">Direct Messages</h3>
-                    <DirectMessagesList />
-                  </div>
-                </div>
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
+              </div>
+            </CardContent>
+          )}
+        </Card>
       )}
 
       <div className="space-y-4 md:space-y-8">
@@ -212,53 +205,18 @@ const Dashboard = () => {
           />
         </div>
         
-        {/* Today's Schedule - Collapsible on mobile, always visible on desktop */}
-        {isMobile ? (
-          <Collapsible open={showSchedule} onOpenChange={setShowSchedule}>
-            <Card className="w-full">
-              <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
-                  <CardTitle className="flex items-center gap-2">
-                    Today's Schedule
-                    {showSchedule ? (
-                      <ChevronUp className="w-4 h-4 text-muted-foreground ml-auto" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-muted-foreground ml-auto" />
-                    )}
-                  </CardTitle>
-                </CardHeader>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent className="pt-0">
-                  <TodaySchedule
-                    jobs={selectedDateJobs}
-                    onEditClick={handleEditClick}
-                    onDeleteClick={handleDeleteClick}
-                    onJobClick={handleJobClick}
-                    userRole={userRole}
-                    selectedDate={date}
-                    hideTasks
-                    isLoading={isLoading}
-                    noWrapper
-                  />
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-        ) : (
-          <div className="w-full">
-            <TodaySchedule
-              jobs={selectedDateJobs}
-              onEditClick={handleEditClick}
-              onDeleteClick={handleDeleteClick}
-              onJobClick={handleJobClick}
-              userRole={userRole}
-              selectedDate={date}
-              hideTasks
-              isLoading={isLoading}
-            />
-          </div>
-        )}
+        {/* Today's Schedule below the calendar - Hidden on mobile */}
+        <div className="w-full hidden md:block">
+          <TodaySchedule
+            jobs={selectedDateJobs}
+            onEditClick={handleEditClick}
+            onDeleteClick={handleDeleteClick}
+            onJobClick={handleJobClick}
+            userRole={userRole}
+            selectedDate={date}
+            hideTasks
+          />
+        </div>
       </div>
 
       {/* Assignment dialog intentionally disabled for dashboard parity */}

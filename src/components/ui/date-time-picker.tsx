@@ -42,13 +42,13 @@ export function DateTimePicker({ value, onChange, timezone = 'Europe/Madrid' }: 
   }, [value, timezone]);
 
   return (
-    <div className="flex flex-col md:flex-row gap-2">
+    <div className="flex gap-2">
       <Popover>
         <PopoverTrigger asChild>
           <Button
             variant={"outline"}
             className={cn(
-              "justify-start text-left font-normal w-full md:w-[240px]",
+              "justify-start text-left font-normal w-[240px]",
               !date && "text-muted-foreground"
             )}
           >
@@ -69,7 +69,7 @@ export function DateTimePicker({ value, onChange, timezone = 'Europe/Madrid' }: 
         type="time"
         value={time}
         onChange={(e) => setTime(e.target.value)}
-        className="w-full md:w-[120px]"
+        className="w-[120px]"
       />
     </div>
   );

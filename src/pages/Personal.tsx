@@ -4,7 +4,7 @@ import { MobilePersonalCalendar } from '@/components/personal/MobilePersonalCale
 import { VacationRequestsTabs } from '@/components/personal/VacationRequestsTabs';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
@@ -105,25 +105,22 @@ const Personal = () => {
         onOpenChange={setIsVacationSectionOpen}
         className="space-y-4"
       >
-        <Card>
-          <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
-              <div className="flex items-center gap-2">
-                {isVacationSectionOpen ? (
-                  <ChevronDown className="h-5 w-5" />
-                ) : (
-                  <ChevronRight className="h-5 w-5" />
-                )}
-                <h2 className="text-xl md:text-2xl font-semibold">Vacation Requests</h2>
-              </div>
-            </CardHeader>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent>
-              {renderVacationContent()}
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
+        <CollapsibleTrigger asChild>
+          <Button 
+            variant="ghost" 
+            className="flex items-center gap-2 text-2xl font-semibold p-0 h-auto hover:bg-transparent"
+          >
+            {isVacationSectionOpen ? (
+              <ChevronDown className="h-5 w-5" />
+            ) : (
+              <ChevronRight className="h-5 w-5" />
+            )}
+            Vacation Requests
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4">
+          {renderVacationContent()}
+        </CollapsibleContent>
       </Collapsible>
     </div>
   );

@@ -30,8 +30,6 @@ import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 // Available departments
 const departments: Department[] = [
@@ -91,7 +89,6 @@ export const LogisticsEventDialog = ({
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const isMobile = useIsMobile();
 
   // Initialize form state when dialog opens or when switching to a different event
   useEffect(() => {

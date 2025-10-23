@@ -6,9 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 type Level = 'info' | 'warn' | 'critical';
 
@@ -24,7 +22,6 @@ interface AnnouncementRow {
 export default function Announcements() {
   useRoleGuard(['admin','management']);
   const { toast } = useToast();
-  const isMobile = useIsMobile();
 
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<AnnouncementRow[]>([]);
@@ -124,109 +121,46 @@ export default function Announcements() {
   };
 
   return (
-    <div className="space-y-6 px-4 md:px-0">
-      {/* Sticky header on mobile */}
-      <div className={`${isMobile ? 'sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4' : ''}`}>
-        <h1 className="text-xl md:text-2xl font-semibold">Announcements (Ticker)</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Messages shown in the wallboard ticker. Newest first.</p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Announcements (Ticker)</h1>
+        <p className="text-muted-foreground">Messages shown in the wallboard ticker. Newest first. Toggle Active to show/hide.</p>
       </div>
 
-      {/* Add announcement form with sticky on mobile */}
-      <Card className={`${isMobile ? 'sticky top-16 z-10' : ''}`}>
-        <CardHeader>
-          <CardTitle className="text-lg md:text-xl">Add Announcement</CardTitle>
-          <CardDescription className="text-sm">Create a new announcement for the wallboard ticker</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-3">
+      <div className="border rounded-md p-4 space-y-3">
+        <div className="text-lg font-medium">Add Announcement</div>
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-center">
+          <div className="md:col-span-3">
             <Input
               placeholder="Message"
               value={newMsg}
               onChange={e => setNewMsg(e.target.value)}
             />
-            <div className="grid grid-cols-2 gap-3">
-              <Select value={newLevel} onValueChange={v => setNewLevel(v as Level)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="info">info</SelectItem>
-                  <SelectItem value="warn">warn</SelectItem>
-                  <SelectItem value="critical">critical</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="flex items-center gap-2">
-                <Switch checked={newActive} onCheckedChange={setNewActive} />
-                <span className="text-sm">Active</span>
-              </div>
-            </div>
-            <Button className="w-full" onClick={createAnnouncement} disabled={!newMsg.trim()}>
-              Add Announcement
-            </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      {isMobile ? (
-        <div className="space-y-3">
-          {rows.map(r => (
-            <Card key={r.id}>
-              <CardContent className="pt-6 space-y-3">
-                {editingId === r.id ? (
-                  <>
-                    <Input value={editMsg} onChange={e => setEditMsg(e.target.value)} />
-                    <Select value={editLevel} onValueChange={v => setEditLevel(v as Level)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="info">info</SelectItem>
-                        <SelectItem value="warn">warn</SelectItem>
-                        <SelectItem value="critical">critical</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </>
-                ) : (
-                  <>
-                    <div className="break-words">{r.message}</div>
-                    <div className="flex items-center gap-2">
-                      <span className="uppercase text-xs px-2 py-1 rounded bg-secondary">{r.level}</span>
-                      <span className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</span>
-                    </div>
-                  </>
-                )}
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center gap-2">
-                    <Switch checked={r.active} onCheckedChange={(v)=>setActive(r.id, v)} />
-                    <span className="text-sm">Active</span>
-                  </div>
-                  <div className="flex gap-2">
-                    {editingId === r.id ? (
-                      <>
-                        <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>Cancel</Button>
-                        <Button size="sm" onClick={() => saveEdit(r.id)} disabled={!editMsg.trim()}>Save</Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => startEdit(r)}>Edit</Button>
-                        <Button size="sm" variant="destructive" onClick={() => remove(r.id)}>Delete</Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {rows.length === 0 && (
-            <Card>
-              <CardContent className="py-6 text-center text-muted-foreground">
-                {loading ? 'Loading…' : 'No announcements yet'}
-              </CardContent>
-            </Card>
-          )}
+          <div>
+            <Select value={newLevel} onValueChange={v => setNewLevel(v as Level)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="info">info</SelectItem>
+                <SelectItem value="warn">warn</SelectItem>
+                <SelectItem value="critical">critical</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch checked={newActive} onCheckedChange={setNewActive} />
+            <span className="text-sm">Active</span>
+          </div>
+          <div className="md:col-span-1">
+            <Button className="w-full" onClick={createAnnouncement} disabled={!newMsg.trim()}>Add</Button>
+          </div>
         </div>
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
+      </div>
+
+      <div className="border rounded-md">
+        <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Message</TableHead>
@@ -286,12 +220,10 @@ export default function Announcements() {
                 </TableCell>
               </TableRow>
             )}
-            </TableBody>
-            </Table>
-            </CardContent>
-            </Card>
-            )}
-            </div>
-            );
-            }
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
 

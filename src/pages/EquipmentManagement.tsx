@@ -9,7 +9,6 @@ import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 export function EquipmentManagement() {
   const auth = useOptimizedAuth();
@@ -18,7 +17,6 @@ export function EquipmentManagement() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
 
   // Fetch current stock entries filtered by user department categories
   const { data: stockEntries = [], error: stockError } = useQuery({
@@ -87,17 +85,16 @@ export function EquipmentManagement() {
 
   if (!userDepartment) {
     return (
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto py-6">
         <div className="flex items-center gap-4 mb-6">
           <Button 
             variant="ghost" 
-            size={isMobile ? "sm" : "icon"}
+            size="icon"
             onClick={() => navigate(-1)}
           >
             <ArrowLeft className="h-4 w-4" />
-            {isMobile && <span className="ml-2">Volver</span>}
           </Button>
-          <h1 className="text-xl md:text-2xl font-bold">Gestionar Inventario</h1>
+          <h1 className="text-2xl font-bold">Gestionar Inventario</h1>
         </div>
         <Alert>
           <AlertCircle className="h-4 w-4" />
@@ -111,17 +108,16 @@ export function EquipmentManagement() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto py-6">
       <div className="flex items-center gap-4 mb-6">
         <Button 
           variant="ghost" 
-          size={isMobile ? "sm" : "icon"}
+          size="icon"
           onClick={() => navigate(-1)}
         >
           <ArrowLeft className="h-4 w-4" />
-          {isMobile && <span className="ml-2">Volver</span>}
         </Button>
-        <h1 className="text-xl md:text-2xl font-bold">Gestionar Inventario</h1>
+        <h1 className="text-2xl font-bold">Gestionar Inventario</h1>
       </div>
 
       {stockError ? (

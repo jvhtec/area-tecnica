@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, RefreshCw, ToggleLeft, ToggleRight, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { addWeeks, addMonths } from "date-fns";
 import { TimeSpanSelector } from "@/components/technician/TimeSpanSelector";
@@ -14,13 +14,12 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+// Standardize on the mobile-style assignment cards for all breakpoints
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 import { useTechnicianDashboardSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
 import { TechnicianTourRates } from "@/components/dashboard/TechnicianTourRates";
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 import { getCategoryFromAssignment } from "@/utils/roleCategory";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 const TechnicianDashboard = () => {
   const [timeSpan, setTimeSpan] = useState<string>("1week");
@@ -28,12 +27,9 @@ const TechnicianDashboard = () => {
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [showMessages, setShowMessages] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showAvailability, setShowAvailability] = useState(false);
-  const [showAssignments, setShowAssignments] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -296,124 +292,63 @@ const TechnicianDashboard = () => {
       {/* Tour Rates Section */}
       <TechnicianTourRates />
 
-      {/* My Availability / Unavailability - Collapsible on mobile */}
-      {isMobile ? (
-        <Collapsible open={showAvailability} onOpenChange={setShowAvailability}>
-          <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Mi disponibilidad
-                  {showAvailability ? (
-                    <ChevronUp className="w-4 h-4 text-muted-foreground ml-auto" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-muted-foreground ml-auto" />
-                  )}
-                </CardTitle>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="flex flex-col gap-3">
-                <div className="text-sm text-muted-foreground">
-                  Gestiona tus bloques de indisponibilidad para que los gestores no asignen trabajos solapados.
-                </div>
-                <Button onClick={() => navigate('/dashboard/unavailability')} className="w-full">
-                  Gestionar indisponibilidad
-                </Button>
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Mi disponibilidad
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center justify-between gap-3">
-            <div className="text-sm text-muted-foreground">
-              Gestiona tus bloques de indisponibilidad para que los gestores no asignen trabajos solapados.
-            </div>
-            <Button onClick={() => navigate('/dashboard/unavailability')}>
-              Gestionar indisponibilidad
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {/* My Availability / Unavailability */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Mi disponibilidad
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-3">
+          <div className="text-sm text-muted-foreground">
+            Gestiona tus bloques de indisponibilidad para que los gestores no asignen trabajos solapados.
+          </div>
+          <Button onClick={() => navigate('/dashboard/unavailability')}>
+            Gestionar indisponibilidad
+          </Button>
+        </CardContent>
+      </Card>
 
-      {/* Assignments - Collapsible on mobile */}
-      {isMobile ? (
-        <Collapsible open={showAssignments} onOpenChange={setShowAssignments}>
-          <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Mis asignaciones {viewMode === 'upcoming' ? 'próximas' : 'pasadas'}
-                  {showAssignments ? (
-                    <ChevronUp className="w-4 h-4 text-muted-foreground ml-auto" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-muted-foreground ml-auto" />
-                  )}
-                </CardTitle>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Mis asignaciones {viewMode === 'upcoming' ? 'próximas' : 'pasadas'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {assignments && assignments.length > 0 ? (
+            <>
+              {/* Desktop view */}
+              <div className="hidden md:block">
+                <AssignmentsGrid 
+                  assignments={assignments}
+                  loading={isLoading}
+                  onRefresh={handleRefresh}
+                  techName={userDepartment ? `Técnico de ${userDepartment}` : 'Técnico'}
+                />
+              </div>
+              {/* Mobile view */}
+              <div className="block md:hidden">
                 <AssignmentsList 
                   assignments={assignments} 
                   loading={isLoading} 
                   onRefresh={handleRefresh}
                   techName={userDepartment ? `Técnico de ${userDepartment}` : 'Técnico'}
                 />
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Mis asignaciones {viewMode === 'upcoming' ? 'próximas' : 'pasadas'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {assignments && assignments.length > 0 ? (
-              <>
-                {/* Desktop view */}
-                <div className="hidden md:block">
-                  <AssignmentsGrid 
-                    assignments={assignments}
-                    loading={isLoading}
-                    onRefresh={handleRefresh}
-                    techName={userDepartment ? `Técnico de ${userDepartment}` : 'Técnico'}
-                  />
-                </div>
-                {/* Mobile view */}
-                <div className="block md:hidden">
-                  <AssignmentsList 
-                    assignments={assignments} 
-                    loading={isLoading} 
-                    onRefresh={handleRefresh}
-                    techName={userDepartment ? `Técnico de ${userDepartment}` : 'Técnico'}
-                  />
-                </div>
-              </>
-            ) : (
-              <AssignmentsList 
-                assignments={assignments} 
-                loading={isLoading} 
-                onRefresh={handleRefresh}
-                techName={userDepartment ? `Técnico de ${userDepartment}` : 'Técnico'}
-              />
-            )}
-          </CardContent>
-        </Card>
-      )}
+              </div>
+            </>
+          ) : (
+            <AssignmentsList 
+              assignments={assignments} 
+              loading={isLoading} 
+              onRefresh={handleRefresh}
+              techName={userDepartment ? `Técnico de ${userDepartment}` : 'Técnico'}
+            />
+          )}
+        </CardContent>
+      </Card>
 
       {showMessages && (
         <Dialog open={showMessages} onOpenChange={handleCloseMessages}>

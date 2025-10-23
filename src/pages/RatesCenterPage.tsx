@@ -8,8 +8,6 @@ import { RatesApprovalsTable } from '@/features/rates/components/RatesApprovalsT
 import { useRatesOverview } from '@/features/rates/hooks/useRatesOverview';
 import { TourRatesManagerDialog } from '@/components/tours/TourRatesManagerDialog';
 import Timesheets from '@/pages/Timesheets';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 const TABS = [
   { id: 'catalogs', label: 'Catálogo de tarifas' },
@@ -19,7 +17,6 @@ const TABS = [
 ] as const;
 
 export default function RatesCenterPage() {
-  const isMobile = useIsMobile();
   const { data: overview, isLoading } = useRatesOverview();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as typeof TABS[number]['id']) || 'catalogs';
@@ -50,38 +47,26 @@ export default function RatesCenterPage() {
   }, [activeTab]);
 
   return (
-    <div className="space-y-6 px-4 md:px-0">
+    <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-xl md:text-2xl font-semibold">Centro de Tarifas y Extras</h1>
+        <h1 className="text-2xl font-semibold">Centro de Tarifas y Extras</h1>
         <p className="text-sm text-muted-foreground">
-          Configura valores por defecto de gira, extras y overrides.
+          Configura valores por defecto de gira, extras y overrides de house desde un único panel de gestión.
         </p>
       </div>
 
       <RatesCenterHeader overview={overview} isLoading={isLoading} />
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof TABS[number]['id'])}>
-        {isMobile ? (
-          <ScrollArea className="w-full whitespace-nowrap">
-            <TabsList className="inline-flex w-max">
-              {TABS.map((tab) => (
-                <TabsTrigger key={tab.id} value={tab.id} className="text-xs">
-                  {tab.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </ScrollArea>
-        ) : (
-          <TabsList className="w-full sm:w-auto">
-            {TABS.map((tab) => (
-              <TabsTrigger key={tab.id} value={tab.id} className="flex-1 sm:flex-none">
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        )}
+        <TabsList className="w-full sm:w-auto">
+          {TABS.map((tab) => (
+            <TabsTrigger key={tab.id} value={tab.id} className="flex-1 sm:flex-none">
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
         <TabsContent value="catalogs" className="mt-4">
-          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             <ExtrasCatalogEditor />
             <BaseRatesEditor />
           </div>

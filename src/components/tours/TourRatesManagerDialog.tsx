@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Euro, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX, Printer } from 'lucide-react';
+import { Euro, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -22,7 +22,6 @@ import { ExtrasCatalogEditor, BaseRatesEditor } from '@/features/rates/component
 import { invalidateRatesContext } from '@/services/ratesService';
 import { syncFlexWorkOrdersForJob, FlexWorkOrderSyncResult } from '@/services/flexWorkOrders';
 import { toast } from 'sonner';
-import { downloadTourDatePayoutBreakdownPDF } from '@/utils/payoutBreakdownPdf';
 
 type TourRatesManagerDialogProps = {
   open: boolean;
@@ -291,23 +290,6 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                   <Users className="h-3 w-3 mr-1" />
                   {quotes.length} asignaciones
                 </Badge>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!selectedJobId}
-                  onClick={async () => {
-                    if (!selectedJobId) return;
-                    try {
-                      await downloadTourDatePayoutBreakdownPDF(selectedJobId);
-                    } catch (e: any) {
-                      console.error('Print tour-date payouts failed', e);
-                      toast.error('No se pudo generar el PDF de pagos de la fecha');
-                    }
-                  }}
-                  className="flex items-center gap-1"
-                >
-                  <Printer className="h-4 w-4" /> Imprimir pagos (fecha)
-                </Button>
               </CardContent>
             </Card>
 

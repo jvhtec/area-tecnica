@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,10 +15,6 @@ import { useTourWeightDefaults } from '@/hooks/useTourWeightDefaults';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { Badge } from '@/components/ui/badge';
-import { ToolStepFlow, type ToolStepDefinition, ToolResponsiveTable, type ToolResponsiveColumn } from '@/components/shared/tooling';
-import { SoundTouchNumericField, SoundToolHelpOverlay } from '@/components/sound/Tooling';
-import { queuePdfExport } from '@/utils/pdfExportQueue';
-import { usePdfExportQueueNotifications } from '@/hooks/usePdfExportQueueNotifications';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -90,8 +86,6 @@ const PesosTool: React.FC = () => {
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
   const jobIdFromUrl = searchParams.get('jobId');
-  usePdfExportQueueNotifications();
-  const [activeStep, setActiveStep] = useState<'context' | 'build' | 'review'>('context');
   
   // Tour context detection - UPDATED TOUR DEFAULTS MODE DETECTION
   const tourId = searchParams.get('tourId');
@@ -368,7 +362,6 @@ const PesosTool: React.FC = () => {
     setSelectedJobId(jobId);
     const job = jobs?.find((j) => j.id === jobId) || null;
     setSelectedJob(job);
-    setActiveStep('build');
   };
 
   const saveAsDefaultSet = async () => {
@@ -627,7 +620,6 @@ const PesosTool: React.FC = () => {
       // For regular defaults mode, tables are just saved to local state
     });
 
-    setActiveStep('review');
     resetCurrentTable();
     setUseDualMotors(false);
     setMirroredCluster(false);
@@ -664,6 +656,7 @@ const PesosTool: React.FC = () => {
       };
     });
 
+    // Group tables by clusterId to handle cable picks
     const clusters = tables.reduce((acc, table) => {
       if (table.clusterId) {
         if (!acc[table.clusterId]) {
@@ -674,6 +667,7 @@ const PesosTool: React.FC = () => {
       return acc;
     }, {} as Record<string, Table[]>);
 
+    // If Cable Pick is enabled, add one cable pick summary row per cluster
     if (cablePick) {
       Object.values(clusters).forEach(() => {
         summaryRows.push({
@@ -684,535 +678,59 @@ const PesosTool: React.FC = () => {
       });
     }
 
-    let logoUrl: string | undefined = undefined;
     try {
-      const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
-      logoUrl = await fetchJobLogo(selectedJobId);
-    } catch (logoError) {
-      console.error('Error fetching logo:', logoError);
-    }
+      let logoUrl: string | undefined = undefined;
+      try {
+        const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+        logoUrl = await fetchJobLogo(selectedJobId);
+        console.log("Logo URL for PDF:", logoUrl);
+      } catch (logoError) {
+        console.error("Error fetching logo:", logoError);
+      }
 
-    const fileName = `Pesos Report - ${selectedJob.title}.pdf`;
-    const exportArgs: Parameters<typeof exportToPDF> = [
-      selectedJob.title,
-      tables.map((table) => ({ ...table, toolType: 'pesos' })),
-      'weight',
-      selectedJob.title,
-      selectedJob?.start_time || new Date().toISOString(),
-      summaryRows,
-      undefined,
-      undefined,
-      logoUrl,
-    ];
+      // For now just use the job title - location will be added later when available
+      const pdfBlob = await exportToPDF(
+        selectedJob.title,
+        tables.map((table) => ({ ...table, toolType: 'pesos' })),
+        'weight',
+        selectedJob.title,
+        selectedJob?.start_time || new Date().toISOString(),
+        summaryRows,
+        undefined,
+        undefined, // FIXED: Remove safety margin for weight reports
+        logoUrl
+      );
 
-    queuePdfExport({ args: exportArgs, metadata: { title: selectedJob.title, fileName } })
-      .then(async (pdfBlob) => {
-        try {
-          const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
-          await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/pesos');
-        } catch (uploadErr) {
-          console.error(uploadErr);
-          toast({
-            title: 'Upload failed',
-            description: 'The PDF was generated, but uploading to the job failed.',
-            variant: 'destructive',
-          });
-        }
+      const fileName = `Pesos Report - ${selectedJob.title}.pdf`;
+      try {
+        const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
+        await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/pesos');
+      } catch (uploadErr) {
+        throw uploadErr;
+      }
 
-        try {
-          const url = window.URL.createObjectURL(pdfBlob);
-          const anchor = document.createElement('a');
-          anchor.href = url;
-          anchor.download = fileName;
-          document.body.appendChild(anchor);
-          anchor.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(anchor);
-        } catch (downloadError) {
-          console.error(downloadError);
-        }
-      })
-      .catch((error) => {
-        console.error(error);
-        toast({
-          title: 'Export failed',
-          description: 'Failed to generate the PDF export. Please try again.',
-          variant: 'destructive',
-        });
+      toast({
+        title: 'Success',
+        description: 'PDF has been generated and uploaded successfully.',
       });
+
+      const url = window.URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate or upload the PDF.',
+        variant: 'destructive',
+      });
+    }
   };
-
-  const builderTableDesktop = (
-    <div className="hidden md:block">
-      <div className="overflow-hidden rounded-lg border">
-        <table className="w-full">
-          <thead className="bg-muted">
-            <tr>
-              <th className="px-4 py-3 text-left font-medium">Quantity</th>
-              <th className="px-4 py-3 text-left font-medium">Component</th>
-              <th className="px-4 py-3 text-left font-medium">Weight (per unit)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {currentTable.rows.map((row, index) => (
-              <tr key={index} className="border-t">
-                <td className="p-4">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    pattern="[0-9]*"
-                    value={row.quantity}
-                    onChange={(e) => updateInput(index, 'quantity', e.target.value)}
-                    min="0"
-                    className="w-full"
-                  />
-                </td>
-                <td className="p-4">
-                  <Select
-                    value={row.componentId}
-                    onValueChange={(value) => updateInput(index, 'componentId', value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select component" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {soundComponentDatabase.map((component) => (
-                        <SelectItem key={component.id} value={component.id.toString()}>
-                          {component.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </td>
-                <td className="p-4">
-                  <Input
-                    type="number"
-                    value={row.weight}
-                    readOnly
-                    className="w-full bg-muted"
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
-  const builderTableMobile = (
-    <div className="space-y-3 md:hidden">
-      {currentTable.rows.map((row, index) => (
-        <div key={index} className="space-y-3 rounded-lg border bg-card p-4 shadow-sm">
-          <SoundTouchNumericField
-            id={`quantity-${index}`}
-            label="Quantity"
-            value={row.quantity}
-            onChange={(value) => updateInput(index, 'quantity', value)}
-            suffix="pcs"
-          />
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Component</Label>
-            <Select
-              value={row.componentId}
-              onValueChange={(value) => updateInput(index, 'componentId', value)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select component" />
-              </SelectTrigger>
-              <SelectContent>
-                {soundComponentDatabase.map((component) => (
-                  <SelectItem key={component.id} value={component.id.toString()}>
-                    {component.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Weight (per unit)</Label>
-            <Input value={row.weight} readOnly className="bg-muted" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  const canExport = !isDefaults && !isTourContext && !isTourDefaults && tables.length > 0;
-
-  const steps: ToolStepDefinition[] = [
-    {
-      id: 'context',
-      title: 'Context & Mode',
-      description: 'Select job, tour, or defaults scope',
-      content: (
-        <div className="space-y-6">
-          {isJobOverrideMode && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm font-medium text-blue-900">Job override mode active</p>
-              <p className="mt-1 text-sm text-blue-700">
-                This job is part of a tour. Tables you create will be stored as overrides for the tour date.
-              </p>
-              {jobTourInfo && (
-                <p className="mt-2 text-xs uppercase tracking-wide text-blue-600">
-                  {jobTourInfo.tourName} • {jobTourInfo.date} — {jobTourInfo.location}
-                </p>
-              )}
-            </div>
-          )}
-
-          {isTourDefaults && (
-            <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-              <p className="text-sm font-medium text-green-900">Tour defaults mode active</p>
-              <p className="mt-1 text-sm text-green-700">
-                Weight tables will be saved as defaults for <span className="font-semibold">{tourName || 'this tour'}</span>.
-              </p>
-            </div>
-          )}
-
-          {isTourDateContext && tourDateInfo && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm font-medium text-blue-900">Override mode for tour date</p>
-              <p className="mt-1 text-sm text-blue-700">
-                {tourDateInfo.date} — {tourDateInfo.location}
-              </p>
-            </div>
-          )}
-
-          {isTourContext && !isDefaults && !isTourDefaults && (
-            <div className="rounded-lg border border-muted bg-muted/40 p-4 text-sm text-muted-foreground">
-              Creating weight requirements for tour: <span className="font-medium text-foreground">{tourName}</span>
-            </div>
-          )}
-
-          {isDefaults && !isTourDefaults && (
-            <div className="space-y-2">
-              <Label htmlFor="setName">Default Set Name</Label>
-              <Input
-                id="setName"
-                value={currentSetName}
-                onChange={(e) => setCurrentSetName(e.target.value)}
-                placeholder="Enter set name (e.g., Main Stage Rigging)"
-              />
-            </div>
-          )}
-
-          {!isTourContext && !isTourDefaults && !jobIdFromUrl && (
-            <div className="space-y-2">
-              <Label htmlFor="jobSelect">Select Job</Label>
-              <Select value={selectedJobId} onValueChange={handleJobSelect}>
-                <SelectTrigger id="jobSelect">
-                  <SelectValue placeholder="Select a job" />
-                </SelectTrigger>
-                <SelectContent>
-                  {jobs?.map((job) => (
-                    <SelectItem key={job.id} value={job.id}>
-                      {job.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      id: 'build',
-      title: 'Build clusters',
-      description: 'Add components and advanced options',
-      content: (
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="tableName">
-              {isDefaults || isTourDefaults ? 'Weight Default Name' : 'Table Name'}
-            </Label>
-            <Input
-              id="tableName"
-              value={tableName}
-              onChange={(e) => setTableName(e.target.value)}
-              placeholder={isDefaults || isTourDefaults ? 'Enter default name (e.g., K2 Array)' : 'Enter table name'}
-            />
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            <div className="flex items-start justify-between rounded-lg border px-4 py-3">
-              <div className="flex flex-1 gap-3">
-                <Checkbox
-                  id="dualMotors"
-                  checked={useDualMotors}
-                  onCheckedChange={(checked) => setUseDualMotors(!!checked)}
-                />
-                <div className="space-y-1">
-                  <label htmlFor="dualMotors" className="text-sm font-medium">
-                    Dual motors configuration
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    Generates paired rigging points and splits the load across two motors.
-                  </p>
-                </div>
-              </div>
-              <SoundToolHelpOverlay
-                title="Dual motors"
-                description="Use when each hang uses two motors. The calculator will allocate SX numbers in pairs."
-              />
-            </div>
-
-            <div className="flex items-start justify-between rounded-lg border px-4 py-3">
-              <div className="flex flex-1 gap-3">
-                <Checkbox
-                  id="mirroredCluster"
-                  checked={mirroredCluster}
-                  onCheckedChange={(checked) => setMirroredCluster(!!checked)}
-                />
-                <div className="space-y-1">
-                  <label htmlFor="mirroredCluster" className="text-sm font-medium">
-                    Mirrored cluster
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    Creates left/right tables with shared cluster ID for symmetrical hangs.
-                  </p>
-                </div>
-              </div>
-              <SoundToolHelpOverlay
-                title="Mirrored clusters"
-                description="Define a single hang and duplicate it as left/right pairs while keeping totals linked."
-              />
-            </div>
-
-            <div className="flex items-start justify-between rounded-lg border px-4 py-3">
-              <div className="flex flex-1 gap-3">
-                <Checkbox
-                  id="cablePick"
-                  checked={cablePick}
-                  onCheckedChange={(checked) => setCablePick(!!checked)}
-                />
-                <div className="space-y-2">
-                  <label htmlFor="cablePick" className="text-sm font-medium">
-                    Cable pick
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    Adds a helper load per cluster to account for cable picks.
-                  </p>
-                  {cablePick && (
-                    <Select value={cablePickWeight} onValueChange={(value) => setCablePickWeight(value)}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue placeholder="Weight" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {['100', '200', '300', '400', '500'].map((w) => (
-                          <SelectItem key={w} value={w}>
-                            {w} kg
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              </div>
-              <SoundToolHelpOverlay
-                title="Cable pick load"
-                description="Adds an auxiliary weight per cluster so the summary reflects cable pick requirements."
-              />
-            </div>
-          </div>
-
-          {builderTableDesktop}
-          {builderTableMobile}
-
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={addRow} className="w-full sm:w-auto">
-              Add Row
-            </Button>
-            <Button onClick={generateTable} variant="secondary" className="w-full sm:w-auto">
-              {isDefaults ? 'Save Default' : isTourDefaults ? 'Save Tour Default' : 'Generate Table'}
-            </Button>
-            <Button onClick={resetCurrentTable} variant="destructive" className="w-full sm:w-auto">
-              Reset
-            </Button>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 'review',
-      title: 'Review & export',
-      description: 'Validate totals before sharing',
-      content: (
-        <div className="space-y-6">
-          {isDefaults && defaultSets.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Existing Default Sets</h3>
-              {defaultSets.map((set) => {
-                const setTables = defaultTables.filter(
-                  (dt) => dt.set_id === set.id && dt.table_type === 'weight'
-                );
-                return (
-                  <div key={set.id} className="space-y-2 rounded-lg border p-4">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h4 className="font-medium">{set.name}</h4>
-                        <p className="text-sm text-muted-foreground">{set.description}</p>
-                      </div>
-                      <Button variant="destructive" size="sm" onClick={() => deleteSet(set.id)}>
-                        Delete Set
-                      </Button>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {setTables.map((table) => (
-                        <div key={table.id} className="rounded-md border px-3 py-2 text-sm">
-                          <div className="font-medium">{table.table_name}</div>
-                          <div className="text-muted-foreground">{table.total_value.toFixed(2)} kg</div>
-                        </div>
-                      ))}
-                      {setTables.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          No weight defaults stored in this set yet.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {isTourDateContext && weightOverrides.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Existing overrides for this date</h3>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {weightOverrides.map((override) => (
-                  <div key={override.id} className="space-y-2 rounded-lg border p-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">{override.item_name}</h4>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteOverride({ id: override.id, table: 'weight' })}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {(override.weight_kg * override.quantity).toFixed(2)} kg
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {tables.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tables generated yet.</p>
-          ) : (
-            <div className="space-y-6">
-              {tables.map((table) => {
-                const columns: ToolResponsiveColumn<TableRow>[] = [
-                  {
-                    key: 'quantity',
-                    header: 'Quantity',
-                    render: (row) => row.quantity || '—',
-                  },
-                  {
-                    key: 'component',
-                    header: 'Component',
-                    render: (row) => row.componentName || '—',
-                  },
-                  {
-                    key: 'unit',
-                    header: 'Unit Weight',
-                    render: (row) => (row.weight ? `${row.weight} kg` : '—'),
-                  },
-                  {
-                    key: 'total',
-                    header: 'Total Weight',
-                    render: (row) =>
-                      row.totalWeight !== undefined ? `${row.totalWeight.toFixed(2)} kg` : '—',
-                    align: 'right',
-                  },
-                ];
-
-                return (
-                  <div key={table.id} className="overflow-hidden rounded-lg border">
-                    <div className="flex flex-col gap-3 border-b bg-muted px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-semibold">{table.name}</h3>
-                        {isTourDefaults && (
-                          <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
-                            Default
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {!isDefaults && isTourContext && (
-                          <Button variant="outline" size="sm" onClick={() => saveAsDefaultSet()}>
-                            <Save className="mr-1 h-4 w-4" />
-                            Save as Default
-                          </Button>
-                        )}
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => typeof table.id === 'number' && removeTable(table.id)}
-                        >
-                          Remove Table
-                        </Button>
-                      </div>
-                    </div>
-
-                    {(table.dualMotors || table.clusterId || cablePick) && (
-                      <div className="flex flex-wrap gap-2 bg-muted/40 px-4 py-3 text-xs font-medium text-muted-foreground">
-                        {table.dualMotors && <span className="rounded bg-blue-100 px-2 py-1 text-blue-700">Dual motors</span>}
-                        {table.clusterId && <span className="rounded bg-green-100 px-2 py-1 text-green-700">Mirrored cluster</span>}
-                        {cablePick && (
-                          <span className="rounded bg-purple-100 px-2 py-1 text-purple-700">
-                            Cable pick ({cablePickWeight} kg)
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <ToolResponsiveTable
-                      data={table.rows}
-                      columns={columns}
-                      footer={{
-                        label: 'Total Weight',
-                        value: `${table.totalWeight?.toFixed(2) ?? '0.00'} kg`,
-                      }}
-                    />
-
-                    {table.dualMotors && (
-                      <div className="px-4 py-2 text-sm text-muted-foreground">
-                        * Load distributed between two motors for redundancy.
-                      </div>
-                    )}
-                    {table.riggingPoints && (
-                      <div className="border-t bg-blue-50 px-4 py-2 text-sm text-blue-600">
-                        <strong>Rigging Points:</strong> {table.riggingPoints}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {canExport && (
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button
-                onClick={handleExportPDF}
-                variant="outline"
-                className="w-full gap-2 sm:w-auto"
-              >
-                <FileText className="h-4 w-4" />
-                Export &amp; Upload PDF
-              </Button>
-            </div>
-          )}
-        </div>
-      ),
-    },
-  ];
 
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
@@ -1263,11 +781,357 @@ const PesosTool: React.FC = () => {
         </div>
       </CardHeader>
       <CardContent>
-        <ToolStepFlow
-          steps={steps}
-          activeStepId={activeStep}
-          onStepChange={(stepId) => setActiveStep(stepId as 'context' | 'build' | 'review')}
-        />
+        <div className="space-y-6">
+          {/* Job-based override notification */}
+          {isJobOverrideMode && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <p className="text-sm font-medium text-blue-900">
+                  Job Override Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-blue-700 mt-1">
+                This job is part of a tour. Any tables you create will be saved as overrides for the specific tour date.
+              </p>
+            </div>
+          )}
+
+          {/* Tour defaults mode notification */}
+          {isTourDefaults && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                <p className="text-sm font-medium text-green-900">
+                  Tour Defaults Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-green-700 mt-1">
+                Any tables you create will be saved as global defaults for this tour. These defaults will apply to all tour dates unless specifically overridden.
+              </p>
+            </div>
+          )}
+
+          {/* Tour date override notification */}
+          {isTourDateContext && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <p className="text-sm font-medium text-blue-900">
+                  Override Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-blue-700 mt-1">
+                Any tables you create will be saved as overrides for this specific tour date.
+              </p>
+            </div>
+          )}
+
+          {isDefaults && !isTourDefaults && (
+            <div className="space-y-2">
+              <Label htmlFor="setName">Default Set Name</Label>
+              <Input
+                id="setName"
+                value={currentSetName}
+                onChange={(e) => setCurrentSetName(e.target.value)}
+                placeholder="Enter set name (e.g., 'Main Stage Rigging')"
+              />
+            </div>
+          )}
+
+          {/* Hide job selection when coming from card (jobId in URL), or in tour defaults mode */}
+          {!isTourContext && !isTourDefaults && !jobIdFromUrl && (
+            <div className="space-y-2">
+              <Label htmlFor="jobSelect">Select Job</Label>
+              <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a job" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="tableName">
+              {isDefaults || isTourDefaults ? 'Weight Default Name' : 'Table Name'}
+            </Label>
+            <Input
+              id="tableName"
+              value={tableName}
+              onChange={(e) => setTableName(e.target.value)}
+              placeholder={isDefaults || isTourDefaults ? "Enter default name (e.g., K2 Array)" : "Enter table name"}
+            />
+            
+            {/* UPDATED: Enable advanced features in tour defaults mode */}
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="dualMotors"
+                checked={useDualMotors}
+                onCheckedChange={(checked) => setUseDualMotors(checked as boolean)}
+              />
+              <Label htmlFor="dualMotors" className="text-sm font-medium">
+                Dual Motors Configuration
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="mirroredCluster"
+                checked={mirroredCluster}
+                onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
+              />
+              <Label htmlFor="mirroredCluster" className="text-sm font-medium">
+                Mirrored Cluster
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="cablePick"
+                checked={cablePick}
+                onCheckedChange={(checked) => setCablePick(checked as boolean)}
+              />
+              <Label htmlFor="cablePick" className="text-sm font-medium">
+                Cable Pick
+              </Label>
+              {cablePick && (
+                <Select value={cablePickWeight} onValueChange={(value) => setCablePickWeight(value)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Select weight" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['100', '200', '300', '400', '500'].map((w) => (
+                      <SelectItem key={w} value={w}>
+                        {w} kg
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium">Quantity</th>
+                  <th className="px-4 py-3 text-left font-medium">Component</th>
+                  <th className="px-4 py-3 text-left font-medium">Weight (per unit)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentTable.rows.map((row, index) => (
+                  <tr key={index} className="border-t">
+                    <td className="p-4">
+                      <Input
+                        type="number"
+                        value={row.quantity}
+                        onChange={(e) => updateInput(index, 'quantity', e.target.value)}
+                        min="0"
+                        className="w-full"
+                      />
+                    </td>
+                    <td className="p-4">
+                      <Select
+                        value={row.componentId}
+                        onValueChange={(value) => updateInput(index, 'componentId', value)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select component" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {soundComponentDatabase.map((component) => (
+                            <SelectItem key={component.id} value={component.id.toString()}>
+                              {component.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="p-4">
+                      <Input type="number" value={row.weight} readOnly className="w-full bg-muted" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={addRow}>Add Row</Button>
+            <Button onClick={generateTable} variant="secondary">
+              {isDefaults ? 'Save Default' : isTourDefaults ? 'Save Tour Default' : 'Generate Table'}
+            </Button>
+            <Button onClick={resetCurrentTable} variant="destructive">
+              Reset
+            </Button>
+            {tables.length > 0 && !isDefaults && !isTourContext && !isTourDefaults && (
+              <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
+                <FileText className="w-4 h-4" />
+                Export &amp; Upload PDF
+              </Button>
+            )}
+          </div>
+
+          {/* Display existing default sets */}
+          {isDefaults && defaultSets.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Existing Default Sets</h3>
+              {defaultSets.map((set) => {
+                const setTables = defaultTables.filter(dt => dt.set_id === set.id && dt.table_type === 'weight');
+                return (
+                  <div key={set.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-medium">{set.name}</h4>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteSet(set.id)}
+                      >
+                        Delete Set
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {set.description} • {setTables.length} tables
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {setTables.map((table) => (
+                        <div key={table.id} className="text-sm border rounded p-2">
+                          <div className="font-medium">{table.table_name}</div>
+                          <div className="text-muted-foreground">{table.total_value.toFixed(2)} kg</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Display existing overrides for tour dates */}
+          {isTourDateContext && weightOverrides.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Existing Overrides for This Date</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {weightOverrides.map((override) => (
+                  <div key={override.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-medium">{override.item_name}</h4>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteOverride({ id: override.id, table: 'weight' })}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {(override.weight_kg * override.quantity).toFixed(2)} kg
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Table display with save as default option */}
+          {tables.map((table) => (
+            <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
+              <div className="bg-muted px-4 py-3 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">{table.name}</h3>
+                  {isTourDefaults && (
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      Default
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {!isDefaults && isTourContext && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => saveAsDefaultSet()}
+                    >
+                      <Save className="h-4 w-4 mr-1" />
+                      Save as Default
+                    </Button>
+                  )}
+                  <Button variant="destructive" size="sm" onClick={() => table.id && removeTable(table.id)}>
+                    Remove Table
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Advanced Options Display */}
+              {(table.dualMotors || table.clusterId || cablePick) && (
+                <div className="p-4 bg-muted/50 space-y-2">
+                  <h4 className="font-medium text-sm">Configuration:</h4>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    {table.dualMotors && (
+                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        Dual Motors
+                      </span>
+                    )}
+                    {table.clusterId && (
+                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+                        Mirrored Cluster
+                      </span>
+                    )}
+                    {cablePick && (
+                      <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                        Cable Pick ({cablePickWeight} kg)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium">Quantity</th>
+                    <th className="px-4 py-3 text-left font-medium">Component</th>
+                    <th className="px-4 py-3 text-left font-medium">Weight (per unit)</th>
+                    <th className="px-4 py-3 text-left font-medium">Total Weight</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {table.rows.map((row, index) => (
+                    <tr key={index} className="border-t">
+                      <td className="px-4 py-3">{row.quantity}</td>
+                      <td className="px-4 py-3">{row.componentName}</td>
+                      <td className="px-4 py-3">{row.weight} kg</td>
+                      <td className="px-4 py-3">{row.totalWeight?.toFixed(2)} kg</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t bg-muted/50 font-medium">
+                    <td colSpan={3} className="px-4 py-3 text-right">
+                      Total Weight:
+                    </td>
+                    <td className="px-4 py-3">{table.totalWeight?.toFixed(2)} kg</td>
+                  </tr>
+                </tbody>
+              </table>
+              {table.dualMotors && (
+                <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
+                  *This configuration uses dual motors. Load is distributed between two motors for safety and redundancy.
+                </div>
+              )}
+              {table.riggingPoints && (
+                <div className="px-4 py-2 text-sm text-blue-600 bg-blue-50 border-t">
+                  <strong>Rigging Points:</strong> {table.riggingPoints}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
