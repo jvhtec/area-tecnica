@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarDays, Clock, FileText, Download, Plus, User, Trash2, AlertTriangle } from "lucide-react";
+import { CalendarDays, Clock, FileText, User, Trash2, AlertTriangle } from "lucide-react";
 import { useTimesheets } from "@/hooks/useTimesheets";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
@@ -16,7 +16,7 @@ import { TimesheetSignature } from "./TimesheetSignature";
 import { JobTotalAmounts } from "./JobTotalAmounts";
 import { MyJobTotal } from "./MyJobTotal";
 import { format, parseISO } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
+import { ResponsiveTable, type ResponsiveTableColumn } from "@/components/shared/ResponsiveTable";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +28,7 @@ import {
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MobileBulkActionsSheet } from "./MobileBulkActionsSheet";
 
 interface TimesheetViewProps {
   jobId: string;
@@ -40,7 +41,6 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const { user, userRole } = useOptimizedAuth();
   const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, refetch } = useTimesheets(jobId, { userRole });
   const { assignments } = useJobAssignmentsRealtime(jobId);
-  const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);
   const [selectedTimesheets, setSelectedTimesheets] = useState<Set<string>>(new Set());
@@ -277,6 +277,384 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const isTechnician = userRole === 'technician' || userRole === 'house_tech';
   const isHouseTech = userRole === 'house_tech';
 
+  const hasSelection = selectedTimesheets.size > 0;
+
+  const getTimesheetDisplayName = (timesheet: Timesheet) => {
+    if (isTechnician) {
+      return 'My Timesheet';
+    }
+
+    const parts = [timesheet.technician?.first_name, timesheet.technician?.last_name]
+      .filter(Boolean)
+      .join(' ');
+    return parts || timesheet.technician?.email || 'Unassigned';
+  };
+
+  const timesheetColumns: ResponsiveTableColumn<Timesheet>[] = [
+    ...(isManagementUser
+      ? [{
+          key: 'select',
+          header: 'Seleccionar',
+          accessor: (timesheet: Timesheet) => (
+            <input
+              type="checkbox"
+              checked={selectedTimesheets.has(timesheet.id)}
+              onChange={() => toggleTimesheetSelection(timesheet.id)}
+              className="h-4 w-4"
+              disabled={isBulkUpdating}
+            />
+          ),
+          mobileLabel: 'Seleccionar',
+          className: 'w-[80px]'
+        } satisfies ResponsiveTableColumn<Timesheet>] : []),
+    {
+      key: 'technician',
+      header: isTechnician ? 'Parte' : 'Técnico',
+      accessor: (timesheet: Timesheet) => (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">{getTimesheetDisplayName(timesheet)}</span>
+            <Badge variant={getStatusColor(timesheet.status)} className="capitalize">
+              {timesheet.status}
+            </Badge>
+          </div>
+          {!isTechnician && timesheet.technician?.department && (
+            <p className="text-sm text-muted-foreground">{timesheet.technician?.department}</p>
+          )}
+          {timesheet.status === 'rejected' && (
+            <Alert variant="destructive">
+              <AlertTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Timesheet rechazado
+              </AlertTitle>
+              <AlertDescription>
+                {timesheet.rejection_reason?.length
+                  ? timesheet.rejection_reason
+                  : 'Revisa los horarios y vuelve a enviar el parte.'}
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      ),
+      mobileLabel: isTechnician ? 'Parte' : 'Técnico',
+      priority: 3
+    },
+    {
+      key: 'schedule',
+      header: 'Horario',
+      accessor: (timesheet: Timesheet) => {
+        if (editingTimesheet === timesheet.id) {
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor={`start_time_${timesheet.id}`}>Hora inicio</Label>
+                <Input
+                  id={`start_time_${timesheet.id}`}
+                  type="time"
+                  value={formData.start_time}
+                  onChange={(event) => setFormData({ ...formData, start_time: event.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor={`end_time_${timesheet.id}`}>Hora fin</Label>
+                <Input
+                  id={`end_time_${timesheet.id}`}
+                  type="time"
+                  value={formData.end_time}
+                  onChange={(event) => setFormData({ ...formData, end_time: event.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor={`break_minutes_${timesheet.id}`}>Pausa (min)</Label>
+                <Input
+                  id={`break_minutes_${timesheet.id}`}
+                  type="number"
+                  value={formData.break_minutes}
+                  onChange={(event) =>
+                    setFormData({
+                      ...formData,
+                      break_minutes: parseInt(event.target.value, 10) || 0
+                    })
+                  }
+                />
+              </div>
+              <div className="flex items-center gap-2 pt-2 md:pt-7">
+                <input
+                  id={`ends_next_day_${timesheet.id}`}
+                  type="checkbox"
+                  checked={!!formData.ends_next_day}
+                  onChange={(event) => setFormData({ ...formData, ends_next_day: event.target.checked })}
+                  className="h-4 w-4"
+                />
+                <Label htmlFor={`ends_next_day_${timesheet.id}`}>Finaliza al día siguiente</Label>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-muted-foreground">Inicio</p>
+              <p className="font-medium">{timesheet.start_time || 'No definido'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Fin</p>
+              <p className="font-medium">{timesheet.end_time || 'No definido'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Descanso</p>
+              <p className="font-medium">{timesheet.break_minutes || 0} min</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Horas totales</p>
+              <p className="font-medium">
+                {calculateHours(
+                  timesheet.start_time || '09:00',
+                  timesheet.end_time || '17:00',
+                  timesheet.break_minutes || 0,
+                  timesheet.ends_next_day
+                ).toFixed(1)}h
+              </p>
+            </div>
+            {timesheet.ends_next_day && (
+              <div className="col-span-2">
+                <p className="text-muted-foreground">Cruza medianoche</p>
+                <p className="font-medium">Sí</p>
+              </div>
+            )}
+          </div>
+        );
+      },
+      mobileLabel: 'Horario',
+      priority: 2
+    },
+    {
+      key: 'details',
+      header: 'Detalles',
+      accessor: (timesheet: Timesheet) => {
+        if (editingTimesheet === timesheet.id) {
+          return (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor={`category_${timesheet.id}`}>Categoría</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value as any })}
+                  >
+                    <SelectTrigger id={`category_${timesheet.id}`}>
+                      <SelectValue placeholder="Selecciona categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tecnico">tecnico</SelectItem>
+                      <SelectItem value="especialista">especialista</SelectItem>
+                      <SelectItem value="responsable">responsable</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor={`overtime_${timesheet.id}`}>Horas extra</Label>
+                  <Input
+                    id={`overtime_${timesheet.id}`}
+                    type="number"
+                    step="0.5"
+                    value={formData.overtime_hours}
+                    onChange={(event) =>
+                      setFormData({
+                        ...formData,
+                        overtime_hours: parseFloat(event.target.value) || 0
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor={`notes_${timesheet.id}`}>Notas</Label>
+                <Textarea
+                  id={`notes_${timesheet.id}`}
+                  value={formData.notes}
+                  onChange={(event) => setFormData({ ...formData, notes: event.target.value })}
+                  placeholder="Añade comentarios adicionales..."
+                  className="min-h-[120px]"
+                />
+              </div>
+            </div>
+          );
+        }
+
+        const breakdownVisible = !!timesheet.amount_breakdown_visible;
+        const isTechnicianRole = userRole === 'technician';
+        const canShowRates = isManagementUser || (isTechnicianRole && breakdownVisible) || (isHouseTech && breakdownVisible);
+        const breakdown = isManagementUser
+          ? timesheet.amount_breakdown
+          : timesheet.amount_breakdown_visible;
+
+        return (
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-muted-foreground">Categoría</p>
+                <p className="font-medium">{timesheet.category || 'No asignada'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Horas extra</p>
+                <p className="font-medium">{timesheet.overtime_hours || 0}</p>
+              </div>
+            </div>
+            {timesheet.notes && (
+              <div>
+                <p className="text-muted-foreground">Notas</p>
+                <p className="font-medium whitespace-pre-line">{timesheet.notes}</p>
+              </div>
+            )}
+            {canShowRates && (
+              <div className="rounded-md border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium">Cálculo de tarifa</p>
+                  {isManagementUser && (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => recalcTimesheet(timesheet.id)}>Recalcular</Button>
+                      {!timesheet.category && (
+                        <Badge variant="destructive">Añade categoría</Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {breakdown ? (
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Horas redondeadas</p>
+                      <p className="font-medium">{breakdown.worked_hours_rounded}h</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Importe base</p>
+                      <p className="font-medium">€{breakdown.base_amount_eur.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Horas extra</p>
+                      <p className="font-medium">{breakdown.overtime_hours}h × €{breakdown.overtime_hour_eur}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Importe OT</p>
+                      <p className="font-medium">€{breakdown.overtime_amount_eur.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Total</p>
+                      <p className="font-semibold">€{breakdown.total_eur.toFixed(2)}</p>
+                    </div>
+                    {(isTechnician || isHouseTech) && (
+                      <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
+                        Notas: redondeo tras 30 minutos; pueden aplicarse descuentos según contrato.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {isTechnicianRole ? 'Pendiente de aprobación' : 'Sin cálculo disponible todavía'}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      },
+      mobileLabel: 'Detalles',
+      priority: 1
+    },
+    {
+      key: 'actions',
+      header: 'Acciones',
+      accessor: (timesheet: Timesheet) => {
+        const editableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
+        const submittableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
+        const canEditTimesheet = isTechnician
+          ? (timesheet.technician_id === user?.id && editableStatuses.includes(timesheet.status))
+          : (isManagementUser && editableStatuses.includes(timesheet.status));
+        const canSubmitTimesheet = isTechnician
+          ? (timesheet.technician_id === user?.id && submittableStatuses.includes(timesheet.status))
+          : (isManagementUser && submittableStatuses.includes(timesheet.status));
+
+        return (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-2">
+              {editingTimesheet === timesheet.id ? (
+                <>
+                  <Button onClick={() => handleUpdateTimesheet(timesheet)} disabled={isBulkUpdating}>
+                    Guardar cambios
+                  </Button>
+                  <Button variant="outline" onClick={() => setEditingTimesheet(null)} disabled={isBulkUpdating}>
+                    Cancelar
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {canEditTimesheet && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => startEditing(timesheet)}
+                      disabled={isBulkUpdating}
+                    >
+                      Editar
+                    </Button>
+                  )}
+                  {canSubmitTimesheet && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => submitTimesheet(timesheet.id)}
+                      disabled={isBulkUpdating}
+                    >
+                      Enviar
+                    </Button>
+                  )}
+                  {isManagementUser && timesheet.status === 'submitted' && (
+                    <>
+                      <Button size="sm" onClick={() => approveTimesheet(timesheet.id)} disabled={isBulkUpdating}>
+                        Aprobar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openRejectDialog(timesheet)}
+                        disabled={isBulkUpdating}
+                      >
+                        Rechazar
+                      </Button>
+                    </>
+                  )}
+                  {isManagementUser && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => deleteTimesheet(timesheet.id)}
+                      disabled={isBulkUpdating}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Eliminar
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+            {(timesheet.status === 'draft' || timesheet.status === 'submitted' || timesheet.status === 'rejected') && (
+              <div className="pt-2 border-t">
+                <TimesheetSignature
+                  timesheetId={timesheet.id}
+                  currentSignature={timesheet.signature_data}
+                  canSign={timesheet.technician_id === user?.id || isManagementUser}
+                  onSigned={signTimesheet}
+                />
+              </div>
+            )}
+          </div>
+        );
+      },
+      mobileLabel: 'Acciones'
+    }
+  ];
+
   console.log('TimesheetView Debug:', { 
     userRole, 
     isManagementUser,
@@ -299,7 +677,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       {/* Technician’s total for this job */}
       <MyJobTotal jobId={jobId} />
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Clock className="h-6 w-6" />
@@ -307,66 +685,83 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           </h2>
           {jobTitle && <p className="text-muted-foreground">Job: {jobTitle}</p>}
         </div>
+
         {isManagementUser && filteredTimesheets.length > 0 && (
-          <div className="flex items-center gap-2">
-            {showBulkActions && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { 
-                    console.log('Edit Times button clicked, showBulkEditForm:', showBulkEditForm); 
-                    setShowBulkEditForm(!showBulkEditForm); 
-                  }}
-                  disabled={isBulkUpdating}
-                >
-                  Edit Times ({selectedTimesheets.size})
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleBulkAction('submit')}
-                  disabled={selectedTimesheets.size === 0 || isBulkUpdating}
-                >
-                  Submit Selected ({selectedTimesheets.size})
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => handleBulkAction('approve')}
-                  disabled={selectedTimesheets.size === 0 || isBulkUpdating}
-                >
-                  Approve Selected ({selectedTimesheets.size})
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleBulkAction('delete')}
-                  disabled={selectedTimesheets.size === 0 || isBulkUpdating}
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete Selected ({selectedTimesheets.size})
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={clearSelection}
-                  disabled={isBulkUpdating}
-                >
-                  Clear
-                </Button>
-              </>
-            )}
+          <div className="flex flex-col gap-2 md:items-end md:w-auto">
             <Button
               variant="outline"
-              size="sm"
-              onClick={selectedTimesheets.size > 0 ? clearSelection : selectAllVisibleTimesheets}
+              className="w-full md:w-auto"
+              onClick={hasSelection ? clearSelection : selectAllVisibleTimesheets}
               disabled={isBulkUpdating}
             >
-              {selectedTimesheets.size > 0 ? 'Deselect All' : 'Select All'}
+              {hasSelection ? 'Deselect All' : 'Select All'}
             </Button>
+            <div className="hidden md:flex flex-wrap items-center justify-end gap-2">
+              {showBulkActions && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowBulkEditForm(!showBulkEditForm)}
+                    disabled={isBulkUpdating}
+                  >
+                    Edit Times ({selectedTimesheets.size})
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkAction('submit')}
+                    disabled={!hasSelection || isBulkUpdating}
+                  >
+                    Submit Selected ({selectedTimesheets.size})
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => handleBulkAction('approve')}
+                    disabled={!hasSelection || isBulkUpdating}
+                  >
+                    Approve Selected ({selectedTimesheets.size})
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleBulkAction('delete')}
+                    disabled={!hasSelection || isBulkUpdating}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete Selected ({selectedTimesheets.size})
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearSelection}
+                    disabled={isBulkUpdating}
+                  >
+                    Clear
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
+
+      {isManagementUser && filteredTimesheets.length > 0 && (
+        <MobileBulkActionsSheet
+          selectedCount={selectedTimesheets.size}
+          isBulkUpdating={isBulkUpdating}
+          onToggleBulkEdit={() => setShowBulkEditForm(!showBulkEditForm)}
+          onSubmitSelected={() => handleBulkAction('submit')}
+          onApproveSelected={() => handleBulkAction('approve')}
+          onDeleteSelected={() => handleBulkAction('delete')}
+          onClearSelection={clearSelection}
+          canBulkEdit={showBulkActions}
+          isBulkEditOpen={showBulkEditForm}
+          showSubmit={showBulkActions}
+          showApprove={showBulkActions}
+          showDelete={showBulkActions}
+        />
+      )}
 
       {/* Bulk Edit Form */}
       {showBulkEditForm && selectedTimesheets.size > 0 && (
@@ -376,7 +771,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
               Edit Times for {selectedTimesheets.size} Selected Timesheets
               {isBulkUpdating && <span className="text-sm text-muted-foreground ml-2">(Updating...)</span>}
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
                 <Label htmlFor="bulk_start_time">Start Time</Label>
                 <Input
@@ -423,11 +818,11 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                 />
               </div>
               <div className="flex items-end">
-                <Button 
-                  onClick={() => { 
-                    console.log('Apply Changes button clicked!'); 
-                    handleBulkEdit(); 
-                  }} 
+                <Button
+                  onClick={() => {
+                    console.log('Apply Changes button clicked!');
+                    handleBulkEdit();
+                  }}
                   className="w-full"
                   disabled={isBulkUpdating}
                 >
@@ -517,332 +912,12 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
               {format(parseISO(date), 'EEEE, MMMM do, yyyy')}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {dayTimesheets.map((timesheet) => {
-              const editableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
-              const canEditTimesheet = isTechnician
-                ? (timesheet.technician_id === user?.id && editableStatuses.includes(timesheet.status))
-                : (isManagementUser && editableStatuses.includes(timesheet.status));
-
-              const submittableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
-              const canSubmitTimesheet = isTechnician
-                ? (timesheet.technician_id === user?.id && submittableStatuses.includes(timesheet.status))
-                : (isManagementUser && submittableStatuses.includes(timesheet.status));
-              
-              console.log('Timesheet permission check:', {
-                timesheetId: timesheet.id,
-                technicianId: timesheet.technician_id,
-                userId: user?.id,
-                status: timesheet.status,
-                isTechnician,
-                canEditTimesheet,
-                canSubmitTimesheet
-              });
-              
-              return (
-                <div key={timesheet.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {isManagementUser && (
-                        <input
-                          type="checkbox"
-                          checked={selectedTimesheets.has(timesheet.id)}
-                          onChange={() => toggleTimesheetSelection(timesheet.id)}
-                          className="h-4 w-4"
-                          disabled={isBulkUpdating}
-                        />
-                      )}
-                      <div>
-                        <p className="font-medium">
-                          {isTechnician ? 'My Timesheet' : `${timesheet.technician?.first_name} ${timesheet.technician?.last_name}`}
-                        </p>
-                        {!isTechnician && (
-                          <p className="text-sm text-muted-foreground">{timesheet.technician?.department}</p>
-                        )}
-                      </div>
-                      <Badge variant={getStatusColor(timesheet.status)}>
-                        {timesheet.status}
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      {/* Edit button */}
-                      {canEditTimesheet && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => startEditing(timesheet)}
-                          disabled={isBulkUpdating}
-                        >
-                          Edit
-                        </Button>
-                      )}
-                      
-                      {/* Submit button */}
-                      {canSubmitTimesheet && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => submitTimesheet(timesheet.id)}
-                          disabled={isBulkUpdating}
-                        >
-                          Submit
-                        </Button>
-                      )}
-                      
-                      {/* Only management can approve submitted timesheets */}
-                      {isManagementUser && timesheet.status === 'submitted' && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => approveTimesheet(timesheet.id)}
-                            disabled={isBulkUpdating}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openRejectDialog(timesheet)}
-                            disabled={isBulkUpdating}
-                          >
-                            Reject
-                          </Button>
-                        </>
-                      )}
-                      
-                      {/* Delete button - only for management */}
-                      {isManagementUser && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => deleteTimesheet(timesheet.id)}
-                          disabled={isBulkUpdating}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {timesheet.status === 'rejected' && (
-                    <Alert variant="destructive">
-                      <AlertTitle className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        Timesheet rejected
-                      </AlertTitle>
-                      <AlertDescription>
-                        {timesheet.rejection_reason?.length
-                          ? timesheet.rejection_reason
-                          : 'Please review the hours and resubmit for approval.'}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  {editingTimesheet === timesheet.id ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div>
-                        <Label htmlFor="start_time">Start Time</Label>
-                        <Input
-                          id="start_time"
-                          type="time"
-                          value={formData.start_time}
-                          onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="end_time">End Time</Label>
-                        <Input
-                          id="end_time"
-                          type="time"
-                          value={formData.end_time}
-                          onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="break_minutes">Break (minutes)</Label>
-                        <Input
-                          id="break_minutes"
-                          type="number"
-                          value={formData.break_minutes}
-                          onChange={(e) => setFormData({ ...formData, break_minutes: parseInt(e.target.value) || 0 })}
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 mt-6">
-                        <input
-                          id="ends_next_day"
-                          type="checkbox"
-                          checked={!!formData.ends_next_day}
-                          onChange={(e) => setFormData({ ...formData, ends_next_day: e.target.checked })}
-                        />
-                        <Label htmlFor="ends_next_day">Ends next day</Label>
-                      </div>
-                      <div>
-                        <Label htmlFor="category">Category</Label>
-                        <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v as any })}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="tecnico">tecnico</SelectItem>
-                            <SelectItem value="especialista">especialista</SelectItem>
-                            <SelectItem value="responsable">responsable</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="overtime_hours">Overtime (hours)</Label>
-                        <Input
-                          id="overtime_hours"
-                          type="number"
-                          step="0.5"
-                          value={formData.overtime_hours}
-                          onChange={(e) => setFormData({ ...formData, overtime_hours: parseFloat(e.target.value) || 0 })}
-                        />
-                      </div>
-                      <div className="col-span-2 md:col-span-4">
-                        <Label htmlFor="notes">Notes</Label>
-                        <Textarea
-                          id="notes"
-                          value={formData.notes}
-                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                          placeholder="Additional notes..."
-                        />
-                      </div>
-                      <div className="col-span-2 md:col-span-4 flex gap-2">
-                        <Button onClick={() => handleUpdateTimesheet(timesheet)}>
-                          Save Changes
-                        </Button>
-                        <Button variant="outline" onClick={() => setEditingTimesheet(null)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Start Time</p>
-                        <p className="font-medium">{timesheet.start_time || 'Not set'}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">End Time</p>
-                        <p className="font-medium">{timesheet.end_time || 'Not set'}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Break</p>
-                        <p className="font-medium">{timesheet.break_minutes || 0} min</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Total Hours</p>
-                        <p className="font-medium">
-                          {calculateHours(
-                            timesheet.start_time || '09:00',
-                            timesheet.end_time || '17:00',
-                            timesheet.break_minutes || 0,
-                            timesheet.ends_next_day
-                          ).toFixed(1)}h
-                        </p>
-                      </div>
-                      {timesheet.ends_next_day && (
-                        <div>
-                          <p className="text-muted-foreground">Spans midnight</p>
-                          <p className="font-medium">Yes</p>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-muted-foreground">Category</p>
-                        <p className="font-medium">{timesheet.category || 'Not set'}</p>
-                      </div>
-                      {timesheet.notes && (
-                        <div className="col-span-2 md:col-span-4">
-                          <p className="text-muted-foreground">Notes</p>
-                          <p className="font-medium">{timesheet.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Rate calculation visibility & actions
-                      - Managers: always visible
-                      - Technicians: visible only when amount_breakdown_visible exists
-                      - House tech: never visible
-                  */}
-                   {(() => {
-                     const breakdownVisible = !!timesheet.amount_breakdown_visible;
-                     const isTechnicianRole = userRole === 'technician';
-                     const isHouseTechRole = userRole === 'house_tech';
-                     const canShowRates = isManagementUser || (isTechnicianRole && breakdownVisible) || (isHouseTechRole && breakdownVisible);
-                     if (!canShowRates) return null;
-                    return (
-                  <div className="mt-4 p-3 rounded-md border">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="font-medium">Rate Calculation</p>
-                      {isManagementUser && (
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => recalcTimesheet(timesheet.id)}>Recalculate</Button>
-                          {!timesheet.category && (
-                            <Badge variant="destructive">Set category to calculate</Badge>
-                          )}
-                        </div>
-                       )}
-                     </div>
-
-                     {(() => {
-                      const breakdown = isManagementUser
-                        ? timesheet.amount_breakdown
-                        : timesheet.amount_breakdown_visible;
-                      if (!breakdown) {
-                        return (
-                          <p className="text-sm text-muted-foreground">
-                            {userRole === 'technician' ? 'Pending approval' : 'No calculation available yet'}
-                          </p>
-                        );
-                      }
-                      return (
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Rounded Hours</p>
-                            <p className="font-medium">{breakdown.worked_hours_rounded}h</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Base Amount</p>
-                            <p className="font-medium">€{breakdown.base_amount_eur.toFixed(2)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Overtime</p>
-                            <p className="font-medium">{breakdown.overtime_hours}h × €{breakdown.overtime_hour_eur}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">OT Amount</p>
-                            <p className="font-medium">€{breakdown.overtime_amount_eur.toFixed(2)}</p>
-                          </div>
-                           <div>
-                             <p className="text-muted-foreground">Total</p>
-                             <p className="font-semibold">€{breakdown.total_eur.toFixed(2)}</p>
-                           </div>
-                           {(userRole === 'technician' || userRole === 'house_tech') && (
-                             <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
-                               Notes: rounding after 30 minutes; some conditions such as 30€ discounts for autónomos may apply depending on contract.
-                             </div>
-                           )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                    );
-                  })()}
-
-                  {(timesheet.status === 'draft' || timesheet.status === 'submitted' || timesheet.status === 'rejected') && (
-                    <TimesheetSignature
-                      timesheetId={timesheet.id}
-                      currentSignature={timesheet.signature_data}
-                      canSign={timesheet.technician_id === user?.id || isManagementUser}
-                      onSigned={signTimesheet}
-                    />
-                  )}
-                </div>
-              );
-            })}
+          <CardContent>
+            <ResponsiveTable
+              data={dayTimesheets}
+              columns={timesheetColumns}
+              keyExtractor={(item) => item.id}
+            />
           </CardContent>
         </Card>
       ))}
