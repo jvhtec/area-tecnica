@@ -2,6 +2,7 @@
 // Re-export the main Supabase client and utilities
 import { supabase, checkNetworkConnection, getRealtimeConnectionStatus } from './supabase-client';
 import { retryWithBackoff, isOnline } from './network-utils';
+import { toast } from '@/hooks/use-toast';
 
 export { 
   supabase, 
@@ -46,7 +47,7 @@ export async function ensureRealtimeConnection(): Promise<boolean> {
       
       if (newStatus === 'CONNECTED') {
         console.log('Realtime connection successfully recovered');
-        // Connection restored - components can listen to 'connection-restored' event
+        toast.success('Connection restored', { duration: 3000 });
         return true;
       }
       
@@ -83,9 +84,15 @@ export function monitorConnectionHealth(
       // If we're now connected, trigger a data refresh
       if (currentStatus) {
         window.dispatchEvent(new CustomEvent('connection-restored'));
-        console.log('Connection restored - real-time updates active');
+        toast.success('Connection restored', { 
+          description: 'Real-time updates active',
+          duration: 3000
+        });
       } else {
-        console.log('Connection lost - attempting to reconnect...');
+        toast.warning('Connection lost', {
+          description: 'Attempting to reconnect...',
+          duration: 5000
+        });
       }
     }
     

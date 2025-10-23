@@ -1,9 +1,7 @@
 
-export { JobCardNew } from './JobCardNew';
-export type { JobCardNewProps } from './JobCardNew';
-export { JobCardHeader } from './JobCardHeader';
-export { JobCardActions } from './JobCardActions';
-export { JobCardAssignments } from './JobCardAssignments';
-export { JobCardDocuments } from './JobCardDocuments';
-export type { JobDocument } from './JobCardDocuments';
-export { JobCardProgress } from './JobCardProgress';
+export * from './JobCardNew';
+export * from './JobCardHeader';
+export * from './JobCardActions';
+export * from './JobCardAssignments';
+export * from './JobCardDocuments';
+export * from './JobCardProgress';
