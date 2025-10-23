@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { useRatesApprovals } from '@/features/rates/hooks/useRatesApprovals';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { downloadJobPayoutBreakdownPDF, downloadTourPayoutBreakdownPDF } from '@/utils/payoutBreakdownPdf';
 
 interface RatesApprovalsTableProps {
   onManageTour: (tourId: string) => void;
@@ -144,13 +145,42 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
                     </TableCell>
                     <TableCell className="text-right space-x-2">
                       {row.entityType === 'tour' ? (
-                        <Button size="sm" onClick={() => onManageTour(row.id)}>
-                          Gestionar
-                        </Button>
+                        <>
+                          <Button size="sm" onClick={() => onManageTour(row.id)}>
+                            Gestionar
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await downloadTourPayoutBreakdownPDF(row.id);
+                              } catch (e) {
+                                console.error('Error printing tour payout breakdown:', e);
+                              }
+                            }}
+                          >
+                            Imprimir pagos
+                          </Button>
+                        </>
                       ) : (
-                        <Button size="sm" variant="outline" asChild>
-                          <Link to={`/management/rates?tab=timesheets&jobId=${row.id}`}>Revisar partes</Link>
-                        </Button>
+                        <>
+                          <Button size="sm" variant="outline" asChild>
+                            <Link to={`/management/rates?tab=timesheets&jobId=${row.id}`}>Revisar partes</Link>
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await downloadJobPayoutBreakdownPDF(row.id);
+                              } catch (e) {
+                                console.error('Error printing payout breakdown:', e);
+                                // Fallback: no user-facing toast infra here; console is sufficient
+                              }
+                            }}
+                          >
+                            Imprimir pagos
+                          </Button>
+                        </>
                       )}
                     </TableCell>
                   </TableRow>
