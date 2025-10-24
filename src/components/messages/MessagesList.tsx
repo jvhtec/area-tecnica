@@ -39,7 +39,7 @@ export const MessagesList = () => {
   }, []);
 
   const { messages, loading, isFetching, setMessages } = useMessagesQuery(userRole, userDepartment);
-  const { handleDeleteMessage, handleMarkAsRead } = useMessageOperations(messages, setMessages, toast);
+  const { handleDeleteMessage, handleMarkAsRead, handleGrantSoundVisionAccess } = useMessageOperations(messages, setMessages, toast);
 
   if (loading) {
     return <div>Cargando mensajes...</div>;
@@ -60,6 +60,7 @@ export const MessagesList = () => {
             currentUserId={userRole === 'management' ? message.sender_id : undefined}
             onDelete={handleDeleteMessage}
             onMarkAsRead={handleMarkAsRead}
+            onGrantSoundVisionAccess={handleGrantSoundVisionAccess}
             isManagement={userRole === 'management'}
           />
         ))

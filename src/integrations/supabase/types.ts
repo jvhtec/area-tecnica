@@ -3669,6 +3669,7 @@ export type Database = {
           created_at: string
           department: string
           id: string
+          metadata: Json | null
           sender_id: string
           status: Database["public"]["Enums"]["message_status"]
         }
@@ -3677,6 +3678,7 @@ export type Database = {
           created_at?: string
           department: string
           id?: string
+          metadata?: Json | null
           sender_id: string
           status?: Database["public"]["Enums"]["message_status"]
         }
@@ -3685,6 +3687,7 @@ export type Database = {
           created_at?: string
           department?: string
           id?: string
+          metadata?: Json | null
           sender_id?: string
           status?: Database["public"]["Enums"]["message_status"]
         }
