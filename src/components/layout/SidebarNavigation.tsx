@@ -112,8 +112,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 9,
     mobileSlot: "secondary",
     getPath: () => "/soundvision-files",
-    isVisible: ({ hasSoundVisionAccess, userRole }) =>
-      Boolean(hasSoundVisionAccess) && userRole !== "management",
+    isVisible: ({ userRole }) => userRole !== "management",
   },
   {
     id: "personal",

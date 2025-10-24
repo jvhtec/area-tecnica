@@ -2,30 +2,82 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SoundVisionDatabaseDialog } from '@/components/soundvision/SoundVisionDatabaseDialog';
 import { SoundVisionMap } from '@/components/soundvision/SoundVisionMap';
+import { SoundVisionAccessRequestDialog } from '@/components/soundvision/SoundVisionAccessRequestDialog';
 import { useSoundVisionFiles } from '@/hooks/useSoundVisionFiles';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getDashboardPath } from '@/utils/roleBasedRouting';
-import type { UserRole } from '@/types/user';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, Lock } from 'lucide-react';
 
 const SoundVisionFiles = () => {
-  const { hasSoundVisionAccess, isLoading, userRole } = useOptimizedAuth();
+  const { hasSoundVisionAccess, isLoading } = useOptimizedAuth();
   const navigate = useNavigate();
+  const [showAccessDialog, setShowAccessDialog] = useState(false);
 
+  // Auto-open dialog when user doesn't have access
   useEffect(() => {
-    if (isLoading) return;
-
-    if (!hasSoundVisionAccess) {
-      const fallbackPath = getDashboardPath(userRole ? (userRole as UserRole) : null);
-      navigate(fallbackPath, { replace: true });
+    if (!isLoading && !hasSoundVisionAccess) {
+      setShowAccessDialog(true);
     }
-  }, [hasSoundVisionAccess, isLoading, navigate, userRole]);
+  }, [hasSoundVisionAccess, isLoading]);
 
   const { data: files = [], isLoading: isFilesLoading } = useSoundVisionFiles();
 
-  if (isLoading || !hasSoundVisionAccess || isFilesLoading) {
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-6 max-w-7xl h-[calc(100vh-6rem)] flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="text-muted-foreground">Cargando...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access request dialog if user doesn't have access
+  if (!hasSoundVisionAccess) {
+    return (
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Volver
+            </Button>
+            <h1 className="text-xl font-semibold">Archivos SoundVision</h1>
+          </div>
+        </div>
+
+        <Card className="p-6 md:p-8 lg:p-12 max-w-2xl mx-auto mt-8">
+          <div className="flex flex-col items-center text-center space-y-6">
+            <div className="rounded-full bg-muted p-4">
+              <Lock className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-semibold">Acceso Restringido</h2>
+              <p className="text-muted-foreground">
+                No tienes acceso a los archivos de SoundVision. Solicita acceso para ver y gestionar los archivos.
+              </p>
+            </div>
+            <Button 
+              onClick={() => setShowAccessDialog(true)}
+              className="mt-4"
+            >
+              Solicitar Acceso
+            </Button>
+          </div>
+        </Card>
+
+        <SoundVisionAccessRequestDialog 
+          open={showAccessDialog} 
+          onOpenChange={setShowAccessDialog}
+        />
+      </div>
+    );
+  }
+
+  // Show loading state while files are being fetched
+  if (isFilesLoading) {
     return (
       <div className="container mx-auto px-4 py-6 max-w-7xl h-[calc(100vh-6rem)] flex items-center justify-center">
         <div className="flex items-center gap-2">
