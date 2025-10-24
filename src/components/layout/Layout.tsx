@@ -314,6 +314,8 @@ const Layout = () => {
           onSignOut={handleSignOut}
           isLoggingOut={isLoggingOut}
           notificationProps={notificationProps}
+          userRole={userRole ?? undefined}
+          userEmail={session.user?.email ?? undefined}
         />
       )}
     </SidebarProvider>

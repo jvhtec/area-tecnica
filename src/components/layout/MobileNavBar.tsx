@@ -16,6 +16,8 @@ interface MobileNavBarProps {
     userRole: string
     userDepartment: string | null
   }
+  userRole?: string
+  userEmail?: string
 }
 
 export const MobileNavBar = ({
@@ -24,6 +26,8 @@ export const MobileNavBar = ({
   onSignOut,
   isLoggingOut,
   notificationProps,
+  userRole,
+  userEmail,
 }: MobileNavBarProps) => {
   const { pathname } = useLocation()
   const hasNavigation = primaryItems.length > 0 || trayItems.length > 0
@@ -70,6 +74,8 @@ export const MobileNavBar = ({
             onSignOut={onSignOut}
             isLoggingOut={isLoggingOut}
             notificationProps={notificationProps}
+            userRole={userRole}
+            userEmail={userEmail}
             renderTrigger={(open) => (
               <button
                 type="button"
