@@ -3,16 +3,12 @@ import { MoreHorizontal } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-import {
-  NavigationItem,
-  SidebarNavigationProps,
-} from "./SidebarNavigation"
+import { NavigationItem } from "./SidebarNavigation"
 import { MobileActionTray } from "./MobileActionTray"
 
 interface MobileNavBarProps {
   primaryItems: NavigationItem[]
   trayItems: NavigationItem[]
-  navigationProps: SidebarNavigationProps
   onSignOut: () => Promise<void> | void
   isLoggingOut: boolean
   notificationProps?: {
@@ -25,13 +21,13 @@ interface MobileNavBarProps {
 export const MobileNavBar = ({
   primaryItems,
   trayItems,
-  navigationProps,
   onSignOut,
   isLoggingOut,
   notificationProps,
 }: MobileNavBarProps) => {
   const { pathname } = useLocation()
   const hasNavigation = primaryItems.length > 0 || trayItems.length > 0
+  const shouldShowTrayTrigger = trayItems.length > 0
 
   if (!hasNavigation) {
     return null
@@ -68,25 +64,27 @@ export const MobileNavBar = ({
             </Link>
           )
         })}
-        <MobileActionTray
-          navigationProps={navigationProps}
-          onSignOut={onSignOut}
-          isLoggingOut={isLoggingOut}
-          notificationProps={notificationProps}
-          renderTrigger={(open) => (
-            <button
-              type="button"
-              aria-label="Más opciones"
-              className={cn(
-                "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                (open || activeInTray) && "bg-primary/10 text-primary",
-              )}
-            >
-              <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
-              <span className="max-w-[5rem] truncate">Más</span>
-            </button>
-          )}
-        />
+        {shouldShowTrayTrigger && (
+          <MobileActionTray
+            trayItems={trayItems}
+            onSignOut={onSignOut}
+            isLoggingOut={isLoggingOut}
+            notificationProps={notificationProps}
+            renderTrigger={(open) => (
+              <button
+                type="button"
+                aria-label="Más opciones"
+                className={cn(
+                  "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  (open || activeInTray) && "bg-primary/10 text-primary",
+                )}
+              >
+                <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+                <span className="max-w-[5rem] truncate">Más</span>
+              </button>
+            )}
+          />
+        )}
       </div>
     </nav>
   )

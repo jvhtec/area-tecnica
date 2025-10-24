@@ -1,16 +1,19 @@
 import { useState } from "react"
+import { Link, useLocation } from "react-router-dom"
 import { LogOut } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { cn } from "@/lib/utils"
 
-import { SidebarNavigation, SidebarNavigationProps } from "./SidebarNavigation"
+import { NavigationItem } from "./SidebarNavigation"
 import { ThemeToggle } from "./ThemeToggle"
 import { NotificationBadge } from "./NotificationBadge"
 
 interface MobileActionTrayProps {
-  navigationProps: SidebarNavigationProps
+  trayItems: NavigationItem[]
   renderTrigger: (open: boolean) => React.ReactNode
   onSignOut: () => Promise<void> | void
   isLoggingOut: boolean
@@ -22,13 +25,14 @@ interface MobileActionTrayProps {
 }
 
 export const MobileActionTray = ({
-  navigationProps,
+  trayItems,
   renderTrigger,
   onSignOut,
   isLoggingOut,
   notificationProps,
 }: MobileActionTrayProps) => {
   const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
 
   const handleNavigate = () => {
     setOpen(false)
@@ -59,8 +63,49 @@ export const MobileActionTray = ({
                 className="w-full justify-start"
               />
             )}
-            <Separator className="bg-border/60" />
-            <SidebarNavigation {...navigationProps} onNavigate={handleNavigate} />
+            {trayItems.length > 0 && (
+              <>
+                <Separator className="bg-border/60" />
+                <div className="grid grid-cols-2 gap-2">
+                  {trayItems.map((item) => {
+                    const Icon = item.icon
+                    const isActive = item.isActive(pathname)
+
+                    return (
+                      <Button
+                        key={item.id}
+                        variant="ghost"
+                        className={cn(
+                          "h-full justify-center gap-2 rounded-2xl border border-border/60 bg-muted/40 px-3 py-3 text-xs font-semibold text-muted-foreground transition-colors hover:border-border hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                          isActive && "border-primary/60 bg-primary/10 text-primary",
+                        )}
+                        data-active={isActive}
+                        asChild
+                      >
+                        <Link
+                          to={item.to}
+                          onClick={handleNavigate}
+                          aria-label={item.label}
+                          aria-current={isActive ? "page" : undefined}
+                          className="flex h-full flex-col items-center justify-center gap-2"
+                        >
+                          <Icon className="h-5 w-5" aria-hidden="true" />
+                          <span className="text-center leading-tight">{item.mobileLabel}</span>
+                          {item.badge && (
+                            <Badge
+                              variant="secondary"
+                              className="rounded-full px-2 py-0 text-[10px] font-semibold"
+                            >
+                              {item.badge}
+                            </Badge>
+                          )}
+                        </Link>
+                      </Button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
             <Separator className="bg-border/60" />
             <Button
               type="button"
