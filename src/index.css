@@ -91,6 +91,19 @@
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
     --sidebar-border: 214.3 31.8% 91.4%;
     --sidebar-ring: 222.2 84% 4.9%;
+    /* Safe area insets */
+    --safe-area-top: env(safe-area-inset-top);
+    --safe-area-bottom: env(safe-area-inset-bottom);
+    --safe-area-left: env(safe-area-inset-left);
+    --safe-area-right: env(safe-area-inset-right);
+    /* Mobile typography scale */
+    --text-xs: clamp(0.75rem, 0.68rem + 0.3vw, 0.8rem);
+    --text-sm: clamp(0.875rem, 0.82rem + 0.35vw, 0.95rem);
+    --text-base: clamp(0.95rem, 0.9rem + 0.4vw, 1.05rem);
+    --text-lg: clamp(1.05rem, 0.98rem + 0.5vw, 1.2rem);
+    --text-xl: clamp(1.25rem, 1.1rem + 0.8vw, 1.5rem);
+    --text-2xl: clamp(1.5rem, 1.25rem + 1vw, 1.875rem);
+    --text-3xl: clamp(1.875rem, 1.5rem + 1.2vw, 2.25rem);
   }
 
   .dark {
@@ -130,12 +143,24 @@
 }
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
+    font-size: var(--text-base);
+    line-height: 1.5;
   }
+  h1 { font-size: var(--text-3xl); line-height: 1.2; }
+  h2 { font-size: var(--text-2xl); line-height: 1.25; }
+  h3 { font-size: var(--text-xl); line-height: 1.3; }
+  h4 { font-size: var(--text-lg); line-height: 1.35; }
+  small { font-size: var(--text-xs); }
 }
 
 /* Custom scrollbar styles */
@@ -301,4 +326,21 @@
   .matrix-row {
     contain-intrinsic-size: 80px;
   }
+}
+
+/* Safe-area padding utilities (for iOS/edge devices) */
+@layer utilities {
+  .pt-safe { padding-top: var(--safe-area-top); }
+  .pb-safe { padding-bottom: var(--safe-area-bottom); }
+  .pl-safe { padding-left: var(--safe-area-left); }
+  .pr-safe { padding-right: var(--safe-area-right); }
+  .px-safe { padding-left: var(--safe-area-left); padding-right: var(--safe-area-right); }
+  .py-safe { padding-top: var(--safe-area-top); padding-bottom: var(--safe-area-bottom); }
+
+  .pt-safe-2 { padding-top: calc(var(--safe-area-top) + 0.5rem); }
+  .pt-safe-3 { padding-top: calc(var(--safe-area-top) + 0.75rem); }
+  .pt-safe-4 { padding-top: calc(var(--safe-area-top) + 1rem); }
+  .pb-safe-2 { padding-bottom: calc(var(--safe-area-bottom) + 0.5rem); }
+  .pb-safe-3 { padding-bottom: calc(var(--safe-area-bottom) + 0.75rem); }
+  .pb-safe-4 { padding-bottom: calc(var(--safe-area-bottom) + 1rem); }
 }
