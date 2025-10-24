@@ -146,5 +146,53 @@ export const vacationRequestsApi = {
       console.warn('Vacation decision email (rejected) failed:', e);
     }
     return data;
+  },
+
+  // Submit SoundVision access request (creates vacation_request + message)
+  async submitSoundVisionAccessRequest(reason: string, department: string = 'sound') {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Create a vacation request with special dates to indicate SoundVision access request
+    const today = new Date().toISOString().split('T')[0];
+    const { data: vacationRequest, error: vacationError } = await supabase
+      .from('vacation_requests')
+      .insert({
+        technician_id: user.id,
+        start_date: today,
+        end_date: today,
+        reason: reason,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (vacationError) throw vacationError;
+
+    // Create a message to management with metadata linking to the vacation request
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('id', user.id)
+      .single();
+
+    const messageContent = `SoundVision Access Request from ${profile?.first_name} ${profile?.last_name}:\n\n${reason}`;
+
+    const { error: messageError } = await supabase
+      .from('messages')
+      .insert({
+        content: messageContent,
+        department: department,
+        sender_id: user.id,
+        status: 'unread',
+        metadata: {
+          type: 'soundvision_access_request',
+          vacation_request_id: vacationRequest.id
+        }
+      });
+
+    if (messageError) throw messageError;
+
+    return vacationRequest;
   }
 };

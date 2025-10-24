@@ -17,6 +17,11 @@ export interface DirectMessage {
   recipient_id: string;
 }
 
+export interface MessageMetadata {
+  type?: 'soundvision_access_request';
+  vacation_request_id?: string;
+}
+
 export interface Message {
   id: string;
   content: string;
@@ -24,6 +29,7 @@ export interface Message {
   department: string;
   sender_id: string;
   status: 'read' | 'unread';
+  metadata?: MessageMetadata | null;
   sender: {
     id: string;
     first_name: string;

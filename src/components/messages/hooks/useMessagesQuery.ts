@@ -21,7 +21,13 @@ export const useMessagesQuery = (userRole: string | null, userDepartment: string
       const query = supabase
         .from('messages')
         .select(`
-          *,
+          id,
+          content,
+          created_at,
+          department,
+          sender_id,
+          status,
+          metadata,
           sender:profiles!messages_sender_id_fkey (
             id,
             first_name,

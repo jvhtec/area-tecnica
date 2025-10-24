@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { MessageSquare, Trash2, CheckCircle, Reply } from "lucide-react";
+import { MessageSquare, Trash2, CheckCircle, Reply, UserCheck } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Message } from "./types";
 import { DirectMessageDialog } from "./DirectMessageDialog";
 
@@ -12,6 +13,7 @@ interface MessageCardProps {
   currentUserId: string | undefined;
   onDelete?: (messageId: string) => void;
   onMarkAsRead?: (messageId: string) => void;
+  onGrantSoundVisionAccess?: (messageId: string, vacationRequestId: string) => void;
   isManagement?: boolean;
 }
 
@@ -20,11 +22,16 @@ export const MessageCard = ({
   currentUserId,
   onDelete,
   onMarkAsRead,
+  onGrantSoundVisionAccess,
   isManagement
 }: MessageCardProps) => {
   const [isReplyOpen, setIsReplyOpen] = useState(false);
   const showMarkAsRead = isManagement && message.status === 'unread';
   const canReply = isManagement && !!message.sender_id; // only management replies to department messages
+  
+  // Check if this is a SoundVision access request message
+  const isSoundVisionRequest = message.metadata?.type === 'soundvision_access_request';
+  const vacationRequestId = message.metadata?.vacation_request_id;
 
   return (
     <Card key={message.id}>
@@ -33,9 +40,16 @@ export const MessageCard = ({
           <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
             <div className="flex flex-col">
-              <span className="font-medium">
-                {message.sender.first_name} {message.sender.last_name}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">
+                  {message.sender.first_name} {message.sender.last_name}
+                </span>
+                {isSoundVisionRequest && (
+                  <Badge variant="secondary" className="text-xs">
+                    SoundVision Access Request
+                  </Badge>
+                )}
+              </div>
               <span className="text-sm text-muted-foreground">
                 Departamento: {message.department}
               </span>
@@ -80,6 +94,21 @@ export const MessageCard = ({
           </div>
         </div>
         <p className="mt-2">{message.content}</p>
+        
+        {isSoundVisionRequest && isManagement && vacationRequestId && onGrantSoundVisionAccess && (
+          <div className="mt-4 pt-4 border-t">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => onGrantSoundVisionAccess(message.id, vacationRequestId)}
+              className="gap-2"
+            >
+              <UserCheck className="h-4 w-4" />
+              Grant SoundVision Access
+            </Button>
+          </div>
+        )}
+        
         {canReply && (
           <DirectMessageDialog
             open={isReplyOpen}
