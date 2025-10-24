@@ -144,9 +144,9 @@ export const CopyShiftsDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Copy Shifts to Another Date</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Copy Shifts to Another Date</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-4">
           <div>

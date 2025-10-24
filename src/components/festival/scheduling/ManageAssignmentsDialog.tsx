@@ -250,12 +250,12 @@ export const ManageAssignmentsDialog = ({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">
             {isViewOnly ? "View Staff for" : "Manage Staff for"} {shift.name}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             {isViewOnly 
               ? "View staff assigned to this shift" 
               : "Add or remove staff from this shift"}

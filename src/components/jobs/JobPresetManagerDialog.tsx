@@ -155,7 +155,7 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
 
   const Manager = () => (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">Department</span>
           <select
@@ -168,7 +168,9 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
             <option value="video">Video</option>
           </select>
         </div>
-        <Button size="sm" onClick={() => setIsCreating(true)}>Create New Preset</Button>
+        <Button size="sm" onClick={() => setIsCreating(true)} className="w-full sm:w-auto">
+          Create New Preset
+        </Button>
       </div>
 
       <Card>
@@ -176,14 +178,16 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
           <ScrollArea className="h-[420px]">
             <div className="space-y-3 py-2">
               {presets.map((p) => (
-                <div key={p.id} className="flex items-center justify-between border rounded p-3">
+                <div key={p.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border rounded p-3">
                   <div>
                     <div className="font-medium">{p.name}</div>
                     <div className="text-xs text-muted-foreground">{p.items.length} items · {department}</div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {jobDates.length > 1 && (
-                      <Button variant="outline" size="sm" onClick={() => assignPresetMutation.mutate(p.id)}>Assign to all dates</Button>
+                      <Button variant="outline" size="sm" onClick={() => assignPresetMutation.mutate(p.id)} className="text-xs">
+                        Assign to all dates
+                      </Button>
                     )}
                     <Button variant="ghost" size="icon" onClick={() => setCopyingPreset({ ...p, name: `Copy of ${p.name}` })}>
                       <Copy className="h-4 w-4" />
@@ -211,9 +215,9 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Job Presets</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Job Presets</DialogTitle>
         </DialogHeader>
 
         {isCreating || editingPreset || copyingPreset ? (

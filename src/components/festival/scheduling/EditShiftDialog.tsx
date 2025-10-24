@@ -95,9 +95,9 @@ export const EditShiftDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Shift</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Edit Shift</DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 pt-4">
           <div className="space-y-2">

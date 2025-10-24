@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Calendar, MapPin, FileText, Settings, UserCheck, RefreshCw, LogOut, FileImage, Cloud, Box } from "lucide-react";
+import { Loader2, ArrowLeft, Calendar, MapPin, FileText, Settings, UserCheck, RefreshCw, LogOut, FileImage, Cloud, Box, MoreVertical } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +15,12 @@ import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { JobExtrasManagement } from "@/components/jobs/JobExtrasManagement";
 import { CrewCallLinkerDialog } from "@/components/jobs/CrewCallLinker";
 import { JobPresetManagerDialog } from "@/components/jobs/JobPresetManagerDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface UnifiedJobManagementProps {
   mode: 'job' | 'festival';
@@ -268,105 +274,132 @@ export const UnifiedJobManagement = ({ mode }: UnifiedJobManagementProps) => {
   const endDate = new Date(job.end_time);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          
-          {logoUrl && (
-            <img 
-              src={logoUrl} 
-              alt={`${job.title} logo`}
-              className="h-12 w-auto object-contain"
-            />
-          )}
+    <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 sm:gap-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            
+            {logoUrl && (
+              <img 
+                src={logoUrl} 
+                alt={`${job.title} logo`}
+                className="h-10 sm:h-12 w-auto object-contain"
+              />
+            )}
+          </div>
           
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-xl sm:text-2xl font-bold">
               {mode === 'festival' ? 'Festival Management' : 'Job Management'}
             </h1>
-            <h2 className="text-xl text-muted-foreground">{job.title}</h2>
+            <h2 className="text-lg sm:text-xl text-muted-foreground">{job.title}</h2>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
           {mode === 'festival' ? (
             <>
-              <Button 
-                onClick={() => setShowPrintDialog(true)}
-                disabled={isPrinting}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                {isPrinting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-4 w-4" />
-                    Print
-                  </>
-                )}
-              </Button>
-              <Button 
-                onClick={handleFlexClick}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <LogOut className="h-4 w-4" />
-                Flex
-              </Button>
-              <Button 
-                onClick={() => setShowJobPresets(true)}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Box className="h-4 w-4" />
-                Job Presets
-              </Button>
-              <Button 
-                onClick={() => navigate(`/festival-management/${jobId}/gear`)}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <FileImage className="h-4 w-4" />
-                Logo Manager
-              </Button>
-              <Button 
-                onClick={() => setShowJobPresets(true)}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Box className="h-4 w-4" />
-                Presets
-              </Button>
+              <div className="hidden md:flex items-center gap-2">
+                <Button 
+                  onClick={() => setShowPrintDialog(true)}
+                  disabled={isPrinting}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  {isPrinting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4" />
+                      Print
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  onClick={handleFlexClick}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Flex
+                </Button>
+                <Button 
+                  onClick={() => navigate(`/festival-management/${jobId}/gear`)}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <FileImage className="h-4 w-4" />
+                  Logo Manager
+                </Button>
+                <Button 
+                  onClick={() => setShowJobPresets(true)}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Box className="h-4 w-4" />
+                  Presets
+                </Button>
+              </div>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild className="md:hidden">
+                  <Button variant="outline" size="sm">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => setShowPrintDialog(true)} disabled={isPrinting}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    {isPrinting ? 'Generating...' : 'Print'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleFlexClick}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Flex
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate(`/festival-management/${jobId}/gear`)}>
+                    <FileImage className="h-4 w-4 mr-2" />
+                    Logo Manager
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowJobPresets(true)}>
+                    <Box className="h-4 w-4 mr-2" />
+                    Presets
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           ) : (
             <>
               <Button 
                 onClick={() => setShowJobPresets(true)}
                 variant="outline"
+                size="sm"
                 className="flex items-center gap-2"
               >
                 <Box className="h-4 w-4" />
-                Presets
+                <span className="hidden sm:inline">Presets</span>
               </Button>
             </>
           )}
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         <Card className="hover:shadow-md transition-shadow cursor-pointer">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -448,7 +481,7 @@ export const UnifiedJobManagement = ({ mode }: UnifiedJobManagementProps) => {
 
       {/* Flex Crew Call linking (dialog trigger) */}
       {mode === 'festival' ? null : (
-        <div className="flex justify-end">
+        <div className="flex justify-start sm:justify-end">
           {jobId && <CrewCallLinkerDialog jobId={jobId} />}
         </div>
       )}
