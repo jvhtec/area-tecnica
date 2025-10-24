@@ -5,8 +5,16 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function TechnicianUnavailability() {
@@ -16,6 +24,63 @@ export default function TechnicianUnavailability() {
   const [allDay, setAllDay] = React.useState(true);
   const [start, setStart] = React.useState<string>('');
   const [end, setEnd] = React.useState<string>('');
+  const [fieldErrors, setFieldErrors] = React.useState<{ start?: string; end?: string }>({});
+  const [formError, setFormError] = React.useState<string | null>(null);
+  const isMobile = useIsMobile();
+
+  React.useEffect(() => {
+    if (!open) {
+      setFieldErrors({});
+      setFormError(null);
+      setStart('');
+      setEnd('');
+      setAllDay(true);
+    }
+  }, [open]);
+
+  const normalizeToDate = React.useCallback((value: string) => {
+    if (!value) return '';
+    if (value.includes('T')) {
+      return value.slice(0, 10);
+    }
+    return value;
+  }, []);
+
+  const handleSubmit = React.useCallback(() => {
+    const nextErrors: { start?: string; end?: string } = {};
+    const normalizedStart = normalizeToDate(start);
+    const normalizedEnd = normalizeToDate(end);
+
+    if (!start) {
+      nextErrors.start = 'La fecha de inicio es obligatoria.';
+    } else if (normalizedStart.length !== 10 || Number.isNaN(new Date(`${normalizedStart}T00:00:00`).getTime())) {
+      nextErrors.start = 'Introduce una fecha de inicio válida.';
+    }
+
+    if (!end) {
+      nextErrors.end = 'La fecha de fin es obligatoria.';
+    } else if (normalizedEnd.length !== 10 || Number.isNaN(new Date(`${normalizedEnd}T00:00:00`).getTime())) {
+      nextErrors.end = 'Introduce una fecha de fin válida.';
+    }
+
+    if (!nextErrors.start && !nextErrors.end) {
+      const startDate = new Date(`${normalizedStart}T00:00:00`);
+      const endDate = new Date(`${normalizedEnd}T00:00:00`);
+      if (startDate > endDate) {
+        nextErrors.end = 'La fecha de fin debe ser igual o posterior a la de inicio.';
+      }
+    }
+
+    if (nextErrors.start || nextErrors.end) {
+      setFieldErrors(nextErrors);
+      setFormError('Revisa los campos marcados antes de continuar.');
+      return;
+    }
+
+    setFieldErrors({});
+    setFormError(null);
+    createMutation.mutate({ startDate: normalizedStart, endDate: normalizedEnd, status: 'day_off' });
+  }, [createMutation, end, normalizeToDate, start]);
   // Reasonless flow; defaults to day_off in DB
 
   const statusLabels: Record<string, string> = {
@@ -62,8 +127,15 @@ export default function TechnicianUnavailability() {
       setOpen(false);
       setStart('');
       setEnd('');
+      setAllDay(true);
+      setFieldErrors({});
+      setFormError(null);
     },
-    onError: (e: any) => toast.error(e?.message || 'No se pudo crear el bloqueo'),
+    onError: (e: any) => {
+      const message = e?.message || 'No se pudo crear el bloqueo';
+      setFormError(message);
+      toast.error(message);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -119,45 +191,208 @@ export default function TechnicianUnavailability() {
         </div>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Añadir bloqueo de disponibilidad</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Switch checked={allDay} onCheckedChange={(v) => setAllDay(Boolean(v))} id="allDay" />
-              <Label htmlFor="allDay">Todo el día</Label>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <Label>Inicio{allDay ? ' (fecha)' : ' (fecha y hora)'}</Label>
-                <Input type={allDay ? 'date' : 'datetime-local'} value={start} onChange={(e) => setStart(e.target.value)} />
-              </div>
-              <div>
-                <Label>Fin{allDay ? ' (fecha)' : ' (fecha y hora)'}</Label>
-                <Input type={allDay ? 'date' : 'datetime-local'} value={end} onChange={(e) => setEnd(e.target.value)} />
-              </div>
-            </div>
-            {/* Reason removed; defaults to day_off */}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => {
-              try {
-                if (!start || !end) { toast.error('Las fechas de inicio y fin son obligatorias'); return; }
-                const normalize = (v: string) => (v.includes('T') ? v.slice(0,10) : v);
-                const s = normalize(start);
-                const e = normalize(end);
-                if (s.length !== 10 || e.length !== 10) { toast.error('Fecha no válida'); return; }
-                createMutation.mutate({ startDate: s, endDate: e, status: 'day_off' });
-              } catch (e) {
-                toast.error('Fecha no válida');
-              }
-            }} disabled={createMutation.isPending || !start || !end}>Crear</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {isMobile ? (
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetContent
+            side="bottom"
+            className="flex h-[95vh] flex-col overflow-hidden rounded-t-3xl px-4 pb-6 pt-8 sm:h-auto"
+          >
+            <SheetHeader className="mb-4">
+              <SheetTitle className="text-left text-xl font-semibold">
+                Añadir bloqueo de disponibilidad
+              </SheetTitle>
+            </SheetHeader>
+            <FormContent
+              allDay={allDay}
+              end={end}
+              fieldErrors={fieldErrors}
+              formError={formError}
+              isPending={createMutation.isPending}
+              isSubmitDisabled={createMutation.isPending || !start || !end}
+              onCancel={() => setOpen(false)}
+              onChangeAllDay={(value) => setAllDay(value)}
+              onChangeEnd={(value) => {
+                setEnd(value);
+                setFieldErrors((prev) => ({ ...prev, end: undefined }));
+                setFormError(null);
+              }}
+              onChangeStart={(value) => {
+                setStart(value);
+                setFieldErrors((prev) => ({ ...prev, start: undefined }));
+                setFormError(null);
+              }}
+              onSubmit={handleSubmit}
+              start={start}
+            />
+          </SheetContent>
+        </Sheet>
+      ) : (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader className="mb-2">
+              <DialogTitle>Añadir bloqueo de disponibilidad</DialogTitle>
+            </DialogHeader>
+            <FormContent
+              allDay={allDay}
+              end={end}
+              fieldErrors={fieldErrors}
+              formError={formError}
+              isPending={createMutation.isPending}
+              isSubmitDisabled={createMutation.isPending || !start || !end}
+              onCancel={() => setOpen(false)}
+              onChangeAllDay={(value) => setAllDay(value)}
+              onChangeEnd={(value) => {
+                setEnd(value);
+                setFieldErrors((prev) => ({ ...prev, end: undefined }));
+                setFormError(null);
+              }}
+              onChangeStart={(value) => {
+                setStart(value);
+                setFieldErrors((prev) => ({ ...prev, start: undefined }));
+                setFormError(null);
+              }}
+              onSubmit={handleSubmit}
+              start={start}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
+  );
+}
+
+function FormContent({
+  allDay,
+  end,
+  fieldErrors,
+  formError,
+  isPending,
+  isSubmitDisabled,
+  onCancel,
+  onChangeAllDay,
+  onChangeEnd,
+  onChangeStart,
+  onSubmit,
+  start,
+}: {
+  allDay: boolean;
+  end: string;
+  fieldErrors: { start?: string; end?: string };
+  formError: string | null;
+  isPending: boolean;
+  isSubmitDisabled: boolean;
+  onCancel: () => void;
+  onChangeAllDay: (value: boolean) => void;
+  onChangeEnd: (value: string) => void;
+  onChangeStart: (value: string) => void;
+  onSubmit: () => void;
+  start: string;
+}) {
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onSubmit();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex h-full flex-col gap-6 overflow-hidden">
+      <div className="flex-1 space-y-6 overflow-y-auto pr-1">
+        <section className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-4">
+          <div className="space-y-1">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              Duración
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Ajusta cómo se registrará el bloqueo según la disponibilidad del técnico.
+            </p>
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-lg bg-background px-4 py-3 shadow-sm">
+            <div className="space-y-1">
+              <Label htmlFor="allDay" className="text-base font-medium">
+                Todo el día
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Activa esta opción para bloquear la jornada completa. Desactívala si necesitas horarios concretos.
+              </p>
+            </div>
+            <Switch
+              id="allDay"
+              checked={allDay}
+              onCheckedChange={(value) => onChangeAllDay(Boolean(value))}
+              disabled={isPending}
+            />
+          </div>
+        </section>
+
+        <section className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-4">
+          <div className="space-y-1">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              Rango de fechas
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Indica cuándo no estarás disponible. Puedes seleccionar un único día o un rango completo.
+            </p>
+          </div>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="start">
+                Inicio{allDay ? ' (fecha)' : ' (fecha y hora)'}
+              </Label>
+              <Input
+                id="start"
+                type={allDay ? 'date' : 'datetime-local'}
+                value={start}
+                onChange={(event) => onChangeStart(event.target.value)}
+                disabled={isPending}
+                aria-invalid={Boolean(fieldErrors.start)}
+              />
+              {fieldErrors.start ? (
+                <p className="text-sm text-destructive">{fieldErrors.start}</p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="end">
+                Fin{allDay ? ' (fecha)' : ' (fecha y hora)'}
+              </Label>
+              <Input
+                id="end"
+                type={allDay ? 'date' : 'datetime-local'}
+                value={end}
+                onChange={(event) => onChangeEnd(event.target.value)}
+                disabled={isPending}
+                aria-invalid={Boolean(fieldErrors.end)}
+              />
+              {fieldErrors.end ? (
+                <p className="text-sm text-destructive">{fieldErrors.end}</p>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        {formError ? (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={isPending}
+          className="h-12 w-full rounded-lg text-base sm:h-10 sm:w-auto"
+        >
+          Cancelar
+        </Button>
+        <Button
+          type="submit"
+          disabled={isSubmitDisabled}
+          className="h-12 w-full rounded-lg text-base sm:h-10 sm:w-auto"
+        >
+          {isPending && <Loader2 className="h-4 w-4 animate-spin" />}Crear
+        </Button>
+      </div>
+    </form>
   );
 }
