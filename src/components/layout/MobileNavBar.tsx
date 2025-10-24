@@ -31,7 +31,9 @@ export const MobileNavBar = ({
 }: MobileNavBarProps) => {
   const { pathname } = useLocation()
   const hasNavigation = primaryItems.length > 0 || trayItems.length > 0
-  const shouldShowTrayTrigger = trayItems.length > 0
+  // Always render the tray trigger so persistent actions like Sign Out and About
+  // remain accessible for all roles, even when there are no additional tray items.
+  const shouldShowTrayTrigger = true
 
   if (!hasNavigation) {
     return null
