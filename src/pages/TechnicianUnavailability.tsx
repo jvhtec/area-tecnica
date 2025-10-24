@@ -3,10 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { CalendarDays, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function TechnicianUnavailability() {
@@ -23,6 +25,13 @@ export default function TechnicianUnavailability() {
     travel: 'Viaje',
     sick: 'Baja médica',
     day_off: 'Día libre',
+  };
+
+  const statusStyles: Record<string, string> = {
+    vacation: 'border-transparent bg-amber-100 text-amber-800',
+    travel: 'border-transparent bg-sky-100 text-sky-800',
+    sick: 'border-transparent bg-rose-100 text-rose-800',
+    day_off: 'border-transparent bg-emerald-100 text-emerald-800',
   };
 
   const { data: blocks = [], isLoading } = useQuery({
@@ -99,15 +108,43 @@ export default function TechnicianUnavailability() {
           {blocks.length === 0 && (
             <div className="text-muted-foreground">Todavía no tienes bloqueos de disponibilidad. Añade uno para evitar asignaciones durante esas fechas.</div>
           )}
-          {blocks.map((b: any) => (
-            <div key={b.id} className="flex items-center justify-between border rounded-md p-3">
-              <div>
-                <div className="font-medium">{new Date(b.date).toLocaleDateString('es-ES', { dateStyle: 'long' })}</div>
-                <div className="text-sm text-muted-foreground">{statusLabels[b.status as keyof typeof statusLabels] || b.status}</div>
+          {blocks.map((b: any) => {
+            const formattedDate = new Date(b.date).toLocaleDateString('es-ES', { dateStyle: 'long' });
+            const badgeClass = statusStyles[b.status as keyof typeof statusStyles] || 'border-transparent bg-muted text-foreground';
+            const statusLabel = statusLabels[b.status as keyof typeof statusLabels] || b.status;
+            return (
+              <div
+                key={b.id}
+                className="rounded-lg border border-border/70 bg-muted/30 p-4 shadow-sm transition hover:bg-muted/40"
+              >
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground shadow-inner">
+                        <CalendarDays aria-hidden className="h-5 w-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Fecha</p>
+                        <p className="text-base font-semibold text-foreground">{formattedDate}</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={`self-start ${badgeClass}`}>
+                      {statusLabel}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center md:h-9 md:w-auto md:px-3"
+                    onClick={() => deleteMutation.mutate(b.id)}
+                  >
+                    <Trash2 aria-hidden className="h-4 w-4" />
+                    <span>Eliminar</span>
+                    <span className="sr-only">Bloqueo del {formattedDate}</span>
+                  </Button>
+                </div>
               </div>
-              <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate(b.id)}>Eliminar</Button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
