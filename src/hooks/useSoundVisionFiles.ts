@@ -265,21 +265,67 @@ export const useDownloadSoundVisionFile = () => {
         );
 
       if (recordError) {
+        console.error('Error recording SoundVision download:', recordError);
         downloadRecordError = recordError;
       }
 
-      return { downloadRecordError };
-    },
-    onSuccess: ({ downloadRecordError }) => {
-      queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
+      // Invoke push notification for file download
+      let pushNotificationResult: { success: boolean; error?: string } = { success: true };
+      try {
+        // Get venue_name from populated venue or fallback to metadata
+        const venueName = file.venue?.name || file.metadata?.venue_name || null;
 
-      if (downloadRecordError) {
-        console.error('Error recording SoundVision download:', downloadRecordError);
-        toast.error('La descarga se realizó, pero no se pudo registrar el evento.');
-        return;
+        const { error: pushError } = await supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'soundvision.file.downloaded',
+            file_id: file.id,
+            venue_id: file.venue_id,
+            venue_name: venueName,
+            url: '/soundvision-files',
+          },
+        });
+
+        if (pushError) {
+          console.error('Push notification error:', pushError);
+          pushNotificationResult = {
+            success: false,
+            error: pushError.message || 'Error al enviar notificación',
+          };
+        }
+      } catch (pushErr) {
+        console.error('Failed to send push notification:', pushErr);
+        pushNotificationResult = {
+          success: false,
+          error: pushErr instanceof Error ? pushErr.message : 'Error desconocido al notificar',
+        };
       }
 
-      toast.success('Descarga iniciada correctamente.');
+      return { downloadRecordError, pushNotificationResult };
+    },
+    onSuccess: ({ downloadRecordError, pushNotificationResult }) => {
+      queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
+
+      const hasRecordError = !!downloadRecordError;
+      const hasPushError = !pushNotificationResult.success;
+
+      if (!hasRecordError && !hasPushError) {
+        // Full success
+        toast.success('Descarga iniciada correctamente.');
+      } else if (hasRecordError && !hasPushError) {
+        // Download worked but couldn't record it
+        toast.warning('La descarga se realizó, pero no se pudo registrar el evento.');
+      } else if (!hasRecordError && hasPushError) {
+        // Download and record worked but notification failed
+        toast.success('Descarga iniciada correctamente.', {
+          description: 'Sin embargo, no se pudo notificar a todos los usuarios.',
+        });
+        console.warn('Notification issue:', pushNotificationResult.error);
+      } else {
+        // Both record and push failed
+        toast.warning('La descarga se realizó, pero no se pudo registrar el evento ni notificar.');
+        console.warn('Notification issue:', pushNotificationResult.error);
+      }
     },
     onError: (error) => {
       console.error('Error downloading file:', error);
