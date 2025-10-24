@@ -223,7 +223,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
     .select('id, title, start_time, end_time, job_type, status, rates_approved')
     .neq('job_type', 'tourdate')
     .neq('job_type', 'dryhire')
-    .neq('status', 'Cancelado')
+    .eq('status', 'Confirmado')
     .order('start_time', { ascending: true });
 
   if (jobsError2) throw jobsError2;
