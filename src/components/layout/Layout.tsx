@@ -38,6 +38,114 @@ import {
 import { ThemeToggle } from "./ThemeToggle"
 import { UserInfo } from "./UserInfo"
 
+const PRIMARY_NAVIGATION_PROFILE_MAP: Record<string, readonly string[]> = {
+  sound: [
+    "department-sound",
+    "project-management",
+    "tours",
+    "festivals",
+  ],
+  lights: [
+    "project-management",
+    "department-lights",
+    "disponibilidad",
+    "logistics",
+  ],
+  production: [
+    "management-dashboard",
+    "project-management",
+    "logistics",
+    "job-assignment-matrix",
+  ],
+}
+
+interface SelectPrimaryNavigationItemsParams {
+  items: NavigationItem[]
+  userDepartment: string | null | undefined
+  userRole: string | null | undefined
+  maxPrimary?: number
+}
+
+export const selectPrimaryNavigationItems = ({
+  items,
+  userDepartment,
+  userRole,
+  maxPrimary = 4,
+}: SelectPrimaryNavigationItemsParams): NavigationItem[] => {
+  if (!items.length || maxPrimary <= 0) {
+    return []
+  }
+
+  const normalizedDepartment = userDepartment?.toLowerCase() ?? null
+  const normalizedRole = userRole?.toLowerCase() ?? null
+
+  const customProfileIds =
+    (normalizedDepartment && PRIMARY_NAVIGATION_PROFILE_MAP[normalizedDepartment]) ||
+    (normalizedRole && PRIMARY_NAVIGATION_PROFILE_MAP[normalizedRole]) ||
+    null
+
+  const selected: NavigationItem[] = []
+  const used = new Set<string>()
+
+  const addItem = (item: NavigationItem | undefined) => {
+    if (!item) {
+      return
+    }
+    if (selected.length >= maxPrimary) {
+      return
+    }
+    if (used.has(item.id)) {
+      return
+    }
+    selected.push(item)
+    used.add(item.id)
+  }
+
+  if (customProfileIds) {
+    for (const id of customProfileIds) {
+      if (selected.length >= maxPrimary) break
+      const match = items.find((item) => item.id === id)
+      if (match) {
+        addItem(match)
+      }
+    }
+  }
+
+  if (selected.length < maxPrimary) {
+    for (const item of items) {
+      if (selected.length >= maxPrimary) break
+      if (item.mobileSlot === "primary") {
+        addItem(item)
+      }
+    }
+  }
+
+  const maxAllowed = Math.min(maxPrimary, items.length)
+  if (selected.length < maxAllowed) {
+    for (const item of items) {
+      if (selected.length >= maxAllowed) break
+      addItem(item)
+    }
+  }
+
+  const profileItem = items.find((item) => item.id === "profile")
+  const shouldConsiderProfile =
+    !customProfileIds || selected.length < maxPrimary
+  if (profileItem && shouldConsiderProfile && !used.has(profileItem.id)) {
+    if (selected.length < maxPrimary) {
+      selected.push(profileItem)
+      used.add(profileItem.id)
+    } else if (selected.length > 0) {
+      const replaced = selected[selected.length - 1]
+      used.delete(replaced.id)
+      selected[selected.length - 1] = profileItem
+      used.add(profileItem.id)
+    }
+  }
+
+  return selected
+}
+
 const Layout = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -141,47 +249,15 @@ const Layout = () => {
     )
   }, [navigationItems])
 
-  const primaryItems = useMemo(() => {
-    const maxPrimary = 4
-    if (!sortedMobileItems.length) {
-      return []
-    }
-
-    const selected: NavigationItem[] = []
-    const used = new Set<string>()
-
-    for (const item of sortedMobileItems) {
-      if (selected.length >= maxPrimary) break
-      if (item.mobileSlot === "primary") {
-        selected.push(item)
-        used.add(item.id)
-      }
-    }
-
-    for (const item of sortedMobileItems) {
-      if (selected.length >= Math.min(maxPrimary, sortedMobileItems.length)) {
-        break
-      }
-      if (!used.has(item.id)) {
-        selected.push(item)
-        used.add(item.id)
-      }
-    }
-
-    const profileItem = sortedMobileItems.find((item) => item.id === "profile")
-    if (profileItem && !used.has(profileItem.id)) {
-      if (selected.length < maxPrimary) {
-        selected.push(profileItem)
-      } else if (selected.length > 0) {
-        const replaced = selected[selected.length - 1]
-        used.delete(replaced.id)
-        selected[selected.length - 1] = profileItem
-      }
-      used.add(profileItem.id)
-    }
-
-    return selected
-  }, [sortedMobileItems])
+  const primaryItems = useMemo(
+    () =>
+      selectPrimaryNavigationItems({
+        items: sortedMobileItems,
+        userDepartment,
+        userRole,
+      }),
+    [sortedMobileItems, userDepartment, userRole],
+  )
 
   const trayItems = useMemo(() => {
     if (!sortedMobileItems.length) {
