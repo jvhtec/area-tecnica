@@ -1,50 +1,77 @@
-import { Button } from "@/components/ui/button";
-import { Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { useEffect, useState } from "react"
+import { Moon, Sun } from "lucide-react"
 
-export const ThemeToggle = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const { preferences, updatePreferences } = useUserPreferences();
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import { useUserPreferences } from "@/hooks/useUserPreferences"
+
+interface ThemeToggleProps {
+  display?: "sidebar" | "icon"
+  className?: string
+  ariaLabel?: string
+}
+
+export const ThemeToggle = ({
+  display = "sidebar",
+  className,
+  ariaLabel,
+}: ThemeToggleProps = {}) => {
+  const [isDarkMode, setIsDarkMode] = useState(false)
+  const { preferences, updatePreferences } = useUserPreferences()
 
   useEffect(() => {
     if (preferences?.dark_mode !== undefined) {
-      console.log('Applying saved dark mode preference:', preferences.dark_mode);
-      setIsDarkMode(preferences.dark_mode);
-      if (preferences.dark_mode) {
-        document.documentElement.classList.add("dark");
+      const prefersDark = preferences.dark_mode
+      setIsDarkMode(prefersDark)
+      if (prefersDark) {
+        document.documentElement.classList.add("dark")
       } else {
-        document.documentElement.classList.remove("dark");
+        document.documentElement.classList.remove("dark")
       }
     }
-  }, [preferences]);
+  }, [preferences])
 
   const toggleDarkMode = () => {
-    const newDarkMode = !isDarkMode;
-    console.log('Toggling dark mode to:', newDarkMode);
-    setIsDarkMode(newDarkMode);
-    
+    const newDarkMode = !isDarkMode
+    setIsDarkMode(newDarkMode)
+
     if (newDarkMode) {
-      document.documentElement.classList.add("dark");
+      document.documentElement.classList.add("dark")
     } else {
-      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.remove("dark")
     }
 
-    updatePreferences({ dark_mode: newDarkMode });
-  };
+    updatePreferences({ dark_mode: newDarkMode })
+  }
+
+  const isIconDisplay = display === "icon"
+  const iconSizeClass = isIconDisplay ? "h-5 w-5" : "h-4 w-4"
+  const computedAriaLabel = isIconDisplay
+    ? ariaLabel ?? (isDarkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro")
+    : undefined
 
   return (
-    <Button 
-      variant="ghost" 
-      className="w-full justify-start gap-2" 
+    <Button
+      type="button"
+      variant="ghost"
+      size={isIconDisplay ? "icon" : "default"}
+      className={cn(
+        isIconDisplay
+          ? "h-9 w-9 rounded-full border border-border/60 bg-background/70 text-muted-foreground shadow-sm hover:bg-accent/30 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          : "w-full justify-start gap-2",
+        className,
+      )}
       onClick={toggleDarkMode}
+      aria-label={computedAriaLabel}
     >
       {isDarkMode ? (
-        <Moon className="h-4 w-4" />
+        <Moon className={iconSizeClass} aria-hidden="true" />
       ) : (
-        <Sun className="h-4 w-4" />
+        <Sun className={iconSizeClass} aria-hidden="true" />
       )}
-      <span>{isDarkMode ? 'Dark Mode' : 'Light Mode'}</span>
+      {!isIconDisplay && (
+        <span>{isDarkMode ? "Dark Mode" : "Light Mode"}</span>
+      )}
     </Button>
-  );
-};
+  )
+}
