@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { NavigationItem } from "./SidebarNavigation"
 import { ThemeToggle } from "./ThemeToggle"
 import { NotificationBadge } from "./NotificationBadge"
+import { AboutCard } from "./AboutCard"
 
 interface MobileActionTrayProps {
   trayItems: NavigationItem[]
@@ -22,6 +23,8 @@ interface MobileActionTrayProps {
     userRole: string
     userDepartment: string | null
   }
+  userRole?: string
+  userEmail?: string
 }
 
 export const MobileActionTray = ({
@@ -30,6 +33,8 @@ export const MobileActionTray = ({
   onSignOut,
   isLoggingOut,
   notificationProps,
+  userRole,
+  userEmail,
 }: MobileActionTrayProps) => {
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
@@ -63,6 +68,9 @@ export const MobileActionTray = ({
                 className="w-full justify-start"
               />
             )}
+            <div className="rounded-2xl border border-border/60 bg-muted/40 p-1">
+              <AboutCard userRole={userRole} userEmail={userEmail} />
+            </div>
             {trayItems.length > 0 && (
               <>
                 <Separator className="bg-border/60" />
