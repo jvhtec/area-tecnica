@@ -307,7 +307,6 @@ const Layout = () => {
         <MobileNavBar
           primaryItems={primaryItems}
           trayItems={trayItems}
-          navigationProps={navigationProps}
           onSignOut={handleSignOut}
           isLoggingOut={isLoggingOut}
           notificationProps={notificationProps}

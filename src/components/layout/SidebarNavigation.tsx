@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, type ReactNode } from "react"
 import { Link, useLocation } from "react-router-dom"
 import type { LucideIcon } from "lucide-react"
 import {
@@ -47,6 +47,7 @@ export interface NavigationItem {
   mobilePriority?: number
   mobileSlot: "primary" | "secondary"
   isActive: (pathname: string) => boolean
+  badge?: ReactNode
 }
 
 type LabelSource = string | ((context: NavigationContext) => string | null)
