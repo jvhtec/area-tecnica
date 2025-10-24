@@ -34,6 +34,10 @@ type BroadcastBody = {
   // Optional meta for message composition
   doc_id?: string;
   file_name?: string;
+  // SoundVision events should include either venue_name or enough identifiers to resolve it server-side
+  file_id?: string;
+  venue_id?: string;
+  venue_name?: string;
   actor_name?: string;
   actor_id?: string;
   recipient_name?: string;
@@ -197,6 +201,15 @@ async function getManagementUserIds(client: ReturnType<typeof createClient>): Pr
   return data.map((r: any) => r.id).filter(Boolean);
 }
 
+async function getSoundDepartmentUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
+  const { data, error } = await client
+    .from('profiles')
+    .select('id')
+    .eq('department', 'sound');
+  if (error || !data) return [];
+  return data.map((r: any) => r.id).filter(Boolean);
+}
+
 async function getJobParticipantUserIds(client: ReturnType<typeof createClient>, jobId: string): Promise<string[]> {
   if (!jobId) return [];
   const { data, error } = await client
@@ -226,6 +239,38 @@ async function getProfileDisplayName(client: ReturnType<typeof createClient>, us
   if (full) return full;
   if (data.nickname) return data.nickname;
   return data.email || null;
+}
+
+async function resolveSoundVisionVenueName(
+  client: ReturnType<typeof createClient>,
+  body: BroadcastBody,
+): Promise<string | null> {
+  if (body.venue_name) return body.venue_name;
+
+  try {
+    if (body.venue_id) {
+      const { data } = await client.from('venues').select('name').eq('id', body.venue_id).maybeSingle();
+      if (data?.name) {
+        return data.name as string;
+      }
+    }
+
+    if (body.file_id) {
+      const { data } = await client
+        .from('soundvision_files')
+        .select('venue:venues(name)')
+        .eq('id', body.file_id)
+        .maybeSingle();
+      const venueName = (data as any)?.venue?.name as string | undefined;
+      if (venueName) {
+        return venueName;
+      }
+    }
+  } catch (_) {
+    // Ignore lookup failures and fall through to null default
+  }
+
+  return null;
 }
 
 function fmtFieldEs(field: string): string {
@@ -269,7 +314,9 @@ async function handleBroadcast(
 
   // Determine recipients
   let recipients = new Set<string>();
-  const mgmt = new Set(await getManagementUserIds(client));
+  const management = new Set(await getManagementUserIds(client));
+  const soundDept = new Set(await getSoundDepartmentUserIds(client));
+  const mgmt = new Set<string>([...management, ...soundDept]);
   const participants = new Set(await getJobParticipantUserIds(client, jobId || ''));
 
   const addUsers = (ids: (string | null | undefined)[]) => {
@@ -433,6 +480,15 @@ async function handleBroadcast(
     text = tn ? `${actor} eliminó una fecha de "${tn}".` : `${actor} eliminó una fecha de tour.`;
     url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
     addUsers(Array.from(mgmt));
+  } else if (type === 'soundvision.file.uploaded' || type === 'soundvision.file.downloaded') {
+    // SoundVision payloads should provide venue_name, or file_id/venue_id for lookup so we can compose contextual notifications.
+    const venueName = (await resolveSoundVisionVenueName(client, body)) || 'desconocido';
+    const action = type === 'soundvision.file.uploaded' ? 'subido' : 'descargado';
+    title = type === 'soundvision.file.uploaded' ? 'Archivo SoundVision subido' : 'Archivo SoundVision descargado';
+    text = `${actor} ha ${action} un archivo SoundVision ${venueName} a la base de datos.`;
+    url = body.url || '/soundvision-files';
+    addUsers(Array.from(management));
+    addUsers(Array.from(soundDept));
   } else {
     // Generic fallback using activity catalog label if available
     try {
@@ -479,6 +535,9 @@ async function handleBroadcast(
       recipient: recipName,
       channel: ch,
       ...('file_name' in body ? { fileName: body.file_name } : {}),
+      ...('file_id' in body ? { fileId: body.file_id } : {}),
+      ...('venue_id' in body ? { venueId: body.venue_id } : {}),
+      ...('venue_name' in body ? { venueName: body.venue_name } : {}),
       ...('changes' in body ? { changes: body.changes } : {}),
       ...('message_preview' in body ? { messagePreview: body.message_preview } : {}),
       ...('message_id' in body ? { messageId: body.message_id } : {}),
