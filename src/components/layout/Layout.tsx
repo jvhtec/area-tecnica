@@ -217,6 +217,8 @@ const Layout = () => {
     return fullscreenParam === "1" || fullscreenParam === "true"
   }, [location.pathname, location.search])
 
+  const showSidebar = !isMobile || suppressChrome
+
   const showMobileNav =
     isMobile &&
     !suppressChrome &&
@@ -224,50 +226,52 @@ const Layout = () => {
     (primaryItems.length > 0 || trayItems.length > 0)
 
   return (
-    <SidebarProvider defaultOpen={!isMobile}>
+    <SidebarProvider defaultOpen={showSidebar}>
       <div className="flex min-h-screen w-full bg-background">
-        <Sidebar className="border-r border-border/50 bg-sidebar text-sidebar-foreground">
-          <SidebarContent>
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarNavigation {...navigationProps} />
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarContent>
-          <SidebarFooter className="border-t border-sidebar-border">
-            <ThemeToggle className="w-full" />
-            <UserInfo />
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full justify-start gap-2"
-              onClick={handleSignOut}
-              disabled={isLoggingOut}
-            >
-              <LogOut className="h-4 w-4" />
-              <span>{isLoggingOut ? "Cerrando sesión..." : "Cerrar sesión"}</span>
-            </Button>
-            <AboutCard
-              userRole={userRole ?? undefined}
-              userEmail={session.user?.email ?? undefined}
-            />
-            <SidebarSeparator />
-            <div className="px-2 py-4">
-              <img
-                src="/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png"
-                alt="Sector Pro Logo"
-                className="h-6 w-auto dark:invert"
-                draggable="false"
+        {showSidebar && (
+          <Sidebar className="border-r border-border/50 bg-sidebar text-sidebar-foreground">
+            <SidebarContent>
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <SidebarNavigation {...navigationProps} />
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarContent>
+            <SidebarFooter className="border-t border-sidebar-border">
+              <ThemeToggle className="w-full" />
+              <UserInfo />
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full justify-start gap-2"
+                onClick={handleSignOut}
+                disabled={isLoggingOut}
+              >
+                <LogOut className="h-4 w-4" />
+                <span>{isLoggingOut ? "Cerrando sesión..." : "Cerrar sesión"}</span>
+              </Button>
+              <AboutCard
+                userRole={userRole ?? undefined}
+                userEmail={session.user?.email ?? undefined}
               />
-            </div>
-          </SidebarFooter>
-        </Sidebar>
+              <SidebarSeparator />
+              <div className="px-2 py-4">
+                <img
+                  src="/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png"
+                  alt="Sector Pro Logo"
+                  className="h-6 w-auto dark:invert"
+                  draggable="false"
+                />
+              </div>
+            </SidebarFooter>
+          </Sidebar>
+        )}
         <div className="flex flex-1 flex-col">
           {!suppressChrome && (
             <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 px-3 pb-2 pt-[max(0.75rem,calc(env(safe-area-inset-top)+0.75rem))] shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur sm:px-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <SidebarTrigger className="h-9 w-9" />
+                  {showSidebar && <SidebarTrigger className="h-9 w-9" />}
                   <HeaderStatus className="text-xs text-muted-foreground" />
                 </div>
                 <div className="flex items-center gap-1.5">
