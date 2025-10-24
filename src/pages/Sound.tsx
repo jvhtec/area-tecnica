@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { Calculator, PieChart, FileText, Zap, FileStack, Tent, AlertTriangle, Plus, Database } from 'lucide-react';
+import { Calculator, PieChart, FileText, Zap, FileStack, Tent, AlertTriangle, Plus, Database, Lock } from 'lucide-react';
 import type { JobType } from "@/types/job";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
 import { IncidentReport } from "@/components/sound/tools/IncidentReport";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { SoundVisionAccessRequestDialog } from "@/components/soundvision/SoundVisionAccessRequestDialog";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -38,6 +39,7 @@ const Sound = () => {
   const [showAmplifierTool, setShowAmplifierTool] = useState(false);
   const [showMemoriaTecnica, setShowMemoriaTecnica] = useState(false);
   const [showIncidentReport, setShowIncidentReport] = useState(false);
+  const [showAccessRequestDialog, setShowAccessRequestDialog] = useState(false);
   // SoundVision now routes to a dedicated page
   const currentDepartment = "sound";
   
@@ -260,7 +262,7 @@ const Sound = () => {
               <span className="text-center leading-tight">Festivals</span>
             </Button>
 
-            {hasSoundVisionAccess && (
+            {hasSoundVisionAccess ? (
               <Button
                 variant="outline"
                 size="lg"
@@ -269,6 +271,16 @@ const Sound = () => {
               >
                 <Database className="h-4 w-4 sm:h-6 sm:w-6" />
                 <span className="text-center leading-tight">Archivos SoundVision</span>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+                onClick={() => setShowAccessRequestDialog(true)}
+              >
+                <Lock className="h-4 w-4 sm:h-6 sm:w-6" />
+                <span className="text-center leading-tight">Request SoundVision Access</span>
               </Button>
             )}
            </div>
@@ -340,6 +352,12 @@ const Sound = () => {
             <IncidentReport />
           </DialogContent>
         </Dialog>
+
+        {/* SoundVision Access Request Dialog */}
+        <SoundVisionAccessRequestDialog
+          open={showAccessRequestDialog}
+          onOpenChange={setShowAccessRequestDialog}
+        />
 
         {/* SoundVision dialog removed in favor of dedicated route */}
       </div>
