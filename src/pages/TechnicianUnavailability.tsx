@@ -79,10 +79,17 @@ export default function TechnicianUnavailability() {
   });
 
   return (
-    <div className="p-4 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">Mis bloqueos de disponibilidad</h1>
-        <Button onClick={() => setOpen(true)}>Añadir bloqueo</Button>
+    <div className="relative mx-auto max-w-3xl p-4 pb-24 md:pb-6">
+      <div className="mb-6 flex flex-col gap-y-2 md:mb-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold">Mis bloqueos de disponibilidad</h1>
+          <p className="text-sm text-muted-foreground">
+            Gestiona y revisa los días en los que no estarás disponible para asignaciones.
+          </p>
+        </div>
+        <Button className="hidden md:inline-flex" onClick={() => setOpen(true)}>
+          Añadir bloqueo
+        </Button>
       </div>
 
       {isLoading ? (
@@ -103,6 +110,14 @@ export default function TechnicianUnavailability() {
           ))}
         </div>
       )}
+
+      <div className="md:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-20 bg-background/95 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <Button className="w-full" onClick={() => setOpen(true)}>
+            Añadir bloqueo
+          </Button>
+        </div>
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
