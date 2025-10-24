@@ -90,12 +90,52 @@ export const useSoundVisionUpload = () => {
         queryClient.invalidateQueries({ queryKey: ['soundvision-file-reviews', fileRecord.id] });
       }
 
+      // Invoke push notification for file upload
+      let notificationResult: { success: boolean; error?: string } = { success: true };
+      try {
+        const { error: pushError } = await supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'soundvision.file.uploaded',
+            file_id: fileRecord.id,
+            venue_id: venueId,
+            venue_name: venueData.name,
+            url: '/soundvision-files',
+          },
+        });
+
+        if (pushError) {
+          console.error('Push notification error:', pushError);
+          notificationResult = { 
+            success: false, 
+            error: pushError.message || 'Error al enviar notificación' 
+          };
+        }
+      } catch (pushErr) {
+        console.error('Failed to send push notification:', pushErr);
+        notificationResult = { 
+          success: false, 
+          error: pushErr instanceof Error ? pushErr.message : 'Error desconocido al notificar'
+        };
+      }
+
       setProgress(100);
+
+      return { fileRecord, notificationResult };
     },
-    onSuccess: () => {
+    onSuccess: ({ notificationResult }) => {
       queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
       queryClient.invalidateQueries({ queryKey: ['venues'] });
-      toast.success('Archivo subido correctamente');
+      
+      if (notificationResult.success) {
+        toast.success('Archivo subido correctamente');
+      } else {
+        toast.success('Archivo subido correctamente', {
+          description: 'Sin embargo, no se pudo notificar a todos los usuarios.',
+        });
+        console.warn('Notification issue:', notificationResult.error);
+      }
+      
       setProgress(0);
     },
     onError: (error) => {
