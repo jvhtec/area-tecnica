@@ -277,7 +277,9 @@ export default function TechnicianUnavailability() {
       )}
 
       <div className="md:hidden">
-        <div className="fixed inset-x-0 bottom-0 z-50 bg-background/95 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div
+          className="fixed inset-x-0 bottom-20 z-40 bg-background/95 px-4 pb-4 pt-4 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/60 supports-[bottom:env(safe-area-inset-bottom)]:bottom-[calc(env(safe-area-inset-bottom)+5rem)]"
+        >
           <Button className="w-full" onClick={() => setOpen(true)}>
             Añadir bloqueo
           </Button>
