@@ -603,7 +603,7 @@ export const PrintOptionsDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[100vw] sm:max-w-2xl max-h-[100vh] sm:max-h-[90vh] h-full sm:h-auto w-full sm:w-auto overflow-y-auto p-4 sm:p-6">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] sm:max-h-[90vh] w-[95vw] sm:w-auto overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-base sm:text-lg">Select Documents to Print</DialogTitle>
         </DialogHeader>

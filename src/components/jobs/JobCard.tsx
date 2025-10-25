@@ -53,14 +53,14 @@ export const JobCard = ({
       onClick={() => onJobClick(job.id)}
     >
       <CardHeader className="relative">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">
-            {job.title}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-2">
+          <CardTitle className="text-base md:text-lg font-semibold flex items-center gap-2">
+            <span className="break-words">{job.title}</span>
             {job.job_type === 'festival' && (
-              <Music className="inline-block ml-2 h-4 w-4 text-primary" />
+              <Music className="inline-block h-4 w-4 text-primary flex-shrink-0" />
             )}
           </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
             {canEditJobs && (
               <Button 
                 variant="outline" 
@@ -69,37 +69,44 @@ export const JobCard = ({
                   e.stopPropagation(); 
                   setShowExtrasDialog(true);
                 }}
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 h-8 md:h-9"
               >
                 <DollarSign className="h-3 w-3" />
-                Extras
+                <span className="hidden sm:inline">Extras</span>
               </Button>
             )}
             {job.job_type === 'festival' && canManageFestival && (
               <Button 
-                variant="outline" 
+                variant="outline"
+                size="sm"
                 onClick={handleFestivalManage}
+                className="h-8 md:h-9 text-xs md:text-sm"
               >
-                {userRole === 'technician' ? 'View Festival' : 'Manage Festival'}
+                <span className="hidden sm:inline">{userRole === 'technician' ? 'View Festival' : 'Manage Festival'}</span>
+                <span className="sm:hidden">{userRole === 'technician' ? 'View' : 'Manage'}</span>
               </Button>
             )}
             {canEditJobs && !hideFestivalControls && (
               <>
                 <Button 
-                  variant="outline" 
+                  variant="outline"
+                  size="sm"
                   onClick={(e) => { 
                     e.stopPropagation(); 
                     onEditClick(job); 
                   }}
+                  className="h-8 md:h-9"
                 >
                   Edit
                 </Button>
                 <Button 
-                  variant="destructive" 
+                  variant="destructive"
+                  size="sm"
                   onClick={(e) => { 
                     e.stopPropagation(); 
                     onDeleteClick(job.id); 
                   }}
+                  className="h-8 md:h-9"
                 >
                   Delete
                 </Button>
@@ -108,9 +115,9 @@ export const JobCard = ({
           </div>
         </div>
       </CardHeader>
-      <div className="p-4">
+      <div className="p-3 md:p-4">
         {festivalLogo && (
-          <div className="mb-4 h-32 flex justify-center items-center">
+          <div className="mb-4 h-24 md:h-32 flex justify-center items-center">
             <img 
               src={festivalLogo} 
               alt={`${job.title} logo`} 
@@ -118,12 +125,12 @@ export const JobCard = ({
             />
           </div>
         )}
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs md:text-sm text-muted-foreground line-clamp-3 md:line-clamp-none break-words">
           {job.description}
         </p>
-        <div className="mt-2 flex items-center">
-          <CalendarDays className="h-4 w-4 text-muted-foreground" />
-          <span className="ml-2 text-sm text-muted-foreground">
+        <div className="mt-2 flex items-start md:items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5 md:mt-0" />
+          <span className="text-xs md:text-sm text-muted-foreground break-words">
             {new Date(job.start_time).toLocaleDateString()} - {new Date(job.end_time).toLocaleDateString()}
           </span>
         </div>
