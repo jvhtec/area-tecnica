@@ -35,6 +35,69 @@ For cases where Flex access must be proxied differently, `createTourRootFoldersM
 ### Tour-Date Jobs via UI Hook
 When a user opts to generate folders for individual tour dates from the management dialog, the `useTourDateFlexFolders` hook described above executes the job helper for each date, ensuring tour-level jobs gain the same folder structure as stand-alone jobs.【F:src/hooks/useTourDateFlexFolders.ts†L13-L158】
 
+## Flex Element Selector Integration
+
+### Overview
+The Flex Element Selector provides an interactive dialog for selecting which Flex folder to open when clicking "Open Flex" on job cards in the project management context.
+
+### Components
+
+#### FlexElementSelectorDialog (`src/components/flex/FlexElementSelectorDialog.tsx`)
+A modal dialog that:
+* Fetches available Flex folders (main event, department folders) for a given job
+* Presents a dropdown selector with all available folders
+* Defaults to the user's department folder when applicable
+* Opens the selected Flex element in a new browser tab
+* Provides error feedback when folders cannot be loaded
+
+#### Helper Functions (`src/utils/flexMainFolderId.ts`)
+Two utility functions for resolving the main Flex element ID:
+
+* **`getMainFlexElementIdSync`**: Synchronously extracts the main element ID from `job.flex_folders` array
+  - Prefers `folder_type === 'main_event'`
+  - Falls back to `folder_type === 'main'` for legacy data
+  - Returns `{ elementId, department }` or `null`
+
+* **`resolveMainFlexElementId`**: Async version that queries Supabase when job data lacks flex_folders
+  - First checks job's in-memory flex_folders array
+  - Falls back to Supabase query for `main_event` or `main` folder types
+  - Handles errors gracefully with console logging
+
+### Integration in JobCardActions
+
+The "Open Flex" button behavior varies by context:
+
+**Project Management Page (with main element)**:
+* Computes the main Flex element ID using `getMainFlexElementIdSync`
+* Opens the FlexElementSelectorDialog when clicked
+* User selects from available department folders
+* Selected folder opens in new tab
+
+**Other Contexts (or no main element)**:
+* Retains legacy behavior using `useFlexUuid` hook
+* Directly navigates to the job's primary Flex folder
+* Shows appropriate error/info toasts when folders unavailable
+
+### Loading States
+The button remains disabled while:
+* Folder state is loading (`folderStateLoading`)
+* Folders are being created (`isCreatingFolders`)
+* Flex UUID is being resolved (`isFlexLoading`)
+
+Toast feedback is shown for:
+* Main folder resolution failures
+* Selector loading errors
+* Missing folder availability
+
+### Testing
+Unit tests in `src/utils/flexMainFolderId.test.ts` cover:
+* Synchronous extraction from job.flex_folders
+* Preference for main_event over main folder type
+* Fallback to Supabase queries
+* Error handling for missing/invalid data
+* Graceful handling of exceptions
+
 ## Observations
 * All job-facing entry points now share the API-driven `createAllFoldersForJob` helper, ensuring consistent Flex element creation and Supabase persistence across cards, dialogs, and hooks.【F:src/components/dashboard/JobCardNew.tsx†L512-L587】【F:src/pages/FestivalManagement.tsx†L498-L600】【F:src/hooks/useJobActions.ts†L1-L122】
 * Each workflow writes to the `flex_folders` table to mirror remote structure, so any schema changes should remain backward compatible with these inserts (job, dryhire, tourdate, and tour department folder types).【F:src/utils/flex-folders/folders.ts†L232-L239】【F:supabase/functions/create-flex-folders/index.ts†L292-L301】
+* The Flex Element Selector enhances user experience by allowing department-specific navigation while maintaining backward compatibility with direct Flex UUID navigation for non-project-management contexts.
