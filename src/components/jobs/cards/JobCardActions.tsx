@@ -13,6 +13,8 @@ import { supabase } from "@/lib/supabase";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
+import { getMainFlexElementIdSync } from "@/utils/flexMainFolderId";
 
 interface JobCardActionsProps {
   job: any;
@@ -95,6 +97,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   const [waAlmacenOpen, setWaAlmacenOpen] = React.useState(false);
   const [waMessage, setWaMessage] = React.useState<string>("");
   const [isSendingWa, setIsSendingWa] = React.useState(false);
+  const [flexSelectorOpen, setFlexSelectorOpen] = React.useState(false);
 
   const handleTimesheetClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -157,6 +160,11 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     return foldersAreCreated ? "Folders already exist" : "Create Flex folders";
   };
 
+  // Compute the main Flex element ID from the job's flex_folders
+  const mainFlexInfo = React.useMemo(() => {
+    return getMainFlexElementIdSync(job);
+  }, [job]);
+
   // When folders exist, enable "Open in Flex" behavior by resolving UUID
   const { flexUuid, isLoading: isFlexLoading, error: flexError } = useFlexUuid(foldersAreCreated ? job.id : "");
 
@@ -171,6 +179,14 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       });
       return;
     }
+
+    // If on project management page and main element exists, open selector dialog
+    if (isProjectManagementPage && mainFlexInfo?.elementId) {
+      setFlexSelectorOpen(true);
+      return;
+    }
+
+    // Otherwise, retain existing direct flexUuid navigation
     if (flexUuid) {
       const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
       window.open(flexUrl, '_blank', 'noopener');
@@ -507,6 +523,17 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Flex Element Selector Dialog */}
+      {mainFlexInfo?.elementId && (
+        <FlexElementSelectorDialog
+          open={flexSelectorOpen}
+          onOpenChange={setFlexSelectorOpen}
+          mainElementId={mainFlexInfo.elementId}
+          defaultDepartment={department}
+          jobId={job.id}
+        />
       )}
     </div>
   );
