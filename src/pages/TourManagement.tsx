@@ -339,10 +339,10 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
 
   if (isTechnicianView) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0">
+      <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row items-start gap-4">
+            <div className="flex-shrink-0 mx-auto md:mx-0">
               {tourLogoUrl ? (
                 <img
                   src={tourLogoUrl}
@@ -360,26 +360,26 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
               )}
             </div>
 
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="flex-1 text-center md:text-left">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
                 <Button variant="ghost" onClick={handleBackToTechnicianDashboard} className="p-0 h-auto">
                   <ArrowLeft className="h-4 w-4 mr-1" />
                   Back to Dashboard
                 </Button>
-                <Badge variant="outline" className="ml-2">
+                <Badge variant="outline">
                   <Eye className="h-3 w-3 mr-1" />
                   Technician View
                 </Badge>
               </div>
-              <h1 className="text-3xl font-bold">{tour.name}</h1>
+              <h1 className="text-2xl md:text-3xl font-bold">{tour.name}</h1>
               {tour.description && (
-                <p className="text-muted-foreground mt-1">{tour.description}</p>
+                <p className="text-muted-foreground mt-1 text-sm md:text-base">{tour.description}</p>
               )}
-              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-2 text-sm text-muted-foreground">
                 {tour.start_date && tour.end_date && (
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
-                    <span>
+                    <span className="text-xs md:text-sm">
                       {format(new Date(tour.start_date), 'MMM d')} - {format(new Date(tour.end_date), 'MMM d, yyyy')}
                     </span>
                   </div>
@@ -391,12 +391,12 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setIsAssignmentsOpen(true)}>
+          <div className="flex flex-col sm:flex-row gap-2 w-full">
+            <Button variant="outline" onClick={() => setIsAssignmentsOpen(true)} className="w-full sm:w-auto">
               <Users className="h-4 w-4 mr-2" />
               View Assignments
             </Button>
-            <Button onClick={() => setIsDocumentsOpen(true)}>
+            <Button onClick={() => setIsDocumentsOpen(true)} className="w-full sm:w-auto">
               <FileText className="h-4 w-4 mr-2" />
               Open Documents
             </Button>
@@ -405,12 +405,12 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl">Scheduled Tour Dates</CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <CardTitle className="text-lg md:text-xl">Scheduled Tour Dates</CardTitle>
+            <p className="text-xs md:text-sm text-muted-foreground">
               Review confirmed dates and locations for this tour.
             </p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 md:px-6">
             {sortedTourDates.length > 0 ? (
               <div className="space-y-3">
                 {sortedTourDates.map((date: any) => {
@@ -419,17 +419,17 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                   return (
                     <div
                       key={date.id}
-                      className="p-4 border rounded-lg flex flex-col gap-2 bg-muted/30"
+                      className="p-3 md:p-4 border rounded-lg flex flex-col gap-2 bg-muted/30"
                     >
                       {eventDate ? (
-                        <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">
+                            <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <span className="font-medium text-sm md:text-base">
                               {format(eventDate, 'EEEE, MMMM d, yyyy')}
                             </span>
                           </div>
-                          <Badge variant="outline">
+                          <Badge variant="outline" className="self-start sm:self-auto">
                             {format(eventDate, 'HH:mm')}
                           </Badge>
                         </div>
@@ -440,13 +440,13 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                         </div>
                       )}
                       {date.location?.name && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4" />
-                          <span>{date.location.name}</span>
+                        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                          <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                          <span className="break-words">{date.location.name}</span>
                         </div>
                       )}
                       {date.notes && (
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        <p className="text-xs md:text-sm text-muted-foreground whitespace-pre-wrap break-words">
                           {date.notes}
                         </p>
                       )}
@@ -455,7 +455,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                 })}
               </div>
             ) : (
-              <div className="text-center py-10 text-muted-foreground">
+              <div className="text-center py-10 text-muted-foreground text-sm">
                 No scheduled dates available for this tour yet.
               </div>
             )}
@@ -488,13 +488,13 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header Section */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex items-start gap-4">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row items-start gap-4">
           {/* Tour Logo */}
           {tourLogoUrl && (
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 mx-auto md:mx-0">
               <img 
                 src={tourLogoUrl} 
                 alt={`${tour.name} logo`}
@@ -507,26 +507,26 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
             </div>
           )}
           
-          <div className="flex-1">
+          <div className="flex-1 text-center md:text-left">
             {isTechnicianView && (
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
                 <Button variant="ghost" onClick={handleBackToTechnicianDashboard} className="p-0 h-auto">
                   <ArrowLeft className="h-4 w-4 mr-1" />
                   Back to Dashboard
                 </Button>
-                <Badge variant="outline" className="ml-2">
+                <Badge variant="outline">
                   <Eye className="h-3 w-3 mr-1" />
                   Technician View
                 </Badge>
               </div>
             )}
-            <h1 className="text-3xl font-bold">{tour.name}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold">{tour.name}</h1>
             {tour.description && (
-              <p className="text-muted-foreground mt-1">{tour.description}</p>
+              <p className="text-muted-foreground mt-1 text-sm md:text-base">{tour.description}</p>
             )}
-            <div className="flex items-center gap-4 mt-2">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 md:gap-4 mt-2">
               {tour.start_date && tour.end_date && (
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2 text-xs md:text-sm">
                   <Calendar className="h-4 w-4" />
                   <span>
                     {format(new Date(tour.start_date), 'MMM d')} - {format(new Date(tour.end_date), 'MMM d, yyyy')}
@@ -546,11 +546,12 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         </div>
         
         {!isTechnicianView && (
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
             <Button 
               onClick={handlePrintSchedule}
               variant="outline"
               disabled={isPrintingSchedule}
+              className="w-full sm:w-auto"
             >
               <Printer className="h-4 w-4 mr-2" />
               {isPrintingSchedule ? 'Printing...' : 'Print Schedule'}
@@ -560,7 +561,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
               <Button
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 w-full sm:w-auto"
                 onClick={handleFlexClick}
                 disabled={!flexUuid || isFlexLoading}
               >
@@ -573,12 +574,12 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
               </Button>
             )}
             {(userRole === 'management' || userRole === 'admin') && (
-              <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={openWaDialog}>
+              <Button variant="outline" size="sm" className="flex items-center gap-2 w-full sm:w-auto" onClick={openWaDialog}>
                 <MessageCircle className="h-4 w-4" />
                 WhatsApp Group
               </Button>
             )}
-            <Button onClick={() => setIsSettingsOpen(true)}>
+            <Button onClick={() => setIsSettingsOpen(true)} className="w-full sm:w-auto">
               <Settings className="h-4 w-4 mr-2" />
               Tour Settings
             </Button>
@@ -588,53 +589,53 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
 
       {/* Auto-sync info for management users */}
       {!isTechnicianView && (
-        <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className="bg-blue-50 dark:bg-blue-950 p-3 md:p-4 rounded-lg border border-blue-200 dark:border-blue-800">
           <div className="flex items-start gap-2">
-            <Info className="h-4 w-4 text-blue-600 mt-0.5" />
-            <div className="text-sm text-blue-800 dark:text-blue-200">
+            <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-xs md:text-sm text-blue-800 dark:text-blue-200">
               <p className="font-medium mb-1">Automatic Job Synchronization</p>
-              <p>Tour assignments are automatically applied to all jobs in this tour. Team members assigned to the tour will instantly appear on all individual job assignments, and removing them from the tour removes them from all jobs.</p>
+              <p className="text-xs md:text-sm">Tour assignments are automatically applied to all jobs in this tour. Team members assigned to the tour will instantly appear on all individual job assignments, and removing them from the tour removes them from all jobs.</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Dates</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6 pt-3 md:pt-6">
+            <CardTitle className="text-xs md:text-sm font-medium">Total Dates</CardTitle>
+            <Calendar className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalDates}</div>
+          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+            <div className="text-xl md:text-2xl font-bold">{totalDates}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6 pt-3 md:pt-6">
+            <CardTitle className="text-xs md:text-sm font-medium">Completed</CardTitle>
+            <BarChart3 className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{completedDates}</div>
+          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+            <div className="text-xl md:text-2xl font-bold">{completedDates}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6 pt-3 md:pt-6">
+            <CardTitle className="text-xs md:text-sm font-medium">Upcoming</CardTitle>
+            <Clock className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalDates - completedDates}</div>
+          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+            <div className="text-xl md:text-2xl font-bold">{totalDates - completedDates}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Assigned Crew</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6 pt-3 md:pt-6">
+            <CardTitle className="text-xs md:text-sm font-medium">Assigned Crew</CardTitle>
+            <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalAssignments}</div>
+          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+            <div className="text-xl md:text-2xl font-bold">{totalAssignments}</div>
             <p className="text-xs text-muted-foreground">
               {assignedDepartments} departments
             </p>
@@ -644,31 +645,34 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
 
       {/* Quick Actions Grid */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">
+        <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 px-1">
           {isTechnicianView ? 'Tour Information' : 'Management Areas'}
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {quickActions.map((action, index) => (
             <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer" onClick={action.onClick}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <action.icon className="h-6 w-6" style={{ color: tour.color }} />
-                    {action.hasAutoSync && !isTechnicianView && (
-                      <Badge variant="outline" className="text-xs border-blue-300 text-blue-700">
-                        Auto-sync
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={action.badge === "Coming Soon" ? "secondary" : tourRatesApproved && action.title === 'Rates & Extras Manager' ? 'default' : 'outline'}>
+              <CardHeader className="pb-3 px-3 md:px-6 pt-3 md:pt-6">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <action.icon className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" style={{ color: tour.color }} />
+                      {action.hasAutoSync && !isTechnicianView && (
+                        <Badge variant="outline" className="text-xs border-blue-300 text-blue-700 hidden sm:inline-flex">
+                          Auto-sync
+                        </Badge>
+                      )}
+                    </div>
+                    <Badge variant={action.badge === "Coming Soon" ? "secondary" : tourRatesApproved && action.title === 'Rates & Extras Manager' ? 'default' : 'outline'} className="text-xs">
                       {action.badge}
                     </Badge>
-                    {!isTechnicianView && action.title === 'Rates & Extras Manager' && (
-                      tourRatesApproved ? (
+                  </div>
+                  {!isTechnicianView && action.title === 'Rates & Extras Manager' && (
+                    <div className="flex gap-2">
+                      {tourRatesApproved ? (
                         <Button
                           variant="outline"
                           size="sm"
+                          className="w-full text-xs"
                           onClick={async (e) => {
                             e.stopPropagation();
                             await supabase
@@ -684,6 +688,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                         <Button
                           variant="default"
                           size="sm"
+                          className="w-full text-xs"
                           onClick={async (e) => {
                             e.stopPropagation();
                             const { data: u } = await supabase.auth.getUser();
@@ -696,14 +701,14 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                         >
                           Approve
                         </Button>
-                      )
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <CardTitle className="text-sm">{action.title}</CardTitle>
+                <CardTitle className="text-sm md:text-base mt-2">{action.title}</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">{action.description}</p>
+              <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+                <p className="text-xs text-muted-foreground line-clamp-2">{action.description}</p>
                 {action.viewOnly && isTechnicianView && (
                   <Badge variant="secondary" className="mt-2 text-xs">
                     View Only
@@ -718,26 +723,26 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       {/* Upcoming Dates Section */}
       {upcomingDates.length > 0 && (
         <div>
-          <h2 className="text-xl font-semibold mb-4">Upcoming Tour Dates</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 px-1">Upcoming Tour Dates</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {upcomingDates.map((date: any) => (
               <Card key={date.id}>
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-3 px-3 md:px-6 pt-3 md:pt-6">
                   <div className="flex items-center justify-between">
-                    <Calendar className="h-5 w-5 text-muted-foreground" />
-                    <Badge variant="outline">
+                    <Calendar className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground flex-shrink-0" />
+                    <Badge variant="outline" className="text-xs">
                       {format(new Date(date.date), 'MMM d')}
                     </Badge>
                   </div>
-                  <CardTitle className="text-base">
+                  <CardTitle className="text-sm md:text-base mt-2">
                     {format(new Date(date.date), 'EEEE, MMMM d, yyyy')}
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
                   {date.location?.name && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      <span>{date.location.name}</span>
+                    <div className="flex items-start gap-2 text-xs md:text-sm text-muted-foreground mb-2">
+                      <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                      <span className="break-words">{date.location.name}</span>
                     </div>
                   )}
                   {!isTechnicianView && <TourDateFlexButton tourDateId={date.id} />}
@@ -816,18 +821,18 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
 
       {/* Create WhatsApp Group Dialog */}
       <Dialog open={isWaDialogOpen} onOpenChange={setIsWaDialogOpen}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] md:w-full max-w-md">
           <DialogHeader>
-            <DialogTitle>Create WhatsApp Group</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base md:text-lg">Create WhatsApp Group</DialogTitle>
+            <DialogDescription className="text-xs md:text-sm">
               Choose a tour date and department. The group will include the assigned crew for that date.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <label className="block text-sm font-medium mb-1">Tour Date</label>
+              <label className="block text-xs md:text-sm font-medium mb-1">Tour Date</label>
               <select
-                className="w-full border rounded px-2 py-1"
+                className="w-full border rounded px-2 py-1 text-sm"
                 value={waSelectedDateId || ''}
                 onChange={(e) => setWaSelectedDateId(e.target.value || null)}
               >
@@ -839,26 +844,26 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Department</label>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer text-sm">
+              <label className="block text-xs md:text-sm font-medium mb-1">Department</label>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                <label className="flex items-center gap-2 cursor-pointer text-xs md:text-sm">
                   <input type="radio" name="wa-dept" checked={waDepartment==='sound'} onChange={() => setWaDepartment('sound')} />
                   <span>Sound</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <label className="flex items-center gap-2 cursor-pointer text-xs md:text-sm">
                   <input type="radio" name="wa-dept" checked={waDepartment==='lights'} onChange={() => setWaDepartment('lights')} />
                   <span>Lights</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <label className="flex items-center gap-2 cursor-pointer text-xs md:text-sm">
                   <input type="radio" name="wa-dept" checked={waDepartment==='video'} onChange={() => setWaDepartment('video')} />
                   <span>Video</span>
                 </label>
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsWaDialogOpen(false)} disabled={isCreatingWaGroup}>Cancel</Button>
-            <Button onClick={handleCreateWaGroup} disabled={isCreatingWaGroup}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setIsWaDialogOpen(false)} disabled={isCreatingWaGroup} className="w-full sm:w-auto">Cancel</Button>
+            <Button onClick={handleCreateWaGroup} disabled={isCreatingWaGroup} className="w-full sm:w-auto">
               {isCreatingWaGroup ? 'Creating…' : 'Create Group'}
             </Button>
           </DialogFooter>

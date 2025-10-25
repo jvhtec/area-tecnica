@@ -167,9 +167,9 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Tour Logistics – Transport</DialogTitle>
+          <DialogTitle className="text-base md:text-lg">Tour Logistics – Transport</DialogTitle>
         </DialogHeader>
 
         {/* Department + Note */}

@@ -832,9 +832,9 @@ export const TourDefaultsManager = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Tour Defaults: {tour?.name}</DialogTitle>
+          <DialogTitle className="text-base md:text-lg truncate">Tour Defaults: {tour?.name}</DialogTitle>
         </DialogHeader>
         
         <Tabs value={activeTab} onValueChange={setActiveTab}>

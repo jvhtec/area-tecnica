@@ -173,9 +173,9 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Tour Presets</DialogTitle>
+          <DialogTitle className="text-base md:text-lg">Tour Presets</DialogTitle>
         </DialogHeader>
 
         {isCreating || editingPreset || copyingPreset ? (

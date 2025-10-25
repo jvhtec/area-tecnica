@@ -151,15 +151,15 @@ export const TourManagementDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-base md:text-lg">
               Manage Tour: {tour.name}
               {tourDateId && <span className="text-sm text-muted-foreground ml-2">(Override Mode)</span>}
             </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             <div className="border-b pb-4">
               <h3 className="text-sm font-medium mb-3">Tour Logo</h3>
               <TourLogoManager tourId={tour.id} />

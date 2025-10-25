@@ -197,11 +197,11 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
         <DialogHeader>
-          <div className="flex items-center justify-between gap-2">
-            <DialogTitle className="flex items-center gap-2">
-              <Euro className="h-5 w-5" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
+              <Euro className="h-4 w-4 md:h-5 md:w-5" />
               Gestor de Tarifas y Extras
             </DialogTitle>
             <div className="flex items-center gap-2">

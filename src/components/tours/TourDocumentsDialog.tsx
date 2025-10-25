@@ -25,11 +25,11 @@ export const TourDocumentsDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Tour Documents - {tourName}
+          <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
+            <FileText className="h-4 w-4 md:h-5 md:w-5" />
+            <span className="truncate">Tour Documents - {tourName}</span>
           </DialogTitle>
         </DialogHeader>
 
