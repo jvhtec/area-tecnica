@@ -253,3 +253,39 @@ export const updateLineItemDates = async (
 
   return { success: true };
 };
+
+export interface ElementTreeNode {
+  nodeId: string;
+  name: string;
+  documentNumber?: string;
+  parentId?: string | null;
+  iconUrl?: string;
+  leaf: boolean;
+  children?: ElementTreeNode[];
+  displayName: string;
+}
+
+export const getElementTree = async (elementId: string): Promise<ElementTreeNode[]> => {
+  const token = await getAuthToken();
+  const url = `https://sectorpro.flexrentalsolutions.com/f5/api/element/${elementId}/tree`;
+
+  console.log(`Fetching element tree for element ID: ${elementId}`);
+
+  const response = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Auth-Token': token,
+    },
+  });
+
+  if (!response.ok) {
+    const errorMessage = `Failed to fetch element tree for element ID ${elementId}: ${response.statusText} (${response.status})`;
+    console.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  console.log(`Successfully fetched element tree for element ID: ${elementId}`, data);
+
+  return Array.isArray(data) ? data : [];
+};
