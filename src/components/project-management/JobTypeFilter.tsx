@@ -9,6 +9,8 @@ import {
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Filter } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface JobTypeFilterProps {
   allJobTypes: string[];
@@ -31,21 +33,25 @@ export const JobTypeFilter = ({
   selectedJobTypes,
   onTypeToggle,
 }: JobTypeFilterProps) => {
+  const isMobile = useIsMobile();
+  
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Filter className="h-4 w-4" />
-          Types
-          {selectedJobTypes.length > 0 && (
-            <span className="ml-1 rounded-full bg-primary text-primary-foreground text-xs px-2 py-0.5">
-              {selectedJobTypes.length}
-            </span>
-          )}
+        <Button variant="outline" size="sm" className={cn("gap-2", isMobile && "w-full justify-between")}>
+          <span className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            Types
+            {selectedJobTypes.length > 0 && (
+              <span className="ml-1 rounded-full bg-primary text-primary-foreground text-xs px-2 py-0.5">
+                {selectedJobTypes.length}
+              </span>
+            )}
+          </span>
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align={isMobile ? "center" : "end"} className={cn("w-56", isMobile && "w-[calc(100vw-2rem)]")}>
         {/* Select All / Clear All */}
         <DropdownMenuItem
           onClick={() => {

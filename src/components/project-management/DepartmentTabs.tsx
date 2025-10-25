@@ -4,6 +4,8 @@ import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
 import { Department } from "@/types/department";
 import { Loader2 } from "lucide-react";
 import { isToday, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface DepartmentTabsProps {
   selectedDepartment: Department;
@@ -24,6 +26,7 @@ export const DepartmentTabs = ({
   userRole,
   highlightToday = false
 }: DepartmentTabsProps) => {
+  const isMobile = useIsMobile();
   
   // Check if a job is happening today
   const isJobToday = (job: any) => {
@@ -38,23 +41,27 @@ export const DepartmentTabs = ({
   };
 
   return (
-    <Tabs value={selectedDepartment} onValueChange={onDepartmentChange} className="mt-4">
-      <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-        <TabsTrigger value="sound">Sound</TabsTrigger>
-        <TabsTrigger value="lights">Lights</TabsTrigger>
-        <TabsTrigger value="video">Video</TabsTrigger>
+    <Tabs value={selectedDepartment} onValueChange={onDepartmentChange} className={cn(isMobile ? "mt-3" : "mt-4")}>
+      <TabsList className={cn(
+        isMobile 
+          ? "w-full grid grid-cols-3" 
+          : "grid w-full grid-cols-3 lg:w-[400px]"
+      )}>
+        <TabsTrigger value="sound" className={cn(isMobile && "text-xs sm:text-sm")}>Sound</TabsTrigger>
+        <TabsTrigger value="lights" className={cn(isMobile && "text-xs sm:text-sm")}>Lights</TabsTrigger>
+        <TabsTrigger value="video" className={cn(isMobile && "text-xs sm:text-sm")}>Video</TabsTrigger>
       </TabsList>
 
       {["sound", "lights", "video"].map((dept) => (
-        <TabsContent key={dept} value={dept}>
+        <TabsContent key={dept} value={dept} className={cn(isMobile && "mt-3")}>
           {jobsLoading ? (
-            <div className="flex justify-center">
+            <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin" />
             </div>
           ) : jobs.length === 0 ? (
-            <p className="text-center text-muted-foreground">No jobs found</p>
+            <p className="text-center text-muted-foreground py-8">No jobs found</p>
           ) : (
-            <div className="space-y-4">
+            <div className={cn("space-y-4", isMobile && "space-y-3")}>
               {jobs.map((job) => {
                 const shouldHighlight = highlightToday && isJobToday(job);
                 return (

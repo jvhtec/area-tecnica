@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Filter } from "lucide-react";
 import { JobStatusBadge } from "@/components/jobs/JobStatusBadge";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 type JobStatus = "Tentativa" | "Confirmado" | "Completado" | "Cancelado";
 
@@ -31,6 +33,8 @@ export const StatusFilter = ({
   selectedJobStatuses,
   onStatusSelection
 }: StatusFilterProps) => {
+  const isMobile = useIsMobile();
+  
   const getStatusLabel = (status: string): string => {
     return STATUS_LABELS[status as JobStatus] || status;
   };
@@ -38,18 +42,20 @@ export const StatusFilter = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Filter className="h-4 w-4" />
-          Status
-          {selectedJobStatuses.length > 0 && (
-            <span className="ml-1 rounded-full bg-primary text-primary-foreground text-xs px-2 py-0.5">
-              {selectedJobStatuses.length}
-            </span>
-          )}
+        <Button variant="outline" size="sm" className={cn("gap-2", isMobile && "w-full justify-between")}>
+          <span className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            Status
+            {selectedJobStatuses.length > 0 && (
+              <span className="ml-1 rounded-full bg-primary text-primary-foreground text-xs px-2 py-0.5">
+                {selectedJobStatuses.length}
+              </span>
+            )}
+          </span>
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align={isMobile ? "center" : "end"} className={cn("w-56", isMobile && "w-[calc(100vw-2rem)]")}>
         {/* Select All / Clear All */}
         <DropdownMenuItem
           onClick={() => {

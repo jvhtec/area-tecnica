@@ -11,6 +11,8 @@ import { Department } from "@/types/department";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface JobCardActionsProps {
   job: any;
@@ -188,9 +190,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   };
 
   const showFlexButtons = false; // Temporarily hide Flex sync and logs buttons
+  const isMobile = useIsMobile();
 
   return (
-    <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
+    <div className={cn("flex flex-wrap", isMobile ? "gap-1" : "gap-1.5")} onClick={(e) => e.stopPropagation()}>
       {isProjectManagementPage && job.job_type !== 'dryhire' && onOpenTasks && (
         <Button
           variant="outline"
