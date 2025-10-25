@@ -17,6 +17,12 @@ const FINANCIAL_DOCUMENT_DEFINITION_IDS = [
   FLEX_FOLDER_IDS.pullSheet, // a220432c-af33-11df-b8d5-00e08175e43e
 ];
 
+// Known simple folder/subfolder definition IDs that should use simple-element URLs
+const SIMPLE_ELEMENT_DEFINITION_IDS = [
+  FLEX_FOLDER_IDS.mainFolder, // e281e71c-2c42-49cd-9834-0eb68135e9ac
+  FLEX_FOLDER_IDS.subFolder, // 358f312c-b051-11df-b8d5-00e08175e43e
+];
+
 export interface ElementDetails {
   elementId: string;
   definitionId?: string;
@@ -26,12 +32,17 @@ export interface ElementDetails {
 
 /**
  * Fetches element details from Flex API to get definitionId
+ * @param elementId - The element ID to fetch
+ * @param authToken - Flex API authentication token
+ * @returns Element details including definitionId
  */
 export async function getElementDetails(
   elementId: string,
   authToken: string
 ): Promise<ElementDetails> {
   try {
+    console.log(`[buildFlexUrl] Fetching element details for ${elementId}`);
+    
     const response = await fetch(
       `https://sectorpro.flexrentalsolutions.com/f5/api/element/${elementId}/key-info/`,
       {
@@ -44,7 +55,7 @@ export async function getElementDetails(
     );
 
     if (!response.ok) {
-      console.warn(`Failed to fetch element details for ${elementId}: ${response.statusText}`);
+      console.warn(`[buildFlexUrl] Failed to fetch element details for ${elementId}: ${response.statusText}`);
       return { elementId };
     }
 
@@ -56,6 +67,8 @@ export async function getElementDetails(
     const name = data?.name?.data || data?.documentName?.data;
     const documentNumber = data?.documentNumber?.data;
 
+    console.log(`[buildFlexUrl] Element details fetched:`, { elementId, definitionId, name, documentNumber });
+
     return {
       elementId,
       definitionId,
@@ -63,7 +76,7 @@ export async function getElementDetails(
       documentNumber,
     };
   } catch (error) {
-    console.error('Error fetching element details:', error);
+    console.error('[buildFlexUrl] Error fetching element details:', error);
     return { elementId };
   }
 }
@@ -78,20 +91,48 @@ export function isFinancialDocument(definitionId?: string): boolean {
 }
 
 /**
+ * Determines if an element is a simple folder/subfolder
+ * based on its definitionId
+ */
+export function isSimpleFolder(definitionId?: string): boolean {
+  if (!definitionId) return false;
+  return SIMPLE_ELEMENT_DEFINITION_IDS.includes(definitionId);
+}
+
+/**
  * Builds the appropriate Flex URL for an element based on its type
  * 
  * @param elementId - The element/document ID
  * @param definitionId - Optional definition ID to determine element type
  * @returns Formatted Flex URL
+ * 
+ * @remarks
+ * This function handles multiple element types:
+ * - Financial documents (presupuesto, orden, etc.) use #fin-doc URL format
+ * - Simple elements (folders, subfolders) use #element URL format
+ * - Dryhire jobs store the subfolder element_id (simple element)
+ * - Tourdate jobs store subfolder element_ids (simple elements)
+ * - Default fallback is simple element URL format
  */
 export function buildFlexUrl(elementId: string, definitionId?: string): string {
+  console.log(`[buildFlexUrl] Building URL for element ${elementId} with definitionId ${definitionId}`);
+  
   if (isFinancialDocument(definitionId)) {
-    // Financial document URL format
-    return `${FLEX_BASE_URL}#fin-doc/${elementId}/doc-view/${PRESUPUESTO_VIEW_ID}/header`;
+    // Financial document URL format (presupuesto, hojaGastos, ordenCompra, etc.)
+    const url = `${FLEX_BASE_URL}#fin-doc/${elementId}/doc-view/${PRESUPUESTO_VIEW_ID}/header`;
+    console.log(`[buildFlexUrl] Using financial document URL: ${url}`);
+    return url;
   }
   
   // Default simple element URL format
-  return `${FLEX_BASE_URL}#element/${elementId}/view/simple-element/header`;
+  // This handles:
+  // - Simple folders and subfolders (mainFolder, subFolder)
+  // - Dryhire subfolders (folder_type='dryhire' in database)
+  // - Tourdate subfolders (folder_type='tourdate' in database)
+  // - Any other element type not explicitly handled
+  const url = `${FLEX_BASE_URL}#element/${elementId}/view/simple-element/header`;
+  console.log(`[buildFlexUrl] Using simple element URL: ${url}`);
+  return url;
 }
 
 /**
@@ -101,11 +142,26 @@ export function buildFlexUrl(elementId: string, definitionId?: string): string {
  * @param elementId - The element ID to open
  * @param authToken - Flex API authentication token
  * @returns Promise with the formatted Flex URL
+ * 
+ * @remarks
+ * This function attempts to fetch element details from Flex API to determine
+ * the correct URL format. If the API call fails, it falls back to simple-element
+ * URL format which works for most element types including dryhire and tourdate subfolders.
  */
 export async function buildFlexUrlWithTypeDetection(
   elementId: string,
   authToken: string
 ): Promise<string> {
-  const details = await getElementDetails(elementId, authToken);
-  return buildFlexUrl(elementId, details.definitionId);
+  console.log(`[buildFlexUrl] Starting type detection for element ${elementId}`);
+  
+  try {
+    const details = await getElementDetails(elementId, authToken);
+    const url = buildFlexUrl(elementId, details.definitionId);
+    console.log(`[buildFlexUrl] Successfully built URL with type detection: ${url}`);
+    return url;
+  } catch (error) {
+    console.error(`[buildFlexUrl] Error in type detection, falling back to simple element URL:`, error);
+    // Fallback to simple element URL on any error
+    return buildFlexUrl(elementId);
+  }
 }

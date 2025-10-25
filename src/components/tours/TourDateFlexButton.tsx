@@ -29,6 +29,8 @@ export const TourDateFlexButton = ({ tourDateId, isCreatingFolders = false }: To
 
     if (flexUuid) {
       try {
+        console.log(`[TourDateFlexButton] Opening Flex for tour date ${tourDateId}, element: ${flexUuid}`);
+        
         // Get auth token from Supabase
         const { data: { X_AUTH_TOKEN }, error: authError } = await supabase
           .functions.invoke('get-secret', {
@@ -36,21 +38,29 @@ export const TourDateFlexButton = ({ tourDateId, isCreatingFolders = false }: To
           });
         
         if (authError || !X_AUTH_TOKEN) {
-          console.error('Failed to get auth token:', authError);
+          console.error('[TourDateFlexButton] Failed to get auth token:', authError);
           // Fallback to simple element URL if auth fails
+          // This is safe for tourdate elements which are subfolders
           const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+          console.log(`[TourDateFlexButton] Using fallback URL: ${flexUrl}`);
           window.open(flexUrl, '_blank', 'noopener');
           return;
         }
 
         // Build URL with element type detection
         const flexUrl = await buildFlexUrlWithTypeDetection(flexUuid, X_AUTH_TOKEN);
+        console.log(`[TourDateFlexButton] Opening Flex URL: ${flexUrl}`);
         window.open(flexUrl, '_blank', 'noopener');
       } catch (err) {
-        console.error('Error building Flex URL:', err);
+        console.error('[TourDateFlexButton] Error building Flex URL:', err);
         // Fallback to simple element URL if error occurs
         const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+        console.log(`[TourDateFlexButton] Using fallback URL after error: ${flexUrl}`);
         window.open(flexUrl, '_blank', 'noopener');
+        toast({ 
+          title: 'Warning', 
+          description: 'Opened with fallback URL format', 
+        });
       }
     } else if (error) {
       toast({
