@@ -215,7 +215,7 @@ export const CopyArtistsDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -228,7 +228,7 @@ export const CopyArtistsDialog = ({
           <div className="space-y-2">
             <Label>Select Source Festival</Label>
             <Select onValueChange={handleFestivalChange} disabled={isLoading}>
-              <SelectTrigger>
+              <SelectTrigger className="h-10">
                 <SelectValue placeholder="Choose a festival to copy from..." />
               </SelectTrigger>
               <SelectContent>
@@ -252,7 +252,7 @@ export const CopyArtistsDialog = ({
             <div className="space-y-2">
               <Label>Select Source Date</Label>
               <Select onValueChange={setSelectedSourceDate}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="Choose a date..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -270,46 +270,50 @@ export const CopyArtistsDialog = ({
           {artists.length > 0 && (
             <div className="space-y-4">
               <Label className="text-base font-medium">Copy Options</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center space-x-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex items-start space-x-2">
                   <Checkbox
                     id="resetTimes"
                     checked={copyOptions.resetTimes}
                     onCheckedChange={(checked) => 
                       setCopyOptions(prev => ({ ...prev, resetTimes: !!checked }))
                     }
+                    className="mt-1"
                   />
-                  <Label htmlFor="resetTimes" className="text-sm">Reset show times</Label>
+                  <Label htmlFor="resetTimes" className="text-sm leading-normal cursor-pointer">Reset show times</Label>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-start space-x-2">
                   <Checkbox
                     id="resetStages"
                     checked={copyOptions.resetStages}
                     onCheckedChange={(checked) => 
                       setCopyOptions(prev => ({ ...prev, resetStages: !!checked }))
                     }
+                    className="mt-1"
                   />
-                  <Label htmlFor="resetStages" className="text-sm">Reset to Stage 1</Label>
+                  <Label htmlFor="resetStages" className="text-sm leading-normal cursor-pointer">Reset to Stage 1</Label>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-start space-x-2">
                   <Checkbox
                     id="copyNotes"
                     checked={copyOptions.copyNotes}
                     onCheckedChange={(checked) => 
                       setCopyOptions(prev => ({ ...prev, copyNotes: !!checked }))
                     }
+                    className="mt-1"
                   />
-                  <Label htmlFor="copyNotes" className="text-sm">Copy notes</Label>
+                  <Label htmlFor="copyNotes" className="text-sm leading-normal cursor-pointer">Copy notes</Label>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-start space-x-2">
                   <Checkbox
                     id="copyTechnicalSpecs"
                     checked={copyOptions.copyTechnicalSpecs}
                     onCheckedChange={(checked) => 
                       setCopyOptions(prev => ({ ...prev, copyTechnicalSpecs: !!checked }))
                     }
+                    className="mt-1"
                   />
-                  <Label htmlFor="copyTechnicalSpecs" className="text-sm">Copy technical specs</Label>
+                  <Label htmlFor="copyTechnicalSpecs" className="text-sm leading-normal cursor-pointer">Copy technical specs</Label>
                 </div>
               </div>
             </div>

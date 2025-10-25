@@ -191,12 +191,12 @@ export const FestivalDateNavigation = ({
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           {isLongFestival && (
             <>
               <div className="flex items-center gap-2">
-                <Label htmlFor="view-mode" className="text-sm">View:</Label>
+                <Label htmlFor="view-mode" className="text-sm whitespace-nowrap">View:</Label>
                 <Switch
                   id="view-mode"
                   checked={viewMode === 'week'}
@@ -212,7 +212,7 @@ export const FestivalDateNavigation = ({
                   checked={showOnlyShowDates}
                   onCheckedChange={setShowOnlyShowDates}
                 />
-                <Label htmlFor="show-filter" className="text-sm">Key dates only</Label>
+                <Label htmlFor="show-filter" className="text-sm whitespace-nowrap">Key dates only</Label>
               </div>
             </>
           )}
@@ -220,9 +220,9 @@ export const FestivalDateNavigation = ({
           {/* Stage Filter */}
           {showStageFilter && onStageChange && (
             <div className="flex items-center gap-2">
-              <Label htmlFor="stage-filter" className="text-sm">Stage:</Label>
+              <Label htmlFor="stage-filter" className="text-sm whitespace-nowrap">Stage:</Label>
               <Select value={selectedStage} onValueChange={onStageChange}>
-                <SelectTrigger id="stage-filter" className="w-[120px]">
+                <SelectTrigger id="stage-filter" className="w-[120px] h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -238,7 +238,7 @@ export const FestivalDateNavigation = ({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 justify-between sm:justify-end">
           {viewMode === 'week' && (
             <>
               <Button
@@ -246,11 +246,12 @@ export const FestivalDateNavigation = ({
                 size="sm"
                 onClick={handlePrevWeek}
                 disabled={!canGoToPrevWeek}
+                className="h-10 min-w-[40px]"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               
-              <span className="text-sm font-medium min-w-[120px] text-center">
+              <span className="text-sm font-medium min-w-[100px] sm:min-w-[120px] text-center">
                 {getWeekRange()}
               </span>
               
@@ -259,6 +260,7 @@ export const FestivalDateNavigation = ({
                 size="sm"
                 onClick={handleNextWeek}
                 disabled={!canGoToNextWeek}
+                className="h-10 min-w-[40px]"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -267,9 +269,29 @@ export const FestivalDateNavigation = ({
 
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Calendar className="h-4 w-4" />
+              <Button variant="outline" size="sm" className="h-10 hidden sm:flex">
+                <Calendar className="h-4 w-4 mr-2" />
                 Jump to Date
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <CalendarComponent
+                mode="single"
+                selected={new Date(selectedDate)}
+                onSelect={handleDateJump}
+                disabled={(date) => 
+                  !jobDates.some(jobDate => 
+                    format(jobDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                  )
+                }
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" className="h-10 w-10 sm:hidden">
+                <Calendar className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
@@ -291,42 +313,44 @@ export const FestivalDateNavigation = ({
 
       {/* Date Tabs */}
       <Tabs value={selectedDate} onValueChange={onDateChange} className="w-full">
-        <TabsList className="mb-4 flex flex-wrap h-auto p-1">
-          {weekDates.map((date) => {
-            const formattedDateValue = format(date, 'yyyy-MM-dd');
-            const dateTypeColor = getDateTypeColor(date);
-            
-            return (
-              <DateTypeContextMenu 
-                key={formattedDateValue}
-                jobId={jobId}
-                date={date}
-                onTypeChange={onTypeChange}
-              >
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <TabsTrigger
-                        value={formattedDateValue}
-                        className={`relative border-b-2 ${dateTypeColor} min-w-[100px]`}
-                      >
-                        {formatTabDate(date)}
-                        {getDateTypeBadge(date)}
-                      </TabsTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="text-center">
-                        <p>Festival day runs from {dayStartTime} to {dayStartTime} the next day</p>
-                        <p>Date: {formattedDateValue}</p>
-                        <p>Type: {dateTypes[`${jobId}-${formattedDateValue}`] || 'Not set'}</p>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </DateTypeContextMenu>
-            );
-          })}
-        </TabsList>
+        <div className="overflow-x-auto -mx-2 px-2 touch-pan-x">
+          <TabsList className="mb-4 inline-flex h-auto p-1 w-auto min-w-full">
+            {weekDates.map((date) => {
+              const formattedDateValue = format(date, 'yyyy-MM-dd');
+              const dateTypeColor = getDateTypeColor(date);
+              
+              return (
+                <DateTypeContextMenu 
+                  key={formattedDateValue}
+                  jobId={jobId}
+                  date={date}
+                  onTypeChange={onTypeChange}
+                >
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <TabsTrigger
+                          value={formattedDateValue}
+                          className={`relative border-b-2 ${dateTypeColor} min-w-[100px] h-12 touch-manipulation`}
+                        >
+                          {formatTabDate(date)}
+                          {getDateTypeBadge(date)}
+                        </TabsTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-center">
+                          <p>Festival day runs from {dayStartTime} to {dayStartTime} the next day</p>
+                          <p>Date: {formattedDateValue}</p>
+                          <p>Type: {dateTypes[`${jobId}-${formattedDateValue}`] || 'Not set'}</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </DateTypeContextMenu>
+              );
+            })}
+          </TabsList>
+        </div>
         
         {weekDates.map((date) => (
           <TabsContent

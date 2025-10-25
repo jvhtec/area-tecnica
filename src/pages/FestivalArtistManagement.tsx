@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Printer, Info, Copy } from "lucide-react";
+import { Plus, ArrowLeft, Printer, Info, Copy, Menu } from "lucide-react";
 import { ArtistTable } from "@/components/festival/ArtistTable";
 import { ArtistManagementDialog } from "@/components/festival/ArtistManagementDialog";
 import { ArtistTableFilters } from "@/components/festival/ArtistTableFilters";
@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useArtistsQuery } from "@/hooks/useArtistsQuery";
 import { CopyArtistsDialog } from "@/components/festival/CopyArtistsDialog";
 import { exportFullFestivalSchedulePDF, FullFestivalSchedulePdfData } from "@/utils/fullFestivalSchedulePdfExport";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
@@ -549,21 +550,22 @@ const FestivalArtistManagement = () => {
 
   return (
     <div className="w-full py-6">
-      <div className="mb-6 px-6">
+      <div className="mb-6 px-4 md:px-6">
         <Button variant="ghost" onClick={() => navigate(`/festival-management/${jobId}`)} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Festival Management
+          <span className="hidden sm:inline">Back to Festival Management</span>
+          <span className="sm:hidden">Back</span>
         </Button>
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{jobTitle}</h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-xl md:text-2xl font-bold truncate">{jobTitle}</h1>
           <ConnectionIndicator />
         </div>
       </div>
 
-      <Card className="mx-6">
-        <CardHeader className="flex flex-row items-center justify-between">
+      <Card className="mx-4 md:mx-6">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <CardTitle className="flex items-center gap-2">
-            Artist Management
+            <span className="text-lg md:text-xl">Artist Management</span>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -578,7 +580,9 @@ const FestivalArtistManagement = () => {
               </Tooltip>
             </TooltipProvider>
           </CardTitle>
-          <div className="flex items-center gap-2">
+          
+          {/* Desktop buttons */}
+          <div className="hidden lg:flex items-center gap-2">
             {showArtistControls && (
               <Button 
                 variant="outline" 
@@ -614,6 +618,66 @@ const FestivalArtistManagement = () => {
                 Add Artist
               </Button>
             )}
+          </div>
+
+          {/* Mobile - Primary action + menu */}
+          <div className="flex lg:hidden items-center gap-2 w-full sm:w-auto">
+            {showArtistControls ? (
+              <Button onClick={handleAddArtist} className="flex-1 sm:flex-initial">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Artist
+              </Button>
+            ) : (
+              <Button disabled title="Artists can only be added on show dates" className="flex-1 sm:flex-initial">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Artist
+              </Button>
+            )}
+            
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Menu className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                <SheetHeader>
+                  <SheetTitle>Actions</SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-col gap-3 mt-6">
+                  {showArtistControls && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsCopyDialogOpen(true)}
+                      className="justify-start w-full"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Artists
+                    </Button>
+                  )}
+                  <Button 
+                    variant="outline"
+                    onClick={handlePrintFullSchedule}
+                    disabled={isFullSchedulePrinting}
+                    className="justify-start w-full"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    {isFullSchedulePrinting ? "Generating..." : "Print Full Schedule"}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setPrintDate(selectedDate);
+                      setIsPrintDialogOpen(true);
+                    }}
+                    className="justify-start w-full"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Day Schedule
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </CardHeader>
         <CardContent className="p-0">

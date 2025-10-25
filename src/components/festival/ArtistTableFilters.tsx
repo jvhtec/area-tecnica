@@ -32,20 +32,21 @@ export const ArtistTableFilters = ({
     <div className="space-y-4 mb-4">
       <div className={`grid grid-cols-1 md:grid-cols-2 ${gridCols} gap-4`}>
         <div>
-          <Label htmlFor="search">Search Artist</Label>
+          <Label htmlFor="search" className="text-sm">Search Artist</Label>
           <Input
             id="search"
             placeholder="Search by name..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
+            className="h-10"
           />
         </div>
         
         {!hideStageFilter && (
           <div>
-            <Label htmlFor="stage">Filter by Stage</Label>
+            <Label htmlFor="stage" className="text-sm">Filter by Stage</Label>
             <Select value={stageFilter} onValueChange={onStageFilterChange}>
-              <SelectTrigger id="stage">
+              <SelectTrigger id="stage" className="h-10">
                 <SelectValue placeholder="All Stages" />
               </SelectTrigger>
               <SelectContent>
@@ -59,9 +60,9 @@ export const ArtistTableFilters = ({
         )}
 
         <div>
-          <Label htmlFor="equipment">Filter by Equipment</Label>
+          <Label htmlFor="equipment" className="text-sm">Filter by Equipment</Label>
           <Select value={equipmentFilter} onValueChange={onEquipmentFilterChange}>
-            <SelectTrigger id="equipment">
+            <SelectTrigger id="equipment" className="h-10">
               <SelectValue placeholder="All Equipment" />
             </SelectTrigger>
             <SelectContent>
@@ -74,9 +75,9 @@ export const ArtistTableFilters = ({
         </div>
 
         <div>
-          <Label htmlFor="rider">Filter by Rider Status</Label>
+          <Label htmlFor="rider" className="text-sm">Filter by Rider Status</Label>
           <Select value={riderFilter} onValueChange={onRiderFilterChange}>
-            <SelectTrigger id="rider">
+            <SelectTrigger id="rider" className="h-10">
               <SelectValue placeholder="All Riders" />
             </SelectTrigger>
             <SelectContent>

@@ -354,7 +354,7 @@ export const ArtistTablePrintDialog = ({
 
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] w-[95vw]">
         <DialogHeader>
           <DialogTitle>Print Artist Schedule</DialogTitle>
           <DialogDescription>
@@ -362,32 +362,33 @@ export const ArtistTablePrintDialog = ({
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
+          <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+            <Label htmlFor="name" className="sm:text-right">
               Job Title
             </Label>
-            <Input id="name" value={jobTitle || 'Festival Schedule'} className="col-span-3" disabled />
+            <Input id="name" value={jobTitle || 'Festival Schedule'} className="sm:col-span-3" disabled />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="username" className="text-right">
+          <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+            <Label htmlFor="username" className="sm:text-right">
               Date
             </Label>
-            <Input id="username" value={selectedDate} className="col-span-3" disabled />
+            <Input id="username" value={selectedDate} className="sm:col-span-3" disabled />
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-start space-x-2 pt-2">
             <Checkbox 
               id="gear-conflicts" 
               checked={includeGearConflicts}
               onCheckedChange={(checked) => {
                 setIncludeGearConflicts(checked === true);
               }}
+              className="mt-1"
             />
-            <Label htmlFor="gear-conflicts" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            <Label htmlFor="gear-conflicts" className="text-sm font-medium leading-normal cursor-pointer">
               Include gear conflicts summary
             </Label>
           </div>
         </div>
-        <Button onClick={handleTablePrint} disabled={isGenerating || isLoading}>
+        <Button onClick={handleTablePrint} disabled={isGenerating || isLoading} className="w-full">
           {(isGenerating || isLoading) ? (
             <>
               Generating <Loader2 className="ml-2 h-4 w-4 animate-spin" />
