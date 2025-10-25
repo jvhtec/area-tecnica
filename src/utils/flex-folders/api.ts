@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { FlexFolderPayload, FlexFolderResponse } from "./types";
+import { getFlexApiBaseUrl } from "./config";
 
 let cachedFlexToken: string | null = null;
 
@@ -35,8 +36,9 @@ export async function createFlexFolder(payload: FlexFolderPayload): Promise<Flex
   console.log("Creating Flex folder with payload:", payload);
   
   const token = await getFlexAuthToken();
+  const apiBaseUrl = getFlexApiBaseUrl();
 
-  const response = await fetch("https://sectorpro.flexrentalsolutions.com/f5/api/element", {
+  const response = await fetch(`${apiBaseUrl}/element`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

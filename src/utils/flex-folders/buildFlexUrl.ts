@@ -1,27 +1,12 @@
-import { FLEX_FOLDER_IDS } from './constants';
-
-const FLEX_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
-
-// Standard view IDs for different document types in Flex
-const PRESUPUESTO_VIEW_ID = 'ca6b072c-b122-11df-b8d5-00e08175e43e';
-
-// Known financial document definition IDs
-const FINANCIAL_DOCUMENT_DEFINITION_IDS = [
-  FLEX_FOLDER_IDS.presupuesto, // 9bfb850c-b117-11df-b8d5-00e08175e43e
-  FLEX_FOLDER_IDS.presupuestoDryHire, // fb8b82c9-41d6-4b8f-99b6-4ab8276d06aa
-  FLEX_FOLDER_IDS.hojaGastos, // 566d32e0-1a1e-11e0-a472-00e08175e43e
-  FLEX_FOLDER_IDS.ordenCompra, // ff1a5a50-3f1d-11df-b8d5-00e08175e43e
-  FLEX_FOLDER_IDS.ordenSubalquiler, // 7e2ae0d0-b0bc-11df-b8d5-00e08175e43e
-  FLEX_FOLDER_IDS.ordenTrabajo, // f6e70edc-f42d-11e0-a8de-00e08175e43e
-  FLEX_FOLDER_IDS.crewCall, // 253878cc-af31-11df-b8d5-00e08175e43e
-  FLEX_FOLDER_IDS.pullSheet, // a220432c-af33-11df-b8d5-00e08175e43e
-];
-
-// Known simple folder/subfolder definition IDs that should use simple-element URLs
-const SIMPLE_ELEMENT_DEFINITION_IDS = [
-  FLEX_FOLDER_IDS.mainFolder, // e281e71c-2c42-49cd-9834-0eb68135e9ac
-  FLEX_FOLDER_IDS.subFolder, // 358f312c-b051-11df-b8d5-00e08175e43e
-];
+import { getFlexApiBaseUrl } from './config';
+import {
+  detectFlexLinkIntent,
+  IntentDetectionContext,
+  isFinancialDocument,
+  isSimpleFolder,
+  isSimpleProjectElement,
+} from './intentDetection';
+import { buildFlexUrlByIntent } from './urlBuilder';
 
 export interface ElementDetails {
   elementId: string;
@@ -43,8 +28,9 @@ export async function getElementDetails(
   try {
     console.log(`[buildFlexUrl] Fetching element details for ${elementId}`);
     
+    const apiBaseUrl = getFlexApiBaseUrl();
     const response = await fetch(
-      `https://sectorpro.flexrentalsolutions.com/f5/api/element/${elementId}/key-info/`,
+      `${apiBaseUrl}/element/${elementId}/key-info/`,
       {
         method: 'GET',
         headers: {
@@ -82,31 +68,8 @@ export async function getElementDetails(
   }
 }
 
-/**
- * Determines if an element is a financial document (presupuesto, orden, etc.)
- * based on its definitionId
- */
-export function isFinancialDocument(definitionId?: string): boolean {
-  if (!definitionId) return false;
-  return FINANCIAL_DOCUMENT_DEFINITION_IDS.includes(definitionId);
-}
-
-/**
- * Determines if an element is a simple folder/subfolder
- * based on its definitionId
- */
-export function isSimpleFolder(definitionId?: string): boolean {
-  if (!definitionId) return false;
-  return SIMPLE_ELEMENT_DEFINITION_IDS.includes(definitionId);
-}
-
-/**
- * Determines if a domainId indicates a simple project element
- */
-export function isSimpleProjectElement(domainId?: string): boolean {
-  if (!domainId) return false;
-  return domainId === 'simple-project-element';
-}
+// Re-export intent detection helpers for backward compatibility
+export { isFinancialDocument, isSimpleFolder, isSimpleProjectElement } from './intentDetection';
 
 /**
  * Builds the appropriate Flex URL for an element based on its type
@@ -120,99 +83,54 @@ export function isSimpleProjectElement(domainId?: string): boolean {
  * This function handles multiple element types:
  * - domainId = "simple-project-element" uses #element URL format
  * - Financial documents (presupuesto, orden, etc.) use #fin-doc URL format
+ * - Crew call/contact lists use #contact-list URL format
+ * - Equipment lists use #equipment-list URL format
+ * - Remote file lists use #remote-file-list URL format
  * - Simple elements (folders, subfolders) use #element URL format
  * - Dryhire jobs store the subfolder element_id (simple element)
  * - Tourdate jobs store subfolder element_ids (simple elements)
  * - Default fallback is simple element URL format
  */
 export function buildFlexUrl(elementId: string, definitionId?: string, domainId?: string): string {
+  const context: IntentDetectionContext = {
+    definitionId,
+    domainId,
+  };
+
+  const intent = detectFlexLinkIntent(context);
+
   console.log('[buildFlexUrl] Building URL', {
     elementId,
     elementIdType: typeof elementId,
-    elementIdValue: elementId,
-    elementIdNull: elementId === null,
-    elementIdUndefined: elementId === undefined,
-    elementIdEmpty: elementId === '',
     elementIdValid: !!elementId && elementId.trim().length > 0,
-    elementIdLength: elementId?.length || 0,
     definitionId,
     domainId,
-    isFinancialDoc: isFinancialDocument(definitionId),
-    isSimpleFolder: isSimpleFolder(definitionId),
-    isSimpleProjectElement: isSimpleProjectElement(domainId),
+    detectedIntent: intent,
   });
 
   // Validate elementId
   if (!elementId || typeof elementId !== 'string' || elementId.trim().length === 0) {
     const error = `Invalid elementId provided to buildFlexUrl: "${elementId}" (type: ${typeof elementId})`;
-    console.error('[buildFlexUrl]', error, {
-      elementId,
-      elementIdType: typeof elementId,
-      elementIdValue: elementId,
-      stack: new Error().stack,
-    });
+    console.error('[buildFlexUrl]', error);
     throw new Error(error);
   }
-  
-  // Check domainId first (from tree API)
-  if (isSimpleProjectElement(domainId)) {
-    const url = `${FLEX_BASE_URL}#element/${elementId}/view/simple-element/header`;
-    console.log('[buildFlexUrl] Built simple-project-element URL from domainId:', {
+
+  try {
+    const url = buildFlexUrlByIntent(intent, elementId);
+    console.log('[buildFlexUrl] Built URL:', {
       url,
       elementId,
-      domainId,
-      urlType: 'simple-element (from domainId)',
+      intent,
     });
     return url;
+  } catch (error) {
+    console.error('[buildFlexUrl] Error building URL:', error);
+    throw error;
   }
-  
-  if (isFinancialDocument(definitionId)) {
-    // Financial document URL format (presupuesto, hojaGastos, ordenCompra, etc.)
-    const url = `${FLEX_BASE_URL}#fin-doc/${elementId}/doc-view/${PRESUPUESTO_VIEW_ID}/header`;
-    console.log('[buildFlexUrl] Built financial document URL:', {
-      url,
-      elementId,
-      definitionId,
-      urlType: 'fin-doc',
-    });
-    return url;
-  }
-  
-  // Default simple element URL format
-  // This handles:
-  // - Simple folders and subfolders (mainFolder, subFolder)
-  // - Dryhire subfolders (folder_type='dryhire' in database)
-  // - Tourdate subfolders (folder_type='tourdate' in database)
-  // - Any other element type not explicitly handled
-  const url = `${FLEX_BASE_URL}#element/${elementId}/view/simple-element/header`;
-  console.log('[buildFlexUrl] Built simple element URL:', {
-    url,
-    elementId,
-    definitionId: definitionId || 'none',
-    domainId: domainId || 'none',
-    urlType: 'simple-element',
-  });
-  return url;
 }
 
-export interface ElementContext {
-  /**
-   * Job type - helps determine if this is a dryhire or tourdate subfolder
-   */
-  jobType?: 'single' | 'festival' | 'dryhire' | 'tourdate';
-  /**
-   * Folder type from the database - indicates the element type
-   */
-  folderType?: 'main' | 'dryhire' | 'tourdate';
-  /**
-   * If we already know the definitionId, we can skip the API call
-   */
-  definitionId?: string;
-  /**
-   * Domain ID from tree API - indicates the element type
-   */
-  domainId?: string;
-}
+// Re-export IntentDetectionContext as ElementContext for backward compatibility
+export type ElementContext = IntentDetectionContext;
 
 /**
  * Builds a Flex URL with element type detection
@@ -274,38 +192,21 @@ export async function buildFlexUrlWithTypeDetection(
     });
   }
   
-  // If context provides domainId, use it first
-  if (context?.domainId) {
-    console.log('[buildFlexUrl] Using domainId from context (optimization)', {
-      domainId: context.domainId,
+  // If context provides sufficient information for intent detection, use it
+  if (context?.domainId || context?.definitionId || context?.folderType || context?.jobType || context?.viewHint) {
+    console.log('[buildFlexUrl] Using context for intent detection (optimization)', {
+      context,
       elementId,
     });
-    const url = buildFlexUrl(elementId, context.definitionId, context.domainId);
-    console.log('[buildFlexUrl] Built URL from context domainId:', { url, elementId });
-    return url;
-  }
-  
-  // If context provides definitionId, we can skip the API call
-  if (context?.definitionId) {
-    console.log('[buildFlexUrl] Using definitionId from context (optimization)', {
-      definitionId: context.definitionId,
+    
+    const intent = detectFlexLinkIntent(context);
+    const url = buildFlexUrlByIntent(intent, elementId);
+    
+    console.log('[buildFlexUrl] Built URL from context:', {
+      url,
       elementId,
+      intent,
     });
-    const url = buildFlexUrl(elementId, context.definitionId);
-    console.log('[buildFlexUrl] Built URL from context definitionId:', { url, elementId });
-    return url;
-  }
-  
-  // If context indicates dryhire or tourdate, we know it's a subfolder (simple element)
-  if (context?.folderType === 'dryhire' || context?.folderType === 'tourdate' || 
-      context?.jobType === 'dryhire' || context?.jobType === 'tourdate') {
-    console.log('[buildFlexUrl] Context indicates dryhire/tourdate subfolder (optimization)', {
-      folderType: context?.folderType,
-      jobType: context?.jobType,
-      elementId,
-    });
-    const url = buildFlexUrl(elementId); // No definitionId = simple element URL
-    console.log('[buildFlexUrl] Built simple-element URL from context:', { url, elementId });
     return url;
   }
   

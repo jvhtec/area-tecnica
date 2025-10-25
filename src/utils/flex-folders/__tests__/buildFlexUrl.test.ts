@@ -30,6 +30,17 @@ describe('buildFlexUrl', () => {
     expect(url).toContain('/header');
   });
 
+  it('should build contact-list URL for crewCall', () => {
+    const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.crewCall);
+    expect(url).toContain('#contact-list/test-element-id/view/');
+    expect(url).toContain('/detail');
+  });
+
+  it('should build equipment-list URL for pullSheet', () => {
+    const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.pullSheet);
+    expect(url).toContain('#equipment-list/test-element-id/view/simple-element/header');
+  });
+
   it('should build simple element URL for mainFolder', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.mainFolder);
     expect(url).toContain('#element/test-element-id/view/simple-element/header');
@@ -248,7 +259,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
     expect(url).toContain('#element/test-element-id/view/simple-element/header');
   });
 
-  it('should fetch element details for single jobType (no shortcut)', async () => {
+  it('should not fetch when no context is provided that enables optimization', async () => {
     const mockResponse = {
       elementDefinitionId: { data: FLEX_FOLDER_IDS.mainFolder },
     };
@@ -258,9 +269,8 @@ describe('buildFlexUrlWithTypeDetection', () => {
       json: async () => mockResponse,
     });
 
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
-      jobType: 'single',
-    });
+    // When no context that enables optimization is provided, fetch should be called
+    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {});
 
     expect(url).toContain('#element/test-element-id/view/simple-element/header');
     expect(global.fetch).toHaveBeenCalled();
@@ -306,5 +316,32 @@ describe('buildFlexUrlWithTypeDetection', () => {
     const url = await buildFlexUrlWithTypeDetection('test-element-id', '');
 
     expect(url).toContain('#element/test-element-id/view/simple-element/header');
+  });
+
+  it('should use viewHint when provided in context', async () => {
+    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
+      viewHint: 'contact-list',
+    });
+
+    expect(url).toContain('#contact-list/test-element-id/view/');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('should use equipment-list URL when viewHint is equipment-list', async () => {
+    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
+      viewHint: 'equipment-list',
+    });
+
+    expect(url).toContain('#equipment-list/test-element-id/view/simple-element/header');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('should use remote-file-list URL when viewHint is remote-file-list', async () => {
+    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
+      viewHint: 'remote-file-list',
+    });
+
+    expect(url).toContain('#remote-file-list/test-element-id/view/simple-element/header');
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
