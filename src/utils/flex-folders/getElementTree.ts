@@ -8,6 +8,8 @@ export interface FlexElementNode {
   displayName: string;
   documentNumber?: string;
   parentElementId?: string | null;
+  domainId?: string;
+  definitionId?: string;
   children?: FlexElementNode[];
 }
 
@@ -16,6 +18,8 @@ export interface FlatElementNode {
   displayName: string;
   documentNumber?: string;
   parentElementId?: string | null;
+  domainId?: string;
+  definitionId?: string;
   depth: number;
 }
 
@@ -146,6 +150,13 @@ function transformSingleElement(element: unknown): FlexElementNode {
       (typeof el.parentElementId === "string" ? el.parentElementId : null) ||
       (typeof el.parentId === "string" ? el.parentId : null) ||
       undefined,
+    domainId:
+      (typeof el.domainId === "string" ? el.domainId : null) ||
+      undefined,
+    definitionId:
+      (typeof el.definitionId === "string" ? el.definitionId : null) ||
+      (typeof el.elementDefinitionId === "string" ? el.elementDefinitionId : null) ||
+      undefined,
   };
 
   // Recursively transform children
@@ -176,6 +187,8 @@ export function flattenTree(
       displayName: node.displayName,
       documentNumber: node.documentNumber,
       parentElementId: node.parentElementId,
+      domainId: node.domainId,
+      definitionId: node.definitionId,
       depth,
     });
 
@@ -223,6 +236,8 @@ export function searchTree(
           displayName: node.displayName,
           documentNumber: node.documentNumber,
           parentElementId: node.parentElementId,
+          domainId: node.domainId,
+          definitionId: node.definitionId,
           depth,
         });
       }

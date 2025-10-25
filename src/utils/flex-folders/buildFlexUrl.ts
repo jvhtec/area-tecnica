@@ -101,27 +101,39 @@ export function isSimpleFolder(definitionId?: string): boolean {
 }
 
 /**
+ * Determines if a domainId indicates a simple project element
+ */
+export function isSimpleProjectElement(domainId?: string): boolean {
+  if (!domainId) return false;
+  return domainId === 'simple-project-element';
+}
+
+/**
  * Builds the appropriate Flex URL for an element based on its type
  * 
  * @param elementId - The element/document ID
  * @param definitionId - Optional definition ID to determine element type
+ * @param domainId - Optional domain ID from tree API to determine element type
  * @returns Formatted Flex URL
  * 
  * @remarks
  * This function handles multiple element types:
+ * - domainId = "simple-project-element" uses #element URL format
  * - Financial documents (presupuesto, orden, etc.) use #fin-doc URL format
  * - Simple elements (folders, subfolders) use #element URL format
  * - Dryhire jobs store the subfolder element_id (simple element)
  * - Tourdate jobs store subfolder element_ids (simple elements)
  * - Default fallback is simple element URL format
  */
-export function buildFlexUrl(elementId: string, definitionId?: string): string {
+export function buildFlexUrl(elementId: string, definitionId?: string, domainId?: string): string {
   console.log('[buildFlexUrl] Building URL', {
     elementId,
     elementIdValid: !!elementId && elementId.trim().length > 0,
     definitionId,
+    domainId,
     isFinancialDoc: isFinancialDocument(definitionId),
     isSimpleFolder: isSimpleFolder(definitionId),
+    isSimpleProjectElement: isSimpleProjectElement(domainId),
   });
 
   // Validate elementId
@@ -129,6 +141,18 @@ export function buildFlexUrl(elementId: string, definitionId?: string): string {
     const error = `Invalid elementId provided to buildFlexUrl: "${elementId}"`;
     console.error('[buildFlexUrl]', error);
     throw new Error(error);
+  }
+  
+  // Check domainId first (from tree API)
+  if (isSimpleProjectElement(domainId)) {
+    const url = `${FLEX_BASE_URL}#element/${elementId}/view/simple-element/header`;
+    console.log('[buildFlexUrl] Built simple-project-element URL from domainId:', {
+      url,
+      elementId,
+      domainId,
+      urlType: 'simple-element (from domainId)',
+    });
+    return url;
   }
   
   if (isFinancialDocument(definitionId)) {
@@ -154,6 +178,7 @@ export function buildFlexUrl(elementId: string, definitionId?: string): string {
     url,
     elementId,
     definitionId: definitionId || 'none',
+    domainId: domainId || 'none',
     urlType: 'simple-element',
   });
   return url;
@@ -172,6 +197,10 @@ export interface ElementContext {
    * If we already know the definitionId, we can skip the API call
    */
   definitionId?: string;
+  /**
+   * Domain ID from tree API - indicates the element type
+   */
+  domainId?: string;
 }
 
 /**
@@ -220,6 +249,17 @@ export async function buildFlexUrlWithTypeDetection(
       hasAuthToken: !!authToken,
       authTokenType: typeof authToken,
     });
+  }
+  
+  // If context provides domainId, use it first
+  if (context?.domainId) {
+    console.log('[buildFlexUrl] Using domainId from context (optimization)', {
+      domainId: context.domainId,
+      elementId,
+    });
+    const url = buildFlexUrl(elementId, context.definitionId, context.domainId);
+    console.log('[buildFlexUrl] Built URL from context domainId:', { url, elementId });
+    return url;
   }
   
   // If context provides definitionId, we can skip the API call
