@@ -7,6 +7,7 @@ import { FLEX_FOLDER_IDS } from './constants';
 export type FlexLinkIntent =
   | 'simple-element'    // Folders, subfolders, dryhire, tourdate
   | 'fin-doc'           // Financial documents (presupuesto, hojaGastos, ordenes)
+  | 'expense-sheet'     // Expense sheet documents
   | 'contact-list'      // Crew call/contact list
   | 'equipment-list'    // Pull sheet/equipment list
   | 'remote-file-list'; // Remote file list
@@ -42,6 +43,8 @@ export interface IntentDetectionContext {
 }
 
 // Financial documents that use the #fin-doc URL schema
+const EXPENSE_SHEET_DEFINITION_IDS = [FLEX_FOLDER_IDS.hojaGastos];
+
 const FINANCIAL_DOCUMENT_DEFINITION_IDS = [
   FLEX_FOLDER_IDS.presupuesto,
   FLEX_FOLDER_IDS.presupuestoDryHire,
@@ -90,14 +93,18 @@ export function detectFlexLinkIntent(context?: IntentDetectionContext): FlexLink
 
   // Check definitionId
   if (context.definitionId) {
+    if (EXPENSE_SHEET_DEFINITION_IDS.includes(context.definitionId)) {
+      return 'expense-sheet';
+    }
+
     if (CREW_CALL_DEFINITION_IDS.includes(context.definitionId)) {
       return 'contact-list';
     }
-    
+
     if (EQUIPMENT_LIST_DEFINITION_IDS.includes(context.definitionId)) {
       return 'equipment-list';
     }
-    
+
     if (FINANCIAL_DOCUMENT_DEFINITION_IDS.includes(context.definitionId)) {
       return 'fin-doc';
     }
@@ -108,6 +115,10 @@ export function detectFlexLinkIntent(context?: IntentDetectionContext): FlexLink
   }
 
   // Check domainId from tree API
+  if (context.domainId === 'expense-sheet') {
+    return 'expense-sheet';
+  }
+
   if (context.domainId === 'simple-project-element') {
     return 'simple-element';
   }
