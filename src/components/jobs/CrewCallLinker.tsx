@@ -135,32 +135,36 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
 
   const Row = ({ label, dept }: { label: string; dept: Dept }) => (
     <div className="space-y-2">
-      <Label className="text-xs">{label}</Label>
-      <div className={`grid ${dialogMode ? 'grid-cols-12' : 'grid-cols-12'} gap-2 items-center`}>
-        <Input
-          className="col-span-7 h-8 text-sm"
-          placeholder="Paste Flex crew call URL"
-          value={url[dept]}
-          onChange={(e) => setUrl({ ...url, [dept]: e.target.value })}
-        />
-        <Button type="button" variant="secondary" size="sm" className="col-span-2 gap-1 h-8" onClick={() => handleExtract(dept)}>
-          <Wand2 className="h-3 w-3" /> Extract
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="col-span-2 gap-1 h-8" onClick={() => handlePasteExtract(dept)}>
-          <ClipboardPaste className="h-3 w-3" /> Paste
-        </Button>
-        <Input
-          className="col-span-7 h-8 text-sm"
-          placeholder="Flex Element ID"
-          value={elementId[dept]}
-          onChange={(e) => setElementId({ ...elementId, [dept]: e.target.value })}
-        />
-        <Button type="button" variant="default" size="sm" className="col-span-2 gap-1 h-8" onClick={() => saveDept(dept)} disabled={loading}>
-          <Save className="h-3 w-3" /> Save
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="col-span-2 gap-1 h-8" onClick={() => openFlex(dept)} disabled={!elementId[dept]}>
-          <ExternalLink className="h-3 w-3" /> Open
-        </Button>
+      <Label className="text-xs sm:text-sm">{label}</Label>
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-2">
+          <Input
+            className="flex-1 h-8 text-sm"
+            placeholder="Paste Flex crew call URL"
+            value={url[dept]}
+            onChange={(e) => setUrl({ ...url, [dept]: e.target.value })}
+          />
+          <Button type="button" variant="secondary" size="sm" className="gap-1 h-8 shrink-0" onClick={() => handleExtract(dept)}>
+            <Wand2 className="h-3 w-3" /> <span className="hidden sm:inline">Extract</span>
+          </Button>
+          <Button type="button" variant="outline" size="sm" className="gap-1 h-8 shrink-0" onClick={() => handlePasteExtract(dept)}>
+            <ClipboardPaste className="h-3 w-3" /> <span className="hidden sm:inline">Paste</span>
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          <Input
+            className="flex-1 h-8 text-sm"
+            placeholder="Flex Element ID"
+            value={elementId[dept]}
+            onChange={(e) => setElementId({ ...elementId, [dept]: e.target.value })}
+          />
+          <Button type="button" variant="default" size="sm" className="gap-1 h-8 shrink-0" onClick={() => saveDept(dept)} disabled={loading}>
+            <Save className="h-3 w-3" /> <span className="hidden sm:inline">Save</span>
+          </Button>
+          <Button type="button" variant="outline" size="sm" className="gap-1 h-8 shrink-0" onClick={() => openFlex(dept)} disabled={!elementId[dept]}>
+            <ExternalLink className="h-3 w-3" /> <span className="hidden sm:inline">Open</span>
+          </Button>
+        </div>
       </div>
       <p className="text-[10px] text-muted-foreground">
         Example: https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact-list/&lt;elementId&gt;/view/{CREW_CALL_VIEW_ID}/detail
@@ -201,10 +205,10 @@ export function CrewCallLinkerDialog({ jobId }: { jobId: string }) {
           <Link2 className="h-4 w-4" /> Link Crew Calls
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[640px]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5" /> Link Flex Crew Calls
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Link2 className="h-4 w-4 sm:h-5 sm:w-5" /> Link Flex Crew Calls
           </DialogTitle>
         </DialogHeader>
         <CrewCallLinker jobId={jobId} dialogMode />

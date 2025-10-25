@@ -70,9 +70,9 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
     >
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <CloudIcon className="h-5 w-5" />
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <CloudIcon className="h-4 w-4 sm:h-5 sm:w-5" />
               Weather Forecast
             </CardTitle>
             {canFetchWeather && (
@@ -81,7 +81,7 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
                 size="sm"
                 onClick={fetchWeather}
                 disabled={isLoading}
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 w-fit"
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -110,19 +110,19 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
               Fetching weather forecast...
             </div>
           ) : weatherData && weatherData.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {weatherData.map((weather, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{getWeatherIcon(weather.condition)}</span>
+                <div key={index} className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <span className="text-xl sm:text-2xl">{getWeatherIcon(weather.condition)}</span>
                     <div>
-                      <div className="font-medium">
+                      <div className="font-medium text-sm sm:text-base">
                         {formatDate(weather.date)} – {weather.condition}
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-xs sm:text-sm text-muted-foreground">
                         {Math.round(weather.maxTemp)}°C / {Math.round(weather.minTemp)}°C
                         {weather.precipitationProbability > 0 && (
-                          <span>, {weather.precipitationProbability}% chance of rain</span>
+                          <span>, {weather.precipitationProbability}% rain</span>
                         )}
                       </div>
                     </div>

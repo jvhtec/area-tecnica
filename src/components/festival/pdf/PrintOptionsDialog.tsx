@@ -603,9 +603,9 @@ export const PrintOptionsDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Select Documents to Print</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Select Documents to Print</DialogTitle>
         </DialogHeader>
         <div className="space-y-6 py-4">
           <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800">

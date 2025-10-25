@@ -212,10 +212,10 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
   }
 
   return (
-    <Card className="mt-6">
-      <CardHeader>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <CardTitle>Festival Schedule</CardTitle>
+    <Card className="mt-4 sm:mt-6">
+      <CardHeader className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
+          <CardTitle className="text-base sm:text-lg">Festival Schedule</CardTitle>
           <div className="flex gap-2">
             {!isViewOnly && (
               <Button 
@@ -224,7 +224,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
                 className="flex items-center gap-1"
               >
                 <Plus className="h-4 w-4" />
-                Create Shift
+                <span className="hidden sm:inline">Create Shift</span>
               </Button>
             )}
             <Button 
@@ -235,30 +235,28 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
               disabled={isRefreshing}
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              Refresh
+              <span className="hidden sm:inline">Refresh</span>
             </Button>
           </div>
         </div>
-        <div className="mt-2 flex justify-between items-center">
+        <div className="mt-2 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
           <SubscriptionIndicator 
             tables={['festival_shifts', 'festival_shift_assignments']} 
             variant="compact"
             showRefreshButton
             onRefresh={handleRefresh}
           />
-        </div>
-        <div className="mt-2 flex justify-end">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
-            className="text-xs"
+            className="text-xs w-fit"
           >
             {viewMode === "table" ? "List View" : "Table View"}
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 sm:p-6">
         <div className="space-y-4">
           {jobDates.length > 0 && (
             <FestivalDateNavigation

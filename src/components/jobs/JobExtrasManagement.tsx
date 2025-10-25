@@ -98,12 +98,12 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <DollarSign className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
           Job Extras & Rates
         </CardTitle>
         {isManager && (
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <Users className="h-4 w-4" />
               {visibleAssignments.length} technician{visibleAssignments.length !== 1 ? 's' : ''}
@@ -116,7 +116,7 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
           </div>
         )}
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4 sm:space-y-6">
         {visibleAssignments.map((assignment, index) => {
           const technicianName = (
             `${assignment.profiles?.first_name ?? ''} ${assignment.profiles?.last_name ?? ''}`
@@ -125,7 +125,7 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
           
           return (
             <div key={assignment.technician_id}>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                 <h3 className="font-medium">{technicianName}</h3>
                 {technicianPayout && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -147,7 +147,7 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
                 showVehicleDisclaimer={technicianPayout?.vehicle_disclaimer || false}
               />
               
-              {index < assignments.length - 1 && <Separator className="mt-6" />}
+              {index < assignments.length - 1 && <Separator className="mt-4 sm:mt-6" />}
             </div>
           );
         })}
