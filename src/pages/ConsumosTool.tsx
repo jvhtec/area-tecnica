@@ -609,43 +609,56 @@ const ConsumosTool: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/sound')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-2xl font-bold">Power Calculator</CardTitle>
-            {isTourDefaults && (
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                Tour Defaults
-              </Badge>
-            )}
-            {isJobOverrideMode && (
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                Override
-              </Badge>
-            )}
-          </div>
-        </div>
-        {isTourDefaults && (
           <div className="text-center">
-            <p className="text-sm text-muted-foreground">
-              Creating power defaults for tour: <span className="font-medium">{tourName}</span>
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              These defaults will apply to all tour dates unless specifically overridden
-            </p>
+            <CardTitle className="text-2xl font-bold">
+              Power Calculator
+            </CardTitle>
+            {isTourDefaults && (
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  Tour Defaults Mode
+                </Badge>
+                <p className="text-sm text-muted-foreground">
+                  Creating defaults for: <span className="font-medium">{tourName}</span>
+                </p>
+              </div>
+            )}
+            {isJobOverrideMode && tourInfo && (
+              <div className="text-sm text-muted-foreground mt-1 flex items-center justify-center gap-2">
+                <Badge variant="secondary">Override Mode</Badge>
+                <p>Tour: {tourInfo.tourName} • {tourInfo.tourDate} - {tourInfo.locationName}</p>
+              </div>
+            )}
           </div>
-        )}
+          <div></div>
+        </div>
       </CardHeader>
 
       <CardContent>
         <div className="space-y-6">
-          <div className="flex items-center space-x-2">
-            <Checkbox id="foh-schuko" checked={fohSchukoRequired} onCheckedChange={(c) => setFohSchukoRequired(!!c)} />
-            <Label htmlFor="foh-schuko">Se requiere potencia de 16A en formato schuko hembra en posicion FoH</Label>
-          </div>
+          {/* Job-based override notification */}
+          {isJobOverrideMode && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <p className="text-sm font-medium text-blue-900">
+                  Job Override Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-blue-700 mt-1">
+                This job is part of a tour. Any tables you create will be saved as overrides for the specific tour date.
+              </p>
+            </div>
+          )}
+
+          {/* Tour defaults mode notification */}
           {isTourDefaults && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                <p className="text-sm font-medium text-green-900">Tour Defaults Mode Active</p>
+                <p className="text-sm font-medium text-green-900">
+                  Tour Defaults Mode Active
+                </p>
               </div>
               <p className="text-sm text-green-700 mt-1">
                 Any tables you create will be saved as global defaults for this tour. These defaults will apply to all tour dates unless specifically overridden.
@@ -653,19 +666,13 @@ const ConsumosTool: React.FC = () => {
             </div>
           )}
 
-          {isJobOverrideMode && tourInfo && (
-            <TourOverrideModeHeader
-              tourName={tourInfo.tourName}
-              tourDate={tourInfo.tourDate}
-              locationName={tourInfo.locationName}
-              defaultsCount={tourDefaultTables.length}
-              overridesCount={powerOverrides.length}
-              department="sound"
-            />
-          )}
+          <div className="flex items-center space-x-2">
+            <Checkbox id="foh-schuko" checked={fohSchukoRequired} onCheckedChange={(c) => setFohSchukoRequired(!!c)} />
+            <Label htmlFor="foh-schuko">Se requiere potencia de 16A en formato schuko hembra en posicion FoH</Label>
+          </div>
 
-          {/* NEW: Supply/PF row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Supply/PF controls */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Supply</Label>
               <Select value={phaseMode} onValueChange={(v) => setPhaseMode(v as 'single' | 'three')}>
@@ -707,28 +714,19 @@ const ConsumosTool: React.FC = () => {
             </Select>
           </div>
 
+          {/* Hide job selection when coming from card (jobId in URL), or in tour defaults mode */}
           {!isJobOverrideMode && !isTourDefaults && !jobIdFromUrl && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Select Job</Label>
               <Select value={selectedJobId} onValueChange={handleJobSelect}>
-                <SelectTrigger><SelectValue placeholder="Select a job" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a job" />
+                </SelectTrigger>
                 <SelectContent>
                   {jobs?.map((job) => (
-                    <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {isJobOverrideMode && !jobIdFromUrl && (
-            <div className="space-y-2">
-              <Label htmlFor="jobSelect">Select Job</Label>
-              <Select value={selectedJobId} onValueChange={handleJobSelect}>
-                <SelectTrigger><SelectValue placeholder="Select a job" /></SelectTrigger>
-                <SelectContent>
-                  {jobs?.map((job) => (
-                    <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -749,12 +747,12 @@ const ConsumosTool: React.FC = () => {
                     </div>
                   </div>
                   <div className="p-4 space-y-2 text-sm">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>Total Watts: <span className="font-medium">{table.totalWatts?.toFixed(2)} W</span></div>
                       <div>{phaseMode === 'three' ? 'Current per Phase' : 'Current'}: <span className="font-medium">{table.currentPerPhase?.toFixed(2)} A</span></div>
                       <div>PDU Type: <span className="font-medium">{table.customPduType || table.pduType}</span></div>
                       {table.includesHoist && (
-                        <div className="col-span-2 text-green-700">✓ Includes additional hoist power (CEE32A 3P+N+G)</div>
+                        <div className="col-span-1 sm:col-span-2 text-green-700">✓ Includes additional hoist power (CEE32A 3P+N+G)</div>
                       )}
                     </div>
                   </div>
@@ -768,7 +766,7 @@ const ConsumosTool: React.FC = () => {
               <h3 className="text-lg font-semibold text-orange-900">Existing Overrides</h3>
               {tourOverrideTables.map((table) => (
                 <div key={table.id} className="border rounded-lg overflow-hidden bg-orange-50/30">
-                  <div className="bg-orange-100 px-4 py-3 flex justify-between items-center">
+                  <div className="bg-orange-100 px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold text-orange-900">{table.name}</h4>
                       <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">Override</Badge>
@@ -800,12 +798,12 @@ const ConsumosTool: React.FC = () => {
                     </div>
                   </div>
                   <div className="p-4 space-y-2 text-sm">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>Total Watts: <span className="font-medium">{table.totalWatts?.toFixed(2)} W</span></div>
                       <div>{phaseMode === 'three' ? 'Current per Phase' : 'Current'}: <span className="font-medium">{table.currentPerPhase?.toFixed(2)} A</span></div>
                       <div>PDU Type: <span className="font-medium">{table.customPduType || table.pduType}</span></div>
                       {table.includesHoist && (
-                        <div className="col-span-2 text-orange-700">✓ Includes additional hoist power (CEE32A 3P+N+G)</div>
+                        <div className="col-span-1 sm:col-span-2 text-orange-700">✓ Includes additional hoist power (CEE32A 3P+N+G)</div>
                       )}
                     </div>
                   </div>
@@ -827,53 +825,55 @@ const ConsumosTool: React.FC = () => {
           </div>
 
           <div className="border rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">Quantity</th>
-                  <th className="px-4 py-3 text-left font-medium">Component</th>
-                  <th className="px-4 py-3 text-left font-medium">Watts (per unit)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentTable.rows.map((row, index) => (
-                  <tr key={index} className="border-t">
-                    <td className="p-4">
-                      <Input
-                        type="number"
-                        value={row.quantity}
-                        onChange={(e) => updateInput(index, 'quantity', e.target.value)}
-                        min="0"
-                        className="w-full"
-                      />
-                    </td>
-                    <td className="p-4">
-                      <Select
-                        value={row.componentId}
-                        onValueChange={(value) => value && updateInput(index, 'componentId', value)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select component" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {soundComponentDatabase.map((component) => (
-                            <SelectItem key={component.id} value={component.id.toString()}>
-                              {component.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="p-4">
-                      <Input type="number" value={row.watts} readOnly className="w-full bg-muted" />
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-sm">Quantity</th>
+                    <th className="px-4 py-3 text-left font-medium text-sm">Component</th>
+                    <th className="px-4 py-3 text-left font-medium text-sm">Watts (per unit)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {currentTable.rows.map((row, index) => (
+                    <tr key={index} className="border-t">
+                      <td className="p-4">
+                        <Input
+                          type="number"
+                          value={row.quantity}
+                          onChange={(e) => updateInput(index, 'quantity', e.target.value)}
+                          min="0"
+                          className="w-full min-w-[100px]"
+                        />
+                      </td>
+                      <td className="p-4">
+                        <Select
+                          value={row.componentId}
+                          onValueChange={(value) => value && updateInput(index, 'componentId', value)}
+                        >
+                          <SelectTrigger className="w-full min-w-[150px]">
+                            <SelectValue placeholder="Select component" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {soundComponentDatabase.map((component) => (
+                              <SelectItem key={component.id} value={component.id.toString()}>
+                                {component.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-4">
+                        <Input type="number" value={row.watts} readOnly className="w-full min-w-[120px] bg-muted" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button onClick={addRow}>Add Row</Button>
             <Button 
               onClick={generateTable} 
@@ -900,24 +900,24 @@ const ConsumosTool: React.FC = () => {
 
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
-              <div className="bg-muted px-4 py-3 flex justify-between items-center">
+              <div className="bg-muted px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <h3 className="font-semibold">{table.name}</h3>
                 <Button variant="destructive" size="sm" onClick={() => removeTable(table.id as number)}>Remove Table</Button>
               </div>
               
               <div className="p-4 bg-muted/50 space-y-4">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id={`hoist-${table.id}`}
                       checked={table.includesHoist}
                       onCheckedChange={(checked) => updateTableSettings(table.id as number, { includesHoist: !!checked })}
                     />
-                    <Label htmlFor={`hoist-${table.id}`}>Requires additional hoist power (CEE32A 3P+N+G)</Label>
+                    <Label htmlFor={`hoist-${table.id}`} className="text-sm">Requires additional hoist power (CEE32A 3P+N+G)</Label>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <Label>PDU Type Override:</Label>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                    <Label className="text-sm whitespace-nowrap">PDU Type Override:</Label>
                     <Select
                       value={table.customPduType ? (PDU_TYPES.includes(table.customPduType) ? table.customPduType : 'custom') : 'default'}
                       onValueChange={(value) => {
@@ -930,7 +930,7 @@ const ConsumosTool: React.FC = () => {
                         }
                       }}
                     >
-                      <SelectTrigger className="w-[220px]">
+                      <SelectTrigger className="w-full sm:w-[220px]">
                         <SelectValue placeholder="Use recommended PDU type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -946,56 +946,58 @@ const ConsumosTool: React.FC = () => {
                         placeholder="Enter custom PDU type"
                         value={table.customPduType || ''}
                         onChange={(e) => updateTableSettings(table.id as number, { customPduType: e.target.value })}
-                        className="w-[220px]"
+                        className="w-full sm:w-[220px]"
                       />
                     )}
                   </div>
                 </div>
               </div>
 
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">Quantity</th>
-                    <th className="px-4 py-3 text-left font-medium">Component</th>
-                    <th className="px-4 py-3 text-left font-medium">Watts (per unit)</th>
-                    <th className="px-4 py-3 text-left font-medium">Total Watts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {table.rows.map((row, index) => (
-                    <tr key={index} className="border-t">
-                      <td className="px-4 py-3">{row.quantity}</td>
-                      <td className="px-4 py-3">{row.componentName}</td>
-                      <td className="px-4 py-3">{row.watts}</td>
-                      <td className="px-4 py-3">{row.totalWatts?.toFixed(2)}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium text-sm">Quantity</th>
+                      <th className="px-4 py-3 text-left font-medium text-sm">Component</th>
+                      <th className="px-4 py-3 text-left font-medium text-sm">Watts (per unit)</th>
+                      <th className="px-4 py-3 text-left font-medium text-sm">Total Watts</th>
                     </tr>
-                  ))}
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">Total Watts:</td>
-                    <td className="px-4 py-3">{table.totalWatts?.toFixed(2)} W</td>
-                  </tr>
-                  {safetyMargin > 0 && (
+                  </thead>
+                  <tbody>
+                    {table.rows.map((row, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="px-4 py-3 text-sm">{row.quantity}</td>
+                        <td className="px-4 py-3 text-sm">{row.componentName}</td>
+                        <td className="px-4 py-3 text-sm">{row.watts}</td>
+                        <td className="px-4 py-3 text-sm">{row.totalWatts?.toFixed(2)}</td>
+                      </tr>
+                    ))}
                     <tr className="border-t bg-muted/50 font-medium">
-                      <td colSpan={3} className="px-4 py-3 text-right">Adjusted Watts ({safetyMargin}% safety margin):</td>
-                      <td className="px-4 py-3">{table.adjustedWatts?.toFixed(2)} W</td>
+                      <td colSpan={3} className="px-4 py-3 text-right text-sm">Total Watts:</td>
+                      <td className="px-4 py-3 text-sm">{table.totalWatts?.toFixed(2)} W</td>
                     </tr>
-                  )}
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">{phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}</td>
-                    <td className="px-4 py-3">{table.currentPerPhase?.toFixed(2)} A</td>
-                  </tr>
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">PDU Type:</td>
-                    <td className="px-4 py-3">{table.customPduType || table.pduType}</td>
-                  </tr>
-                  {table.includesHoist && (
+                    {safetyMargin > 0 && (
+                      <tr className="border-t bg-muted/50 font-medium">
+                        <td colSpan={3} className="px-4 py-3 text-right text-sm">Adjusted Watts ({safetyMargin}% safety margin):</td>
+                        <td className="px-4 py-3 text-sm">{table.adjustedWatts?.toFixed(2)} W</td>
+                      </tr>
+                    )}
                     <tr className="border-t bg-muted/50 font-medium">
-                      <td colSpan={4} className="px-4 py-3">Additional Hoist Power Required: CEE32A 3P+N+G</td>
+                      <td colSpan={3} className="px-4 py-3 text-right text-sm">{phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}</td>
+                      <td className="px-4 py-3 text-sm">{table.currentPerPhase?.toFixed(2)} A</td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                    <tr className="border-t bg-muted/50 font-medium">
+                      <td colSpan={3} className="px-4 py-3 text-right text-sm">PDU Type:</td>
+                      <td className="px-4 py-3 text-sm">{table.customPduType || table.pduType}</td>
+                    </tr>
+                    {table.includesHoist && (
+                      <tr className="border-t bg-muted/50 font-medium">
+                        <td colSpan={4} className="px-4 py-3 text-sm">Additional Hoist Power Required: CEE32A 3P+N+G</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ))}
         </div>
