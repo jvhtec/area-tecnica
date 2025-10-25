@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Upload, File, FilePlus, FileCheck, Loader2, Image as ImageIcon, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
@@ -123,7 +124,7 @@ export const MemoriaTecnica = () => {
 
   const uploadToStorage = async (file: File, path: string) => {
     const safePath = path.replace(/\s+/g, '_');
-    let lastErr: any = null;
+    let lastErr: Error | null = null;
     for (const bucket of STORAGE_BUCKET_CANDIDATES) {
       try {
         const { error: uploadError } = await supabase.storage
@@ -137,10 +138,10 @@ export const MemoriaTecnica = () => {
         if (signUrlError) throw signUrlError;
         return signedUrlData.signedUrl;
       } catch (err) {
-        lastErr = err;
+        lastErr = err as Error;
         // Try next candidate on 404 bucket not found; otherwise rethrow
-        const msg = (err && (err.message || err.error || '')) + '';
-        if (!msg.toLowerCase().includes('bucket not found') && !(err?.statusCode === '404')) {
+        const msg = (err && ((err as Error).message || (err as { error?: string }).error || '')) + '';
+        if (!msg.toLowerCase().includes('bucket not found') && !((err as { statusCode?: string })?.statusCode === '404')) {
           throw err;
         }
       }
@@ -271,41 +272,47 @@ export const MemoriaTecnica = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-6rem)] overflow-y-auto">
-      <div className="max-w-3xl mx-auto p-6 space-y-6">
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Memoria Técnica de Sonido</h2>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="projectName">Nombre del Proyecto</Label>
-              <Input
-                id="projectName"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="Ingrese el nombre del proyecto"
-              />
-            </div>
+    <div className="h-[calc(100vh-6rem)] overflow-y-auto p-4 sm:p-6">
+      <Card className="w-full max-w-4xl mx-auto">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">
+            Memoria Técnica de Sonido
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Project Name Section */}
+          <div className="space-y-2">
+            <Label htmlFor="projectName">Nombre del Proyecto</Label>
+            <Input
+              id="projectName"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="Ingrese el nombre del proyecto"
+            />
+          </div>
 
+          {/* Logo Selection Section with muted background */}
+          <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
             <div className="space-y-2">
               <Label>Logo</Label>
               
               <RadioGroup 
                 value={logoSource} 
                 onValueChange={(value) => setLogoSource(value as "upload" | "existing")} 
-                className="flex items-center space-x-6 mb-2"
+                className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="upload" id="r-upload" />
-                  <Label htmlFor="r-upload">Subir nuevo logo</Label>
+                  <Label htmlFor="r-upload" className="cursor-pointer">Subir nuevo logo</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="existing" id="r-existing" />
-                  <Label htmlFor="r-existing">Usar logo existente</Label>
+                  <Label htmlFor="r-existing" className="cursor-pointer">Usar logo existente</Label>
                 </div>
               </RadioGroup>
 
               {logoSource === "upload" ? (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <Input
                     type="file"
                     accept="image/*"
@@ -340,6 +347,7 @@ export const MemoriaTecnica = () => {
                       variant="ghost"
                       size="icon"
                       onClick={() => window.open(logo.url, '_blank')}
+                      className="shrink-0"
                     >
                       <ImageIcon className="h-4 w-4" />
                     </Button>
@@ -376,7 +384,7 @@ export const MemoriaTecnica = () => {
                   </Select>
 
                   {selectedLogoOption && (
-                    <div className="flex justify-center p-2 bg-muted rounded-md">
+                    <div className="flex justify-center p-4 bg-muted rounded-md border">
                       <img 
                         src={logoOptions.find(opt => opt.value === selectedLogoOption)?.url || ''} 
                         alt="Selected logo preview" 
@@ -391,68 +399,75 @@ export const MemoriaTecnica = () => {
                 </div>
               )}
             </div>
+          </div>
 
-            <div className="space-y-4">
-              {documents.map((doc) => (
-                <div key={doc.id} className="space-y-2">
-                  <Label>{doc.title}</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="file"
-                      accept=".pdf"
-                      className="hidden"
-                      id={`file-${doc.id}`}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFileUpload(file, doc.id);
-                      }}
-                    />
+          {/* Documents Upload Section with muted background */}
+          <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+            <h3 className="font-semibold text-sm">Documentos</h3>
+            {documents.map((doc) => (
+              <div key={doc.id} className="space-y-2">
+                <Label>{doc.title}</Label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    id={`file-${doc.id}`}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file, doc.id);
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    asChild
+                    className="w-full"
+                  >
+                    <label htmlFor={`file-${doc.id}`} className="cursor-pointer flex items-center justify-center gap-2">
+                      {doc.file ? (
+                        <>
+                          <FileCheck className="h-4 w-4" />
+                          Archivo cargado
+                        </>
+                      ) : (
+                        <>
+                          <FilePlus className="h-4 w-4" />
+                          Subir archivo
+                        </>
+                      )}
+                    </label>
+                  </Button>
+                  {doc.file && (
                     <Button
-                      variant="outline"
-                      asChild
-                      className="w-full"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => window.open(doc.file?.url, '_blank')}
+                      className="shrink-0"
                     >
-                      <label htmlFor={`file-${doc.id}`} className="cursor-pointer flex items-center justify-center gap-2">
-                        {doc.file ? (
-                          <>
-                            <FileCheck className="h-4 w-4" />
-                            Archivo cargado
-                          </>
-                        ) : (
-                          <>
-                            <FilePlus className="h-4 w-4" />
-                            Subir archivo
-                          </>
-                        )}
-                      </label>
+                      <File className="h-4 w-4" />
                     </Button>
-                    {doc.file && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => window.open(doc.file?.url, '_blank')}
-                      >
-                        <File className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                  )}
                 </div>
-              ))}
-            </div>
-
-            {isGenerating && (
-              <div className="space-y-2">
-                <Progress value={progress} />
-                <p className="text-sm text-muted-foreground text-center">
-                  Generando memoria técnica...
-                </p>
               </div>
-            )}
+            ))}
+          </div>
 
+          {/* Progress Section */}
+          {isGenerating && (
+            <div className="space-y-2 border rounded-lg p-4 bg-muted/30">
+              <Progress value={progress} />
+              <p className="text-sm text-muted-foreground text-center">
+                Generando memoria técnica...
+              </p>
+            </div>
+          )}
+
+          {/* Action Buttons Section */}
+          <div className="flex flex-col sm:flex-row gap-2">
             {generatedPdfUrl && (
               <Button 
                 variant="outline"
-                className="w-full"
+                className="w-full sm:flex-1"
                 onClick={() => window.open(generatedPdfUrl, '_blank')}
               >
                 <Download className="h-4 w-4 mr-2" />
@@ -463,7 +478,7 @@ export const MemoriaTecnica = () => {
             <Button 
               onClick={generateMemoriaTecnica} 
               disabled={isGenerating}
-              className="w-full"
+              className="w-full sm:flex-1"
             >
               {isGenerating ? (
                 <>
@@ -478,8 +493,8 @@ export const MemoriaTecnica = () => {
               )}
             </Button>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
