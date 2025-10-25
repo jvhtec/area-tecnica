@@ -72,10 +72,10 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
   };
 
   return (
-    <div className="space-y-4 border rounded-lg p-4">
-      <h3 className="text-lg font-semibold">RF & Wireless Setup</h3>
+    <div className="space-y-4 border rounded-lg p-3 md:p-4">
+      <h3 className="text-base md:text-lg font-semibold">RF & Wireless Setup</h3>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <div className="space-y-4">
           <WirelessConfig
             systems={formData.wireless_systems || []}

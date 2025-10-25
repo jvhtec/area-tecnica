@@ -184,9 +184,9 @@ export const PrintOptionsDialog = ({
 
   const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages' | 'rfIemTableStages' | 'infrastructureTableStages' | 'wiredMicNeedsStages') => {
     return (
-      <div className="pl-6 space-y-2">
-        <p className="text-sm text-muted-foreground">Select stages:</p>
-        <div className="grid grid-cols-2 gap-2">
+      <div className="pl-4 sm:pl-6 space-y-2">
+        <p className="text-xs sm:text-sm text-muted-foreground">Select stages:</p>
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2">
           {Array.from({ length: maxStages }, (_, i) => i + 1).map((stageNum) => (
             <div key={stageNum} className="flex items-center space-x-2">
               <Checkbox
@@ -199,7 +199,7 @@ export const PrintOptionsDialog = ({
               />
               <Label 
                 htmlFor={`${section}-${stageNum}`}
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+                className="text-xs sm:text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
               >
                 Stage {stageNum}
               </Label>
@@ -603,11 +603,11 @@ export const PrintOptionsDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[100vw] sm:max-w-2xl max-h-[100vh] sm:max-h-[90vh] h-full sm:h-auto w-full sm:w-auto overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-base sm:text-lg">Select Documents to Print</DialogTitle>
         </DialogHeader>
-        <div className="space-y-6 py-4">
+        <div className="space-y-4 sm:space-y-6 py-2 sm:py-4">
           <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800">
             <div className="flex items-center space-x-2 mb-2">
               <Checkbox
@@ -636,11 +636,12 @@ export const PrintOptionsDialog = ({
           {maxStages > 1 && (
             <div className="border-b pb-4">
               <h3 className="text-sm font-medium mb-3 dark:text-gray-200">Global Stage Controls</h3>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={handleSelectAllStages}
+                  className="w-full sm:w-auto"
                 >
                   Select All Stages
                 </Button>
@@ -648,6 +649,7 @@ export const PrintOptionsDialog = ({
                   variant="outline" 
                   size="sm"
                   onClick={handleDeselectAllStages}
+                  className="w-full sm:w-auto"
                 >
                   Deselect All Stages
                 </Button>
@@ -943,17 +945,18 @@ export const PrintOptionsDialog = ({
 
           <div className="border-t pt-4">
             <div className="bg-muted/50 p-3 rounded-md dark:bg-muted/20">
-              <h4 className="text-sm font-medium mb-1 dark:text-gray-200">Generated filename:</h4>
-              <p className="text-sm text-muted-foreground font-mono dark:text-gray-300">{generateFilename()}</p>
+              <h4 className="text-xs sm:text-sm font-medium mb-1 dark:text-gray-200">Generated filename:</h4>
+              <p className="text-xs sm:text-sm text-muted-foreground font-mono dark:text-gray-300 break-all">{generateFilename()}</p>
             </div>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
             Cancel
           </Button>
-          <Button onClick={handleConfirm}>
-            Generate {options.generateIndividualStagePDFs ? 'Individual Stage PDFs' : 'PDF'}
+          <Button onClick={handleConfirm} className="w-full sm:w-auto">
+            <span className="hidden sm:inline">Generate {options.generateIndividualStagePDFs ? 'Individual Stage PDFs' : 'PDF'}</span>
+            <span className="sm:hidden">Generate</span>
           </Button>
         </DialogFooter>
       </DialogContent>

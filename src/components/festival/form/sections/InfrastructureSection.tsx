@@ -10,13 +10,13 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
   const { validateEquipment } = useEquipmentValidation(gearSetup);
 
   return (
-    <div className="space-y-4 border rounded-lg p-4">
-      <h3 className="text-lg font-semibold">Infrastructure</h3>
+    <div className="space-y-4 border rounded-lg p-3 md:p-4">
+      <h3 className="text-base md:text-lg font-semibold">Infrastructure</h3>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* CAT6 */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center space-x-2">
               <Switch
                 id="infra-cat6"
@@ -28,7 +28,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                   })
                 }
               />
-              <Label htmlFor="infra-cat6">CAT6</Label>
+              <Label htmlFor="infra-cat6" className="text-sm md:text-base">CAT6</Label>
             </div>
             {formData.infra_cat6 && (
               <QuantityInput
@@ -39,7 +39,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                 available={gearSetup?.available_cat6_runs}
                 validate={(value) => validateEquipment('cat6', value)}
                 min={1}
-                className="w-24"
+                className="w-full sm:w-24"
               />
             )}
           </div>
@@ -47,7 +47,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
 
         {/* HMA */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center space-x-2">
               <Switch
                 id="infra-hma"
@@ -59,7 +59,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                   })
                 }
               />
-              <Label htmlFor="infra-hma">HMA</Label>
+              <Label htmlFor="infra-hma" className="text-sm md:text-base">HMA</Label>
             </div>
             {formData.infra_hma && (
               <QuantityInput
@@ -70,7 +70,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                 available={gearSetup?.available_hma_runs}
                 validate={(value) => validateEquipment('hma', value)}
                 min={1}
-                className="w-24"
+                className="w-full sm:w-24"
               />
             )}
           </div>
@@ -78,7 +78,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
 
         {/* Coax */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center space-x-2">
               <Switch
                 id="infra-coax"
@@ -90,7 +90,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                   })
                 }
               />
-              <Label htmlFor="infra-coax">Coax</Label>
+              <Label htmlFor="infra-coax" className="text-sm md:text-base">Coax</Label>
             </div>
             {formData.infra_coax && (
               <QuantityInput
@@ -101,7 +101,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                 available={gearSetup?.available_coax_runs}
                 validate={(value) => validateEquipment('coax', value)}
                 min={1}
-                className="w-24"
+                className="w-full sm:w-24"
               />
             )}
           </div>
@@ -109,7 +109,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
 
         {/* OpticalCon Duo */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center space-x-2">
               <Switch
                 id="infra-opticalcon"
@@ -121,7 +121,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                   })
                 }
               />
-              <Label htmlFor="infra-opticalcon">OpticalCon Duo</Label>
+              <Label htmlFor="infra-opticalcon" className="text-sm md:text-base">OpticalCon Duo</Label>
             </div>
             {formData.infra_opticalcon_duo && (
               <QuantityInput
@@ -132,7 +132,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                 available={gearSetup?.available_opticalcon_duo_runs}
                 validate={(value) => validateEquipment('opticalcon', value)}
                 min={1}
-                className="w-24"
+                className="w-full sm:w-24"
               />
             )}
           </div>
@@ -140,8 +140,8 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
 
         {/* Analog Lines */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="infra-analog">Analog Lines</Label>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <Label htmlFor="infra-analog" className="text-sm md:text-base">Analog Lines</Label>
             <QuantityInput
               id="infra-analog"
               label=""
@@ -150,7 +150,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
               available={gearSetup?.available_analog_runs}
               validate={(value) => validateEquipment('analog', value)}
               min={0}
-              className="w-24"
+              className="w-full sm:w-24"
             />
           </div>
         </div>
