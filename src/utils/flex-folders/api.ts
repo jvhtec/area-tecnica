@@ -1,5 +1,30 @@
-
+import { supabase } from "@/integrations/supabase/client";
 import { FlexFolderPayload, FlexFolderResponse } from "./types";
+
+let cachedFlexToken: string | null = null;
+
+/**
+ * Gets the Flex authentication token from Supabase secrets
+ */
+async function getFlexAuthToken(): Promise<string> {
+  if (cachedFlexToken) return cachedFlexToken;
+
+  const { data, error } = await supabase.functions.invoke('get-secret', {
+    body: { secretName: 'X_AUTH_TOKEN' },
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to resolve Flex auth token');
+  }
+
+  const token = (data as { X_AUTH_TOKEN?: string } | null)?.X_AUTH_TOKEN;
+  if (!token) {
+    throw new Error('Flex auth token response missing X_AUTH_TOKEN');
+  }
+
+  cachedFlexToken = token;
+  return token;
+}
 
 /**
  * Creates a folder in the Flex system
@@ -9,11 +34,14 @@ import { FlexFolderPayload, FlexFolderResponse } from "./types";
 export async function createFlexFolder(payload: FlexFolderPayload): Promise<FlexFolderResponse> {
   console.log("Creating Flex folder with payload:", payload);
   
+  const token = await getFlexAuthToken();
+
   const response = await fetch("https://sectorpro.flexrentalsolutions.com/f5/api/element", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Auth-Token": "82b5m0OKgethSzL1YbrWMUFvxdNkNMjRf82E"
+      "X-Auth-Token": token,
+      "apikey": token,
     },
     body: JSON.stringify(payload)
   });

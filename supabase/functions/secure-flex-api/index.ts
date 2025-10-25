@@ -65,6 +65,7 @@ serve(async (req) => {
       headers: {
         'Content-Type': 'application/json',
         'X-Auth-Token': authToken,
+        'apikey': authToken,
       },
       body: payload ? JSON.stringify(payload) : undefined
     });

@@ -75,6 +75,7 @@ describe("getElementTree", () => {
         headers: {
           "Content-Type": "application/json",
           "X-Auth-Token": "test-token",
+          "apikey": "test-token",
         },
       }
     );
@@ -275,6 +276,7 @@ describe("getElementTree", () => {
       expect.objectContaining({
         headers: expect.objectContaining({
           "X-Auth-Token": "test-token",
+          "apikey": "test-token",
         }),
       })
     );
@@ -283,6 +285,7 @@ describe("getElementTree", () => {
       expect.objectContaining({
         headers: expect.objectContaining({
           "X-Auth-Token": "test-token",
+          "apikey": "test-token",
         }),
       })
     );

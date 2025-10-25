@@ -125,6 +125,7 @@ export const getProjectDetails = async (searchText: string): Promise<ProjectDeta
     headers: {
       'Content-Type': 'application/json',
       'X-Auth-Token': token,
+      'apikey': token,
     },
   });
 
@@ -144,6 +145,7 @@ export const getProjectHeader = async (projectId: string): Promise<ProjectHeader
     headers: {
       'Content-Type': 'application/json',
       'X-Auth-Token': token,
+      'apikey': token,
     },
   });
 
@@ -173,6 +175,7 @@ export const createLaborPO = async (data: CreateLaborPORequest): Promise<CreateL
       'Content-Type': 'application/json',
       accept: '*/*',
       'X-Auth-Token': token,
+      'apikey': token,
     },
     body: JSON.stringify({
       definitionId: 'labor-po-definition-id',
@@ -211,6 +214,7 @@ export const addResourceLineItem = async (
     headers: {
       accept: '*/*',
       'X-Auth-Token': token,
+      'apikey': token,
     },
   });
 
@@ -243,6 +247,7 @@ export const updateLineItemDates = async (
       'Content-Type': 'application/json',
       accept: '*/*',
       'X-Auth-Token': token,
+      'apikey': token,
     },
     body: JSON.stringify(payload),
   });
@@ -275,6 +280,7 @@ export const getElementTree = async (elementId: string): Promise<ElementTreeNode
     headers: {
       'Content-Type': 'application/json',
       'X-Auth-Token': token,
+      'apikey': token,
     },
   });
 

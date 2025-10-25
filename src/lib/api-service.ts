@@ -41,6 +41,7 @@ export class ApiService {
         headers: {
           'Content-Type': 'application/json',
           'X-Auth-Token': token,
+          'apikey': token,
         },
       });
       
@@ -63,6 +64,7 @@ export class ApiService {
         headers: {
           'Content-Type': 'application/json',
           'X-Auth-Token': token,
+          'apikey': token,
         },
         body: JSON.stringify(data),
       });
@@ -86,6 +88,7 @@ export class ApiService {
         headers: {
           'Content-Type': 'application/json',
           'X-Auth-Token': token,
+          'apikey': token,
         },
         body: JSON.stringify(data),
       });
@@ -109,6 +112,7 @@ export class ApiService {
         headers: {
           'Content-Type': 'application/json',
           'X-Auth-Token': token,
+          'apikey': token,
         },
       });
       
