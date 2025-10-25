@@ -511,16 +511,16 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
   return (
     <>
-      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleCardClick}>
+      <Card className="cursor-pointer hover:shadow-md transition-shadow h-full flex flex-col" onClick={handleCardClick}>
         <CardHeader 
-          className="pb-3 relative"
+          className="pb-3 relative px-4 py-3 md:px-6 md:py-4"
           style={{ backgroundColor: `${tour.color}20` }}
         >
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <div className="flex items-start gap-3 mb-2">
+          <div className="flex justify-between items-start gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start gap-2 md:gap-3 mb-2">
                 {logoUrl && (
-                  <div className="w-12 h-12 flex-shrink-0">
+                  <div className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
                     <img
                       src={logoUrl}
                       alt="Tour logo"
@@ -532,10 +532,10 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                     />
                   </div>
                 )}
-                <div className="flex-1">
-                  <CardTitle className="text-lg">{tour.name}</CardTitle>
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-base md:text-lg truncate md:whitespace-normal">{tour.name}</CardTitle>
                   {tour.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                    <p className="text-xs md:text-sm text-muted-foreground line-clamp-2 mt-1">
                       {tour.description}
                     </p>
                   )}
@@ -641,12 +641,12 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
           </div>
         </CardHeader>
         
-        <CardContent className="pt-3">
-          <div className="space-y-4">
+        <CardContent className="pt-3 px-4 pb-4 md:px-6 md:pb-6 flex-1">
+          <div className="space-y-3 md:space-y-4">
             {/* Tour dates info */}
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-muted-foreground">
                   {tour.tour_dates?.length || 0} dates
                 </span>
@@ -661,15 +661,15 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
             {/* Upcoming dates preview */}
             {upcomingDates.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-sm font-medium">Upcoming:</h4>
+                <h4 className="text-xs md:text-sm font-medium">Upcoming:</h4>
                 {upcomingDates.map((date: any) => (
-                  <div key={date.id} className="flex items-center gap-2 text-xs">
-                    <Calendar className="h-3 w-3 text-muted-foreground" />
-                    <span>{format(new Date(date.start_date || date.date), 'MMM d, yyyy')}</span>
+                  <div key={date.id} className="flex flex-wrap items-center gap-1 md:gap-2 text-xs">
+                    <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    <span className="whitespace-nowrap">{format(new Date(date.start_date || date.date), 'MMM d, yyyy')}</span>
                     {date.location?.name && (
                       <>
-                        <MapPin className="h-3 w-3 text-muted-foreground ml-2" />
-                        <span className="text-muted-foreground">{date.location.name}</span>
+                        <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0 ml-1" />
+                        <span className="text-muted-foreground truncate">{date.location.name}</span>
                       </>
                     )}
                   </div>
@@ -678,7 +678,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
             )}
 
             {/* Status badges */}
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-1.5 md:gap-2 flex-wrap">
               {tour.status === 'cancelled' && (
                 <Badge variant="destructive" className="text-xs">
                   <XCircle className="h-3 w-3 mr-1" />

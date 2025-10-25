@@ -137,18 +137,18 @@ export const BulkTourFolderActions = ({
 
   return (
     <Card className="mb-4 border-orange-200 bg-orange-50 dark:bg-orange-950/20">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center justify-between">
+      <CardHeader className="pb-3 px-4 py-3 md:px-6 md:py-4">
+        <CardTitle className="text-base md:text-lg flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <FolderPlus className="h-5 w-5 text-orange-600" />
-            Legacy Tours Detected
+            <FolderPlus className="h-4 w-4 md:h-5 md:w-5 text-orange-600 flex-shrink-0" />
+            <span className="text-sm md:text-base">Legacy Tours Detected</span>
           </div>
           {isCollapsible && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 touch-manipulation"
             >
               {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
             </Button>
@@ -156,15 +156,15 @@ export const BulkTourFolderActions = ({
         </CardTitle>
       </CardHeader>
       {!isCollapsed && (
-        <CardContent>
+        <CardContent className="px-4 pb-4 md:px-6 md:pb-6">
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs md:text-sm text-muted-foreground">
               {toursNeedingRootFolders.length} tour(s) appear to need root folders. This might be a display issue if folders already exist.
             </p>
           
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 md:gap-2">
             {toursNeedingRootFolders.map((tour) => (
-              <Badge key={tour.id} variant="outline" className="border-orange-300 text-orange-700">
+              <Badge key={tour.id} variant="outline" className="border-orange-300 text-orange-700 text-xs">
                 {tour.name}
                 {tour.flex_main_folder_id && (
                   <span className="ml-1 text-xs text-green-600">(Has Folder ID)</span>
@@ -173,22 +173,24 @@ export const BulkTourFolderActions = ({
             ))}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button 
               onClick={handleVerifyFolders}
               disabled={isVerifying || isCreating}
               variant="outline"
-              className="flex-1"
+              className="flex-1 touch-manipulation"
             >
               {isVerifying ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Verifying...
+                  <span className="hidden sm:inline">Verifying...</span>
+                  <span className="sm:hidden">Verifying...</span>
                 </>
               ) : (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Verify Status
+                  <span className="hidden sm:inline">Verify Status</span>
+                  <span className="sm:hidden">Verify</span>
                 </>
               )}
             </Button>
@@ -196,17 +198,19 @@ export const BulkTourFolderActions = ({
             <Button 
               onClick={handleCreateBulkRootFolders}
               disabled={isCreating || isVerifying}
-              className="flex-1"
+              className="flex-1 touch-manipulation"
             >
               {isCreating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating Root Folders...
+                  <span className="hidden sm:inline">Creating Root Folders...</span>
+                  <span className="sm:hidden">Creating...</span>
                 </>
               ) : (
                 <>
                   <FolderPlus className="h-4 w-4 mr-2" />
-                  Create Root Folders
+                  <span className="hidden sm:inline">Create Root Folders</span>
+                  <span className="sm:hidden">Create</span>
                 </>
               )}
             </Button>
