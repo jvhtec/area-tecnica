@@ -6,7 +6,8 @@ import { FLEX_FOLDER_IDS } from './constants';
  */
 export type FlexLinkIntent =
   | 'simple-element'    // Folders, subfolders, dryhire, tourdate
-  | 'fin-doc'           // Financial documents (presupuesto, hojaGastos, ordenes)
+  | 'fin-doc'           // Financial documents (presupuesto, hoja info, ordenes)
+  | 'expense-sheet'     // Expense sheet (hoja de gastos)
   | 'contact-list'      // Crew call/contact list
   | 'equipment-list'    // Pull sheet/equipment list
   | 'remote-file-list'; // Remote file list
@@ -45,10 +46,21 @@ export interface IntentDetectionContext {
 const FINANCIAL_DOCUMENT_DEFINITION_IDS = [
   FLEX_FOLDER_IDS.presupuesto,
   FLEX_FOLDER_IDS.presupuestoDryHire,
-  FLEX_FOLDER_IDS.hojaGastos,
   FLEX_FOLDER_IDS.ordenCompra,
   FLEX_FOLDER_IDS.ordenSubalquiler,
   FLEX_FOLDER_IDS.ordenTrabajo,
+  FLEX_FOLDER_IDS.hojaInfoSx,
+  FLEX_FOLDER_IDS.hojaInfoLx,
+  FLEX_FOLDER_IDS.hojaInfoVx,
+];
+
+// Expense sheet documents (hoja de gastos)
+const EXPENSE_SHEET_DEFINITION_IDS = [FLEX_FOLDER_IDS.hojaGastos];
+
+// Remote file list documents
+const REMOTE_FILE_LIST_DEFINITION_IDS = [
+  FLEX_FOLDER_IDS.documentacionTecnica,
+  FLEX_FOLDER_IDS.presupuestosRecibidos,
 ];
 
 // Crew call/contact list documents
@@ -98,6 +110,14 @@ export function detectFlexLinkIntent(context?: IntentDetectionContext): FlexLink
       return 'equipment-list';
     }
     
+    if (REMOTE_FILE_LIST_DEFINITION_IDS.includes(context.definitionId)) {
+      return 'remote-file-list';
+    }
+
+    if (EXPENSE_SHEET_DEFINITION_IDS.includes(context.definitionId)) {
+      return 'expense-sheet';
+    }
+
     if (FINANCIAL_DOCUMENT_DEFINITION_IDS.includes(context.definitionId)) {
       return 'fin-doc';
     }
@@ -132,6 +152,14 @@ export function detectFlexLinkIntent(context?: IntentDetectionContext): FlexLink
 export function isFinancialDocument(definitionId?: string): boolean {
   if (!definitionId) return false;
   return FINANCIAL_DOCUMENT_DEFINITION_IDS.includes(definitionId);
+}
+
+/**
+ * Determines if a definitionId is an expense sheet
+ */
+export function isExpenseSheet(definitionId?: string): boolean {
+  if (!definitionId) return false;
+  return EXPENSE_SHEET_DEFINITION_IDS.includes(definitionId);
 }
 
 /**

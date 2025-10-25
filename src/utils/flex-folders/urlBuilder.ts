@@ -17,6 +17,7 @@ import { FlexLinkIntent } from './intentDetection';
  * - contact-list: #contact-list/{id}/view/{viewId}/detail
  * - equipment-list: #equipment-list/{id}/view/simple-element/header
  * - remote-file-list: #remote-file-list/{id}/view/simple-element/header
+ * - expense-sheet: #fin-doc/{id}/doc-view/{viewId}/header
  */
 export function buildFlexUrlByIntent(
   intent: FlexLinkIntent,
@@ -39,6 +40,11 @@ export function buildFlexUrlByIntent(
     case 'fin-doc': {
       const finDocViewId = viewId || getFlexViewId('presupuesto');
       return `${baseUrl}#fin-doc/${elementId}/doc-view/${finDocViewId}/header`;
+    }
+
+    case 'expense-sheet': {
+      const expenseSheetViewId = viewId || getFlexViewId('hojaGastos');
+      return `${baseUrl}#fin-doc/${elementId}/doc-view/${expenseSheetViewId}/header`;
     }
 
     case 'contact-list': {
