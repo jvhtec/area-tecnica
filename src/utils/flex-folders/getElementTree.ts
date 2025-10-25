@@ -101,6 +101,7 @@ function transformSingleElement(element: unknown): FlexElementNode {
   const node: FlexElementNode = {
     elementId:
       (typeof el.elementId === "string" ? el.elementId : null) ||
+      (typeof el.nodeId === "string" ? el.nodeId : null) ||
       (typeof el.id === "string" ? el.id : null) ||
       "",
     displayName:
