@@ -199,6 +199,12 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     }
   };
 
+  const handleFlexElementSelect = React.useCallback((elementId: string) => {
+    // Navigate to the selected Flex element
+    const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${elementId}/view/simple-element/header`;
+    window.open(flexUrl, '_blank', 'noopener');
+  }, []);
+
   const handleManageJob = (e: React.MouseEvent) => {
     e.stopPropagation();
     const params = new URLSearchParams({ singleJob: 'true' });
@@ -531,8 +537,13 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           open={flexSelectorOpen}
           onOpenChange={setFlexSelectorOpen}
           mainElementId={mainFlexInfo.elementId}
-          defaultDepartment={department}
-          jobId={job.id}
+          onSelect={handleFlexElementSelect}
+          defaultElementId={
+            // Try to find department-specific folder as default
+            job.flex_folders?.find((f: any) => 
+              f.department?.toLowerCase() === department?.toLowerCase()
+            )?.element_id || mainFlexInfo.elementId
+          }
         />
       )}
     </div>
