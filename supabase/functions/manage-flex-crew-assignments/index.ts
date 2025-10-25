@@ -121,6 +121,7 @@ serve(async (req) => {
 
       const flexHeaders: Record<string,string> = {
         'X-Auth-Token': flexAuthToken,
+        'apikey': flexAuthToken,
         'X-Requested-With': 'XMLHttpRequest',
         'X-API-Client': 'flex5-desktop',
         'Accept': '*/*',
@@ -311,6 +312,7 @@ serve(async (req) => {
         method: 'DELETE',
         headers: {
           'X-Auth-Token': flexAuthToken,
+          'apikey': flexAuthToken,
         },
       });
 

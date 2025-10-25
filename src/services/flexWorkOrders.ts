@@ -78,6 +78,7 @@ async function createWorkOrderElement(options: {
       'Content-Type': 'application/json',
       accept: 'application/json',
       'X-Auth-Token': token,
+      'apikey': token,
     },
     body: JSON.stringify(payload),
   });
@@ -103,7 +104,7 @@ async function createWorkOrderElement(options: {
 async function fetchDocumentNumber(documentId: string, token: string): Promise<string | null> {
   const url = `${FLEX_API_BASE_URL}/element/${encodeURIComponent(documentId)}/key-info/`;
   try {
-    const res = await fetch(url, { headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token } });
+    const res = await fetch(url, { headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token, 'apikey': token } });
     if (!res.ok) return null;
     const j = await res.json().catch(() => null) as any;
     const docNum = j?.documentNumber?.data || j?.documentNumber || null;
@@ -141,7 +142,7 @@ async function addResourceLineItem(options: {
     }
   };
 
-  const headers = { accept: '*/*', 'X-Auth-Token': token } as Record<string, string>;
+  const headers = { accept: '*/*', 'X-Auth-Token': token, 'apikey': token } as Record<string, string>;
   let payload: any | null = null;
   if (!parentLineItemId) {
     // Try JSON path first when not nesting under a parent line
@@ -188,6 +189,7 @@ async function updateLineItemDates(options: {
         'Content-Type': 'application/json',
         accept: '*/*',
         'X-Auth-Token': token,
+        'apikey': token,
       },
       body: JSON.stringify({
         bulkData: [{ itemId: lineItemId, alternatePickupDate: pickupDate, alternateReturnDate: returnDate }],
@@ -213,6 +215,7 @@ async function setLineItemPricingModel(options: {
       'Content-Type': 'application/json',
       accept: 'application/json',
       'X-Auth-Token': token,
+      'apikey': token,
       'X-Requested-With': 'XMLHttpRequest',
       'X-API-Client': 'flex5-desktop',
     } as Record<string,string>;
@@ -254,6 +257,7 @@ async function setLineItemTimeQty(options: {
       'Content-Type': 'application/json',
       accept: 'application/json',
       'X-Auth-Token': token,
+      'apikey': token,
       'X-Requested-With': 'XMLHttpRequest',
       'X-API-Client': 'flex5-desktop',
     } as Record<string,string>;
@@ -304,6 +308,7 @@ async function setLineItemTimeQtyBulk(options: {
         'Content-Type': 'application/json',
         accept: '*/*',
         'X-Auth-Token': token,
+        'apikey': token,
         'X-Requested-With': 'XMLHttpRequest',
         'X-API-Client': 'flex5-desktop',
       },
@@ -332,6 +337,7 @@ async function updateLineItemField(options: {
         'Content-Type': 'application/json',
         accept: 'application/json',
         'X-Auth-Token': token,
+        'apikey': token,
         'X-Requested-With': 'XMLHttpRequest',
         'X-API-Client': 'flex5-desktop',
       },
@@ -357,6 +363,7 @@ async function setLineItemQuantityRow(options: {
       'Content-Type': 'application/json',
       accept: 'application/json',
       'X-Auth-Token': token,
+      'apikey': token,
       'X-Requested-With': 'XMLHttpRequest',
       'X-API-Client': 'flex5-desktop',
     } as Record<string,string>;
@@ -396,6 +403,7 @@ async function setLineItemQuantityBulk(options: {
         'Content-Type': 'application/json',
         accept: '*/*',
         'X-Auth-Token': token,
+        'apikey': token,
         'X-Requested-With': 'XMLHttpRequest',
         'X-API-Client': 'flex5-desktop',
       },
@@ -424,6 +432,7 @@ async function addExtraNoteLineItem(options: {
           'Content-Type': 'application/json',
           accept: 'application/json',
           'X-Auth-Token': token,
+          'apikey': token,
         },
         body: JSON.stringify({ note }),
       });
@@ -444,6 +453,7 @@ async function addExtraNoteLineItem(options: {
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
         accept: '*/*',
         'X-Auth-Token': token,
+        'apikey': token,
       },
       body: new URLSearchParams({ note }).toString(),
     });
@@ -576,6 +586,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
         'Content-Type': 'application/json',
         accept: 'application/json',
         'X-Auth-Token': token,
+        'apikey': token,
       },
       body: JSON.stringify(workOrderPayload),
     });

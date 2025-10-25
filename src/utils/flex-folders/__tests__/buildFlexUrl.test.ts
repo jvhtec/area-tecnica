@@ -144,6 +144,7 @@ describe('getElementDetails', () => {
         headers: {
           'Content-Type': 'application/json',
           'X-Auth-Token': 'test-token',
+          'apikey': 'test-token',
         },
       }
     );

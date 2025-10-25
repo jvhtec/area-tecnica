@@ -54,7 +54,7 @@ serve(async (req: Request) => {
     const qs = new URLSearchParams();
     qs.set('_dc', String(Date.now()));
     const url = `https://sectorpro.flexrentalsolutions.com/f5/api/contact/${encodeURIComponent(cid)}/key-info/?${qs.toString()}`;
-    const res = await fetch(url, { headers: { 'X-Auth-Token': flexAuthToken, 'X-Requested-With': 'XMLHttpRequest' } });
+    const res = await fetch(url, { headers: { 'X-Auth-Token': flexAuthToken, 'apikey': flexAuthToken, 'X-Requested-With': 'XMLHttpRequest' } });
     if (!res.ok) {
       const text = await res.text();
       return new Response(JSON.stringify({ error: `Flex error ${res.status}`, details: text }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

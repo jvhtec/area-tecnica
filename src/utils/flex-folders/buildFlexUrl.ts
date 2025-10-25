@@ -50,6 +50,7 @@ export async function getElementDetails(
         headers: {
           'Content-Type': 'application/json',
           'X-Auth-Token': authToken,
+          'apikey': authToken,
         },
       }
     );

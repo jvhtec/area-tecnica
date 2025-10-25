@@ -104,6 +104,7 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: {
         'X-Auth-Token': flexAuthToken,
+        'apikey': flexAuthToken,
         'Content-Type': 'application/json',
       },
       body: '{}'
@@ -145,7 +146,7 @@ Deno.serve(async (req) => {
               const childUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/workflow-action/${child.element_id}/process/${workflowActions.sub[status]}?bulkProcess=false`;
               const childRes = await fetch(childUrl, {
                 method: 'POST',
-                headers: { 'X-Auth-Token': flexAuthToken, 'Content-Type': 'application/json' },
+                headers: { 'X-Auth-Token': flexAuthToken, 'apikey': flexAuthToken, 'Content-Type': 'application/json' },
                 body: '{}'
               });
               let childJson: any = null; try { childJson = await childRes.json(); } catch {}
