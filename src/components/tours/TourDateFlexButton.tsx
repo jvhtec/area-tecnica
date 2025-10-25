@@ -4,8 +4,7 @@ import createFolderIcon from "@/assets/icons/icon.png";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
-import { buildFlexUrlWithTypeDetection } from "@/utils/flex-folders";
+import { openFlexElement } from "@/utils/flex-folders";
 
 interface TourDateFlexButtonProps {
   tourDateId: string;
@@ -28,40 +27,28 @@ export const TourDateFlexButton = ({ tourDateId, isCreatingFolders = false }: To
     }
 
     if (flexUuid) {
-      try {
-        console.log(`[TourDateFlexButton] Opening Flex for tour date ${tourDateId}, element: ${flexUuid}`);
-        
-        // Get auth token from Supabase
-        const { data: { X_AUTH_TOKEN }, error: authError } = await supabase
-          .functions.invoke('get-secret', {
-            body: { secretName: 'X_AUTH_TOKEN' }
+      console.log(`[TourDateFlexButton] Opening Flex for tour date ${tourDateId}, element: ${flexUuid}`);
+      
+      await openFlexElement({
+        elementId: flexUuid,
+        context: {
+          jobType: 'tourdate',
+          folderType: 'tourdate',
+        },
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: error.message || "Failed to open Flex",
+            variant: "destructive",
           });
-        
-        if (authError || !X_AUTH_TOKEN) {
-          console.error('[TourDateFlexButton] Failed to get auth token:', authError);
-          // Fallback to simple element URL if auth fails
-          // This is safe for tourdate elements which are subfolders
-          const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-          console.log(`[TourDateFlexButton] Using fallback URL: ${flexUrl}`);
-          window.open(flexUrl, '_blank', 'noopener');
-          return;
-        }
-
-        // Build URL with element type detection
-        const flexUrl = await buildFlexUrlWithTypeDetection(flexUuid, X_AUTH_TOKEN);
-        console.log(`[TourDateFlexButton] Opening Flex URL: ${flexUrl}`);
-        window.open(flexUrl, '_blank', 'noopener');
-      } catch (err) {
-        console.error('[TourDateFlexButton] Error building Flex URL:', err);
-        // Fallback to simple element URL if error occurs
-        const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-        console.log(`[TourDateFlexButton] Using fallback URL after error: ${flexUrl}`);
-        window.open(flexUrl, '_blank', 'noopener');
-        toast({ 
-          title: 'Warning', 
-          description: 'Opened with fallback URL format', 
-        });
-      }
+        },
+        onWarning: (message) => {
+          toast({
+            title: "Warning",
+            description: message,
+          });
+        },
+      });
     } else if (error) {
       toast({
         title: "Error",

@@ -15,7 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
 import { getMainFlexElementIdSync, resolveTourFolderForTourdate } from "@/utils/flexMainFolderId";
-import { buildFlexUrlWithTypeDetection, createTourdateFilterPredicate } from "@/utils/flex-folders";
+import { createTourdateFilterPredicate, openFlexElement } from "@/utils/flex-folders";
 
 interface JobCardActionsProps {
   job: any;
@@ -236,42 +236,29 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       }
     }
 
-    // Otherwise, use direct flexUuid navigation with type detection
+    // Otherwise, use direct flexUuid navigation with shared utility
     if (flexUuid) {
-      try {
-        console.log(`[JobCardActions] Opening Flex folder for job ${job.id}, element: ${flexUuid}, type: ${job.job_type}`);
-        
-        // Get auth token from Supabase
-        const { data: { X_AUTH_TOKEN }, error } = await supabase
-          .functions.invoke('get-secret', {
-            body: { secretName: 'X_AUTH_TOKEN' }
+      console.log(`[JobCardActions] Opening Flex folder for job ${job.id}, element: ${flexUuid}, type: ${job.job_type}`);
+      
+      await openFlexElement({
+        elementId: flexUuid,
+        context: {
+          jobType: job.job_type,
+        },
+        onError: (error) => {
+          toast({
+            title: 'Error',
+            description: error.message || 'Failed to open Flex',
+            variant: 'destructive',
           });
-        
-        if (error || !X_AUTH_TOKEN) {
-          console.error('[JobCardActions] Failed to get auth token:', error);
-          // Fallback to simple element URL if auth fails
-          // This is safe for dryhire and tourdate which use subfolders
-          const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-          console.log(`[JobCardActions] Using fallback URL: ${flexUrl}`);
-          window.open(flexUrl, '_blank', 'noopener');
-          return;
-        }
-
-        // Build URL with element type detection
-        const flexUrl = await buildFlexUrlWithTypeDetection(flexUuid, X_AUTH_TOKEN);
-        console.log(`[JobCardActions] Opening Flex URL: ${flexUrl}`);
-        window.open(flexUrl, '_blank', 'noopener');
-      } catch (error) {
-        console.error('[JobCardActions] Error opening Flex:', error);
-        // Fallback to simple element URL if error occurs
-        const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-        console.log(`[JobCardActions] Using fallback URL after error: ${flexUrl}`);
-        window.open(flexUrl, '_blank', 'noopener');
-        toast({ 
-          title: 'Warning', 
-          description: 'Opened with fallback URL format', 
-        });
-      }
+        },
+        onWarning: (message) => {
+          toast({
+            title: 'Warning',
+            description: message,
+          });
+        },
+      });
       return;
     }
     if (flexError) {
@@ -282,41 +269,29 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   };
 
   const handleFlexElementSelect = React.useCallback(async (elementId: string) => {
-    // Navigate to the selected Flex element with type-specific URL
-    try {
-      console.log(`[JobCardActions] Opening Flex element: ${elementId}`);
-      
-      // Get auth token from Supabase
-      const { data: { X_AUTH_TOKEN }, error } = await supabase
-        .functions.invoke('get-secret', {
-          body: { secretName: 'X_AUTH_TOKEN' }
+    // Navigate to the selected Flex element with type-specific URL using shared utility
+    console.log(`[JobCardActions] Opening Flex element: ${elementId}`);
+    
+    await openFlexElement({
+      elementId,
+      context: {
+        jobType: job.job_type,
+      },
+      onError: (error) => {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to open Flex element',
+          variant: 'destructive',
         });
-      
-      if (error || !X_AUTH_TOKEN) {
-        console.error('[JobCardActions] Failed to get auth token:', error);
-        // Fallback to simple element URL if auth fails
-        const fallbackUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${elementId}/view/simple-element/header`;
-        console.log(`[JobCardActions] Using fallback URL: ${fallbackUrl}`);
-        window.open(fallbackUrl, '_blank', 'noopener');
-        return;
-      }
-
-      // Build URL with element type detection
-      const flexUrl = await buildFlexUrlWithTypeDetection(elementId, X_AUTH_TOKEN);
-      console.log(`[JobCardActions] Opening Flex URL: ${flexUrl}`);
-      window.open(flexUrl, '_blank', 'noopener');
-    } catch (error) {
-      console.error('[JobCardActions] Error opening Flex element:', error);
-      // Final fallback: try simple element URL anyway
-      const fallbackUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${elementId}/view/simple-element/header`;
-      console.log(`[JobCardActions] Using fallback URL after error: ${fallbackUrl}`);
-      window.open(fallbackUrl, '_blank', 'noopener');
-      toast({ 
-        title: 'Warning', 
-        description: 'Opened with fallback URL format', 
-      });
-    }
-  }, [toast]);
+      },
+      onWarning: (message) => {
+        toast({
+          title: 'Warning',
+          description: message,
+        });
+      },
+    });
+  }, [job.job_type, toast]);
 
   const handleManageJob = (e: React.MouseEvent) => {
     e.stopPropagation();
