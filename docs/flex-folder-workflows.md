@@ -38,17 +38,46 @@ When a user opts to generate folders for individual tour dates from the manageme
 ## Flex Element Selector Integration
 
 ### Overview
-The Flex Element Selector provides an interactive dialog for selecting which Flex folder to open when clicking "Open Flex" on job cards in the project management context.
+The Flex Element Selector provides an interactive tree-based dialog for selecting which Flex element to open, with hierarchical navigation, search functionality, and visual indentation.
 
 ### Components
 
 #### FlexElementSelectorDialog (`src/components/flex/FlexElementSelectorDialog.tsx`)
-A modal dialog that:
-* Fetches available Flex folders (main event, department folders) for a given job
-* Presents a dropdown selector with all available folders
-* Defaults to the user's department folder when applicable
-* Opens the selected Flex element in a new browser tab
-* Provides error feedback when folders cannot be loaded
+A reusable modal dialog component that:
+* Fetches the complete element tree from Flex API via `getElementTree` helper
+* Uses TanStack Query for efficient data fetching and caching
+* Renders elements in a searchable, scrollable command menu
+* Displays nested hierarchy with visual indentation (16px per level)
+* Shows element display names and document numbers
+* Highlights the default element when specified
+* Supports real-time filtering by name or document number
+* Provides loading spinner and error states with retry functionality
+* Calls `onSelect` callback with selected element ID and closes on selection
+
+**Props**:
+* `open: boolean` - Controls dialog visibility
+* `onOpenChange: (open: boolean) => void` - Callback for dialog state changes
+* `mainElementId: string` - Root element ID to fetch tree from
+* `defaultElementId?: string` - Optional element ID to highlight as default
+* `onSelect: (elementId: string) => void` - Callback invoked when element is selected
+
+#### Element Tree Helper (`src/utils/flex-folders/getElementTree.ts`)
+Provides utilities for fetching and processing Flex element trees:
+
+* **`getElementTree(mainElementId)`**: Fetches the element tree from Flex API
+  - Returns array of FlexElementNode objects with hierarchical structure
+  - Handles API errors and transforms response to normalized format
+  - Supports nested children with recursive structure
+
+* **`flattenTree(nodes, depth?)`**: Flattens hierarchical tree to list with depth
+  - Preserves parent-child relationships
+  - Adds depth property for indentation rendering
+  - Returns FlatElementNode array for easy list rendering
+
+* **`searchTree(nodes, query)`**: Searches tree by display name or document number
+  - Case-insensitive search
+  - Returns flattened results with depth preserved
+  - Empty query returns all nodes flattened
 
 #### Helper Functions (`src/utils/flexMainFolderId.ts`)
 Two utility functions for resolving the main Flex element ID:
@@ -90,7 +119,25 @@ Toast feedback is shown for:
 * Missing folder availability
 
 ### Testing
-Unit tests in `src/utils/flexMainFolderId.test.ts` cover:
+
+#### Element Tree Tests (`src/utils/flex-folders/getElementTree.test.ts`)
+Comprehensive unit tests covering:
+* Tree flattening with correct depth calculation
+* Multi-level nesting and sibling handling
+* Search filtering by display name and document number
+* Case-insensitive search
+* Edge cases (empty trees, missing children, deep nesting)
+
+#### Dialog Component Tests (`src/components/flex/FlexElementSelectorDialog.test.tsx`)
+Unit tests for component behavior:
+* Tree flattening for rendering with indentation
+* Search/filter functionality
+* Node selection callback invocation
+* Default element highlighting logic
+* Document number display handling
+
+#### Main Folder ID Tests (`src/utils/flexMainFolderId.test.ts`)
+Tests covering:
 * Synchronous extraction from job.flex_folders
 * Preference for main_event over main folder type
 * Fallback to Supabase queries
