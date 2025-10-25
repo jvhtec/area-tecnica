@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, EyeOff, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Eye, EyeOff, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { TourDateManagementDialog } from "../tours/TourDateManagementDialog";
 import { TourCard } from "../tours/TourCard";
@@ -10,6 +10,8 @@ import { toast } from "@/hooks/use-toast";
 import { exportTourPDF } from "@/lib/tourPdfExport";
 import { BulkTourFolderActions } from "../tours/BulkTourFolderActions";
 import { useTourSubscription } from "@/hooks/useTourSubscription";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 interface TourChipsProps {
   onTourClick: (tourId: string) => void;
@@ -21,6 +23,8 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showCompletedTours, setShowCompletedTours] = useState(false);
   const [showLegacyDisclaimer, setShowLegacyDisclaimer] = useState(true);
+  const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   // Set up realtime subscription for tours
   useTourSubscription();
@@ -129,51 +133,97 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      {/* Mobile: Stack actions vertically, Desktop: Horizontal layout */}
+      <div className="flex flex-col md:flex-row gap-3 md:justify-between md:items-center">
         <Button
           onClick={() => setIsCreateDialogOpen(true)}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 w-full md:w-auto touch-manipulation"
+          size={isMobile ? "default" : "default"}
         >
           <Plus className="h-4 w-4" />
           Create Tour
         </Button>
         
-        <div className="flex items-center gap-2">
-          {completedTours.length > 0 && (
-            <>
-              <span className="text-sm text-muted-foreground">
-                {completedTours.length} completed
-              </span>
+        {/* Desktop: Show completed tours filter inline */}
+        {!isMobile && completedTours.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground hidden sm:inline">
+              {completedTours.length} completed
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCompletedTours(!showCompletedTours)}
+              className="flex items-center gap-2"
+            >
+              {showCompletedTours ? (
+                <>
+                  <EyeOff className="h-4 w-4" />
+                  <span className="hidden sm:inline">Hide Completed</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="h-4 w-4" />
+                  <span className="hidden sm:inline">Show Completed ({completedTours.length})</span>
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+        
+        {/* Mobile: Show completed tours filter in sheet */}
+        {isMobile && completedTours.length > 0 && (
+          <Sheet open={isMobileActionsOpen} onOpenChange={setIsMobileActionsOpen}>
+            <SheetTrigger asChild>
               <Button
                 variant="outline"
-                size="sm"
-                onClick={() => setShowCompletedTours(!showCompletedTours)}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 w-full touch-manipulation"
               >
-                {showCompletedTours ? (
-                  <>
-                    <EyeOff className="h-4 w-4" />
-                    Hide Completed
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-4 w-4" />
-                    Show Completed ({completedTours.length})
-                  </>
-                )}
+                <MoreVertical className="h-4 w-4" />
+                View Options ({completedTours.length} completed)
               </Button>
-            </>
-          )}
-        </div>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-auto max-h-[40vh]">
+              <SheetHeader>
+                <SheetTitle>Tour Options</SheetTitle>
+              </SheetHeader>
+              <div className="grid gap-3 pt-4">
+                <div
+                  className="flex items-center justify-between p-3 hover:bg-accent rounded-md cursor-pointer transition-colors"
+                  onClick={() => {
+                    setShowCompletedTours(!showCompletedTours);
+                    setIsMobileActionsOpen(false);
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    {showCompletedTours ? (
+                      <>
+                        <EyeOff className="h-5 w-5" />
+                        <span>Hide Completed Tours</span>
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="h-5 w-5" />
+                        <span>Show Completed Tours</span>
+                      </>
+                    )}
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {completedTours.length}
+                  </span>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
 
-      <div className="flex flex-wrap gap-4">
+      {/* Tour Cards Grid - Responsive wrapping */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
         {displayedTours.map((tour: any) => (
           <div
             key={tour.id}
-            className={`w-full sm:w-[calc(50%-1rem)] md:w-[calc(33.33%-1rem)] lg:w-[calc(25%-1rem)] ${
-              completedTours.some(ct => ct.id === tour.id) ? 'opacity-75' : ''
-            }`}
+            className={completedTours.some(ct => ct.id === tour.id) ? 'opacity-75' : ''}
           >
             <TourCard
               tour={tour}

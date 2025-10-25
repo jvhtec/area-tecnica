@@ -1022,15 +1022,15 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] flex flex-col gap-0 p-0">
+        <DialogHeader className="px-4 pt-4 pb-2 md:px-6 md:pt-6 md:pb-4 border-b">
           <DialogTitle className="text-base md:text-lg">
             {readOnly ? 'Tour Dates' : 'Manage Tour Dates'}
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="h-[60vh] md:h-[60vh] pr-2 md:pr-4">
-          <div className="space-y-4">
+        <ScrollArea className="flex-1 h-[60vh] md:h-[60vh] px-4 md:px-6">
+          <div className="space-y-3 md:space-y-4 py-4">
             {/* Bulk folders button removed; availability moved to Team Assignments */}
             
             <div className="space-y-4">
@@ -1040,11 +1040,11 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                 const isCreatingFoldersForDate = createdTourDateIds.includes(dateObj.id);
 
                 return (
-                  <div key={dateObj.id} className="p-3 border rounded-lg">
+                  <div key={dateObj.id} className="p-3 md:p-4 border rounded-lg">
                     {editingTourDate && editingTourDate.id === dateObj.id && !readOnly ? (
                       <div className="flex flex-col gap-3">
                         <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
+                          <Calendar className="h-4 w-4 flex-shrink-0" />
                           <Input
                             type="date"
                             value={editStartDate}
@@ -1056,17 +1056,19 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                               }
                             }}
                             required
+                            className="text-sm"
                           />
                         </div>
                         {editTourDateType === 'rehearsal' && (
                           <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
+                            <Clock className="h-4 w-4 flex-shrink-0" />
                             <Input
                               type="date"
                               value={editEndDate}
                               min={editStartDate}
                               onChange={(e) => setEditEndDate(e.target.value)}
                               required
+                              className="text-sm"
                             />
                           </div>
                         )}
@@ -1095,36 +1097,37 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                             checked={editTourPackOnly}
                             onCheckedChange={(checked) => setEditTourPackOnly(checked as boolean)}
                           />
-                          <Label htmlFor="tour-pack-only-edit" className="text-sm">
+                          <Label htmlFor="tour-pack-only-edit" className="text-xs md:text-sm">
                             Tour Pack Only (skip PA pullsheet)
                           </Label>
                         </div>
-                        <div className="flex gap-2">
-                          <Button onClick={() => submitEditing(dateObj.id)}>
-                            Save
-                          </Button>
-                          <Button variant="outline" onClick={cancelEditing}>
+                        <div className="flex flex-col-reverse sm:flex-row gap-2">
+                          <Button variant="outline" onClick={cancelEditing} className="w-full sm:w-auto">
                             Cancel
+                          </Button>
+                          <Button onClick={() => submitEditing(dateObj.id)} className="w-full sm:w-auto">
+                            Save
                           </Button>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-4 w-4" />
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
+                            <Calendar className="h-4 w-4 flex-shrink-0" />
                             <span>{format(new Date(dateObj.date), "MMM d, yyyy")}</span>
                             {dateObj.is_tour_pack_only && (
                               <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
                                 <Package className="h-3 w-3" />
-                                Tour Pack Only
+                                <span className="hidden sm:inline">Tour Pack Only</span>
+                                <span className="sm:hidden">TP Only</span>
                               </div>
                             )}
                           </div>
                           {dateObj.location?.name && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <MapPin className="h-4 w-4" />
-                              <span>{dateObj.location.name}</span>
+                            <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
+                              <MapPin className="h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">{dateObj.location.name}</span>
                             </div>
                           )}
                           {foldersExist && (
@@ -1133,7 +1136,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                             </div>
                           )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1 md:gap-2 self-end sm:self-auto">
                           {!readOnly && (
                             <>
                               <Button
@@ -1142,7 +1145,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                                 onClick={() => handleCreateFoldersForDate(dateObj)}
                                 title="Create Flex folders"
                                 disabled={foldersExist || isCreatingFoldersForDate}
-                                className={foldersExist ? "opacity-50 cursor-not-allowed" : ""}
+                                className={`h-9 w-9 touch-manipulation ${foldersExist ? "opacity-50 cursor-not-allowed" : ""}`}
                               >
                                 {isCreatingFoldersForDate ? (
                                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -1156,6 +1159,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                                 onClick={() => startEditing(dateObj)}
                                 title="Edit Date"
                                 disabled={isDeleting}
+                                className="h-9 w-9 touch-manipulation"
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -1165,7 +1169,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                                 onClick={() => handleDeleteDate(dateObj.id)}
                                 title="Delete Date"
                                 disabled={isDeleting}
-                                className={isDeleting ? "opacity-50 cursor-not-allowed" : ""}
+                                className={`h-9 w-9 touch-manipulation ${isDeleting ? "opacity-50 cursor-not-allowed" : ""}`}
                               >
                                 {isDeleting ? (
                                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -1184,8 +1188,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
             </div>
             
             {!readOnly && (
-              <div className="space-y-4 border-t pt-4">
-                <h3 className="text-lg font-semibold">Add New Date</h3>
+              <div className="space-y-3 md:space-y-4 border-t pt-4">
+                <h3 className="text-base md:text-lg font-semibold">Add New Date</h3>
                 <TourDateFormFields
                   location={newLocation}
                   setLocation={setNewLocation}
@@ -1203,7 +1207,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                     checked={newTourPackOnly}
                     onCheckedChange={(checked) => setNewTourPackOnly(checked as boolean)}
                   />
-                  <Label htmlFor="tour-pack-only" className="text-sm">
+                  <Label htmlFor="tour-pack-only" className="text-xs md:text-sm">
                     Tour Pack Only (skip PA pullsheet)
                   </Label>
                 </div>
@@ -1232,11 +1236,17 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                     setNewEndDate("");
                     setNewTourPackOnly(false);
                   }}
-                  className="w-full"
+                  className="w-full touch-manipulation"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add {newTourDateType === 'rehearsal' ? 'Rehearsal Period' : 
-                        newTourDateType === 'travel' ? 'Travel Day' : 'Show Date'}
+                  <span className="hidden sm:inline">
+                    Add {newTourDateType === 'rehearsal' ? 'Rehearsal Period' : 
+                          newTourDateType === 'travel' ? 'Travel Day' : 'Show Date'}
+                  </span>
+                  <span className="sm:hidden">
+                    Add {newTourDateType === 'rehearsal' ? 'Rehearsal' : 
+                          newTourDateType === 'travel' ? 'Travel' : 'Show'}
+                  </span>
                 </Button>
               </div>
             )}
