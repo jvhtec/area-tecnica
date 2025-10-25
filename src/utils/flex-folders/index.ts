@@ -5,5 +5,6 @@ export * from "./constants";
 export * from "./types";
 export * from "./getElementTree";
 export * from "./buildFlexUrl";
+export * from "./resolveFlexUrl";
 export * from "./openFlexElement";
 export * from "./openFlexElementSync";

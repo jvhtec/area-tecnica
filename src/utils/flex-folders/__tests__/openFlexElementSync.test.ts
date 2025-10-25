@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { openFlexElementSync } from '../openFlexElementSync';
-import * as buildFlexUrlModule from '../buildFlexUrl';
+import * as resolverModule from '../resolveFlexUrl';
 
 // Mock toast
 vi.mock('sonner', () => ({
@@ -11,12 +11,12 @@ vi.mock('sonner', () => ({
   },
 }));
 
-// Mock buildFlexUrl
-vi.mock('../buildFlexUrl', async () => {
-  const actual = await vi.importActual('../buildFlexUrl');
+// Mock resolver
+vi.mock('../resolveFlexUrl', async () => {
+  const actual = await vi.importActual('../resolveFlexUrl');
   return {
     ...actual,
-    buildFlexUrl: vi.fn(),
+    resolveFlexUrlSync: vi.fn(),
   };
 });
 
@@ -54,7 +54,7 @@ describe('openFlexElementSync', () => {
 
   it('should create and click an anchor element with correct attributes', () => {
     const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrl').mockReturnValue(mockUrl);
+    vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue(mockUrl);
 
     openFlexElementSync({
       elementId: 'test-id',
@@ -77,7 +77,7 @@ describe('openFlexElementSync', () => {
 
   it('should build URL with domainId and definitionId', () => {
     const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrl').mockReturnValue(mockUrl);
+    vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue(mockUrl);
 
     openFlexElementSync({
       elementId: 'test-id',
@@ -85,12 +85,11 @@ describe('openFlexElementSync', () => {
       definitionId: 'test-definition-id',
     });
 
-    // Verify buildFlexUrl was called with correct parameters
-    expect(buildFlexUrlModule.buildFlexUrl).toHaveBeenCalledWith(
-      'test-id',
-      'test-definition-id',
-      'simple-project-element'
-    );
+    // Verify resolver was called with correct parameters
+    expect(resolverModule.resolveFlexUrlSync).toHaveBeenCalledWith({
+      elementId: 'test-id',
+      context: { definitionId: 'test-definition-id', domainId: 'simple-project-element' },
+    });
   });
 
   it('should reject empty elementId', () => {
@@ -149,11 +148,9 @@ describe('openFlexElementSync', () => {
     expect(mockDocument.createElement).not.toHaveBeenCalled();
   });
 
-  it('should use fallback URL when buildFlexUrl throws', () => {
+  it('should use fallback URL when resolver returns empty', () => {
     const { toast } = require('sonner');
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrl').mockImplementation(() => {
-      throw new Error('URL construction failed');
-    });
+    vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue('');
 
     openFlexElementSync({
       elementId: 'test-id',
@@ -173,7 +170,7 @@ describe('openFlexElementSync', () => {
 
   it('should show error toast when both primary and fallback fail', () => {
     const { toast } = require('sonner');
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrl').mockImplementation(() => {
+    vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockImplementation(() => {
       throw new Error('URL construction failed');
     });
 
@@ -192,19 +189,18 @@ describe('openFlexElementSync', () => {
 
   it('should handle financial document with definitionId', () => {
     const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#fin-doc/test-id/doc-view/ca6b072c-b122-11df-b8d5-00e08175e43e/header';
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrl').mockReturnValue(mockUrl);
+    vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue(mockUrl);
 
     openFlexElementSync({
       elementId: 'test-id',
       definitionId: '9bfb850c-b117-11df-b8d5-00e08175e43e', // presupuesto
     });
 
-    // Verify buildFlexUrl was called with definitionId
-    expect(buildFlexUrlModule.buildFlexUrl).toHaveBeenCalledWith(
-      'test-id',
-      '9bfb850c-b117-11df-b8d5-00e08175e43e',
-      undefined
-    );
+    // Verify resolver was called with definitionId
+    expect(resolverModule.resolveFlexUrlSync).toHaveBeenCalledWith({
+      elementId: 'test-id',
+      context: { definitionId: '9bfb850c-b117-11df-b8d5-00e08175e43e', domainId: undefined },
+    });
 
     // Verify anchor was clicked
     expect(mockAnchor.click).toHaveBeenCalled();
@@ -213,7 +209,7 @@ describe('openFlexElementSync', () => {
   it('should log comprehensive debug information', () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrl').mockReturnValue(mockUrl);
+    vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue(mockUrl);
 
     openFlexElementSync({
       elementId: 'test-id',
@@ -238,7 +234,7 @@ describe('openFlexElementSync', () => {
 
   it('should handle element with display name in error messages', () => {
     const { toast } = require('sonner');
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrl').mockReturnValue('');
+    vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue('');
 
     openFlexElementSync({
       elementId: 'test-id',
@@ -253,7 +249,7 @@ describe('openFlexElementSync', () => {
 
   it('should set anchor style to display none', () => {
     const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrl').mockReturnValue(mockUrl);
+    vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue(mockUrl);
 
     openFlexElementSync({
       elementId: 'test-id',

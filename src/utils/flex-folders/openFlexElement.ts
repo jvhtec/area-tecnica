@@ -1,5 +1,4 @@
-import { supabase } from '@/lib/supabase';
-import { buildFlexUrlWithTypeDetection } from './buildFlexUrl';
+import { resolveFlexUrl } from './resolveFlexUrl';
 
 export interface OpenFlexElementOptions {
   elementId: string;
@@ -25,18 +24,10 @@ export interface OpenFlexElementOptions {
 const FLEX_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
 
 /**
- * Opens a Flex element in a new tab, handling the async token fetch and URL building
- * while preserving the user gesture to avoid pop-up blocking.
- * 
- * This utility:
- * 1. Opens a placeholder window synchronously (preserves user gesture)
- * 2. Fetches the auth token asynchronously
- * 3. Builds the final URL with type detection
- * 4. Updates the placeholder window's location
- * 5. Handles errors gracefully with fallbacks
- * 
- * @param options - Configuration for opening the Flex element
- * @returns Promise that resolves when the operation completes
+ * Opens a Flex element in a new tab, handling URL resolution while preserving user gesture.
+ * This utility opens a placeholder window synchronously, resolves the final URL using the
+ * shared resolver, then navigates the placeholder window. If resolution fails, it falls back
+ * to a simple-element URL.
  */
 export async function openFlexElement(options: OpenFlexElementOptions): Promise<void> {
   const { elementId, context, onError, onWarning } = options;
@@ -71,7 +62,6 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
   }
 
   // Step 1: Try to open a placeholder window synchronously to preserve user gesture
-  // This prevents pop-up blockers from interfering
   let placeholderWindow: Window | null = null;
   let useAlternativeMethod = false;
   
@@ -93,102 +83,45 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
   }
 
   try {
-    // Step 2: Fetch the auth token asynchronously
-    console.log('[openFlexElement] Fetching auth token for element:', { 
-      elementId,
-      elementIdValid: !!elementId && elementId.trim().length > 0,
-    });
-    
-    const { data: { X_AUTH_TOKEN }, error: tokenError } = await supabase
-      .functions.invoke('get-secret', {
-        body: { secretName: 'X_AUTH_TOKEN' }
-      });
+    // Resolve the final URL using the shared resolver (handles token + type detection)
+    console.log('[openFlexElement] Resolving final URL via resolver...', { elementId, context });
+    const resolvedUrl = await resolveFlexUrl({ elementId, context });
 
-    if (tokenError || !X_AUTH_TOKEN) {
-      console.error('[openFlexElement] Failed to get auth token:', {
-        error: tokenError,
-        elementId,
-        context,
-        hasToken: !!X_AUTH_TOKEN,
-      });
-      
-      // Fallback to simple element URL if auth fails
+    if (!resolvedUrl || typeof resolvedUrl !== 'string' || resolvedUrl.trim().length === 0) {
+      // Fallback to simple element URL if resolver failed
       const fallbackUrl = `${FLEX_BASE_URL}#element/${elementId}/view/simple-element/header`;
-      console.log('[openFlexElement] Using fallback URL after auth failure:', {
+      console.log('[openFlexElement] Resolver returned empty, using fallback URL:', {
         fallbackUrl,
         elementId,
-        reason: 'Authentication failed',
         useAlternativeMethod,
       });
-      
+
       if (useAlternativeMethod) {
-        // Use link click method
         navigateWithLinkClick(fallbackUrl);
       } else {
         placeholderWindow!.location.href = fallbackUrl;
       }
-      
+
       if (onWarning) {
-        onWarning('Opened with fallback URL format (authentication failed)');
+        onWarning('Opened with fallback URL format (resolver failed)');
       }
       return;
     }
 
-    console.log('[openFlexElement] Auth token fetched successfully, token length:', X_AUTH_TOKEN.length);
-
-    // Step 3: Build URL with element type detection
-    console.log('[openFlexElement] Building URL with type detection...', {
-      elementId,
-      elementIdValue: elementId,
-      hasContext: !!context,
-      contextJobType: context?.jobType,
-      contextFolderType: context?.folderType,
-      contextDefinitionId: context?.definitionId,
-      contextDomainId: context?.domainId,
-    });
-    
-    const flexUrl = await buildFlexUrlWithTypeDetection(
-      elementId,
-      X_AUTH_TOKEN,
-      context
-    );
-    
-    console.log('[openFlexElement] Successfully built Flex URL:', {
-      url: flexUrl,
-      urlType: typeof flexUrl,
-      urlNull: flexUrl === null,
-      urlUndefined: flexUrl === undefined,
-      urlEmpty: flexUrl === '',
-      elementId,
-      urlLength: flexUrl?.length || 0,
-      hasValidUrl: flexUrl ? flexUrl.includes(elementId) : false,
-    });
-    
-    // Guard: Verify URL is valid before navigating
-    if (!flexUrl || typeof flexUrl !== 'string' || flexUrl.trim().length === 0) {
-      const error = `buildFlexUrlWithTypeDetection returned invalid URL: "${flexUrl}" (type: ${typeof flexUrl})`;
-      console.error('[openFlexElement]', error, {
-        elementId,
-        context,
-        flexUrl,
-      });
-      throw new Error(error);
-    }
-    
-    // Step 4: Navigate using the appropriate method
-    if (useAlternativeMethod) {
-      console.log('[openFlexElement] Navigating with link click method');
-      navigateWithLinkClick(flexUrl);
-    } else {
-      console.log('[openFlexElement] Updating placeholder window location');
-      placeholderWindow!.location.href = flexUrl;
-    }
-    
-    console.log('[openFlexElement] Navigation completed successfully', {
+    console.log('[openFlexElement] Successfully resolved URL:', {
+      url: resolvedUrl,
       method: useAlternativeMethod ? 'link-click' : 'placeholder-window',
-      url: flexUrl,
     });
-    
+
+    // Navigate using the appropriate method
+    if (useAlternativeMethod) {
+      navigateWithLinkClick(resolvedUrl);
+    } else {
+      placeholderWindow!.location.href = resolvedUrl;
+    }
+
+    console.log('[openFlexElement] Navigation completed successfully');
+
   } catch (error) {
     console.error('[openFlexElement] Error during navigation:', {
       error,
