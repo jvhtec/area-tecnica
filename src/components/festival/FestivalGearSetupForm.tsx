@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MicrophoneNeedsCalculator } from "./gear-setup/MicrophoneNeedsCalculator";
 import { FestivalConsoleSetupSection } from "./form/sections/FestivalConsoleSetupSection";
 import { FestivalMicKitConfig } from "./gear-setup/FestivalMicKitConfig";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 
 interface FestivalGearSetupFormProps {
   jobId: string;
@@ -462,63 +463,177 @@ export const FestivalGearSetupForm = ({
   });
 
   return (
-    <form onSubmit={handleFormSubmit} className="space-y-8">
+    <form onSubmit={handleFormSubmit} className="space-y-6 md:space-y-8">
       <Alert variant={alertVariant} className={isPrimaryStage ? "bg-yellow-50" : hasStageSpecificSetup ? "bg-blue-50" : "bg-gray-50"}>
-        <AlertDescription>
+        <AlertDescription className="text-sm">
           {alertText}
         </AlertDescription>
       </Alert>
       
-      <FestivalConsoleSetupSection
-        formData={setup}
-        onChange={(changes) => handleChange(changes)}
-      />
+      {/* Desktop Layout - Always visible */}
+      <div className="hidden md:block space-y-8">
+        <FestivalConsoleSetupSection
+          formData={setup}
+          onChange={(changes) => handleChange(changes)}
+        />
 
-      <WirelessSetupSection
-        formData={getCompatibleFormData()}
-        onChange={(changes) => handleChange(changes)}
-      />
+        <WirelessSetupSection
+          formData={getCompatibleFormData()}
+          onChange={(changes) => handleChange(changes)}
+        />
 
-      <FestivalMicKitConfig
-        jobId={jobId}
-        stageNumber={stageNumber}
-        wiredMics={setup.wired_mics}
-        onChange={(wiredMics) => {
-          console.log('FestivalMicKitConfig onChange called with:', wiredMics);
-          handleChange({ wired_mics: wiredMics });
-        }}
-      />
+        <FestivalMicKitConfig
+          jobId={jobId}
+          stageNumber={stageNumber}
+          wiredMics={setup.wired_mics}
+          onChange={(wiredMics) => {
+            console.log('FestivalMicKitConfig onChange called with:', wiredMics);
+            handleChange({ wired_mics: wiredMics });
+          }}
+        />
 
-      <MonitorSetupSection
-        formData={getCompatibleFormData()}
-        onChange={(changes) => handleChange(changes)}
-        gearSetup={globalSetup}
-      />
+        <MonitorSetupSection
+          formData={getCompatibleFormData()}
+          onChange={(changes) => handleChange(changes)}
+          gearSetup={globalSetup}
+        />
 
-      <ExtraRequirementsSection
-        formData={getCompatibleFormData()}
-        onChange={(changes) => handleChange(changes)}
-        gearSetup={globalSetup}
-      />
+        <ExtraRequirementsSection
+          formData={getCompatibleFormData()}
+          onChange={(changes) => handleChange(changes)}
+          gearSetup={globalSetup}
+        />
 
-      <InfrastructureSection
-        formData={getCompatibleFormData()}
-        onChange={(changes) => handleChange(changes)}
-        gearSetup={globalSetup}
-      />
+        <InfrastructureSection
+          formData={getCompatibleFormData()}
+          onChange={(changes) => handleChange(changes)}
+          gearSetup={globalSetup}
+        />
 
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Microphone Requirements Analysis</h3>
-        <p className="text-sm text-muted-foreground">
-          Calculate wired microphone needs based on artist requirements and show schedules.
-        </p>
-        <MicrophoneNeedsCalculator jobId={jobId} />
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Microphone Requirements Analysis</h3>
+          <p className="text-sm text-muted-foreground">
+            Calculate wired microphone needs based on artist requirements and show schedules.
+          </p>
+          <MicrophoneNeedsCalculator jobId={jobId} />
+        </div>
+
+        <NotesSection
+          formData={getCompatibleFormData()}
+          onChange={(changes) => handleChange(changes)}
+        />
       </div>
 
-      <NotesSection
-        formData={getCompatibleFormData()}
-        onChange={(changes) => handleChange(changes)}
-      />
+      {/* Mobile Layout - Accordion */}
+      <div className="md:hidden">
+        <Accordion type="multiple" defaultValue={["consoles", "wireless"]} className="space-y-4">
+          <AccordionItem value="consoles" className="border rounded-lg px-4">
+            <AccordionTrigger className="text-base font-semibold hover:no-underline">
+              Console Configuration
+            </AccordionTrigger>
+            <AccordionContent>
+              <FestivalConsoleSetupSection
+                formData={setup}
+                onChange={(changes) => handleChange(changes)}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="wireless" className="border rounded-lg px-4">
+            <AccordionTrigger className="text-base font-semibold hover:no-underline">
+              Wireless Setup
+            </AccordionTrigger>
+            <AccordionContent>
+              <WirelessSetupSection
+                formData={getCompatibleFormData()}
+                onChange={(changes) => handleChange(changes)}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="mics" className="border rounded-lg px-4">
+            <AccordionTrigger className="text-base font-semibold hover:no-underline">
+              Microphone Kit
+            </AccordionTrigger>
+            <AccordionContent>
+              <FestivalMicKitConfig
+                jobId={jobId}
+                stageNumber={stageNumber}
+                wiredMics={setup.wired_mics}
+                onChange={(wiredMics) => {
+                  console.log('FestivalMicKitConfig onChange called with:', wiredMics);
+                  handleChange({ wired_mics: wiredMics });
+                }}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="monitors" className="border rounded-lg px-4">
+            <AccordionTrigger className="text-base font-semibold hover:no-underline">
+              Monitor Setup
+            </AccordionTrigger>
+            <AccordionContent>
+              <MonitorSetupSection
+                formData={getCompatibleFormData()}
+                onChange={(changes) => handleChange(changes)}
+                gearSetup={globalSetup}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="extras" className="border rounded-lg px-4">
+            <AccordionTrigger className="text-base font-semibold hover:no-underline">
+              Extra Requirements
+            </AccordionTrigger>
+            <AccordionContent>
+              <ExtraRequirementsSection
+                formData={getCompatibleFormData()}
+                onChange={(changes) => handleChange(changes)}
+                gearSetup={globalSetup}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="infrastructure" className="border rounded-lg px-4">
+            <AccordionTrigger className="text-base font-semibold hover:no-underline">
+              Infrastructure
+            </AccordionTrigger>
+            <AccordionContent>
+              <InfrastructureSection
+                formData={getCompatibleFormData()}
+                onChange={(changes) => handleChange(changes)}
+                gearSetup={globalSetup}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="analysis" className="border rounded-lg px-4">
+            <AccordionTrigger className="text-base font-semibold hover:no-underline">
+              Microphone Analysis
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Calculate wired microphone needs based on artist requirements and show schedules.
+                </p>
+                <MicrophoneNeedsCalculator jobId={jobId} />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="notes" className="border rounded-lg px-4">
+            <AccordionTrigger className="text-base font-semibold hover:no-underline">
+              Notes
+            </AccordionTrigger>
+            <AccordionContent>
+              <NotesSection
+                formData={getCompatibleFormData()}
+                onChange={(changes) => handleChange(changes)}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </div>
 
       <Button type="submit" disabled={isLoading} className="w-full">
         <Save className="h-4 w-4 mr-2" />

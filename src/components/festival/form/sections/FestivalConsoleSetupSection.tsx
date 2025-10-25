@@ -15,8 +15,8 @@ interface FestivalConsoleSetupSectionProps {
 
 export const FestivalConsoleSetupSection = ({ formData, onChange }: FestivalConsoleSetupSectionProps) => {
   return (
-    <div className="space-y-6 border rounded-lg p-4">
-      <h3 className="text-lg font-semibold">Console Configuration</h3>
+    <div className="space-y-4 md:space-y-6 border rounded-lg p-3 md:p-4">
+      <h3 className="text-base md:text-lg font-semibold">Console Configuration</h3>
       
       <ConsoleConfig
         consoles={formData.foh_consoles}

@@ -468,19 +468,19 @@ const FestivalGearManagement = () => {
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <Button
           variant="ghost"
           onClick={() => navigate(`/festival-management/${jobId}`)}
-          className="mb-4"
+          className="self-start"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Festival Management
         </Button>
-        <div className="text-right flex flex-col items-end">
-          <h1 className="text-2xl font-bold">{jobTitle}</h1>
+        <div className="flex flex-col items-start md:items-end md:text-right">
+          <h1 className="text-xl md:text-2xl font-bold">{jobTitle}</h1>
           <div className="flex items-center gap-2">
-            <p className="text-muted-foreground">Gear Management</p>
+            <p className="text-sm md:text-base text-muted-foreground">Gear Management</p>
             <ConnectionIndicator variant="icon" />
           </div>
         </div>
@@ -488,36 +488,38 @@ const FestivalGearManagement = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Stages Configuration</CardTitle>
-            <Button onClick={handleAddStage} size="sm">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div className="space-y-2">
+              <CardTitle>Stages Configuration</CardTitle>
+              <CardDescription>
+                Configure the stages for your festival. Click on a stage name to edit it.
+              </CardDescription>
+            </div>
+            <Button onClick={handleAddStage} size="sm" className="self-start sm:self-auto">
               <Plus className="h-4 w-4 mr-2" />
               Add Stage
             </Button>
           </div>
-          <CardDescription>
-            Configure the stages for your festival. Click on a stage name to edit it.
-          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-3">
             {stages.map((stage) => (
               <div key={stage.number} className="relative">
                 <Button
                   variant={selectedStage === stage.number ? "default" : "outline"}
                   onClick={() => setSelectedStage(stage.number)}
-                  className="px-6 flex items-center gap-2"
+                  className="px-4 md:px-6 flex items-center gap-2 text-sm md:text-base"
                 >
-                  <span>{stage.name}</span>
+                  <span className="truncate max-w-[120px] md:max-w-none">{stage.name}</span>
                   {stageSetups[stage.number] && (
-                    <Badge variant="outline" className="ml-2 bg-blue-100">
+                    <Badge variant="outline" className="ml-1 md:ml-2 bg-blue-100 text-xs">
                       Custom
                     </Badge>
                   )}
                 </Button>
                 
                 {editingStage === stage.number ? (
-                  <div className="absolute top-full left-0 mt-2 p-2 bg-white border rounded-md shadow-lg z-10 min-w-[200px]">
+                  <div className="fixed md:absolute top-1/2 left-1/2 md:top-full md:left-0 -translate-x-1/2 -translate-y-1/2 md:translate-x-0 md:translate-y-0 md:mt-2 p-4 md:p-2 bg-white border rounded-md shadow-lg z-50 w-[90vw] md:w-auto md:min-w-[200px]">
                     <Input
                       value={editingStageName}
                       onChange={(e) => setEditingStageName(e.target.value)}
@@ -529,12 +531,14 @@ const FestivalGearManagement = () => {
                       }}
                       autoFocus
                     />
-                    <div className="flex gap-1">
-                      <Button size="sm" onClick={handleSaveStageEdit}>
-                        <Check className="h-3 w-3" />
+                    <div className="flex gap-2 md:gap-1">
+                      <Button size="sm" onClick={handleSaveStageEdit} className="flex-1 md:flex-initial">
+                        <Check className="h-3 w-3 mr-2 md:mr-0" />
+                        <span className="md:hidden">Save</span>
                       </Button>
-                      <Button size="sm" variant="outline" onClick={handleCancelStageEdit}>
-                        <X className="h-3 w-3" />
+                      <Button size="sm" variant="outline" onClick={handleCancelStageEdit} className="flex-1 md:flex-initial">
+                        <X className="h-3 w-3 mr-2 md:mr-0" />
+                        <span className="md:hidden">Cancel</span>
                       </Button>
                     </div>
                   </div>
@@ -557,29 +561,32 @@ const FestivalGearManagement = () => {
       {!isLoading && (
         <Card className="mb-6">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Wrench className="h-5 w-5" />
-                {getCurrentStageName(selectedStage)} Gear Setup
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                <Wrench className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="truncate">{getCurrentStageName(selectedStage)} Gear Setup</span>
               </CardTitle>
               <Button 
                 onClick={handlePrintGearSetup} 
                 disabled={isPrinting}
                 variant="outline"
+                size="sm"
+                className="self-start sm:self-auto"
               >
                 {isPrinting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Printer className="h-4 w-4 mr-2" />
                 )}
-                Print Gear Setup
+                <span className="hidden sm:inline">Print Gear Setup</span>
+                <span className="sm:hidden">Print</span>
               </Button>
             </div>
           </CardHeader>
           <CardContent>
             <div className="mb-4">
               <Alert>
-                <AlertDescription>
+                <AlertDescription className="text-sm">
                   Configure the gear setup for {getCurrentStageName(selectedStage)}. This information will be used when artists submit their technical requirements.
                 </AlertDescription>
               </Alert>
