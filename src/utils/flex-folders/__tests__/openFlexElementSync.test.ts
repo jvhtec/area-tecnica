@@ -1,8 +1,9 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { openFlexElementSync } from '../openFlexElementSync';
-import * as resolverModule from '../resolveFlexUrl';
 
-// Mock toast
+// Mock toast BEFORE importing the module that uses it
 vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
@@ -10,6 +11,9 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }));
+
+import { openFlexElementSync } from '../openFlexElementSync';
+import * as resolverModule from '../resolveFlexUrl';
 
 // Mock resolver
 vi.mock('../resolveFlexUrl', async () => {
@@ -22,7 +26,9 @@ vi.mock('../resolveFlexUrl', async () => {
 
 describe('openFlexElementSync', () => {
   let mockAnchor: any;
-  let mockDocument: any;
+  let createElementSpy: any;
+  let appendChildSpy: any;
+  let removeChildSpy: any;
 
   beforeEach(() => {
     // Mock anchor element
@@ -34,15 +40,10 @@ describe('openFlexElementSync', () => {
       click: vi.fn(),
     };
 
-    // Mock document.createElement and appendChild/removeChild
-    mockDocument = {
-      createElement: vi.fn(() => mockAnchor),
-      body: {
-        appendChild: vi.fn(),
-        removeChild: vi.fn(),
-      },
-    };
-    global.document = mockDocument as any;
+    // Spy on document methods instead of replacing document
+    createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as any);
+    appendChildSpy = vi.spyOn(document.body, 'appendChild').mockReturnValue(mockAnchor as any);
+    removeChildSpy = vi.spyOn(document.body, 'removeChild').mockReturnValue(mockAnchor as any);
 
     // Reset mocks
     vi.clearAllMocks();
@@ -62,7 +63,7 @@ describe('openFlexElementSync', () => {
     });
 
     // Verify anchor was created
-    expect(mockDocument.createElement).toHaveBeenCalledWith('a');
+    expect(createElementSpy).toHaveBeenCalledWith('a');
 
     // Verify anchor attributes
     expect(mockAnchor.href).toBe(mockUrl);
@@ -70,9 +71,9 @@ describe('openFlexElementSync', () => {
     expect(mockAnchor.rel).toBe('noopener noreferrer');
 
     // Verify anchor was added and removed
-    expect(mockDocument.body.appendChild).toHaveBeenCalledWith(mockAnchor);
+    expect(appendChildSpy).toHaveBeenCalledWith(mockAnchor);
     expect(mockAnchor.click).toHaveBeenCalled();
-    expect(mockDocument.body.removeChild).toHaveBeenCalledWith(mockAnchor);
+    expect(removeChildSpy).toHaveBeenCalledWith(mockAnchor);
   });
 
   it('should build URL with domainId and definitionId', () => {
@@ -103,7 +104,7 @@ describe('openFlexElementSync', () => {
     expect(toast.error).toHaveBeenCalled();
 
     // Verify no anchor was created
-    expect(mockDocument.createElement).not.toHaveBeenCalled();
+    expect(createElementSpy).not.toHaveBeenCalled();
   });
 
   it('should reject null elementId', () => {
@@ -117,7 +118,7 @@ describe('openFlexElementSync', () => {
     expect(toast.error).toHaveBeenCalled();
 
     // Verify no anchor was created
-    expect(mockDocument.createElement).not.toHaveBeenCalled();
+    expect(createElementSpy).not.toHaveBeenCalled();
   });
 
   it('should reject undefined elementId', () => {
@@ -131,7 +132,7 @@ describe('openFlexElementSync', () => {
     expect(toast.error).toHaveBeenCalled();
 
     // Verify no anchor was created
-    expect(mockDocument.createElement).not.toHaveBeenCalled();
+    expect(createElementSpy).not.toHaveBeenCalled();
   });
 
   it('should reject whitespace-only elementId', () => {
@@ -145,7 +146,7 @@ describe('openFlexElementSync', () => {
     expect(toast.error).toHaveBeenCalled();
 
     // Verify no anchor was created
-    expect(mockDocument.createElement).not.toHaveBeenCalled();
+    expect(createElementSpy).not.toHaveBeenCalled();
   });
 
   it('should use fallback URL when resolver returns empty', () => {
