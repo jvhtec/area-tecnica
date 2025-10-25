@@ -7,6 +7,7 @@ import {
   getElementDetails,
 } from '../buildFlexUrl';
 import { FLEX_FOLDER_IDS } from '../constants';
+import { FLEX_CONFIG } from '../config';
 
 // Mock fetch globally
 global.fetch = vi.fn();
@@ -14,31 +15,35 @@ global.fetch = vi.fn();
 describe('buildFlexUrl', () => {
   it('should build financial document URL for presupuesto', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.presupuesto);
-    expect(url).toContain('#fin-doc/test-element-id/doc-view/');
+    expect(url).toContain(
+      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.presupuesto}/header`
+    );
     expect(url).toContain('/header');
   });
 
   it('should build financial document URL for presupuestoDryHire', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.presupuestoDryHire);
-    expect(url).toContain('#fin-doc/test-element-id/doc-view/');
+    expect(url).toContain(
+      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.presupuesto}/header`
+    );
     expect(url).toContain('/header');
   });
 
   it('should build financial document URL for hojaGastos', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.hojaGastos);
-    expect(url).toContain('#fin-doc/test-element-id/doc-view/');
-    expect(url).toContain('/header');
+    expect(url).toContain(
+      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.expenseSheet}/header`
+    );
   });
 
   it('should build contact-list URL for crewCall', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.crewCall);
-    expect(url).toContain('#contact-list/test-element-id/view/');
-    expect(url).toContain('/detail');
+    expect(url).toContain('#element/test-element-id/view/contact-list/header');
   });
 
   it('should build equipment-list URL for pullSheet', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.pullSheet);
-    expect(url).toContain('#equipment-list/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/equipment-list/header');
   });
 
   it('should build simple element URL for mainFolder', () => {

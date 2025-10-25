@@ -14,9 +14,10 @@ import { FlexLinkIntent } from './intentDetection';
  * It handles the different URL schemas based on intent:
  * - simple-element: #element/{id}/view/simple-element/header
  * - fin-doc: #fin-doc/{id}/doc-view/{viewId}/header
- * - contact-list: #contact-list/{id}/view/{viewId}/detail
- * - equipment-list: #equipment-list/{id}/view/simple-element/header
- * - remote-file-list: #remote-file-list/{id}/view/simple-element/header
+ * - expense-sheet: #fin-doc/{id}/doc-view/{expenseViewId}/header
+ * - contact-list: #element/{id}/view/contact-list/header
+ * - equipment-list: #element/{id}/view/equipment-list/header
+ * - remote-file-list: #element/{id}/view/remote-file-list/header
  */
 export function buildFlexUrlByIntent(
   intent: FlexLinkIntent,
@@ -41,16 +42,25 @@ export function buildFlexUrlByIntent(
       return `${baseUrl}#fin-doc/${elementId}/doc-view/${finDocViewId}/header`;
     }
 
-    case 'contact-list': {
-      const contactViewId = viewId || getFlexViewId('crewCall');
-      return `${baseUrl}#contact-list/${elementId}/view/${contactViewId}/detail`;
+    case 'expense-sheet': {
+      const expenseSheetViewId = viewId || getFlexViewId('expenseSheet');
+      return `${baseUrl}#fin-doc/${elementId}/doc-view/${expenseSheetViewId}/header`;
     }
 
-    case 'equipment-list':
-      return `${baseUrl}#equipment-list/${elementId}/view/simple-element/header`;
+    case 'contact-list': {
+      const contactViewName = viewId || 'contact-list';
+      return `${baseUrl}#element/${elementId}/view/${contactViewName}/header`;
+    }
 
-    case 'remote-file-list':
-      return `${baseUrl}#remote-file-list/${elementId}/view/simple-element/header`;
+    case 'equipment-list': {
+      const equipmentViewName = viewId || 'equipment-list';
+      return `${baseUrl}#element/${elementId}/view/${equipmentViewName}/header`;
+    }
+
+    case 'remote-file-list': {
+      const remoteFileViewName = viewId || 'remote-file-list';
+      return `${baseUrl}#element/${elementId}/view/${remoteFileViewName}/header`;
+    }
 
     default: {
       // TypeScript exhaustiveness check

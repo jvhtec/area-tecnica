@@ -9,6 +9,7 @@ export const FLEX_CONFIG = {
   viewIds: {
     presupuesto: 'ca6b072c-b122-11df-b8d5-00e08175e43e',
     crewCall: '139e2f60-8d20-11e2-b07f-00e08175e43e',
+    expenseSheet: '566d32e0-1a1e-11e0-a472-00e08175e43e',
   },
 } as const;
 
