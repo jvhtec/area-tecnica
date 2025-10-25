@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -8,194 +9,169 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { supabase } from "@/lib/supabase";
-import { Loader2, ExternalLink } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-
-interface FlexElementOption {
-  elementId: string;
-  label: string;
-  department: string | null;
-}
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Loader2, FolderTree, FileText } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  getElementTree,
+  searchTree,
+  flattenTree,
+  type FlexElementNode,
+  type FlatElementNode,
+} from "@/utils/flex-folders";
 
 interface FlexElementSelectorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mainElementId: string;
-  defaultDepartment?: string | null;
-  jobId: string;
+  defaultElementId?: string;
+  onSelect: (elementId: string) => void;
 }
 
 export const FlexElementSelectorDialog: React.FC<
   FlexElementSelectorDialogProps
-> = ({ open, onOpenChange, mainElementId, defaultDepartment, jobId }) => {
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [elementOptions, setElementOptions] = useState<FlexElementOption[]>([]);
-  const [selectedElementId, setSelectedElementId] = useState<string>("");
+> = ({ open, onOpenChange, mainElementId, defaultElementId, onSelect }) => {
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const loadElementOptions = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      // Fetch all department folders for this job
-      const { data, error } = await supabase
-        .from("flex_folders")
-        .select("element_id, department, folder_type")
-        .eq("job_id", jobId)
-        .order("department", { ascending: true });
+  const {
+    data: treeData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<FlexElementNode[], Error>({
+    queryKey: ["flexElementTree", mainElementId],
+    queryFn: () => getElementTree(mainElementId),
+    enabled: open && !!mainElementId,
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
+  });
 
-      if (error) {
-        console.error("Error loading Flex folder options:", error);
-        toast({
-          title: "Error",
-          description: "Could not load Flex folder options.",
-          variant: "destructive",
-        });
-        return;
-      }
+  const flattenedNodes = useMemo(() => {
+    if (!treeData) return [];
 
-      if (!data || data.length === 0) {
-        toast({
-          title: "No folders found",
-          description: "No Flex folders available for this job.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Build options list: main folder + department folders
-      const options: FlexElementOption[] = [];
-
-      // Add main folder as first option
-      options.push({
-        elementId: mainElementId,
-        label: "Main Event",
-        department: null,
-      });
-
-      // Add department folders
-      const departmentFolders = data.filter(
-        (folder) =>
-          folder.folder_type === "department" ||
-          folder.folder_type === "tourdate" ||
-          folder.folder_type === "dryhire"
-      );
-
-      departmentFolders.forEach((folder) => {
-        const label = folder.department
-          ? `${folder.department.charAt(0).toUpperCase()}${folder.department.slice(1)}`
-          : folder.folder_type || "Unknown";
-        options.push({
-          elementId: folder.element_id,
-          label,
-          department: folder.department,
-        });
-      });
-
-      setElementOptions(options);
-
-      // Set default selection: prefer default department or main
-      if (defaultDepartment) {
-        const defaultOption = options.find(
-          (opt) => opt.department === defaultDepartment
-        );
-        if (defaultOption) {
-          setSelectedElementId(defaultOption.elementId);
-        } else {
-          setSelectedElementId(mainElementId);
-        }
-      } else {
-        setSelectedElementId(mainElementId);
-      }
-    } catch (err) {
-      console.error("Exception loading Flex folder options:", err);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [jobId, mainElementId, defaultDepartment, toast]);
-
-  useEffect(() => {
-    if (open && mainElementId) {
-      loadElementOptions();
-    }
-  }, [open, mainElementId, loadElementOptions]);
-
-  const handleOpenInFlex = () => {
-    if (!selectedElementId) {
-      toast({
-        title: "No selection",
-        description: "Please select a Flex folder.",
-        variant: "destructive",
-      });
-      return;
+    if (searchQuery.trim()) {
+      return searchTree(treeData, searchQuery);
     }
 
-    const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${selectedElementId}/view/simple-element/header`;
-    window.open(flexUrl, "_blank", "noopener");
+    return flattenTree(treeData);
+  }, [treeData, searchQuery]);
+
+  const handleSelect = (elementId: string) => {
+    onSelect(elementId);
     onOpenChange(false);
+    setSearchQuery("");
+  };
+
+  const handleCancel = () => {
+    onOpenChange(false);
+    setSearchQuery("");
+  };
+
+  const renderNode = (node: FlatElementNode) => {
+    const isDefault = node.elementId === defaultElementId;
+    const indent = node.depth * 16;
+
+    return (
+      <CommandItem
+        key={node.elementId}
+        value={`${node.elementId}-${node.displayName}-${node.documentNumber || ""}`}
+        onSelect={() => handleSelect(node.elementId)}
+        className={cn(
+          "cursor-pointer",
+          isDefault && "bg-accent/50 font-medium"
+        )}
+        style={{ paddingLeft: `${indent + 8}px` }}
+      >
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {node.depth === 0 ? (
+            <FolderTree className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+          ) : (
+            <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+          )}
+          <div className="flex flex-col flex-1 min-w-0">
+            <span className="truncate">{node.displayName}</span>
+            {node.documentNumber && (
+              <span className="text-xs text-muted-foreground truncate">
+                {node.documentNumber}
+              </span>
+            )}
+          </div>
+          {isDefault && (
+            <span className="text-xs text-muted-foreground flex-shrink-0">
+              (default)
+            </span>
+          )}
+        </div>
+      </CommandItem>
+    );
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Open in Flex</DialogTitle>
+          <DialogTitle>Select Flex Element</DialogTitle>
           <DialogDescription>
-            Select which Flex folder to open.
+            Choose an element from the tree to open in Flex.
           </DialogDescription>
         </DialogHeader>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="flex-element-select">Flex Folder</Label>
-              <Select
-                value={selectedElementId}
-                onValueChange={setSelectedElementId}
-              >
-                <SelectTrigger id="flex-element-select">
-                  <SelectValue placeholder="Select a folder" />
-                </SelectTrigger>
-                <SelectContent>
-                  {elementOptions.map((option) => (
-                    <SelectItem key={option.elementId} value={option.elementId}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <div className="flex flex-col gap-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Loading element tree...
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          ) : isError ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <div className="text-center space-y-2">
+                <p className="text-sm font-medium text-destructive">
+                  Failed to load element tree
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {error?.message || "An unexpected error occurred"}
+                </p>
+              </div>
+              <Button onClick={() => refetch()} variant="outline" size="sm">
+                Retry
+              </Button>
+            </div>
+          ) : (
+            <Command className="rounded-lg border">
+              <CommandInput
+                placeholder="Search elements..."
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+              />
+              <CommandList className="max-h-[400px]">
+                <CommandEmpty>
+                  {searchQuery
+                    ? "No elements found matching your search."
+                    : "No elements available."}
+                </CommandEmpty>
+                <CommandGroup>
+                  {flattenedNodes.map((node) => renderNode(node))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          )}
+        </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={handleCancel}>
             Cancel
-          </Button>
-          <Button
-            onClick={handleOpenInFlex}
-            disabled={loading || !selectedElementId}
-            className="gap-2"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Open in Flex
           </Button>
         </DialogFooter>
       </DialogContent>
