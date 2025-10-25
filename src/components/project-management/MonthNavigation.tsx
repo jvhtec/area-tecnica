@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface MonthNavigationProps {
   currentDate: Date;
@@ -13,18 +15,30 @@ export const MonthNavigation = ({
   onPreviousMonth,
   onNextMonth,
 }: MonthNavigationProps) => {
+  const isMobile = useIsMobile();
+  
   return (
-    <div className="flex items-center justify-between mb-6">
-      <Button variant="outline" size="sm" onClick={onPreviousMonth}>
-        <ChevronLeft className="h-4 w-4 mr-1" />
-        Previous
+    <div className={cn("flex items-center justify-between", isMobile ? "mb-4" : "mb-6")}>
+      <Button 
+        variant="outline" 
+        size={isMobile ? "sm" : "default"}
+        onClick={onPreviousMonth}
+        className={cn(isMobile && "px-2 min-w-[2.5rem]")}
+      >
+        <ChevronLeft className={cn("h-4 w-4", !isMobile && "mr-1")} />
+        {!isMobile && "Previous"}
       </Button>
-      <h2 className="text-lg font-semibold">
-        {format(currentDate, 'MMMM yyyy')}
+      <h2 className={cn("font-semibold", isMobile ? "text-base" : "text-lg")}>
+        {format(currentDate, isMobile ? 'MMM yyyy' : 'MMMM yyyy')}
       </h2>
-      <Button variant="outline" size="sm" onClick={onNextMonth}>
-        Next
-        <ChevronRight className="h-4 w-4 ml-1" />
+      <Button 
+        variant="outline" 
+        size={isMobile ? "sm" : "default"}
+        onClick={onNextMonth}
+        className={cn(isMobile && "px-2 min-w-[2.5rem]")}
+      >
+        {!isMobile && "Next"}
+        <ChevronRight className={cn("h-4 w-4", !isMobile && "ml-1")} />
       </Button>
     </div>
   );

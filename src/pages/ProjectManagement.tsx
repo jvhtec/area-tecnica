@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle, Search } from "lucide-react";
+import { Loader2, CheckCircle, Search, Filter, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
 import { startOfMonth, endOfMonth, addMonths } from "date-fns";
@@ -17,10 +17,14 @@ import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { autoCompleteJobs } from "@/utils/jobStatusUtils";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
 const ProjectManagement = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -33,6 +37,7 @@ const ProjectManagement = () => {
   const [isAutoCompleting, setIsAutoCompleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const { forceSubscribe } = useSubscriptionContext();
 
   const startDate = startOfMonth(currentDate);
@@ -287,57 +292,85 @@ const ProjectManagement = () => {
     ));
   };
 
+  const FilterContent = () => (
+    <div className={cn("flex flex-col gap-4", isMobile ? "w-full" : "")}>
+      <div className={cn("flex", isMobile ? "flex-col gap-3" : "items-center gap-4")}>
+        <JobTypeFilter
+          allJobTypes={allJobTypes}
+          selectedJobTypes={selectedJobTypes}
+          onTypeToggle={toggleJobType}
+        />
+        <StatusFilter
+          allJobStatuses={allJobStatuses}
+          selectedJobStatuses={selectedJobStatuses}
+          onStatusSelection={handleJobStatusSelection}
+        />
+      </div>
+      {canCreateItems && (
+        <Button 
+          onClick={handleAutoCompleteAll}
+          disabled={isAutoCompleting || jobsLoading}
+          variant="outline"
+          size="sm"
+          className={cn("flex items-center gap-2", isMobile && "w-full")}
+        >
+          {isAutoCompleting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <CheckCircle className="h-4 w-4" />
+          )}
+          Auto-Complete Past Jobs
+        </Button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="container mx-auto px-4 space-y-6">
+    <div className={cn("container mx-auto space-y-4", isMobile ? "px-3 py-4" : "px-4 py-6")}>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Project Management</CardTitle>
-          <div className="flex gap-2 flex-wrap">
-            <div className="flex items-center gap-4">
-              <JobTypeFilter
-                allJobTypes={allJobTypes}
-                selectedJobTypes={selectedJobTypes}
-                onTypeToggle={toggleJobType}
-              />
-              <StatusFilter
-                allJobStatuses={allJobStatuses}
-                selectedJobStatuses={selectedJobStatuses}
-                onStatusSelection={handleJobStatusSelection}
-              />
-            </div>
-            <div className="relative">
+        <CardHeader className={cn("flex flex-col space-y-4", isMobile ? "p-4 pb-3" : "pb-4")}>
+          <div className="flex items-center justify-between">
+            <CardTitle className={cn(isMobile ? "text-lg" : "text-xl")}>Project Management</CardTitle>
+            {isMobile && (
+              <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filters
+                    {(selectedJobTypes.length > 0 || selectedJobStatuses.length > 0) && (
+                      <span className="ml-1 rounded-full bg-primary text-primary-foreground text-xs px-2 py-0.5">
+                        {selectedJobTypes.length + selectedJobStatuses.length}
+                      </span>
+                    )}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="h-auto max-h-[85vh] overflow-y-auto">
+                  <SheetHeader className="mb-4">
+                    <SheetTitle>Filters</SheetTitle>
+                  </SheetHeader>
+                  <FilterContent />
+                </SheetContent>
+              </Sheet>
+            )}
+          </div>
+          
+          <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-row flex-wrap items-center")}>
+            {!isMobile && <FilterContent />}
+            <div className={cn("relative", isMobile ? "w-full" : "flex-1 min-w-[220px] max-w-[280px]")}>
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search projects..."
-                className="pl-8 h-8 w-[220px]"
+                className={cn("pl-8 h-9", isMobile && "w-full")}
               />
               {(jobsLoading) && (
                 <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
               )}
             </div>
-            {canCreateItems && (
-              <>
-                <Button 
-                  onClick={handleAutoCompleteAll}
-                  disabled={isAutoCompleting || jobsLoading}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  {isAutoCompleting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4" />
-                  )}
-                  Auto-Complete Past Jobs
-                </Button>
-              </>
-            )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className={cn(isMobile ? "p-4 pt-2" : "")}>
           <MonthNavigation
             currentDate={currentDate}
             onPreviousMonth={() => setCurrentDate(prev => addMonths(prev, -1))}
@@ -348,7 +381,7 @@ const ProjectManagement = () => {
             onDepartmentChange={(value) => setSelectedDepartment(value as Department)}
             jobs={jobs}
             jobsLoading={jobsLoading}
-            onDeleteDocument={undefined} // Will be handled by optimized jobs hook
+            onDeleteDocument={undefined}
             userRole={userRole}
             highlightToday={highlightToday}
           />
