@@ -7,10 +7,10 @@ import { ExternalLink, Link2, Save, Wand2, ClipboardPaste } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { buildFlexUrlByIntent } from '@/utils/flex-folders/urlBuilder';
+import { getFlexViewId } from '@/utils/flex-folders/config';
 
 type Dept = 'sound' | 'lights';
-
-const CREW_CALL_VIEW_ID = '139e2f60-8d20-11e2-b07f-00e08175e43e';
 
 interface Props {
   jobId: string;
@@ -36,6 +36,7 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
     if (!s) return '';
     const uuidRe = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/g;
     try {
+      const crewCallViewId = getFlexViewId('crewCall');
       // Prefer the segment after 'contact-list/' if present
       const hash = s.split('#')[1] || s; // handle hash-based and raw inputs
       const idx = hash.indexOf('contact-list/');
@@ -46,7 +47,7 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
       }
       // Fallback: get first UUID that is not the known view id
       const all = Array.from(s.matchAll(uuidRe)).map(m => m[0]);
-      const first = all.find(id => id.toLowerCase() !== CREW_CALL_VIEW_ID);
+      const first = all.find(id => id.toLowerCase() !== crewCallViewId);
       return first || '';
     } catch {
       return '';
@@ -129,7 +130,7 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
   const openFlex = (dept: Dept) => {
     const id = (elementId[dept] || '').trim();
     if (!id) return;
-    const url = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact-list/${id}/view/${CREW_CALL_VIEW_ID}/detail`;
+    const url = buildFlexUrlByIntent('contact-list', id);
     window.open(url, '_blank');
   };
 
@@ -167,7 +168,7 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
         </div>
       </div>
       <p className="text-[10px] text-muted-foreground">
-        Example: https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact-list/&lt;elementId&gt;/view/{CREW_CALL_VIEW_ID}/detail
+        Example: {buildFlexUrlByIntent('contact-list', '<elementId>')}
       </p>
     </div>
   );

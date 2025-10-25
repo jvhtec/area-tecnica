@@ -1,10 +1,11 @@
 import { buildFlexUrl, buildFlexUrlWithTypeDetection, ElementContext } from './buildFlexUrl';
 import { supabase } from '@/lib/supabase';
+import { detectFlexLinkIntent, IntentDetectionContext } from './intentDetection';
+import { buildFlexUrlByIntent } from './urlBuilder';
 
 export interface ResolveFlexUrlOptions {
   elementId: string;
-  context?: ElementContext & {
-    viewHint?: 'simple-element' | 'fin-doc' | 'auto';
+  context?: IntentDetectionContext & {
     displayName?: string;
     documentNumber?: string;
   };
@@ -27,19 +28,16 @@ export function resolveFlexUrlSync(options: ResolveFlexUrlOptions): string | nul
     return null;
   }
 
-  // Prefer domainId hint (from selector tree) or explicit definitionId
   try {
-    const url = buildFlexUrl(elementId, context?.definitionId, context?.domainId);
+    // Detect the intent using shared detection logic
+    const intent = detectFlexLinkIntent(context);
+    const url = buildFlexUrlByIntent(intent, elementId);
 
     console.log('[resolveFlexUrlSync] Resolved URL (sync):', {
       url,
       elementId,
-      definitionId: context?.definitionId,
-      domainId: context?.domainId,
-      jobType: context?.jobType,
-      folderType: context?.folderType,
-      viewHint: context && 'viewHint' in context ? (context as any).viewHint : undefined,
-      schema: url.includes('#fin-doc/') ? 'fin-doc' : 'simple-element',
+      intent,
+      context,
     });
 
     return url;
@@ -67,16 +65,15 @@ export async function resolveFlexUrl(options: ResolveFlexUrlOptions): Promise<st
   }
 
   try {
-    // Optimization: if we have domainId or definitionId or jobType shortcuts, build without token
-    if (context?.domainId || context?.definitionId || context?.folderType === 'dryhire' || context?.folderType === 'tourdate' || context?.jobType === 'dryhire' || context?.jobType === 'tourdate') {
-      const url = buildFlexUrl(elementId, context?.definitionId, context?.domainId);
+    // Optimization: if we have sufficient context for intent detection, build without token
+    if (context?.domainId || context?.definitionId || context?.folderType || context?.jobType || context?.viewHint) {
+      const intent = detectFlexLinkIntent(context);
+      const url = buildFlexUrlByIntent(intent, elementId);
       console.log('[resolveFlexUrl] Resolved URL using context (no API):', {
         url,
         elementId,
-        definitionId: context?.definitionId,
-        domainId: context?.domainId,
-        jobType: context?.jobType,
-        folderType: context?.folderType,
+        intent,
+        context,
       });
       return url;
     }

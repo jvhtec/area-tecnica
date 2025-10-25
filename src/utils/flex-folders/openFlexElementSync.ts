@@ -1,5 +1,8 @@
 import { resolveFlexUrlSync } from './resolveFlexUrl';
 import { toast as showToast } from 'sonner';
+import { getFlexBaseUrl } from './config';
+import { IntentDetectionContext } from './intentDetection';
+import { buildFlexUrlByIntent } from './urlBuilder';
 
 export interface OpenFlexElementSyncOptions {
   elementId: string;
@@ -20,8 +23,6 @@ export interface OpenFlexElementSyncOptions {
    */
   documentNumber?: string;
 }
-
-const FLEX_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
 
 /**
  * Opens a Flex element synchronously in a new tab without using window.open().
@@ -94,10 +95,11 @@ export function openFlexElementSync(options: OpenFlexElementSyncOptions): void {
     }
 
     // Guard: Verify URL starts with expected base
-    if (!url.startsWith(FLEX_BASE_URL)) {
+    const expectedBase = getFlexBaseUrl();
+    if (!url.startsWith(expectedBase)) {
       console.warn('[openFlexElementSync] URL does not start with expected base:', {
         url,
-        expectedBase: FLEX_BASE_URL,
+        expectedBase,
         elementId,
       });
     }
@@ -142,7 +144,7 @@ export function openFlexElementSync(options: OpenFlexElementSyncOptions): void {
 
     // Attempt fallback URL construction
     try {
-      const fallbackUrl = `${FLEX_BASE_URL}#element/${elementId}/view/simple-element/header`;
+      const fallbackUrl = buildFlexUrlByIntent('simple-element', elementId);
       console.log('[openFlexElementSync] Attempting fallback URL:', {
         fallbackUrl,
         elementId,

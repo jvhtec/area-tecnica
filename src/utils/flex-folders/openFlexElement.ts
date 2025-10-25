@@ -1,16 +1,14 @@
 import { resolveFlexUrl } from './resolveFlexUrl';
+import { getFlexBaseUrl } from './config';
+import { IntentDetectionContext } from './intentDetection';
+import { buildFlexUrlByIntent } from './urlBuilder';
 
 export interface OpenFlexElementOptions {
   elementId: string;
   /**
    * Optional context about the element to avoid extra API calls
    */
-  context?: {
-    jobType?: 'single' | 'festival' | 'dryhire' | 'tourdate';
-    folderType?: 'main' | 'dryhire' | 'tourdate';
-    definitionId?: string;
-    domainId?: string;
-  };
+  context?: IntentDetectionContext;
   /**
    * Optional callback for error handling
    */
@@ -20,8 +18,6 @@ export interface OpenFlexElementOptions {
    */
   onWarning?: (message: string) => void;
 }
-
-const FLEX_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
 
 /**
  * Opens a Flex element in a new tab, handling URL resolution while preserving user gesture.
@@ -89,7 +85,7 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
 
     if (!resolvedUrl || typeof resolvedUrl !== 'string' || resolvedUrl.trim().length === 0) {
       // Fallback to simple element URL if resolver failed
-      const fallbackUrl = `${FLEX_BASE_URL}#element/${elementId}/view/simple-element/header`;
+      const fallbackUrl = buildFlexUrlByIntent('simple-element', elementId);
       console.log('[openFlexElement] Resolver returned empty, using fallback URL:', {
         fallbackUrl,
         elementId,
@@ -133,7 +129,7 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
     });
     
     // Final fallback: use simple element URL
-    const fallbackUrl = `${FLEX_BASE_URL}#element/${elementId}/view/simple-element/header`;
+    const fallbackUrl = buildFlexUrlByIntent('simple-element', elementId);
     console.log('[openFlexElement] Attempting fallback URL after error:', {
       fallbackUrl,
       elementId,
