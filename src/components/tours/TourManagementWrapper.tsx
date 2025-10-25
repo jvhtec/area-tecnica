@@ -38,12 +38,12 @@ export const TourManagementWrapper = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-3 md:p-6">
         <Card>
-          <CardContent className="flex items-center justify-center py-12">
+          <CardContent className="flex items-center justify-center py-8 md:py-12 px-4">
             <div className="flex items-center gap-2">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Loading tour management...</span>
+              <span className="text-sm md:text-base">Loading tour management...</span>
             </div>
           </CardContent>
         </Card>
@@ -53,12 +53,12 @@ export const TourManagementWrapper = () => {
 
   if (error || !tour) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-3 md:p-6">
         <Card>
-          <CardContent className="flex items-center justify-center py-12">
+          <CardContent className="flex items-center justify-center py-8 md:py-12 px-4">
             <div className="text-center">
-              <h2 className="text-xl font-semibold mb-2">Tour Not Found</h2>
-              <p className="text-muted-foreground">
+              <h2 className="text-lg md:text-xl font-semibold mb-2">Tour Not Found</h2>
+              <p className="text-sm md:text-base text-muted-foreground">
                 {error?.message || "The requested tour could not be found."}
               </p>
             </div>

@@ -221,13 +221,13 @@ export const TourAssignmentDialog = ({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
+          <DialogTitle className="flex flex-wrap items-center gap-2 text-base md:text-lg">
+            <Users className="h-4 w-4 md:h-5 md:w-5" />
             {readOnly ? 'Tour Team Members' : 'Tour Team Assignments'}
             {readOnly && (
-              <Badge variant="secondary">
+              <Badge variant="secondary" className="text-xs">
                 <Eye className="h-3 w-3 mr-1" />
                 View Only
               </Badge>

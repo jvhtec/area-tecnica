@@ -1022,14 +1022,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-base md:text-lg">
             {readOnly ? 'Tour Dates' : 'Manage Tour Dates'}
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="h-[60vh] pr-4">
+        <ScrollArea className="h-[60vh] md:h-[60vh] pr-2 md:pr-4">
           <div className="space-y-4">
             {/* Bulk folders button removed; availability moved to Team Assignments */}
             
