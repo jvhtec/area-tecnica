@@ -84,18 +84,19 @@ export function FestivalManagementWrapper() {
 
   if (isError || retryCount >= maxRetries) {
     return (
-      <div className="flex flex-col items-center justify-center h-[50vh] max-w-md mx-auto text-center p-4">
-        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-        <h2 className="text-xl font-bold">Error Loading Festival</h2>
-        <p className="text-muted-foreground mt-2 mb-4">
+      <div className="flex flex-col items-center justify-center min-h-[50vh] max-w-md mx-auto text-center p-4 md:p-6">
+        <AlertTriangle className="h-10 w-10 md:h-12 md:w-12 text-destructive mb-3 md:mb-4" />
+        <h2 className="text-lg md:text-xl font-bold">Error Loading Festival</h2>
+        <p className="text-sm md:text-base text-muted-foreground mt-2 mb-3 md:mb-4">
           {error instanceof Error ? error.message : 'Failed to load festival data'}
         </p>
-        <p className="text-sm text-muted-foreground mb-6">
+        <p className="text-xs md:text-sm text-muted-foreground mb-4 md:mb-6">
           Connection status: {connectionStatus}
         </p>
         <Button 
           onClick={handleRetry} 
           variant="default"
+          size="sm"
           className="flex items-center gap-2"
         >
           <RefreshCw className="h-4 w-4" />
@@ -107,9 +108,9 @@ export function FestivalManagementWrapper() {
 
   if (!festival) {
     return (
-      <div className="flex flex-col items-center justify-center h-[50vh]">
-        <h2 className="text-xl font-bold">Festival Not Found</h2>
-        <p className="text-muted-foreground mt-2">
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-4 text-center">
+        <h2 className="text-lg md:text-xl font-bold">Festival Not Found</h2>
+        <p className="text-sm md:text-base text-muted-foreground mt-2">
           The requested festival could not be found or may have been deleted.
         </p>
       </div>

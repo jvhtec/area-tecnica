@@ -317,11 +317,11 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[625px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Manage {currentDepartment} Assignments</span>
-            <div className="flex items-center gap-2">
+      <DialogContent className="w-[95vw] max-w-[625px] max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <span className="text-base md:text-lg">Manage {currentDepartment} Assignments</span>
+            <div className="flex flex-wrap items-center gap-2">
               {crewCallData?.flex_element_id && (
                 <Button
                   variant="outline"
@@ -347,32 +347,33 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
               )}
             </div>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs md:text-sm">
             Assign available {currentDepartment} technicians to this job.
             {crewCallData?.flex_element_id && (
-              <span className="block text-sm text-muted-foreground mt-1">
+              <span className="block text-xs md:text-sm text-muted-foreground mt-1">
                 Crew call available for {currentDepartment} department.
               </span>
             )}
             {reqForDept && (
-              <span className="block text-sm text-muted-foreground mt-1">
+              <span className="block text-xs md:text-sm text-muted-foreground mt-1">
                 Coverage: {(Array.from(assignedByRole.values()).reduce((a,b)=>a+b,0))}/{reqForDept.total_required} required
               </span>
             )}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="technician" className="text-right">
-              Technician
-            </Label>
+        <div className="flex-1 overflow-y-auto px-1">
+          <div className="grid gap-3 md:gap-4 py-3 md:py-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
+              <Label htmlFor="technician" className="md:text-right text-xs md:text-sm">
+                Technician
+              </Label>
             <Select
               onValueChange={setSelectedTechnician}
               value={selectedTechnician || ""}
               disabled={isLoadingTechnicians || isLoadingJob}
             >
-              <SelectTrigger className="col-span-3">
+              <SelectTrigger className="md:col-span-3">
                 <SelectValue placeholder={
                   isLoadingTechnicians || isLoadingJob 
                     ? "Loading available technicians..." 
@@ -390,12 +391,12 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
           </div>
 
           {currentDepartment === "sound" && (
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="sound-role" className="text-right">
+            <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
+              <Label htmlFor="sound-role" className="md:text-right text-xs md:text-sm">
                 Sound Role
               </Label>
               <Select onValueChange={setSoundRole} value={soundRole}>
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger className="md:col-span-3">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -416,12 +417,12 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
           )}
 
           {currentDepartment === "lights" && (
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="lights-role" className="text-right">
+            <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
+              <Label htmlFor="lights-role" className="md:text-right text-xs md:text-sm">
                 Lights Role
               </Label>
               <Select onValueChange={setLightsRole} value={lightsRole}>
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger className="md:col-span-3">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -444,6 +445,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
           <Button
             onClick={handleAddTechnician}
             disabled={isAdding || !selectedTechnician || isLoadingTechnicians || isLoadingJob}
+            size="sm"
+            className="w-full"
           >
             {isAdding ? (
               <>
@@ -456,20 +459,22 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
           </Button>
         </div>
 
-        <div className="py-4">
-          <h3 className="text-lg font-semibold mb-2">Current Assignments</h3>
+        <div className="py-3 md:py-4 border-t">
+          <h3 className="text-base md:text-lg font-semibold mb-2">Current Assignments</h3>
           {assignments.length === 0 ? (
-            <p className="text-muted-foreground">No technicians assigned yet.</p>
+            <p className="text-xs md:text-sm text-muted-foreground">No technicians assigned yet.</p>
           ) : (
             <div className="space-y-2">
               {assignments.map((assignment) => (
                 <div
                   key={assignment.technician_id}
-                  className="flex items-center justify-between border rounded-md p-2"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border rounded-md p-2 md:p-3"
                 >
-                  <div>
-                    {formatAssignmentTechnicianName(assignment)}
-                    <p className="text-sm text-muted-foreground">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm md:text-base font-medium truncate">
+                      {formatAssignmentTechnicianName(assignment)}
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">
                       {currentDepartment === "sound" && `Sound: ${labelForCode(assignment.sound_role) || "None"}`}
                       {currentDepartment === "lights" && `Lights: ${labelForCode(assignment.lights_role) || "None"}`}
                     </p>
@@ -480,6 +485,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                         variant="destructive"
                         size="sm"
                         disabled={isRemoving[assignment.technician_id]}
+                        className="w-full sm:w-auto"
                       >
                         {isRemoving[assignment.technician_id] ? (
                           <>
@@ -514,9 +520,10 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
             </div>
           )}
         </div>
+        </div>
 
-        <DialogFooter>
-          <Button type="submit" onClick={handleSaveAssignments} disabled={isLoading}>
+        <DialogFooter className="flex-shrink-0">
+          <Button type="submit" onClick={handleSaveAssignments} disabled={isLoading} size="sm" className="w-full sm:w-auto">
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

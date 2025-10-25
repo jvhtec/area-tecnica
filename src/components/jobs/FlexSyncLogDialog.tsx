@@ -52,26 +52,26 @@ export const FlexSyncLogDialog: React.FC<FlexSyncLogDialogProps> = ({ jobId, ope
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Flex Sync Logs</DialogTitle>
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="text-base md:text-lg">Flex Sync Logs</DialogTitle>
         </DialogHeader>
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2 flex-shrink-0">
+          <div className="text-xs md:text-sm text-muted-foreground">
             {folderIds.length} folder(s) • {logs.length} entries
           </div>
-          <Button variant="ghost" size="sm" onClick={loadData} disabled={loading} className="gap-2">
+          <Button variant="ghost" size="sm" onClick={loadData} disabled={loading} className="gap-2 w-full sm:w-auto">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Refresh
           </Button>
         </div>
-        <ScrollArea className="h-[420px] pr-2">
+        <ScrollArea className="flex-1 pr-2">
           {loading ? (
-            <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+            <div className="flex items-center justify-center h-40 text-xs md:text-sm text-muted-foreground">
               Loading...
             </div>
           ) : logs.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No logs yet for this job.</div>
+            <div className="text-xs md:text-sm text-muted-foreground">No logs yet for this job.</div>
           ) : (
             <div className="space-y-2">
               {logs.map((log) => {
@@ -86,13 +86,13 @@ export const FlexSyncLogDialog: React.FC<FlexSyncLogDialogProps> = ({ jobId, ope
                   return '';
                 })();
                 return (
-                  <div key={log.id} className="border rounded p-3 text-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge variant={log.success ? 'default' : 'destructive'}>
+                  <div key={log.id} className="border rounded p-2 md:p-3 text-xs md:text-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant={log.success ? 'default' : 'destructive'} className="text-xs">
                           {log.success ? 'OK' : 'FAIL'}
                         </Badge>
-                        <span className="font-medium">{log.previous_status || '—'} → {log.new_status}</span>
+                        <span className="font-medium text-xs md:text-sm">{log.previous_status || '—'} → {log.new_status}</span>
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {new Date(log.processed_at).toLocaleString()}
