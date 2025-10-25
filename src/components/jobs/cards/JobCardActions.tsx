@@ -183,6 +183,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 
     // If on project management page and main element exists, open selector dialog
     if (isProjectManagementPage && mainFlexInfo?.elementId) {
+      console.log(`[JobCardActions] Opening Flex element selector for main element: ${mainFlexInfo.elementId}`);
       setFlexSelectorOpen(true);
       return;
     }
@@ -190,6 +191,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     // Otherwise, use direct flexUuid navigation with type detection
     if (flexUuid) {
       try {
+        console.log(`[JobCardActions] Opening Flex folder for job ${job.id}, element: ${flexUuid}, type: ${job.job_type}`);
+        
         // Get auth token from Supabase
         const { data: { X_AUTH_TOKEN }, error } = await supabase
           .functions.invoke('get-secret', {
@@ -197,21 +200,29 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           });
         
         if (error || !X_AUTH_TOKEN) {
-          console.error('Failed to get auth token:', error);
+          console.error('[JobCardActions] Failed to get auth token:', error);
           // Fallback to simple element URL if auth fails
+          // This is safe for dryhire and tourdate which use subfolders
           const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+          console.log(`[JobCardActions] Using fallback URL: ${flexUrl}`);
           window.open(flexUrl, '_blank', 'noopener');
           return;
         }
 
         // Build URL with element type detection
         const flexUrl = await buildFlexUrlWithTypeDetection(flexUuid, X_AUTH_TOKEN);
+        console.log(`[JobCardActions] Opening Flex URL: ${flexUrl}`);
         window.open(flexUrl, '_blank', 'noopener');
       } catch (error) {
-        console.error('Error opening Flex:', error);
+        console.error('[JobCardActions] Error opening Flex:', error);
         // Fallback to simple element URL if error occurs
         const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+        console.log(`[JobCardActions] Using fallback URL after error: ${flexUrl}`);
         window.open(flexUrl, '_blank', 'noopener');
+        toast({ 
+          title: 'Warning', 
+          description: 'Opened with fallback URL format', 
+        });
       }
       return;
     }
@@ -225,6 +236,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   const handleFlexElementSelect = React.useCallback(async (elementId: string) => {
     // Navigate to the selected Flex element with type-specific URL
     try {
+      console.log(`[JobCardActions] Opening Flex element: ${elementId}`);
+      
       // Get auth token from Supabase
       const { data: { X_AUTH_TOKEN }, error } = await supabase
         .functions.invoke('get-secret', {
@@ -232,24 +245,27 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         });
       
       if (error || !X_AUTH_TOKEN) {
-        console.error('Failed to get auth token:', error);
-        toast({ 
-          title: 'Error', 
-          description: 'Failed to authenticate with Flex', 
-          variant: 'destructive' 
-        });
+        console.error('[JobCardActions] Failed to get auth token:', error);
+        // Fallback to simple element URL if auth fails
+        const fallbackUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${elementId}/view/simple-element/header`;
+        console.log(`[JobCardActions] Using fallback URL: ${fallbackUrl}`);
+        window.open(fallbackUrl, '_blank', 'noopener');
         return;
       }
 
       // Build URL with element type detection
       const flexUrl = await buildFlexUrlWithTypeDetection(elementId, X_AUTH_TOKEN);
+      console.log(`[JobCardActions] Opening Flex URL: ${flexUrl}`);
       window.open(flexUrl, '_blank', 'noopener');
     } catch (error) {
-      console.error('Error opening Flex element:', error);
+      console.error('[JobCardActions] Error opening Flex element:', error);
+      // Final fallback: try simple element URL anyway
+      const fallbackUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${elementId}/view/simple-element/header`;
+      console.log(`[JobCardActions] Using fallback URL after error: ${fallbackUrl}`);
+      window.open(fallbackUrl, '_blank', 'noopener');
       toast({ 
-        title: 'Error', 
-        description: 'Failed to open Flex element', 
-        variant: 'destructive' 
+        title: 'Warning', 
+        description: 'Opened with fallback URL format', 
       });
     }
   }, [toast]);
