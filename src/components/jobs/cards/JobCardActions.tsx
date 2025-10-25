@@ -14,8 +14,8 @@ import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
-import { getMainFlexElementIdSync } from "@/utils/flexMainFolderId";
-import { buildFlexUrlWithTypeDetection } from "@/utils/flex-folders";
+import { getMainFlexElementIdSync, resolveTourFolderForTourdate } from "@/utils/flexMainFolderId";
+import { buildFlexUrlWithTypeDetection, createTourdateFilterPredicate } from "@/utils/flex-folders";
 
 interface JobCardActionsProps {
   job: any;
@@ -99,6 +99,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   const [waMessage, setWaMessage] = React.useState<string>("");
   const [isSendingWa, setIsSendingWa] = React.useState(false);
   const [flexSelectorOpen, setFlexSelectorOpen] = React.useState(false);
+  const [tourdateSelectorInfo, setTourdateSelectorInfo] = React.useState<{
+    mainElementId: string;
+    filterDate: string;
+  } | null>(null);
 
   const handleTimesheetClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -186,6 +190,50 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       console.log(`[JobCardActions] Opening Flex element selector for main element: ${mainFlexInfo.elementId}`);
       setFlexSelectorOpen(true);
       return;
+    }
+
+    // Handle tourdate jobs - resolve tour folder and open filtered selector
+    if (isProjectManagementPage && job.job_type === 'tourdate') {
+      try {
+        console.log(`[JobCardActions] Resolving tour folder for tourdate job ${job.id}`);
+        const tourFolderId = await resolveTourFolderForTourdate(job, department);
+        
+        if (!tourFolderId) {
+          toast({
+            title: "Tour folders not found",
+            description: "Please ensure the parent tour has Flex folders created first.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Get the tour date from job data
+        const tourDate = job.start_time;
+        if (!tourDate) {
+          toast({
+            title: "Date not found",
+            description: "Unable to determine tour date for filtering.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        console.log(`[JobCardActions] Opening filtered selector for tourdate: ${tourDate}, folder: ${tourFolderId}`);
+        setTourdateSelectorInfo({
+          mainElementId: tourFolderId,
+          filterDate: tourDate,
+        });
+        setFlexSelectorOpen(true);
+        return;
+      } catch (error) {
+        console.error('[JobCardActions] Error resolving tour folder:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load tour folder information.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     // Otherwise, use direct flexUuid navigation with type detection
@@ -597,17 +645,27 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       )}
 
       {/* Flex Element Selector Dialog */}
-      {mainFlexInfo?.elementId && (
+      {(mainFlexInfo?.elementId || tourdateSelectorInfo) && (
         <FlexElementSelectorDialog
           open={flexSelectorOpen}
-          onOpenChange={setFlexSelectorOpen}
-          mainElementId={mainFlexInfo.elementId}
+          onOpenChange={(open) => {
+            setFlexSelectorOpen(open);
+            if (!open) {
+              setTourdateSelectorInfo(null);
+            }
+          }}
+          mainElementId={tourdateSelectorInfo?.mainElementId || mainFlexInfo?.elementId || ""}
           onSelect={handleFlexElementSelect}
           defaultElementId={
             // Try to find department-specific folder as default
             job.flex_folders?.find((f: any) => 
               f.department?.toLowerCase() === department?.toLowerCase()
-            )?.element_id || mainFlexInfo.elementId
+            )?.element_id || mainFlexInfo?.elementId
+          }
+          filterPredicate={
+            tourdateSelectorInfo
+              ? createTourdateFilterPredicate(tourdateSelectorInfo.filterDate)
+              : undefined
           }
         />
       )}

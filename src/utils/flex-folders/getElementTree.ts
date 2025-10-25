@@ -207,3 +207,71 @@ export function searchTree(
   searchRecursive(nodes, 0);
   return result;
 }
+
+/**
+ * Type for a filter predicate function
+ */
+export type TreeFilterPredicate = (node: FlexElementNode) => boolean;
+
+/**
+ * Filter tree nodes by a predicate while preserving ancestor hierarchy
+ * This ensures that parent nodes are included even if they don't match,
+ * as long as they have descendants that match
+ * @param nodes The nodes to filter
+ * @param predicate Function that returns true for nodes to keep
+ * @returns Filtered tree with ancestors preserved
+ */
+export function filterTreeWithAncestors(
+  nodes: FlexElementNode[],
+  predicate: TreeFilterPredicate
+): FlexElementNode[] {
+  const result: FlexElementNode[] = [];
+
+  for (const node of nodes) {
+    // Check if node itself matches
+    const nodeMatches = predicate(node);
+    
+    // Recursively filter children
+    const filteredChildren = node.children
+      ? filterTreeWithAncestors(node.children, predicate)
+      : [];
+
+    // Include node if it matches OR if it has matching descendants
+    if (nodeMatches || filteredChildren.length > 0) {
+      result.push({
+        ...node,
+        children: filteredChildren.length > 0 ? filteredChildren : undefined,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Creates a predicate function for filtering tourdate nodes by document number pattern
+ * Tourdate document numbers follow the pattern: YYMMDD + SUFFIX (e.g., "2501015S" for 2025-01-01 sound)
+ * @param date The tourdate date (ISO string or Date object)
+ * @returns Predicate function that matches nodes with the date pattern in their document number
+ */
+export function createTourdateFilterPredicate(
+  date: string | Date
+): TreeFilterPredicate {
+  // Convert date to YYMMDD format
+  const dateObj = typeof date === "string" ? new Date(date) : date;
+  const documentDatePattern = dateObj
+    .toISOString()
+    .slice(2, 10) // Get YYMMDD from ISO string
+    .replace(/-/g, ""); // Remove dashes
+
+  return (node: FlexElementNode) => {
+    // If node has no document number, it's likely a parent folder - don't match it directly
+    // but let filterTreeWithAncestors include it if it has matching descendants
+    if (!node.documentNumber) {
+      return false;
+    }
+
+    // Match if document number starts with the date pattern
+    return node.documentNumber.startsWith(documentDatePattern);
+  };
+}

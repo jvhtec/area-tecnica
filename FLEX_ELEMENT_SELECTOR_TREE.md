@@ -200,6 +200,57 @@ Uses the same X-Auth-Token as other Flex API calls (see `src/utils/flex-folders/
 - shadcn-ui components (Dialog, Command, Button)
 - lucide-react icons
 
+## Tourdate Job Filtering
+
+### Overview
+Tourdate jobs require special handling to show only date-specific elements within the parent tour's folder structure. This prevents users from accidentally opening elements for different tour dates.
+
+### How It Works
+
+#### Data Dependencies
+Tourdate jobs need:
+- `job.job_type === 'tourdate'`
+- `job.tour_id` or embedded `job.tour` object with tour folder IDs
+- `job.start_time` for the specific tour date
+
+#### Tree Filtering Process
+1. **Resolve Tour Folder**: When a tourdate job's "Open Flex" button is clicked, the system fetches the parent tour's folder IDs from the `tours` table
+2. **Apply Date Filter**: A filter predicate is created using `createTourdateFilterPredicate(date)` which matches nodes by document number pattern (YYMMDD format)
+3. **Preserve Hierarchy**: The `filterTreeWithAncestors` function filters the tree while keeping parent folders visible for context
+4. **Display Filtered Tree**: Only elements matching the tour date are shown in the selector dialog
+
+#### Document Number Pattern
+Tourdate elements use a standardized document number format:
+- Pattern: `YYMMDD` + `SUFFIX`
+- Example: `2501155S` = January 15, 2025, Sound department
+- Suffixes: `S` (Sound), `L` (Lights), `V` (Video), `P` (Production), `PE` (Personnel)
+
+#### Usage in JobCardActions
+```typescript
+// For tourdate jobs, resolve tour folder and create date filter
+if (job.job_type === 'tourdate') {
+  const tourFolderId = await resolveTourFolderForTourdate(job, department);
+  const filterPredicate = createTourdateFilterPredicate(job.start_time);
+  
+  <FlexElementSelectorDialog
+    mainElementId={tourFolderId}
+    filterPredicate={filterPredicate}
+    ...
+  />
+}
+```
+
+### Error Handling
+- **No Tour Folders**: Shows toast if parent tour folders haven't been created yet
+- **Missing Date**: Shows error if `start_time` is not available
+- **Fetch Failures**: Logs errors and shows user-friendly messages
+
+### Testing
+See `src/utils/flex-folders/getElementTree.test.ts` for comprehensive tests:
+- `filterTreeWithAncestors` tests verify ancestor preservation
+- `createTourdateFilterPredicate` tests verify date pattern matching
+- Edge cases include missing document numbers, multiple departments, and date boundaries
+
 ## Future Enhancements
 
 Potential improvements for future iterations:
@@ -213,6 +264,7 @@ Potential improvements for future iterations:
 - [ ] Bulk selection mode
 - [ ] Export tree structure
 - [ ] Tree visualization diagram
+- [ ] Cached tour folder resolution for performance
 
 ## Performance Considerations
 

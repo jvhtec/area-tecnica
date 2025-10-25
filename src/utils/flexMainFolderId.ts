@@ -9,6 +9,19 @@ export interface FlexFolder {
 
 export interface JobWithFlexFolders {
   id: string;
+  job_type?: string;
+  tour_id?: string;
+  tour_date_id?: string;
+  start_time?: string;
+  tour?: {
+    id: string;
+    flex_main_folder_id?: string | null;
+    flex_sound_folder_id?: string | null;
+    flex_lights_folder_id?: string | null;
+    flex_video_folder_id?: string | null;
+    flex_production_folder_id?: string | null;
+    flex_personnel_folder_id?: string | null;
+  };
   flex_folders?: FlexFolder[];
 }
 
@@ -115,4 +128,83 @@ export function getMainFlexElementIdSync(
   }
 
   return null;
+}
+
+/**
+ * Resolves the tour folder ID for a tourdate job
+ * @param job - Tourdate job object
+ * @param department - Optional department to get specific folder (sound, lights, video, production, personnel)
+ * @returns Tour folder element ID or null if not available
+ */
+export async function resolveTourFolderForTourdate(
+  job: JobWithFlexFolders,
+  department?: string
+): Promise<string | null> {
+  if (job.job_type !== "tourdate") {
+    return null;
+  }
+
+  const tourId = job.tour_id || job.tour?.id;
+  if (!tourId) {
+    console.error("[resolveTourFolderForTourdate] No tour_id found for tourdate job");
+    return null;
+  }
+
+  // Check if tour data is already embedded
+  if (job.tour) {
+    // Try to get department-specific folder if specified
+    if (department) {
+      const folderKey = `flex_${department}_folder_id` as keyof typeof job.tour;
+      const folderId = job.tour[folderKey];
+      if (folderId && typeof folderId === "string") {
+        return folderId;
+      }
+    }
+    
+    // Fall back to main folder
+    if (job.tour.flex_main_folder_id) {
+      return job.tour.flex_main_folder_id;
+    }
+  }
+
+  // Fetch tour data from Supabase
+  try {
+    const { data: tour, error } = await supabase
+      .from("tours")
+      .select(`
+        flex_main_folder_id,
+        flex_sound_folder_id,
+        flex_lights_folder_id,
+        flex_video_folder_id,
+        flex_production_folder_id,
+        flex_personnel_folder_id
+      `)
+      .eq("id", tourId)
+      .single();
+
+    if (error) {
+      console.error("[resolveTourFolderForTourdate] Error fetching tour:", error);
+      return null;
+    }
+
+    if (!tour) {
+      console.error("[resolveTourFolderForTourdate] Tour not found:", tourId);
+      return null;
+    }
+
+    // Try to get department-specific folder if specified
+    if (department) {
+      const folderKey = `flex_${department}_folder_id` as keyof typeof tour;
+      const folderId = tour[folderKey];
+      if (folderId) {
+        return folderId;
+      }
+    }
+
+    // Fall back to main folder
+    return tour.flex_main_folder_id || null;
+  } catch (err) {
+    console.error("[resolveTourFolderForTourdate] Exception:", err);
+    return null;
+  }
 }

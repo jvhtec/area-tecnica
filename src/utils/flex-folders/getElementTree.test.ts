@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   flattenTree,
   searchTree,
+  filterTreeWithAncestors,
+  createTourdateFilterPredicate,
   type FlexElementNode,
 } from "./getElementTree";
 
@@ -274,6 +276,208 @@ describe("getElementTree utilities", () => {
       expect(result).toHaveLength(5);
       expect(result.filter((n) => n.depth === 0)).toHaveLength(2);
       expect(result.filter((n) => n.depth === 1)).toHaveLength(3);
+    });
+  });
+
+  describe("filterTreeWithAncestors", () => {
+    const tourTree: FlexElementNode[] = [
+      {
+        elementId: "tour-main",
+        displayName: "Tour Main Folder",
+        children: [
+          {
+            elementId: "sound-dept",
+            displayName: "Sound Department",
+            children: [
+              {
+                elementId: "date1-sound",
+                displayName: "Barcelona - Jan 15 - Sound",
+                documentNumber: "2501155S",
+              },
+              {
+                elementId: "date2-sound",
+                displayName: "Madrid - Jan 20 - Sound",
+                documentNumber: "2501205S",
+              },
+            ],
+          },
+          {
+            elementId: "lights-dept",
+            displayName: "Lights Department",
+            children: [
+              {
+                elementId: "date1-lights",
+                displayName: "Barcelona - Jan 15 - Lights",
+                documentNumber: "2501155L",
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    it("should filter nodes by predicate", () => {
+      const predicate = (node: FlexElementNode) =>
+        node.documentNumber?.startsWith("250115") || false;
+
+      const result = filterTreeWithAncestors(tourTree, predicate);
+
+      // Should include matching nodes and their ancestors
+      expect(result).toHaveLength(1); // tour-main
+      expect(result[0].elementId).toBe("tour-main");
+      expect(result[0].children).toHaveLength(2); // sound-dept and lights-dept
+      
+      const soundDept = result[0].children?.find(c => c.elementId === "sound-dept");
+      expect(soundDept).toBeDefined();
+      expect(soundDept?.children).toHaveLength(1); // Only date1-sound
+      expect(soundDept?.children?.[0].elementId).toBe("date1-sound");
+      
+      const lightsDept = result[0].children?.find(c => c.elementId === "lights-dept");
+      expect(lightsDept).toBeDefined();
+      expect(lightsDept?.children).toHaveLength(1); // date1-lights
+    });
+
+    it("should preserve ancestor hierarchy", () => {
+      const predicate = (node: FlexElementNode) =>
+        node.documentNumber === "2501205S";
+
+      const result = filterTreeWithAncestors(tourTree, predicate);
+
+      // Should include: tour-main > sound-dept > date2-sound
+      expect(result).toHaveLength(1);
+      expect(result[0].elementId).toBe("tour-main");
+      expect(result[0].children).toHaveLength(1);
+      expect(result[0].children?.[0].elementId).toBe("sound-dept");
+      expect(result[0].children?.[0].children).toHaveLength(1);
+      expect(result[0].children?.[0].children?.[0].elementId).toBe("date2-sound");
+    });
+
+    it("should return empty array when no matches", () => {
+      const predicate = (node: FlexElementNode) =>
+        node.documentNumber === "NONEXISTENT";
+
+      const result = filterTreeWithAncestors(tourTree, predicate);
+      expect(result).toHaveLength(0);
+    });
+
+    it("should handle nodes without document numbers", () => {
+      const predicate = (node: FlexElementNode) =>
+        node.displayName.includes("Sound Department");
+
+      const result = filterTreeWithAncestors(tourTree, predicate);
+
+      // Should include tour-main and sound-dept (but not its children since they don't match)
+      expect(result).toHaveLength(1);
+      expect(result[0].elementId).toBe("tour-main");
+      expect(result[0].children).toHaveLength(1);
+      expect(result[0].children?.[0].elementId).toBe("sound-dept");
+      expect(result[0].children?.[0].children).toBeUndefined();
+    });
+
+    it("should work with multiple matching branches", () => {
+      const predicate = (node: FlexElementNode) =>
+        node.documentNumber?.includes("5S") || false;
+
+      const result = filterTreeWithAncestors(tourTree, predicate);
+
+      // Should include both sound dates
+      expect(result).toHaveLength(1);
+      const soundDept = result[0].children?.find(c => c.elementId === "sound-dept");
+      expect(soundDept?.children).toHaveLength(2);
+    });
+  });
+
+  describe("createTourdateFilterPredicate", () => {
+    it("should create predicate that matches document numbers by date", () => {
+      const date = new Date("2025-01-15T10:00:00Z");
+      const predicate = createTourdateFilterPredicate(date);
+
+      const matchingNode: FlexElementNode = {
+        elementId: "1",
+        displayName: "Test",
+        documentNumber: "2501155S", // YYMMDD + suffix
+      };
+
+      const nonMatchingNode: FlexElementNode = {
+        elementId: "2",
+        displayName: "Test",
+        documentNumber: "2501205S",
+      };
+
+      expect(predicate(matchingNode)).toBe(true);
+      expect(predicate(nonMatchingNode)).toBe(false);
+    });
+
+    it("should work with ISO date strings", () => {
+      const dateString = "2025-01-15T00:00:00Z";
+      const predicate = createTourdateFilterPredicate(dateString);
+
+      const matchingNode: FlexElementNode = {
+        elementId: "1",
+        displayName: "Test",
+        documentNumber: "2501155S",
+      };
+
+      expect(predicate(matchingNode)).toBe(true);
+    });
+
+    it("should not match nodes without document numbers", () => {
+      const date = new Date("2025-01-15T10:00:00Z");
+      const predicate = createTourdateFilterPredicate(date);
+
+      const nodeWithoutDocNumber: FlexElementNode = {
+        elementId: "1",
+        displayName: "Parent Folder",
+      };
+
+      expect(predicate(nodeWithoutDocNumber)).toBe(false);
+    });
+
+    it("should match different department suffixes for same date", () => {
+      const date = new Date("2025-01-15T10:00:00Z");
+      const predicate = createTourdateFilterPredicate(date);
+
+      const soundNode: FlexElementNode = {
+        elementId: "1",
+        displayName: "Sound",
+        documentNumber: "2501155S",
+      };
+
+      const lightsNode: FlexElementNode = {
+        elementId: "2",
+        displayName: "Lights",
+        documentNumber: "2501155L",
+      };
+
+      const videoNode: FlexElementNode = {
+        elementId: "3",
+        displayName: "Video",
+        documentNumber: "2501155V",
+      };
+
+      expect(predicate(soundNode)).toBe(true);
+      expect(predicate(lightsNode)).toBe(true);
+      expect(predicate(videoNode)).toBe(true);
+    });
+
+    it("should handle dates in different months and years", () => {
+      const decemberDate = new Date("2024-12-31T10:00:00Z");
+      const predicate = createTourdateFilterPredicate(decemberDate);
+
+      const matchingNode: FlexElementNode = {
+        elementId: "1",
+        displayName: "Test",
+        documentNumber: "2412315S",
+      };
+
+      const nonMatchingNode: FlexElementNode = {
+        elementId: "2",
+        displayName: "Test",
+        documentNumber: "2501015S", // Different date
+      };
+
+      expect(predicate(matchingNode)).toBe(true);
+      expect(predicate(nonMatchingNode)).toBe(false);
     });
   });
 });
