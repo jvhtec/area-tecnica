@@ -140,7 +140,7 @@ function normalize(value: string | null | undefined): string | undefined {
 }
 
 function pickPrimaryElementId(node: FlexTreeNode): string | null {
-  const dynamic = node as Record<string, unknown>;
+  const dynamic = node as unknown as Record<string, unknown>;
   const candidates: unknown[] = [
     node.nodeId,
     node.elementId,

@@ -50,7 +50,16 @@ export const useMessagesQuery = (userRole: string | null, userDepartment: string
       }
 
       console.log('Fetched messages:', data);
-      return data || [];
+      
+      // Transform the data to handle the sender relationship properly
+      const transformedData = (data || []).map((msg: any) => ({
+        ...msg,
+        sender: Array.isArray(msg.sender) && msg.sender.length > 0 
+          ? msg.sender[0] 
+          : msg.sender || { id: '', first_name: '', last_name: '' }
+      }));
+      
+      return transformedData;
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
     gcTime: 1000 * 60 * 5, // 5 minutes

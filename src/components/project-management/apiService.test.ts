@@ -24,8 +24,8 @@ describe("getElementTree", () => {
   it("should throw error when auth token retrieval fails", async () => {
     vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({
       data: { X_AUTH_TOKEN: null },
-      error: { message: "Failed to get secret" },
-    });
+      error: { message: "Failed to get secret" } as any,
+    } as any);
 
     await expect(getElementTree("test-element-id")).rejects.toThrow(
       "Failed to get auth token"

@@ -183,13 +183,13 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobileLabel: ({ userDepartment }) =>
       departmentLabelMap[userDepartment?.toLowerCase() ?? ""] ||
       "Departamento",
-    icon: ({ userDepartment }) => {
+    icon: (({ userDepartment }) => {
       const dept = userDepartment?.toLowerCase()
       if (dept === "sound") return Music2
       if (dept === "lights") return Lightbulb
       if (dept === "video") return Video
       return null
-    },
+    }) as (context: NavigationContext) => LucideIcon | null,
     mobilePriority: 2,
     mobileSlot: "primary",
     getPath: ({ userDepartment }) =>
@@ -328,9 +328,9 @@ const resolveIcon = (
   context: NavigationContext,
 ): LucideIcon | null => {
   if (typeof source === "function") {
-    return source(context)
+    return source(context) as LucideIcon | null
   }
-  return source
+  return source as LucideIcon
 }
 
 export const buildNavigationItems = (

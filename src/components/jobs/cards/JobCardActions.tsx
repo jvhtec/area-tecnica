@@ -324,14 +324,23 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       }
     }
 
-    // Handle dry-hire jobs - try to find dryhire folder from flex_folders first
+    // Handle dry-hire jobs - check for saved presupuesto first, then fallback to tree traversal
     if (isProjectManagementPage && job.job_type === 'dryhire') {
       const dryHireFolder = job.flex_folders?.find((f: any) => f.folder_type === 'dryhire');
+      const savedPresupuesto = job.flex_folders?.find((f: any) => f.folder_type === 'dryhire_presupuesto');
+      
       let presupuestoElementId =
         typeof dryHirePresupuestoElementRef.current === 'string'
           ? dryHirePresupuestoElementRef.current
           : null;
 
+      // Use saved presupuesto element_id if available
+      if (!presupuestoElementId && savedPresupuesto?.element_id) {
+        presupuestoElementId = savedPresupuesto.element_id;
+        dryHirePresupuestoElementRef.current = presupuestoElementId;
+      }
+
+      // Fallback to tree traversal for jobs created before this fix
       if (!presupuestoElementId && dryHireFolder?.element_id) {
         try {
           console.log('[JobCardActions] Resolving dryhire presupuesto via element tree', {

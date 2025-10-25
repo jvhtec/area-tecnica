@@ -400,7 +400,7 @@ export async function createAllFoldersForJob(
     const dryHireFolder = await createFlexFolder(dryHireFolderPayload);
 
     const dryHireDocumentSuffix = department === "sound" ? "SDH" : "LDH";
-    await createFlexFolder({
+    const presupuestoFolder = await createFlexFolder({
       definitionId: FLEX_FOLDER_IDS.presupuestoDryHire,
       parentElementId: dryHireFolder.elementId,
       open: true,
@@ -414,15 +414,25 @@ export async function createAllFoldersForJob(
       personResponsibleId: dryHireFolderPayload.personResponsibleId,
     });
 
+    // Save both dryhire parent and presupuesto folders
     await supabase
       .from("flex_folders")
-      .insert({
-        job_id: job.id,
-        parent_id: parentFolderId,
-        element_id: dryHireFolder.elementId,
-        department: department,
-        folder_type: "dryhire",
-      });
+      .insert([
+        {
+          job_id: job.id,
+          parent_id: parentFolderId,
+          element_id: dryHireFolder.elementId,
+          department: department,
+          folder_type: "dryhire",
+        },
+        {
+          job_id: job.id,
+          parent_id: dryHireFolder.elementId,
+          element_id: presupuestoFolder.elementId,
+          department: department,
+          folder_type: "dryhire_presupuesto",
+        }
+      ]);
 
     return;
   }
