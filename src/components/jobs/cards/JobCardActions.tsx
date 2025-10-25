@@ -173,9 +173,38 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   // When folders exist, enable "Open in Flex" behavior by resolving UUID
   const { flexUuid, isLoading: isFlexLoading, error: flexError } = useFlexUuid(foldersAreCreated ? job.id : "");
 
+  // Determine if the Open Flex button should be enabled
+  const canOpenFlex = React.useMemo(() => {
+    if (folderStateLoading || isCreatingFolders || isFlexLoading) return false;
+    
+    // For project management page with selector dialog support
+    if (isProjectManagementPage) {
+      // Main element available - can open selector
+      if (mainFlexInfo?.elementId) return true;
+      
+      // Tourdate job - needs tour folder resolution (check later)
+      if (job.job_type === 'tourdate') return true;
+      
+      // Dry-hire job - check if we have any flex_folders with dryhire type
+      if (job.job_type === 'dryhire') {
+        const dryHireFolder = job.flex_folders?.find((f: any) => f.folder_type === 'dryhire');
+        return !!dryHireFolder?.element_id;
+      }
+    }
+    
+    // Otherwise need flexUuid
+    return !!flexUuid;
+  }, [folderStateLoading, isCreatingFolders, isFlexLoading, isProjectManagementPage, mainFlexInfo, job, flexUuid]);
+
   const handleOpenFlex = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    
     if (folderStateLoading || isCreatingFolders || isFlexLoading) {
+      console.warn('[JobCardActions] Open Flex clicked while loading:', {
+        folderStateLoading,
+        isCreatingFolders,
+        isFlexLoading,
+      });
       toast({
         title: "Loading",
         description: isCreatingFolders
@@ -199,6 +228,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         const tourFolderId = await resolveTourFolderForTourdate(job, department);
         
         if (!tourFolderId) {
+          console.error('[JobCardActions] No tour folder found for tourdate job:', job.id);
           toast({
             title: "Tour folders not found",
             description: "Please ensure the parent tour has Flex folders created first.",
@@ -210,6 +240,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         // Get the tour date from job data
         const tourDate = job.start_time;
         if (!tourDate) {
+          console.error('[JobCardActions] No start_time found for tourdate job:', job.id);
           toast({
             title: "Date not found",
             description: "Unable to determine tour date for filtering.",
@@ -236,6 +267,67 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       }
     }
 
+    // Handle dry-hire jobs - try to find dryhire folder from flex_folders first
+    if (isProjectManagementPage && job.job_type === 'dryhire') {
+      const dryHireFolder = job.flex_folders?.find((f: any) => f.folder_type === 'dryhire');
+      
+      if (dryHireFolder?.element_id) {
+        console.log(`[JobCardActions] Opening dryhire subfolder from flex_folders:`, {
+          elementId: dryHireFolder.element_id,
+          department: dryHireFolder.department,
+          jobId: job.id,
+        });
+        
+        // Open selector dialog with the dryhire subfolder as main element
+        // This allows selecting expense sheets and other documents within
+        setFlexSelectorOpen(true);
+        return;
+      } else if (flexUuid) {
+        // Fallback to flexUuid if available
+        console.log(`[JobCardActions] No dryhire subfolder in flex_folders, using flexUuid fallback:`, {
+          flexUuid,
+          jobId: job.id,
+        });
+        
+        await openFlexElement({
+          elementId: flexUuid,
+          context: {
+            jobType: job.job_type,
+            folderType: 'dryhire',
+          },
+          onError: (error) => {
+            console.error('[JobCardActions] Failed to open dryhire element:', error);
+            toast({
+              title: 'Error',
+              description: error.message || 'Failed to open Flex',
+              variant: 'destructive',
+            });
+          },
+          onWarning: (message) => {
+            console.warn('[JobCardActions] Warning opening dryhire element:', message);
+            toast({
+              title: 'Warning',
+              description: message,
+            });
+          },
+        });
+        return;
+      } else {
+        console.error('[JobCardActions] No dryhire element available:', {
+          jobId: job.id,
+          hasFlexFolders: !!job.flex_folders,
+          flexFoldersCount: job.flex_folders?.length || 0,
+          flexUuid,
+        });
+        toast({
+          title: 'Dryhire folder not found',
+          description: 'No dryhire subfolder or element available for this job.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     // Otherwise, use direct flexUuid navigation with shared utility
     if (flexUuid) {
       console.log(`[JobCardActions] Opening Flex folder for job ${job.id}, element: ${flexUuid}, type: ${job.job_type}`);
@@ -246,6 +338,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           jobType: job.job_type,
         },
         onError: (error) => {
+          console.error('[JobCardActions] Failed to open Flex element:', error);
           toast({
             title: 'Error',
             description: error.message || 'Failed to open Flex',
@@ -253,6 +346,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           });
         },
         onWarning: (message) => {
+          console.warn('[JobCardActions] Warning opening Flex element:', message);
           toast({
             title: 'Warning',
             description: message,
@@ -261,10 +355,26 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       });
       return;
     }
+    
+    // No valid element available
+    console.error('[JobCardActions] No valid Flex element available:', {
+      jobId: job.id,
+      jobType: job.job_type,
+      foldersAreCreated,
+      hasMainFlexInfo: !!mainFlexInfo,
+      flexUuid,
+      flexError,
+      hasFlexFolders: !!job.flex_folders,
+    });
+    
     if (flexError) {
       toast({ title: 'Error', description: flexError, variant: 'destructive' });
     } else {
-      toast({ title: 'Info', description: 'Flex folder not available for this job' });
+      toast({ 
+        title: 'Flex folder not available', 
+        description: 'No valid Flex element found for this job. Please ensure folders are created.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -285,59 +395,162 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       displayName: node?.displayName,
       documentNumber: node?.documentNumber,
       jobType: job.job_type,
+      jobId: job.id,
     });
 
     // Validate elementId first
     if (!elementId || typeof elementId !== 'string' || elementId.trim().length === 0) {
-      console.error('[JobCardActions] Invalid elementId received from selector:', {
+      const errorDetails = {
         elementId,
         elementIdType: typeof elementId,
         node,
-      });
+        jobId: job.id,
+        jobType: job.job_type,
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.error('[JobCardActions] Invalid elementId received from selector:', errorDetails);
+      console.error('[JobCardActions] Telemetry: Missing element ID detected', errorDetails);
+      
       toast({
-        title: 'Error',
-        description: `Invalid element ID: "${elementId}". Cannot open in Flex.`,
+        title: 'Invalid element',
+        description: node?.displayName 
+          ? `Cannot open "${node.displayName}" - invalid element ID.`
+          : 'Invalid element ID received. Cannot navigate to Flex.',
         variant: 'destructive',
       });
       return;
     }
 
     // Build URL synchronously using the resolver, leveraging selector metadata
-    const url: string | null = resolveFlexUrlSync({
-      elementId,
-      context: {
-        definitionId: node?.definitionId,
-        domainId: node?.domainId,
-        jobType: job.job_type,
-      },
-    });
-
-    if (!url) {
-      console.error('[JobCardActions] resolveFlexUrlSync returned null/invalid URL for:', {
+    let url: string | null = null;
+    
+    try {
+      url = resolveFlexUrlSync({
+        elementId,
+        context: {
+          definitionId: node?.definitionId,
+          domainId: node?.domainId,
+          jobType: job.job_type,
+        },
+      });
+    } catch (error) {
+      const errorDetails = {
+        error: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
         elementId,
         node,
-      });
+        jobId: job.id,
+        jobType: job.job_type,
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.error('[JobCardActions] Exception while resolving Flex URL:', errorDetails);
+      console.error('[JobCardActions] Telemetry: URL resolution exception', errorDetails);
+      
       toast({
-        title: 'Navigation failed',
-        description: 'Could not construct a valid Flex URL for the selected element.',
+        title: 'Navigation error',
+        description: 'An error occurred while preparing the Flex URL.',
         variant: 'destructive',
       });
       return;
     }
 
+    if (!url || typeof url !== 'string' || url.trim().length === 0) {
+      const errorDetails = {
+        url,
+        urlType: typeof url,
+        elementId,
+        definitionId: node?.definitionId,
+        domainId: node?.domainId,
+        displayName: node?.displayName,
+        documentNumber: node?.documentNumber,
+        jobId: job.id,
+        jobType: job.job_type,
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.error('[JobCardActions] resolveFlexUrlSync returned null/invalid URL:', errorDetails);
+      console.error('[JobCardActions] Telemetry: Unmapped intent detected - no valid URL scheme found', errorDetails);
+      
+      toast({
+        title: 'Navigation failed',
+        description: node?.displayName
+          ? `Could not determine how to open "${node.displayName}" in Flex.`
+          : 'Could not construct a valid Flex URL for the selected element.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate URL contains the elementId (sanity check)
+    if (!url.includes(elementId)) {
+      const warningDetails = {
+        url,
+        elementId,
+        urlContainsElementId: false,
+        jobId: job.id,
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.warn('[JobCardActions] URL does not contain elementId - possible issue:', warningDetails);
+      console.warn('[JobCardActions] Telemetry: URL validation warning', warningDetails);
+    }
+
     const schema = url.includes('#fin-doc/') ? 'fin-doc' : 'simple-element';
-    console.log('[JobCardActions] Resolved Flex URL and schema:', { url, schema });
+    console.log('[JobCardActions] Resolved Flex URL and schema:', {
+      url,
+      schema,
+      elementId,
+      displayName: node?.displayName,
+      documentNumber: node?.documentNumber,
+      jobId: job.id,
+    });
+    
+    console.log('[JobCardActions] Telemetry: Navigation successful', {
+      elementId,
+      schema,
+      displayName: node?.displayName,
+      documentNumber: node?.documentNumber,
+      definitionId: node?.definitionId,
+      domainId: node?.domainId,
+      jobId: job.id,
+      jobType: job.job_type,
+      timestamp: new Date().toISOString(),
+    });
 
     // Create ephemeral anchor to navigate in the same gesture
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.target = '_blank';
-    anchor.rel = 'noopener noreferrer';
-    anchor.style.display = 'none';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-  }, [job.job_type, toast]);
+    try {
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      
+      console.log('[JobCardActions] Navigation anchor clicked successfully');
+    } catch (error) {
+      const errorDetails = {
+        error: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        url,
+        elementId,
+        jobId: job.id,
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.error('[JobCardActions] Failed to create/click navigation anchor:', errorDetails);
+      console.error('[JobCardActions] Telemetry: Anchor navigation failure', errorDetails);
+      
+      toast({
+        title: 'Navigation error',
+        description: 'Failed to open the Flex window. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [job.job_type, job.id, toast]);
 
   const handleManageJob = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -541,10 +754,27 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           <Button
             variant="outline"
             size="sm"
-            onClick={handleOpenFlex}
-            disabled={folderStateLoading || isCreatingFolders || isFlexLoading}
+            onClick={(e) => {
+              if (!canOpenFlex) {
+                e.stopPropagation();
+                toast({
+                  title: 'Cannot open Flex',
+                  description: 'No valid Flex element available for this job.',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              handleOpenFlex(e);
+            }}
+            disabled={!canOpenFlex}
             className="gap-2"
-            title={isFlexLoading || isCreatingFolders || folderStateLoading ? 'Loading…' : 'Open in Flex'}
+            title={
+              !canOpenFlex
+                ? 'No valid Flex element available'
+                : isFlexLoading || isCreatingFolders || folderStateLoading
+                ? 'Loading…'
+                : 'Open in Flex'
+            }
           >
             {(isFlexLoading || isCreatingFolders || folderStateLoading) ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -666,30 +896,47 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       )}
 
       {/* Flex Element Selector Dialog */}
-      {(mainFlexInfo?.elementId || tourdateSelectorInfo) && (
-        <FlexElementSelectorDialog
-          open={flexSelectorOpen}
-          onOpenChange={(open) => {
-            setFlexSelectorOpen(open);
-            if (!open) {
-              setTourdateSelectorInfo(null);
+      {(() => {
+        // Determine the main element ID for the selector
+        let selectorMainElementId: string | undefined;
+        
+        if (tourdateSelectorInfo) {
+          selectorMainElementId = tourdateSelectorInfo.mainElementId;
+        } else if (mainFlexInfo?.elementId) {
+          selectorMainElementId = mainFlexInfo.elementId;
+        } else if (job.job_type === 'dryhire') {
+          // For dryhire, use the dryhire subfolder as the main element
+          const dryHireFolder = job.flex_folders?.find((f: any) => f.folder_type === 'dryhire');
+          selectorMainElementId = dryHireFolder?.element_id;
+        }
+        
+        if (!selectorMainElementId) return null;
+        
+        return (
+          <FlexElementSelectorDialog
+            open={flexSelectorOpen}
+            onOpenChange={(open) => {
+              setFlexSelectorOpen(open);
+              if (!open) {
+                setTourdateSelectorInfo(null);
+              }
+            }}
+            mainElementId={selectorMainElementId}
+            onSelect={handleFlexElementSelect}
+            defaultElementId={
+              // Try to find department-specific folder as default
+              job.flex_folders?.find((f: any) => 
+                f.department?.toLowerCase() === department?.toLowerCase()
+              )?.element_id || mainFlexInfo?.elementId
             }
-          }}
-          mainElementId={tourdateSelectorInfo?.mainElementId || mainFlexInfo?.elementId || ""}
-          onSelect={handleFlexElementSelect}
-          defaultElementId={
-            // Try to find department-specific folder as default
-            job.flex_folders?.find((f: any) => 
-              f.department?.toLowerCase() === department?.toLowerCase()
-            )?.element_id || mainFlexInfo?.elementId
-          }
-          filterPredicate={
-            tourdateSelectorInfo
-              ? createTourdateFilterPredicate(tourdateSelectorInfo.filterDate)
-              : undefined
-          }
-        />
-      )}
+            filterPredicate={
+              tourdateSelectorInfo
+                ? createTourdateFilterPredicate(tourdateSelectorInfo.filterDate)
+                : undefined
+            }
+          />
+        );
+      })()}
     </div>
   );
 };
