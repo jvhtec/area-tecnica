@@ -15,7 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
 import { getMainFlexElementIdSync, resolveTourFolderForTourdate } from "@/utils/flexMainFolderId";
-import { createTourdateFilterPredicate, openFlexElement } from "@/utils/flex-folders";
+import { createTourdateFilterPredicate, openFlexElement, openFlexElementSync } from "@/utils/flex-folders";
 
 interface JobCardActionsProps {
   job: any;
@@ -268,8 +268,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     }
   };
 
-  const handleFlexElementSelect = React.useCallback(async (elementId: string, node?: any) => {
-    // Navigate to the selected Flex element with type-specific URL using shared utility
+  const handleFlexElementSelect = React.useCallback((elementId: string, node?: any) => {
+    // Navigate to the selected Flex element synchronously (no async/await)
     console.log(`[JobCardActions] Opening Flex element:`, {
       elementId,
       elementIdType: typeof elementId,
@@ -287,7 +287,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       jobType: job.job_type,
     });
     
-    // Additional validation before calling openFlexElement
+    // Additional validation before calling openFlexElementSync
     if (!elementId || typeof elementId !== 'string' || elementId.trim().length === 0) {
       console.error('[JobCardActions] Invalid elementId received from selector:', {
         elementId,
@@ -302,26 +302,13 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       return;
     }
     
-    await openFlexElement({
+    // Use synchronous navigation - no async/await to preserve user gesture
+    openFlexElementSync({
       elementId,
-      context: {
-        jobType: job.job_type,
-        domainId: node?.domainId,
-        definitionId: node?.definitionId,
-      },
-      onError: (error) => {
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to open Flex element',
-          variant: 'destructive',
-        });
-      },
-      onWarning: (message) => {
-        toast({
-          title: 'Warning',
-          description: message,
-        });
-      },
+      domainId: node?.domainId,
+      definitionId: node?.definitionId,
+      displayName: node?.displayName,
+      documentNumber: node?.documentNumber,
     });
   }, [job.job_type, toast]);
 
