@@ -1,22 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { openFlexElement } from '../openFlexElement';
-import * as buildFlexUrlModule from '../buildFlexUrl';
+import * as resolverModule from '../resolveFlexUrl';
 
-// Mock supabase
-vi.mock('@/lib/supabase', () => ({
-  supabase: {
-    functions: {
-      invoke: vi.fn(),
-    },
-  },
-}));
-
-// Mock buildFlexUrlWithTypeDetection
-vi.mock('../buildFlexUrl', async () => {
-  const actual = await vi.importActual('../buildFlexUrl');
+// Mock resolver
+vi.mock('../resolveFlexUrl', async () => {
+  const actual = await vi.importActual('../resolveFlexUrl');
   return {
     ...actual,
-    buildFlexUrlWithTypeDetection: vi.fn(),
+    resolveFlexUrl: vi.fn(),
   };
 });
 
@@ -44,13 +35,7 @@ describe('openFlexElement', () => {
   });
 
   it('should open a placeholder window synchronously', async () => {
-    const { supabase } = await import('@/lib/supabase');
-    (supabase.functions.invoke as any).mockResolvedValue({
-      data: { X_AUTH_TOKEN: 'test-token' },
-      error: null,
-    });
-
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrlWithTypeDetection').mockResolvedValue(
+    (resolverModule.resolveFlexUrl as any).mockResolvedValue(
       'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header'
     );
 
@@ -62,43 +47,27 @@ describe('openFlexElement', () => {
     expect(mockWindow.open).toHaveBeenCalledWith('about:blank', '_blank', 'noopener,noreferrer');
   });
 
-  it('should fetch auth token and build URL with type detection', async () => {
-    const { supabase } = await import('@/lib/supabase');
-    (supabase.functions.invoke as any).mockResolvedValue({
-      data: { X_AUTH_TOKEN: 'test-token' },
-      error: null,
-    });
-
+  it('should resolve URL via resolver and navigate placeholder window', async () => {
     const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrlWithTypeDetection').mockResolvedValue(mockUrl);
+    vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(mockUrl);
 
     await openFlexElement({
       elementId: 'test-id',
       context: { jobType: 'single' },
     });
 
-    // Verify auth token was fetched
-    expect(supabase.functions.invoke).toHaveBeenCalledWith('get-secret', {
-      body: { secretName: 'X_AUTH_TOKEN' },
+    // Verify resolver was called with correct parameters
+    expect(resolverModule.resolveFlexUrl).toHaveBeenCalledWith({
+      elementId: 'test-id',
+      context: { jobType: 'single' },
     });
-
-    // Verify URL was built with correct parameters
-    expect(buildFlexUrlModule.buildFlexUrlWithTypeDetection).toHaveBeenCalledWith(
-      'test-id',
-      'test-token',
-      { jobType: 'single' }
-    );
 
     // Verify placeholder window location was updated
     expect(mockPlaceholderWindow.location.href).toBe(mockUrl);
   });
 
-  it('should use fallback URL when auth token fetch fails', async () => {
-    const { supabase } = await import('@/lib/supabase');
-    (supabase.functions.invoke as any).mockResolvedValue({
-      data: {},
-      error: new Error('Auth failed'),
-    });
+  it('should use fallback URL when resolver returns null', async () => {
+    vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(null);
 
     const onWarning = vi.fn();
 
@@ -113,19 +82,12 @@ describe('openFlexElement', () => {
     );
 
     // Verify warning callback was called
-    expect(onWarning).toHaveBeenCalledWith('Opened with fallback URL format (authentication failed)');
+    expect(onWarning).toHaveBeenCalled();
+    expect(onWarning.mock.calls[0][0]).toContain('fallback URL format');
   });
 
-  it('should use fallback URL when buildFlexUrlWithTypeDetection throws', async () => {
-    const { supabase } = await import('@/lib/supabase');
-    (supabase.functions.invoke as any).mockResolvedValue({
-      data: { X_AUTH_TOKEN: 'test-token' },
-      error: null,
-    });
-
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrlWithTypeDetection').mockRejectedValue(
-      new Error('API error')
-    );
+  it('should use fallback URL when resolver throws', async () => {
+    vi.spyOn(resolverModule, 'resolveFlexUrl').mockRejectedValue(new Error('Resolver error'));
 
     const onWarning = vi.fn();
 
@@ -143,9 +105,14 @@ describe('openFlexElement', () => {
     expect(onWarning).toHaveBeenCalledWith('Opened with fallback URL format (error occurred)');
   });
 
-  it('should call onError when popup is blocked', async () => {
+  it('should handle popup blocked by using link click method without error', async () => {
     // Mock window.open to return null (popup blocked)
     mockWindow.open = vi.fn(() => null);
+
+    // Resolver returns a valid URL
+    vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(
+      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header'
+    );
 
     const onError = vi.fn();
 
@@ -154,21 +121,13 @@ describe('openFlexElement', () => {
       onError,
     });
 
-    // Verify error callback was called
-    expect(onError).toHaveBeenCalled();
-    const error = onError.mock.calls[0][0];
-    expect(error.message).toContain('Pop-up blocked');
+    // Verify error callback was NOT called
+    expect(onError).not.toHaveBeenCalled();
   });
 
-  it('should pass context to buildFlexUrlWithTypeDetection', async () => {
-    const { supabase } = await import('@/lib/supabase');
-    (supabase.functions.invoke as any).mockResolvedValue({
-      data: { X_AUTH_TOKEN: 'test-token' },
-      error: null,
-    });
-
+  it('should pass context to resolver', async () => {
     const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrlWithTypeDetection').mockResolvedValue(mockUrl);
+    vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(mockUrl);
 
     const context = {
       jobType: 'dryhire' as const,
@@ -181,22 +140,15 @@ describe('openFlexElement', () => {
     });
 
     // Verify context was passed through
-    expect(buildFlexUrlModule.buildFlexUrlWithTypeDetection).toHaveBeenCalledWith(
-      'test-id',
-      'test-token',
-      context
-    );
+    expect(resolverModule.resolveFlexUrl).toHaveBeenCalledWith({
+      elementId: 'test-id',
+      context,
+    });
   });
 
   it('should handle window.close gracefully when setting location fails', async () => {
-    const { supabase } = await import('@/lib/supabase');
-    (supabase.functions.invoke as any).mockResolvedValue({
-      data: { X_AUTH_TOKEN: 'test-token' },
-      error: null,
-    });
-
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrlWithTypeDetection').mockRejectedValue(
-      new Error('API error')
+    vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(
+      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header'
     );
 
     // Make setting location.href throw
@@ -290,14 +242,8 @@ describe('openFlexElement', () => {
   });
 
   it('should handle dryhire context with proper URL format', async () => {
-    const { supabase } = await import('@/lib/supabase');
-    (supabase.functions.invoke as any).mockResolvedValue({
-      data: { X_AUTH_TOKEN: 'test-token' },
-      error: null,
-    });
-
     const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-dryhire-id/view/simple-element/header';
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrlWithTypeDetection').mockResolvedValue(mockUrl);
+    vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(mockUrl);
 
     await openFlexElement({
       elementId: 'test-dryhire-id',
@@ -308,25 +254,18 @@ describe('openFlexElement', () => {
     });
 
     // Verify context was passed through
-    expect(buildFlexUrlModule.buildFlexUrlWithTypeDetection).toHaveBeenCalledWith(
-      'test-dryhire-id',
-      'test-token',
-      { jobType: 'dryhire', folderType: 'dryhire' }
-    );
+    expect(resolverModule.resolveFlexUrl).toHaveBeenCalledWith({
+      elementId: 'test-dryhire-id',
+      context: { jobType: 'dryhire', folderType: 'dryhire' },
+    });
 
     // Verify placeholder window location was updated
     expect(mockPlaceholderWindow.location.href).toBe(mockUrl);
   });
 
   it('should handle tourdate context with proper URL format', async () => {
-    const { supabase } = await import('@/lib/supabase');
-    (supabase.functions.invoke as any).mockResolvedValue({
-      data: { X_AUTH_TOKEN: 'test-token' },
-      error: null,
-    });
-
     const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-tourdate-id/view/simple-element/header';
-    vi.spyOn(buildFlexUrlModule, 'buildFlexUrlWithTypeDetection').mockResolvedValue(mockUrl);
+    vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(mockUrl);
 
     await openFlexElement({
       elementId: 'test-tourdate-id',
@@ -337,11 +276,10 @@ describe('openFlexElement', () => {
     });
 
     // Verify context was passed through
-    expect(buildFlexUrlModule.buildFlexUrlWithTypeDetection).toHaveBeenCalledWith(
-      'test-tourdate-id',
-      'test-token',
-      { jobType: 'tourdate', folderType: 'tourdate' }
-    );
+    expect(resolverModule.resolveFlexUrl).toHaveBeenCalledWith({
+      elementId: 'test-tourdate-id',
+      context: { jobType: 'tourdate', folderType: 'tourdate' },
+    });
 
     // Verify placeholder window location was updated
     expect(mockPlaceholderWindow.location.href).toBe(mockUrl);

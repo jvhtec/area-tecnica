@@ -15,7 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
 import { getMainFlexElementIdSync, resolveTourFolderForTourdate } from "@/utils/flexMainFolderId";
-import { createTourdateFilterPredicate, openFlexElement, openFlexElementSync } from "@/utils/flex-folders";
+import { createTourdateFilterPredicate, openFlexElement, resolveFlexUrlSync } from "@/utils/flex-folders";
 
 interface JobCardActionsProps {
   job: any;
@@ -269,8 +269,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   };
 
   const handleFlexElementSelect = React.useCallback((elementId: string, node?: any) => {
-    // Navigate to the selected Flex element synchronously (no async/await)
-    console.log(`[JobCardActions] Opening Flex element:`, {
+    // Synchronous navigation path to preserve user gesture
+    console.log(`[JobCardActions] Opening Flex element from selector`, {
       elementId,
       elementIdType: typeof elementId,
       elementIdValue: elementId,
@@ -286,8 +286,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       documentNumber: node?.documentNumber,
       jobType: job.job_type,
     });
-    
-    // Additional validation before calling openFlexElementSync
+
+    // Validate elementId first
     if (!elementId || typeof elementId !== 'string' || elementId.trim().length === 0) {
       console.error('[JobCardActions] Invalid elementId received from selector:', {
         elementId,
@@ -301,15 +301,42 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       });
       return;
     }
-    
-    // Use synchronous navigation - no async/await to preserve user gesture
-    openFlexElementSync({
+
+    // Build URL synchronously using the resolver, leveraging selector metadata
+    const url: string | null = resolveFlexUrlSync({
       elementId,
-      domainId: node?.domainId,
-      definitionId: node?.definitionId,
-      displayName: node?.displayName,
-      documentNumber: node?.documentNumber,
+      context: {
+        definitionId: node?.definitionId,
+        domainId: node?.domainId,
+        jobType: job.job_type,
+      },
     });
+
+    if (!url) {
+      console.error('[JobCardActions] resolveFlexUrlSync returned null/invalid URL for:', {
+        elementId,
+        node,
+      });
+      toast({
+        title: 'Navigation failed',
+        description: 'Could not construct a valid Flex URL for the selected element.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const schema = url.includes('#fin-doc/') ? 'fin-doc' : 'simple-element';
+    console.log('[JobCardActions] Resolved Flex URL and schema:', { url, schema });
+
+    // Create ephemeral anchor to navigate in the same gesture
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
   }, [job.job_type, toast]);
 
   const handleManageJob = (e: React.MouseEvent) => {

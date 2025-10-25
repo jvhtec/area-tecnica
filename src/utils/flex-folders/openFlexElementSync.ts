@@ -1,4 +1,4 @@
-import { buildFlexUrl } from './buildFlexUrl';
+import { resolveFlexUrlSync } from './resolveFlexUrl';
 import { toast as showToast } from 'sonner';
 
 export interface OpenFlexElementSyncOptions {
@@ -31,19 +31,6 @@ const FLEX_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop'
  * to preserve the user gesture and avoid pop-up blocking.
  * 
  * @param options - Configuration for opening the Flex element
- * 
- * @example
- * // In a click handler:
- * function handleClick(e: React.MouseEvent) {
- *   e.stopPropagation();
- *   openFlexElementSync({
- *     elementId: node.elementId,
- *     domainId: node.domainId,
- *     definitionId: node.definitionId,
- *     displayName: node.displayName,
- *     documentNumber: node.documentNumber,
- *   });
- * }
  */
 export function openFlexElementSync(options: OpenFlexElementSyncOptions): void {
   const { elementId, domainId, definitionId, displayName, documentNumber } = options;
@@ -77,11 +64,11 @@ export function openFlexElementSync(options: OpenFlexElementSyncOptions): void {
   }
 
   try {
-    // Build URL synchronously using available context
-    console.log('[openFlexElementSync] Building Flex URL synchronously');
-    const url = buildFlexUrl(elementId, definitionId, domainId);
+    // Resolve URL synchronously using available context
+    console.log('[openFlexElementSync] Resolving Flex URL synchronously via resolver');
+    const url = resolveFlexUrlSync({ elementId, context: { definitionId, domainId } });
 
-    console.log('[openFlexElementSync] Successfully built Flex URL:', {
+    console.log('[openFlexElementSync] URL resolved:', {
       url,
       urlType: typeof url,
       urlNull: url === null,
@@ -94,7 +81,7 @@ export function openFlexElementSync(options: OpenFlexElementSyncOptions): void {
 
     // Guard: Verify URL is valid before navigating
     if (!url || typeof url !== 'string' || url.trim().length === 0) {
-      const error = `buildFlexUrl returned invalid URL: "${url}" (type: ${typeof url})`;
+      const error = `resolveFlexUrlSync returned invalid URL: "${url}" (type: ${typeof url})`;
       console.error('[openFlexElementSync]', error, {
         elementId,
         domainId,
