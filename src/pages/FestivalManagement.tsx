@@ -802,26 +802,26 @@ const FestivalManagement = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
+    <div className="container mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="text-2xl flex items-center gap-2">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-xl md:text-2xl flex items-center gap-2">
                 {isSingleJobMode ? (
-                  <FileText className="h-6 w-6" />
+                  <FileText className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" />
                 ) : (
-                  <Music2 className="h-6 w-6" />
+                  <Music2 className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" />
                 )}
-                {job?.title}
+                <span className="truncate">{job?.title}</span>
               </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs md:text-sm text-muted-foreground mt-1">
                 {isSingleJobMode ? 'Single Job Management' : 'Festival Management'} •
                 {' '}
                 {new Date(job?.start_time || '').toLocaleDateString()} - {new Date(job?.end_time || '').toLocaleDateString()}
               </p>
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center">
               {canEdit && (
                 <Button
                   variant="outline"
@@ -835,7 +835,8 @@ const FestivalManagement = () => {
                   ) : (
                     <Printer className="h-4 w-4" />
                   )}
-                  {isPrinting ? 'Generating...' : 'Print Documentation'}
+                  <span className="hidden sm:inline">{isPrinting ? 'Generating...' : 'Print Documentation'}</span>
+                  <span className="sm:hidden">Print</span>
                 </Button>
               )}
               {/* Only show Flex button if folder exists or is loading */}
@@ -864,7 +865,7 @@ const FestivalManagement = () => {
                   onClick={() => setIsJobPresetsOpen(true)}
                 >
                   <Box className="h-4 w-4" />
-                  Presets
+                  <span className="hidden sm:inline">Presets</span>
                 </Button>
               )}
             </div>
@@ -874,18 +875,18 @@ const FestivalManagement = () => {
 
       {!isSchedulingRoute && !isArtistRoute && !isGearRoute && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <Users className="h-4 w-4 md:h-5 md:w-5" />
                   Artists
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">{artistCount}</p>
-                <p className="text-sm text-muted-foreground">Total Artists</p>
-                <Button className="mt-4 w-full" onClick={(e) => {
+              <CardContent className="space-y-3">
+                <p className="text-2xl md:text-3xl font-bold">{artistCount}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Total Artists</p>
+                <Button className="w-full" size="sm" onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/festival-management/${jobId}/artists`);
                 }}>
@@ -895,15 +896,15 @@ const FestivalManagement = () => {
             </Card>
 
             <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/gear`)}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Layout className="h-5 w-5" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <Layout className="h-4 w-4 md:h-5 md:w-5" />
                   Stages & Gear
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Manage stages and technical equipment</p>
-                <Button className="mt-4 w-full" onClick={(e) => {
+              <CardContent className="space-y-3">
+                <p className="text-xs md:text-sm text-muted-foreground">Manage stages and technical equipment</p>
+                <Button className="w-full" size="sm" onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/festival-management/${jobId}/gear`);
                 }}>
@@ -913,15 +914,15 @@ const FestivalManagement = () => {
             </Card>
 
             <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <Calendar className="h-4 w-4 md:h-5 md:w-5" />
                   Scheduling
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Manage shifts and staff assignments</p>
-                <Button className="mt-4 w-full" onClick={(e) => {
+              <CardContent className="space-y-3">
+                <p className="text-xs md:text-sm text-muted-foreground">Manage shifts and staff assignments</p>
+                <Button className="w-full" size="sm" onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/festival-management/${jobId}/scheduling`);
                 }}>
@@ -931,46 +932,48 @@ const FestivalManagement = () => {
             </Card>
           </div>
           
-          <Card className="mt-6">
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <RefreshCw className="h-5 w-5" />
-                Quick Actions
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRefreshAll();
-                }}
-                disabled={isLoading || isLoadingDocuments}
-                className="w-full sm:w-auto gap-2"
-              >
-                {isLoading || isLoadingDocuments ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                Refresh Data
-              </Button>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <RefreshCw className="h-4 w-4 md:h-5 md:w-5" />
+                  Quick Actions
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRefreshAll();
+                  }}
+                  disabled={isLoading || isLoadingDocuments}
+                  className="w-full sm:w-auto gap-2"
+                >
+                  {isLoading || isLoadingDocuments ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Refresh Data
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                <div className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <Users className="h-4 w-4" />
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+                <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <Users className="h-4 w-4 flex-shrink-0" />
                       Assignments
                     </div>
-                    <Badge variant="outline">{humanizeDepartment(assignmentDepartment)}</Badge>
+                    <Badge variant="outline" className="text-xs">{humanizeDepartment(assignmentDepartment)}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs md:text-sm text-muted-foreground">
                     Coordinate crew assignments by department.
                   </p>
-                  <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex flex-col gap-2">
                     <Select value={assignmentDepartment} onValueChange={(value) => setAssignmentDepartment(value as Department)}>
-                      <SelectTrigger className="sm:w-[160px]">
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Department" />
                       </SelectTrigger>
                       <SelectContent>
@@ -984,19 +987,20 @@ const FestivalManagement = () => {
                     <Button
                       onClick={handleOpenAssignments}
                       disabled={!job || isAssignmentDialogOpen}
-                      className="sm:flex-1"
+                      size="sm"
+                      className="w-full"
                     >
                       Open
                     </Button>
                   </div>
                 </div>
 
-                <div className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <LinkIcon className="h-4 w-4" />
+                <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
+                  <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                    <LinkIcon className="h-4 w-4 flex-shrink-0" />
                     Flex Crew Calls
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs md:text-sm text-muted-foreground">
                     Link Sound/Lights crew call element IDs.
                   </p>
                   <div className="flex">
@@ -1004,48 +1008,49 @@ const FestivalManagement = () => {
                   </div>
                 </div>
 
-                <div className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <Clock className="h-4 w-4" />
+                <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
+                  <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                    <Clock className="h-4 w-4 flex-shrink-0" />
                     Timesheets
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs md:text-sm text-muted-foreground">
                     Review and approve crew timesheets for this job.
                   </p>
-                  <Button onClick={handleNavigateTimesheets} disabled={!jobId} className="w-full">
+                  <Button onClick={handleNavigateTimesheets} disabled={!jobId} size="sm" className="w-full">
                     Open Timesheets
                   </Button>
                 </div>
 
-                <div className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <MapPin className="h-4 w-4" />
+                <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
+                  <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                    <MapPin className="h-4 w-4 flex-shrink-0" />
                     Hoja de Ruta
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs md:text-sm text-muted-foreground">
                     Generate and review the roadmap for this job.
                   </p>
-                  <Button onClick={handleOpenRouteSheet} disabled={!jobId} className="w-full">
+                  <Button onClick={handleOpenRouteSheet} disabled={!jobId} size="sm" className="w-full">
                     Open Hoja de Ruta
                   </Button>
                 </div>
 
-                <div className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <FolderPlus className="h-4 w-4" />
+                <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <FolderPlus className="h-4 w-4 flex-shrink-0" />
                       Flex Folders
                     </div>
-                    <Badge variant={flexStatus.variant}>{flexStatus.label}</Badge>
+                    <Badge variant={flexStatus.variant} className="text-xs">{flexStatus.label}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs md:text-sm text-muted-foreground">
                     Keep Flex folders in sync with this job&apos;s data.
                   </p>
-                  <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex flex-col gap-2">
                     <Button
                       onClick={handleCreateFlexFolders}
                       disabled={!canEdit || !job || isCreatingFlexFolders || isFlexLoading}
-                      className="sm:flex-1"
+                      size="sm"
+                      className="w-full"
                     >
                       {isCreatingFlexFolders ? (
                         <>
@@ -1056,35 +1061,37 @@ const FestivalManagement = () => {
                         'Create / Verify'
                       )}
                     </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={handleOpenFlexPicker}
-                      disabled={
-                        !canEdit ||
-                        !job ||
-                        isCreatingFlexFolders ||
-                        isFlexLoading ||
-                        !folderExists
-                      }
-                      className="sm:flex-1"
-                    >
-                      {isCreatingFlexFolders ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Updating…
-                        </>
-                      ) : (
-                        'Add'
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleOpenFlexLogs}
-                      disabled={!canEdit}
-                      className="sm:flex-1"
-                    >
-                      View Logs
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={handleOpenFlexPicker}
+                        disabled={
+                          !canEdit ||
+                          !job ||
+                          isCreatingFlexFolders ||
+                          isFlexLoading ||
+                          !folderExists
+                        }
+                        size="sm"
+                      >
+                        {isCreatingFlexFolders ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Updating…
+                          </>
+                        ) : (
+                          'Add'
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleOpenFlexLogs}
+                        disabled={!canEdit}
+                        size="sm"
+                      >
+                        View Logs
+                      </Button>
+                    </div>
                   </div>
                   {flexError && (
                     <p className="text-xs text-destructive">
@@ -1093,15 +1100,15 @@ const FestivalManagement = () => {
                   )}
                 </div>
 
-                <div className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <FileText className="h-4 w-4" />
+                <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
+                  <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                    <FileText className="h-4 w-4 flex-shrink-0" />
                     Job Details
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs md:text-sm text-muted-foreground">
                     View the complete job configuration and metadata.
                   </p>
-                  <Button onClick={handleOpenJobDetails} disabled={!job} className="w-full">
+                  <Button onClick={handleOpenJobDetails} disabled={!job} size="sm" className="w-full">
                     View Job Details
                   </Button>
                 </div>
@@ -1116,29 +1123,31 @@ const FestivalManagement = () => {
             jobDates={jobDates}
           />
 
-          <Card className="mt-6">
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <FileText className="h-5 w-5" />
-                Documents & Riders
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRefreshDocuments();
-                }}
-                disabled={isLoadingDocuments}
-                className="w-full sm:w-auto"
-              >
-                {isLoadingDocuments ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                {isLoadingDocuments ? 'Refreshing…' : 'Refresh'}
-              </Button>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <FileText className="h-4 w-4 md:h-5 md:w-5" />
+                  Documents & Riders
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRefreshDocuments();
+                  }}
+                  disabled={isLoadingDocuments}
+                  className="w-full sm:w-auto"
+                >
+                  {isLoadingDocuments ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {isLoadingDocuments ? 'Refreshing…' : 'Refresh'}
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 md:space-y-6">
               {isLoadingDocuments ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1147,51 +1156,53 @@ const FestivalManagement = () => {
               ) : (
                 <>
                   <div>
-                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
+                    <h4 className="text-xs md:text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+                      <FileText className="h-4 w-4 flex-shrink-0" />
                       Job Documents
                     </h4>
                     {jobDocuments.length > 0 ? (
-                      <div className="mt-3 space-y-2">
+                      <div className="space-y-2">
                         {jobDocuments.map((doc) => {
                           const isTemplate = doc.template_type === 'soundvision';
                           const isReadOnly = Boolean(doc.read_only);
                           return (
-                            <div key={doc.id} className="flex items-center justify-between rounded-md border bg-card px-3 py-2">
-                              <div>
-                                <div className="text-sm font-medium text-foreground flex items-center gap-2">
-                                  {doc.file_name}
+                            <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md border bg-card p-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs md:text-sm font-medium text-foreground flex flex-wrap items-center gap-2">
+                                  <span className="truncate">{doc.file_name}</span>
                                   {isTemplate && (
-                                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide flex-shrink-0">
                                       Template SoundVision File
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="text-xs text-muted-foreground">
+                                <div className="text-xs text-muted-foreground mt-1">
                                   Uploaded {formatDateLabel(doc.uploaded_at)}
                                   {isReadOnly && <span className="ml-2 italic">Read-only</span>}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 sm:flex-shrink-0">
                                 <Button
                                   variant="ghost"
-                                  size="icon"
+                                  size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleJobDocumentView(doc);
                                   }}
                                   title="View"
+                                  className="h-8 w-8 p-0"
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
-                                  size="icon"
+                                  size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleJobDocumentDownload(doc);
                                   }}
                                   title="Download"
+                                  className="h-8 w-8 p-0"
                                 >
                                   <Download className="h-4 w-4" />
                                 </Button>
@@ -1201,51 +1212,53 @@ const FestivalManagement = () => {
                         })}
                       </div>
                     ) : (
-                      <p className="mt-3 text-sm text-muted-foreground">
+                      <p className="text-xs md:text-sm text-muted-foreground">
                         No job documents have been uploaded yet.
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                      <Users className="h-4 w-4" />
+                    <h4 className="text-xs md:text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+                      <Users className="h-4 w-4 flex-shrink-0" />
                       Artist Riders
                     </h4>
                     {groupedRiderFiles.length > 0 ? (
-                      <div className="mt-3 space-y-4">
+                      <div className="space-y-4">
                         {groupedRiderFiles.map((artist) => (
                           <div key={artist.artistId} className="space-y-2">
-                            <div className="text-sm font-medium text-foreground">{artist.artistName}</div>
+                            <div className="text-xs md:text-sm font-medium text-foreground">{artist.artistName}</div>
                             <div className="space-y-2">
                               {artist.files.map((file) => (
-                                <div key={file.id} className="flex items-center justify-between rounded-md border bg-accent/20 px-3 py-2">
-                                  <div>
-                                    <div className="text-sm font-medium text-foreground">{file.file_name}</div>
-                                    <div className="text-xs text-muted-foreground">
+                                <div key={file.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md border bg-accent/20 p-3">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-xs md:text-sm font-medium text-foreground truncate">{file.file_name}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">
                                       Uploaded {formatDateLabel(file.created_at)}
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-1">
+                                  <div className="flex items-center gap-1 sm:flex-shrink-0">
                                     <Button
                                       variant="ghost"
-                                      size="icon"
+                                      size="sm"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleRiderView(file);
                                       }}
                                       title="View"
+                                      className="h-8 w-8 p-0"
                                     >
                                       <Eye className="h-4 w-4" />
                                     </Button>
                                     <Button
                                       variant="ghost"
-                                      size="icon"
+                                      size="sm"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleRiderDownload(file);
                                       }}
                                       title="Download"
+                                      className="h-8 w-8 p-0"
                                     >
                                       <Download className="h-4 w-4" />
                                     </Button>
@@ -1257,7 +1270,7 @@ const FestivalManagement = () => {
                         ))}
                       </div>
                     ) : (
-                      <p className="mt-3 text-sm text-muted-foreground">
+                      <p className="text-xs md:text-sm text-muted-foreground">
                         No artist riders uploaded yet. Riders added through the artist table will appear here automatically.
                       </p>
                     )}
@@ -1304,7 +1317,7 @@ const FestivalManagement = () => {
       />
 
       <Dialog open={isRouteSheetOpen} onOpenChange={setIsRouteSheetOpen}>
-        <DialogContent className="max-w-[96vw] w-[96vw] h-[90vh] p-0 overflow-hidden">
+        <DialogContent className="max-w-[96vw] w-[96vw] max-h-[90vh] md:h-[90vh] p-0 overflow-hidden flex flex-col">
           <div className="h-full overflow-auto">
             {jobId && <ModernHojaDeRuta jobId={jobId} />}
           </div>

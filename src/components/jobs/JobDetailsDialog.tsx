@@ -374,7 +374,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   if (isJobLoading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
@@ -386,8 +386,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const gridColsClass = isDryhire
     ? 'grid-cols-1'
     : showExtrasTab
-      ? (showTourRatesTab ? 'grid-cols-7' : 'grid-cols-6')
-      : (showTourRatesTab ? 'grid-cols-6' : 'grid-cols-5');
+      ? (showTourRatesTab ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-7' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6')
+      : (showTourRatesTab ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5');
 
   const showPendingRatesNotice = !isDryhire
     && jobDetails?.job_type === 'tourdate'
@@ -397,28 +397,28 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            {jobDetails?.title || 'Detalles del trabajo'}
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
+            <Calendar className="h-4 w-4 md:h-5 md:w-5" />
+            <span className="truncate">{jobDetails?.title || 'Detalles del trabajo'}</span>
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-          <TabsList className={`grid w-full ${gridColsClass}`}>
-            <TabsTrigger value="info">Información</TabsTrigger>
-            {!isDryhire && <TabsTrigger value="location">Ubicación</TabsTrigger>}
-            {!isDryhire && <TabsTrigger value="personnel">Personal</TabsTrigger>}
-            {!isDryhire && <TabsTrigger value="documents">Documentos</TabsTrigger>}
-            {!isDryhire && <TabsTrigger value="restaurants">Restaurantes</TabsTrigger>}
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className={`grid w-full ${gridColsClass} flex-shrink-0 h-auto text-xs md:text-sm`}>
+            <TabsTrigger value="info" className="py-2">Info</TabsTrigger>
+            {!isDryhire && <TabsTrigger value="location" className="py-2">Ubicación</TabsTrigger>}
+            {!isDryhire && <TabsTrigger value="personnel" className="py-2">Personal</TabsTrigger>}
+            {!isDryhire && <TabsTrigger value="documents" className="py-2">Docs</TabsTrigger>}
+            {!isDryhire && <TabsTrigger value="restaurants" className="py-2">Restau.</TabsTrigger>}
             {showTourRatesTab && (
-              <TabsTrigger value="tour-rates">Tarifas de gira</TabsTrigger>
+              <TabsTrigger value="tour-rates" className="py-2">Tarifas</TabsTrigger>
             )}
-            {!isDryhire && showExtrasTab && <TabsTrigger value="extras">Extras</TabsTrigger>}
+            {!isDryhire && showExtrasTab && <TabsTrigger value="extras" className="py-2">Extras</TabsTrigger>}
           </TabsList>
 
-          <ScrollArea className="h-[500px] mt-4">
+          <ScrollArea className="flex-1 mt-3 md:mt-4 px-1">
             <TabsContent value="info" className="space-y-4">
               <Card className="p-4">
                 <div className="space-y-3">
