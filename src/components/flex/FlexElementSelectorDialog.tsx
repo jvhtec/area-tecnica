@@ -84,6 +84,20 @@ export const FlexElementSelectorDialog: React.FC<
   }, [treeData, searchQuery, filterPredicate]);
 
   const handleSelect = (node: FlatElementNode) => {
+    console.log('[FlexElementSelectorDialog] Element selected:', {
+      elementId: node.elementId,
+      elementIdType: typeof node.elementId,
+      elementIdValue: node.elementId,
+      elementIdValid: !!node.elementId && node.elementId.trim().length > 0,
+      elementIdLength: node.elementId?.length || 0,
+      displayName: node.displayName,
+      documentNumber: node.documentNumber,
+      domainId: node.domainId,
+      definitionId: node.definitionId,
+      depth: node.depth,
+      node,
+    });
+    
     onSelect(node.elementId, node);
     onOpenChange(false);
     setSearchQuery("");

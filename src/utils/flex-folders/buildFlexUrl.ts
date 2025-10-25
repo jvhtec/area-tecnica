@@ -128,7 +128,13 @@ export function isSimpleProjectElement(domainId?: string): boolean {
 export function buildFlexUrl(elementId: string, definitionId?: string, domainId?: string): string {
   console.log('[buildFlexUrl] Building URL', {
     elementId,
+    elementIdType: typeof elementId,
+    elementIdValue: elementId,
+    elementIdNull: elementId === null,
+    elementIdUndefined: elementId === undefined,
+    elementIdEmpty: elementId === '',
     elementIdValid: !!elementId && elementId.trim().length > 0,
+    elementIdLength: elementId?.length || 0,
     definitionId,
     domainId,
     isFinancialDoc: isFinancialDocument(definitionId),
@@ -138,8 +144,13 @@ export function buildFlexUrl(elementId: string, definitionId?: string, domainId?
 
   // Validate elementId
   if (!elementId || typeof elementId !== 'string' || elementId.trim().length === 0) {
-    const error = `Invalid elementId provided to buildFlexUrl: "${elementId}"`;
-    console.error('[buildFlexUrl]', error);
+    const error = `Invalid elementId provided to buildFlexUrl: "${elementId}" (type: ${typeof elementId})`;
+    console.error('[buildFlexUrl]', error, {
+      elementId,
+      elementIdType: typeof elementId,
+      elementIdValue: elementId,
+      stack: new Error().stack,
+    });
     throw new Error(error);
   }
   
@@ -230,7 +241,13 @@ export async function buildFlexUrlWithTypeDetection(
 ): Promise<string> {
   console.log('[buildFlexUrl] Starting type detection', {
     elementId,
+    elementIdType: typeof elementId,
+    elementIdValue: elementId,
+    elementIdNull: elementId === null,
+    elementIdUndefined: elementId === undefined,
+    elementIdEmpty: elementId === '',
     elementIdValid: !!elementId && elementId.trim().length > 0,
+    elementIdLength: elementId?.length || 0,
     hasAuthToken: !!authToken,
     authTokenLength: authToken?.length || 0,
     hasContext: !!context,
@@ -239,8 +256,14 @@ export async function buildFlexUrlWithTypeDetection(
 
   // Validate inputs
   if (!elementId || typeof elementId !== 'string' || elementId.trim().length === 0) {
-    const error = `Invalid elementId in buildFlexUrlWithTypeDetection: "${elementId}"`;
-    console.error('[buildFlexUrl]', error);
+    const error = `Invalid elementId in buildFlexUrlWithTypeDetection: "${elementId}" (type: ${typeof elementId})`;
+    console.error('[buildFlexUrl]', error, {
+      elementId,
+      elementIdType: typeof elementId,
+      elementIdValue: elementId,
+      context,
+      stack: new Error().stack,
+    });
     throw new Error(error);
   }
 
