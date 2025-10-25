@@ -220,4 +220,130 @@ describe('openFlexElement', () => {
     // Verify error callback was called
     expect(onError).toHaveBeenCalled();
   });
+
+  it('should reject empty elementId', async () => {
+    const onError = vi.fn();
+
+    await openFlexElement({
+      elementId: '',
+      onError,
+    });
+
+    // Verify error callback was called
+    expect(onError).toHaveBeenCalled();
+    const error = onError.mock.calls[0][0];
+    expect(error.message).toContain('Invalid element ID');
+
+    // Verify no window was opened
+    expect(mockWindow.open).not.toHaveBeenCalled();
+  });
+
+  it('should reject null elementId', async () => {
+    const onError = vi.fn();
+
+    await openFlexElement({
+      elementId: null as any,
+      onError,
+    });
+
+    // Verify error callback was called
+    expect(onError).toHaveBeenCalled();
+    const error = onError.mock.calls[0][0];
+    expect(error.message).toContain('Invalid element ID');
+
+    // Verify no window was opened
+    expect(mockWindow.open).not.toHaveBeenCalled();
+  });
+
+  it('should reject undefined elementId', async () => {
+    const onError = vi.fn();
+
+    await openFlexElement({
+      elementId: undefined as any,
+      onError,
+    });
+
+    // Verify error callback was called
+    expect(onError).toHaveBeenCalled();
+    const error = onError.mock.calls[0][0];
+    expect(error.message).toContain('Invalid element ID');
+
+    // Verify no window was opened
+    expect(mockWindow.open).not.toHaveBeenCalled();
+  });
+
+  it('should reject whitespace-only elementId', async () => {
+    const onError = vi.fn();
+
+    await openFlexElement({
+      elementId: '   ',
+      onError,
+    });
+
+    // Verify error callback was called
+    expect(onError).toHaveBeenCalled();
+    const error = onError.mock.calls[0][0];
+    expect(error.message).toContain('Invalid element ID');
+
+    // Verify no window was opened
+    expect(mockWindow.open).not.toHaveBeenCalled();
+  });
+
+  it('should handle dryhire context with proper URL format', async () => {
+    const { supabase } = await import('@/lib/supabase');
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: { X_AUTH_TOKEN: 'test-token' },
+      error: null,
+    });
+
+    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-dryhire-id/view/simple-element/header';
+    vi.spyOn(buildFlexUrlModule, 'buildFlexUrlWithTypeDetection').mockResolvedValue(mockUrl);
+
+    await openFlexElement({
+      elementId: 'test-dryhire-id',
+      context: {
+        jobType: 'dryhire',
+        folderType: 'dryhire',
+      },
+    });
+
+    // Verify context was passed through
+    expect(buildFlexUrlModule.buildFlexUrlWithTypeDetection).toHaveBeenCalledWith(
+      'test-dryhire-id',
+      'test-token',
+      { jobType: 'dryhire', folderType: 'dryhire' }
+    );
+
+    // Verify placeholder window location was updated
+    expect(mockPlaceholderWindow.location.href).toBe(mockUrl);
+  });
+
+  it('should handle tourdate context with proper URL format', async () => {
+    const { supabase } = await import('@/lib/supabase');
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: { X_AUTH_TOKEN: 'test-token' },
+      error: null,
+    });
+
+    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-tourdate-id/view/simple-element/header';
+    vi.spyOn(buildFlexUrlModule, 'buildFlexUrlWithTypeDetection').mockResolvedValue(mockUrl);
+
+    await openFlexElement({
+      elementId: 'test-tourdate-id',
+      context: {
+        jobType: 'tourdate',
+        folderType: 'tourdate',
+      },
+    });
+
+    // Verify context was passed through
+    expect(buildFlexUrlModule.buildFlexUrlWithTypeDetection).toHaveBeenCalledWith(
+      'test-tourdate-id',
+      'test-token',
+      { jobType: 'tourdate', folderType: 'tourdate' }
+    );
+
+    // Verify placeholder window location was updated
+    expect(mockPlaceholderWindow.location.href).toBe(mockUrl);
+  });
 });

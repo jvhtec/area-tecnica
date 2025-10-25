@@ -49,6 +49,22 @@ describe('buildFlexUrl', () => {
     const url = buildFlexUrl('test-element-id', 'unknown-definition-id');
     expect(url).toContain('#element/test-element-id/view/simple-element/header');
   });
+
+  it('should throw error for empty elementId', () => {
+    expect(() => buildFlexUrl('', FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
+  });
+
+  it('should throw error for null elementId', () => {
+    expect(() => buildFlexUrl(null as any, FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
+  });
+
+  it('should throw error for undefined elementId', () => {
+    expect(() => buildFlexUrl(undefined as any, FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
+  });
+
+  it('should throw error for whitespace-only elementId', () => {
+    expect(() => buildFlexUrl('   ', FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
+  });
 });
 
 describe('isFinancialDocument', () => {
@@ -247,5 +263,47 @@ describe('buildFlexUrlWithTypeDetection', () => {
 
     expect(url).toContain('#element/test-element-id/view/simple-element/header');
     expect(global.fetch).toHaveBeenCalled();
+  });
+
+  it('should throw error for empty elementId in buildFlexUrlWithTypeDetection', async () => {
+    await expect(
+      buildFlexUrlWithTypeDetection('', 'test-token')
+    ).rejects.toThrow('Invalid elementId');
+  });
+
+  it('should throw error for null elementId in buildFlexUrlWithTypeDetection', async () => {
+    await expect(
+      buildFlexUrlWithTypeDetection(null as any, 'test-token')
+    ).rejects.toThrow('Invalid elementId');
+  });
+
+  it('should throw error for undefined elementId in buildFlexUrlWithTypeDetection', async () => {
+    await expect(
+      buildFlexUrlWithTypeDetection(undefined as any, 'test-token')
+    ).rejects.toThrow('Invalid elementId');
+  });
+
+  it('should throw error for whitespace-only elementId in buildFlexUrlWithTypeDetection', async () => {
+    await expect(
+      buildFlexUrlWithTypeDetection('   ', 'test-token')
+    ).rejects.toThrow('Invalid elementId');
+  });
+
+  it('should handle empty authToken gracefully with context optimization', async () => {
+    // With context optimization, should not need authToken
+    const url = await buildFlexUrlWithTypeDetection('test-element-id', '', {
+      jobType: 'dryhire',
+    });
+
+    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('should use fallback when authToken is empty and no context', async () => {
+    (global.fetch as any).mockRejectedValueOnce(new Error('Unauthorized'));
+
+    const url = await buildFlexUrlWithTypeDetection('test-element-id', '');
+
+    expect(url).toContain('#element/test-element-id/view/simple-element/header');
   });
 });

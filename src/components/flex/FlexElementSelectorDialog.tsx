@@ -67,11 +67,20 @@ export const FlexElementSelectorDialog: React.FC<
     }
 
     // Then apply search query if present
+    let nodes: FlatElementNode[];
     if (searchQuery.trim()) {
-      return searchTree(filteredTree, searchQuery);
+      nodes = searchTree(filteredTree, searchQuery);
+    } else {
+      nodes = flattenTree(filteredTree);
     }
 
-    return flattenTree(filteredTree);
+    // Filter out nodes with invalid elementIds (empty or whitespace-only)
+    // This prevents the user from selecting an invalid element
+    return nodes.filter(node => 
+      node.elementId && 
+      typeof node.elementId === 'string' && 
+      node.elementId.trim().length > 0
+    );
   }, [treeData, searchQuery, filterPredicate]);
 
   const handleSelect = (elementId: string) => {
