@@ -18,9 +18,9 @@ export const JobExtrasDialog = ({
 }: JobExtrasDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
         <DialogHeader>
-          <DialogTitle>Job Extras - {jobTitle}</DialogTitle>
+          <DialogTitle className="text-base md:text-lg">Job Extras - {jobTitle}</DialogTitle>
         </DialogHeader>
         
         <JobExtrasManagement jobId={jobId} isManager={isManager} />

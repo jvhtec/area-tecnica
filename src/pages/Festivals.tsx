@@ -215,29 +215,30 @@ const Festivals = () => {
   const emptyFunction = () => {};
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-4 md:space-y-6 p-4 md:p-0">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0 pb-2">
           <div className="flex items-center gap-4">
-            <CardTitle className="text-2xl font-bold">Festival Management</CardTitle>
-            <Tent className="h-6 w-6 text-muted-foreground" />
+            <CardTitle className="text-xl md:text-2xl font-bold">Festival Management</CardTitle>
+            <Tent className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground" />
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowCompleted(!showCompleted)}
-              className="mr-2"
+              className="w-full sm:w-auto"
             >
-              {showCompleted ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-              {showCompleted ? 'Hide Completed' : 'Show Completed'}
+              {showCompleted ? <EyeOff className="h-4 w-4 sm:mr-2" /> : <Eye className="h-4 w-4 sm:mr-2" />}
+              <span className="ml-2 sm:ml-0">{showCompleted ? 'Hide Completed' : 'Show Completed'}</span>
             </Button>
             <SubscriptionIndicator 
               tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types', 'festival_logos']} 
               showRefreshButton 
               onRefresh={handleRefreshClick}
               showLabel
+              className="justify-center sm:justify-start"
             />
           </div>
         </CardHeader>
@@ -281,21 +282,21 @@ const Festivals = () => {
               </p>
             </div>
           ) : (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-4 md:space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 snap-y snap-mandatory md:snap-none overflow-y-auto md:overflow-visible max-h-[70vh] md:max-h-none">
                 {paginatedFestivals.map((job) => (
                   <div 
                     key={job.id} 
-                    className="relative"
+                    className="relative snap-start min-h-[280px] md:min-h-0"
                     ref={(el) => {
                       festivalRefs.current[job.id] = el;
                     }}
                   >
                     <div 
                       onClick={() => handleJobClick(job.id)} 
-                      className={`cursor-pointer transition-all duration-300 ${
+                      className={`cursor-pointer transition-all duration-300 active:scale-95 md:active:scale-100 ${
                         highlightedFestivalId === job.id 
-                          ? 'ring-2 ring-primary ring-offset-2 shadow-lg scale-105' 
+                          ? 'ring-2 ring-primary ring-offset-2 shadow-lg md:scale-105' 
                           : ''
                       }`}
                     >
@@ -314,7 +315,7 @@ const Festivals = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="absolute top-2 right-2 z-10"
+                        className="absolute top-3 right-3 md:top-2 md:right-2 z-10 h-9 w-9 md:h-8 md:w-8 p-0"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleOpenPrintDialog(job.id, job.title);
