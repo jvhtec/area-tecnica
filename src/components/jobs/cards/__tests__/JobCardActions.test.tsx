@@ -6,6 +6,11 @@ import * as resolveFlexUrl from '@/utils/flex-folders/resolveFlexUrl';
 import * as useFlexUuidModule from '@/hooks/useFlexUuid';
 import * as flexMainFolderId from '@/utils/flexMainFolderId';
 
+const FlexElementSelectorDialogMock = vi.fn(() => null);
+const openFlexElementMock = vi.fn();
+const getElementTreeMock = vi.fn();
+const MOCK_PRESUPUESTO_DRYHIRE_ID = 'mock-presupuesto-dryhire';
+
 // Mock modules
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({
@@ -56,13 +61,17 @@ vi.mock('@/components/incident-reports/TechnicianIncidentReportDialog', () => ({
 }));
 
 vi.mock('@/components/flex/FlexElementSelectorDialog', () => ({
-  FlexElementSelectorDialog: () => null,
+  FlexElementSelectorDialog: FlexElementSelectorDialogMock,
 }));
 
 vi.mock('@/utils/flex-folders', () => ({
   createTourdateFilterPredicate: vi.fn(),
-  openFlexElement: vi.fn(),
+  openFlexElement: openFlexElementMock,
   resolveFlexUrlSync: vi.fn(),
+  getElementTree: getElementTreeMock,
+  FLEX_FOLDER_IDS: {
+    presupuestoDryHire: MOCK_PRESUPUESTO_DRYHIRE_ID,
+  },
 }));
 
 vi.mock('@/utils/flexMainFolderId', () => ({
@@ -114,6 +123,11 @@ describe('JobCardActions', () => {
     });
     // Mock getMainFlexElementIdSync
     vi.spyOn(flexMainFolderId, 'getMainFlexElementIdSync').mockReturnValue(null);
+    openFlexElementMock.mockReset();
+    getElementTreeMock.mockReset();
+    FlexElementSelectorDialogMock.mockClear();
+    openFlexElementMock.mockResolvedValue(undefined);
+    getElementTreeMock.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -193,7 +207,82 @@ describe('JobCardActions', () => {
   });
 
   describe('Dry-hire job handling', () => {
-    it('should enable Open Flex when dryhire folder exists', () => {
+    it('should open dryhire presupuesto directly when stored element ID is available', async () => {
+      const user = userEvent.setup();
+      const props = {
+        ...defaultProps,
+        job: {
+          ...defaultProps.job,
+          job_type: 'dryhire',
+          dryhire_presupuesto_element_id: 'dryhire-presupuesto-id',
+          flex_folders: [
+            {
+              id: 'folder-1',
+              element_id: 'dryhire-element-id',
+              folder_type: 'dryhire',
+              department: 'sound',
+            },
+          ],
+        },
+        foldersAreCreated: true,
+      };
+
+      render(<JobCardActions {...props} />);
+
+      const openFlexButton = screen.getByTitle('Open in Flex');
+      expect(openFlexButton).not.toBeDisabled();
+      await user.click(openFlexButton);
+
+      await waitFor(() => {
+        expect(openFlexElementMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            elementId: 'dryhire-presupuesto-id',
+            context: expect.objectContaining({
+              jobType: 'dryhire',
+              folderType: 'dryhire',
+              definitionId: MOCK_PRESUPUESTO_DRYHIRE_ID,
+            }),
+          })
+        );
+      });
+      expect(getElementTreeMock).not.toHaveBeenCalled();
+      expect(FlexElementSelectorDialogMock).not.toHaveBeenCalled();
+    });
+
+    it('should be disabled when dryhire job has no dryhire folder', () => {
+      const props = {
+        ...defaultProps,
+        job: {
+          ...defaultProps.job,
+          job_type: 'dryhire',
+          flex_folders: [],
+        },
+        foldersAreCreated: true,
+      };
+
+      render(<JobCardActions {...props} />);
+
+      const openFlexButton = screen.getByTitle(/No valid Flex element available|Open in Flex/);
+      expect(openFlexButton).toBeDisabled();
+    });
+
+    it('should resolve dryhire presupuesto via element tree when stored ID is missing', async () => {
+      const user = userEvent.setup();
+      getElementTreeMock.mockResolvedValue([
+        {
+          elementId: 'dryhire-element-id',
+          displayName: 'Dryhire Root',
+          definitionId: 'some-other-id',
+          children: [
+            {
+              elementId: 'resolved-presupuesto-id',
+              displayName: 'Presupuesto Dry Hire',
+              definitionId: MOCK_PRESUPUESTO_DRYHIRE_ID,
+            },
+          ],
+        },
+      ]);
+
       const props = {
         ...defaultProps,
         job: {
@@ -215,23 +304,27 @@ describe('JobCardActions', () => {
 
       const openFlexButton = screen.getByTitle('Open in Flex');
       expect(openFlexButton).not.toBeDisabled();
-    });
 
-    it('should be disabled when dryhire job has no dryhire folder', () => {
-      const props = {
-        ...defaultProps,
-        job: {
-          ...defaultProps.job,
-          job_type: 'dryhire',
-          flex_folders: [],
-        },
-        foldersAreCreated: true,
-      };
+      await user.click(openFlexButton);
 
-      render(<JobCardActions {...props} />);
+      await waitFor(() => {
+        expect(getElementTreeMock).toHaveBeenCalledWith('dryhire-element-id');
+      });
 
-      const openFlexButton = screen.getByTitle(/No valid Flex element available|Open in Flex/);
-      expect(openFlexButton).toBeDisabled();
+      await waitFor(() => {
+        expect(openFlexElementMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            elementId: 'resolved-presupuesto-id',
+            context: expect.objectContaining({
+              jobType: 'dryhire',
+              folderType: 'dryhire',
+              definitionId: MOCK_PRESUPUESTO_DRYHIRE_ID,
+            }),
+          })
+        );
+      });
+
+      expect(FlexElementSelectorDialogMock).not.toHaveBeenCalled();
     });
   });
 
