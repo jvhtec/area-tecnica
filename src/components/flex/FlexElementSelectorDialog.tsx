@@ -23,8 +23,10 @@ import {
   getElementTree,
   searchTree,
   flattenTree,
+  filterTreeWithAncestors,
   type FlexElementNode,
   type FlatElementNode,
+  type TreeFilterPredicate,
 } from "@/utils/flex-folders";
 
 interface FlexElementSelectorDialogProps {
@@ -33,11 +35,12 @@ interface FlexElementSelectorDialogProps {
   mainElementId: string;
   defaultElementId?: string;
   onSelect: (elementId: string) => void;
+  filterPredicate?: TreeFilterPredicate;
 }
 
 export const FlexElementSelectorDialog: React.FC<
   FlexElementSelectorDialogProps
-> = ({ open, onOpenChange, mainElementId, defaultElementId, onSelect }) => {
+> = ({ open, onOpenChange, mainElementId, defaultElementId, onSelect, filterPredicate }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const {
@@ -57,12 +60,19 @@ export const FlexElementSelectorDialog: React.FC<
   const flattenedNodes = useMemo(() => {
     if (!treeData) return [];
 
-    if (searchQuery.trim()) {
-      return searchTree(treeData, searchQuery);
+    // Apply filter predicate first if provided
+    let filteredTree = treeData;
+    if (filterPredicate) {
+      filteredTree = filterTreeWithAncestors(treeData, filterPredicate);
     }
 
-    return flattenTree(treeData);
-  }, [treeData, searchQuery]);
+    // Then apply search query if present
+    if (searchQuery.trim()) {
+      return searchTree(filteredTree, searchQuery);
+    }
+
+    return flattenTree(filteredTree);
+  }, [treeData, searchQuery, filterPredicate]);
 
   const handleSelect = (elementId: string) => {
     onSelect(elementId);
@@ -120,7 +130,9 @@ export const FlexElementSelectorDialog: React.FC<
         <DialogHeader>
           <DialogTitle>Select Flex Element</DialogTitle>
           <DialogDescription>
-            Choose an element from the tree to open in Flex.
+            {filterPredicate
+              ? "Choose an element for this tour date to open in Flex."
+              : "Choose an element from the tree to open in Flex."}
           </DialogDescription>
         </DialogHeader>
 
