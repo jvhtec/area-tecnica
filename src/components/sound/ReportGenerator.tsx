@@ -377,13 +377,16 @@ export const ReportGenerator = () => {
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-xl">SoundVision Report Generator</CardTitle>
+    <Card className="w-full max-w-4xl mx-auto my-6">
+      <CardHeader className="space-y-1">
+        <CardTitle className="text-2xl font-bold text-center">
+          SoundVision Report Generator
+        </CardTitle>
       </CardHeader>
-      <ScrollArea className="h-[calc(100vh-12rem)]">
-        <CardContent className="space-y-4">
-          <div>
+      <CardContent>
+        <div className="space-y-6">
+          {/* Job Selection */}
+          <div className="space-y-2">
             <Label htmlFor="jobSelect">Job</Label>
             <Select value={selectedJobId} onValueChange={setSelectedJobId}>
               <SelectTrigger className="w-full">
@@ -399,12 +402,13 @@ export const ReportGenerator = () => {
             </Select>
           </div>
 
-          <div>
+          {/* Report System Selection */}
+          <div className="space-y-2">
             <Label className="mb-2">Report System</Label>
             <RadioGroup 
               value={reportSystem}
               onValueChange={(value) => setReportSystem(value as "LA" | "Turbo")}
-              className="flex items-center space-x-6"
+              className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="LA" id="r-la" />
@@ -417,7 +421,8 @@ export const ReportGenerator = () => {
             </RadioGroup>
           </div>
 
-          <div>
+          {/* Equipment List */}
+          <div className="space-y-2">
             <Label htmlFor="equipamiento">Equipment List</Label>
             <Textarea
               id="equipamiento"
@@ -430,14 +435,14 @@ export const ReportGenerator = () => {
 
           {/* Auto-mapping section */}
           <div className="space-y-3 p-4 border rounded-lg bg-muted/50">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <Label className="text-sm font-medium">Auto-map Images from Folder</Label>
               {mappingResult && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={clearAutoMapping}
-                  className="text-xs"
+                  className="text-xs w-full sm:w-auto"
                 >
                   Clear Mapping
                 </Button>
@@ -445,8 +450,8 @@ export const ReportGenerator = () => {
             </div>
             
             <div className="flex items-center gap-2">
-              <Label htmlFor="folderSelect" className="cursor-pointer">
-                <div className="flex items-center gap-2 px-3 py-2 border rounded-md hover:bg-background transition-colors">
+              <Label htmlFor="folderSelect" className="cursor-pointer flex-1 sm:flex-initial">
+                <div className="flex items-center justify-center sm:justify-start gap-2 px-3 py-2 border rounded-md hover:bg-background transition-colors">
                   <FolderOpen className="h-4 w-4" />
                   <span className="text-sm">Select Folder</span>
                 </div>
@@ -469,100 +474,108 @@ export const ReportGenerator = () => {
             {showMappingPreview && mappingResult && (
               <div className="space-y-2">
                 <Label className="text-xs font-medium">Mapping Results:</Label>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {mappingResult.found.map((item, index) => (
-                    <div key={index} className="flex items-center gap-2 text-xs">
-                      <Check className="h-3 w-3 text-green-600" />
-                      <span className="font-mono">{item.filename}</span>
-                      <span className="text-muted-foreground">→</span>
-                      <span>{item.section} ({item.view})</span>
-                    </div>
-                  ))}
-                  {mappingResult.missing.map((item, index) => (
-                    <div key={index} className="flex items-center gap-2 text-xs">
-                      <X className="h-3 w-3 text-red-600" />
-                      <span className="font-mono text-muted-foreground">{item.filename}</span>
-                      <span className="text-muted-foreground">→</span>
-                      <span className="text-muted-foreground">{item.section} ({item.view})</span>
-                    </div>
-                  ))}
-                </div>
+                <ScrollArea className="max-h-48">
+                  <div className="space-y-1 pr-4">
+                    {mappingResult.found.map((item, index) => (
+                      <div key={index} className="flex items-center gap-2 text-xs">
+                        <Check className="h-3 w-3 text-green-600 flex-shrink-0" />
+                        <span className="font-mono text-xs break-all">{item.filename}</span>
+                        <span className="text-muted-foreground flex-shrink-0">→</span>
+                        <span className="text-xs">{item.section} ({item.view})</span>
+                      </div>
+                    ))}
+                    {mappingResult.missing.map((item, index) => (
+                      <div key={index} className="flex items-center gap-2 text-xs">
+                        <X className="h-3 w-3 text-red-600 flex-shrink-0" />
+                        <span className="font-mono text-muted-foreground text-xs break-all">{item.filename}</span>
+                        <span className="text-muted-foreground flex-shrink-0">→</span>
+                        <span className="text-muted-foreground text-xs">{item.section} ({item.view})</span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               </div>
             )}
           </div>
 
-          {reportSections.slice(1).map((section) => {
-            const topViewKey = `${section.title}-Top View`;
-            const isoViewKey = `${section.title}-ISO View`;
-            const hasTopImage = images[topViewKey];
-            const hasIsoImage = images[isoViewKey];
+          {/* Image Upload Sections */}
+          <div className="space-y-4">
+            {reportSections.slice(1).map((section) => {
+              const topViewKey = `${section.title}-Top View`;
+              const isoViewKey = `${section.title}-ISO View`;
+              const hasTopImage = images[topViewKey];
+              const hasIsoImage = images[isoViewKey];
 
-            return (
-              <div key={section.title} className="space-y-2 pb-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">{section.title}</Label>
-                  {section.hasIsoView && (
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id={`iso-${section.title}`}
-                        checked={isoViewEnabled[section.title]}
-                        onCheckedChange={() => toggleIsoView(section.title)}
-                      />
-                      <Label htmlFor={`iso-${section.title}`} className="text-xs">
-                        Include ISO
-                      </Label>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs">Top View</Label>
-                      {hasTopImage && <Check className="h-3 w-3 text-green-600" />}
-                    </div>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleImageChange(section.title, "Top View", e.target.files?.[0] || null)}
-                      className="text-sm"
-                    />
-                    {hasTopImage && (
-                      <div className="text-xs text-muted-foreground">
-                        📁 {hasTopImage.name}
+              return (
+                <div key={section.title} className="border rounded-lg p-4 bg-muted/30">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                    <Label className="text-sm font-medium">{section.title}</Label>
+                    {section.hasIsoView && (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`iso-${section.title}`}
+                          checked={isoViewEnabled[section.title]}
+                          onCheckedChange={() => toggleIsoView(section.title)}
+                        />
+                        <Label htmlFor={`iso-${section.title}`} className="text-xs cursor-pointer">
+                          Include ISO View
+                        </Label>
                       </div>
                     )}
                   </div>
-
-                  {section.hasIsoView && isoViewEnabled[section.title] && (
-                    <div className="space-y-1">
+                  
+                  <div className="space-y-3">
+                    <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label className="text-xs">ISO View</Label>
-                        {hasIsoImage && <Check className="h-3 w-3 text-green-600" />}
+                        <Label className="text-xs font-medium">Top View</Label>
+                        {hasTopImage && <Check className="h-3 w-3 text-green-600" />}
                       </div>
                       <Input
                         type="file"
                         accept="image/*"
-                        onChange={(e) => handleImageChange(section.title, "ISO View", e.target.files?.[0] || null)}
+                        onChange={(e) => handleImageChange(section.title, "Top View", e.target.files?.[0] || null)}
                         className="text-sm"
                       />
-                      {hasIsoImage && (
+                      {hasTopImage && (
                         <div className="text-xs text-muted-foreground">
-                          📁 {hasIsoImage.name}
+                          📁 {hasTopImage.name}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
 
-          <Button onClick={generatePDF} className="w-full mt-4">
-            Generate Report
-          </Button>
-        </CardContent>
-      </ScrollArea>
+                    {section.hasIsoView && isoViewEnabled[section.title] && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs font-medium">ISO View</Label>
+                          {hasIsoImage && <Check className="h-3 w-3 text-green-600" />}
+                        </div>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageChange(section.title, "ISO View", e.target.files?.[0] || null)}
+                          className="text-sm"
+                        />
+                        {hasIsoImage && (
+                          <div className="text-xs text-muted-foreground">
+                            📁 {hasIsoImage.name}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Generate Button */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button onClick={generatePDF} className="w-full">
+              Generate Report
+            </Button>
+          </div>
+        </div>
+      </CardContent>
     </Card>
   );
 };
