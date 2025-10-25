@@ -10,6 +10,7 @@ export interface OpenFlexElementOptions {
     jobType?: 'single' | 'festival' | 'dryhire' | 'tourdate';
     folderType?: 'main' | 'dryhire' | 'tourdate';
     definitionId?: string;
+    domainId?: string;
   };
   /**
    * Optional callback for error handling
@@ -47,6 +48,8 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
     context,
     jobType: context?.jobType,
     folderType: context?.folderType,
+    domainId: context?.domainId,
+    definitionId: context?.definitionId,
   });
 
   // Guard: Validate elementId is present and non-empty
@@ -114,6 +117,7 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
       contextJobType: context?.jobType,
       contextFolderType: context?.folderType,
       contextDefinitionId: context?.definitionId,
+      contextDomainId: context?.domainId,
     });
     
     const flexUrl = await buildFlexUrlWithTypeDetection(

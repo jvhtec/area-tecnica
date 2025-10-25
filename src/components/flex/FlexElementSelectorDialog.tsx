@@ -34,7 +34,7 @@ interface FlexElementSelectorDialogProps {
   onOpenChange: (open: boolean) => void;
   mainElementId: string;
   defaultElementId?: string;
-  onSelect: (elementId: string) => void;
+  onSelect: (elementId: string, node?: FlatElementNode) => void;
   filterPredicate?: TreeFilterPredicate;
 }
 
@@ -83,8 +83,8 @@ export const FlexElementSelectorDialog: React.FC<
     );
   }, [treeData, searchQuery, filterPredicate]);
 
-  const handleSelect = (elementId: string) => {
-    onSelect(elementId);
+  const handleSelect = (node: FlatElementNode) => {
+    onSelect(node.elementId, node);
     onOpenChange(false);
     setSearchQuery("");
   };
@@ -102,7 +102,7 @@ export const FlexElementSelectorDialog: React.FC<
       <CommandItem
         key={node.elementId}
         value={`${node.elementId}-${node.displayName}-${node.documentNumber || ""}`}
-        onSelect={() => handleSelect(node.elementId)}
+        onSelect={() => handleSelect(node)}
         className={cn(
           "cursor-pointer",
           isDefault && "bg-accent/50 font-medium"

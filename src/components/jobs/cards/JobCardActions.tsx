@@ -268,14 +268,22 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     }
   };
 
-  const handleFlexElementSelect = React.useCallback(async (elementId: string) => {
+  const handleFlexElementSelect = React.useCallback(async (elementId: string, node?: any) => {
     // Navigate to the selected Flex element with type-specific URL using shared utility
-    console.log(`[JobCardActions] Opening Flex element: ${elementId}`);
+    console.log(`[JobCardActions] Opening Flex element:`, {
+      elementId,
+      domainId: node?.domainId,
+      definitionId: node?.definitionId,
+      displayName: node?.displayName,
+      documentNumber: node?.documentNumber,
+    });
     
     await openFlexElement({
       elementId,
       context: {
         jobType: job.job_type,
+        domainId: node?.domainId,
+        definitionId: node?.definitionId,
       },
       onError: (error) => {
         toast({
