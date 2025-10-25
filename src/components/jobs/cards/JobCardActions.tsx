@@ -15,7 +15,13 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
 import { getMainFlexElementIdSync, resolveTourFolderForTourdate } from "@/utils/flexMainFolderId";
-import { createTourdateFilterPredicate, openFlexElement, resolveFlexUrlSync } from "@/utils/flex-folders";
+import {
+  FLEX_FOLDER_IDS,
+  createTourdateFilterPredicate,
+  getElementTree,
+  openFlexElement,
+  resolveFlexUrlSync,
+} from "@/utils/flex-folders";
 
 interface JobCardActionsProps {
   job: any;
@@ -103,6 +109,57 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     mainElementId: string;
     filterDate: string;
   } | null>(null);
+  const dryHirePresupuestoElementRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (job?.job_type !== "dryhire") {
+      dryHirePresupuestoElementRef.current = null;
+      return;
+    }
+
+    const candidateIds = [
+      job?.dryhire_presupuesto_element_id,
+      job?.dryhirePresupuestoElementId,
+      job?.presupuesto_element_id,
+      job?.presupuestoElementId,
+      job?.flex_presupuesto_element_id,
+      job?.flexPresupuestoElementId,
+      job?.flex_budget_element_id,
+      job?.flexBudgetElementId,
+    ];
+
+    for (const candidate of candidateIds) {
+      if (typeof candidate === "string" && candidate.trim().length > 0) {
+        dryHirePresupuestoElementRef.current = candidate;
+        return;
+      }
+    }
+
+    const matchingFolder = job.flex_folders?.find((folder: any) => {
+      const folderType = typeof folder?.folder_type === "string" ? folder.folder_type.toLowerCase() : "";
+      const folderKey = typeof folder?.key === "string" ? folder.key.toLowerCase() : "";
+      const folderName = typeof folder?.name === "string" ? folder.name.toLowerCase() : "";
+
+      return (
+        folderType === "dryhire_presupuesto" ||
+        folderType === "presupuesto" ||
+        folderType === "presupuesto_dryhire" ||
+        folderKey === "dryhire_presupuesto" ||
+        folderKey === "presupuesto" ||
+        folderKey === "presupuestodryhire" ||
+        folderName.includes("presupuesto")
+      );
+    });
+
+    const storedElementId =
+      typeof matchingFolder?.element_id === "string" && matchingFolder.element_id.trim().length > 0
+        ? matchingFolder.element_id
+        : typeof matchingFolder?.elementId === "string" && matchingFolder.elementId.trim().length > 0
+        ? matchingFolder.elementId
+        : null;
+
+    dryHirePresupuestoElementRef.current = storedElementId;
+  }, [job]);
 
   const handleTimesheetClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -270,62 +327,112 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     // Handle dry-hire jobs - try to find dryhire folder from flex_folders first
     if (isProjectManagementPage && job.job_type === 'dryhire') {
       const dryHireFolder = job.flex_folders?.find((f: any) => f.folder_type === 'dryhire');
-      
-      if (dryHireFolder?.element_id) {
-        console.log(`[JobCardActions] Opening dryhire subfolder from flex_folders:`, {
-          elementId: dryHireFolder.element_id,
-          department: dryHireFolder.department,
-          jobId: job.id,
-        });
-        
-        // Open selector dialog with the dryhire subfolder as main element
-        // This allows selecting expense sheets and other documents within
-        setFlexSelectorOpen(true);
-        return;
-      } else if (flexUuid) {
-        // Fallback to flexUuid if available
-        console.log(`[JobCardActions] No dryhire subfolder in flex_folders, using flexUuid fallback:`, {
-          flexUuid,
-          jobId: job.id,
-        });
-        
-        await openFlexElement({
-          elementId: flexUuid,
-          context: {
-            jobType: job.job_type,
-            folderType: 'dryhire',
-          },
-          onError: (error) => {
-            console.error('[JobCardActions] Failed to open dryhire element:', error);
-            toast({
-              title: 'Error',
-              description: error.message || 'Failed to open Flex',
-              variant: 'destructive',
-            });
-          },
-          onWarning: (message) => {
-            console.warn('[JobCardActions] Warning opening dryhire element:', message);
-            toast({
-              title: 'Warning',
-              description: message,
-            });
-          },
-        });
-        return;
-      } else {
-        console.error('[JobCardActions] No dryhire element available:', {
+      let presupuestoElementId =
+        typeof dryHirePresupuestoElementRef.current === 'string'
+          ? dryHirePresupuestoElementRef.current
+          : null;
+
+      if (!presupuestoElementId && dryHireFolder?.element_id) {
+        try {
+          console.log('[JobCardActions] Resolving dryhire presupuesto via element tree', {
+            jobId: job.id,
+            dryHireFolderId: dryHireFolder.element_id,
+          });
+
+          const tree = await getElementTree(dryHireFolder.element_id);
+          const queue: any[] = Array.isArray(tree) ? [...tree] : [];
+
+          while (queue.length > 0) {
+            const node = queue.shift();
+
+            if (!node || typeof node !== 'object') {
+              continue;
+            }
+
+            const nodeElementId =
+              typeof node.elementId === 'string' && node.elementId.trim().length > 0
+                ? node.elementId
+                : null;
+            const nodeDefinitionId = typeof node.definitionId === 'string' ? node.definitionId : undefined;
+            const nodeDisplayName =
+              typeof node.displayName === 'string'
+                ? node.displayName
+                : typeof node.name === 'string'
+                ? node.name
+                : '';
+
+            if (
+              nodeElementId &&
+              (
+                nodeDefinitionId === FLEX_FOLDER_IDS.presupuestoDryHire ||
+                (nodeDisplayName || '').toLowerCase().includes('presupuesto')
+              )
+            ) {
+              presupuestoElementId = nodeElementId;
+              break;
+            }
+
+            if (Array.isArray(node.children)) {
+              queue.push(...node.children);
+            }
+          }
+
+          if (presupuestoElementId) {
+            dryHirePresupuestoElementRef.current = presupuestoElementId;
+          }
+        } catch (error) {
+          console.error('[JobCardActions] Failed to resolve dryhire presupuesto element via tree:', {
+            error,
+            jobId: job.id,
+            dryHireFolderId: dryHireFolder.element_id,
+          });
+          toast({
+            title: 'Error',
+            description: 'Failed to load the dry-hire presupuesto from Flex.',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
+      if (!presupuestoElementId) {
+        console.error('[JobCardActions] No dryhire presupuesto element available:', {
           jobId: job.id,
           hasFlexFolders: !!job.flex_folders,
           flexFoldersCount: job.flex_folders?.length || 0,
-          flexUuid,
         });
         toast({
-          title: 'Dryhire folder not found',
-          description: 'No dryhire subfolder or element available for this job.',
+          title: 'Presupuesto not found',
+          description: 'No presupuesto element was found for this dry-hire job.',
           variant: 'destructive',
         });
         return;
       }
+
+      await openFlexElement({
+        elementId: presupuestoElementId,
+        context: {
+          jobType: job.job_type,
+          folderType: 'dryhire',
+          definitionId: FLEX_FOLDER_IDS.presupuestoDryHire,
+        },
+        onError: (error) => {
+          console.error('[JobCardActions] Failed to open dryhire presupuesto element:', error);
+          toast({
+            title: 'Error',
+            description: error.message || 'Failed to open Flex',
+            variant: 'destructive',
+          });
+        },
+        onWarning: (message) => {
+          console.warn('[JobCardActions] Warning opening dryhire presupuesto element:', message);
+          toast({
+            title: 'Warning',
+            description: message,
+          });
+        },
+      });
+      return;
     }
 
     // Otherwise, use direct flexUuid navigation with shared utility
@@ -904,14 +1011,14 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           selectorMainElementId = tourdateSelectorInfo.mainElementId;
         } else if (mainFlexInfo?.elementId) {
           selectorMainElementId = mainFlexInfo.elementId;
-        } else if (job.job_type === 'dryhire') {
-          // For dryhire, use the dryhire subfolder as the main element
-          const dryHireFolder = job.flex_folders?.find((f: any) => f.folder_type === 'dryhire');
-          selectorMainElementId = dryHireFolder?.element_id;
         }
-        
+
         if (!selectorMainElementId) return null;
-        
+
+        if (job.job_type === 'dryhire') {
+          return null;
+        }
+
         return (
           <FlexElementSelectorDialog
             open={flexSelectorOpen}
