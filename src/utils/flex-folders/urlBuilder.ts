@@ -14,10 +14,10 @@ import { FlexLinkIntent } from './intentDetection';
  * It handles the different URL schemas based on intent:
  * - simple-element: #element/{id}/view/simple-element/header
  * - fin-doc: #fin-doc/{id}/doc-view/{viewId}/header
+ * - expense-sheet: #fin-doc/{id}/doc-view/{viewId}/header
  * - contact-list: #contact-list/{id}/view/{viewId}/detail
  * - equipment-list: #equipment-list/{id}/view/simple-element/header
  * - remote-file-list: #remote-file-list/{id}/view/simple-element/header
- * - expense-sheet: #fin-doc/{id}/doc-view/{viewId}/header
  */
 export function buildFlexUrlByIntent(
   intent: FlexLinkIntent,

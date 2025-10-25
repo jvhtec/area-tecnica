@@ -300,6 +300,21 @@ describe('JobCardActions', () => {
       );
     });
 
+    it('should generate URL for remote file list when selecting presupuestos recibidos', () => {
+      resolveFlexUrlSyncSpy.mockRestore();
+
+      const result = resolveFlexUrl.resolveFlexUrlSync({
+        elementId: 'remote-presupuesto',
+        context: {
+          definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
+        },
+      });
+
+      expect(result).toBe(
+        'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#remote-file-list/remote-presupuesto/view/simple-element/header'
+      );
+    });
+
     it('should generate URL for dryhire subfolder', () => {
       const dryHireSubfolderUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/dryhire-subfolder/view/simple-element/header';
       

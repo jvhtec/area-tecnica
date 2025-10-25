@@ -43,25 +43,7 @@ export interface IntentDetectionContext {
 }
 
 // Financial documents that use the #fin-doc URL schema
-const DEFINITION_INTENT_MAP = new Map<string, FlexLinkIntent>([
-  [FLEX_FOLDER_IDS.presupuesto, 'fin-doc'],
-  [FLEX_FOLDER_IDS.presupuestoDryHire, 'fin-doc'],
-  [FLEX_FOLDER_IDS.ordenCompra, 'fin-doc'],
-  [FLEX_FOLDER_IDS.ordenSubalquiler, 'fin-doc'],
-  [FLEX_FOLDER_IDS.ordenTrabajo, 'fin-doc'],
-  [FLEX_FOLDER_IDS.hojaInfoSx, 'fin-doc'],
-  [FLEX_FOLDER_IDS.hojaInfoLx, 'fin-doc'],
-  [FLEX_FOLDER_IDS.hojaInfoVx, 'fin-doc'],
-  [FLEX_FOLDER_IDS.hojaGastos, 'expense-sheet'],
-  [FLEX_FOLDER_IDS.documentacionTecnica, 'remote-file-list'],
-  [FLEX_FOLDER_IDS.presupuestosRecibidos, 'remote-file-list'],
-  [FLEX_FOLDER_IDS.crewCall, 'contact-list'],
-  [FLEX_FOLDER_IDS.pullSheet, 'equipment-list'],
-  [FLEX_FOLDER_IDS.mainFolder, 'simple-element'],
-  [FLEX_FOLDER_IDS.subFolder, 'simple-element'],
-]);
-
-const FINANCIAL_DOCUMENT_DEFINITION_IDS = new Set<string>([
+const FINANCIAL_DOCUMENT_DEFINITION_IDS = [
   FLEX_FOLDER_IDS.presupuesto,
   FLEX_FOLDER_IDS.presupuestoDryHire,
   FLEX_FOLDER_IDS.ordenCompra,
@@ -70,18 +52,23 @@ const FINANCIAL_DOCUMENT_DEFINITION_IDS = new Set<string>([
   FLEX_FOLDER_IDS.hojaInfoSx,
   FLEX_FOLDER_IDS.hojaInfoLx,
   FLEX_FOLDER_IDS.hojaInfoVx,
-]);
+];
 
-const EXPENSE_SHEET_DEFINITION_IDS = new Set<string>([FLEX_FOLDER_IDS.hojaGastos]);
+const EXPENSE_SHEET_DEFINITION_IDS = [FLEX_FOLDER_IDS.hojaGastos];
 
-const CREW_CALL_DEFINITION_IDS = new Set<string>([FLEX_FOLDER_IDS.crewCall]);
+const CREW_CALL_DEFINITION_IDS = [FLEX_FOLDER_IDS.crewCall];
 
-const EQUIPMENT_LIST_DEFINITION_IDS = new Set<string>([FLEX_FOLDER_IDS.pullSheet]);
+const EQUIPMENT_LIST_DEFINITION_IDS = [FLEX_FOLDER_IDS.pullSheet];
 
-const SIMPLE_ELEMENT_DEFINITION_IDS = new Set<string>([
+const REMOTE_FILE_LIST_DEFINITION_IDS = [
+  FLEX_FOLDER_IDS.documentacionTecnica,
+  FLEX_FOLDER_IDS.presupuestosRecibidos,
+];
+
+const SIMPLE_ELEMENT_DEFINITION_IDS = [
   FLEX_FOLDER_IDS.mainFolder,
   FLEX_FOLDER_IDS.subFolder,
-]);
+];
 
 /**
  * Detects the appropriate Flex link intent based on available context
@@ -106,14 +93,27 @@ export function detectFlexLinkIntent(context?: IntentDetectionContext): FlexLink
 
   // Check definitionId
   if (context.definitionId) {
-    const normalizedDefinitionId = context.definitionId;
-    const mappedIntent = DEFINITION_INTENT_MAP.get(normalizedDefinitionId);
-
-    if (mappedIntent) {
-      return mappedIntent;
+    if (CREW_CALL_DEFINITION_IDS.includes(context.definitionId)) {
+      return 'contact-list';
     }
 
-    if (SIMPLE_ELEMENT_DEFINITION_IDS.has(normalizedDefinitionId)) {
+    if (EQUIPMENT_LIST_DEFINITION_IDS.includes(context.definitionId)) {
+      return 'equipment-list';
+    }
+
+    if (FINANCIAL_DOCUMENT_DEFINITION_IDS.includes(context.definitionId)) {
+      return 'fin-doc';
+    }
+
+    if (EXPENSE_SHEET_DEFINITION_IDS.includes(context.definitionId)) {
+      return 'expense-sheet';
+    }
+
+    if (REMOTE_FILE_LIST_DEFINITION_IDS.includes(context.definitionId)) {
+      return 'remote-file-list';
+    }
+
+    if (SIMPLE_ELEMENT_DEFINITION_IDS.includes(context.definitionId)) {
       return 'simple-element';
     }
   }
@@ -142,7 +142,7 @@ export function detectFlexLinkIntent(context?: IntentDetectionContext): FlexLink
  */
 export function isFinancialDocument(definitionId?: string): boolean {
   if (!definitionId) return false;
-  return FINANCIAL_DOCUMENT_DEFINITION_IDS.has(definitionId);
+  return FINANCIAL_DOCUMENT_DEFINITION_IDS.includes(definitionId);
 }
 
 /**
@@ -150,7 +150,7 @@ export function isFinancialDocument(definitionId?: string): boolean {
  */
 export function isExpenseSheet(definitionId?: string): boolean {
   if (!definitionId) return false;
-  return EXPENSE_SHEET_DEFINITION_IDS.has(definitionId);
+  return EXPENSE_SHEET_DEFINITION_IDS.includes(definitionId);
 }
 
 /**
@@ -158,7 +158,7 @@ export function isExpenseSheet(definitionId?: string): boolean {
  */
 export function isCrewCall(definitionId?: string): boolean {
   if (!definitionId) return false;
-  return CREW_CALL_DEFINITION_IDS.has(definitionId);
+  return CREW_CALL_DEFINITION_IDS.includes(definitionId);
 }
 
 /**
@@ -166,7 +166,15 @@ export function isCrewCall(definitionId?: string): boolean {
  */
 export function isEquipmentList(definitionId?: string): boolean {
   if (!definitionId) return false;
-  return EQUIPMENT_LIST_DEFINITION_IDS.has(definitionId);
+  return EQUIPMENT_LIST_DEFINITION_IDS.includes(definitionId);
+}
+
+/**
+ * Determines if a definitionId is a remote file list
+ */
+export function isRemoteFileList(definitionId?: string): boolean {
+  if (!definitionId) return false;
+  return REMOTE_FILE_LIST_DEFINITION_IDS.includes(definitionId);
 }
 
 /**
@@ -174,7 +182,7 @@ export function isEquipmentList(definitionId?: string): boolean {
  */
 export function isSimpleFolder(definitionId?: string): boolean {
   if (!definitionId) return false;
-  return SIMPLE_ELEMENT_DEFINITION_IDS.has(definitionId);
+  return SIMPLE_ELEMENT_DEFINITION_IDS.includes(definitionId);
 }
 
 /**

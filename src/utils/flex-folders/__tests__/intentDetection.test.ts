@@ -5,6 +5,7 @@ import {
   isExpenseSheet,
   isCrewCall,
   isEquipmentList,
+  isRemoteFileList,
   isSimpleFolder,
   isSimpleProjectElement,
 } from '../intentDetection';
@@ -253,6 +254,20 @@ describe('isEquipmentList', () => {
 
   it('should return false for undefined', () => {
     expect(isEquipmentList(undefined)).toBe(false);
+  });
+});
+
+describe('isRemoteFileList', () => {
+  it('should return true for documentacionTecnica', () => {
+    expect(isRemoteFileList(FLEX_FOLDER_IDS.documentacionTecnica)).toBe(true);
+  });
+
+  it('should return true for presupuestosRecibidos', () => {
+    expect(isRemoteFileList(FLEX_FOLDER_IDS.presupuestosRecibidos)).toBe(true);
+  });
+
+  it('should return false for undefined', () => {
+    expect(isRemoteFileList(undefined)).toBe(false);
   });
 });
 
