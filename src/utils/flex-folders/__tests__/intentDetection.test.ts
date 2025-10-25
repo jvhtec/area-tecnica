@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   detectFlexLinkIntent,
   isFinancialDocument,
+  isExpenseSheet,
   isCrewCall,
   isEquipmentList,
   isSimpleFolder,
@@ -27,11 +28,46 @@ describe('detectFlexLinkIntent', () => {
     expect(intent).toBe('fin-doc');
   });
 
-  it('should detect fin-doc for hojaGastos definitionId', () => {
+  it('should detect expense-sheet for hojaGastos definitionId', () => {
     const intent = detectFlexLinkIntent({
       definitionId: FLEX_FOLDER_IDS.hojaGastos,
     });
+    expect(intent).toBe('expense-sheet');
+  });
+
+  it('should detect fin-doc for hojaInfoSx definitionId', () => {
+    const intent = detectFlexLinkIntent({
+      definitionId: FLEX_FOLDER_IDS.hojaInfoSx,
+    });
     expect(intent).toBe('fin-doc');
+  });
+
+  it('should detect fin-doc for hojaInfoLx definitionId', () => {
+    const intent = detectFlexLinkIntent({
+      definitionId: FLEX_FOLDER_IDS.hojaInfoLx,
+    });
+    expect(intent).toBe('fin-doc');
+  });
+
+  it('should detect fin-doc for hojaInfoVx definitionId', () => {
+    const intent = detectFlexLinkIntent({
+      definitionId: FLEX_FOLDER_IDS.hojaInfoVx,
+    });
+    expect(intent).toBe('fin-doc');
+  });
+
+  it('should detect remote-file-list for documentacionTecnica definitionId', () => {
+    const intent = detectFlexLinkIntent({
+      definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
+    });
+    expect(intent).toBe('remote-file-list');
+  });
+
+  it('should detect remote-file-list for presupuestosRecibidos definitionId', () => {
+    const intent = detectFlexLinkIntent({
+      definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
+    });
+    expect(intent).toBe('remote-file-list');
   });
 
   it('should detect contact-list for crewCall definitionId', () => {
@@ -137,12 +173,28 @@ describe('isFinancialDocument', () => {
     expect(isFinancialDocument(FLEX_FOLDER_IDS.presupuestoDryHire)).toBe(true);
   });
 
-  it('should return true for hojaGastos', () => {
-    expect(isFinancialDocument(FLEX_FOLDER_IDS.hojaGastos)).toBe(true);
+  it('should return true for hojaInfoSx', () => {
+    expect(isFinancialDocument(FLEX_FOLDER_IDS.hojaInfoSx)).toBe(true);
+  });
+
+  it('should return true for hojaInfoLx', () => {
+    expect(isFinancialDocument(FLEX_FOLDER_IDS.hojaInfoLx)).toBe(true);
+  });
+
+  it('should return true for hojaInfoVx', () => {
+    expect(isFinancialDocument(FLEX_FOLDER_IDS.hojaInfoVx)).toBe(true);
   });
 
   it('should return true for ordenCompra', () => {
     expect(isFinancialDocument(FLEX_FOLDER_IDS.ordenCompra)).toBe(true);
+  });
+
+  it('should return false for hojaGastos', () => {
+    expect(isFinancialDocument(FLEX_FOLDER_IDS.hojaGastos)).toBe(false);
+  });
+
+  it('should return false for documentacionTecnica', () => {
+    expect(isFinancialDocument(FLEX_FOLDER_IDS.documentacionTecnica)).toBe(false);
   });
 
   it('should return false for crewCall', () => {
@@ -159,6 +211,20 @@ describe('isFinancialDocument', () => {
 
   it('should return false for undefined', () => {
     expect(isFinancialDocument(undefined)).toBe(false);
+  });
+});
+
+describe('isExpenseSheet', () => {
+  it('should return true for hojaGastos', () => {
+    expect(isExpenseSheet(FLEX_FOLDER_IDS.hojaGastos)).toBe(true);
+  });
+
+  it('should return false for presupuesto', () => {
+    expect(isExpenseSheet(FLEX_FOLDER_IDS.presupuesto)).toBe(false);
+  });
+
+  it('should return false for undefined', () => {
+    expect(isExpenseSheet(undefined)).toBe(false);
   });
 });
 

@@ -5,6 +5,7 @@ import { JobCardActions } from '../JobCardActions';
 import * as resolveFlexUrl from '@/utils/flex-folders/resolveFlexUrl';
 import * as useFlexUuidModule from '@/hooks/useFlexUuid';
 import * as flexMainFolderId from '@/utils/flexMainFolderId';
+import { FLEX_FOLDER_IDS } from '@/utils/flex-folders/constants';
 
 // Mock modules
 vi.mock('@/hooks/use-toast', () => ({
@@ -269,21 +270,34 @@ describe('JobCardActions', () => {
       expect(resolveFlexUrlSyncSpy).not.toHaveBeenCalled();
     });
 
-    it('should generate URL for expense sheet', () => {
-      const expenseSheetUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#fin-doc/expense-element/doc-view/ca6b072c-b122-11df-b8d5-00e08175e43e/header';
-      
-      resolveFlexUrlSyncSpy.mockReturnValue(expenseSheetUrl);
+    it('should generate URL for expense sheet intent', () => {
+      resolveFlexUrlSyncSpy.mockRestore();
 
-      // Test that the correct URL format is returned
       const result = resolveFlexUrl.resolveFlexUrlSync({
         elementId: 'expense-element',
         context: {
-          definitionId: '566d32e0-1a1e-11e0-a472-00e08175e43e', // hojaGastos
+          definitionId: FLEX_FOLDER_IDS.hojaGastos,
           jobType: 'single',
         },
       });
 
-      expect(result).toBe(expenseSheetUrl);
+      expect(result).toContain('#fin-doc/expense-element/doc-view/');
+      expect(result).toContain(FLEX_FOLDER_IDS.hojaGastos);
+    });
+
+    it('should generate URL for remote file list intent', () => {
+      resolveFlexUrlSyncSpy.mockRestore();
+
+      const result = resolveFlexUrl.resolveFlexUrlSync({
+        elementId: 'remote-element',
+        context: {
+          definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
+        },
+      });
+
+      expect(result).toBe(
+        'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#remote-file-list/remote-element/view/simple-element/header'
+      );
     });
 
     it('should generate URL for dryhire subfolder', () => {
