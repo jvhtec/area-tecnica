@@ -350,13 +350,13 @@ export const AmplifierTool = () => {
   const renderSpeakerSection = (section: string, title: string) => (
     <div className="space-y-4">
       {['mains', 'outs', 'delays'].includes(section) && (
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 bg-muted/50 rounded-lg p-3 border">
           <Checkbox
             id={`${section}-mirrored`}
             checked={config[section].mirrored}
             onCheckedChange={(checked) => handleMirroredChange(section, checked as boolean)}
           />
-          <Label htmlFor={`${section}-mirrored`} className="flex items-center space-x-2 cursor-pointer">
+          <Label htmlFor={`${section}-mirrored`} className="flex items-center space-x-2 cursor-pointer text-sm font-medium">
             <Repeat className="h-4 w-4" />
             <span>Mirrored Clusters</span>
           </Label>
@@ -364,7 +364,7 @@ export const AmplifierTool = () => {
       )}
       
       {config[section].speakers.map((speaker, index) => (
-        <div key={index} className="relative border rounded-lg p-4">
+        <div key={index} className="relative border rounded-lg p-4 bg-card">
           <Button
             variant="ghost"
             size="icon"
@@ -373,9 +373,9 @@ export const AmplifierTool = () => {
           >
             <X className="h-4 w-4" />
           </Button>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor={`${section}-${index}-speaker`}>Speaker Type</Label>
+              <Label htmlFor={`${section}-${index}-speaker`} className="text-sm font-medium">Speaker Type</Label>
               <Select
                 value={speaker.speakerId}
                 onValueChange={(value) => handleConfigChange(section, index, "speakerId", value)}
@@ -394,7 +394,7 @@ export const AmplifierTool = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor={`${section}-${index}-quantity`}>Quantity</Label>
+              <Label htmlFor={`${section}-${index}-quantity`} className="text-sm font-medium">Quantity</Label>
               <Input
                 id={`${section}-${index}-quantity`}
                 type="number"
@@ -405,7 +405,7 @@ export const AmplifierTool = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor={`${section}-${index}-maxlinked`}>Max Linked</Label>
+              <Label htmlFor={`${section}-${index}-maxlinked`} className="text-sm font-medium">Max Linked</Label>
               <Input
                 id={`${section}-${index}-maxlinked`}
                 type="number"
@@ -429,20 +429,20 @@ export const AmplifierTool = () => {
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Amplifier Calculator</CardTitle>
+    <Card className="w-full">
+      <CardHeader className="space-y-1">
+        <CardTitle className="text-2xl font-bold text-center">Amplifier Calculator</CardTitle>
       </CardHeader>
       <ScrollArea className="h-[calc(100vh-12rem)]">
-        <CardContent>
+        <CardContent className="space-y-6">
           <Tabs defaultValue="mains" className="space-y-4">
-            <TabsList className="grid grid-cols-3 lg:grid-cols-6">
-              <TabsTrigger value="mains">Mains</TabsTrigger>
-              <TabsTrigger value="outs">Outs</TabsTrigger>
-              <TabsTrigger value="subs">Subs</TabsTrigger>
-              <TabsTrigger value="fronts">Fronts</TabsTrigger>
-              <TabsTrigger value="delays">Delays</TabsTrigger>
-              <TabsTrigger value="other">Other</TabsTrigger>
+            <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 w-full">
+              <TabsTrigger value="mains" className="text-xs sm:text-sm">Mains</TabsTrigger>
+              <TabsTrigger value="outs" className="text-xs sm:text-sm">Outs</TabsTrigger>
+              <TabsTrigger value="subs" className="text-xs sm:text-sm">Subs</TabsTrigger>
+              <TabsTrigger value="fronts" className="text-xs sm:text-sm">Fronts</TabsTrigger>
+              <TabsTrigger value="delays" className="text-xs sm:text-sm">Delays</TabsTrigger>
+              <TabsTrigger value="other" className="text-xs sm:text-sm">Other</TabsTrigger>
             </TabsList>
 
             <TabsContent value="mains">
@@ -465,25 +465,27 @@ export const AmplifierTool = () => {
             </TabsContent>
           </Tabs>
 
-          <div className="flex justify-end gap-4 mt-6">
-            <Button onClick={calculateAmplifiers} variant="secondary">
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 mt-6">
+            <Button onClick={calculateAmplifiers} variant="secondary" className="w-full sm:w-auto">
               Calculate Amplifiers
             </Button>
-            <Button onClick={generatePDF} className="gap-2">
+            <Button onClick={generatePDF} className="gap-2 w-full sm:w-auto">
               <FileText className="h-4 w-4" />
               Export PDF
             </Button>
           </div>
 
           {results && (
-            <div className="mt-6 p-4 border rounded-lg space-y-4">
-              <h3 className="text-lg font-semibold">Required Amplifiers</h3>
+            <div className="mt-6 border rounded-lg overflow-hidden">
+              <div className="bg-muted px-4 py-3">
+                <h3 className="text-lg font-semibold">Required Amplifiers</h3>
+              </div>
               
-              <div className="space-y-4">
+              <div className="p-4 space-y-4">
                 {Object.entries(results.perSection).map(([section, data]) => (
                   data.totalAmps > 0 && (
-                    <div key={section} className="space-y-2">
-                      <div className="font-medium capitalize">
+                    <div key={section} className="space-y-2 pb-4 border-b last:border-b-0 last:pb-0">
+                      <div className="font-medium capitalize text-sm text-muted-foreground">
                         {section}{data.mirrored ? ' (Mirrored)' : ''}
                       </div>
                       {data.details.map((detail, index) => (
@@ -501,24 +503,37 @@ export const AmplifierTool = () => {
                 ))}
               </div>
 
-              <div className="pt-4 border-t mt-4">
-                <div className="font-medium">Summary:</div>
-                <div className="text-sm space-y-1">
+              <div className="bg-muted/50 px-4 py-3 border-t space-y-2">
+                <div className="font-semibold text-sm text-muted-foreground">Summary</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                   {results.completeRaks > 0 && (
-                    <div>LA-RAKs required: {results.completeRaks}</div>
+                    <div className="flex justify-between">
+                      <span>LA-RAKs required:</span>
+                      <span className="font-medium">{results.completeRaks}</span>
+                    </div>
                   )}
                   {results.looseAmplifiers > 0 && (
-                    <div>Additional loose LA12X amplifiers: {results.looseAmplifiers}</div>
+                    <div className="flex justify-between">
+                      <span>Loose LA12X amplifiers:</span>
+                      <span className="font-medium">{results.looseAmplifiers}</span>
+                    </div>
                   )}
                   {results.plmRacks > 0 && (
-                    <div>PLM20000 Touring Racks required: {results.plmRacks}</div>
+                    <div className="flex justify-between">
+                      <span>PLM20000 Racks:</span>
+                      <span className="font-medium">{results.plmRacks}</span>
+                    </div>
                   )}
                   {results.loosePLMAmps > 0 && (
-                    <div>Additional loose PLM20000D amplifiers: {results.loosePLMAmps}</div>
+                    <div className="flex justify-between">
+                      <span>Loose PLM20000D amplifiers:</span>
+                      <span className="font-medium">{results.loosePLMAmps}</span>
+                    </div>
                   )}
-                  <div className="font-medium pt-2">
-                    Total amplifiers needed: {results.totalAmplifiersNeeded}
-                  </div>
+                </div>
+                <div className="flex justify-between font-semibold pt-2 border-t">
+                  <span>Total amplifiers needed:</span>
+                  <span>{results.totalAmplifiersNeeded}</span>
                 </div>
               </div>
             </div>
