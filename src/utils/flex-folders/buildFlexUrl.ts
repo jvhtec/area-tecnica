@@ -135,25 +135,66 @@ export function buildFlexUrl(elementId: string, definitionId?: string): string {
   return url;
 }
 
+export interface ElementContext {
+  /**
+   * Job type - helps determine if this is a dryhire or tourdate subfolder
+   */
+  jobType?: 'single' | 'festival' | 'dryhire' | 'tourdate';
+  /**
+   * Folder type from the database - indicates the element type
+   */
+  folderType?: 'main' | 'dryhire' | 'tourdate';
+  /**
+   * If we already know the definitionId, we can skip the API call
+   */
+  definitionId?: string;
+}
+
 /**
  * Builds a Flex URL with element type detection
  * Fetches element details if needed to determine the correct URL format
  * 
  * @param elementId - The element ID to open
  * @param authToken - Flex API authentication token
+ * @param context - Optional context about the element to avoid extra API calls
  * @returns Promise with the formatted Flex URL
  * 
  * @remarks
  * This function attempts to fetch element details from Flex API to determine
  * the correct URL format. If the API call fails, it falls back to simple-element
  * URL format which works for most element types including dryhire and tourdate subfolders.
+ * 
+ * If context is provided with definitionId or folderType, it can skip the API call:
+ * - dryhire jobs use subfolder elements (simple-element URL)
+ * - tourdate jobs use subfolder elements (simple-element URL)
+ * - main folders use simple-element URL
+ * - financial documents use fin-doc URL
  */
 export async function buildFlexUrlWithTypeDetection(
   elementId: string,
-  authToken: string
+  authToken: string,
+  context?: ElementContext
 ): Promise<string> {
-  console.log(`[buildFlexUrl] Starting type detection for element ${elementId}`);
+  console.log(`[buildFlexUrl] Starting type detection for element ${elementId}`, { context });
   
+  // If context provides definitionId, we can skip the API call
+  if (context?.definitionId) {
+    console.log(`[buildFlexUrl] Using definitionId from context: ${context.definitionId}`);
+    const url = buildFlexUrl(elementId, context.definitionId);
+    console.log(`[buildFlexUrl] Built URL from context: ${url}`);
+    return url;
+  }
+  
+  // If context indicates dryhire or tourdate, we know it's a subfolder (simple element)
+  if (context?.folderType === 'dryhire' || context?.folderType === 'tourdate' || 
+      context?.jobType === 'dryhire' || context?.jobType === 'tourdate') {
+    console.log(`[buildFlexUrl] Context indicates subfolder type, using simple-element URL`);
+    const url = buildFlexUrl(elementId); // No definitionId = simple element URL
+    console.log(`[buildFlexUrl] Built URL from context: ${url}`);
+    return url;
+  }
+  
+  // Otherwise, fetch element details from API
   try {
     const details = await getElementDetails(elementId, authToken);
     const url = buildFlexUrl(elementId, details.definitionId);

@@ -8,7 +8,7 @@ import { format, startOfDay } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTableSubscription } from "@/hooks/useTableSubscription";
 import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
-import { buildFlexUrlWithTypeDetection } from "@/utils/flex-folders";
+import { openFlexElement } from "@/utils/flex-folders";
 
 interface DateTypeContextMenuProps {
   children: React.ReactNode;
@@ -95,40 +95,24 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
     }
 
     if (flexUuid) {
-      try {
-        console.log(`[DateTypeContextMenu] Opening Flex for job ${jobId}, element: ${flexUuid}`);
-        
-        // Get auth token from Supabase
-        const { data: { X_AUTH_TOKEN }, error } = await supabase
-          .functions.invoke('get-secret', {
-            body: { secretName: 'X_AUTH_TOKEN' }
+      console.log(`[DateTypeContextMenu] Opening Flex for job ${jobId}, element: ${flexUuid}`);
+      
+      await openFlexElement({
+        elementId: flexUuid,
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: error.message || "Failed to open Flex",
+            variant: "destructive",
           });
-        
-        if (error || !X_AUTH_TOKEN) {
-          console.error('[DateTypeContextMenu] Failed to get auth token:', error);
-          // Fallback to simple element URL if auth fails
-          // This is safe for all element types including dryhire and tourdate
-          const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-          console.log(`[DateTypeContextMenu] Using fallback URL: ${flexUrl}`);
-          window.open(flexUrl, '_blank', 'noopener');
-          return;
-        }
-
-        // Build URL with element type detection
-        const flexUrl = await buildFlexUrlWithTypeDetection(flexUuid, X_AUTH_TOKEN);
-        console.log(`[DateTypeContextMenu] Opening Flex URL: ${flexUrl}`);
-        window.open(flexUrl, '_blank', 'noopener');
-      } catch (error) {
-        console.error('[DateTypeContextMenu] Error building Flex URL:', error);
-        // Fallback to simple element URL if error occurs
-        const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-        console.log(`[DateTypeContextMenu] Using fallback URL after error: ${flexUrl}`);
-        window.open(flexUrl, '_blank', 'noopener');
-        toast({ 
-          title: 'Warning', 
-          description: 'Opened with fallback URL format', 
-        });
-      }
+        },
+        onWarning: (message) => {
+          toast({
+            title: "Warning",
+            description: message,
+          });
+        },
+      });
     } else if (flexError) {
       toast({
         title: "Error",
