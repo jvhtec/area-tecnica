@@ -46,6 +46,7 @@ import { useFlexUuid } from "@/hooks/useFlexUuid";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { TourDateFlexButton } from "@/components/tours/TourDateFlexButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { buildFlexUrlWithTypeDetection } from "@/utils/flex-folders";
 
 interface TourManagementProps {
   tour: any;
@@ -311,7 +312,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
     navigate('/technician-dashboard');
   };
 
-  const handleFlexClick = () => {
+  const handleFlexClick = async () => {
     if (isFlexLoading) {
       toast({
         title: "Loading",
@@ -321,8 +322,30 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
     }
 
     if (flexUuid) {
-      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-      window.open(flexUrl, '_blank', 'noopener');
+      try {
+        // Get auth token from Supabase
+        const { data: { X_AUTH_TOKEN }, error: authError } = await supabase
+          .functions.invoke('get-secret', {
+            body: { secretName: 'X_AUTH_TOKEN' }
+          });
+        
+        if (authError || !X_AUTH_TOKEN) {
+          console.error('Failed to get auth token:', authError);
+          // Fallback to simple element URL if auth fails
+          const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+          window.open(flexUrl, '_blank', 'noopener');
+          return;
+        }
+
+        // Build URL with element type detection
+        const flexUrl = await buildFlexUrlWithTypeDetection(flexUuid, X_AUTH_TOKEN);
+        window.open(flexUrl, '_blank', 'noopener');
+      } catch (error) {
+        console.error('Error building Flex URL:', error);
+        // Fallback to simple element URL if error occurs
+        const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+        window.open(flexUrl, '_blank', 'noopener');
+      }
     } else if (flexError) {
       toast({
         title: "Error",

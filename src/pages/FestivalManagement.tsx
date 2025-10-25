@@ -25,7 +25,7 @@ import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { CrewCallLinkerDialog } from "@/components/jobs/CrewCallLinker";
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
-import { createAllFoldersForJob } from "@/utils/flex-folders";
+import { createAllFoldersForJob, buildFlexUrlWithTypeDetection } from "@/utils/flex-folders";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { JobPresetManagerDialog } from "@/components/jobs/JobPresetManagerDialog";
 import { resolveJobDocBucket } from "@/utils/jobDocuments";
@@ -763,7 +763,7 @@ const FestivalManagement = () => {
     setIsPrintDialogOpen(true);
   };
 
-  const handleFlexClick = () => {
+  const handleFlexClick = async () => {
     if (isFlexLoading) {
       toast({
         title: "Loading",
@@ -773,8 +773,30 @@ const FestivalManagement = () => {
     }
 
     if (flexUuid) {
-      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-      window.open(flexUrl, '_blank', 'noopener');
+      try {
+        // Get auth token from Supabase
+        const { data: { X_AUTH_TOKEN }, error: authError } = await supabase
+          .functions.invoke('get-secret', {
+            body: { secretName: 'X_AUTH_TOKEN' }
+          });
+        
+        if (authError || !X_AUTH_TOKEN) {
+          console.error('Failed to get auth token:', authError);
+          // Fallback to simple element URL if auth fails
+          const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+          window.open(flexUrl, '_blank', 'noopener');
+          return;
+        }
+
+        // Build URL with element type detection
+        const flexUrl = await buildFlexUrlWithTypeDetection(flexUuid, X_AUTH_TOKEN);
+        window.open(flexUrl, '_blank', 'noopener');
+      } catch (error) {
+        console.error('Error building Flex URL:', error);
+        // Fallback to simple element URL if error occurs
+        const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+        window.open(flexUrl, '_blank', 'noopener');
+      }
     } else if (flexError) {
       toast({
         title: "Error",

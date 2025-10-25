@@ -15,6 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
 import { getMainFlexElementIdSync } from "@/utils/flexMainFolderId";
+import { buildFlexUrlWithTypeDetection } from "@/utils/flex-folders";
 
 interface JobCardActionsProps {
   job: any;
@@ -168,7 +169,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   // When folders exist, enable "Open in Flex" behavior by resolving UUID
   const { flexUuid, isLoading: isFlexLoading, error: flexError } = useFlexUuid(foldersAreCreated ? job.id : "");
 
-  const handleOpenFlex = (e: React.MouseEvent) => {
+  const handleOpenFlex = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (folderStateLoading || isCreatingFolders || isFlexLoading) {
       toast({
@@ -186,10 +187,32 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       return;
     }
 
-    // Otherwise, retain existing direct flexUuid navigation
+    // Otherwise, use direct flexUuid navigation with type detection
     if (flexUuid) {
-      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-      window.open(flexUrl, '_blank', 'noopener');
+      try {
+        // Get auth token from Supabase
+        const { data: { X_AUTH_TOKEN }, error } = await supabase
+          .functions.invoke('get-secret', {
+            body: { secretName: 'X_AUTH_TOKEN' }
+          });
+        
+        if (error || !X_AUTH_TOKEN) {
+          console.error('Failed to get auth token:', error);
+          // Fallback to simple element URL if auth fails
+          const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+          window.open(flexUrl, '_blank', 'noopener');
+          return;
+        }
+
+        // Build URL with element type detection
+        const flexUrl = await buildFlexUrlWithTypeDetection(flexUuid, X_AUTH_TOKEN);
+        window.open(flexUrl, '_blank', 'noopener');
+      } catch (error) {
+        console.error('Error opening Flex:', error);
+        // Fallback to simple element URL if error occurs
+        const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+        window.open(flexUrl, '_blank', 'noopener');
+      }
       return;
     }
     if (flexError) {
@@ -199,11 +222,37 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     }
   };
 
-  const handleFlexElementSelect = React.useCallback((elementId: string) => {
-    // Navigate to the selected Flex element
-    const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${elementId}/view/simple-element/header`;
-    window.open(flexUrl, '_blank', 'noopener');
-  }, []);
+  const handleFlexElementSelect = React.useCallback(async (elementId: string) => {
+    // Navigate to the selected Flex element with type-specific URL
+    try {
+      // Get auth token from Supabase
+      const { data: { X_AUTH_TOKEN }, error } = await supabase
+        .functions.invoke('get-secret', {
+          body: { secretName: 'X_AUTH_TOKEN' }
+        });
+      
+      if (error || !X_AUTH_TOKEN) {
+        console.error('Failed to get auth token:', error);
+        toast({ 
+          title: 'Error', 
+          description: 'Failed to authenticate with Flex', 
+          variant: 'destructive' 
+        });
+        return;
+      }
+
+      // Build URL with element type detection
+      const flexUrl = await buildFlexUrlWithTypeDetection(elementId, X_AUTH_TOKEN);
+      window.open(flexUrl, '_blank', 'noopener');
+    } catch (error) {
+      console.error('Error opening Flex element:', error);
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to open Flex element', 
+        variant: 'destructive' 
+      });
+    }
+  }, [toast]);
 
   const handleManageJob = (e: React.MouseEvent) => {
     e.stopPropagation();

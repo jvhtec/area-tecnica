@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQueryClient } from "@tanstack/react-query";
+import { buildFlexUrlWithTypeDetection } from "@/utils/flex-folders";
 
 interface MobileJobCardProps {
   job: any;
@@ -244,8 +245,30 @@ export function MobileJobCard({
       }
 
       if (flexUuid) {
-        const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-        window.open(flexUrl, '_blank', 'noopener');
+        try {
+          // Get auth token from Supabase
+          const { data: { X_AUTH_TOKEN }, error } = await supabase
+            .functions.invoke('get-secret', {
+              body: { secretName: 'X_AUTH_TOKEN' }
+            });
+          
+          if (error || !X_AUTH_TOKEN) {
+            console.error('Failed to get auth token:', error);
+            // Fallback to simple element URL if auth fails
+            const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+            window.open(flexUrl, '_blank', 'noopener');
+            return;
+          }
+
+          // Build URL with element type detection
+          const flexUrl = await buildFlexUrlWithTypeDetection(flexUuid, X_AUTH_TOKEN);
+          window.open(flexUrl, '_blank', 'noopener');
+        } catch (error) {
+          console.error('Error building Flex URL:', error);
+          // Fallback to simple element URL if error occurs
+          const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+          window.open(flexUrl, '_blank', 'noopener');
+        }
       } else if (flexError) {
         toast({ title: "Error", description: String(flexError), variant: "destructive" });
       } else {
