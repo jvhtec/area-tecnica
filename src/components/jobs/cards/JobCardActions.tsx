@@ -272,11 +272,35 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     // Navigate to the selected Flex element with type-specific URL using shared utility
     console.log(`[JobCardActions] Opening Flex element:`, {
       elementId,
+      elementIdType: typeof elementId,
+      elementIdValue: elementId,
+      elementIdNull: elementId === null,
+      elementIdUndefined: elementId === undefined,
+      elementIdEmpty: elementId === '',
+      elementIdValid: !!elementId && (typeof elementId === 'string') && elementId.trim().length > 0,
+      elementIdLength: elementId?.length || 0,
+      node,
       domainId: node?.domainId,
       definitionId: node?.definitionId,
       displayName: node?.displayName,
       documentNumber: node?.documentNumber,
+      jobType: job.job_type,
     });
+    
+    // Additional validation before calling openFlexElement
+    if (!elementId || typeof elementId !== 'string' || elementId.trim().length === 0) {
+      console.error('[JobCardActions] Invalid elementId received from selector:', {
+        elementId,
+        elementIdType: typeof elementId,
+        node,
+      });
+      toast({
+        title: 'Error',
+        description: `Invalid element ID: "${elementId}". Cannot open in Flex.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     
     await openFlexElement({
       elementId,

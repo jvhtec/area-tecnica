@@ -45,6 +45,8 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
     elementId, 
     elementIdType: typeof elementId,
     elementIdEmpty: !elementId,
+    elementIdValue: elementId,
+    elementIdLength: elementId?.length || 0,
     context,
     jobType: context?.jobType,
     folderType: context?.folderType,
@@ -55,30 +57,48 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
   // Guard: Validate elementId is present and non-empty
   if (!elementId || typeof elementId !== 'string' || elementId.trim().length === 0) {
     const error = new Error(`Invalid element ID: "${elementId}". Cannot navigate to Flex without a valid element identifier.`);
-    console.error('[openFlexElement] Invalid element ID:', { elementId, type: typeof elementId });
+    console.error('[openFlexElement] Invalid element ID:', { 
+      elementId, 
+      type: typeof elementId,
+      isEmpty: elementId === '',
+      isNull: elementId === null,
+      isUndefined: elementId === undefined,
+    });
     if (onError) {
       onError(error);
     }
     return;
   }
 
-  // Step 1: Open a placeholder window synchronously to preserve user gesture
+  // Step 1: Try to open a placeholder window synchronously to preserve user gesture
   // This prevents pop-up blockers from interfering
-  const placeholderWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
+  let placeholderWindow: Window | null = null;
+  let useAlternativeMethod = false;
+  
+  try {
+    placeholderWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
+    console.log('[openFlexElement] Placeholder window opened:', { 
+      success: !!placeholderWindow,
+      windowType: typeof placeholderWindow,
+    });
+  } catch (openError) {
+    console.warn('[openFlexElement] window.open threw error, will use alternative method:', openError);
+    useAlternativeMethod = true;
+  }
 
-  if (!placeholderWindow) {
-    // Pop-up was blocked even with synchronous call
-    const error = new Error('Pop-up blocked. Please allow pop-ups for this site.');
-    console.error('[openFlexElement] Pop-up blocked:', error);
-    if (onError) {
-      onError(error);
-    }
-    return;
+  if (!placeholderWindow || useAlternativeMethod) {
+    // Pop-up was blocked or error occurred - use alternative link click method
+    console.warn('[openFlexElement] Placeholder window blocked or failed, using link click method');
+    useAlternativeMethod = true;
   }
 
   try {
     // Step 2: Fetch the auth token asynchronously
-    console.log('[openFlexElement] Fetching auth token for element:', elementId);
+    console.log('[openFlexElement] Fetching auth token for element:', { 
+      elementId,
+      elementIdValid: !!elementId && elementId.trim().length > 0,
+    });
+    
     const { data: { X_AUTH_TOKEN }, error: tokenError } = await supabase
       .functions.invoke('get-secret', {
         body: { secretName: 'X_AUTH_TOKEN' }
@@ -98,9 +118,15 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
         fallbackUrl,
         elementId,
         reason: 'Authentication failed',
+        useAlternativeMethod,
       });
       
-      placeholderWindow.location.href = fallbackUrl;
+      if (useAlternativeMethod) {
+        // Use link click method
+        navigateWithLinkClick(fallbackUrl);
+      } else {
+        placeholderWindow!.location.href = fallbackUrl;
+      }
       
       if (onWarning) {
         onWarning('Opened with fallback URL format (authentication failed)');
@@ -113,6 +139,7 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
     // Step 3: Build URL with element type detection
     console.log('[openFlexElement] Building URL with type detection...', {
       elementId,
+      elementIdValue: elementId,
       hasContext: !!context,
       contextJobType: context?.jobType,
       contextFolderType: context?.folderType,
@@ -128,19 +155,39 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
     
     console.log('[openFlexElement] Successfully built Flex URL:', {
       url: flexUrl,
+      urlType: typeof flexUrl,
+      urlNull: flexUrl === null,
+      urlUndefined: flexUrl === undefined,
+      urlEmpty: flexUrl === '',
       elementId,
-      urlLength: flexUrl.length,
-      hasValidUrl: flexUrl.includes(elementId),
+      urlLength: flexUrl?.length || 0,
+      hasValidUrl: flexUrl ? flexUrl.includes(elementId) : false,
     });
     
     // Guard: Verify URL is valid before navigating
     if (!flexUrl || typeof flexUrl !== 'string' || flexUrl.trim().length === 0) {
-      throw new Error(`buildFlexUrlWithTypeDetection returned invalid URL: "${flexUrl}"`);
+      const error = `buildFlexUrlWithTypeDetection returned invalid URL: "${flexUrl}" (type: ${typeof flexUrl})`;
+      console.error('[openFlexElement]', error, {
+        elementId,
+        context,
+        flexUrl,
+      });
+      throw new Error(error);
     }
     
-    // Step 4: Update the placeholder window's location
-    placeholderWindow.location.href = flexUrl;
-    console.log('[openFlexElement] Placeholder window location updated successfully');
+    // Step 4: Navigate using the appropriate method
+    if (useAlternativeMethod) {
+      console.log('[openFlexElement] Navigating with link click method');
+      navigateWithLinkClick(flexUrl);
+    } else {
+      console.log('[openFlexElement] Updating placeholder window location');
+      placeholderWindow!.location.href = flexUrl;
+    }
+    
+    console.log('[openFlexElement] Navigation completed successfully', {
+      method: useAlternativeMethod ? 'link-click' : 'placeholder-window',
+      url: flexUrl,
+    });
     
   } catch (error) {
     console.error('[openFlexElement] Error during navigation:', {
@@ -149,6 +196,7 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
       errorStack: error instanceof Error ? error.stack : undefined,
       elementId,
       context,
+      useAlternativeMethod,
     });
     
     // Final fallback: use simple element URL
@@ -157,10 +205,15 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
       fallbackUrl,
       elementId,
       errorType: error instanceof Error ? error.name : typeof error,
+      useAlternativeMethod,
     });
     
     try {
-      placeholderWindow.location.href = fallbackUrl;
+      if (useAlternativeMethod) {
+        navigateWithLinkClick(fallbackUrl);
+      } else {
+        placeholderWindow!.location.href = fallbackUrl;
+      }
       console.log('[openFlexElement] Fallback URL set successfully');
       
       if (onWarning) {
@@ -173,13 +226,16 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
         originalError: error,
         elementId,
         fallbackUrl,
+        useAlternativeMethod,
       });
       
-      try {
-        placeholderWindow.close();
-        console.log('[openFlexElement] Placeholder window closed due to fatal error');
-      } catch (closeError) {
-        console.error('[openFlexElement] Failed to close placeholder window:', closeError);
+      if (!useAlternativeMethod && placeholderWindow) {
+        try {
+          placeholderWindow.close();
+          console.log('[openFlexElement] Placeholder window closed due to fatal error');
+        } catch (closeError) {
+          console.error('[openFlexElement] Failed to close placeholder window:', closeError);
+        }
       }
       
       if (onError) {
@@ -187,4 +243,31 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
       }
     }
   }
+}
+
+/**
+ * Helper function to navigate using the link click method
+ * This bypasses popup blockers by programmatically clicking a link element
+ */
+function navigateWithLinkClick(url: string): void {
+  console.log('[openFlexElement] Creating programmatic link for navigation:', url);
+  
+  const link = document.createElement('a');
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  
+  // Style the link to be invisible
+  link.style.display = 'none';
+  
+  document.body.appendChild(link);
+  
+  console.log('[openFlexElement] Clicking programmatic link');
+  link.click();
+  
+  // Clean up after a short delay
+  setTimeout(() => {
+    document.body.removeChild(link);
+    console.log('[openFlexElement] Programmatic link removed');
+  }, 100);
 }

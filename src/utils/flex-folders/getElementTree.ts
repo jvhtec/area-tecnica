@@ -125,6 +125,7 @@ function transformFlexTreeResponse(data: unknown): FlexElementNode[] {
  */
 function transformSingleElement(element: unknown): FlexElementNode {
   if (typeof element !== "object" || element === null) {
+    console.warn('[getElementTree] Received non-object element, returning default:', element);
     return {
       elementId: "",
       displayName: "Unnamed",
@@ -132,12 +133,28 @@ function transformSingleElement(element: unknown): FlexElementNode {
   }
 
   const el = element as Record<string, unknown>;
+  
+  // Extract elementId with fallbacks
+  const extractedElementId = 
+    (typeof el.elementId === "string" ? el.elementId : null) ||
+    (typeof el.nodeId === "string" ? el.nodeId : null) ||
+    (typeof el.id === "string" ? el.id : null) ||
+    "";
+  
+  // Log warning if elementId is empty
+  if (!extractedElementId || extractedElementId.trim().length === 0) {
+    console.warn('[getElementTree] Element has no valid ID, will be filtered out:', {
+      element: el,
+      elementId: el.elementId,
+      nodeId: el.nodeId,
+      id: el.id,
+      displayName: el.displayName || el.name,
+      documentNumber: el.documentNumber || el.docNumber,
+    });
+  }
+  
   const node: FlexElementNode = {
-    elementId:
-      (typeof el.elementId === "string" ? el.elementId : null) ||
-      (typeof el.nodeId === "string" ? el.nodeId : null) ||
-      (typeof el.id === "string" ? el.id : null) ||
-      "",
+    elementId: extractedElementId,
     displayName:
       (typeof el.displayName === "string" ? el.displayName : null) ||
       (typeof el.name === "string" ? el.name : null) ||
