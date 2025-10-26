@@ -3357,8 +3357,10 @@ export type Database = {
         Row: {
           assigned_to: string | null
           created_at: string | null
+          due_at: string | null
           id: string
           job_id: string | null
+          priority: number | null
           progress: number | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_type: string
@@ -3368,8 +3370,10 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           created_at?: string | null
+          due_at?: string | null
           id?: string
           job_id?: string | null
+          priority?: number | null
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type: string
@@ -3379,8 +3383,10 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           created_at?: string | null
+          due_at?: string | null
           id?: string
           job_id?: string | null
+          priority?: number | null
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type?: string
@@ -4371,8 +4377,10 @@ export type Database = {
         Row: {
           assigned_to: string | null
           created_at: string | null
+          due_at: string | null
           id: string
           job_id: string | null
+          priority: number | null
           progress: number | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_type: string
@@ -4382,8 +4390,10 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           created_at?: string | null
+          due_at?: string | null
           id?: string
           job_id?: string | null
+          priority?: number | null
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type: string
@@ -4393,8 +4403,10 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           created_at?: string | null
+          due_at?: string | null
           id?: string
           job_id?: string | null
+          priority?: number | null
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type?: string
@@ -6008,8 +6020,10 @@ export type Database = {
         Row: {
           assigned_to: string | null
           created_at: string | null
+          due_at: string | null
           id: string
           job_id: string | null
+          priority: number | null
           progress: number | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_type: string
@@ -6019,8 +6033,10 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           created_at?: string | null
+          due_at?: string | null
           id?: string
           job_id?: string | null
+          priority?: number | null
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type: string
@@ -6030,8 +6046,10 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           created_at?: string | null
+          due_at?: string | null
           id?: string
           job_id?: string | null
+          priority?: number | null
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type?: string
@@ -6181,63 +6199,28 @@ export type Database = {
           },
         ]
       }
-      management_pending_tasks: {
+      pending_tasks_view: {
         Row: {
           assigned_to: string | null
+          assignee_first_name: string | null
+          assignee_last_name: string | null
+          assignee_role: Database["public"]["Enums"]["user_role"] | null
+          client: string | null
           created_at: string | null
-          department: string
+          department: string | null
           due_at: string | null
-          job_end_time: string | null
+          id: string | null
           job_id: string | null
-          job_start_time: string | null
-          job_title: string | null
-          progress: number
-          status: Database["public"]["Enums"]["task_status"]
-          task_id: string
-          task_type: string
-          tour_end_date: string | null
+          job_name: string | null
+          priority: number | null
+          progress: number | null
+          status: Database["public"]["Enums"]["task_status"] | null
+          task_type: string | null
           tour_id: string | null
           tour_name: string | null
-          tour_start_date: string | null
           updated_at: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "sound_job_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sound_job_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sound_job_tasks_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sound_job_tasks_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "v_job_tech_payout_2025"
-            referencedColumns: ["job_id"]
-          },
-          {
-            foreignKeyName: "sound_job_tasks_tour_id_fkey"
-            columns: ["tour_id"]
-            isOneToOne: false
-            referencedRelation: "tours"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       v_job_tech_payout_2025: {
         Row: {
