@@ -509,16 +509,39 @@ const ConsumosTool: React.FC = () => {
         ? `${tourName} - Sound Power Defaults.pdf`
         : `Sound Power Report - ${selectedJob?.title || 'Report'}.pdf`;
       
+      // Auto-complete sound Consumos tasks only after successful upload
+      // This automation is department-specific: only sound department tasks are affected
+      let completedTasksCount = 0;
       if (selectedJobId) {
-        const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
-        await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/consumos');
+        try {
+          const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
+          await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/consumos');
+          
+          // Auto-complete Consumos tasks for sound department only
+          // Note: Lights and video Consumos tools should implement their own auto-completion
+          const { autoCompleteConsumosTasks } = await import('@/utils/taskAutoCompletion');
+          const result = await autoCompleteConsumosTasks(selectedJobId, 'sound');
+          completedTasksCount = result.completedCount;
+          
+          if (result.completedCount > 0) {
+            console.log(`Auto-completed ${result.completedCount} sound Consumos task(s)`);
+          }
+        } catch (err) {
+          // If auto-completion fails, log but don't fail the upload
+          if (err instanceof Error && err.message.includes('uploadJobPdfWithCleanup')) {
+            throw err; // Re-throw upload errors
+          }
+          console.warn('Task auto-completion failed:', err);
+        }
       }
 
       toast({
         title: 'Success',
         description: isTourDefaults 
           ? 'PDF has been generated and downloaded successfully.'
-          : 'PDF has been generated and uploaded successfully.',
+          : completedTasksCount > 0
+            ? `PDF uploaded successfully. ${completedTasksCount} Consumos task(s) auto-completed.`
+            : 'PDF has been generated and uploaded successfully.',
       });
 
       const url = window.URL.createObjectURL(pdfBlob);

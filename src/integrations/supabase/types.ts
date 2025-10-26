@@ -3356,6 +3356,9 @@ export type Database = {
       lights_job_tasks: {
         Row: {
           assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          completion_source: string | null
           created_at: string | null
           due_at: string | null
           id: string
@@ -3369,6 +3372,9 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_source?: string | null
           created_at?: string | null
           due_at?: string | null
           id?: string
@@ -3382,6 +3388,9 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_source?: string | null
           created_at?: string | null
           due_at?: string | null
           id?: string
@@ -4376,6 +4385,9 @@ export type Database = {
       sound_job_tasks: {
         Row: {
           assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          completion_source: string | null
           created_at: string | null
           due_at: string | null
           id: string
@@ -4389,6 +4401,9 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_source?: string | null
           created_at?: string | null
           due_at?: string | null
           id?: string
@@ -4402,6 +4417,9 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_source?: string | null
           created_at?: string | null
           due_at?: string | null
           id?: string
@@ -6019,6 +6037,9 @@ export type Database = {
       video_job_tasks: {
         Row: {
           assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          completion_source: string | null
           created_at: string | null
           due_at: string | null
           id: string
@@ -6032,6 +6053,9 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_source?: string | null
           created_at?: string | null
           due_at?: string | null
           id?: string
@@ -6045,6 +6069,9 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_source?: string | null
           created_at?: string | null
           due_at?: string | null
           id?: string
