@@ -11,8 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertCircle, Calendar, ExternalLink, Loader2 } from 'lucide-react';
+import { AlertCircle, Calendar, ExternalLink, Loader2, CheckCircle } from 'lucide-react';
 import { usePendingTasks, GroupedPendingTask } from '@/hooks/usePendingTasks';
+import { useCompleteTask, Department } from '@/hooks/useCompleteTask';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -47,11 +48,30 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
 }) => {
   const navigate = useNavigate();
   const { data: groupedTasks, isLoading, error } = usePendingTasks(userId, userRole);
+  const { mutate: completeTask, isPending: isCompletingTask } = useCompleteTask();
+  const [completingTaskId, setCompletingTaskId] = React.useState<string | null>(null);
 
   const handleViewDetails = (link: string) => {
     navigate(link);
     onOpenChange(false);
   };
+
+  const handleCompleteTask = (taskId: string, department: Department) => {
+    if (!userId) return;
+    
+    setCompletingTaskId(taskId);
+    completeTask(
+      { taskId, department, userId },
+      {
+        onSettled: () => {
+          setCompletingTaskId(null);
+        },
+      }
+    );
+  };
+
+  // Check if user can complete tasks (must be management, admin, or logistics)
+  const canCompleteTask = userRole && ['management', 'admin', 'logistics'].includes(userRole);
 
   const totalTaskCount = groupedTasks?.reduce((sum, group) => sum + group.tasks.length, 0) || 0;
 
@@ -131,7 +151,7 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
                           <TableHead className="w-[140px]">Status</TableHead>
                           <TableHead className="w-[160px]">Progress</TableHead>
                           <TableHead className="w-[140px]">Due Date</TableHead>
-                          <TableHead className="w-[100px]"></TableHead>
+                          <TableHead className="w-[200px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -190,15 +210,40 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
                               )}
                             </TableCell>
                             <TableCell>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleViewDetails(task.detailLink)}
-                                className="h-8"
-                              >
-                                <ExternalLink className="h-3 w-3 mr-1" />
-                                View
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleViewDetails(task.detailLink)}
+                                  className="h-8"
+                                  aria-label={`View details for ${task.taskType} task`}
+                                >
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  View
+                                </Button>
+                                {canCompleteTask && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => handleCompleteTask(task.id, task.department)}
+                                    disabled={completingTaskId === task.id}
+                                    className="h-8"
+                                    aria-label={`Mark ${task.taskType} task as complete`}
+                                  >
+                                    {completingTaskId === task.id ? (
+                                      <>
+                                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                        Completing...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                        Complete
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}

@@ -36,6 +36,10 @@ export interface GroupedPendingTask {
     dueDate: string | null;
     priority: number | null;
     detailLink: string;
+    jobId: string | null;
+    tourId: string | null;
+    assignedTo: string;
+    assigneeRole: string | null;
   }>;
 }
 
@@ -93,6 +97,10 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
           dueDate: task.due_at,
           priority: task.priority,
           detailLink,
+          jobId: task.job_id,
+          tourId: task.tour_id,
+          assignedTo: task.assigned_to,
+          assigneeRole: task.assignee_role,
         });
       });
 
