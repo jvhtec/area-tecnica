@@ -414,10 +414,36 @@ const VideoConsumosTool: React.FC = () => {
 
       const fileName = `Video Power Report - ${jobToUse.title}.pdf`;
       
+      // Auto-complete video Consumos tasks only after successful upload
+      // This automation is department-specific: only video department tasks are affected
+      let completedTasksCount = 0;
       if (!isTourDefaults && selectedJobId) {
-        const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
-        await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/consumos');
-        toast({ title: 'Success', description: 'PDF has been generated and uploaded successfully.' });
+        try {
+          const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
+          await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/consumos');
+          
+          // Auto-complete Consumos tasks for video department only
+          const { autoCompleteConsumosTasks } = await import('@/utils/taskAutoCompletion');
+          const result = await autoCompleteConsumosTasks(selectedJobId, 'video');
+          completedTasksCount = result.completedCount;
+          
+          if (result.completedCount > 0) {
+            console.log(`Auto-completed ${result.completedCount} video Consumos task(s)`);
+          }
+        } catch (err) {
+          // If auto-completion fails, log but don't fail the upload
+          if (err instanceof Error && err.message.includes('uploadJobPdfWithCleanup')) {
+            throw err; // Re-throw upload errors
+          }
+          console.warn('Task auto-completion failed:', err);
+        }
+        
+        toast({
+          title: 'Success',
+          description: completedTasksCount > 0
+            ? `PDF uploaded successfully. ${completedTasksCount} Consumos task(s) auto-completed.`
+            : 'PDF has been generated and uploaded successfully.'
+        });
       } else {
         toast({ title: 'Success', description: 'PDF has been generated successfully.' });
       }

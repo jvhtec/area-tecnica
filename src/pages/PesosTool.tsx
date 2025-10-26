@@ -702,6 +702,8 @@ const PesosTool: React.FC = () => {
       );
 
       const fileName = `Pesos Report - ${selectedJob.title}.pdf`;
+      
+      // Upload PDF first - only auto-complete tasks if upload succeeds
       try {
         const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
         await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/pesos');
@@ -709,9 +711,27 @@ const PesosTool: React.FC = () => {
         throw uploadErr;
       }
 
+      // Auto-complete all Pesos tasks for this job after successful upload
+      // This automation marks relevant tasks as completed with proper audit trail
+      let completedTasksCount = 0;
+      try {
+        const { autoCompletePesosTasks } = await import('@/utils/taskAutoCompletion');
+        const result = await autoCompletePesosTasks(selectedJobId);
+        completedTasksCount = result.completedCount;
+        
+        if (result.completedCount > 0) {
+          console.log(`Auto-completed ${result.completedCount} Pesos task(s)`);
+        }
+      } catch (autoCompleteErr) {
+        // Non-fatal: log but don't fail the upload flow
+        console.warn('Task auto-completion failed:', autoCompleteErr);
+      }
+
       toast({
         title: 'Success',
-        description: 'PDF has been generated and uploaded successfully.',
+        description: completedTasksCount > 0
+          ? `PDF uploaded successfully. ${completedTasksCount} Pesos task(s) auto-completed.`
+          : 'PDF has been generated and uploaded successfully.',
       });
 
       const url = window.URL.createObjectURL(pdfBlob);

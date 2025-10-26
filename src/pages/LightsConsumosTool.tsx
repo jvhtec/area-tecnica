@@ -385,19 +385,41 @@ const LightsConsumosTool: React.FC = () => {
 
       const fileName = `Informe de Potencia - ${jobToUse.title}.pdf`;
 
+      // Auto-complete lights Consumos tasks only after successful upload
+      // This automation is department-specific: only lights department tasks are affected
+      let completedTasksCount = 0;
       if (!isOverrideMode && selectedJobId) {
-        const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
-        await uploadJobPdfWithCleanup(
-          selectedJobId,
-          pdfBlob,
-          fileName,
-          'calculators/lights-consumos'
-        );
+        try {
+          const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
+          await uploadJobPdfWithCleanup(
+            selectedJobId,
+            pdfBlob,
+            fileName,
+            'calculators/lights-consumos'
+          );
+
+          // Auto-complete Consumos tasks for lights department only
+          const { autoCompleteConsumosTasks } = await import('@/utils/taskAutoCompletion');
+          const result = await autoCompleteConsumosTasks(selectedJobId, 'lights');
+          completedTasksCount = result.completedCount;
+          
+          if (result.completedCount > 0) {
+            console.log(`Auto-completed ${result.completedCount} lights Consumos task(s)`);
+          }
+        } catch (err) {
+          // If auto-completion fails, log but don't fail the upload
+          if (err instanceof Error && err.message.includes('uploadJobPdfWithCleanup')) {
+            throw err; // Re-throw upload errors
+          }
+          console.warn('Task auto-completion failed:', err);
+        }
       }
 
       toast({
         title: 'Éxito',
-        description: 'El PDF se ha generado y subido exitosamente.',
+        description: completedTasksCount > 0
+          ? `PDF subido exitosamente. ${completedTasksCount} tarea(s) de Consumos auto-completadas.`
+          : 'El PDF se ha generado y subido exitosamente.',
       });
 
       const url = window.URL.createObjectURL(pdfBlob);

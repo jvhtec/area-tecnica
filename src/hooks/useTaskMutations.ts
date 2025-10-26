@@ -84,20 +84,34 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     if (fetchError) throw fetchError;
 
     const progress = status === 'completed' ? 100 : status === 'in_progress' ? 50 : 0;
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData?.user?.id || null;
+    
+    // Build update payload with completion tracking for completed status
+    const updatePayload: any = { 
+      status, 
+      progress, 
+      updated_at: new Date().toISOString() 
+    };
+    
+    if (status === 'completed') {
+      updatePayload.completed_at = new Date().toISOString();
+      updatePayload.completed_by = userId;
+      updatePayload.completion_source = 'manual';
+    }
+    
     const { error } = await supabase
       .from(table)
-      .update({ status, progress, updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', id);
     if (error) throw error;
 
     if (status === 'completed') {
-      const { data: authData } = await supabase.auth.getUser();
-      const actorId = authData?.user?.id ?? null;
       const recipients = new Set<string>();
-      if (actorId) recipients.add(actorId);
+      if (userId) recipients.add(userId);
       if (task?.assigned_to) recipients.add(task.assigned_to);
 
-      if (actorId && recipients.size > 0) {
+      if (userId && recipients.size > 0) {
         try {
           await supabase.functions.invoke('push', {
             body: {
