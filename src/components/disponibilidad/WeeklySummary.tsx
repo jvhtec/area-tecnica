@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ChevronsUpDown, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsUpDown, Download, Filter } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,6 +18,10 @@ import { ReloadButton } from '@/components/ui/reload-button';
 import { EquipmentCategory, AllCategories, getCategoriesForDepartment, allCategoryLabels } from '@/types/equipment';
 import { useDepartment } from '@/contexts/DepartmentContext';
 import { useOptimizedTableSubscriptions } from '@/hooks/useOptimizedSubscriptions';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface WeeklySummaryProps {
   selectedDate: Date;
@@ -37,6 +41,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
   const { department } = useDepartment();
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(selectedDate));
 
   // Keep the week aligned with the selected date coming from the calendar
@@ -55,6 +60,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
   // Filters disabled by default: show all categories until user opts in
   const [filtersEnabled, setFiltersEnabled] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<AllCategories[]>([]);
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('weeklySummaryOpen', JSON.stringify(isOpen));
@@ -311,75 +317,143 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
       onOpenChange={setIsOpen}
       className="w-full space-y-2"
     >
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Resumen Semanal</h2>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex gap-2">
-              {departmentCategories.map((category) => (
-                <Button
-                  key={category}
-                  variant={selectedCategories.includes(category) ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => toggleCategory(category)}
-                >
-                  {allCategoryLabels[category]}
-                </Button>
-              ))}
-            </div>
-            {filtersEnabled && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setFiltersEnabled(false); setSelectedCategories([]); }}
-                title="Disable filters"
-              >
-                Clear
+      <div className={cn("flex", isMobile ? "flex-col gap-3" : "items-center justify-between")}>
+        <div className={cn("flex items-center", isMobile ? "justify-between" : "gap-2")}>
+          <h2 className={cn("font-semibold", isMobile ? "text-base" : "text-lg md:text-lg")}>Resumen Semanal</h2>
+          {isMobile && (
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <ChevronsUpDown className="h-4 w-4" />
               </Button>
-            )}
+            </CollapsibleTrigger>
+          )}
+        </div>
+        
+        {/* Category Filters */}
+        <div className={cn("flex items-center gap-2", isMobile && "w-full")}>
+          {isMobile ? (
+            <Sheet open={categorySheetOpen} onOpenChange={setCategorySheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 flex-1">
+                  <Filter className="h-4 w-4" />
+                  Categorías
+                  {filtersEnabled && selectedCategories.length > 0 && (
+                    <Badge variant="default" className="ml-1 px-2 py-0">
+                      {selectedCategories.length}
+                    </Badge>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="h-auto max-h-[85vh] overflow-y-auto">
+                <SheetHeader className="mb-4">
+                  <SheetTitle>Categorías</SheetTitle>
+                </SheetHeader>
+                <div className="space-y-2">
+                  {departmentCategories.map((category) => (
+                    <Button
+                      key={category}
+                      variant={selectedCategories.includes(category) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => toggleCategory(category)}
+                      className="w-full justify-start"
+                    >
+                      {allCategoryLabels[category]}
+                    </Button>
+                  ))}
+                  {filtersEnabled && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { 
+                        setFiltersEnabled(false); 
+                        setSelectedCategories([]); 
+                        setCategorySheetOpen(false);
+                      }}
+                      className="w-full"
+                    >
+                      Limpiar Filtros
+                    </Button>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <>
+              <div className="flex gap-2">
+                {departmentCategories.map((category) => (
+                  <Button
+                    key={category}
+                    variant={selectedCategories.includes(category) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleCategory(category)}
+                  >
+                    {allCategoryLabels[category]}
+                  </Button>
+                ))}
+              </div>
+              {filtersEnabled && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setFiltersEnabled(false); setSelectedCategories([]); }}
+                  title="Disable filters"
+                >
+                  Clear
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+        
+        {/* Week Navigation and Actions */}
+        <div className={cn("flex items-center gap-2 flex-wrap", isMobile && "w-full")}>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handlePreviousWeek}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm whitespace-nowrap">
+              {format(currentWeekStart, "d 'de' MMMM", { locale: es })} - {" "}
+              {format(endOfWeek(currentWeekStart), "d 'de' MMMM", { locale: es })}
+            </span>
+            <Button variant="outline" size="sm" onClick={handleNextWeek}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={handlePreviousWeek}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm">
-            {format(currentWeekStart, "d 'de' MMMM", { locale: es })} - {" "}
-            {format(endOfWeek(currentWeekStart), "d 'de' MMMM", { locale: es })}
-          </span>
-          <Button variant="outline" size="sm" onClick={handleNextWeek}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
           <ReloadButton onReload={handleReload} />
           <Button 
             variant="outline" 
             size="sm"
             onClick={handleExportPDF}
+            className={cn(isMobile && "flex-1")}
           >
             <Download className="h-4 w-4 mr-2" />
             Exportar PDF
           </Button>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm">
-              <ChevronsUpDown className="h-4 w-4" />
-            </Button>
-          </CollapsibleTrigger>
+          {!isMobile && (
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <ChevronsUpDown className="h-4 w-4" />
+              </Button>
+            </CollapsibleTrigger>
+          )}
         </div>
       </div>
 
       <CollapsibleContent className="space-y-2">
-        <Card className="p-4">
+        <Card className={cn(isMobile ? "p-3" : "p-3 sm:p-4")}>
           <ScrollArea className="h-[500px]">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Equipo</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Stock Total</TableHead>
+                  <TableHead className={cn(isMobile && "text-xs")}>Equipo</TableHead>
+                  <TableHead className={cn(isMobile && "text-xs")}>Categoría</TableHead>
+                  <TableHead className={cn(isMobile && "text-xs")}>Stock Total</TableHead>
                   {weekDates.map((date) => (
-                    <TableHead key={date.toISOString()} className="text-center">
+                    <TableHead key={date.toISOString()} className={cn("text-center", isMobile && "text-xs")}>
                       {format(date, 'EEE d', { locale: es })}
                     </TableHead>
                   ))}
-                  <TableHead className="text-right">
+                  <TableHead className={cn("text-right", isMobile && "text-xs")}>
                     Disponible
                     <span className="ml-2 text-xs text-muted-foreground">
                       ({format(selectedDate || currentWeekStart, 'EEE d', { locale: es })})
