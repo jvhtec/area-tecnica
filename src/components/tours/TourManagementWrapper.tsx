@@ -11,7 +11,11 @@ export const TourManagementWrapper = () => {
   const { tourId } = useParams();
   const { user } = useOptimizedAuth();
 
-  const { data: tour, isLoading, error } = useQuery({
+  const {
+    data: tourData,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["tour", tourId],
     queryFn: async () => {
       if (!tourId) throw new Error("Tour ID is required");
@@ -31,10 +35,25 @@ export const TourManagementWrapper = () => {
       if (error) throw error;
       if (!data) throw new Error("Tour not found");
 
-      return data;
+      const { data: jobData, error: jobError } = await supabase
+        .from("jobs")
+        .select("id")
+        .eq("tour_id", tourId)
+        .eq("job_type", "tour")
+        .maybeSingle();
+
+      if (jobError) throw jobError;
+
+      return {
+        tour: data,
+        tourJobId: jobData?.id ?? null,
+      };
     },
     enabled: !!tourId,
   });
+
+  const tour = tourData?.tour;
+  const tourJobId = tourData?.tourJobId ?? null;
 
   if (isLoading) {
     return (
@@ -68,5 +87,5 @@ export const TourManagementWrapper = () => {
     );
   }
 
-  return <TourManagement tour={tour} />;
+  return <TourManagement tour={tour} tourJobId={tourJobId} />;
 };
