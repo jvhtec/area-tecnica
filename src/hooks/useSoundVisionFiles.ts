@@ -116,7 +116,7 @@ export const useSoundVisionFiles = (filters?: SoundVisionFileFilters) => {
           ])
         );
 
-        const { data: downloadData, error: downloadError } = await supabase
+        const { data: downloadData, error: downloadError } = await (supabase as any)
           .from('soundvision_file_downloads')
           .select('file_id, downloaded_at')
           .eq('profile_id', currentUserId)
@@ -252,7 +252,7 @@ export const useDownloadSoundVisionFile = () => {
 
       const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
 
-      const { error: recordError } = await supabase
+      const { error: recordError } = await (supabase as any)
         .from('soundvision_file_downloads')
         .upsert(
           {
