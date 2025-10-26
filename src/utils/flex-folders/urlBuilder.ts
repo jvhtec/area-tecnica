@@ -15,7 +15,7 @@ import { FlexLinkIntent } from './intentDetection';
  * - simple-element: #element/{id}/view/simple-element/detail
  * - fin-doc: #fin-doc/{id}/doc-view/{viewId}/detail
  * - expense-sheet: #fin-doc/{id}/doc-view/{expenseViewId}/detail
- * - contact-list: #element/{id}/view/contact-list/detail
+ * - contact-list: #contact-list/{id}/view/{crewCallViewId}/detail
  * - equipment-list: #element/{id}/view/equipment-list/detail
  * - remote-file-list: #element/{id}/view/remote-file-list/detail
  */
@@ -48,8 +48,8 @@ export function buildFlexUrlByIntent(
     }
 
     case 'contact-list': {
-      const contactViewName = viewId || 'contact-list';
-      return `${baseUrl}#element/${elementId}/view/${contactViewName}/detail`;
+      const contactViewId = viewId || getFlexViewId('crewCall');
+      return `${baseUrl}#contact-list/${elementId}/view/${contactViewId}/detail`;
     }
 
     case 'equipment-list': {

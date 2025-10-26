@@ -25,7 +25,7 @@ describe('buildFlexUrlByIntent', () => {
 
   it('should build contact-list URL', () => {
     const url = buildFlexUrlByIntent('contact-list', 'test-id');
-    expect(url).toContain('#element/test-id/view/contact-list/detail');
+    expect(url).toContain(`#contact-list/test-id/view/${FLEX_CONFIG.viewIds.crewCall}/detail`);
     expect(url).toContain('https://sectorpro.flexrentalsolutions.com');
   });
 
@@ -50,7 +50,7 @@ describe('buildFlexUrlByIntent', () => {
   it('should accept custom viewId for contact-list', () => {
     const customViewId = 'custom-view-id';
     const url = buildFlexUrlByIntent('contact-list', 'test-id', customViewId);
-    expect(url).toContain(`#element/test-id/view/${customViewId}/detail`);
+    expect(url).toContain(`#contact-list/test-id/view/${customViewId}/detail`);
   });
 
   it('should throw error for empty elementId', () => {

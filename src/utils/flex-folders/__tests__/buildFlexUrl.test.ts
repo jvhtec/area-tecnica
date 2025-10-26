@@ -38,7 +38,7 @@ describe('buildFlexUrl', () => {
 
   it('should build contact-list URL for crewCall', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.crewCall);
-    expect(url).toContain('#element/test-element-id/view/contact-list/detail');
+    expect(url).toContain(`#contact-list/test-element-id/view/${FLEX_CONFIG.viewIds.crewCall}/detail`);
   });
 
   it('should build equipment-list URL for pullSheet', () => {
