@@ -220,7 +220,7 @@ async function setLineItemPricingModel(options: {
       'X-API-Client': 'flex5-desktop',
     } as Record<string,string>;
     // First try dedicated update endpoint with camelCase field (per working example)
-    let ok = await updateLineItemField({ documentId, lineItemId, fieldType: 'pricingModel', payloadValue: pricingModelId, token });
+    const ok = await updateLineItemField({ documentId, lineItemId, fieldType: 'pricingModel', payloadValue: pricingModelId, token });
     if (ok) return true;
 
     // Fallback to row-data camelCase
@@ -262,7 +262,7 @@ async function setLineItemTimeQty(options: {
       'X-API-Client': 'flex5-desktop',
     } as Record<string,string>;
     // Try dedicated update endpoint first (as per working payload)
-    let ok = await updateLineItemField({ documentId, lineItemId, fieldType: 'timeQty', payloadValue: timeQty, token });
+    const ok = await updateLineItemField({ documentId, lineItemId, fieldType: 'timeQty', payloadValue: timeQty, token });
     if (ok) return true;
     // Try canonical camelCase key first (as seen in Flex payloads)
     let res = await fetch(rowDataUrl, {
@@ -368,7 +368,7 @@ async function setLineItemQuantityRow(options: {
       'X-API-Client': 'flex5-desktop',
     } as Record<string,string>;
     // Try dedicated update endpoint first
-    let ok = await updateLineItemField({ documentId, lineItemId, fieldType: 'quantity', payloadValue: quantity, token });
+    const ok = await updateLineItemField({ documentId, lineItemId, fieldType: 'quantity', payloadValue: quantity, token });
     if (ok) return true;
     let res = await fetch(rowDataUrl, {
       method: 'POST',
@@ -527,7 +527,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
   }
 
   // Check if work_orders folder exists
-  let { data: folders, error: foldersError } = await supabase
+  const { data: folders, error: foldersError } = await supabase
     .from('flex_folders')
     .select('element_id, department')
     .match(searchCriteria);

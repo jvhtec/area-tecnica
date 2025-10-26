@@ -20,7 +20,7 @@ serve(async (req: Request) => {
   try {
     const body = await req.json() as { job_id: string; departments?: Dept[] };
     const job_id = body.job_id;
-    let departments = body.departments;
+    const departments = body.departments;
     if (!job_id) throw new Error("Missing job_id");
 
     const supabase = createClient(

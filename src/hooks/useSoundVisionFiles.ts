@@ -57,7 +57,7 @@ export const useSoundVisionFiles = (filters?: SoundVisionFileFilters) => {
     queryKey: ['soundvision-files', filters],
     queryFn: async () => {
       // First get the files with venue data
-      let query = supabase
+      const query = supabase
         .from('soundvision_files')
         .select(`
           *,

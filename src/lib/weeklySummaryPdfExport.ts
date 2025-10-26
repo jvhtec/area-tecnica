@@ -76,7 +76,7 @@ export const exportWeeklySummaryPDF = async (
               fillColor: [51, 51, 51] as [number, number, number],
               textColor: [255, 255, 255] as [number, number, number],
               fontStyle: usage.remaining < 0 ? 'bold' : 'normal' as 'bold' | 'normal',
-              halign: 'center' as 'center'
+              halign: 'center' as const
             }
           };
         }),
@@ -100,14 +100,14 @@ export const exportWeeklySummaryPDF = async (
           cellPadding: 5,
           lineColor: [220, 220, 230] as [number, number, number],
           lineWidth: 0.1,
-          halign: 'left' as 'left'
+          halign: 'left' as const
         },
         margin: { top: 60, left: 14, right: 14, bottom: 42 },
         headStyles: {
           fillColor: [125, 1, 1] as [number, number, number],
           textColor: [255, 255, 255] as [number, number, number],
-          fontStyle: 'bold' as 'bold',
-          halign: 'center' as 'center'
+          fontStyle: 'bold' as const,
+          halign: 'center' as const
         },
         bodyStyles: { 
           textColor: [51, 51, 51] as [number, number, number],

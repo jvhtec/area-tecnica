@@ -338,7 +338,7 @@ export default function Wallboard() {
       (locRows||[]).forEach((l:any)=> locById.set(l.id, l.name));
 
       // Timesheet statuses via view
-      let tsByJobTech = new Map<string, Map<string,string>>();
+      const tsByJobTech = new Map<string, Map<string,string>>();
       if (jobIds.length) {
         const { data: ts } = await supabase
           .from('wallboard_timesheet_status')
@@ -530,7 +530,7 @@ export default function Wallboard() {
       }
       const evts = le || [];
       const evtJobIds = Array.from(new Set(evts.map((e:any)=>e.job_id).filter(Boolean)));
-      let titlesByJob = new Map<string,string>();
+      const titlesByJob = new Map<string,string>();
       if (evtJobIds.length) {
         const { data: trows } = await supabase.from('jobs').select('id,title').in('id', evtJobIds);
         (trows||[]).forEach((r:any)=> titlesByJob.set(r.id, r.title));

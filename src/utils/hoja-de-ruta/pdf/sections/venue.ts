@@ -100,11 +100,11 @@ export class VenueSection {
       const availableWidth = pageWidth - leftMargin - rightMargin;
       const desiredMapWidth = 100;
       const sideBySide = availableWidth >= (desiredMapWidth + gap + qrSize);
-      let mapW = sideBySide ? desiredMapWidth : availableWidth;
-      let mapX = leftMargin;
-      let mapY = yPosition;
-      let qrX = sideBySide ? Math.min(leftMargin + mapW + gap, pageWidth - rightMargin - qrSize) : leftMargin;
-      let qrY = sideBySide ? yPosition : (yPosition + mapHeight + 10);
+      const mapW = sideBySide ? desiredMapWidth : availableWidth;
+      const mapX = leftMargin;
+      const mapY = yPosition;
+      const qrX = sideBySide ? Math.min(leftMargin + mapW + gap, pageWidth - rightMargin - qrSize) : leftMargin;
+      const qrY = sideBySide ? yPosition : (yPosition + mapHeight + 10);
 
       let mapDataUrl: string | null = null;
       try {

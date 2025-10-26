@@ -87,7 +87,7 @@ export function useStaffingMatrixStatuses(
       }
 
       // 2) Date-based statuses derived from staffing_requests across visible jobs
-      let reqRows: any[] = []
+      const reqRows: any[] = []
       try {
         const techBatches = chunk(technicianIds, 20)
         const jobBatches = chunk(jobIds, 20)

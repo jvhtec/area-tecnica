@@ -90,7 +90,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
       return;
     }
     try {
-      const next = !Boolean(doc.visible_to_tech);
+      const next = !doc.visible_to_tech;
       const { error } = await supabase
         .from('job_documents')
         .update({ visible_to_tech: next })

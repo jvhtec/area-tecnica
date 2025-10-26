@@ -117,7 +117,7 @@ export const UnifiedJobManagement = ({ mode }: UnifiedJobManagementProps) => {
         const startDate = new Date(data.start_time);
         const endDate = new Date(data.end_time);
         const dateArray = [];
-        let currentDate = new Date(startDate);
+        const currentDate = new Date(startDate);
         
         while (currentDate <= endDate) {
           dateArray.push(new Date(currentDate));

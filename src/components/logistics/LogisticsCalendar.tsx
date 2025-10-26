@@ -118,7 +118,7 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
       doc.text(day, startX + (index * cellWidth) + 15, startY + 7);
     });
 
-    let yPos = startY + 10;
+    const yPos = startY + 10;
     allDays.forEach((day, i) => {
       const x = startX + ((i % 7) * cellWidth);
       const y = yPos + (Math.floor(i / 7) * cellHeight);
