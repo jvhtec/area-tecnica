@@ -24,8 +24,11 @@ import { useSubscriptionContext } from "@/providers/SubscriptionProvider"
 import { getDashboardPath } from "@/utils/roleBasedRouting"
 import type { UserRole } from "@/types/user"
 import { cn } from "@/lib/utils"
-import { usePendingTasks } from "@/hooks/usePendingTasks"
+import { useFlatPendingTasks } from "@/hooks/useFlatPendingTasks"
+import { useAcknowledgedTasks } from "@/hooks/useAcknowledgedTasks"
 import { PendingTasksModal } from "@/components/tasks/PendingTasksModal"
+import { SingleTaskPopup } from "@/components/tasks/SingleTaskPopup"
+import { PendingTasksBadge } from "@/components/tasks/PendingTasksBadge"
 
 import { AboutCard } from "./AboutCard"
 import { HelpButton } from "./HelpButton"
@@ -148,8 +151,6 @@ export const selectPrimaryNavigationItems = ({
   return selected
 }
 
-const PENDING_TASKS_DISMISSED_KEY = 'pending_tasks_dismissed';
-
 const Layout = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -158,6 +159,8 @@ const Layout = () => {
 
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [showPendingTasksModal, setShowPendingTasksModal] = useState(false)
+  const [showSingleTaskPopup, setShowSingleTaskPopup] = useState(false)
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
 
   const {
     session,
@@ -174,7 +177,17 @@ const Layout = () => {
   const userId = session?.user?.id ?? null
 
   // Fetch pending tasks for eligible roles
-  const { data: pendingTasks } = usePendingTasks(userId, userRole)
+  const { data: flatPendingTasks } = useFlatPendingTasks(userId, userRole)
+  
+  // Track acknowledged tasks
+  const { acknowledgedTaskIds, acknowledgeTask, clearAcknowledgedTasks, isTaskAcknowledged } = 
+    useAcknowledgedTasks(userId)
+
+  // Filter out acknowledged tasks to get unacknowledged ones
+  const unacknowledgedTasks = useMemo(() => {
+    if (!flatPendingTasks) return []
+    return flatPendingTasks.filter(task => !isTaskAcknowledged(task.id))
+  }, [flatPendingTasks, isTaskAcknowledged])
 
   useActivityRealtime({
     userId: session?.user?.id,
@@ -203,7 +216,25 @@ const Layout = () => {
     }
   }, [isLoading, session, userRole, location.pathname, navigate])
 
-  // Auto-open pending tasks modal on first load when tasks exist
+  // Clean up acknowledged tasks that no longer exist in pending tasks
+  useEffect(() => {
+    if (!flatPendingTasks || !userId) return
+
+    const currentTaskIds = new Set(flatPendingTasks.map(t => t.id))
+    const acknowledgedToRemove: string[] = []
+
+    acknowledgedTaskIds.forEach(taskId => {
+      if (!currentTaskIds.has(taskId)) {
+        acknowledgedToRemove.push(taskId)
+      }
+    })
+
+    if (acknowledgedToRemove.length > 0) {
+      clearAcknowledgedTasks(acknowledgedToRemove)
+    }
+  }, [flatPendingTasks, acknowledgedTaskIds, clearAcknowledgedTasks, userId])
+
+  // Auto-open single task popup on login when there are unacknowledged tasks
   useEffect(() => {
     if (!userId || !userRole || isLoading) {
       return
@@ -215,41 +246,16 @@ const Layout = () => {
       return
     }
 
-    // Check if modal was already dismissed in this session
-    const dismissalKey = `${PENDING_TASKS_DISMISSED_KEY}_${userId}`
-    const wasDismissed = sessionStorage.getItem(dismissalKey)
-
-    // If there are pending tasks and modal hasn't been dismissed, show it
-    if (pendingTasks && pendingTasks.length > 0 && !wasDismissed) {
-      // Small delay to avoid showing modal before UI is ready
+    // If there are unacknowledged tasks, show the first one
+    if (unacknowledgedTasks && unacknowledgedTasks.length > 0) {
+      // Small delay to avoid showing popup before UI is ready
       const timer = setTimeout(() => {
-        setShowPendingTasksModal(true)
-      }, 500)
+        setCurrentTaskIndex(0)
+        setShowSingleTaskPopup(true)
+      }, 800)
       return () => clearTimeout(timer)
     }
-  }, [userId, userRole, pendingTasks, isLoading])
-
-  // Re-open modal if new tasks appear after dismissal (within the same session)
-  useEffect(() => {
-    if (!userId || !userRole || isLoading || !pendingTasks) {
-      return
-    }
-
-    const isEligibleRole = ['management', 'admin', 'logistics'].includes(userRole)
-    if (!isEligibleRole) {
-      return
-    }
-
-    const dismissalKey = `${PENDING_TASKS_DISMISSED_KEY}_${userId}`
-    const dismissedTaskCount = sessionStorage.getItem(`${dismissalKey}_count`)
-    
-    // If task count has increased since dismissal, show modal again
-    if (dismissedTaskCount && pendingTasks.length > parseInt(dismissedTaskCount, 10)) {
-      setShowPendingTasksModal(true)
-      // Update the dismissed count
-      sessionStorage.setItem(`${dismissalKey}_count`, pendingTasks.length.toString())
-    }
-  }, [userId, userRole, pendingTasks, isLoading])
+  }, [userId, userRole, unacknowledgedTasks, isLoading])
 
   const handleSignOut = async () => {
     if (isLoggingOut) return
@@ -268,18 +274,31 @@ const Layout = () => {
     await queryClient.refetchQueries()
   }
 
-  const handlePendingTasksModalClose = (open: boolean) => {
-    setShowPendingTasksModal(open)
-    
-    // If modal is being closed/dismissed, mark it in sessionStorage
-    if (!open && userId) {
-      const dismissalKey = `${PENDING_TASKS_DISMISSED_KEY}_${userId}`
-      sessionStorage.setItem(dismissalKey, 'true')
-      
-      // Store current task count to detect new tasks later
-      const taskCount = pendingTasks?.length || 0
-      sessionStorage.setItem(`${dismissalKey}_count`, taskCount.toString())
+  const handleSingleTaskDismiss = () => {
+    if (!unacknowledgedTasks || unacknowledgedTasks.length === 0) return
+
+    // Acknowledge current task
+    const currentTask = unacknowledgedTasks[currentTaskIndex]
+    if (currentTask) {
+      acknowledgeTask(currentTask.id)
     }
+
+    // Move to next task or close popup
+    if (currentTaskIndex + 1 < unacknowledgedTasks.length) {
+      setCurrentTaskIndex(currentTaskIndex + 1)
+    } else {
+      setShowSingleTaskPopup(false)
+      setCurrentTaskIndex(0)
+    }
+  }
+
+  const handleViewAllTasks = () => {
+    setShowSingleTaskPopup(false)
+    setShowPendingTasksModal(true)
+  }
+
+  const handlePendingTasksBadgeClick = () => {
+    setShowPendingTasksModal(true)
   }
 
   if (isLoading) {
@@ -427,6 +446,13 @@ const Layout = () => {
                       display="icon"
                     />
                   )}
+                  {userId && userRole && ['management', 'admin', 'logistics'].includes(userRole) && (
+                    <PendingTasksBadge
+                      userId={userId}
+                      userRole={userRole}
+                      onClick={handlePendingTasksBadgeClick}
+                    />
+                  )}
                   <ThemeToggle display="icon" />
                   <ReloadButton
                     onReload={handleReload}
@@ -466,10 +492,24 @@ const Layout = () => {
       )}
       <PendingTasksModal
         open={showPendingTasksModal}
-        onOpenChange={handlePendingTasksModalClose}
+        onOpenChange={setShowPendingTasksModal}
         userId={userId}
         userRole={userRole}
       />
+      {unacknowledgedTasks && unacknowledgedTasks.length > 0 && (
+        <SingleTaskPopup
+          open={showSingleTaskPopup}
+          onOpenChange={setShowSingleTaskPopup}
+          task={unacknowledgedTasks[currentTaskIndex] || null}
+          jobOrTourName={unacknowledgedTasks[currentTaskIndex]?.jobOrTourName || ''}
+          jobOrTourType={unacknowledgedTasks[currentTaskIndex]?.jobOrTourType || 'job'}
+          client={unacknowledgedTasks[currentTaskIndex]?.client}
+          onDismiss={handleSingleTaskDismiss}
+          onViewAll={handleViewAllTasks}
+          totalPendingCount={unacknowledgedTasks.length}
+          currentIndex={currentTaskIndex}
+        />
+      )}
     </SidebarProvider>
   )
 }
