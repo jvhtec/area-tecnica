@@ -1,9 +1,9 @@
-import { useParams, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Calendar, 
+import {
+  Calendar,
   MapPin, 
   Settings, 
   Users, 
@@ -22,7 +22,8 @@ import {
   Loader2,
   Euro,
   MessageCircle,
-  Box
+  Box,
+  ListChecks
 } from "lucide-react";
 import { TourRatesManagerDialog } from "@/components/tours/TourRatesManagerDialog";
 import { useTourRatesApproval } from "@/hooks/useTourRatesApproval";
@@ -47,19 +48,33 @@ import createFolderIcon from "@/assets/icons/icon.png";
 import { TourDateFlexButton } from "@/components/tours/TourDateFlexButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { buildFlexUrlWithTypeDetection } from "@/utils/flex-folders";
+import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 
 interface TourManagementProps {
   tour: any;
+  tourJobId?: string | null;
 }
 
-export const TourManagement = ({ tour }: TourManagementProps) => {
+type QuickAction = {
+  title: string;
+  description: string;
+  icon: typeof Calendar;
+  onClick: () => void;
+  badge: string;
+  viewOnly?: boolean;
+  showForTechnician?: boolean;
+  hasAutoSync?: boolean;
+  disabled?: boolean;
+};
+
+export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userRole } = useOptimizedAuth();
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
   const isTechnicianView = mode === 'technician' || ['technician', 'house_tech'].includes(userRole || '');
-  
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDatesOpen, setIsDatesOpen] = useState(false);
   const [isDefaultsManagerOpen, setIsDefaultsManagerOpen] = useState(false);
@@ -68,6 +83,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isTourPresetsOpen, setIsTourPresetsOpen] = useState(false);
   const [isRatesManagerOpen, setIsRatesManagerOpen] = useState(false);
   const [isLogisticsOpen, setIsLogisticsOpen] = useState(false);
+  const [isTourTasksOpen, setIsTourTasksOpen] = useState(false);
   const [tourLogoUrl, setTourLogoUrl] = useState<string | undefined>();
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
   const [isWaDialogOpen, setIsWaDialogOpen] = useState(false);
@@ -87,6 +103,12 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       fetchTourLogo(tour.id).then(setTourLogoUrl);
     }
   }, [tour?.id]);
+
+  useEffect(() => {
+    if (!tourJobId) {
+      setIsTourTasksOpen(false);
+    }
+  }, [tourJobId]);
 
   if (!tour) {
     return (
@@ -217,7 +239,20 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const assignedDepartments = new Set(assignments.map(a => a.department)).size;
 
   // Filter quick actions based on view mode
-  const quickActions = [
+  const handleOpenTourTasks = () => {
+    if (!tourJobId) {
+      toast({
+        title: 'Tour job not available',
+        description: 'Tour tasks require a linked tour job.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsTourTasksOpen(true);
+  };
+
+  const quickActions: QuickAction[] = [
     {
       title: "Tour Dates & Locations",
       description: "View tour dates, venues, and locations",
@@ -300,6 +335,15 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       onClick: () => setIsLogisticsOpen(true),
       badge: "Available",
       showForTechnician: false
+    },
+    {
+      title: "Tour Tasks",
+      description: "Manage tour-wide tasks and updates",
+      icon: ListChecks,
+      onClick: handleOpenTourTasks,
+      badge: tourJobId ? "Available" : "Requires Job",
+      showForTechnician: false,
+      disabled: !tourJobId,
     }
   ].filter(action => {
     if (isTechnicianView && action.showForTechnician === false) {
@@ -673,7 +717,11 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {quickActions.map((action, index) => (
-            <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer" onClick={action.onClick}>
+            <Card
+              key={index}
+              className={`hover:shadow-md transition-shadow cursor-pointer ${action.disabled ? 'opacity-60' : ''}`}
+              onClick={action.onClick}
+            >
               <CardHeader className="pb-3 px-3 md:px-6 pt-3 md:pt-6">
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
@@ -835,10 +883,19 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
 
       {/* Logistics – tour‑wide with per‑date overrides */}
       {!isTechnicianView && (
-        <TourLogisticsDialog
-          open={isLogisticsOpen}
-          onOpenChange={setIsLogisticsOpen}
-          tourId={tour.id}
+      <TourLogisticsDialog
+        open={isLogisticsOpen}
+        onOpenChange={setIsLogisticsOpen}
+        tourId={tour.id}
+      />
+      )}
+
+      {!isTechnicianView && tourJobId && (
+        <TaskManagerDialog
+          open={isTourTasksOpen}
+          onOpenChange={setIsTourTasksOpen}
+          jobId={tourJobId}
+          userRole={userRole}
         />
       )}
 
