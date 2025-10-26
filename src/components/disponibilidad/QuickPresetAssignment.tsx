@@ -14,9 +14,10 @@ import { useDepartment } from '@/contexts/DepartmentContext';
 interface QuickPresetAssignmentProps {
   selectedDate: Date;
   onAssign?: () => void;
+  className?: string;
 }
 
-export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAssignmentProps) {
+export function QuickPresetAssignment({ selectedDate, onAssign, className }: QuickPresetAssignmentProps) {
   const { department } = useDepartment();
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
@@ -141,7 +142,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" className={className}>
           <Calendar className="mr-2 h-4 w-4" />
           Assign Preset
         </Button>
