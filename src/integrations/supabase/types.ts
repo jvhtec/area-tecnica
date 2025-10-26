@@ -3362,6 +3362,7 @@ export type Database = {
           progress: number | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_type: string
+          tour_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -3372,6 +3373,7 @@ export type Database = {
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type: string
+          tour_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -3382,6 +3384,7 @@ export type Database = {
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type?: string
+          tour_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -3412,6 +3415,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_job_tech_payout_2025"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "lights_job_tasks_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -4082,9 +4092,9 @@ export type Database = {
           phone: string | null
           residencia: string | null
           role: Database["public"]["Enums"]["user_role"]
-          soundvision_access_enabled: boolean | null
           selected_job_statuses: string[] | null
           selected_job_types: string[] | null
+          soundvision_access_enabled: boolean | null
           time_span: string | null
           timezone: string | null
           tours_expanded: boolean | null
@@ -4111,9 +4121,9 @@ export type Database = {
           phone?: string | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
-          soundvision_access_enabled?: boolean | null
           selected_job_statuses?: string[] | null
           selected_job_types?: string[] | null
+          soundvision_access_enabled?: boolean | null
           time_span?: string | null
           timezone?: string | null
           tours_expanded?: boolean | null
@@ -4140,9 +4150,9 @@ export type Database = {
           phone?: string | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
-          soundvision_access_enabled?: boolean | null
           selected_job_statuses?: string[] | null
           selected_job_types?: string[] | null
+          soundvision_access_enabled?: boolean | null
           time_span?: string | null
           timezone?: string | null
           tours_expanded?: boolean | null
@@ -4366,6 +4376,7 @@ export type Database = {
           progress: number | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_type: string
+          tour_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -4376,6 +4387,7 @@ export type Database = {
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type: string
+          tour_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -4386,6 +4398,7 @@ export type Database = {
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type?: string
+          tour_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -4417,51 +4430,64 @@ export type Database = {
             referencedRelation: "v_job_tech_payout_2025"
             referencedColumns: ["job_id"]
           },
+          {
+            foreignKeyName: "sound_job_tasks_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
         ]
       }
-      soundvision_file_downloads: {
+      soundvision_file_reviews: {
         Row: {
-          downloaded_at: string
+          created_at: string
           file_id: string
           id: string
-          ip_address: string | null
-          profile_id: string
-          user_agent: string | null
+          is_initial: boolean
+          rating: number
+          review: string | null
+          reviewer_id: string
+          updated_at: string
         }
         Insert: {
-          downloaded_at?: string
+          created_at?: string
           file_id: string
           id?: string
-          ip_address?: string | null
-          profile_id: string
-          user_agent?: string | null
+          is_initial?: boolean
+          rating: number
+          review?: string | null
+          reviewer_id: string
+          updated_at?: string
         }
         Update: {
-          downloaded_at?: string
+          created_at?: string
           file_id?: string
           id?: string
-          ip_address?: string | null
-          profile_id?: string
-          user_agent?: string | null
+          is_initial?: boolean
+          rating?: number
+          review?: string | null
+          reviewer_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "soundvision_file_downloads_file_id_fkey"
+            foreignKeyName: "soundvision_file_reviews_file_id_fkey"
             columns: ["file_id"]
             isOneToOne: false
             referencedRelation: "soundvision_files"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "soundvision_file_downloads_profile_id_fkey"
-            columns: ["profile_id"]
+            foreignKeyName: "soundvision_file_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "soundvision_file_downloads_profile_id_fkey"
-            columns: ["profile_id"]
+            foreignKeyName: "soundvision_file_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
             isOneToOne: false
             referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
@@ -4523,61 +4549,6 @@ export type Database = {
             columns: ["venue_id"]
             isOneToOne: false
             referencedRelation: "venues"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      soundvision_file_reviews: {
-        Row: {
-          created_at: string
-          file_id: string
-          id: string
-          is_initial: boolean
-          rating: number
-          review: string | null
-          reviewer_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          file_id: string
-          id?: string
-          is_initial?: boolean
-          rating: number
-          review?: string | null
-          reviewer_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          file_id?: string
-          id?: string
-          is_initial?: boolean
-          rating?: number
-          review?: string | null
-          reviewer_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "soundvision_file_reviews_file_id_fkey"
-            columns: ["file_id"]
-            isOneToOne: false
-            referencedRelation: "soundvision_files"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "soundvision_file_reviews_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "soundvision_file_reviews_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -6042,6 +6013,7 @@ export type Database = {
           progress: number | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_type: string
+          tour_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -6052,6 +6024,7 @@ export type Database = {
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type: string
+          tour_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -6062,6 +6035,7 @@ export type Database = {
           progress?: number | null
           status?: Database["public"]["Enums"]["task_status"] | null
           task_type?: string
+          tour_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -6092,6 +6066,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_job_tech_payout_2025"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_job_tasks_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -6396,10 +6377,6 @@ export type Database = {
         }[]
       }
       get_current_user_role: { Args: never; Returns: string }
-      is_management_or_admin: {
-        Args: { p_user_id: string }
-        Returns: boolean
-      }
       get_job_total_amounts: {
         Args: { _job_id: string; _user_role?: string }
         Returns: {
@@ -6506,6 +6483,7 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_house_tech: { Args: { _profile_id: string }; Returns: boolean }
+      is_management_or_admin: { Args: { p_user_id: string }; Returns: boolean }
       iso_year_week_madrid: {
         Args: { ts: string }
         Returns: {

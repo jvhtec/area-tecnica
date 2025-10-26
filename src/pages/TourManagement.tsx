@@ -104,11 +104,6 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
     }
   }, [tour?.id]);
 
-  useEffect(() => {
-    if (!tourJobId) {
-      setIsTourTasksOpen(false);
-    }
-  }, [tourJobId]);
 
   if (!tour) {
     return (
@@ -240,15 +235,6 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
 
   // Filter quick actions based on view mode
   const handleOpenTourTasks = () => {
-    if (!tourJobId) {
-      toast({
-        title: 'Tour job not available',
-        description: 'Tour tasks require a linked tour job.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsTourTasksOpen(true);
   };
 
@@ -341,9 +327,8 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       description: "Manage tour-wide tasks and updates",
       icon: ListChecks,
       onClick: handleOpenTourTasks,
-      badge: tourJobId ? "Available" : "Requires Job",
+      badge: "Available",
       showForTechnician: false,
-      disabled: !tourJobId,
     }
   ].filter(action => {
     if (isTechnicianView && action.showForTechnician === false) {
@@ -890,11 +875,11 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       />
       )}
 
-      {!isTechnicianView && tourJobId && (
+      {!isTechnicianView && (
         <TaskManagerDialog
           open={isTourTasksOpen}
           onOpenChange={setIsTourTasksOpen}
-          jobId={tourJobId}
+          tourId={tour.id}
           userRole={userRole}
         />
       )}

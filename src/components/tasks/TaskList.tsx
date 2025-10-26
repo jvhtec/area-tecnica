@@ -21,16 +21,17 @@ const TASK_TYPES: Record<'sound'|'lights'|'video', string[]> = {
 type Dept = 'sound'|'lights'|'video';
 
 interface TaskListProps {
-  jobId: string;
+  jobId?: string;
+  tourId?: string;
   department: Dept;
   canEdit: boolean;
   canAssign: boolean;
   canUpdateOwn: boolean;
 }
 
-export const TaskList: React.FC<TaskListProps> = ({ jobId, department, canEdit, canAssign }) => {
-  const { tasks, loading, refetch } = useJobTasks(jobId, department);
-  const { createTask, assignUser, setStatus, setDueDate, deleteTask, uploadAttachment, deleteAttachment } = useTaskMutations(jobId, department);
+export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, canEdit, canAssign }) => {
+  const { tasks, loading, refetch } = useJobTasks(jobId, department, tourId);
+  const { createTask, assignUser, setStatus, setDueDate, deleteTask, uploadAttachment, deleteAttachment } = useTaskMutations(jobId, department, tourId);
   const [newType, setNewType] = React.useState<string | undefined>(TASK_TYPES[department][0]);
   const [newAssignee, setNewAssignee] = React.useState<string | undefined>(undefined);
   const { toast } = useToast();

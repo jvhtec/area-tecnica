@@ -5,7 +5,8 @@ import { TaskList } from "@/components/tasks/TaskList";
 import { canAssignTasks, canEditTasks, isTechRole } from "@/utils/tasks";
 
 interface TaskManagerDialogProps {
-  jobId: string;
+  jobId?: string;
+  tourId?: string;
   userRole?: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -13,7 +14,7 @@ interface TaskManagerDialogProps {
 
 // Phase A: Wrapper that presents a unified entry point and opens
 // the existing department dialogs from each tab. Read-only parity.
-export const TaskManagerDialog: React.FC<TaskManagerDialogProps> = ({ jobId, userRole, open, onOpenChange }) => {
+export const TaskManagerDialog: React.FC<TaskManagerDialogProps> = ({ jobId, tourId, userRole, open, onOpenChange }) => {
   const [activeTab, setActiveTab] = React.useState<'sound' | 'lights' | 'video'>('sound');
   const canEdit = canEditTasks(userRole);
   const canAssign = canAssignTasks(userRole);
@@ -32,13 +33,13 @@ export const TaskManagerDialog: React.FC<TaskManagerDialogProps> = ({ jobId, use
               <TabsTrigger value="video">Video</TabsTrigger>
             </TabsList>
             <TabsContent value="sound" className="pt-4">
-              <TaskList jobId={jobId} department="sound" canEdit={canEdit} canAssign={canAssign} canUpdateOwn={true} />
+              <TaskList jobId={jobId} tourId={tourId} department="sound" canEdit={canEdit} canAssign={canAssign} canUpdateOwn={true} />
             </TabsContent>
             <TabsContent value="lights" className="pt-4">
-              <TaskList jobId={jobId} department="lights" canEdit={canEdit} canAssign={canAssign} canUpdateOwn={true} />
+              <TaskList jobId={jobId} tourId={tourId} department="lights" canEdit={canEdit} canAssign={canAssign} canUpdateOwn={true} />
             </TabsContent>
             <TabsContent value="video" className="pt-4">
-              <TaskList jobId={jobId} department="video" canEdit={canEdit} canAssign={canAssign} canUpdateOwn={true} />
+              <TaskList jobId={jobId} tourId={tourId} department="video" canEdit={canEdit} canAssign={canAssign} canUpdateOwn={true} />
             </TabsContent>
           </Tabs>
         </div>

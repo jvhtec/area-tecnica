@@ -9,28 +9,36 @@ const TASK_TABLE: Record<'sound'|'lights'|'video', string> = {
   video: 'video_job_tasks',
 };
 
-export function useJobTasks(jobId: string, department: 'sound'|'lights'|'video') {
-  const table = TASK_TABLE[department];
+export function useJobTasks(jobId?: string, department?: 'sound'|'lights'|'video', tourId?: string) {
+  const table = department ? TASK_TABLE[department] : TASK_TABLE.sound;
+  const contextId = tourId || jobId;
 
   const query = useQuery({
-    queryKey: ['job-tasks', jobId, department],
-    enabled: !!jobId,
+    queryKey: ['job-tasks', jobId, tourId, department],
+    enabled: !!contextId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let queryBuilder = supabase
         .from(table)
-        .select(`*, assigned_to(id, first_name, last_name), task_documents(*)`)
-        .eq('job_id', jobId)
-        .order('created_at', { ascending: true });
+        .select(`*, assigned_to(id, first_name, last_name), task_documents(*)`);
+      
+      if (tourId) {
+        queryBuilder = queryBuilder.eq('tour_id', tourId);
+      } else if (jobId) {
+        queryBuilder = queryBuilder.eq('job_id', jobId);
+      }
+      
+      const { data, error } = await queryBuilder.order('created_at', { ascending: true });
       if (error) throw error;
       return data || [];
     }
   });
 
   useEffect(() => {
-    if (!jobId) return;
+    if (!contextId) return;
+    const filterField = tourId ? 'tour_id' : 'job_id';
     const channel = supabase
-      .channel(`rtm-${table}-${jobId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table, filter: `job_id=eq.${jobId}` }, () => {
+      .channel(`rtm-${table}-${contextId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table, filter: `${filterField}=eq.${contextId}` }, () => {
         query.refetch();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'task_documents' }, () => {
@@ -40,7 +48,7 @@ export function useJobTasks(jobId: string, department: 'sound'|'lights'|'video')
 
     return () => { void supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, department]);
+  }, [contextId, department]);
 
   return {
     tasks: query.data || [],

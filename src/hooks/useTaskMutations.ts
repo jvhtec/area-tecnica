@@ -14,12 +14,18 @@ const DOC_FK: Record<Dept, string> = {
   video: 'video_task_id',
 };
 
-export function useTaskMutations(jobId: string, department: Dept) {
-  const table = TASK_TABLE[department];
-  const docFk = DOC_FK[department];
+export function useTaskMutations(jobId?: string, department?: Dept, tourId?: string) {
+  const table = department ? TASK_TABLE[department] : TASK_TABLE.sound;
+  const docFk = department ? DOC_FK[department] : DOC_FK.sound;
+  const contextId = tourId || jobId;
 
   const createTask = async (task_type: string, assigned_to?: string | null, due_at?: string | null) => {
-    const payload: any = { job_id: jobId, task_type, status: 'not_started', progress: 0 };
+    const payload: any = { task_type, status: 'not_started', progress: 0 };
+    if (tourId) {
+      payload.tour_id = tourId;
+    } else if (jobId) {
+      payload.job_id = jobId;
+    }
     if (assigned_to) payload.assigned_to = assigned_to;
     if (due_at) payload.due_at = due_at;
     const { data, error } = await supabase.from(table).insert(payload).select().single();
@@ -55,7 +61,8 @@ export function useTaskMutations(jobId: string, department: Dept) {
           body: {
             action: 'broadcast',
             type: 'task.assigned',
-            job_id: jobId,
+            job_id: jobId || undefined,
+            tour_id: tourId || undefined,
             recipient_id: userId,
             user_ids: [assignerId, userId],
             task_id: id,
@@ -96,7 +103,8 @@ export function useTaskMutations(jobId: string, department: Dept) {
             body: {
               action: 'broadcast',
               type: 'task.completed',
-              job_id: jobId,
+              job_id: jobId || undefined,
+              tour_id: tourId || undefined,
               recipient_id: task?.assigned_to ?? undefined,
               user_ids: Array.from(recipients),
               task_id: id,
