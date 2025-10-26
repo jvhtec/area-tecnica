@@ -395,7 +395,7 @@ export const TourDefaultsManager = ({
 
   const exportTourDatePDF = async (tourDate: any, department: string, type: 'power' | 'weight', logoUrl?: string) => {
     // Get defaults for this department and type
-    let defaultsData = getDepartmentDefaults(department, type);
+    const defaultsData = getDepartmentDefaults(department, type);
 
     // Check for any overrides for this tour date
     const overrideTable = type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides';

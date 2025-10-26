@@ -485,7 +485,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
           const maxPossibleEvents = Math.floor(availableEventSpace / (eventHeight + eventSpacing));
           const maxEventsToShow = Math.min(dayJobs.length, Math.max(maxPossibleEvents, 1));
 
-          let eventY = currentY + dayNumberHeight + cellPadding;
+          const eventY = currentY + dayNumberHeight + cellPadding;
 
           // Render events with improved layout
           for (const [index, job] of dayJobs.slice(0, maxEventsToShow).entries()) {

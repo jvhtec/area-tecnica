@@ -165,7 +165,7 @@ serve(async (req) => {
 
     if (tourError) throw tourError
 
-    let result = { success: true, data: tour }
+    const result = { success: true, data: tour }
 
     // Create root folders if requested
     if (createRootFolders) {

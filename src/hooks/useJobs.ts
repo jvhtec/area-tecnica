@@ -56,7 +56,7 @@ export const useJobs = () => {
 
           // Load tour metadata to hide cancelled/deleted tours
           const tourIds = Array.from(new Set(allJobs.map(j => j.tour_id).filter(Boolean)));
-          let tourMeta: Record<string, { status: string | null; deleted: boolean | null }> = {};
+          const tourMeta: Record<string, { status: string | null; deleted: boolean | null }> = {};
           if (tourIds.length > 0) {
             const { data: toursData, error: toursError } = await supabase
               .from('tours')

@@ -1,8 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-
-export type Department = 'sound' | 'lights' | 'video';
+import { completeTask, Department } from '@/services/taskCompletion';
 
 interface CompleteTaskParams {
   taskId: string;
@@ -15,16 +13,11 @@ interface CompleteTaskResult {
   error?: string;
 }
 
-const TASK_TABLE: Record<Department, string> = {
-  sound: 'sound_job_tasks',
-  lights: 'lights_job_tasks',
-  video: 'video_job_tasks',
-};
-
 /**
  * Hook for manually completing a task from the pending tasks modal.
  * 
  * This hook:
+ * - Uses the centralized task completion service
  * - Updates the task status to 'completed'
  * - Sets completion metadata (completed_at, completed_by, completion_source)
  * - Invalidates pending tasks query to refresh the list
@@ -39,38 +32,16 @@ export function useCompleteTask() {
 
   return useMutation<CompleteTaskResult, Error, CompleteTaskParams>({
     mutationFn: async ({ taskId, department, userId }: CompleteTaskParams) => {
-      const tableName = TASK_TABLE[department];
+      // Use the centralized task completion service
+      const result = await completeTask({
+        taskId,
+        department,
+        actorId: userId,
+        source: 'manual',
+      });
 
-      // Update the task to completed
-      const { error: updateError } = await supabase
-        .from(tableName)
-        .update({
-          status: 'completed',
-          progress: 100,
-          completed_at: new Date().toISOString(),
-          completed_by: userId,
-          completion_source: 'manual',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', taskId);
-
-      if (updateError) {
-        console.error('[useCompleteTask] Error updating task:', updateError);
-        throw new Error(updateError.message);
-      }
-
-      // Trigger push notification (fire-and-forget)
-      try {
-        void supabase.functions.invoke('push', {
-          body: {
-            action: 'broadcast',
-            type: 'task.completed',
-            task_id: taskId,
-            completion_source: 'manual',
-          },
-        });
-      } catch (pushError) {
-        console.warn('[useCompleteTask] Push notification failed:', pushError);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to complete task');
       }
 
       return { success: true };

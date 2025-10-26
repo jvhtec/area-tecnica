@@ -232,7 +232,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
   const jobIds = standaloneJobs.map((j) => j.id);
   jobIds.forEach((id) => jobReviewIds.add(id));
 
-  let assignmentCountByJob: Record<string, number> = {};
+  const assignmentCountByJob: Record<string, number> = {};
   const timesheetInfoByJob: Record<string, { total: number; approved: number; rejected: number }> = {};
   const extrasInfoByJob: Record<string, { pending: number; rejected: number }> = {};
   if (jobIds.length > 0) {

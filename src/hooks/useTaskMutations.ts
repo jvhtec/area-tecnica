@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { completeTask, revertTask, Department } from '@/services/taskCompletion';
 
 type Dept = 'sound'|'lights'|'video';
 
@@ -76,58 +77,33 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
   };
 
   const setStatus = async (id: string, status: 'not_started'|'in_progress'|'completed') => {
-    const { data: task, error: fetchError } = await supabase
-      .from(table)
-      .select('assigned_to, task_type')
-      .eq('id', id)
-      .maybeSingle();
-    if (fetchError) throw fetchError;
-
-    const progress = status === 'completed' ? 100 : status === 'in_progress' ? 50 : 0;
-    const { data: authData } = await supabase.auth.getUser();
-    const userId = authData?.user?.id || null;
-    
-    // Build update payload with completion tracking for completed status
-    const updatePayload: any = { 
-      status, 
-      progress, 
-      updated_at: new Date().toISOString() 
-    };
-    
-    if (status === 'completed') {
-      updatePayload.completed_at = new Date().toISOString();
-      updatePayload.completed_by = userId;
-      updatePayload.completion_source = 'manual';
+    if (!department) {
+      throw new Error('Department is required for setStatus');
     }
-    
-    const { error } = await supabase
-      .from(table)
-      .update(updatePayload)
-      .eq('id', id);
-    if (error) throw error;
 
+    // Use the centralized task completion service
     if (status === 'completed') {
-      const recipients = new Set<string>();
-      if (userId) recipients.add(userId);
-      if (task?.assigned_to) recipients.add(task.assigned_to);
-
-      if (userId && recipients.size > 0) {
-        try {
-          await supabase.functions.invoke('push', {
-            body: {
-              action: 'broadcast',
-              type: 'task.completed',
-              job_id: jobId || undefined,
-              tour_id: tourId || undefined,
-              recipient_id: task?.assigned_to ?? undefined,
-              user_ids: Array.from(recipients),
-              task_id: id,
-              task_type: task?.task_type,
-            },
-          });
-        } catch (pushError) {
-          console.warn('useTaskMutations.setStatus push failed', pushError);
-        }
+      const result = await completeTask({
+        taskId: id,
+        department: department as Department,
+        source: 'manual',
+        jobId,
+        tourId,
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to complete task');
+      }
+    } else {
+      // Revert to active state (clear completion metadata)
+      const result = await revertTask({
+        taskId: id,
+        department: department as Department,
+        newStatus: status,
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to revert task');
       }
     }
   };

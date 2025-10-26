@@ -321,7 +321,7 @@ async function handleBroadcast(
   const tourName = body.tour_name || (await getTourName(client, tourId)) || null;
 
   // Determine recipients
-  let recipients = new Set<string>();
+  const recipients = new Set<string>();
   const management = new Set(await getManagementUserIds(client));
   const soundDept = new Set(await getSoundDepartmentUserIds(client));
   const mgmt = new Set<string>([...management, ...soundDept]);
