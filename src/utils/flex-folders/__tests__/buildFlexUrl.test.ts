@@ -16,54 +16,54 @@ describe('buildFlexUrl', () => {
   it('should build financial document URL for presupuesto', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.presupuesto);
     expect(url).toContain(
-      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.presupuesto}/header`
+      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.presupuesto}/detail`
     );
-    expect(url).toContain('/header');
+    expect(url).toContain('/detail');
   });
 
   it('should build financial document URL for presupuestoDryHire', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.presupuestoDryHire);
     expect(url).toContain(
-      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.presupuesto}/header`
+      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.presupuesto}/detail`
     );
-    expect(url).toContain('/header');
+    expect(url).toContain('/detail');
   });
 
   it('should build financial document URL for hojaGastos', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.hojaGastos);
     expect(url).toContain(
-      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.expenseSheet}/header`
+      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.expenseSheet}/detail`
     );
   });
 
   it('should build contact-list URL for crewCall', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.crewCall);
-    expect(url).toContain('#element/test-element-id/view/contact-list/header');
+    expect(url).toContain('#element/test-element-id/view/contact-list/detail');
   });
 
   it('should build equipment-list URL for pullSheet', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.pullSheet);
-    expect(url).toContain('#element/test-element-id/view/equipment-list/header');
+    expect(url).toContain('#element/test-element-id/view/equipment-list/detail');
   });
 
   it('should build simple element URL for mainFolder', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.mainFolder);
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
   });
 
   it('should build simple element URL for subFolder', () => {
     const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.subFolder);
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
   });
 
   it('should build simple element URL when no definitionId provided', () => {
     const url = buildFlexUrl('test-element-id');
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
   });
 
   it('should build simple element URL for unknown definitionId', () => {
     const url = buildFlexUrl('test-element-id', 'unknown-definition-id');
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
   });
 
   it('should throw error for empty elementId', () => {
@@ -209,7 +209,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
       folderType: 'dryhire',
     });
 
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -218,7 +218,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
       folderType: 'tourdate',
     });
 
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -227,7 +227,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
       jobType: 'dryhire',
     });
 
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -236,7 +236,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
       jobType: 'tourdate',
     });
 
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -261,7 +261,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
 
     const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token');
 
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
   });
 
   it('should not fetch when no context is provided that enables optimization', async () => {
@@ -277,7 +277,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
     // When no context that enables optimization is provided, fetch should be called
     const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {});
 
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
     expect(global.fetch).toHaveBeenCalled();
   });
 
@@ -311,7 +311,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
       jobType: 'dryhire',
     });
 
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -320,7 +320,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
 
     const url = await buildFlexUrlWithTypeDetection('test-element-id', '');
 
-    expect(url).toContain('#element/test-element-id/view/simple-element/header');
+    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
   });
 
   it('should use viewHint when provided in context', async () => {
@@ -337,7 +337,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
       viewHint: 'equipment-list',
     });
 
-    expect(url).toContain('#equipment-list/test-element-id/view/simple-element/header');
+    expect(url).toContain('#equipment-list/test-element-id/view/simple-element/detail');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -346,7 +346,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
       viewHint: 'remote-file-list',
     });
 
-    expect(url).toContain('#remote-file-list/test-element-id/view/simple-element/header');
+    expect(url).toContain('#remote-file-list/test-element-id/view/simple-element/detail');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 });

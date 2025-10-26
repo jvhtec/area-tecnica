@@ -54,7 +54,7 @@ describe('openFlexElementSync', () => {
   });
 
   it('should create and click an anchor element with correct attributes', () => {
-    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
+    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail';
     vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue(mockUrl);
 
     openFlexElementSync({
@@ -77,7 +77,7 @@ describe('openFlexElementSync', () => {
   });
 
   it('should build URL with domainId and definitionId', () => {
-    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
+    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail';
     vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue(mockUrl);
 
     openFlexElementSync({
@@ -159,7 +159,7 @@ describe('openFlexElementSync', () => {
 
     // Verify fallback URL was used
     expect(mockAnchor.href).toBe(
-      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header'
+      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail'
     );
 
     // Verify anchor was clicked
@@ -189,7 +189,7 @@ describe('openFlexElementSync', () => {
   });
 
   it('should handle financial document with definitionId', () => {
-    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#fin-doc/test-id/doc-view/ca6b072c-b122-11df-b8d5-00e08175e43e/header';
+    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#fin-doc/test-id/doc-view/ca6b072c-b122-11df-b8d5-00e08175e43e/detail';
     vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue(mockUrl);
 
     openFlexElementSync({
@@ -209,7 +209,7 @@ describe('openFlexElementSync', () => {
 
   it('should log comprehensive debug information', () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
+    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail';
     vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue(mockUrl);
 
     openFlexElementSync({
@@ -249,7 +249,7 @@ describe('openFlexElementSync', () => {
   });
 
   it('should set anchor style to display none', () => {
-    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
+    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail';
     vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue(mockUrl);
 
     openFlexElementSync({

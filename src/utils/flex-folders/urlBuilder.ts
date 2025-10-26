@@ -12,12 +12,12 @@ import { FlexLinkIntent } from './intentDetection';
  * @remarks
  * This is the core URL builder that all other functions should use.
  * It handles the different URL schemas based on intent:
- * - simple-element: #element/{id}/view/simple-element/header
- * - fin-doc: #fin-doc/{id}/doc-view/{viewId}/header
- * - expense-sheet: #fin-doc/{id}/doc-view/{expenseViewId}/header
- * - contact-list: #element/{id}/view/contact-list/header
- * - equipment-list: #element/{id}/view/equipment-list/header
- * - remote-file-list: #element/{id}/view/remote-file-list/header
+ * - simple-element: #element/{id}/view/simple-element/detail
+ * - fin-doc: #fin-doc/{id}/doc-view/{viewId}/detail
+ * - expense-sheet: #fin-doc/{id}/doc-view/{expenseViewId}/detail
+ * - contact-list: #element/{id}/view/contact-list/detail
+ * - equipment-list: #element/{id}/view/equipment-list/detail
+ * - remote-file-list: #element/{id}/view/remote-file-list/detail
  */
 export function buildFlexUrlByIntent(
   intent: FlexLinkIntent,
@@ -35,38 +35,38 @@ export function buildFlexUrlByIntent(
 
   switch (intent) {
     case 'simple-element':
-      return `${baseUrl}#element/${elementId}/view/simple-element/header`;
+      return `${baseUrl}#element/${elementId}/view/simple-element/detail`;
 
     case 'fin-doc': {
       const finDocViewId = viewId || getFlexViewId('presupuesto');
-      return `${baseUrl}#fin-doc/${elementId}/doc-view/${finDocViewId}/header`;
+      return `${baseUrl}#fin-doc/${elementId}/doc-view/${finDocViewId}/detail`;
     }
 
     case 'expense-sheet': {
       const expenseSheetViewId = viewId || getFlexViewId('expenseSheet');
-      return `${baseUrl}#fin-doc/${elementId}/doc-view/${expenseSheetViewId}/header`;
+      return `${baseUrl}#fin-doc/${elementId}/doc-view/${expenseSheetViewId}/detail`;
     }
 
     case 'contact-list': {
       const contactViewName = viewId || 'contact-list';
-      return `${baseUrl}#element/${elementId}/view/${contactViewName}/header`;
+      return `${baseUrl}#element/${elementId}/view/${contactViewName}/detail`;
     }
 
     case 'equipment-list': {
       const equipmentViewName = viewId || 'equipment-list';
-      return `${baseUrl}#element/${elementId}/view/${equipmentViewName}/header`;
+      return `${baseUrl}#element/${elementId}/view/${equipmentViewName}/detail`;
     }
 
     case 'remote-file-list': {
       const remoteFileViewName = viewId || 'remote-file-list';
-      return `${baseUrl}#element/${elementId}/view/${remoteFileViewName}/header`;
+      return `${baseUrl}#element/${elementId}/view/${remoteFileViewName}/detail`;
     }
 
     default: {
       // TypeScript exhaustiveness check
       const _exhaustive: never = intent;
       console.warn('[urlBuilder] Unknown intent, using simple-element fallback:', intent);
-      return `${baseUrl}#element/${elementId}/view/simple-element/header`;
+      return `${baseUrl}#element/${elementId}/view/simple-element/detail`;
     }
   }
 }

@@ -39,7 +39,7 @@ describe('openFlexElement', () => {
 
   it('should open a placeholder window synchronously', async () => {
     (resolverModule.resolveFlexUrl as any).mockResolvedValue(
-      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header'
+      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail'
     );
 
     await openFlexElement({
@@ -51,7 +51,7 @@ describe('openFlexElement', () => {
   });
 
   it('should resolve URL via resolver and navigate placeholder window', async () => {
-    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
+    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail';
     vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(mockUrl);
 
     await openFlexElement({
@@ -81,7 +81,7 @@ describe('openFlexElement', () => {
 
     // Verify fallback URL was used
     expect(mockPlaceholderWindow.location.href).toBe(
-      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header'
+      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail'
     );
 
     // Verify warning callback was called
@@ -101,7 +101,7 @@ describe('openFlexElement', () => {
 
     // Verify fallback URL was used
     expect(mockPlaceholderWindow.location.href).toBe(
-      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header'
+      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail'
     );
 
     // Verify warning callback was called
@@ -114,7 +114,7 @@ describe('openFlexElement', () => {
 
     // Resolver returns a valid URL
     vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(
-      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header'
+      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail'
     );
 
     const onError = vi.fn();
@@ -129,7 +129,7 @@ describe('openFlexElement', () => {
   });
 
   it('should pass context to resolver', async () => {
-    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header';
+    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail';
     vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(mockUrl);
 
     const context = {
@@ -151,7 +151,7 @@ describe('openFlexElement', () => {
 
   it('should handle window.close gracefully when setting location fails', async () => {
     vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(
-      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/header'
+      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail'
     );
 
     // Make setting location.href throw
@@ -245,7 +245,7 @@ describe('openFlexElement', () => {
   });
 
   it('should handle dryhire context with proper URL format', async () => {
-    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-dryhire-id/view/simple-element/header';
+    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-dryhire-id/view/simple-element/detail';
     vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(mockUrl);
 
     await openFlexElement({
@@ -267,7 +267,7 @@ describe('openFlexElement', () => {
   });
 
   it('should handle tourdate context with proper URL format', async () => {
-    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-tourdate-id/view/simple-element/header';
+    const mockUrl = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-tourdate-id/view/simple-element/detail';
     vi.spyOn(resolverModule, 'resolveFlexUrl').mockResolvedValue(mockUrl);
 
     await openFlexElement({
