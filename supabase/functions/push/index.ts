@@ -227,6 +227,12 @@ async function getJobTitle(client: ReturnType<typeof createClient>, jobId?: stri
   return data?.title ?? null;
 }
 
+async function getTourName(client: ReturnType<typeof createClient>, tourId?: string): Promise<string | null> {
+  if (!tourId) return null;
+  const { data } = await client.from('tours').select('name').eq('id', tourId).maybeSingle();
+  return data?.name ?? null;
+}
+
 async function getProfileDisplayName(client: ReturnType<typeof createClient>, userId?: string | null): Promise<string | null> {
   if (!userId) return null;
   const { data } = await client
@@ -311,6 +317,8 @@ async function handleBroadcast(
     } catch (_) { /* ignore */ }
   }
   const jobTitle = await getJobTitle(client, jobId);
+  const tourId = body.tour_id;
+  const tourName = body.tour_name || (await getTourName(client, tourId)) || null;
 
   // Determine recipients
   let recipients = new Set<string>();
@@ -334,7 +342,7 @@ async function handleBroadcast(
   // Compose Spanish title/body and choose default audience
   let title = '';
   let text = '';
-  let url = body.url || (jobId ? `/jobs/${jobId}` : '/');
+  let url = body.url || (jobId ? `/jobs/${jobId}` : tourId ? `/tours/${tourId}` : '/');
 
   const actor = body.actor_name || (await getProfileDisplayName(client, userId)) || 'Alguien';
   const recipName = body.recipient_name || (await getProfileDisplayName(client, body.recipient_id)) || '';
@@ -429,21 +437,21 @@ async function handleBroadcast(
     addUsers([body.recipient_id]);
   } else if (type === 'task.assigned') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
-    const jobLabel = jobTitle || 'Trabajo';
+    const jobLabel = jobId ? (jobTitle || 'Trabajo') : (tourName || 'Tour');
     title = 'Tarea asignada';
     text = recipName
       ? `${actor} asignó ${taskLabel} a ${recipName} en "${jobLabel}".`
       : `${actor} asignó ${taskLabel} en "${jobLabel}".`;
-    url = body.url || (jobId ? `/job-management/${jobId}` : url);
+    url = body.url || (jobId ? `/job-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
     addUsers([body.recipient_id]);
   } else if (type === 'task.completed') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
-    const jobLabel = jobTitle || 'Trabajo';
+    const jobLabel = jobId ? (jobTitle || 'Trabajo') : (tourName || 'Tour');
     title = 'Tarea completada';
     text = recipName
       ? `${actor} marcó como completada ${taskLabel} de ${recipName} en "${jobLabel}".`
       : `${actor} marcó como completada ${taskLabel} en "${jobLabel}".`;
-    url = body.url || (jobId ? `/job-management/${jobId}` : url);
+    url = body.url || (jobId ? `/job-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
     addUsers([body.recipient_id]);
   } else if (type === 'flex.folders.created') {
     title = 'Carpetas Flex creadas';
@@ -549,6 +557,8 @@ async function handleBroadcast(
     type,
     meta: {
       jobId: jobId,
+      tourId,
+      tourName: tourName ?? undefined,
       actor,
       recipient: recipName,
       channel: ch,
