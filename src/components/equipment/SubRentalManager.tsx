@@ -17,6 +17,8 @@ import { CalendarIcon } from 'lucide-react';
 import { ChevronsUpDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useOptimizedTableSubscriptions } from '@/hooks/useOptimizedSubscriptions';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -45,6 +47,7 @@ export function SubRentalManager() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { department } = useDepartment();
+  const isMobile = useIsMobile();
   const [isAdding, setIsAdding] = useState(false);
   const [isOpen, setIsOpen] = useState(false); // collapsed by default
   // Support multiple items in a single sub-rental action
@@ -197,19 +200,19 @@ export function SubRentalManager() {
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
+      <Card className="p-4 md:p-6">
+        <CardHeader className="p-0 mb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <CardTitle>Sub-Rentals (Temporary Stock Boosts)</CardTitle>
             <div className="flex items-center gap-2">
               {!isAdding && (
-                <Button onClick={() => { setIsAdding(true); setIsOpen(true); }} size="sm">
+                <Button onClick={() => { setIsAdding(true); setIsOpen(true); }} size="sm" className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Sub-Rental
                 </Button>
               )}
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" aria-label="Toggle">
+                <Button variant="ghost" size="sm" aria-label="Toggle" className="w-auto">
                   <ChevronsUpDown className="h-4 w-4" />
                 </Button>
               </CollapsibleTrigger>
@@ -217,15 +220,15 @@ export function SubRentalManager() {
           </div>
         </CardHeader>
         <CollapsibleContent>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-0">
         {isAdding && (
           <Card className="p-4 border-2 border-primary">
             <div className="space-y-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label>Items</Label>
                 {items.map((it, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-8">
+                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    <div className="sm:col-span-8">
                       <Select
                         value={it.equipment_id}
                         onValueChange={(val) => {
@@ -244,7 +247,7 @@ export function SubRentalManager() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-3">
+                    <div className="sm:col-span-3">
                       <Input
                         type="number"
                         min="1"
@@ -253,9 +256,10 @@ export function SubRentalManager() {
                           const q = parseInt(e.target.value) || 1;
                           setItems((prev) => prev.map((p, i) => i === idx ? { ...p, quantity: q } : p));
                         }}
+                        placeholder="Quantity"
                       />
                     </div>
-                    <div className="col-span-1 flex justify-end">
+                    <div className="sm:col-span-1 flex justify-end">
                       <Button
                         type="button"
                         variant="ghost"
@@ -263,6 +267,7 @@ export function SubRentalManager() {
                         onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
                         disabled={items.length === 1}
                         title={items.length === 1 ? 'At least one item required' : 'Remove item'}
+                        className="w-full sm:w-auto"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -275,14 +280,15 @@ export function SubRentalManager() {
                     variant="outline"
                     size="sm"
                     onClick={() => setItems((prev) => [...prev, { equipment_id: '', quantity: 1 }])}
+                    className="w-full sm:w-auto"
                   >
                     <Plus className="h-4 w-4 mr-2" /> Add another item
                   </Button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
                   <Label>Start Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -303,7 +309,7 @@ export function SubRentalManager() {
                   </Popover>
                 </div>
 
-                <div>
+                <div className="space-y-2">
                   <Label>End Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -325,7 +331,7 @@ export function SubRentalManager() {
                 </div>
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label>Notes</Label>
                 <Textarea
                   value={notes}
@@ -334,8 +340,8 @@ export function SubRentalManager() {
                 />
               </div>
 
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsAdding(false)}>
+              <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsAdding(false)} className="w-full sm:w-auto">
                   Cancel
                 </Button>
                 <Button
@@ -345,6 +351,7 @@ export function SubRentalManager() {
                     !endDate ||
                     items.filter((it) => it.equipment_id && (it.quantity ?? 0) > 0).length === 0
                   }
+                  className="w-full sm:w-auto"
                 >
                   Add Sub-Rental
                 </Button>
@@ -353,11 +360,11 @@ export function SubRentalManager() {
           </Card>
         )}
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {batches.map((batch) => (
             <Card key={batch.batchId} className="p-4">
               <div className="space-y-1">
-                <div className="font-medium">{format(new Date(batch.start), 'PPP')} → {format(new Date(batch.end), 'PPP')}</div>
+                <div className="font-medium text-sm sm:text-base">{format(new Date(batch.start), 'PPP')} → {format(new Date(batch.end), 'PPP')}</div>
                 <div className="text-sm text-muted-foreground">Total: +{batch.total} units</div>
                 {batch.notes && (
                   <div className="text-sm text-muted-foreground italic">{batch.notes}</div>
@@ -365,7 +372,7 @@ export function SubRentalManager() {
               </div>
               <div className="mt-3 space-y-2">
                 {batch.items.map((rental) => (
-                  <div key={rental.id} className="flex items-start justify-between border rounded-md p-2">
+                  <div key={rental.id} className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border rounded-md p-3">
                     <div className="text-sm">
                       <div>+{rental.quantity} · {rental.equipment?.name} ({rental.equipment?.category})</div>
                     </div>
@@ -374,6 +381,7 @@ export function SubRentalManager() {
                       size="icon"
                       onClick={() => deleteSubRentalMutation.mutate(rental.id)}
                       title="Remove sub-rental item"
+                      className="self-end md:self-auto"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
