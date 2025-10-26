@@ -40,7 +40,7 @@ describe('resolveFlexUrl', () => {
     const url = await resolveFlexUrl(node);
 
     expect(url).toBe(
-      `${FLEX_UI_BASE_URL}#element/${encodeURIComponent('simple-id')}/view/simple-element/header`
+      `${FLEX_UI_BASE_URL}#element/${encodeURIComponent('simple-id')}/view/simple-element/detail`
     );
     expect(invokeMock()).not.toHaveBeenCalled();
     expect(getFetchMock()).not.toHaveBeenCalled();
@@ -56,7 +56,7 @@ describe('resolveFlexUrl', () => {
     const url = await resolveFlexUrl(node);
 
     expect(url).toBe(
-      `${FLEX_UI_BASE_URL}#fin-doc/${encodeURIComponent('fin-doc-id')}/doc-view/${FLEX_VIEW_IDS.FIN_DOC}/header`
+      `${FLEX_UI_BASE_URL}#fin-doc/${encodeURIComponent('fin-doc-id')}/doc-view/${FLEX_VIEW_IDS.FIN_DOC}/detail`
     );
   });
 
@@ -69,7 +69,7 @@ describe('resolveFlexUrl', () => {
     const url = await resolveFlexUrl(node);
 
     expect(url).toBe(
-      `${FLEX_UI_BASE_URL}#contact-list/${encodeURIComponent('crew-id')}/view/${FLEX_VIEW_IDS.CREW_CALL}/header`
+      `${FLEX_UI_BASE_URL}#contact-list/${encodeURIComponent('crew-id')}/view/${FLEX_VIEW_IDS.CREW_CALL}/detail`
     );
   });
 
@@ -82,7 +82,7 @@ describe('resolveFlexUrl', () => {
     const url = await resolveFlexUrl(node);
 
     expect(url).toBe(
-      `${FLEX_UI_BASE_URL}#expense-sheet/${encodeURIComponent('expense-id')}/view/${FLEX_VIEW_IDS.EXPENSE_SHEET}/header`
+      `${FLEX_UI_BASE_URL}#expense-sheet/${encodeURIComponent('expense-id')}/view/${FLEX_VIEW_IDS.EXPENSE_SHEET}/detail`
     );
   });
 
@@ -95,7 +95,7 @@ describe('resolveFlexUrl', () => {
     const url = await resolveFlexUrl(node);
 
     expect(url).toBe(
-      `${FLEX_UI_BASE_URL}#remote-file-list/${encodeURIComponent('remote-id')}/view/${FLEX_VIEW_IDS.REMOTE_FILE_LIST}/header`
+      `${FLEX_UI_BASE_URL}#remote-file-list/${encodeURIComponent('remote-id')}/view/${FLEX_VIEW_IDS.REMOTE_FILE_LIST}/detail`
     );
   });
 
@@ -108,7 +108,7 @@ describe('resolveFlexUrl', () => {
     const url = await resolveFlexUrl(node);
 
     expect(url).toBe(
-      `${FLEX_UI_BASE_URL}#equipment-list/${encodeURIComponent('equipment-id')}/view/${FLEX_VIEW_IDS.EQUIPMENT_LIST}/header`
+      `${FLEX_UI_BASE_URL}#equipment-list/${encodeURIComponent('equipment-id')}/view/${FLEX_VIEW_IDS.EQUIPMENT_LIST}/detail`
     );
   });
 
@@ -120,7 +120,7 @@ describe('resolveFlexUrl', () => {
     const url = await resolveFlexUrl(node, { jobType: 'dryhire' });
 
     expect(url).toBe(
-      `${FLEX_UI_BASE_URL}#element/${encodeURIComponent('dryhire-folder-id')}/view/simple-element/header`
+      `${FLEX_UI_BASE_URL}#element/${encodeURIComponent('dryhire-folder-id')}/view/simple-element/detail`
     );
     expect(getFetchMock()).not.toHaveBeenCalled();
   });
@@ -134,7 +134,7 @@ describe('resolveFlexUrl', () => {
     const url = await resolveFlexUrl(node, { jobType: 'tourdate' });
 
     expect(url).toBe(
-      `${FLEX_UI_BASE_URL}#element/${encodeURIComponent('tourdate-folder-id')}/view/simple-element/header`
+      `${FLEX_UI_BASE_URL}#element/${encodeURIComponent('tourdate-folder-id')}/view/simple-element/detail`
     );
     expect(getFetchMock()).not.toHaveBeenCalled();
   });
@@ -161,7 +161,7 @@ describe('resolveFlexUrl', () => {
     const url = await resolveFlexUrl(node);
 
     expect(url).toBe(
-      `${FLEX_UI_BASE_URL}#fin-doc/${encodeURIComponent('metadata-id')}/doc-view/${FLEX_VIEW_IDS.FIN_DOC}/header`
+      `${FLEX_UI_BASE_URL}#fin-doc/${encodeURIComponent('metadata-id')}/doc-view/${FLEX_VIEW_IDS.FIN_DOC}/detail`
     );
 
     expect(invokeMock()).toHaveBeenCalledTimes(1);
