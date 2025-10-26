@@ -38,14 +38,76 @@ export function useTaskMutations(jobId: string, department: Dept) {
   };
 
   const assignUser = async (id: string, userId: string | null) => {
-    const { error } = await supabase.from(table).update({ assigned_to: userId }).eq('id', id);
+    const { data: authData } = await supabase.auth.getUser();
+    const assignerId = authData?.user?.id ?? null;
+
+    const { data, error } = await supabase
+      .from(table)
+      .update({ assigned_to: userId })
+      .eq('id', id)
+      .select('id, task_type')
+      .maybeSingle();
     if (error) throw error;
+
+    if (assignerId && userId) {
+      try {
+        await supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'task.assigned',
+            job_id: jobId,
+            recipient_id: userId,
+            user_ids: [assignerId, userId],
+            task_id: id,
+            task_type: data?.task_type,
+          },
+        });
+      } catch (pushError) {
+        console.warn('useTaskMutations.assignUser push failed', pushError);
+      }
+    }
   };
 
   const setStatus = async (id: string, status: 'not_started'|'in_progress'|'completed') => {
+    const { data: task, error: fetchError } = await supabase
+      .from(table)
+      .select('assigned_to, task_type')
+      .eq('id', id)
+      .maybeSingle();
+    if (fetchError) throw fetchError;
+
     const progress = status === 'completed' ? 100 : status === 'in_progress' ? 50 : 0;
-    const { error } = await supabase.from(table).update({ status, progress, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await supabase
+      .from(table)
+      .update({ status, progress, updated_at: new Date().toISOString() })
+      .eq('id', id);
     if (error) throw error;
+
+    if (status === 'completed') {
+      const { data: authData } = await supabase.auth.getUser();
+      const actorId = authData?.user?.id ?? null;
+      const recipients = new Set<string>();
+      if (actorId) recipients.add(actorId);
+      if (task?.assigned_to) recipients.add(task.assigned_to);
+
+      if (actorId && recipients.size > 0) {
+        try {
+          await supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: 'task.completed',
+              job_id: jobId,
+              recipient_id: task?.assigned_to ?? undefined,
+              user_ids: Array.from(recipients),
+              task_id: id,
+              task_type: task?.task_type,
+            },
+          });
+        } catch (pushError) {
+          console.warn('useTaskMutations.setStatus push failed', pushError);
+        }
+      }
+    }
   };
 
   const setDueDate = async (id: string, due_at: string | null) => {

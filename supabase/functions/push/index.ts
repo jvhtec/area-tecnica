@@ -427,6 +427,24 @@ async function handleBroadcast(
       text = `Has sido asignado a "${jobTitle || 'Trabajo'}".`;
     }
     addUsers([body.recipient_id]);
+  } else if (type === 'task.assigned') {
+    const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
+    const jobLabel = jobTitle || 'Trabajo';
+    title = 'Tarea asignada';
+    text = recipName
+      ? `${actor} asignó ${taskLabel} a ${recipName} en "${jobLabel}".`
+      : `${actor} asignó ${taskLabel} en "${jobLabel}".`;
+    url = body.url || (jobId ? `/job-management/${jobId}` : url);
+    addUsers([body.recipient_id]);
+  } else if (type === 'task.completed') {
+    const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
+    const jobLabel = jobTitle || 'Trabajo';
+    title = 'Tarea completada';
+    text = recipName
+      ? `${actor} marcó como completada ${taskLabel} de ${recipName} en "${jobLabel}".`
+      : `${actor} marcó como completada ${taskLabel} en "${jobLabel}".`;
+    url = body.url || (jobId ? `/job-management/${jobId}` : url);
+    addUsers([body.recipient_id]);
   } else if (type === 'flex.folders.created') {
     title = 'Carpetas Flex creadas';
     text = jobTitle
@@ -541,6 +559,8 @@ async function handleBroadcast(
       ...('changes' in body ? { changes: body.changes } : {}),
       ...('message_preview' in body ? { messagePreview: body.message_preview } : {}),
       ...('message_id' in body ? { messageId: body.message_id } : {}),
+      ...('task_id' in body ? { taskId: body.task_id } : {}),
+      ...('task_type' in body ? { taskType: body.task_type } : {}),
     },
   };
 
