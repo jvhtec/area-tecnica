@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
+import { tickerLevelDotStyles, tickerLevelStyles, type TickerMessageChunk } from '@/lib/tickerStyles';
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -134,18 +135,17 @@ const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data
   </PanelContainer>
 );
 
-const Ticker: React.FC<{ messages: string[]; bottomOffset?: number }>=({ messages, bottomOffset = 0 })=> {
+const Ticker: React.FC<{ messages: TickerMessageChunk[]; bottomOffset?: number }>=({ messages, bottomOffset = 0 })=> {
   const [posX, setPosX] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const textRef = useRef<HTMLSpanElement | null>(null);
   const gap = 64; // px spacing between repeats
-  const text = (messages || []).join('   •   ');
 
   // Start from the right edge whenever content changes
   useEffect(() => {
     const cw = containerRef.current?.offsetWidth || 0;
     setPosX(cw);
-  }, [text]);
+  }, [messages]);
 
   // Also reset to right edge on initial mount to avoid mid-screen starts
   useEffect(() => {
@@ -155,7 +155,7 @@ const Ticker: React.FC<{ messages: string[]; bottomOffset?: number }>=({ message
 
   // Smooth, endless loop: track translateX decreases; wrap by one copy width
   useEffect(() => {
-    if (!text) return;
+    if (!messages.length) return;
     let raf = 0;
     let last = performance.now();
     const speed = 50; // px/sec
@@ -174,14 +174,43 @@ const Ticker: React.FC<{ messages: string[]; bottomOffset?: number }>=({ message
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [text]);
+  }, [messages]);
+
+  const renderChunk = (chunk: TickerMessageChunk, key: string) => (
+    <span
+      key={key}
+      className={`inline-flex items-center gap-2 px-4 py-1 rounded-full text-base ${tickerLevelStyles[chunk.level]}`}
+    >
+      <span className={`w-2 h-2 rounded-full ${tickerLevelDotStyles[chunk.level]}`} />
+      <span className="whitespace-nowrap">{chunk.message}</span>
+    </span>
+  );
+
+  const renderCopy = (copyKey: string, attachRef = false) => (
+    <span
+      key={copyKey}
+      ref={attachRef ? textRef : undefined}
+      className="inline-flex items-center"
+    >
+      {messages.map((chunk, idx) => (
+        <React.Fragment key={`${copyKey}-${idx}`}>
+          {renderChunk(chunk, `${copyKey}-${idx}-chunk`)}
+          {idx < messages.length - 1 && (
+            <span className="mx-8 text-zinc-500">•</span>
+          )}
+        </React.Fragment>
+      ))}
+    </span>
+  );
 
   return (
     <div ref={containerRef} className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 border-t border-zinc-800 py-2 text-xl overflow-hidden" style={{ bottom: bottomOffset }}>
-      {text ? (
+      {messages.length ? (
         <div className="whitespace-nowrap will-change-transform" style={{ transform: `translateX(${posX}px)` }}>
-          <span ref={textRef} className="inline-block">{text}</span>
-          <span className="inline-block" style={{ paddingLeft: gap }}>{text}</span>
+          {renderCopy('primary', true)}
+          <span className="inline-block" style={{ paddingLeft: gap }}>
+            {renderCopy('secondary')}
+          </span>
         </div>
       ) : (
         <div>—</div>
@@ -246,7 +275,7 @@ export default function Wallboard() {
   const [docs, setDocs] = useState<DocProgressFeed|null>(null);
   const [pending, setPending] = useState<PendingActionsFeed|null>(null);
   const [logistics, setLogistics] = useState<LogisticsItem[]|null>(null);
-  const [tickerMsgs, setTickerMsgs] = useState<string[]>([]);
+  const [tickerMsgs, setTickerMsgs] = useState<TickerMessageChunk[]>([]);
   const [highlightJobs, setHighlightJobs] = useState<Map<string, number>>(new Map());
   const [footerH, setFooterH] = useState<number>(72);
 
@@ -604,13 +633,13 @@ export default function Wallboard() {
     const fetchAnns = async () => {
       const { data } = await supabase
         .from('announcements')
-        .select('id, message, active, created_at')
+        .select('id, message, level, active, created_at')
         .eq('active', true)
         .order('created_at', { ascending: false })
         .limit(20);
       if (!cancelled) {
         const regex = /^\s*\[HIGHLIGHT_JOB:([a-f0-9\-]+)\]\s*/i;
-        const messages: string[] = [];
+        const messages: TickerMessageChunk[] = [];
         const now = Date.now();
         const updated = new Map(highlightJobs);
         const HIGHLIGHT_TTL_MS = 5 * 60 * 1000; // auto-deactivate highlights after 5 minutes
@@ -630,7 +659,10 @@ export default function Wallboard() {
             m = m.replace(regex, '');
           }
           // Always include the message body in the ticker
-          if (m.trim()) messages.push(m.trim());
+          if (m.trim()) {
+            const level = (a.level ?? 'info') as TickerMessageChunk['level'];
+            messages.push({ message: m.trim(), level });
+          }
         });
         // Drop expired
         for (const [jid, exp] of updated) {
