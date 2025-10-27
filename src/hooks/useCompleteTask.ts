@@ -2,6 +2,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { completeTask, Department } from '@/services/taskCompletion';
 
+// Re-export Department type for consumers
+export type { Department } from '@/services/taskCompletion';
+
 interface CompleteTaskParams {
   taskId: string;
   department: Department;
