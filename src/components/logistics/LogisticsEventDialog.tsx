@@ -162,6 +162,28 @@ export const LogisticsEventDialog = ({
       queryClient.invalidateQueries({ queryKey: ["logistics-events"] });
       queryClient.invalidateQueries({ queryKey: ["today-logistics"] });
 
+      const cancelledDepartments = (selectedEvent.departments || []).map((dept) => dept.department);
+      try {
+        await supabase.functions.invoke("push", {
+          body: {
+            action: "broadcast",
+            type: "logistics.event.cancelled",
+            job_id: selectedEvent.job_id || undefined,
+            event_id: selectedEvent.id,
+            event_type: selectedEvent.event_type,
+            event_date: selectedEvent.event_date,
+            event_time: selectedEvent.event_time,
+            title: selectedEvent.title,
+            transport_type: selectedEvent.transport_type,
+            loading_bay: selectedEvent.loading_bay,
+            departments: cancelledDepartments,
+            license_plate: selectedEvent.license_plate,
+          },
+        });
+      } catch (pushError) {
+        console.error("Failed to broadcast logistics event cancellation", pushError);
+      }
+
       // Close both the delete dialog and the main event dialog
       setShowDeleteDialog(false);
       onOpenChange(false);
@@ -186,19 +208,30 @@ export const LogisticsEventDialog = ({
     }
 
     try {
-      const notifyEventCreated = async (
-        event: typeof selectedEvent,
-        options?: {
+      const broadcastLogisticsEvent = async (
+        event: typeof selectedEvent | { [key: string]: any } | null | undefined,
+        options: {
+          type?: "logistics.event.created" | "logistics.event.updated" | "logistics.event.cancelled";
           autoCreatedUnload?: boolean;
           pairedEvent?: { event_type: "load" | "unload"; event_date: string; event_time: string };
-        }
+          departmentsOverride?: Department[];
+          changes?: Record<string, unknown> | Record<string, { from?: unknown; to?: unknown }>;
+        } = {}
       ) => {
         if (!event) return;
+        const {
+          type = "logistics.event.created",
+          autoCreatedUnload,
+          pairedEvent,
+          departmentsOverride,
+          changes,
+        } = options;
+
         try {
           await supabase.functions.invoke("push", {
             body: {
               action: "broadcast",
-              type: "logistics.event.created",
+              type,
               job_id: event.job_id || undefined,
               event_id: event.id,
               event_type: event.event_type,
@@ -207,15 +240,17 @@ export const LogisticsEventDialog = ({
               title: event.title,
               transport_type: event.transport_type,
               loading_bay: event.loading_bay,
-              departments: selectedDepartments,
-              auto_created_unload: options?.autoCreatedUnload || undefined,
-              paired_event_type: options?.pairedEvent?.event_type,
-              paired_event_date: options?.pairedEvent?.event_date,
-              paired_event_time: options?.pairedEvent?.event_time,
+              departments: departmentsOverride ?? selectedDepartments,
+              license_plate: event.license_plate,
+              auto_created_unload: autoCreatedUnload || undefined,
+              paired_event_type: pairedEvent?.event_type,
+              paired_event_date: pairedEvent?.event_date,
+              paired_event_time: pairedEvent?.event_time,
+              ...(changes ? { changes } : {}),
             },
           });
         } catch (pushError) {
-          console.error("Failed to broadcast logistics event creation", pushError);
+          console.error(`Failed to broadcast logistics event ${type}`, pushError);
         }
       };
 
@@ -255,6 +290,46 @@ export const LogisticsEventDialog = ({
             );
           if (deptError) throw deptError;
         }
+
+        const previousDepartments = (selectedEvent.departments || []).map((d) => d.department).sort();
+        const updatedEventForNotification = {
+          ...selectedEvent,
+          ...eventData,
+        };
+        const changes: Record<string, { from?: unknown; to?: unknown }> = {};
+
+        if (selectedEvent.event_type !== eventData.event_type) {
+          changes.event_type = { from: selectedEvent.event_type, to: eventData.event_type };
+        }
+        if (selectedEvent.event_date !== eventData.event_date) {
+          changes.event_date = { from: selectedEvent.event_date, to: eventData.event_date };
+        }
+        const previousTime = (selectedEvent.event_time || "").slice(0, 5);
+        const newTime = (eventData.event_time || "").slice(0, 5);
+        if (previousTime !== newTime) {
+          changes.event_time = { from: selectedEvent.event_time, to: eventData.event_time };
+        }
+        if ((selectedEvent.transport_type || "") !== (eventData.transport_type || "")) {
+          changes.transport_type = { from: selectedEvent.transport_type, to: eventData.transport_type };
+        }
+        const previousLoading = selectedEvent.loading_bay || "";
+        const newLoading = eventData.loading_bay || "";
+        if (previousLoading !== newLoading) {
+          changes.loading_bay = { from: selectedEvent.loading_bay, to: eventData.loading_bay };
+        }
+        if ((selectedEvent.license_plate || "") !== (eventData.license_plate || "")) {
+          changes.license_plate = { from: selectedEvent.license_plate, to: eventData.license_plate };
+        }
+        const nextDepartments = [...selectedDepartments].sort();
+        if (JSON.stringify(previousDepartments) !== JSON.stringify(nextDepartments)) {
+          changes.departments = { from: previousDepartments, to: nextDepartments };
+        }
+
+        await broadcastLogisticsEvent(updatedEventForNotification, {
+          type: "logistics.event.updated",
+          departmentsOverride: selectedDepartments,
+          changes: Object.keys(changes).length > 0 ? changes : undefined,
+        });
 
         toast({
           title: "Success",
@@ -305,14 +380,16 @@ export const LogisticsEventDialog = ({
             onCreated?.({ id: unloadEvent.id, event_type: unloadEvent.event_type, event_date: unloadEvent.event_date, event_time: unloadEvent.event_time });
           } catch {}
 
-          await notifyEventCreated(newEvent, {
+          await broadcastLogisticsEvent(newEvent, {
+            type: "logistics.event.created",
             pairedEvent: {
               event_type: unloadEvent.event_type,
               event_date: unloadEvent.event_date,
               event_time: unloadEvent.event_time,
             },
           });
-          await notifyEventCreated(unloadEvent, {
+          await broadcastLogisticsEvent(unloadEvent, {
+            type: "logistics.event.created",
             autoCreatedUnload: true,
             pairedEvent: {
               event_type: newEvent.event_type,
@@ -321,7 +398,7 @@ export const LogisticsEventDialog = ({
             },
           });
         } else {
-          await notifyEventCreated(newEvent);
+          await broadcastLogisticsEvent(newEvent);
         }
 
         toast({

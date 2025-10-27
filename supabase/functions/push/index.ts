@@ -324,6 +324,13 @@ function fmtFieldEs(field: string): string {
     case 'location_id': return 'Ubicación';
     case 'tour_date_type': return 'Tipo de fecha';
     case 'color': return 'Color';
+    case 'event_date': return 'Fecha';
+    case 'event_time': return 'Hora';
+    case 'event_type': return 'Tipo de evento';
+    case 'transport_type': return 'Transporte';
+    case 'loading_bay': return 'Muelle';
+    case 'departments': return 'Departamentos';
+    case 'license_plate': return 'Matrícula';
     default: return field;
   }
 }
@@ -503,7 +510,11 @@ async function handleBroadcast(
     metaExtras.view = 'logistics';
     metaExtras.department = department;
     metaExtras.targetUrl = logisticsUrl;
-  } else if (type === 'logistics.event.created') {
+  } else if (
+    type === 'logistics.event.created'
+    || type === 'logistics.event.updated'
+    || type === 'logistics.event.cancelled'
+  ) {
     const eventType = (body as any)?.event_type as string | undefined;
     const eventDate = (body as any)?.event_date as string | undefined;
     const eventTime = (body as any)?.event_time as string | undefined;
@@ -516,6 +527,12 @@ async function handleBroadcast(
     const departmentsList = Array.isArray((body as any)?.departments)
       ? ((body as any)?.departments as string[])
       : [];
+    const rawChanges = (body as any)?.changes;
+    const changeFields = Array.isArray(rawChanges)
+      ? (rawChanges as string[])
+      : (rawChanges && typeof rawChanges === 'object'
+        ? Object.keys(rawChanges as Record<string, unknown>)
+        : []);
 
     recipients.clear();
     const managementOnly = await getManagementOnlyUserIds(client);
@@ -551,18 +568,30 @@ async function handleBroadcast(
     const transportLabel = transportType ? transportType.charAt(0).toUpperCase() + transportType.slice(1) : undefined;
     const deptText = departmentsList.length ? ` (${departmentsList.join(', ')})` : '';
 
-    title = `${eventLabel} programada`;
-    if (autoCreated) {
-      text = `Se creó automáticamente una ${eventLabel.toLowerCase()} para "${eventTitle}"${whenLabel ? ` (${whenLabel})` : ''}.`;
+    if (type === 'logistics.event.cancelled') {
+      title = `${eventLabel} cancelada`;
+      text = `Se canceló la ${eventLabel.toLowerCase()} de "${eventTitle}"${whenLabel ? ` (${whenLabel})` : ''}.`;
+    } else if (type === 'logistics.event.updated') {
+      title = `${eventLabel} actualizada`;
+      text = `Se actualizó la ${eventLabel.toLowerCase()} de "${eventTitle}"${whenLabel ? ` (${whenLabel})` : ''}.`;
+      if (changeFields.length) {
+        const changeLabels = changeFields.map(fmtFieldEs);
+        text += ` Cambios: ${changeLabels.join(', ')}.`;
+      }
     } else {
-      text = `${eventLabel} para "${eventTitle}" programada${whenLabel ? ` (${whenLabel})` : ''}.`;
+      title = `${eventLabel} programada`;
+      if (autoCreated) {
+        text = `Se creó automáticamente una ${eventLabel.toLowerCase()} para "${eventTitle}"${whenLabel ? ` (${whenLabel})` : ''}.`;
+      } else {
+        text = `${eventLabel} para "${eventTitle}" programada${whenLabel ? ` (${whenLabel})` : ''}.`;
+      }
     }
 
     if (transportLabel) {
       text += ` Transporte: ${transportLabel}.`;
     }
 
-    if (pairedLabel) {
+    if (type === 'logistics.event.created' && pairedLabel) {
       const pairedWhen = pairedDate || pairedTime ? `${pairedDate ?? ''} ${pairedTime ?? ''}`.trim() : '';
       text += autoCreated
         ? ` Vinculada a la ${pairedLabel} existente${pairedWhen ? ` (${pairedWhen})` : ''}.`
