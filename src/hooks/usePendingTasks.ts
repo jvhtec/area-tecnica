@@ -81,8 +81,8 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table },
         (payload: RealtimePostgresChangesPayload<TaskRow>) => {
-          const previousAssignee = payload.old?.assigned_to ?? null;
-          const nextAssignee = payload.new?.assigned_to ?? null;
+          const previousAssignee = (payload.old as TaskRow)?.assigned_to ?? null;
+          const nextAssignee = (payload.new as TaskRow)?.assigned_to ?? null;
 
           if (previousAssignee === userId && nextAssignee !== userId) {
             invalidatePendingTasks();
