@@ -696,17 +696,42 @@ export default function Wallboard() {
 
       const dryHireItems: LogisticsItem[] = jobArr
         .filter((j:any)=> j.job_type==='dryhire' && (j.status==='Confirmado'))
-        .map((j:any)=>{
-          const { date, time } = toTZParts(j.start_time, j.timezone);
-          return {
-            id: `dryhire-${j.id}`,
-            date,
-            time,
-            title: j.title || 'Dry Hire',
-            transport_type: 'recogida cliente',
-            plate: null,
-            job_title: j.title || null,
-          } as LogisticsItem;
+        .flatMap((j:any)=>{
+          const nowParts = toTZParts(new Date().toISOString(), j.timezone);
+          const pickupParts = toTZParts(j.start_time, j.timezone);
+          const returnParts = j.end_time ? toTZParts(j.end_time, j.timezone) : null;
+          const nowKey = `${nowParts.date}${nowParts.time}`;
+          const pickupKey = `${pickupParts.date}${pickupParts.time}`;
+          const items: LogisticsItem[] = [];
+
+          if (pickupKey >= nowKey) {
+            items.push({
+              id: `dryhire-${j.id}`,
+              date: pickupParts.date,
+              time: pickupParts.time,
+              title: j.title || 'Dry Hire',
+              transport_type: 'recogida cliente',
+              plate: null,
+              job_title: j.title || null,
+            });
+          }
+
+          if (returnParts) {
+            const returnKey = `${returnParts.date}${returnParts.time}`;
+            if (returnKey >= nowKey) {
+              items.push({
+                id: `dryhire-return-${j.id}`,
+                date: returnParts.date,
+                time: returnParts.time,
+                title: j.title || 'Dry Hire',
+                transport_type: 'devolución cliente',
+                plate: null,
+                job_title: j.title || null,
+              });
+            }
+          }
+
+          return items;
         });
       const logisticsItems: LogisticsItem[] = [...logisticsItemsBase, ...dryHireItems]
         .sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
