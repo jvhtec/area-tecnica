@@ -19,6 +19,137 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
   const table = department ? TASK_TABLE[department] : TASK_TABLE.sound;
   const docFk = department ? DOC_FK[department] : DOC_FK.sound;
   const contextId = tourId || jobId;
+  const TRACKED_TASK_FIELDS = ['due_at', 'priority', 'requirements', 'notes', 'details'];
+
+  const sanitizeTaskUpdateValue = (field: string, value: any) => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+
+    if (field === 'due_at') {
+      const date = new Date(String(value));
+      if (!Number.isNaN(date.getTime())) {
+        return date.toISOString();
+      }
+    }
+
+    return value;
+  };
+
+  const normalizeTaskValue = (field: string, value: any) => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+
+    if (field === 'due_at') {
+      const date = new Date(String(value));
+      if (!Number.isNaN(date.getTime())) {
+        return date.toISOString();
+      }
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => normalizeTaskValue('', item));
+    }
+
+    if (typeof value === 'object') {
+      try {
+        return JSON.parse(JSON.stringify(value));
+      } catch (_) {
+        return value;
+      }
+    }
+
+    return value;
+  };
+
+  const trackedUpdatesFrom = (fields: Record<string, any>) => {
+    const tracked: Record<string, any> = {};
+    for (const [key, value] of Object.entries(fields)) {
+      if (TRACKED_TASK_FIELDS.includes(key)) {
+        tracked[key] = sanitizeTaskUpdateValue(key, value);
+      }
+    }
+    return tracked;
+  };
+
+  const notifyTaskUpdated = async (task: any, updates: Record<string, any>) => {
+    if (!task?.assigned_to) return;
+
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+
+    for (const [field, rawNewValue] of Object.entries(updates)) {
+      const normalizedNew = normalizeTaskValue(field, rawNewValue);
+      const normalizedOld = normalizeTaskValue(field, task[field]);
+      if (JSON.stringify(normalizedNew) === JSON.stringify(normalizedOld)) {
+        continue;
+      }
+      changes[field] = { from: normalizedOld, to: normalizedNew };
+    }
+
+    if (Object.keys(changes).length === 0) return;
+
+    const { data: authData } = await supabase.auth.getUser();
+    const actorId = authData?.user?.id ?? null;
+
+    const userIds = new Set<string>();
+    if (actorId) userIds.add(actorId);
+    userIds.add(task.assigned_to);
+
+    try {
+      await supabase.functions.invoke('push', {
+        body: {
+          action: 'broadcast',
+          type: 'task.updated',
+          job_id: task.job_id || undefined,
+          tour_id: task.tour_id || undefined,
+          recipient_id: task.assigned_to,
+          user_ids: Array.from(userIds),
+          task_id: task.id,
+          task_type: task.task_type,
+          changes,
+        },
+      });
+    } catch (pushError) {
+      console.warn('useTaskMutations.notifyTaskUpdated push failed', pushError);
+    }
+  };
+
+  const updateTaskWithNotification = async (id: string, fields: Record<string, any>) => {
+    const sanitizedFields: Record<string, any> = {};
+    for (const [key, value] of Object.entries(fields)) {
+      const sanitized = sanitizeTaskUpdateValue(key, value);
+      if (sanitized !== undefined) {
+        sanitizedFields[key] = sanitized;
+      }
+    }
+
+    if (Object.keys(sanitizedFields).length === 0) {
+      return;
+    }
+
+    const trackedUpdates = trackedUpdatesFrom(sanitizedFields);
+    let existingTask: any | null = null;
+
+    if (Object.keys(trackedUpdates).length > 0) {
+      const { data, error } = await supabase
+        .from(table)
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('useTaskMutations.updateTaskWithNotification fetch failed', error);
+      } else {
+        existingTask = data;
+      }
+    }
+
+    const { error } = await supabase.from(table).update(sanitizedFields).eq('id', id);
+    if (error) throw error;
+
+    if (existingTask) {
+      await notifyTaskUpdated(existingTask, trackedUpdates);
+    }
+  };
 
   const createTask = async (task_type: string, assigned_to?: string | null, due_at?: string | null) => {
     const payload: any = { task_type, status: 'not_started', progress: 0 };
@@ -35,8 +166,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
   };
 
   const updateTask = async (id: string, fields: Record<string, any>) => {
-    const { error } = await supabase.from(table).update(fields).eq('id', id);
-    if (error) throw error;
+    await updateTaskWithNotification(id, fields);
   };
 
   const deleteTask = async (id: string) => {
@@ -109,8 +239,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
   };
 
   const setDueDate = async (id: string, due_at: string | null) => {
-    const { error } = await supabase.from(table).update({ due_at }).eq('id', id);
-    if (error) throw error;
+    await updateTaskWithNotification(id, { due_at });
   };
 
   const uploadAttachment = async (taskId: string, file: File) => {
