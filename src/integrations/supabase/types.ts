@@ -6402,6 +6402,51 @@ export type Database = {
         }
         Relationships: []
       }
+      wallboard_presets: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_url: string
+          highlight_ttl_seconds: number
+          id: string
+          name: string
+          panel_durations: Json
+          panel_order: string[]
+          rotation_fallback_seconds: number
+          slug: string
+          ticker_poll_interval_seconds: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_url: string
+          highlight_ttl_seconds?: number
+          id?: string
+          name: string
+          panel_durations: Json
+          panel_order: string[]
+          rotation_fallback_seconds?: number
+          slug: string
+          ticker_poll_interval_seconds?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_url?: string
+          highlight_ttl_seconds?: number
+          id?: string
+          name?: string
+          panel_durations?: Json
+          panel_order?: string[]
+          rotation_fallback_seconds?: number
+          slug?: string
+          ticker_poll_interval_seconds?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       wallboard_profiles: {
         Row: {
           department: string | null
