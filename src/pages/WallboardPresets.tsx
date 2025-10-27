@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
 import { Button } from '@/components/ui/button';
@@ -71,6 +71,7 @@ export default function WallboardPresets() {
   const [presets, setPresets] = useState<WallboardPresetRow[]>([]);
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const isSavingRef = useRef(false);
 
   const activePreset = useMemo(
     () => presets.find((p) => p.slug === activeSlug) || null,
@@ -126,7 +127,7 @@ export default function WallboardPresets() {
   }, [toast]);
 
   useEffect(() => {
-    if (!activePreset) return;
+    if (!activePreset || isSavingRef.current) return;
     setSlugInput(activePreset.slug);
     setDisplayUrlInput(activePreset.display_url ?? '');
     setPanelOrder(normaliseOrder(activePreset.panel_order));
@@ -191,6 +192,7 @@ export default function WallboardPresets() {
     }
 
     setSaving(true);
+    isSavingRef.current = true;
     const nextOrder = panelOrder.length ? panelOrder : [...DEFAULT_ORDER];
     const payload = {
       panel_order: nextOrder,
@@ -247,6 +249,7 @@ export default function WallboardPresets() {
       });
     } finally {
       setSaving(false);
+      isSavingRef.current = false;
     }
   };
 
