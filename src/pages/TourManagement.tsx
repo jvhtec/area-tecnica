@@ -47,7 +47,7 @@ import { useFlexUuid } from "@/hooks/useFlexUuid";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { TourDateFlexButton } from "@/components/tours/TourDateFlexButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { buildFlexUrlWithTypeDetection } from "@/utils/flex-folders";
+import { openFlexElement } from "@/utils/flex-folders";
 import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 
 interface TourManagementProps {
@@ -343,49 +343,24 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
 
   const handleFlexClick = async () => {
     if (isFlexLoading) {
-      toast({
-        title: "Loading",
-        description: "Please wait while we load the Flex folder...",
-      });
+      toast({ title: "Loading", description: "Please wait while we load the Flex folder..." });
       return;
     }
 
     if (flexUuid) {
-      try {
-        // Get auth token from Supabase
-        const { data: { X_AUTH_TOKEN }, error: authError } = await supabase
-          .functions.invoke('get-secret', {
-            body: { secretName: 'X_AUTH_TOKEN' }
-          });
-        
-        if (authError || !X_AUTH_TOKEN) {
-          console.error('Failed to get auth token:', authError);
-          // Fallback to simple element URL if auth fails
-          const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-          window.open(flexUrl, '_blank', 'noopener');
-          return;
-        }
-
-        // Build URL with element type detection
-        const flexUrl = await buildFlexUrlWithTypeDetection(flexUuid, X_AUTH_TOKEN);
-        window.open(flexUrl, '_blank', 'noopener');
-      } catch (error) {
-        console.error('Error building Flex URL:', error);
-        // Fallback to simple element URL if error occurs
-        const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-        window.open(flexUrl, '_blank', 'noopener');
-      }
+      await openFlexElement({
+        elementId: flexUuid,
+        onError: (error) => {
+          toast({ title: "Error", description: error.message || "Failed to open Flex", variant: "destructive" });
+        },
+        onWarning: (message) => {
+          toast({ title: "Warning", description: message });
+        },
+      });
     } else if (flexError) {
-      toast({
-        title: "Error",
-        description: flexError,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: flexError, variant: "destructive" });
     } else {
-      toast({
-        title: "Info",
-        description: "Flex folder not available for this tour",
-      });
+      toast({ title: "Info", description: "Flex folder not available for this tour" });
     }
   };
 

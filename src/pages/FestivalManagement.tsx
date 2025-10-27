@@ -25,7 +25,7 @@ import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { CrewCallLinkerDialog } from "@/components/jobs/CrewCallLinker";
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
-import { createAllFoldersForJob, buildFlexUrlWithTypeDetection } from "@/utils/flex-folders";
+import { createAllFoldersForJob, openFlexElement } from "@/utils/flex-folders";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { JobPresetManagerDialog } from "@/components/jobs/JobPresetManagerDialog";
 import { resolveJobDocBucket } from "@/utils/jobDocuments";
@@ -765,49 +765,24 @@ const FestivalManagement = () => {
 
   const handleFlexClick = async () => {
     if (isFlexLoading) {
-      toast({
-        title: "Loading",
-        description: "Please wait while we load the Flex folder...",
-      });
+      toast({ title: "Loading", description: "Please wait while we load the Flex folder..." });
       return;
     }
 
     if (flexUuid) {
-      try {
-        // Get auth token from Supabase
-        const { data: { X_AUTH_TOKEN }, error: authError } = await supabase
-          .functions.invoke('get-secret', {
-            body: { secretName: 'X_AUTH_TOKEN' }
-          });
-        
-        if (authError || !X_AUTH_TOKEN) {
-          console.error('Failed to get auth token:', authError);
-          // Fallback to simple element URL if auth fails
-          const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-          window.open(flexUrl, '_blank', 'noopener');
-          return;
-        }
-
-        // Build URL with element type detection
-        const flexUrl = await buildFlexUrlWithTypeDetection(flexUuid, X_AUTH_TOKEN);
-        window.open(flexUrl, '_blank', 'noopener');
-      } catch (error) {
-        console.error('Error building Flex URL:', error);
-        // Fallback to simple element URL if error occurs
-        const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-        window.open(flexUrl, '_blank', 'noopener');
-      }
+      await openFlexElement({
+        elementId: flexUuid,
+        onError: (error) => {
+          toast({ title: "Error", description: error.message || "Failed to open Flex", variant: "destructive" });
+        },
+        onWarning: (message) => {
+          toast({ title: "Warning", description: message });
+        },
+      });
     } else if (flexError) {
-      toast({
-        title: "Error",
-        description: flexError,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: flexError, variant: "destructive" });
     } else {
-      toast({
-        title: "Info",
-        description: "Flex folder not available for this festival",
-      });
+      toast({ title: "Info", description: "Flex folder not available for this festival" });
     }
   };
 
