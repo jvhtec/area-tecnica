@@ -54,6 +54,7 @@ import { UserManual } from '@/components/UserManual';
 import IncidentReports from '@/pages/IncidentReports';
 import Wallboard from '@/pages/Wallboard';
 import Announcements from '@/pages/Announcements';
+import WallboardPresets from '@/pages/WallboardPresets';
 import RatesCenterPage from '@/pages/RatesCenterPage';
 import { useActivityPushFallback } from '@/hooks/useActivityPushFallback';
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
@@ -91,7 +92,7 @@ export default function App() {
                       <Route path="/" element={<Auth />} />
                       <Route path="/auth" element={<Auth />} />
                       {/* Wallboard: protected, full-screen (no Layout) */}
-                      <Route path="/wallboard" element={<RequireAuth><Wallboard /></RequireAuth>} />
+                      <Route path="/wallboard/:presetSlug?" element={<RequireAuth><Wallboard /></RequireAuth>} />
                       {/* Public Routes */}
                       <Route path="festival">
                         <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
@@ -119,6 +120,7 @@ export default function App() {
                         <Route path="/festivals" element={<Festivals />} />
                         <Route path="/incident-reports" element={<IncidentReports />} />
                         <Route path="/announcements" element={<Announcements />} />
+                        <Route path="/management/wallboard-presets" element={<WallboardPresets />} />
                         <Route path="/management/rates" element={<RatesCenterPage />} />
                         <Route path="/manual" element={<UserManual />} />
 

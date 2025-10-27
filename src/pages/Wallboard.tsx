@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
 
@@ -225,20 +226,129 @@ const FooterLogo: React.FC<{ onToggle?: () => void; onMeasure?: (h: number) => v
   );
 };
 
-type PanelKey = 'overview'|'crew'|'docs'|'pending'|'logistics';
+type PanelKey = 'overview'|'crew'|'docs'|'logistics'|'pending';
+
+const PANEL_KEYS: PanelKey[] = ['overview','crew','docs','logistics','pending'];
+const DEFAULT_PANEL_ORDER: PanelKey[] = [...PANEL_KEYS];
+const DEFAULT_PANEL_DURATIONS: Record<PanelKey, number> = {
+  overview: 12,
+  crew: 12,
+  docs: 12,
+  logistics: 12,
+  pending: 12,
+};
+const DEFAULT_ROTATION_FALLBACK_SECONDS = 12;
+const DEFAULT_HIGHLIGHT_TTL_SECONDS = 300;
+const DEFAULT_TICKER_SECONDS = 20;
+
+function normalisePanelOrder(order?: string[] | null): PanelKey[] {
+  if (!Array.isArray(order)) return [...DEFAULT_PANEL_ORDER];
+  const seen = new Set<PanelKey>();
+  const filtered: PanelKey[] = [];
+  for (const value of order) {
+    const key = (typeof value === 'string' ? value.toLowerCase() : '') as PanelKey;
+    if ((PANEL_KEYS as readonly string[]).includes(key) && !seen.has(key)) {
+      filtered.push(key);
+      seen.add(key);
+    }
+  }
+  return filtered.length ? filtered : [...DEFAULT_PANEL_ORDER];
+}
+
+function coerceSeconds(value: unknown, fallback: number, min = 1, max = 600): number {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  const clamped = Math.min(Math.max(num, min), max);
+  return Math.round(clamped);
+}
 
 export default function Wallboard() {
   useRoleGuard(['admin','management','wallboard']);
-  const [isAlien, setIsAlien] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const { presetSlug } = useParams<{ presetSlug?: string }>();
+  const effectiveSlug = (presetSlug?.trim() || 'default').toLowerCase();
 
-  // Rotate panels every 12s (overview, crew, docs, pending)
-  const panels: PanelKey[] = ['overview','crew','docs','logistics','pending'];
+  const [isAlien, setIsAlien] = useState(false);
+  const [panelOrder, setPanelOrder] = useState<PanelKey[]>([...DEFAULT_PANEL_ORDER]);
+  const [panelDurations, setPanelDurations] = useState<Record<PanelKey, number>>({ ...DEFAULT_PANEL_DURATIONS });
+  const [rotationFallbackSeconds, setRotationFallbackSeconds] = useState<number>(DEFAULT_ROTATION_FALLBACK_SECONDS);
+  const [highlightTtlMs, setHighlightTtlMs] = useState<number>(DEFAULT_HIGHLIGHT_TTL_SECONDS * 1000);
+  const [tickerIntervalMs, setTickerIntervalMs] = useState<number>(DEFAULT_TICKER_SECONDS * 1000);
+  const [presetMessage, setPresetMessage] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
+
   useEffect(() => {
-    const id = setInterval(() => setIdx(i => (i+1)%panels.length), 12000);
-    return () => clearInterval(id);
-  }, []);
+    setIdx(0);
+  }, [panelOrder]);
+
+  useEffect(() => {
+    if (!panelOrder.length) return;
+    const activePanels = panelOrder;
+    const currentPanel = activePanels[idx % activePanels.length];
+    const seconds = panelDurations[currentPanel] ?? rotationFallbackSeconds;
+    const durationMs = Math.max(1, seconds) * 1000;
+    const timer = window.setTimeout(() => {
+      setIdx(current => {
+        const total = activePanels.length;
+        if (total <= 0) return 0;
+        return (current + 1) % total;
+      });
+    }, durationMs);
+    return () => clearTimeout(timer);
+  }, [idx, panelOrder, panelDurations, rotationFallbackSeconds]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPresetMessage(null);
+    const loadPreset = async () => {
+      const { data, error } = await supabase
+        .from('wallboard_presets')
+        .select('panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds')
+        .eq('slug', effectiveSlug)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error('Wallboard preset load error:', error);
+      }
+
+      if (error || !data) {
+        setPanelOrder([...DEFAULT_PANEL_ORDER]);
+        setPanelDurations({ ...DEFAULT_PANEL_DURATIONS });
+        setRotationFallbackSeconds(DEFAULT_ROTATION_FALLBACK_SECONDS);
+        setHighlightTtlMs(DEFAULT_HIGHLIGHT_TTL_SECONDS * 1000);
+        setTickerIntervalMs(DEFAULT_TICKER_SECONDS * 1000);
+        setPresetMessage(`Using default wallboard preset${effectiveSlug !== 'default' ? ` (missing "${effectiveSlug}")` : ''}.`);
+        setHighlightJobs(new Map());
+        setIdx(0);
+        return;
+      }
+
+      const fallbackSeconds = coerceSeconds(data.rotation_fallback_seconds, DEFAULT_ROTATION_FALLBACK_SECONDS);
+      const highlightSeconds = coerceSeconds(data.highlight_ttl_seconds, DEFAULT_HIGHLIGHT_TTL_SECONDS, 30, 3600);
+      const tickerSeconds = coerceSeconds(data.ticker_poll_interval_seconds, DEFAULT_TICKER_SECONDS, 10, 600);
+      const order = normalisePanelOrder(data.panel_order as string[] | null);
+      const rawDurations = (data.panel_durations ?? {}) as Record<string, unknown>;
+      const durations: Record<PanelKey, number> = { ...DEFAULT_PANEL_DURATIONS };
+      PANEL_KEYS.forEach(key => {
+        durations[key] = coerceSeconds(rawDurations[key], fallbackSeconds);
+      });
+
+      setPanelOrder(order);
+      setPanelDurations(durations);
+      setRotationFallbackSeconds(fallbackSeconds);
+      setHighlightTtlMs(highlightSeconds * 1000);
+      setTickerIntervalMs(tickerSeconds * 1000);
+      setPresetMessage(null);
+      setHighlightJobs(new Map());
+      setIdx(0);
+    };
+
+    loadPreset();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveSlug]);
 
   // Data polling (client-side via RLS-safe views)
   const [overview, setOverview] = useState<JobsOverviewFeed|null>(null);
@@ -583,22 +693,6 @@ export default function Wallboard() {
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
-  // Load current user's role for cleanup permissions
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .maybeSingle();
-        setUserRole(prof?.role ?? null);
-      } catch {}
-    })();
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     const fetchAnns = async () => {
@@ -613,7 +707,7 @@ export default function Wallboard() {
         const messages: string[] = [];
         const now = Date.now();
         const updated = new Map(highlightJobs);
-        const HIGHLIGHT_TTL_MS = 5 * 60 * 1000; // auto-deactivate highlights after 5 minutes
+        const ttl = Math.max(1000, highlightTtlMs);
         const staleIds: string[] = [];
         (data||[]).forEach((a:any) => {
           let m = a.message || '';
@@ -621,7 +715,7 @@ export default function Wallboard() {
           if (match) {
             const jobId = match[1];
             const created = a.created_at ? new Date(a.created_at).getTime() : now;
-            const expireAt = created + HIGHLIGHT_TTL_MS;
+            const expireAt = created + ttl;
             if (expireAt > now) {
               updated.set(jobId, expireAt);
             } else if (a.id) {
@@ -653,9 +747,10 @@ export default function Wallboard() {
       }
     };
     fetchAnns();
-    const id = setInterval(fetchAnns, 20000); // 20s ticker polling
+    const interval = Math.max(5000, tickerIntervalMs);
+    const id = setInterval(fetchAnns, interval); // ticker polling
     return () => { cancelled = true; clearInterval(id); };
-  }, []);
+  }, [highlightTtlMs, tickerIntervalMs]);
 
   // Periodic cleanup of expired highlights
   useEffect(() => {
@@ -673,9 +768,16 @@ export default function Wallboard() {
     return () => clearInterval(id);
   }, []);
 
-  const current = panels[idx];
+  const activePanels = panelOrder.length ? panelOrder : DEFAULT_PANEL_ORDER;
+  const safeIdx = activePanels.length ? idx % activePanels.length : 0;
+  const current = activePanels[safeIdx] ?? 'overview';
   return (
     <div className={`min-h-screen ${isAlien ? 'bg-black text-[var(--alien-amber)] alien-scanlines alien-vignette' : 'bg-black text-white'}`}>
+      {presetMessage && (
+        <div className="bg-amber-500/20 text-amber-200 text-sm text-center py-2">
+          {presetMessage}
+        </div>
+      )}
       <div className="pb-28">{/* space for ticker + footer */}
         {current==='overview' && (isAlien ? <AlienJobsPanel data={overview} highlightIds={new Set(highlightJobs.keys())} /> : <JobsOverviewPanel data={overview} highlightIds={new Set(highlightJobs.keys())} />)}
         {current==='crew' && (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} />)}
