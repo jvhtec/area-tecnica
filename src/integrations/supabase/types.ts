@@ -3144,130 +3144,6 @@ export type Database = {
           },
         ]
       }
-      job_tasks: {
-        Row: {
-          assigned_to: string | null
-          completed_at: string | null
-          completed_by: string | null
-          completion_source: string | null
-          created_at: string
-          created_by: string | null
-          department: string
-          due_at: string | null
-          id: string
-          job_id: string
-          notes: string | null
-          priority: number | null
-          progress: number
-          status: string
-          task_type: string | null
-          title: string | null
-          updated_at: string
-        }
-        Insert: {
-          assigned_to?: string | null
-          completed_at?: string | null
-          completed_by?: string | null
-          completion_source?: string | null
-          created_at?: string
-          created_by?: string | null
-          department: string
-          due_at?: string | null
-          id?: string
-          job_id: string
-          notes?: string | null
-          priority?: number | null
-          progress?: number
-          status?: string
-          task_type?: string | null
-          title?: string | null
-          updated_at?: string
-        }
-        Update: {
-          assigned_to?: string | null
-          completed_at?: string | null
-          completed_by?: string | null
-          completion_source?: string | null
-          created_at?: string
-          created_by?: string | null
-          department?: string
-          due_at?: string | null
-          id?: string
-          job_id?: string
-          notes?: string | null
-          priority?: number | null
-          progress?: number
-          status?: string
-          task_type?: string | null
-          title?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "job_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_completed_by_fkey"
-            columns: ["completed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_completed_by_fkey"
-            columns: ["completed_by"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "v_job_tech_payout_2025"
-            referencedColumns: ["job_id"]
-          },
-          {
-            foreignKeyName: "job_tasks_task_type_fkey"
-            columns: ["task_type"]
-            isOneToOne: false
-            referencedRelation: "task_types"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       job_whatsapp_group_requests: {
         Row: {
           created_at: string
@@ -3537,6 +3413,20 @@ export type Database = {
           {
             foreignKeyName: "lights_job_tasks_assigned_to_fkey"
             columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lights_job_tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lights_job_tasks_completed_by_fkey"
+            columns: ["completed_by"]
             isOneToOne: false
             referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
@@ -4566,6 +4456,20 @@ export type Database = {
           {
             foreignKeyName: "sound_job_tasks_assigned_to_fkey"
             columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sound_job_tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sound_job_tasks_completed_by_fkey"
+            columns: ["completed_by"]
             isOneToOne: false
             referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
@@ -6223,6 +6127,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "video_job_tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_job_tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "video_job_tasks_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
@@ -6350,264 +6268,6 @@ export type Database = {
           },
         ]
       }
-      lights_job_tasks_v: {
-        Row: {
-          assigned_to: string | null
-          completed_at: string | null
-          completed_by: string | null
-          completion_source: string | null
-          created_at: string
-          created_by: string | null
-          department: string
-          due_at: string | null
-          id: string
-          job_id: string
-          notes: string | null
-          priority: number | null
-          progress: number
-          status: string
-          task_type: string | null
-          title: string | null
-          updated_at: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "job_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_completed_by_fkey"
-            columns: ["completed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_completed_by_fkey"
-            columns: ["completed_by"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "v_job_tech_payout_2025"
-            referencedColumns: ["job_id"]
-          },
-          {
-            foreignKeyName: "job_tasks_task_type_fkey"
-            columns: ["task_type"]
-            isOneToOne: false
-            referencedRelation: "task_types"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      sound_job_tasks_v: {
-        Row: {
-          assigned_to: string | null
-          completed_at: string | null
-          completed_by: string | null
-          completion_source: string | null
-          created_at: string
-          created_by: string | null
-          department: string
-          due_at: string | null
-          id: string
-          job_id: string
-          notes: string | null
-          priority: number | null
-          progress: number
-          status: string
-          task_type: string | null
-          title: string | null
-          updated_at: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "job_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_completed_by_fkey"
-            columns: ["completed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_completed_by_fkey"
-            columns: ["completed_by"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "v_job_tech_payout_2025"
-            referencedColumns: ["job_id"]
-          },
-          {
-            foreignKeyName: "job_tasks_task_type_fkey"
-            columns: ["task_type"]
-            isOneToOne: false
-            referencedRelation: "task_types"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      video_job_tasks_v: {
-        Row: {
-          assigned_to: string | null
-          completed_at: string | null
-          completed_by: string | null
-          completion_source: string | null
-          created_at: string
-          created_by: string | null
-          department: string
-          due_at: string | null
-          id: string
-          job_id: string
-          notes: string | null
-          priority: number | null
-          progress: number
-          status: string
-          task_type: string | null
-          title: string | null
-          updated_at: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "job_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_completed_by_fkey"
-            columns: ["completed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_completed_by_fkey"
-            columns: ["completed_by"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_tasks_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "v_job_tech_payout_2025"
-            referencedColumns: ["job_id"]
-          },
-          {
-            foreignKeyName: "job_tasks_task_type_fkey"
-            columns: ["task_type"]
-            isOneToOne: false
-            referencedRelation: "task_types"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       pending_tasks_view: {
         Row: {
           assigned_to: string | null
@@ -6615,9 +6275,6 @@ export type Database = {
           assignee_last_name: string | null
           assignee_role: Database["public"]["Enums"]["user_role"] | null
           client: string | null
-          completed_at: string | null
-          completed_by: string | null
-          completion_source: string | null
           created_at: string | null
           department: string | null
           due_at: string | null
