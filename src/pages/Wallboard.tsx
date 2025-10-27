@@ -8,6 +8,14 @@ type Dept = 'sound' | 'lights' | 'video';
 
 interface JobsOverviewFeed { jobs: Array<{ id:string; title:string; start_time:string; end_time:string; location:{ name:string|null }|null; departments: Dept[]; crewAssigned: Record<string, number>; crewNeeded: Record<string, number>; docs: Record<string, { have:number; need:number }>; status: 'green'|'yellow'|'red'; }> }
 type JobsOverviewJob = JobsOverviewFeed['jobs'][number];
+type CalendarFeed = {
+  jobs: JobsOverviewJob[];
+  jobsByDate: Record<string, JobsOverviewJob[]>;
+  jobDateLookup: Record<string, string>;
+  range: { start: string; end: string };
+  focusMonth: number;
+  focusYear: number;
+};
 interface CrewAssignmentsFeed { jobs: Array<{ id:string; title:string; crew: Array<{ name:string; role:string; dept:Dept|null; timesheetStatus:'submitted'|'draft'|'missing'|'approved'; }> }>; }
 interface DocProgressFeed { jobs: Array<{ id:string; title:string; departments: Array<{ dept:Dept; have:number; need:number; missing:string[] }> }> }
 interface PendingActionsFeed { items: Array<{ severity:'red'|'yellow'; text:string }> }
@@ -43,51 +51,56 @@ function formatDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function buildCalendarModel(data: JobsOverviewFeed | null, highlightIds?: Set<string>): { dayNames: readonly string[]; monthLabel: string; cells: CalendarCell[] } {
-  const highlightSet = highlightIds ? new Set(highlightIds) : new Set<string>();
-  const jobs = (data?.jobs ?? []) as JobsOverviewJob[];
-  const jobsByKey = new Map<string, { jobs: JobsOverviewJob[]; highlightIds: Set<string> }>();
-  jobs.forEach(job => {
-    const key = formatDateKey(new Date(job.start_time));
-    const existing = jobsByKey.get(key);
-    if (existing) {
-      existing.jobs.push(job);
-      if (highlightSet.has(job.id)) existing.highlightIds.add(job.id);
-    } else {
-      jobsByKey.set(key, {
-        jobs: [job],
-        highlightIds: highlightSet.has(job.id) ? new Set<string>([job.id]) : new Set<string>(),
-      });
-    }
-  });
-  jobsByKey.forEach(bucket => {
-    bucket.jobs.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-  });
-
+function buildCalendarModel(data: CalendarFeed | null, highlightIds?: Set<string>): { dayNames: readonly string[]; monthLabel: string; cells: CalendarCell[] } {
   const today = new Date();
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const startOffset = (startOfMonth.getDay() + 6) % 7; // Monday-based calendar
-  const gridStart = new Date(startOfMonth.getTime() - startOffset * MS_PER_DAY);
-  const dayCount = 42; // 6 weeks grid
+  const highlightSet = highlightIds ? new Set(highlightIds) : new Set<string>();
+  const fallbackGrid = (() => {
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const offset = (startOfMonth.getDay() + 6) % 7;
+    const start = new Date(startOfMonth.getTime() - offset * MS_PER_DAY);
+    const end = new Date(start.getTime() + (42 - 1) * MS_PER_DAY);
+    return { start, end };
+  })();
+  const gridStart = data ? new Date(data.range.start) : fallbackGrid.start;
+  const gridEnd = data ? new Date(data.range.end) : fallbackGrid.end;
+  const dayCount = Math.max(1, Math.round((gridEnd.getTime() - gridStart.getTime()) / MS_PER_DAY) + 1);
   const todayKey = formatDateKey(today);
-  const endDate = new Date(gridStart.getTime() + (dayCount - 1) * MS_PER_DAY);
+
+  const jobsByKey = data?.jobsByDate ?? {};
+  const highlightByKey = new Map<string, Set<string>>();
+  if (data) {
+    highlightSet.forEach(jobId => {
+      const key = data.jobDateLookup[jobId];
+      if (!key) return;
+      const bucket = highlightByKey.get(key) ?? new Set<string>();
+      bucket.add(jobId);
+      highlightByKey.set(key, bucket);
+    });
+  }
+
   const monthFormatter = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
-  const startLabel = monthFormatter.format(startOfMonth);
-  const endLabel = monthFormatter.format(new Date(endDate.getFullYear(), endDate.getMonth(), 1));
+  const rangeStart = data ? new Date(data.range.start) : gridStart;
+  const rangeEnd = data ? new Date(data.range.end) : gridEnd;
+  const startLabel = monthFormatter.format(new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1));
+  const endLabel = monthFormatter.format(new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), 1));
   const monthLabel = startLabel === endLabel ? startLabel : `${startLabel} → ${endLabel}`;
+
+  const focusMonth = data ? data.focusMonth : today.getMonth();
+  const focusYear = data ? data.focusYear : today.getFullYear();
 
   const cells: CalendarCell[] = Array.from({ length: dayCount }, (_, idx) => {
     const date = new Date(gridStart.getTime() + idx * MS_PER_DAY);
     const isoKey = formatDateKey(date);
-    const bucket = jobsByKey.get(isoKey);
+    const jobs = jobsByKey[isoKey] ?? [];
+    const highlightBucket = highlightByKey.get(isoKey) ?? new Set<string>();
     return {
       date,
       isoKey,
-      inMonth: date.getMonth() === startOfMonth.getMonth(),
+      inMonth: date.getMonth() === focusMonth && date.getFullYear() === focusYear,
       isToday: isoKey === todayKey,
-      jobs: bucket ? bucket.jobs : [],
-      hasHighlight: !!bucket?.highlightIds.size,
-      highlightJobIds: bucket ? new Set<string>(bucket.highlightIds) : new Set<string>(),
+      jobs,
+      hasHighlight: highlightBucket.size > 0,
+      highlightJobIds: new Set<string>(highlightBucket),
     };
   });
 
@@ -208,7 +221,7 @@ const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data
   </PanelContainer>
 );
 
-const CalendarPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds }) => {
+const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds }) => {
   const { dayNames, monthLabel, cells } = buildCalendarModel(data, highlightIds);
   return (
     <PanelContainer>
@@ -542,7 +555,7 @@ export default function Wallboard() {
 
   // Data polling (client-side via RLS-safe views)
   const [overview, setOverview] = useState<JobsOverviewFeed|null>(null);
-  const [calendarData, setCalendarData] = useState<JobsOverviewFeed|null>(null);
+  const [calendarData, setCalendarData] = useState<CalendarFeed|null>(null);
   const [crew, setCrew] = useState<CrewAssignmentsFeed|null>(null);
   const [docs, setDocs] = useState<DocProgressFeed|null>(null);
   const [pending, setPending] = useState<PendingActionsFeed|null>(null);
@@ -555,15 +568,31 @@ export default function Wallboard() {
     let cancelled = false;
     const fetchAll = async () => {
       const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        // Look-ahead windows: 7-day focus + extended 6-week calendar horizon
-        const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate()+6, 23,59,59,999);
-        const calendarEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate()+41, 23,59,59,999);
-        const startISO = todayStart.toISOString();
-        const weekEndISO = weekEnd.toISOString();
-        const calendarEndISO = calendarEnd.toISOString();
-        const todayMs = todayStart.getTime();
-        const weekEndMs = weekEnd.getTime();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekEnd = new Date(todayStart.getTime() + 7 * MS_PER_DAY - 1);
+      const startOfMonth = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
+      const monthOffset = (startOfMonth.getDay() + 6) % 7;
+      const calendarGridStart = new Date(startOfMonth.getTime() - monthOffset * MS_PER_DAY);
+      const calendarGridEnd = new Date(calendarGridStart.getTime() + 42 * MS_PER_DAY - 1);
+      const weekStartISO = todayStart.toISOString();
+      const weekEndISO = weekEnd.toISOString();
+      const calendarStartISO = calendarGridStart.toISOString();
+      const calendarEndISO = calendarGridEnd.toISOString();
+      const weekStartMs = todayStart.getTime();
+      const weekEndMs = weekEnd.getTime();
+      const calendarStartMs = calendarGridStart.getTime();
+      const calendarEndMs = calendarGridEnd.getTime();
+
+      const jobOverlapsWeek = (j:any) => {
+        const startTime = new Date(j.start_time).getTime();
+        const endTime = new Date(j.end_time).getTime();
+        return endTime >= weekStartMs && startTime <= weekEndMs;
+      };
+      const jobWithinCalendarWindow = (j:any) => {
+        const startTime = new Date(j.start_time).getTime();
+        const endTime = new Date(j.end_time).getTime();
+        return endTime >= calendarStartMs && startTime <= calendarEndMs;
+      };
 
       // 1) Fetch jobs (base fields only)
       const { data: jobs, error: jobsError } = await supabase
@@ -571,10 +600,10 @@ export default function Wallboard() {
         .select('id,title,start_time,end_time,status,location_id,job_type,tour_id,timezone')
         .in('job_type', ['single','festival','tourdate','dryhire'])
         .in('status', ['Confirmado','Tentativa'])
-          .lte('start_time', calendarEndISO)
-          .gte('end_time', startISO)
-          .order('start_time', { ascending: true });
-        if (jobsError) console.error('Wallboard jobs query error:', jobsError?.message || jobsError, { startISO, calendarEndISO });
+        .lte('start_time', calendarEndISO)
+        .gte('end_time', calendarStartISO)
+        .order('start_time', { ascending: true });
+      if (jobsError) console.error('Wallboard jobs query error:', jobsError?.message || jobsError, { calendarStartISO, calendarEndISO });
       let jobArr = jobs || [];
 
       // Exclude jobs whose parent tour is cancelled (some entries may still be Confirmado)
@@ -594,6 +623,8 @@ export default function Wallboard() {
         }
       }
       const jobIds = jobArr.map(j=>j.id);
+      const detailJobSet = new Set(jobArr.filter(jobOverlapsWeek).map((j:any)=>j.id));
+      const detailJobIds = Array.from(detailJobSet);
       const dryhireIds = new Set<string>(jobArr.filter((j:any)=>j.job_type==='dryhire').map((j:any)=>j.id));
       const locationIds = Array.from(new Set(jobArr.map((j:any)=>j.location_id).filter(Boolean)));
 
@@ -609,9 +640,9 @@ export default function Wallboard() {
         deptsByJob.set(r.job_id, list as Dept[]);
       });
 
-      // 3) Fetch assignments for crew counts
-      const { data: assignRows, error: assignErr } = jobIds.length
-        ? await supabase.from('job_assignments').select('job_id,technician_id,sound_role,lights_role,video_role').in('job_id', jobIds)
+      // 3) Fetch assignments for crew counts (restrict to detail window)
+      const { data: assignRows, error: assignErr } = detailJobIds.length
+        ? await supabase.from('job_assignments').select('job_id,technician_id,sound_role,lights_role,video_role').in('job_id', detailJobIds)
         : { data: [], error: null } as any;
       if (assignErr) console.error('Wallboard job_assignments error:', assignErr);
       const assignsByJob = new Map<string, any[]>();
@@ -622,11 +653,11 @@ export default function Wallboard() {
       });
 
       // Fetch required-role summaries for these jobs
-      const { data: reqRows, error: reqErr } = jobIds.length
+      const { data: reqRows, error: reqErr } = detailJobIds.length
         ? await supabase
             .from('job_required_roles_summary')
             .select('job_id, department, total_required')
-            .in('job_id', jobIds)
+            .in('job_id', detailJobIds)
         : { data: [], error: null } as any;
       if (reqErr) console.error('Wallboard job_required_roles_summary error:', reqErr);
       const needByJobDept = new Map<string, number>();
@@ -644,11 +675,11 @@ export default function Wallboard() {
 
       // Timesheet statuses via view
       const tsByJobTech = new Map<string, Map<string,string>>();
-      if (jobIds.length) {
+      if (detailJobIds.length) {
         const { data: ts } = await supabase
           .from('wallboard_timesheet_status')
           .select('job_id, technician_id, status')
-          .in('job_id', jobIds);
+          .in('job_id', detailJobIds);
         ts?.forEach(row => {
           const m = tsByJobTech.get(row.job_id) ?? new Map();
           m.set(row.technician_id, row.status as string);
@@ -658,7 +689,7 @@ export default function Wallboard() {
 
       // Doc counts and requirements
       const [{ data: counts }, { data: reqs }] = await Promise.all([
-        jobIds.length ? supabase.from('wallboard_doc_counts').select('job_id,department,have').in('job_id', jobIds) : Promise.resolve({ data: [] as any }),
+        detailJobIds.length ? supabase.from('wallboard_doc_counts').select('job_id,department,have').in('job_id', detailJobIds) : Promise.resolve({ data: [] as any }),
         supabase.from('wallboard_doc_requirements').select('department,need')
       ]);
 
@@ -666,27 +697,22 @@ export default function Wallboard() {
       const haveByJobDept = new Map<string, number>();
       (counts||[]).forEach((c:any)=> haveByJobDept.set(`${c.job_id}:${c.department}`, c.have));
 
-        const jobOverlapsWeek = (j:any) => {
-          const startTime = new Date(j.start_time).getTime();
-          const endTime = new Date(j.end_time).getTime();
-          return endTime >= todayMs && startTime <= weekEndMs;
-        };
-        const jobStartsTodayOrLater = (j:any) => new Date(j.start_time).getTime() >= todayMs;
-
-        const mapJob = (j:any): JobsOverviewJob => {
-          const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
-          const depts: Dept[] = deptsAll.filter(d => d !== 'video');
-          const crewAssigned: Record<string, number> = { sound: 0, lights: 0, video: 0 };
-          (assignsByJob.get(j.id) ?? []).forEach((a:any)=>{
-            if (a.sound_role) crewAssigned.sound++;
-            if (a.lights_role) crewAssigned.lights++;
-            if (a.video_role) crewAssigned.video++;
-          });
-          const crewNeeded: Record<string, number> = { sound: 0, lights: 0, video: 0 };
-          depts.forEach(d => {
-            crewNeeded[d] = needByJobDept.get(`${j.id}:${d}`) || 0;
-          });
-          let status: 'green'|'yellow'|'red';
+      const mapJob = (j:any): JobsOverviewJob => {
+        const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
+        const depts: Dept[] = deptsAll.filter(d => d !== 'video');
+        const crewAssigned: Record<string, number> = { sound: 0, lights: 0, video: 0 };
+        const assignmentRows = detailJobSet.has(j.id) ? (assignsByJob.get(j.id) ?? []) : [];
+        assignmentRows.forEach((a:any)=>{
+          if (a.sound_role) crewAssigned.sound++;
+          if (a.lights_role) crewAssigned.lights++;
+          if (a.video_role) crewAssigned.video++;
+        });
+        const crewNeeded: Record<string, number> = { sound: 0, lights: 0, video: 0 };
+        depts.forEach(d => {
+          crewNeeded[d] = detailJobSet.has(j.id) ? (needByJobDept.get(`${j.id}:${d}`) || 0) : 0;
+        });
+        let status: 'green'|'yellow'|'red';
+        if (detailJobSet.has(j.id)) {
           const hasReq = depts.some(d => (crewNeeded[d] || 0) > 0);
           if (hasReq) {
             const perDept = depts.map(d => {
@@ -705,41 +731,53 @@ export default function Wallboard() {
             const allHave = depts.length>0 && present.every(n=>n>0);
             status = allHave ? 'green' : hasAny ? 'yellow' : 'red';
           }
-          const docs: Record<string, { have:number; need:number }> = {};
-          depts.forEach(d=>{
-            const have = haveByJobDept.get(`${j.id}:${d}`) ?? 0;
-            const need = needByDept.get(d) ?? 0;
-            docs[d] = { have, need };
-          });
-          return {
-            id: j.id,
-            title: j.title,
-            start_time: j.start_time,
-            end_time: j.end_time,
-            location: { name: (j.location_id ? (locById.get(j.location_id) ?? null) : null) },
-            departments: depts,
-            crewAssigned: { ...crewAssigned, total: (crewAssigned.sound+crewAssigned.lights+crewAssigned.video) },
-            crewNeeded: { ...crewNeeded, total: (crewNeeded.sound + crewNeeded.lights + crewNeeded.video) },
-            docs,
-            status,
-          };
+        } else {
+          status = j.status === 'Confirmado' ? 'green' : 'yellow';
+        }
+        const docs: Record<string, { have:number; need:number }> = {};
+        depts.forEach(d=>{
+          const have = detailJobSet.has(j.id) ? (haveByJobDept.get(`${j.id}:${d}`) ?? 0) : 0;
+          const need = needByDept.get(d) ?? 0;
+          docs[d] = { have, need };
+        });
+        return {
+          id: j.id,
+          title: j.title,
+          start_time: j.start_time,
+          end_time: j.end_time,
+          location: { name: (j.location_id ? (locById.get(j.location_id) ?? null) : null) },
+          departments: depts,
+          crewAssigned: { ...crewAssigned, total: (crewAssigned.sound+crewAssigned.lights+crewAssigned.video) },
+          crewNeeded: { ...crewNeeded, total: (crewNeeded.sound + crewNeeded.lights + crewNeeded.video) },
+          docs,
+          status,
         };
+      };
 
-        const jobsForCalendar: JobsOverviewJob[] = jobArr
-          .filter((j:any)=> !dryhireIds.has(j.id))
-          .filter(jobStartsTodayOrLater)
-          .map(mapJob)
-          .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+      const calendarJobs: JobsOverviewJob[] = jobArr
+        .filter((j:any)=> !dryhireIds.has(j.id))
+        .filter(jobWithinCalendarWindow)
+        .map(mapJob)
+        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
-        const jobsForWeek: JobsOverviewJob[] = jobArr
-          .filter((j:any)=> !dryhireIds.has(j.id))
-          .filter(jobOverlapsWeek)
-          .map(mapJob)
-          .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+      const jobsForWeek: JobsOverviewJob[] = jobArr
+        .filter((j:any)=> !dryhireIds.has(j.id))
+        .filter(jobOverlapsWeek)
+        .map(mapJob)
+        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
-        const overviewPayload: JobsOverviewFeed = {
-          jobs: jobsForWeek,
-        };
+      const jobsByDate: Record<string, JobsOverviewJob[]> = {};
+      const jobDateLookup: Record<string, string> = {};
+      calendarJobs.forEach(job => {
+        const key = formatDateKey(new Date(job.start_time));
+        jobDateLookup[job.id] = key;
+        const bucket = jobsByDate[key] ?? (jobsByDate[key] = []);
+        bucket.push(job);
+      });
+
+      const overviewPayload: JobsOverviewFeed = {
+        jobs: jobsForWeek,
+      };
 
         // Crew assignments
         const assignedTechsByJob = new Map<string, string[]>();
@@ -833,14 +871,21 @@ export default function Wallboard() {
 
         if (!cancelled) {
           setOverview(overviewPayload);
-          setCalendarData({ jobs: jobsForCalendar });
+          setCalendarData({
+            jobs: calendarJobs,
+            jobsByDate,
+            jobDateLookup,
+            range: { start: calendarStartISO, end: calendarEndISO },
+            focusMonth: todayStart.getMonth(),
+            focusYear: todayStart.getFullYear(),
+          });
           setCrew(crewPayload);
           setDocs(docPayload);
           setPending({ items });
         }
 
       // 5) Logistics calendar (next 7 days)
-      const startDate = startISO.slice(0,10);
+      const startDate = weekStartISO.slice(0,10);
       const endDate = weekEndISO.slice(0,10);
       const { data: le, error: leErr } = await supabase
         .from('logistics_events')
@@ -1048,7 +1093,7 @@ const AlienShell: React.FC<{ title: string; kind?: 'standard'|'critical'|'env'|'
   );
 };
 
-const AlienCalendarPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds })=> {
+const AlienCalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds })=> {
   const { dayNames, monthLabel, cells } = buildCalendarModel(data, highlightIds);
   return (
     <AlienShell title={`CALENDAR WINDOW – ${monthLabel.toUpperCase()}`} kind="tracker">
