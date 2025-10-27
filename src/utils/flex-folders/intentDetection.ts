@@ -115,12 +115,33 @@ export function detectFlexLinkIntent(context?: IntentDetectionContext): FlexLink
   }
 
   // Check domainId from tree API
-  if (context.domainId === 'expense-sheet') {
-    return 'expense-sheet';
-  }
-
-  if (context.domainId === 'simple-project-element') {
-    return 'simple-element';
+  // Prefer explicit domain hints only; avoid over-eagerly classifying ambiguous values
+  const domain = context.domainId?.toLowerCase();
+  if (domain) {
+    if (domain === 'expense-sheet' || domain === 'expense' || domain === 'expense-list') {
+      return 'expense-sheet';
+    }
+    if (
+      domain === 'fin-doc' ||
+      domain === 'financial-document' ||
+      domain === 'financial-doc' ||
+      domain === 'presupuesto'
+    ) {
+      return 'fin-doc';
+    }
+    if (domain === 'crew-call' || domain === 'contact-list' || domain === 'contact-list-element') {
+      return 'contact-list';
+    }
+    if (domain === 'equipment-list' || domain === 'equipment' || domain === 'equipment-schedule') {
+      return 'equipment-list';
+    }
+    if (domain === 'remote-file-list' || domain === 'remote-files' || domain === 'file-list') {
+      return 'remote-file-list';
+    }
+    // Do NOT treat 'simple-project-element' as authoritative; let other hints decide
+    if (domain === 'simple-project-element') {
+      // fall through to jobType/folderType checks and default
+    }
   }
 
   // Check jobType/folderType hints for dryhire/tourdate

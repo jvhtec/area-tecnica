@@ -65,8 +65,35 @@ export async function resolveFlexUrl(options: ResolveFlexUrlOptions): Promise<st
   }
 
   try {
-    // Optimization: if we have sufficient context for intent detection, build without token
-    if (context?.domainId || context?.definitionId || context?.folderType || context?.jobType || context?.viewHint) {
+    // Optimization: only skip API when context provides strong, unambiguous hints
+    const hasStrongDefinition = !!context?.definitionId;
+    const isExplicitView = !!(context?.viewHint && context.viewHint !== 'auto');
+    const isDryhireOrTourdate =
+      context?.folderType === 'dryhire' ||
+      context?.folderType === 'tourdate' ||
+      context?.jobType === 'dryhire' ||
+      context?.jobType === 'tourdate';
+    const domain = context?.domainId?.toLowerCase();
+    const hasStrongDomain = !!domain && (
+      domain === 'fin-doc' ||
+      domain === 'financial-document' ||
+      domain === 'financial-doc' ||
+      domain === 'presupuesto' ||
+      domain === 'expense-sheet' ||
+      domain === 'expense' ||
+      domain === 'expense-list' ||
+      domain === 'crew-call' ||
+      domain === 'contact-list' ||
+      domain === 'contact-list-element' ||
+      domain === 'equipment-list' ||
+      domain === 'equipment' ||
+      domain === 'equipment-schedule' ||
+      domain === 'remote-file-list' ||
+      domain === 'remote-files' ||
+      domain === 'file-list'
+    );
+
+    if (hasStrongDefinition || isExplicitView || isDryhireOrTourdate || hasStrongDomain) {
       const intent = detectFlexLinkIntent(context);
       const url = buildFlexUrlByIntent(intent, elementId);
       console.log('[resolveFlexUrl] Resolved URL using context (no API):', {

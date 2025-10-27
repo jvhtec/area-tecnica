@@ -20,7 +20,6 @@ import {
   createTourdateFilterPredicate,
   getElementTree,
   openFlexElement,
-  resolveFlexUrlSync,
 } from "@/utils/flex-folders";
 
 interface JobCardActionsProps {
@@ -538,134 +537,41 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       return;
     }
 
-    // Build URL synchronously using the resolver, leveraging selector metadata
-    let url: string | null = null;
-    
-    try {
-      url = resolveFlexUrlSync({
-        elementId,
-        context: {
-          definitionId: node?.definitionId,
-          domainId: node?.domainId,
-          jobType: job.job_type,
-        },
-      });
-    } catch (error) {
-      const errorDetails = {
-        error: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-        elementId,
-        node,
-        jobId: job.id,
-        jobType: job.job_type,
-        timestamp: new Date().toISOString(),
-      };
-      
-      console.error('[JobCardActions] Exception while resolving Flex URL:', errorDetails);
-      console.error('[JobCardActions] Telemetry: URL resolution exception', errorDetails);
-      
-      toast({
-        title: 'Navigation error',
-        description: 'An error occurred while preparing the Flex URL.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!url || typeof url !== 'string' || url.trim().length === 0) {
-      const errorDetails = {
-        url,
-        urlType: typeof url,
-        elementId,
+    // Use shared navigation utility; it handles placeholder window and async resolution
+    openFlexElement({
+      elementId,
+      context: {
         definitionId: node?.definitionId,
         domainId: node?.domainId,
-        displayName: node?.displayName,
-        documentNumber: node?.documentNumber,
-        jobId: job.id,
         jobType: job.job_type,
-        timestamp: new Date().toISOString(),
-      };
-      
-      console.error('[JobCardActions] resolveFlexUrlSync returned null/invalid URL:', errorDetails);
-      console.error('[JobCardActions] Telemetry: Unmapped intent detected - no valid URL scheme found', errorDetails);
-      
-      toast({
-        title: 'Navigation failed',
-        description: node?.displayName
-          ? `Could not determine how to open "${node.displayName}" in Flex.`
-          : 'Could not construct a valid Flex URL for the selected element.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Validate URL contains the elementId (sanity check)
-    if (!url.includes(elementId)) {
-      const warningDetails = {
-        url,
-        elementId,
-        urlContainsElementId: false,
-        jobId: job.id,
-        timestamp: new Date().toISOString(),
-      };
-      
-      console.warn('[JobCardActions] URL does not contain elementId - possible issue:', warningDetails);
-      console.warn('[JobCardActions] Telemetry: URL validation warning', warningDetails);
-    }
-
-    const schema = url.includes('#fin-doc/') ? 'fin-doc' : 'simple-element';
-    console.log('[JobCardActions] Resolved Flex URL and schema:', {
-      url,
-      schema,
-      elementId,
-      displayName: node?.displayName,
-      documentNumber: node?.documentNumber,
-      jobId: job.id,
+      },
+      onError: (error) => {
+        const errorDetails = {
+          error: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          elementId,
+          node,
+          jobId: job.id,
+          jobType: job.job_type,
+          timestamp: new Date().toISOString(),
+        };
+        console.error('[JobCardActions] Failed to open Flex element from selector:', errorDetails);
+        toast({
+          title: 'Navigation error',
+          description: error instanceof Error ? error.message : 'Failed to open Flex',
+          variant: 'destructive',
+        });
+      },
+      onWarning: (message) => {
+        console.warn('[JobCardActions] Warning opening Flex element from selector:', {
+          message,
+          elementId,
+          node,
+          jobId: job.id,
+        });
+        toast({ title: 'Warning', description: message });
+      },
     });
-    
-    console.log('[JobCardActions] Telemetry: Navigation successful', {
-      elementId,
-      schema,
-      displayName: node?.displayName,
-      documentNumber: node?.documentNumber,
-      definitionId: node?.definitionId,
-      domainId: node?.domainId,
-      jobId: job.id,
-      jobType: job.job_type,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Create ephemeral anchor to navigate in the same gesture
-    try {
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.target = '_blank';
-      anchor.rel = 'noopener noreferrer';
-      anchor.style.display = 'none';
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      
-      console.log('[JobCardActions] Navigation anchor clicked successfully');
-    } catch (error) {
-      const errorDetails = {
-        error: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-        url,
-        elementId,
-        jobId: job.id,
-        timestamp: new Date().toISOString(),
-      };
-      
-      console.error('[JobCardActions] Failed to create/click navigation anchor:', errorDetails);
-      console.error('[JobCardActions] Telemetry: Anchor navigation failure', errorDetails);
-      
-      toast({
-        title: 'Navigation error',
-        description: 'Failed to open the Flex window. Please try again.',
-        variant: 'destructive',
-      });
-    }
   }, [job.job_type, job.id, toast]);
 
   const handleManageJob = (e: React.MouseEvent) => {
