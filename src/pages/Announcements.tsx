@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
 import { Button } from '@/components/ui/button';
@@ -7,13 +7,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { ANNOUNCEMENT_LEVEL_STYLES, type AnnouncementLevel } from '@/constants/announcementLevels';
 
-type Level = 'info' | 'warn' | 'critical';
+const levelOptions: AnnouncementLevel[] = ['info', 'warn', 'critical'];
+
+const LevelBadge: React.FC<{ level: AnnouncementLevel }> = ({ level }) => (
+  <span className={`inline-flex items-center gap-2 uppercase text-xs font-medium px-2 py-1 rounded border ${ANNOUNCEMENT_LEVEL_STYLES[level].badge}`}>
+    <span className={`h-2.5 w-2.5 rounded-full ${ANNOUNCEMENT_LEVEL_STYLES[level].dot}`} />
+    {level}
+  </span>
+);
+
+const LevelPreviewHint: React.FC<{ level: AnnouncementLevel }> = ({ level }) => (
+  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+    <LevelBadge level={level} />
+    <span className={ANNOUNCEMENT_LEVEL_STYLES[level].text}>Ticker preview</span>
+  </div>
+);
 
 interface AnnouncementRow {
   id: string;
   message: string;
-  level: Level;
+  level: AnnouncementLevel;
   active: boolean;
   created_at: string;
   created_by: string | null;
@@ -28,13 +43,13 @@ export default function Announcements() {
 
   // New announcement form
   const [newMsg, setNewMsg] = useState('');
-  const [newLevel, setNewLevel] = useState<Level>('info');
+  const [newLevel, setNewLevel] = useState<AnnouncementLevel>('info');
   const [newActive, setNewActive] = useState(true);
 
   // Inline editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editMsg, setEditMsg] = useState('');
-  const [editLevel, setEditLevel] = useState<Level>('info');
+  const [editLevel, setEditLevel] = useState<AnnouncementLevel>('info');
 
   const fetchAll = async () => {
     setLoading(true);
@@ -138,16 +153,19 @@ export default function Announcements() {
             />
           </div>
           <div>
-            <Select value={newLevel} onValueChange={v => setNewLevel(v as Level)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="info">info</SelectItem>
-                <SelectItem value="warn">warn</SelectItem>
-                <SelectItem value="critical">critical</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Select value={newLevel} onValueChange={v => setNewLevel(v as AnnouncementLevel)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Level" />
+                </SelectTrigger>
+                <SelectContent>
+                  {levelOptions.map(level => (
+                    <SelectItem key={level} value={level}>{level}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <LevelPreviewHint level={newLevel} />
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Switch checked={newActive} onCheckedChange={setNewActive} />
@@ -182,16 +200,19 @@ export default function Announcements() {
                 </TableCell>
                 <TableCell>
                   {editingId === r.id ? (
-                    <Select value={editLevel} onValueChange={v => setEditLevel(v as Level)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="info">info</SelectItem>
-                        <SelectItem value="warn">warn</SelectItem>
-                        <SelectItem value="critical">critical</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Select value={editLevel} onValueChange={v => setEditLevel(v as AnnouncementLevel)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {levelOptions.map(level => (
+                            <SelectItem key={level} value={level}>{level}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <LevelPreviewHint level={editLevel} />
+                    </div>
                   ) : (
-                    <span className="uppercase text-xs px-2 py-1 rounded bg-secondary">{r.level}</span>
+                    <LevelBadge level={r.level} />
                   )}
                 </TableCell>
                 <TableCell>
