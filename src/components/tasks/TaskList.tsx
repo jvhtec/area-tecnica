@@ -1,12 +1,21 @@
 import React from 'react';
 import { useJobTasks } from '@/hooks/useJobTasks';
 import { useTaskMutations } from '@/hooks/useTaskMutations';
-import { Department } from '@/types/department';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Upload, Download, Trash2, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useQuery } from '@tanstack/react-query';
@@ -36,6 +45,8 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
   const [newAssignee, setNewAssignee] = React.useState<string | undefined>(undefined);
   const { toast } = useToast();
   const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
+  const [taskToDelete, setTaskToDelete] = React.useState<{ id: string; label: string } | null>(null);
+  const [isDeletingTask, setIsDeletingTask] = React.useState(false);
 
   React.useEffect(() => {
     (async () => {
@@ -75,6 +86,20 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
       await refetch();
     } catch (e: any) {
       toast({ title: 'Delete failed', description: e?.message || String(e), variant: 'destructive' });
+    }
+  };
+
+  const confirmDeleteTask = async () => {
+    if (!taskToDelete) return;
+    setIsDeletingTask(true);
+    try {
+      await deleteTask(taskToDelete.id);
+      toast({ title: 'Task deleted', description: `${taskToDelete.label} has been removed.` });
+      setTaskToDelete(null);
+    } catch (e: any) {
+      toast({ title: 'Task delete failed', description: e?.message || String(e), variant: 'destructive' });
+    } finally {
+      setIsDeletingTask(false);
     }
   };
 
@@ -193,7 +218,12 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
                     <Button size="sm" variant="outline"><Upload className="h-3 w-3 mr-1"/>Upload</Button>
                   </div>
                   {canEdit && (
-                    <Button size="sm" variant="ghost" onClick={() => deleteTask(task.id).then(() => refetch())}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setTaskToDelete({ id: task.id, label: task.task_type })}
+                      disabled={isDeletingTask}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
@@ -208,6 +238,37 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog
+        open={!!taskToDelete}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingTask) {
+            setTaskToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The task
+              {taskToDelete?.label ? ` "${taskToDelete.label}"` : ''} and any attached documents will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingTask} onClick={() => setTaskToDelete(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteTask}
+              disabled={isDeletingTask}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingTask ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

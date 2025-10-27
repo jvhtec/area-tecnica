@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { completeTask, revertTask, Department } from '@/services/taskCompletion';
 
@@ -18,7 +19,7 @@ const DOC_FK: Record<Dept, string> = {
 export function useTaskMutations(jobId?: string, department?: Dept, tourId?: string) {
   const table = department ? TASK_TABLE[department] : TASK_TABLE.sound;
   const docFk = department ? DOC_FK[department] : DOC_FK.sound;
-  const contextId = tourId || jobId;
+  const queryClient = useQueryClient();
 
   const createTask = async (task_type: string, assigned_to?: string | null, due_at?: string | null) => {
     const payload: any = { task_type, status: 'not_started', progress: 0 };
@@ -35,23 +36,94 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
   };
 
   const updateTask = async (id: string, fields: Record<string, any>) => {
-    const { error } = await supabase.from(table).update(fields).eq('id', id);
+    let query = supabase.from(table).update(fields).eq('id', id);
+    if (tourId) {
+      query = query.eq('tour_id', tourId);
+    } else if (jobId) {
+      query = query.eq('job_id', jobId);
+    }
+    const { error } = await query;
     if (error) throw error;
   };
 
   const deleteTask = async (id: string) => {
-    const { error } = await supabase.from(table).delete().eq('id', id);
-    if (error) throw error;
+    if (!department) {
+      throw new Error('Department is required for deleteTask');
+    }
+
+    let taskQuery = supabase
+      .from(table)
+      .select('id, assigned_to, job_id, tour_id')
+      .eq('id', id);
+
+    if (tourId) {
+      taskQuery = taskQuery.eq('tour_id', tourId);
+    } else if (jobId) {
+      taskQuery = taskQuery.eq('job_id', jobId);
+    }
+
+    const { data: task, error: taskError } = await taskQuery.maybeSingle();
+    if (taskError) throw taskError;
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    const { data: docs, error: docsError } = await supabase
+      .from('task_documents')
+      .select('id, file_path')
+      .eq(docFk, id);
+    if (docsError) throw docsError;
+
+    const filePaths = (docs ?? []).map((doc) => doc.file_path).filter((path): path is string => !!path);
+
+    if (filePaths.length > 0) {
+      const { error: storageError } = await supabase.storage
+        .from('task_documents')
+        .remove(filePaths);
+      if (storageError) throw storageError;
+    }
+
+    const { error: docDeleteError } = await supabase
+      .from('task_documents')
+      .delete()
+      .eq(docFk, id);
+    if (docDeleteError) throw docDeleteError;
+
+    let deleteQuery = supabase.from(table).delete().eq('id', id);
+    if (tourId) {
+      deleteQuery = deleteQuery.eq('tour_id', tourId);
+    } else if (jobId) {
+      deleteQuery = deleteQuery.eq('job_id', jobId);
+    }
+    const { error: deleteError } = await deleteQuery;
+    if (deleteError) throw deleteError;
+
+    queryClient.invalidateQueries({ queryKey: ['job-tasks', jobId, tourId, department] });
+
+    const assigneeId = typeof task.assigned_to === 'object'
+      ? (task.assigned_to as { id?: string } | null)?.id
+      : task.assigned_to;
+    if (assigneeId) {
+      queryClient.invalidateQueries({ queryKey: ['pending-tasks', assigneeId] });
+    }
   };
 
   const assignUser = async (id: string, userId: string | null) => {
     const { data: authData } = await supabase.auth.getUser();
     const assignerId = authData?.user?.id ?? null;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from(table)
       .update({ assigned_to: userId })
-      .eq('id', id)
+      .eq('id', id);
+
+    if (tourId) {
+      query = query.eq('tour_id', tourId);
+    } else if (jobId) {
+      query = query.eq('job_id', jobId);
+    }
+
+    const { data, error } = await query
       .select('id, task_type')
       .maybeSingle();
     if (error) throw error;
@@ -81,7 +153,6 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
       throw new Error('Department is required for setStatus');
     }
 
-    // Use the centralized task completion service
     if (status === 'completed') {
       const result = await completeTask({
         taskId: id,
@@ -95,7 +166,6 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
         throw new Error(result.error || 'Failed to complete task');
       }
     } else {
-      // Revert to active state (clear completion metadata)
       const result = await revertTask({
         taskId: id,
         department: department as Department,
@@ -109,7 +179,13 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
   };
 
   const setDueDate = async (id: string, due_at: string | null) => {
-    const { error } = await supabase.from(table).update({ due_at }).eq('id', id);
+    let query = supabase.from(table).update({ due_at }).eq('id', id);
+    if (tourId) {
+      query = query.eq('tour_id', tourId);
+    } else if (jobId) {
+      query = query.eq('job_id', jobId);
+    }
+    const { error } = await query;
     if (error) throw error;
   };
 
@@ -120,7 +196,6 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     if (upErr) throw upErr;
     const { error: insErr } = await supabase.from('task_documents').insert({ [docFk]: taskId, file_name: file.name, file_path: key });
     if (insErr) throw insErr;
-    // Do not auto-complete; leave explicit status control in UI
   };
 
   const deleteAttachment = async (docId: string, filePath: string) => {
@@ -132,4 +207,3 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
 
   return { createTask, updateTask, deleteTask, assignUser, setStatus, setDueDate, uploadAttachment, deleteAttachment };
 }
-
