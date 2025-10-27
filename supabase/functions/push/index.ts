@@ -210,6 +210,16 @@ async function getSoundDepartmentUserIds(client: ReturnType<typeof createClient>
   return data.map((r: any) => r.id).filter(Boolean);
 }
 
+async function getLogisticsManagementRecipients(client: ReturnType<typeof createClient>): Promise<string[]> {
+  const { data, error } = await client
+    .from('profiles')
+    .select('id')
+    .eq('role', 'management')
+    .in('department', ['logistics', 'production']);
+  if (error || !data) return [];
+  return data.map((r: any) => r.id).filter(Boolean);
+}
+
 async function getJobParticipantUserIds(client: ReturnType<typeof createClient>, jobId: string): Promise<string[]> {
   if (!jobId) return [];
   const { data, error } = await client
@@ -347,6 +357,7 @@ async function handleBroadcast(
   const actor = body.actor_name || (await getProfileDisplayName(client, userId)) || 'Alguien';
   const recipName = body.recipient_name || (await getProfileDisplayName(client, body.recipient_id)) || '';
   const ch = channelEs(body.channel);
+  const metaExtras: { view?: string; department?: string; targetUrl?: string } = {};
 
   if (type === 'job.created') {
     title = 'Trabajo creado';
@@ -453,6 +464,24 @@ async function handleBroadcast(
       : `${actor} marcó como completada ${taskLabel} en "${jobLabel}".`;
     url = body.url || (jobId ? `/job-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
     addUsers([body.recipient_id]);
+  } else if (type === 'logistics.transport.requested') {
+    const department = (body as any)?.department as string | undefined;
+    const departmentLabel = department ? department.charAt(0).toUpperCase() + department.slice(1) : undefined;
+    title = 'Transporte solicitado';
+    const context = jobTitle ? ` en "${jobTitle}"` : '';
+    if (departmentLabel) {
+      text = `${actor} solicitó transporte para ${departmentLabel}${context}.`;
+    } else {
+      text = `${actor} solicitó transporte${context}.`;
+    }
+    const logisticsUrl = jobId ? `/jobs/${jobId}` : '/logistics';
+    url = body.url || logisticsUrl;
+    recipients.clear();
+    const logisticsRecipients = await getLogisticsManagementRecipients(client);
+    addUsers(logisticsRecipients);
+    metaExtras.view = 'logistics';
+    metaExtras.department = department;
+    metaExtras.targetUrl = logisticsUrl;
   } else if (type === 'flex.folders.created') {
     title = 'Carpetas Flex creadas';
     text = jobTitle
@@ -571,6 +600,9 @@ async function handleBroadcast(
       ...('message_id' in body ? { messageId: body.message_id } : {}),
       ...('task_id' in body ? { taskId: body.task_id } : {}),
       ...('task_type' in body ? { taskType: body.task_type } : {}),
+      ...(metaExtras.view ? { view: metaExtras.view } : {}),
+      ...(metaExtras.department ? { department: metaExtras.department } : {}),
+      ...(metaExtras.targetUrl ? { targetUrl: metaExtras.targetUrl } : {}),
     },
   };
 

@@ -113,6 +113,22 @@ export function TransportRequestDialog({
           const { error: itemsErr } = await supabase.from('transport_request_items').insert(toInsert);
           if (itemsErr) throw itemsErr;
         }
+        try {
+          const { error: pushError } = await supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: 'logistics.transport.requested',
+              job_id: jobId,
+              department,
+              request_id,
+            },
+          });
+          if (pushError) {
+            console.error('Failed to invoke push notification for transport request', pushError);
+          }
+        } catch (pushError) {
+          console.error('Unexpected error invoking push notification for transport request', pushError);
+        }
       }
 
       toast({ title: 'Transport request saved' });
