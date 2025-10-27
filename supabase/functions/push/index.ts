@@ -419,6 +419,11 @@ async function handleBroadcast(
     const fname = body.file_name || 'documento';
     text = `Nuevo documento visible: "${fname}" en "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(participants));
+  } else if (type === 'document.tech_visible.disabled') {
+    title = 'Documento oculto para técnicos';
+    const fname = body.file_name || 'documento';
+    text = `El documento "${fname}" dejó de estar visible en "${jobTitle || 'Trabajo'}".`;
+    addUsers(Array.from(participants));
   } else if (type === 'staffing.availability.sent') {
     title = 'Solicitud de disponibilidad enviada';
     text = `${actor} envió solicitud a ${recipName || 'técnico'} (${ch}).`;
