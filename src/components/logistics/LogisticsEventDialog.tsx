@@ -186,6 +186,39 @@ export const LogisticsEventDialog = ({
     }
 
     try {
+      const notifyEventCreated = async (
+        event: typeof selectedEvent,
+        options?: {
+          autoCreatedUnload?: boolean;
+          pairedEvent?: { event_type: "load" | "unload"; event_date: string; event_time: string };
+        }
+      ) => {
+        if (!event) return;
+        try {
+          await supabase.functions.invoke("push", {
+            body: {
+              action: "broadcast",
+              type: "logistics.event.created",
+              job_id: event.job_id || undefined,
+              event_id: event.id,
+              event_type: event.event_type,
+              event_date: event.event_date,
+              event_time: event.event_time,
+              title: event.title,
+              transport_type: event.transport_type,
+              loading_bay: event.loading_bay,
+              departments: selectedDepartments,
+              auto_created_unload: options?.autoCreatedUnload || undefined,
+              paired_event_type: options?.pairedEvent?.event_type,
+              paired_event_date: options?.pairedEvent?.event_date,
+              paired_event_time: options?.pairedEvent?.event_time,
+            },
+          });
+        } catch (pushError) {
+          console.error("Failed to broadcast logistics event creation", pushError);
+        }
+      };
+
       const eventData = {
         event_type: eventType,
         transport_type: transportType,
@@ -271,6 +304,24 @@ export const LogisticsEventDialog = ({
           try {
             onCreated?.({ id: unloadEvent.id, event_type: unloadEvent.event_type, event_date: unloadEvent.event_date, event_time: unloadEvent.event_time });
           } catch {}
+
+          await notifyEventCreated(newEvent, {
+            pairedEvent: {
+              event_type: unloadEvent.event_type,
+              event_date: unloadEvent.event_date,
+              event_time: unloadEvent.event_time,
+            },
+          });
+          await notifyEventCreated(unloadEvent, {
+            autoCreatedUnload: true,
+            pairedEvent: {
+              event_type: newEvent.event_type,
+              event_date: newEvent.event_date,
+              event_time: newEvent.event_time,
+            },
+          });
+        } else {
+          await notifyEventCreated(newEvent);
         }
 
         toast({

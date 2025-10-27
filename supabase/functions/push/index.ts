@@ -34,6 +34,18 @@ type BroadcastBody = {
   // Optional meta for message composition
   doc_id?: string;
   file_name?: string;
+  event_id?: string;
+  event_type?: string;
+  event_date?: string;
+  event_time?: string;
+  transport_type?: string;
+  loading_bay?: string | null;
+  title?: string | null;
+  departments?: string[];
+  auto_created_unload?: boolean;
+  paired_event_type?: string;
+  paired_event_date?: string;
+  paired_event_time?: string;
   // SoundVision events should include either venue_name or enough identifiers to resolve it server-side
   file_id?: string;
   venue_id?: string;
@@ -206,6 +218,15 @@ async function getSoundDepartmentUserIds(client: ReturnType<typeof createClient>
     .from('profiles')
     .select('id')
     .eq('department', 'sound');
+  if (error || !data) return [];
+  return data.map((r: any) => r.id).filter(Boolean);
+}
+
+async function getManagementOnlyUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
+  const { data, error } = await client
+    .from('profiles')
+    .select('id')
+    .eq('role', 'management');
   if (error || !data) return [];
   return data.map((r: any) => r.id).filter(Boolean);
 }
@@ -482,6 +503,75 @@ async function handleBroadcast(
     metaExtras.view = 'logistics';
     metaExtras.department = department;
     metaExtras.targetUrl = logisticsUrl;
+  } else if (type === 'logistics.event.created') {
+    const eventType = (body as any)?.event_type as string | undefined;
+    const eventDate = (body as any)?.event_date as string | undefined;
+    const eventTime = (body as any)?.event_time as string | undefined;
+    const transportType = (body as any)?.transport_type as string | undefined;
+    const eventTitle = jobTitle || (body as any)?.title || 'Evento logístico';
+    const autoCreated = Boolean((body as any)?.auto_created_unload);
+    const pairedType = (body as any)?.paired_event_type as string | undefined;
+    const pairedDate = (body as any)?.paired_event_date as string | undefined;
+    const pairedTime = (body as any)?.paired_event_time as string | undefined;
+    const departmentsList = Array.isArray((body as any)?.departments)
+      ? ((body as any)?.departments as string[])
+      : [];
+
+    recipients.clear();
+    const managementOnly = await getManagementOnlyUserIds(client);
+    addUsers(managementOnly);
+
+    const logisticsUrl = body.url || (jobId ? `/jobs/${jobId}` : '/logistics/calendar');
+    url = logisticsUrl;
+    metaExtras.view = 'logistics-calendar';
+    metaExtras.targetUrl = logisticsUrl;
+    metaExtras.department = 'logistics';
+
+    const eventLabel = eventType === 'unload' ? 'Descarga' : 'Carga';
+    const pairedLabel = pairedType === 'unload' ? 'descarga' : pairedType === 'load' ? 'carga' : undefined;
+
+    let whenLabel = '';
+    if (eventDate || eventTime) {
+      const isoDate = eventDate && eventTime ? `${eventDate}T${eventTime}` : eventDate ? `${eventDate}T00:00:00` : undefined;
+      if (isoDate) {
+        try {
+          const formatted = new Intl.DateTimeFormat('es-ES', {
+            dateStyle: 'medium',
+            timeStyle: eventTime ? 'short' : undefined,
+          }).format(new Date(isoDate));
+          whenLabel = formatted;
+        } catch (_) {
+          whenLabel = `${eventDate ?? ''} ${eventTime ?? ''}`.trim();
+        }
+      } else {
+        whenLabel = `${eventDate ?? ''} ${eventTime ?? ''}`.trim();
+      }
+    }
+
+    const transportLabel = transportType ? transportType.charAt(0).toUpperCase() + transportType.slice(1) : undefined;
+    const deptText = departmentsList.length ? ` (${departmentsList.join(', ')})` : '';
+
+    title = `${eventLabel} programada`;
+    if (autoCreated) {
+      text = `Se creó automáticamente una ${eventLabel.toLowerCase()} para "${eventTitle}"${whenLabel ? ` (${whenLabel})` : ''}.`;
+    } else {
+      text = `${eventLabel} para "${eventTitle}" programada${whenLabel ? ` (${whenLabel})` : ''}.`;
+    }
+
+    if (transportLabel) {
+      text += ` Transporte: ${transportLabel}.`;
+    }
+
+    if (pairedLabel) {
+      const pairedWhen = pairedDate || pairedTime ? `${pairedDate ?? ''} ${pairedTime ?? ''}`.trim() : '';
+      text += autoCreated
+        ? ` Vinculada a la ${pairedLabel} existente${pairedWhen ? ` (${pairedWhen})` : ''}.`
+        : ` También se programó ${pairedLabel}${pairedWhen ? ` (${pairedWhen})` : ''}.`;
+    }
+
+    if (deptText) {
+      text += deptText;
+    }
   } else if (type === 'flex.folders.created') {
     title = 'Carpetas Flex creadas';
     text = jobTitle
