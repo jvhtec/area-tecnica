@@ -97,19 +97,17 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
         .eq('id', doc.id);
       if (error) throw error;
       // Realtime subscription in parent hook will refresh the list
-      if (next) {
-        try {
-          // Notify assigned technicians about new tech-visible document
-          void supabase.functions.invoke('push', {
-            body: {
-              action: 'broadcast',
-              type: 'document.tech_visible.enabled',
-              doc_id: doc.id,
-              file_name: doc.file_name,
-            }
-          });
-        } catch {}
-      }
+      try {
+        // Notify assigned technicians about document visibility updates
+        void supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: next ? 'document.tech_visible.enabled' : 'document.tech_visible.disabled',
+            doc_id: doc.id,
+            file_name: doc.file_name,
+          }
+        });
+      } catch {}
     } catch (err: any) {
       console.error('Error toggling document visibility:', err);
       alert(`Error updating visibility: ${err.message}`);
