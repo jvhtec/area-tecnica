@@ -7,6 +7,7 @@ import { ANNOUNCEMENT_LEVEL_STYLES, type AnnouncementLevel } from '@/constants/a
 type Dept = 'sound' | 'lights' | 'video';
 
 interface JobsOverviewFeed { jobs: Array<{ id:string; title:string; start_time:string; end_time:string; location:{ name:string|null }|null; departments: Dept[]; crewAssigned: Record<string, number>; crewNeeded: Record<string, number>; docs: Record<string, { have:number; need:number }>; status: 'green'|'yellow'|'red'; }> }
+type JobsOverviewJob = JobsOverviewFeed['jobs'][number];
 interface CrewAssignmentsFeed { jobs: Array<{ id:string; title:string; crew: Array<{ name:string; role:string; dept:Dept|null; timesheetStatus:'submitted'|'draft'|'missing'|'approved'; }> }>; }
 interface DocProgressFeed { jobs: Array<{ id:string; title:string; departments: Array<{ dept:Dept; have:number; need:number; missing:string[] }> }> }
 interface PendingActionsFeed { items: Array<{ severity:'red'|'yellow'; text:string }> }
@@ -21,6 +22,77 @@ const PanelContainer: React.FC<{ children: React.ReactNode }>=({ children })=> (
 const StatusDot: React.FC<{ color: 'green'|'yellow'|'red' }>=({ color }) => (
   <span className={`inline-block w-3 h-3 rounded-full mr-2 ${color==='green'?'bg-green-500':color==='yellow'?'bg-yellow-400':'bg-red-500'}`} />
 );
+
+const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] as const;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+type CalendarCell = {
+  date: Date;
+  isoKey: string;
+  inMonth: boolean;
+  isToday: boolean;
+  jobs: JobsOverviewJob[];
+  hasHighlight: boolean;
+  highlightJobIds: Set<string>;
+};
+
+function formatDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildCalendarModel(data: JobsOverviewFeed | null, highlightIds?: Set<string>): { dayNames: readonly string[]; monthLabel: string; cells: CalendarCell[] } {
+  const highlightSet = highlightIds ? new Set(highlightIds) : new Set<string>();
+  const jobs = (data?.jobs ?? []) as JobsOverviewJob[];
+  const jobsByKey = new Map<string, { jobs: JobsOverviewJob[]; highlightIds: Set<string> }>();
+  jobs.forEach(job => {
+    const key = formatDateKey(new Date(job.start_time));
+    const existing = jobsByKey.get(key);
+    if (existing) {
+      existing.jobs.push(job);
+      if (highlightSet.has(job.id)) existing.highlightIds.add(job.id);
+    } else {
+      jobsByKey.set(key, {
+        jobs: [job],
+        highlightIds: highlightSet.has(job.id) ? new Set<string>([job.id]) : new Set<string>(),
+      });
+    }
+  });
+  jobsByKey.forEach(bucket => {
+    bucket.jobs.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  });
+
+  const today = new Date();
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const startOffset = (startOfMonth.getDay() + 6) % 7; // Monday-based calendar
+  const gridStart = new Date(startOfMonth.getTime() - startOffset * MS_PER_DAY);
+  const dayCount = 42; // 6 weeks grid
+  const todayKey = formatDateKey(today);
+  const endDate = new Date(gridStart.getTime() + (dayCount - 1) * MS_PER_DAY);
+  const monthFormatter = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+  const startLabel = monthFormatter.format(startOfMonth);
+  const endLabel = monthFormatter.format(new Date(endDate.getFullYear(), endDate.getMonth(), 1));
+  const monthLabel = startLabel === endLabel ? startLabel : `${startLabel} → ${endLabel}`;
+
+  const cells: CalendarCell[] = Array.from({ length: dayCount }, (_, idx) => {
+    const date = new Date(gridStart.getTime() + idx * MS_PER_DAY);
+    const isoKey = formatDateKey(date);
+    const bucket = jobsByKey.get(isoKey);
+    return {
+      date,
+      isoKey,
+      inMonth: date.getMonth() === startOfMonth.getMonth(),
+      isToday: isoKey === todayKey,
+      jobs: bucket ? bucket.jobs : [],
+      hasHighlight: !!bucket?.highlightIds.size,
+      highlightJobIds: bucket ? new Set<string>(bucket.highlightIds) : new Set<string>(),
+    };
+  });
+
+  return { dayNames: DAY_LABELS, monthLabel, cells };
+}
 
 const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds })=> (
   <PanelContainer>
@@ -136,6 +208,92 @@ const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data
   </PanelContainer>
 );
 
+const CalendarPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds }) => {
+  const { dayNames, monthLabel, cells } = buildCalendarModel(data, highlightIds);
+  return (
+    <PanelContainer>
+      <div className="flex items-end justify-between gap-6">
+        <div>
+          <h1 className="text-5xl font-semibold leading-tight">Job Calendar</h1>
+          <div className="text-2xl uppercase tracking-[0.35em] text-zinc-400 mt-2">{monthLabel}</div>
+        </div>
+        <div className="text-right text-xl text-zinc-500 max-w-[28rem] leading-snug">
+          Six-week horizon of confirmed & tentative jobs with highlight callouts.
+        </div>
+      </div>
+      <div className="grid grid-cols-7 gap-4 text-zinc-500 uppercase tracking-[0.35em] text-lg font-semibold pt-2">
+        {dayNames.map(name => (
+          <div key={name} className="text-center">{name}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-4 auto-rows-fr flex-1">
+        {cells.map((cell, idx) => {
+          const jobs = cell.jobs;
+          const highlightSet = cell.highlightJobIds;
+          const classes = [
+            'rounded-2xl border p-6 flex flex-col gap-4 min-h-[18rem] shadow-inner transition-all duration-300 backdrop-blur-sm',
+            cell.inMonth ? 'bg-zinc-950/90 border-zinc-800 text-white' : 'bg-zinc-900/40 border-zinc-800/40 text-zinc-500',
+            cell.isToday ? 'border-blue-400/80 ring-2 ring-blue-400/30 shadow-[0_0_45px_rgba(96,165,250,0.35)]' : '',
+            cell.hasHighlight ? 'border-amber-400/80 ring-4 ring-amber-400/30 shadow-[0_0_55px_rgba(251,191,36,0.35)]' : '',
+          ].filter(Boolean).join(' ');
+          return (
+            <div key={cell.isoKey + idx} className={classes}>
+              <div className="flex items-start justify-between">
+                <div className={`text-5xl font-bold leading-none ${cell.inMonth ? '' : 'text-zinc-600'}`}>{cell.date.getDate()}</div>
+                {jobs.length > 0 && (
+                  <div className="flex items-center gap-3 text-zinc-400">
+                    <span className="px-4 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-2xl font-semibold tabular-nums">
+                      {jobs.length}
+                    </span>
+                    <span className="tracking-[0.4em] uppercase text-sm">jobs</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 space-y-3">
+                {jobs.slice(0, 3).map(job => {
+                  const highlight = highlightSet.has(job.id);
+                  const time = new Date(job.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const itemClasses = [
+                    'flex items-start gap-3 rounded-xl border px-4 py-3 backdrop-blur-sm',
+                    highlight
+                      ? 'border-amber-300 bg-amber-500/20 text-amber-100 shadow-[0_0_35px_rgba(251,191,36,0.4)]'
+                      : 'border-zinc-700 bg-zinc-900/70 text-zinc-100',
+                  ].join(' ');
+                  return (
+                    <div key={job.id} className={itemClasses}>
+                      <div className="pt-1"><StatusDot color={job.status} /></div>
+                      <div className="flex-1 overflow-hidden">
+                        <div className="text-2xl font-semibold truncate leading-tight">{job.title}</div>
+                        <div className="text-lg text-zinc-400 flex flex-wrap gap-x-3 gap-y-1 leading-tight">
+                          <span className="tabular-nums">{time}</span>
+                          {job.location?.name && (
+                            <span className="truncate max-w-[16rem]">{job.location.name}</span>
+                          )}
+                          {job.departments.length > 0 && (
+                            <span className="uppercase tracking-[0.3em] text-sm text-zinc-500">
+                              {job.departments.join(' / ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {jobs.length > 3 && (
+                  <div className="text-xl text-zinc-400">+{jobs.length - 3} more scheduled</div>
+                )}
+                {jobs.length === 0 && (
+                  <div className="text-3xl text-zinc-700 tracking-[0.4em] uppercase">—</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </PanelContainer>
+  );
+};
+
 type TickerMessage = { message: string; level: AnnouncementLevel };
 
 const Ticker: React.FC<{ messages: TickerMessage[]; bottomOffset?: number }>=({ messages, bottomOffset = 0 })=> {
@@ -250,9 +408,9 @@ const FooterLogo: React.FC<{ onToggle?: () => void; onMeasure?: (h: number) => v
   );
 };
 
-type PanelKey = 'overview'|'crew'|'docs'|'logistics'|'pending';
+type PanelKey = 'overview'|'crew'|'docs'|'logistics'|'pending'|'calendar';
 
-const PANEL_KEYS: PanelKey[] = ['overview','crew','docs','logistics','pending'];
+const PANEL_KEYS: PanelKey[] = ['overview','crew','docs','logistics','pending','calendar'];
 const DEFAULT_PANEL_ORDER: PanelKey[] = [...PANEL_KEYS];
 const DEFAULT_PANEL_DURATIONS: Record<PanelKey, number> = {
   overview: 12,
@@ -260,6 +418,7 @@ const DEFAULT_PANEL_DURATIONS: Record<PanelKey, number> = {
   docs: 12,
   logistics: 12,
   pending: 12,
+  calendar: 12,
 };
 const DEFAULT_ROTATION_FALLBACK_SECONDS = 12;
 const DEFAULT_HIGHLIGHT_TTL_SECONDS = 300;
@@ -276,7 +435,14 @@ function normalisePanelOrder(order?: string[] | null): PanelKey[] {
       seen.add(key);
     }
   }
-  return filtered.length ? filtered : [...DEFAULT_PANEL_ORDER];
+  if (!filtered.length) return [...DEFAULT_PANEL_ORDER];
+  PANEL_KEYS.forEach(key => {
+    if (!seen.has(key)) {
+      filtered.push(key);
+      seen.add(key);
+    }
+  });
+  return filtered;
 }
 
 function coerceSeconds(value: unknown, fallback: number, min = 1, max = 600): number {
@@ -376,6 +542,7 @@ export default function Wallboard() {
 
   // Data polling (client-side via RLS-safe views)
   const [overview, setOverview] = useState<JobsOverviewFeed|null>(null);
+  const [calendarData, setCalendarData] = useState<JobsOverviewFeed|null>(null);
   const [crew, setCrew] = useState<CrewAssignmentsFeed|null>(null);
   const [docs, setDocs] = useState<DocProgressFeed|null>(null);
   const [pending, setPending] = useState<PendingActionsFeed|null>(null);
@@ -388,11 +555,15 @@ export default function Wallboard() {
     let cancelled = false;
     const fetchAll = async () => {
       const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      // Look-ahead window: next 7 days (including today)
-      const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate()+6, 23,59,59,999);
-      const startISO = todayStart.toISOString();
-      const endISO = weekEnd.toISOString();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        // Look-ahead windows: 7-day focus + extended 6-week calendar horizon
+        const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate()+6, 23,59,59,999);
+        const calendarEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate()+41, 23,59,59,999);
+        const startISO = todayStart.toISOString();
+        const weekEndISO = weekEnd.toISOString();
+        const calendarEndISO = calendarEnd.toISOString();
+        const todayMs = todayStart.getTime();
+        const weekEndMs = weekEnd.getTime();
 
       // 1) Fetch jobs (base fields only)
       const { data: jobs, error: jobsError } = await supabase
@@ -400,10 +571,10 @@ export default function Wallboard() {
         .select('id,title,start_time,end_time,status,location_id,job_type,tour_id,timezone')
         .in('job_type', ['single','festival','tourdate','dryhire'])
         .in('status', ['Confirmado','Tentativa'])
-        .lte('start_time', endISO)
-        .gte('end_time', startISO)
-        .order('start_time', { ascending: true });
-      if (jobsError) console.error('Wallboard jobs query error:', jobsError?.message || jobsError, { startISO, endISO });
+          .lte('start_time', calendarEndISO)
+          .gte('end_time', startISO)
+          .order('start_time', { ascending: true });
+        if (jobsError) console.error('Wallboard jobs query error:', jobsError?.message || jobsError, { startISO, calendarEndISO });
       let jobArr = jobs || [];
 
       // Exclude jobs whose parent tour is cancelled (some entries may still be Confirmado)
@@ -495,26 +666,26 @@ export default function Wallboard() {
       const haveByJobDept = new Map<string, number>();
       (counts||[]).forEach((c:any)=> haveByJobDept.set(`${c.job_id}:${c.department}`, c.have));
 
-      // Build overview
-      const overviewPayload: JobsOverviewFeed = {
-        jobs: jobArr
-          // Hide dryhire from overview to avoid one-off items only visible here
-          .filter((j:any)=> !dryhireIds.has(j.id))
-          .map((j:any)=>{
-          // Hide Video in crew context
+        const jobOverlapsWeek = (j:any) => {
+          const startTime = new Date(j.start_time).getTime();
+          const endTime = new Date(j.end_time).getTime();
+          return endTime >= todayMs && startTime <= weekEndMs;
+        };
+        const jobStartsTodayOrLater = (j:any) => new Date(j.start_time).getTime() >= todayMs;
+
+        const mapJob = (j:any): JobsOverviewJob => {
           const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
           const depts: Dept[] = deptsAll.filter(d => d !== 'video');
-          const crewAssigned: any = { sound:0, lights:0, video:0 };
+          const crewAssigned: Record<string, number> = { sound: 0, lights: 0, video: 0 };
           (assignsByJob.get(j.id) ?? []).forEach((a:any)=>{
             if (a.sound_role) crewAssigned.sound++;
             if (a.lights_role) crewAssigned.lights++;
             if (a.video_role) crewAssigned.video++;
           });
-          const crewNeeded: any = { sound: 0, lights: 0, video: 0 };
+          const crewNeeded: Record<string, number> = { sound: 0, lights: 0, video: 0 };
           depts.forEach(d => {
             crewNeeded[d] = needByJobDept.get(`${j.id}:${d}`) || 0;
           });
-          // Status by coverage when requirements exist
           let status: 'green'|'yellow'|'red';
           const hasReq = depts.some(d => (crewNeeded[d] || 0) > 0);
           if (hasReq) {
@@ -534,7 +705,7 @@ export default function Wallboard() {
             const allHave = depts.length>0 && present.every(n=>n>0);
             status = allHave ? 'green' : hasAny ? 'yellow' : 'red';
           }
-          const docs: any = {};
+          const docs: Record<string, { have:number; need:number }> = {};
           depts.forEach(d=>{
             const have = haveByJobDept.get(`${j.id}:${d}`) ?? 0;
             const need = needByDept.get(d) ?? 0;
@@ -552,32 +723,49 @@ export default function Wallboard() {
             docs,
             status,
           };
-        })
-      };
+        };
 
-      // Crew assignments
-      const assignedTechsByJob = new Map<string, string[]>();
-      const crewPayload: CrewAssignmentsFeed = {
-        jobs: jobArr.filter((j:any)=>!dryhireIds.has(j.id)).map((j:any)=>{
-          const crew = (assignsByJob.get(j.id) ?? [])
-            // Hide video crew
-            .filter((a:any)=> a.video_role == null)
-            .map((a:any)=>{
-            const dept: Dept | null = a.sound_role ? 'sound' : a.lights_role ? 'lights' : null;
-            const role = a.sound_role || a.lights_role || 'assigned';
-            // collect tech ids per job
-            const list = assignedTechsByJob.get(j.id) ?? [];
-            list.push(a.technician_id);
-            assignedTechsByJob.set(j.id, list);
-            return { name: '', role, dept, timesheetStatus: 'missing' as const, technician_id: a.technician_id } as any;
-          });
-          return { id: j.id, title: j.title, crew };
-        })
-      } as any;
+        const jobsForCalendar: JobsOverviewJob[] = jobArr
+          .filter((j:any)=> !dryhireIds.has(j.id))
+          .filter(jobStartsTodayOrLater)
+          .map(mapJob)
+          .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
-      // Fill names in one request
-      const techIds = Array.from(new Set(crewPayload.jobs.flatMap(j=>j.crew.map((c:any)=>c.technician_id))));
-      if (techIds.length) {
+        const jobsForWeek: JobsOverviewJob[] = jobArr
+          .filter((j:any)=> !dryhireIds.has(j.id))
+          .filter(jobOverlapsWeek)
+          .map(mapJob)
+          .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+        const overviewPayload: JobsOverviewFeed = {
+          jobs: jobsForWeek,
+        };
+
+        // Crew assignments
+        const assignedTechsByJob = new Map<string, string[]>();
+        const crewPayload: CrewAssignmentsFeed = {
+          jobs: jobArr
+            .filter((j:any)=> !dryhireIds.has(j.id))
+            .filter(jobOverlapsWeek)
+            .map((j:any)=>{
+              const crew = (assignsByJob.get(j.id) ?? [])
+                // Hide video crew
+                .filter((a:any)=> a.video_role == null)
+                .map((a:any)=>{
+                  const dept: Dept | null = a.sound_role ? 'sound' : a.lights_role ? 'lights' : null;
+                  const role = a.sound_role || a.lights_role || 'assigned';
+                  const list = assignedTechsByJob.get(j.id) ?? [];
+                  list.push(a.technician_id);
+                  assignedTechsByJob.set(j.id, list);
+                  return { name: '', role, dept, timesheetStatus: 'missing' as const, technician_id: a.technician_id } as any;
+                });
+              return { id: j.id, title: j.title, crew };
+            })
+        } as any;
+
+        // Fill names in one request
+        const techIds = Array.from(new Set(crewPayload.jobs.flatMap(j=>j.crew.map((c:any)=>c.technician_id))));
+        if (techIds.length) {
         const { data: profs } = await supabase
           .from('wallboard_profiles')
           .select('id,first_name,last_name,department')
@@ -597,13 +785,14 @@ export default function Wallboard() {
       }
 
       // Doc progress
-      const docPayload: DocProgressFeed = {
-        jobs: jobArr
-          .filter((j:any)=> !dryhireIds.has(j.id))
-          .map((j:any)=>{
-            const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
-            return {
-              id: j.id,
+        const docPayload: DocProgressFeed = {
+          jobs: jobArr
+            .filter((j:any)=> !dryhireIds.has(j.id))
+            .filter(jobOverlapsWeek)
+            .map((j:any)=>{
+              const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
+              return {
+                id: j.id,
               title: j.title,
               departments: deptsAll.map((d:Dept)=>({
                 dept: d,
@@ -642,16 +831,17 @@ export default function Wallboard() {
         }
       });
 
-      if (!cancelled) {
-        setOverview(overviewPayload);
-        setCrew(crewPayload);
-        setDocs(docPayload);
-        setPending({ items });
-      }
+        if (!cancelled) {
+          setOverview(overviewPayload);
+          setCalendarData({ jobs: jobsForCalendar });
+          setCrew(crewPayload);
+          setDocs(docPayload);
+          setPending({ items });
+        }
 
       // 5) Logistics calendar (next 7 days)
       const startDate = startISO.slice(0,10);
-      const endDate = endISO.slice(0,10);
+      const endDate = weekEndISO.slice(0,10);
       const { data: le, error: leErr } = await supabase
         .from('logistics_events')
         .select('id,event_date,event_time,title,transport_type,license_plate,job_id')
@@ -702,9 +892,11 @@ export default function Wallboard() {
           const returnParts = j.end_time ? toTZParts(j.end_time, j.timezone) : null;
           const nowKey = `${nowParts.date}${nowParts.time}`;
           const pickupKey = `${pickupParts.date}${pickupParts.time}`;
+          const weekWindowParts = toTZParts(weekEnd.toISOString(), j.timezone);
+          const weekWindowKey = `${weekWindowParts.date}${weekWindowParts.time}`;
           const items: LogisticsItem[] = [];
 
-          if (pickupKey >= nowKey) {
+          if (pickupKey >= nowKey && pickupKey <= weekWindowKey) {
             items.push({
               id: `dryhire-${j.id}`,
               date: pickupParts.date,
@@ -718,7 +910,7 @@ export default function Wallboard() {
 
           if (returnParts) {
             const returnKey = `${returnParts.date}${returnParts.time}`;
-            if (returnKey >= nowKey) {
+            if (returnKey >= nowKey && returnKey <= weekWindowKey) {
               items.push({
                 id: `dryhire-return-${j.id}`,
                 date: returnParts.date,
@@ -835,6 +1027,7 @@ export default function Wallboard() {
         {current==='docs' && (isAlien ? <AlienDocsPanel data={docs} /> : <DocProgressPanel data={docs} />)}
         {current==='logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} />)}
         {current==='pending' && (isAlien ? <AlienPendingPanel data={pending} /> : <PendingActionsPanel data={pending} />)}
+        {current==='calendar' && (isAlien ? <AlienCalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} /> : <CalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} />)}
       </div>
       <Ticker messages={tickerMsgs} bottomOffset={footerH} />
       <FooterLogo onToggle={() => setIsAlien(v => !v)} onMeasure={setFooterH} />
@@ -852,6 +1045,72 @@ const AlienShell: React.FC<{ title: string; kind?: 'standard'|'critical'|'env'|'
         {children}
       </div>
     </div>
+  );
+};
+
+const AlienCalendarPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds })=> {
+  const { dayNames, monthLabel, cells } = buildCalendarModel(data, highlightIds);
+  return (
+    <AlienShell title={`CALENDAR WINDOW – ${monthLabel.toUpperCase()}`} kind="tracker">
+      <div className="space-y-2">
+        <div className="grid grid-cols-7 gap-2 text-[10px] uppercase tracking-[0.35em] text-amber-300">
+          {dayNames.map(name => (
+            <div key={name} className="text-center">{name}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-2 auto-rows-fr">
+          {cells.map((cell, idx) => {
+            const jobs = cell.jobs;
+            const highlightSet = cell.highlightJobIds;
+            const classes = [
+              'border border-[var(--alien-border-dim)] bg-black/70 p-3 flex flex-col gap-2 min-h-[12rem] transition-all duration-300',
+              cell.inMonth ? 'text-amber-200' : 'text-amber-400/50',
+              cell.isToday ? 'border-blue-400 text-blue-200 shadow-[0_0_35px_rgba(96,165,250,0.35)]' : '',
+              cell.hasHighlight ? 'bg-amber-400/25 border-amber-300 text-black shadow-[0_0_40px_rgba(251,191,36,0.45)]' : '',
+            ].filter(Boolean).join(' ');
+            return (
+              <div key={cell.isoKey + idx} className={classes}>
+                <div className="flex items-center justify-between">
+                  <div className="text-xl font-bold tabular-nums">{cell.date.getDate().toString().padStart(2, '0')}</div>
+                  {jobs.length > 0 && (
+                    <div className="text-[10px] uppercase tracking-[0.4em] text-amber-300">
+                      {jobs.length} evt
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 space-y-1">
+                  {jobs.slice(0, 4).map(job => {
+                    const highlight = highlightSet.has(job.id);
+                    const time = new Date(job.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const jobClasses = highlight
+                      ? 'px-2 py-1 bg-amber-300 text-black font-bold uppercase tracking-[0.2em]'
+                      : 'px-2 py-1 border border-[var(--alien-border-dim)] text-amber-200 uppercase tracking-[0.2em]';
+                    return (
+                      <div key={job.id} className={jobClasses}>
+                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="tabular-nums">{time}</span>
+                          <span className="text-[9px] text-amber-400/80">{job.departments.join('/')}</span>
+                        </div>
+                        <div className="text-[11px] truncate">{job.title}</div>
+                        {job.location?.name && (
+                          <div className="text-[9px] text-amber-400/70 truncate">{job.location.name}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {jobs.length > 4 && (
+                    <div className="text-[10px] uppercase tracking-[0.4em] text-amber-300">+{jobs.length - 4} MORE</div>
+                  )}
+                  {jobs.length === 0 && (
+                    <div className="text-[11px] text-amber-500/40 uppercase tracking-[0.4em]">—</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </AlienShell>
   );
 };
 
