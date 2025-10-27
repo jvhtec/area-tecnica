@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
 import { Button } from '@/components/ui/button';
@@ -137,9 +138,14 @@ export default function Announcements() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Announcements (Ticker)</h1>
-        <p className="text-muted-foreground">Messages shown in the wallboard ticker. Newest first. Toggle Active to show/hide.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Announcements (Ticker)</h1>
+          <p className="text-muted-foreground">Messages shown in the wallboard ticker. Newest first. Toggle Active to show/hide.</p>
+        </div>
+        <Button asChild variant="outline" className="w-full sm:w-auto">
+          <Link to="/management/wallboard-presets">Configure wallboards</Link>
+        </Button>
       </div>
 
       <div className="border rounded-md p-4 space-y-3">
