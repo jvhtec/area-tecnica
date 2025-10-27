@@ -50,8 +50,10 @@ function normaliseOrder(order?: string[] | null): PanelKey[] {
       seen.add(key);
     }
   });
-  const missing = DEFAULT_ORDER.filter((key) => !seen.has(key));
-  return filtered.length ? [...filtered, ...missing] : [...DEFAULT_ORDER];
+  if (filtered.length === 0) {
+    return [...DEFAULT_ORDER];
+  }
+  return filtered;
 }
 
 function clampNumber(value: number, min: number, max: number, fallback: number) {
