@@ -9,17 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { ArrowDown, ArrowUp, Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
 
-type PanelKey = 'overview' | 'crew' | 'docs' | 'logistics' | 'pending';
+type PanelKey = 'overview' | 'crew' | 'docs' | 'logistics' | 'calendar' | 'pending';
 
 const PANEL_LABELS: Record<PanelKey, string> = {
   overview: 'Jobs Overview',
   crew: 'Crew Assignments',
   docs: 'Document Progress',
   logistics: 'Logistics',
+  calendar: 'Calendar',
   pending: 'Pending Actions',
 };
 
-const DEFAULT_ORDER: PanelKey[] = ['overview', 'crew', 'docs', 'logistics', 'pending'];
+const DEFAULT_ORDER: PanelKey[] = ['overview', 'crew', 'docs', 'logistics', 'calendar', 'pending'];
 
 interface WallboardPresetRow {
   id: string;
@@ -49,7 +50,8 @@ function normaliseOrder(order?: string[] | null): PanelKey[] {
       seen.add(key);
     }
   });
-  return filtered.length ? filtered : [...DEFAULT_ORDER];
+  const missing = DEFAULT_ORDER.filter((key) => !seen.has(key));
+  return filtered.length ? [...filtered, ...missing] : [...DEFAULT_ORDER];
 }
 
 function clampNumber(value: number, min: number, max: number, fallback: number) {
@@ -87,6 +89,7 @@ export default function WallboardPresets() {
     crew: 12,
     docs: 12,
     logistics: 12,
+    calendar: 12,
     pending: 12,
   });
   const [fallbackSeconds, setFallbackSeconds] = useState(12);
