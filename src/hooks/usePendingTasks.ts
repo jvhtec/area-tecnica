@@ -1,4 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
 export interface PendingTask {
@@ -43,16 +45,62 @@ export interface GroupedPendingTask {
   }>;
 }
 
+const TASK_TABLES = ['sound_job_tasks', 'lights_job_tasks', 'video_job_tasks'] as const;
+
+type TaskRow = Record<string, unknown> & { assigned_to?: string | null };
+
 /**
  * Hook to fetch pending tasks for the current user
  * Only runs when a logged-in management/admin/logistics user is detected
  */
 export function usePendingTasks(userId: string | null, userRole: string | null) {
-  const isEligibleRole = userRole && ['management', 'admin', 'logistics'].includes(userRole);
-  
+  const isEligibleRole = !!userRole && ['management', 'admin', 'logistics'].includes(userRole);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!userId || !isEligibleRole) {
+      return;
+    }
+
+    const channel = supabase.channel(
+      `pending-tasks-${userId}-${Math.random().toString(36).slice(2, 10)}`
+    );
+
+    const invalidatePendingTasks = () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-tasks', userId] });
+    };
+
+    TASK_TABLES.forEach((table) => {
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table, filter: `assigned_to=eq.${userId}` },
+        invalidatePendingTasks
+      );
+
+      channel.on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table },
+        (payload: RealtimePostgresChangesPayload<TaskRow>) => {
+          const previousAssignee = payload.old?.assigned_to ?? null;
+          const nextAssignee = payload.new?.assigned_to ?? null;
+
+          if (previousAssignee === userId && nextAssignee !== userId) {
+            invalidatePendingTasks();
+          }
+        }
+      );
+    });
+
+    channel.subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, isEligibleRole, queryClient]);
+
   return useQuery({
     queryKey: ['pending-tasks', userId],
-    enabled: !!userId && !!isEligibleRole,
+    enabled: !!userId && isEligibleRole,
     queryFn: async (): Promise<GroupedPendingTask[]> => {
       const { data, error } = await supabase
         .from('pending_tasks_view')
@@ -73,8 +121,8 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
         const isJob = !!task.job_id;
         const groupId = isJob ? `job-${task.job_id}` : `tour-${task.tour_id}`;
         const name = isJob ? task.job_name || 'Unknown Job' : task.tour_name || 'Unknown Tour';
-        const detailLink = isJob 
-          ? `/job-management/${task.job_id}` 
+        const detailLink = isJob
+          ? `/job-management/${task.job_id}`
           : `/tour-management/${task.tour_id}`;
 
         if (!grouped.has(groupId)) {

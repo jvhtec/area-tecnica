@@ -57,19 +57,22 @@ The Pending Tasks Modal feature automatically displays incomplete tasks assigned
 - Modal stays hidden after page refresh within same session
 - Modal stays hidden when navigating between pages
 
-### Test 4: New Task Assignment Detection
-**Scenario**: New task is assigned after modal dismissal
+### Test 4: Real-time Task Updates
+**Scenario**: Pending tasks change while the user is active
 
 **Steps**:
-1. Log in as eligible user with 2 pending tasks
-2. Dismiss the modal
-3. Have another user (or via database) assign a new task to the logged-in user
-4. Wait for the query to refetch (or force refresh)
+1. Log in as an eligible user with the Pending Tasks badge visible (modal can be open or previously dismissed).
+2. From another session (or via SQL), perform the following actions one at a time, waiting for the UI to update between each:
+   - Create a new pending task assigned to this user (or reassign an existing task to them).
+   - Reassign one of the user's pending tasks to someone else.
+   - Mark one of the user's pending tasks as completed.
+   - Delete one of the user's pending tasks.
+3. Observe the badge and modal after each change.
 
 **Expected Result**:
-- Modal automatically reopens when new tasks are detected
-- Task count increases in the badge
-- New task appears in the list
+- The badge count updates immediately after each action.
+- The Pending Tasks modal reflects the changes in real time when open (and reopens automatically when new tasks are assigned).
+- No manual refresh or navigation is required to see the updates.
 
 ### Test 5: Session Reset on New Login
 **Scenario**: User logs out and logs back in
