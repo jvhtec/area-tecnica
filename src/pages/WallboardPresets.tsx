@@ -203,6 +203,7 @@ export default function WallboardPresets() {
       ticker_poll_interval_seconds: clampNumber(tickerSeconds, 10, 600, 20),
       slug: trimmedSlug,
       display_url: trimmedUrl,
+      updated_at: new Date().toISOString(),
     };
 
     try {
