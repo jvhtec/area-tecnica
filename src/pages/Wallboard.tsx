@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
+import { ANNOUNCEMENT_LEVEL_STYLES, type AnnouncementLevel } from '@/constants/announcementLevels';
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -135,18 +136,41 @@ const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data
   </PanelContainer>
 );
 
-const Ticker: React.FC<{ messages: string[]; bottomOffset?: number }>=({ messages, bottomOffset = 0 })=> {
+type TickerMessage = { message: string; level: AnnouncementLevel };
+
+const Ticker: React.FC<{ messages: TickerMessage[]; bottomOffset?: number }>=({ messages, bottomOffset = 0 })=> {
   const [posX, setPosX] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const textRef = useRef<HTMLSpanElement | null>(null);
   const gap = 64; // px spacing between repeats
-  const text = (messages || []).join('   •   ');
+  const contentKey = (messages || []).map(m => `${m.level}:${m.message}`).join('|');
+
+  const hasMessages = messages.length > 0;
+
+  const renderCopy = (options?: { ref?: (node: HTMLSpanElement | null) => void; paddingLeft?: number }) => (
+    <span
+      ref={options?.ref}
+      className="inline-flex items-center text-xl"
+      style={options?.paddingLeft ? { paddingLeft: options.paddingLeft } : undefined}
+    >
+      {messages.map((msg, idx) => (
+        <React.Fragment key={`${idx}-${msg.message}`}>
+          <span className={`px-2 whitespace-nowrap ${ANNOUNCEMENT_LEVEL_STYLES[msg.level].text}`}>
+            {msg.message}
+          </span>
+          {idx < messages.length - 1 && (
+            <span className="px-6 text-zinc-500">•</span>
+          )}
+        </React.Fragment>
+      ))}
+    </span>
+  );
 
   // Start from the right edge whenever content changes
   useEffect(() => {
     const cw = containerRef.current?.offsetWidth || 0;
     setPosX(cw);
-  }, [text]);
+  }, [contentKey]);
 
   // Also reset to right edge on initial mount to avoid mid-screen starts
   useEffect(() => {
@@ -156,7 +180,7 @@ const Ticker: React.FC<{ messages: string[]; bottomOffset?: number }>=({ message
 
   // Smooth, endless loop: track translateX decreases; wrap by one copy width
   useEffect(() => {
-    if (!text) return;
+    if (!hasMessages) return;
     let raf = 0;
     let last = performance.now();
     const speed = 50; // px/sec
@@ -175,14 +199,14 @@ const Ticker: React.FC<{ messages: string[]; bottomOffset?: number }>=({ message
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [text]);
+  }, [contentKey, hasMessages]);
 
   return (
     <div ref={containerRef} className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 border-t border-zinc-800 py-2 text-xl overflow-hidden" style={{ bottom: bottomOffset }}>
-      {text ? (
+      {hasMessages ? (
         <div className="whitespace-nowrap will-change-transform" style={{ transform: `translateX(${posX}px)` }}>
-          <span ref={textRef} className="inline-block">{text}</span>
-          <span className="inline-block" style={{ paddingLeft: gap }}>{text}</span>
+          {renderCopy({ ref: node => { textRef.current = node; } })}
+          {renderCopy({ paddingLeft: gap })}
         </div>
       ) : (
         <div>—</div>
@@ -356,7 +380,7 @@ export default function Wallboard() {
   const [docs, setDocs] = useState<DocProgressFeed|null>(null);
   const [pending, setPending] = useState<PendingActionsFeed|null>(null);
   const [logistics, setLogistics] = useState<LogisticsItem[]|null>(null);
-  const [tickerMsgs, setTickerMsgs] = useState<string[]>([]);
+  const [tickerMsgs, setTickerMsgs] = useState<TickerMessage[]>([]);
   const [highlightJobs, setHighlightJobs] = useState<Map<string, number>>(new Map());
   const [footerH, setFooterH] = useState<number>(72);
 
@@ -698,19 +722,21 @@ export default function Wallboard() {
     const fetchAnns = async () => {
       const { data } = await supabase
         .from('announcements')
-        .select('id, message, active, created_at')
+        .select('id, message, level, active, created_at')
         .eq('active', true)
         .order('created_at', { ascending: false })
         .limit(20);
       if (!cancelled) {
         const regex = /^\s*\[HIGHLIGHT_JOB:([a-f0-9\-]+)\]\s*/i;
-        const messages: string[] = [];
+        const messages: TickerMessage[] = [];
         const now = Date.now();
         const updated = new Map(highlightJobs);
         const ttl = Math.max(1000, highlightTtlMs);
         const staleIds: string[] = [];
         (data||[]).forEach((a:any) => {
           let m = a.message || '';
+          const levelRaw = (a.level ?? 'info') as AnnouncementLevel;
+          const level: AnnouncementLevel = ['info','warn','critical'].includes(levelRaw) ? levelRaw : 'info';
           const match = m.match(regex);
           if (match) {
             const jobId = match[1];
@@ -724,7 +750,7 @@ export default function Wallboard() {
             m = m.replace(regex, '');
           }
           // Always include the message body in the ticker
-          if (m.trim()) messages.push(m.trim());
+          if (m.trim()) messages.push({ message: m.trim(), level });
         });
         // Drop expired
         for (const [jid, exp] of updated) {
