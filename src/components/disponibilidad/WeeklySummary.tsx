@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { exportWeeklySummaryPDF } from '@/lib/weeklySummaryPdfExport';
 import { ReloadButton } from '@/components/ui/reload-button';
@@ -441,8 +441,8 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
 
       <CollapsibleContent className="space-y-2">
         <Card className={cn(isMobile ? "p-3" : "p-3 sm:p-4")}>
-          <ScrollArea className="h-[500px]">
-            <Table>
+          <ScrollArea className="h-[500px] w-full">
+            <Table className="min-w-[768px] md:min-w-[960px] lg:min-w-[1120px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className={cn(isMobile && "text-xs")}>Equipo</TableHead>
@@ -561,6 +561,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
                 })}
               </TableBody>
             </Table>
+            <ScrollBar orientation="horizontal" />
           </ScrollArea>
         </Card>
       </CollapsibleContent>
