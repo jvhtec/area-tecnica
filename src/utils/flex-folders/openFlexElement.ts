@@ -62,7 +62,19 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
   let useAlternativeMethod = false;
   
   try {
-    placeholderWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
+    // Open a controllable placeholder window and manually drop the opener to avoid leaks.
+    // Avoid 'noopener' feature to ensure Safari returns a window handle we can navigate.
+    placeholderWindow = window.open('', '_blank');
+    if (placeholderWindow) {
+      try {
+        // Manually nullify opener to replicate 'noopener' behavior
+        (placeholderWindow as any).opener = null;
+        // Ensure it starts blank (some browsers may reuse content)
+        placeholderWindow.location.href = 'about:blank';
+      } catch (noop) {
+        // Ignore errors; we'll still attempt to navigate later
+      }
+    }
     console.log('[openFlexElement] Placeholder window opened:', { 
       success: !!placeholderWindow,
       windowType: typeof placeholderWindow,
@@ -93,6 +105,11 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
       });
 
       if (useAlternativeMethod) {
+        try {
+          if (placeholderWindow) {
+            placeholderWindow.close();
+          }
+        } catch {}
         navigateWithLinkClick(fallbackUrl);
       } else {
         placeholderWindow!.location.href = fallbackUrl;
@@ -111,6 +128,11 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
 
     // Navigate using the appropriate method
     if (useAlternativeMethod) {
+      try {
+        if (placeholderWindow) {
+          placeholderWindow.close();
+        }
+      } catch {}
       navigateWithLinkClick(resolvedUrl);
     } else {
       placeholderWindow!.location.href = resolvedUrl;
