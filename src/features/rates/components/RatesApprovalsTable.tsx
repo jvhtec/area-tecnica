@@ -130,7 +130,7 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
                           row.pendingIssues.map((issue) => {
                             const isCritical = issue === 'Approval required' || issue === 'Timesheets rejected' || issue === 'Extras rejected';
                             const translated = issue === 'Approval required' ? 'Se requiere aprobación'
-                              : issue === 'No tour dates' ? 'Sin fechas de gira'
+                              : issue === 'No tour jobs' ? 'Sin trabajos de gira'
                               : issue === 'No assignments' ? 'Sin asignaciones'
                               : issue === 'No timesheets' ? 'Sin partes'
                               : issue === 'Timesheets pending' ? 'Partes pendientes'
@@ -157,19 +157,20 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
                               try {
                                 const { data: tourJobs, error } = await supabase
                                   .from('jobs')
-                                  .select('id, title, start_time, end_time')
+                                  .select('id, title, start_time, end_time, job_type')
                                   .eq('tour_id', row.id)
-                                  .eq('job_type', 'tourdate')
                                   .order('start_time', { ascending: true });
 
                                 if (error) throw error;
 
-                                if (!tourJobs || tourJobs.length === 0) {
-                                  toast.error('No hay fechas de gira para exportar');
+                                const eligibleTourJobs = (tourJobs || []).filter((job) => (job.job_type ?? '').toLowerCase() !== 'dryhire');
+
+                                if (eligibleTourJobs.length === 0) {
+                                  toast.error('No hay trabajos de gira para exportar');
                                   return;
                                 }
 
-                                const jobsForExport = tourJobs.map((job) => ({
+                                const jobsForExport = eligibleTourJobs.map((job) => ({
                                   id: job.id,
                                   title: job.title,
                                   start_time: job.start_time,

@@ -170,7 +170,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
   const tourList = tours || [];
   const tourIds = tourList.map((tour) => tour.id).filter(Boolean) as string[];
 
-  // Build counts for tour dates and their assignments
+  // Build counts for tour-linked jobs (excluding dry hire) and their assignments
   const tourCounts: Record<string, { jobCount: number; jobIds: string[]; assignmentCount: number }> = {};
   const jobReviewIds = new Set<string>();
 
@@ -178,29 +178,33 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('id, tour_id, job_type')
-      .in('tour_id', tourIds)
-      .eq('job_type', 'tourdate');
+      .in('tour_id', tourIds);
 
     if (jobsError) throw jobsError;
 
-    const tourDateIds: string[] = [];
+    const tourJobIds: string[] = [];
 
-    (jobs || []).forEach((job) => {
+    (jobs || [])
+      .filter((job) => {
+        const type = (job.job_type ?? '').toLowerCase();
+        return type !== 'dryhire';
+      })
+      .forEach((job) => {
       if (!job.tour_id) return;
       if (!tourCounts[job.tour_id]) {
         tourCounts[job.tour_id] = { jobCount: 0, jobIds: [], assignmentCount: 0 };
       }
       tourCounts[job.tour_id].jobCount += 1;
       tourCounts[job.tour_id].jobIds.push(job.id);
-      tourDateIds.push(job.id);
+      tourJobIds.push(job.id);
       jobReviewIds.add(job.id);
     });
 
-    if (tourDateIds.length > 0) {
+    if (tourJobIds.length > 0) {
       const { data: assignments, error: assignmentsError } = await supabase
         .from('job_assignments')
         .select('job_id')
-        .in('job_id', tourDateIds);
+        .in('job_id', tourJobIds);
 
       if (assignmentsError) throw assignmentsError;
 
@@ -220,7 +224,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
   // 2) Fetch standalone jobs (exclude dry hire and tour dates; exclude cancelled)
   const { data: jobsList, error: jobsError2 } = await supabase
     .from('jobs')
-    .select('id, title, start_time, end_time, job_type, status, rates_approved')
+    .select('id, title, start_time, end_time, job_type, status, rates_approved, tour_id')
     .neq('job_type', 'tourdate')
     .neq('job_type', 'dryhire')
     .eq('status', 'Confirmado')
@@ -228,7 +232,9 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
 
   if (jobsError2) throw jobsError2;
 
-  const standaloneJobs = (jobsList || []).filter((j) => (j.job_type ?? '').toLowerCase() !== 'tour');
+  const standaloneJobs = (jobsList || []).filter(
+    (j) => !j.tour_id && (j.job_type ?? '').toLowerCase() !== 'tour'
+  );
   const jobIds = standaloneJobs.map((j) => j.id);
   jobIds.forEach((id) => jobReviewIds.add(id));
 
@@ -289,7 +295,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
       pendingIssues.push('Approval required');
     }
     if (counts.jobCount === 0) {
-      pendingIssues.push('No tour dates');
+      pendingIssues.push('No tour jobs');
     }
     if (counts.assignmentCount === 0) {
       pendingIssues.push('No assignments');
