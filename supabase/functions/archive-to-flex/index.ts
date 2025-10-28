@@ -590,7 +590,8 @@ serve(async (req) => {
     if (!allOk) {
       result.failed += 1;
       for (const d of effectiveDepts) bump(d, "failed");
-      result.details.push({ docId: doc.id, file: filename, deptTargets: effectiveDepts, rflIds, status: "failed_upload" });
+      // Include Flex responses to aid debugging (status/data/error per target)
+      result.details.push({ docId: doc.id, file: filename, deptTargets: effectiveDepts, rflIds, status: "failed_upload", flex: flexResponses });
       continue;
     }
 
