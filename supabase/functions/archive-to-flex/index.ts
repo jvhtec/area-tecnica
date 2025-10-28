@@ -67,6 +67,15 @@ function detectDeptFromPath(path: string): Dept | null {
   return (allowed as string[]).includes(first) ? (first as Dept) : null;
 }
 
+function detectDeptFromFilename(name: string): Dept | null {
+  const n = (name || '').toLowerCase();
+  if (n.includes('sound')) return 'sound';
+  if (n.includes('lights') || n.includes('light')) return 'lights';
+  if (n.includes('video')) return 'video';
+  if (n.includes('prod')) return 'production';
+  return null;
+}
+
 async function addRemoteFileLine(remoteFileListId: string, payload: {
   filename: string;
   mimetype: string;
@@ -99,6 +108,9 @@ async function addRemoteFileLine(remoteFileListId: string, payload: {
   }
 }
 
+// Flex element definition IDs we care about
+const DEF_ID_DOCUMENTACION_TECNICA = "3787806c-af2d-11df-b8d5-00e08175e43e"; // same id used in FE constants
+
 async function getDocTecnicaTargets(
   sb: ReturnType<typeof createClient>,
   jobId: string,
@@ -121,6 +133,150 @@ async function getDocTecnicaTargets(
     if (row.element_id) map.set(dept, row.element_id);
   }
   return map;
+}
+
+// Simple cache helpers
+const deptFolderCache = new Map<string, string | null>(); // key `${jobId}:${dept}` -> element_id
+const docTecCache = new Map<string, string | null>(); // key deptFolderElementId -> doc_tecnica element id
+
+async function getDepartmentFolderElementId(
+  sb: ReturnType<typeof createClient>,
+  jobId: string,
+  dept: Dept,
+): Promise<string | null> {
+  const key = `${jobId}:${dept}`;
+  if (deptFolderCache.has(key)) return deptFolderCache.get(key)!;
+  const { data, error } = await sb
+    .from("flex_folders")
+    .select("element_id")
+    .eq("job_id", jobId)
+    .eq("department", dept)
+    .eq("folder_type", "department")
+    .maybeSingle();
+  const val = error ? null : (data?.element_id ?? null);
+  deptFolderCache.set(key, val);
+  return val;
+}
+
+async function fetchElementTree(elementId: string): Promise<any[]> {
+  if (!FLEX_AUTH_TOKEN) throw new Error("Missing FLEX auth token");
+  const res = await fetch(`${FLEX_API_BASE_URL}/element/${encodeURIComponent(elementId)}/tree`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Auth-Token": FLEX_AUTH_TOKEN,
+      "accept": "*/*",
+    },
+  });
+  if (!res.ok) {
+    let err: any = {};
+    try { err = await res.json(); } catch {}
+    throw new Error(err?.exceptionMessage || `Tree fetch failed (${res.status})`);
+  }
+  const data = await res.json().catch(() => ([]));
+  // Normalize to array of nodes with children
+  if (Array.isArray(data)) return data as any[];
+  if (data && typeof data === 'object' && 'children' in data && Array.isArray((data as any).children)) {
+    return (data as any).children as any[];
+  }
+  return [data];
+}
+
+function nodeName(n: any): string {
+  return (typeof n?.displayName === 'string' && n.displayName)
+    || (typeof n?.name === 'string' && n.name)
+    || '';
+}
+
+function normalize(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}+/gu, '');
+}
+
+function findDocTecnicaInTree(nodes: any[]): string | null {
+  const stack = [...nodes];
+  while (stack.length) {
+    const n = stack.shift();
+    if (!n || typeof n !== 'object') continue;
+    const defId = typeof n.definitionId === 'string' ? n.definitionId : (typeof n.elementDefinitionId === 'string' ? n.elementDefinitionId : undefined);
+    const nm = normalize(nodeName(n));
+    const isDoc = defId === DEF_ID_DOCUMENTACION_TECNICA || nm.includes(normalize('Documentación Técnica'));
+    const elementId = typeof n.elementId === 'string' ? n.elementId : (typeof n.id === 'string' ? n.id : undefined);
+    if (isDoc && elementId) return elementId;
+    if (Array.isArray(n.children)) stack.push(...n.children);
+  }
+  return null;
+}
+
+async function resolveDocTecnicaByTree(
+  deptFolderElementId: string,
+): Promise<string | null> {
+  if (!deptFolderElementId) return null;
+  if (docTecCache.has(deptFolderElementId)) return docTecCache.get(deptFolderElementId)!;
+  try {
+    const tree = await fetchElementTree(deptFolderElementId);
+    const docId = findDocTecnicaInTree(tree);
+    docTecCache.set(deptFolderElementId, docId);
+    return docId;
+  } catch (e) {
+    console.warn('[archive-to-flex] tree fallback failed', e);
+    docTecCache.set(deptFolderElementId, null);
+    return null;
+  }
+}
+
+async function getMainElementId(
+  sb: ReturnType<typeof createClient>,
+  jobId: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await sb
+      .from('flex_folders')
+      .select('element_id, folder_type, parent_id')
+      .eq('job_id', jobId);
+    if (error || !data || data.length === 0) return null;
+    // Prefer explicit main markers
+    const main = data.find((r: any) => r.folder_type === 'main_event')
+      || data.find((r: any) => r.folder_type === 'main')
+      || data.find((r: any) => r.folder_type === 'job');
+    if (main?.element_id) return main.element_id;
+    // Fallback: any row without a parent_id
+    const root = data.find((r: any) => !r.parent_id && r.element_id);
+    return root?.element_id ?? null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function deptKeywords(dept: Dept): string[] {
+  switch (dept) {
+    case 'sound': return ['sound', 'sonido'];
+    case 'lights': return ['lights', 'luces', 'lighting'];
+    case 'video': return ['video', 'vídeo'];
+    case 'production': return ['production', 'produccion', 'producción'];
+    default: return [dept];
+  }
+}
+
+function findDocTecByDeptInTree(nodes: any[], dept: Dept): string | null {
+  const want = deptKeywords(dept).map(normalize);
+  const stack = [...nodes];
+  while (stack.length) {
+    const n = stack.shift();
+    if (!n || typeof n !== 'object') continue;
+    const defId = typeof n.definitionId === 'string' ? n.definitionId : (typeof n.elementDefinitionId === 'string' ? n.elementDefinitionId : undefined);
+    const nm = normalize(nodeName(n));
+    const elementId = typeof n.elementId === 'string' ? n.elementId : (typeof n.id === 'string' ? n.id : undefined);
+    const isDoc = defId === DEF_ID_DOCUMENTACION_TECNICA || nm.includes(normalize('Documentación Técnica'));
+    if (isDoc && elementId) {
+      // Ensure department hint appears in the name if possible
+      if (want.some(w => nm.includes(w))) return elementId;
+    }
+    if (Array.isArray(n.children)) stack.push(...n.children);
+  }
+  return null;
 }
 
 serve(async (req) => {
@@ -147,6 +303,23 @@ serve(async (req) => {
   const explicitDepts = (body.departments || []) as Dept[];
 
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  // Load selected departments for the job (used for better defaults)
+  async function getJobSelectedDepartments(): Promise<Dept[]> {
+    try {
+      const { data, error } = await sb
+        .from('job_departments')
+        .select('department')
+        .eq('job_id', jobId);
+      if (error || !data) return [];
+      const vals = data.map((r: any) => r.department).filter(Boolean);
+      const allowed: string[] = ["sound","lights","video","production","personnel","comercial","logistics","administrative"];
+      return vals.filter((d: string) => allowed.includes(d)) as Dept[];
+    } catch (_) {
+      return [];
+    }
+  }
+  const selectedDepts = await getJobSelectedDepartments();
 
   // Resolve Documentación Técnica remote file list IDs per department
   const targets = await getDocTecnicaTargets(sb, jobId, explicitDepts.length ? explicitDepts : undefined);
@@ -194,8 +367,19 @@ serve(async (req) => {
     if (mode === "all-tech") {
       targetDepts = TECH_DEPTS.filter((d) => !explicitDepts.length || explicitDepts.includes(d));
     } else {
-      const inferred = detectDeptFromPath(doc.file_path) || ("production" as Dept);
-      targetDepts = [inferred].filter((d) => !explicitDepts.length || explicitDepts.includes(d));
+      // Try path-based, then filename-based, else fall back to selected technical departments
+      let inferred: Dept | null = detectDeptFromPath(doc.file_path);
+      if (!inferred) inferred = detectDeptFromFilename(doc.file_name);
+      if (inferred) {
+        targetDepts = [inferred];
+      } else {
+        const selectedTech = (selectedDepts.length ? selectedDepts : TECH_DEPTS).filter((d) => TECH_DEPTS.includes(d));
+        targetDepts = selectedTech.length ? (selectedTech as Dept[]) : TECH_DEPTS;
+      }
+      // Respect explicit department filter if provided
+      if (explicitDepts.length) {
+        targetDepts = targetDepts.filter((d) => explicitDepts.includes(d));
+      }
     }
     if (!targetDepts.length) {
       result.skipped += 1;
@@ -208,11 +392,47 @@ serve(async (req) => {
     const effectiveDepts: Dept[] = [];
     let missingForAny = false;
     for (const dept of targetDepts) {
-      const rfl = targets.get(dept);
+      let rfl = targets.get(dept);
+      if (!rfl) {
+        // Fallback 1: from department folder via tree
+        try {
+          const deptFolderElementId = await getDepartmentFolderElementId(sb, jobId, dept);
+          if (deptFolderElementId) {
+            const docTecId = await resolveDocTecnicaByTree(deptFolderElementId);
+            if (docTecId) {
+              targets.set(dept, docTecId);
+              rfl = docTecId;
+            }
+          }
+        } catch (_) {}
+
+        // Fallback 2: from main element tree by matching department in the name
+        if (!rfl) {
+          try {
+            const mainEl = await getMainElementId(sb, jobId);
+            if (mainEl) {
+              const tree = await fetchElementTree(mainEl);
+              const docTecId = findDocTecByDeptInTree(tree, dept);
+              if (docTecId) {
+                targets.set(dept, docTecId);
+                rfl = docTecId;
+                // Best-effort persist for future runs (ignore errors)
+                await sb.from('flex_folders').insert({
+                  job_id: jobId,
+                  element_id: docTecId,
+                  department: dept,
+                  folder_type: 'doc_tecnica',
+                }).select().limit(1);
+              }
+            }
+          } catch (e) {
+            // ignore; will mark missing below
+          }
+        }
+      }
       if (!rfl) {
         missingForAny = true;
         if (onMissing === "fail") {
-          // Mark failure for this dept
           bump(dept, "failed");
         } else {
           bump(dept, "skipped");
@@ -300,4 +520,3 @@ serve(async (req) => {
 
   return json(result);
 });
-
