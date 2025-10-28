@@ -2,11 +2,14 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Euro, AlertCircle, Clock, CheckCircle } from 'lucide-react';
+import { Euro, AlertCircle, Clock, CheckCircle, FileDown } from 'lucide-react';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { formatCurrency } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { generateJobPayoutPDF } from '@/utils/rates-pdf-export';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 interface JobPayoutTotalsPanelProps {
   jobId: string;
@@ -80,10 +83,45 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Euro className="h-5 w-5" />
-          Job Payout Totals
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Euro className="h-5 w-5" />
+            Job Payout Totals
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              const { data: jobData } = await supabase
+                .from('jobs')
+                .select('id, title, start_time')
+                .eq('id', jobId)
+                .single();
+              
+              if (!jobData) {
+                toast.error('No se pudo cargar la información del trabajo');
+                return;
+              }
+              
+              const techIds = [...new Set(payoutTotals.map(p => p.technician_id))];
+              const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name')
+                .in('id', techIds);
+              
+              await generateJobPayoutPDF(
+                payoutTotals,
+                jobData,
+                profiles || [],
+                lpoMap
+              );
+              toast.success('PDF de pagos generado');
+            }}
+          >
+            <FileDown className="h-4 w-4 mr-1" />
+            Exportar PDF
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {payoutTotals.map((payout) => (

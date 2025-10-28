@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Euro, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX } from 'lucide-react';
+import { Euro, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX, FileDown } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -22,6 +22,7 @@ import { ExtrasCatalogEditor, BaseRatesEditor } from '@/features/rates/component
 import { invalidateRatesContext } from '@/services/ratesService';
 import { syncFlexWorkOrdersForJob, FlexWorkOrderSyncResult } from '@/services/flexWorkOrders';
 import { toast } from 'sonner';
+import { generateRateQuotePDF, generateTourRatesSummaryPDF } from '@/utils/rates-pdf-export';
 
 type TourRatesManagerDialogProps = {
   open: boolean;
@@ -208,6 +209,37 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
               <Badge variant={approved ? 'default' : 'secondary'} className="hidden sm:inline-flex">
                 {approved ? 'Tarifas base liberadas' : 'Aprobación base pendiente'}
               </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  const { data: tourData } = await supabase
+                    .from('tours')
+                    .select('name')
+                    .eq('id', tourId)
+                    .single();
+                  
+                  const jobsWithQuotes = await Promise.all(
+                    tourJobs.map(async (job: any) => {
+                      const { data: jobQuotes } = await supabase.rpc('compute_tour_job_rate_quote_2025', {
+                        _job_id: job.id,
+                        _tech_id: profiles[0]?.id
+                      });
+                      return { job, quotes: quotes.filter(q => q.job_id === job.id) };
+                    })
+                  );
+                  
+                  await generateTourRatesSummaryPDF(
+                    tourData?.name || 'Tour',
+                    jobsWithQuotes.filter(j => j.quotes.length > 0),
+                    profiles
+                  );
+                  toast.success('PDF de gira generado');
+                }}
+                className="flex items-center gap-1"
+              >
+                <FileDown className="h-4 w-4" /> Exportar Gira
+              </Button>
               {approved ? (
                 <Button
                   variant="outline"
@@ -286,10 +318,36 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                     ))}
                   </SelectContent>
                 </Select>
-                <Badge variant="outline" className="ml-auto w-fit">
-                  <Users className="h-3 w-3 mr-1" />
-                  {quotes.length} asignaciones
-                </Badge>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Badge variant="outline" className="w-fit">
+                    <Users className="h-3 w-3 mr-1" />
+                    {quotes.length} asignaciones
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!selectedJobId || quotes.length === 0}
+                    onClick={async () => {
+                      const job = tourJobs.find((j: any) => j.id === selectedJobId);
+                      if (!job) return;
+                      
+                      const { data: lpoRows } = await supabase
+                        .from('flex_work_orders')
+                        .select('technician_id, lpo_number')
+                        .eq('job_id', selectedJobId);
+                      
+                      const lpoMap = new Map(
+                        (lpoRows || []).map(r => [r.technician_id, r.lpo_number])
+                      );
+                      
+                      await generateRateQuotePDF(quotes, job, profiles, lpoMap);
+                      toast.success('PDF generado');
+                    }}
+                  >
+                    <FileDown className="h-4 w-4 mr-1" />
+                    Exportar Fecha
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 

@@ -10,6 +10,11 @@ import { Link } from 'react-router-dom';
 import { useRatesApprovals } from '@/features/rates/hooks/useRatesApprovals';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { FileDown } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { generateTourRatesSummaryPDF } from '@/utils/rates-pdf-export';
+import { toast } from 'sonner';
+import { TourJobRateQuote } from '@/types/tourRates';
 
 interface RatesApprovalsTableProps {
   onManageTour: (tourId: string) => void;
@@ -144,9 +149,67 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
                     </TableCell>
                     <TableCell className="text-right space-x-2">
                       {row.entityType === 'tour' ? (
-                        <Button size="sm" onClick={() => onManageTour(row.id)}>
-                          Gestionar
-                        </Button>
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={async () => {
+                              const { data: tourJobs } = await supabase
+                                .from('jobs')
+                                .select('id, title, start_time')
+                                .eq('tour_id', row.id)
+                                .eq('job_type', 'tourdate')
+                                .order('start_time', { ascending: true });
+                              
+                              if (!tourJobs || tourJobs.length === 0) {
+                                toast.error('No hay fechas de gira para exportar');
+                                return;
+                              }
+                              
+                              const jobsWithQuotes = await Promise.all(
+                                tourJobs.map(async (job) => {
+                                  const { data: assignments } = await supabase
+                                    .from('job_assignments')
+                                    .select('technician_id')
+                                    .eq('job_id', job.id);
+                                  
+                                  const quotes = await Promise.all(
+                                    (assignments || []).map(async (a) => {
+                                      const { data } = await supabase.rpc('compute_tour_job_rate_quote_2025', {
+                                        _job_id: job.id,
+                                        _tech_id: a.technician_id
+                                      });
+                                      return data as unknown as TourJobRateQuote;
+                                    })
+                                  );
+                                  
+                                  return { job, quotes: quotes.filter(Boolean) as TourJobRateQuote[] };
+                                })
+                              );
+                              
+                              const allTechIds = [...new Set(
+                                jobsWithQuotes.flatMap(j => j.quotes.map((q: any) => q.technician_id))
+                              )];
+                              
+                              const { data: profiles } = await supabase
+                                .from('profiles')
+                                .select('id, first_name, last_name')
+                                .in('id', allTechIds);
+                              
+                              await generateTourRatesSummaryPDF(
+                                row.name,
+                                jobsWithQuotes,
+                                profiles || []
+                              );
+                              toast.success('PDF de gira generado');
+                            }}
+                          >
+                            <FileDown className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" onClick={() => onManageTour(row.id)}>
+                            Gestionar
+                          </Button>
+                        </>
                       ) : (
                         <Button size="sm" variant="outline" asChild>
                           <Link to={`/management/rates?tab=timesheets&jobId=${row.id}`}>Revisar partes</Link>
