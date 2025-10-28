@@ -140,7 +140,7 @@ const drawCorporateHeader = (doc: jsPDF, { title, subtitle, metadata, logo }: He
   return HEADER_CONTENT_OFFSET;
 };
 
-const drawCorporateFooter = (doc: jsPDF, logo: HTMLImageElement | null) => {
+const drawCorporateFooter = (doc: jsPDF, companyLogo: HTMLImageElement | null) => {
   const pageCount = doc.getNumberOfPages();
 
   for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
@@ -150,13 +150,21 @@ const drawCorporateFooter = (doc: jsPDF, logo: HTMLImageElement | null) => {
 
     const footerY = pageHeight - 12;
 
-    if (logo) {
+    if (companyLogo) {
       try {
-        const ratio = logo.width && logo.height ? logo.width / logo.height : 1;
+        const ratio =
+          companyLogo.width && companyLogo.height ? companyLogo.width / companyLogo.height : 1;
         const logoHeight = 12;
         const logoWidth = logoHeight * ratio;
         const logoX = (pageWidth - logoWidth) / 2;
-        doc.addImage(logo, 'PNG', logoX, footerY - logoHeight - 3, logoWidth, logoHeight);
+        doc.addImage(
+          companyLogo,
+          'PNG',
+          logoX,
+          footerY - logoHeight - 3,
+          logoWidth,
+          logoHeight
+        );
       } catch (error) {
         console.error('Error adding logo to PDF footer:', error);
       }
@@ -221,7 +229,13 @@ export async function generateRateQuotePDF(
 ) {
   const doc = new jsPDF();
   const tourIdFromQuotes = quotes.find((quote) => quote.tour_id)?.tour_id;
-  const brandingLogo = await resolveBrandingLogo({ jobId: jobDetails.id, tourId: jobDetails.tour_id ?? tourIdFromQuotes });
+  const [brandingLogo, companyLogo] = await Promise.all([
+    resolveBrandingLogo({
+      jobId: jobDetails.id,
+      tourId: jobDetails.tour_id ?? tourIdFromQuotes,
+    }),
+    getCompanyLogo(),
+  ]);
   const headerOptions: HeaderOptions = {
     title: 'Presupuesto de Tarifas',
     subtitle: jobDetails.title,
@@ -317,7 +331,7 @@ export async function generateRateQuotePDF(
   const totalWidth = doc.getTextWidth(totalText);
   doc.text(totalText, 14 + summaryWidth - totalWidth - 6, finalY + 22);
 
-  drawCorporateFooter(doc, brandingLogo);
+  drawCorporateFooter(doc, companyLogo);
 
   const filename = `presupuesto_${jobDetails.title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
     new Date(),
@@ -334,7 +348,10 @@ export async function generateTourRatesSummaryPDF(
 ) {
   const doc = new jsPDF();
   const tourId = jobsWithQuotes.find((job) => job.quotes.length)?.quotes[0]?.tour_id;
-  const brandingLogo = await resolveBrandingLogo({ tourId });
+  const [brandingLogo, companyLogo] = await Promise.all([
+    resolveBrandingLogo({ tourId }),
+    getCompanyLogo(),
+  ]);
   const headerOptions: HeaderOptions = {
     title: 'Resumen de Tarifas',
     subtitle: tourName,
@@ -534,7 +551,7 @@ export async function generateTourRatesSummaryPDF(
     doc.setTextColor(...TEXT_PRIMARY);
   });
 
-  drawCorporateFooter(doc, brandingLogo);
+  drawCorporateFooter(doc, companyLogo);
 
   const filename = `resumen_gira_${tourName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
     new Date(),
@@ -551,7 +568,10 @@ export async function generateJobPayoutPDF(
   lpoMap?: Map<string, string | null>
 ) {
   const doc = new jsPDF();
-  const brandingLogo = await resolveBrandingLogo({ jobId: jobDetails.id, tourId: jobDetails.tour_id });
+  const [brandingLogo, companyLogo] = await Promise.all([
+    resolveBrandingLogo({ jobId: jobDetails.id, tourId: jobDetails.tour_id }),
+    getCompanyLogo(),
+  ]);
   const headerOptions: HeaderOptions = {
     title: 'Informe de Pagos',
     subtitle: jobDetails.title,
@@ -699,7 +719,7 @@ export async function generateJobPayoutPDF(
   const totalWidth = doc.getTextWidth(totalText);
   doc.text(totalText, 14 + summaryWidth - totalWidth - 6, currentY + 22);
 
-  drawCorporateFooter(doc, brandingLogo);
+  drawCorporateFooter(doc, companyLogo);
 
   const filename = `pago_${jobDetails.title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
     new Date(),
