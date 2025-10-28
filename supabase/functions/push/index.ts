@@ -241,6 +241,89 @@ async function getLogisticsManagementRecipients(client: ReturnType<typeof create
   return data.map((r: any) => r.id).filter(Boolean);
 }
 
+// Admin helpers and department-scoped management targeting
+async function getAdminUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
+  const { data, error } = await client
+    .from('profiles')
+    .select('id')
+    .eq('role', 'admin');
+  if (error || !data) return [];
+  return data.map((r: any) => r.id).filter(Boolean);
+}
+
+async function getManagementByDepartmentUserIds(client: ReturnType<typeof createClient>, department: string): Promise<string[]> {
+  if (!department) return [];
+  const { data, error } = await client
+    .from('profiles')
+    .select('id')
+    .eq('role', 'management')
+    .eq('department', department);
+  if (error || !data) return [];
+  return data.map((r: any) => r.id).filter(Boolean);
+}
+
+async function getTimesheetSubmittingTechDepartment(
+  client: ReturnType<typeof createClient>,
+  jobId?: string | null,
+  actorId?: string | null,
+): Promise<string | null> {
+  try {
+    // Prefer actor's submitted timesheet for this job
+    if (jobId && actorId) {
+      const { data: anySubmitted } = await client
+        .from('timesheets')
+        .select('id')
+        .eq('job_id', jobId)
+        .eq('technician_id', actorId)
+        .eq('status', 'submitted')
+        .limit(1);
+      if (anySubmitted && anySubmitted.length) {
+        const { data: prof } = await client
+          .from('profiles')
+          .select('department')
+          .eq('id', actorId)
+          .maybeSingle();
+        return (prof as any)?.department ?? null;
+      }
+    }
+
+    // Fallback: latest submitted timesheet for the job, then resolve that tech's department
+    if (jobId) {
+      const { data: row } = await client
+        .from('timesheets')
+        .select('technician_id, updated_at')
+        .eq('job_id', jobId)
+        .eq('status', 'submitted')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const techId = (row as any)?.technician_id as string | undefined;
+      if (techId) {
+        const { data: prof } = await client
+          .from('profiles')
+          .select('department')
+          .eq('id', techId)
+          .maybeSingle();
+        return (prof as any)?.department ?? null;
+      }
+    }
+  } catch (_) {
+    // ignore
+  }
+  // Last resort: try actor profile
+  if (actorId) {
+    try {
+      const { data: prof } = await client
+        .from('profiles')
+        .select('department')
+        .eq('id', actorId)
+        .maybeSingle();
+      return (prof as any)?.department ?? null;
+    } catch (_) { /* ignore */ }
+  }
+  return null;
+}
+
 async function getJobParticipantUserIds(client: ReturnType<typeof createClient>, jobId: string): Promise<string[]> {
   if (!jobId) return [];
   const { data, error } = await client
@@ -522,6 +605,22 @@ async function handleBroadcast(
     title = 'Trabajo creado';
     text = `${actor} creó "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(mgmt));
+  } else if (type === 'timesheet.submitted') {
+    // Department-scoped management notification for timesheet submissions.
+    // We target: management users whose department matches the submitting technician, plus all admins.
+    // The actor (submitting tech) stays included for self-device delivery.
+    title = 'Parte enviado';
+    text = `${actor} ha rellenado su hoja de horas para "${jobTitle || 'Trabajo'}".`;
+
+    // Resolve department from the submitted timesheet joined to profiles
+    const dept = await getTimesheetSubmittingTechDepartment(client, jobId || null, (body as any)?.actor_id || userId);
+    const adminIds = await getAdminUserIds(client);
+    const mgmtDeptIds = dept ? await getManagementByDepartmentUserIds(client, dept) : [];
+
+    // Only scoped-management recipients + admins; skip generic management broadcast
+    recipients.clear();
+    addUsers([userId]); // keep actor self-notification across devices
+    addUsers(Array.from(new Set([...adminIds, ...mgmtDeptIds])));
   } else if (type === 'job.updated') {
     title = 'Trabajo actualizado';
     if (body.changes && typeof body.changes === 'object') {
