@@ -24,7 +24,7 @@ import { canCreateFolders, canDeleteDocuments, canEditJobs as canEditJobsPerm, c
 import { createSignedUrl, resolveJobDocBucket } from "@/utils/jobDocuments";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plane, Wrench, Star, Moon, Mic, Loader2, FileText } from "lucide-react";
+import { Plane, Wrench, Star, Moon, Mic, Loader2, FileText, Archive } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {
   Clock,
@@ -41,6 +41,10 @@ import {
   FolderPlus,
   ClipboardList
 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
@@ -125,6 +129,13 @@ export function JobCardNew({
   const [editJobDialogOpen, setEditJobDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveResult, setArchiveResult] = useState<any | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [archiveMode, setArchiveMode] = useState<'by-prefix' | 'all-tech'>('by-prefix');
+  const [archiveIncludeTemplates, setArchiveIncludeTemplates] = useState(false);
+  const [archiveDryRun, setArchiveDryRun] = useState(false);
 
   // Check if this job is being deleted
   const isJobBeingDeleted = isDeletingJob(job.id);
@@ -660,6 +671,33 @@ export function JobCardNew({
     }
   };
 
+  const handleArchiveToFlex = async () => {
+    setArchiving(true);
+    setArchiveError(null);
+    setArchiveResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('archive-to-flex', {
+        body: {
+          job_id: job.id,
+          mode: archiveMode,
+          include_templates: archiveIncludeTemplates,
+          dry_run: archiveDryRun,
+        }
+      });
+      if (error) throw error;
+      setArchiveResult(data);
+      // Refresh documents after archive
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: archiveDryRun ? "Dry run complete" : "Archive complete", description: `${data?.uploaded ?? 0} uploaded, ${data?.failed ?? 0} failed` });
+    } catch (err: any) {
+      console.error('[ArchiveToFlex] Error', err);
+      setArchiveError(err?.message || 'Failed to archive');
+      toast({ title: "Archive failed", description: err?.message || 'Failed to archive', variant: 'destructive' });
+    } finally {
+      setArchiving(false);
+    }
+  };
+
   const calculateTotalProgress = () => {
     if (!soundTasks?.length) return 0;
     const totalProgress = soundTasks.reduce((acc, task) => acc + (task.progress || 0), 0);
@@ -1095,6 +1133,19 @@ export function JobCardNew({
                   )}
                 </Button>
               )}
+              {/* Archive to Flex */}
+              {job.job_type !== 'dryhire' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => { e.stopPropagation(); setArchiveOpen(true); }}
+                  disabled={isJobBeingDeleted}
+                  title="Archive documents to Flex"
+                  className="hover:bg-accent/50"
+                >
+                  <Archive className="h-4 w-4" />
+                </Button>
+              )}
               {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (
                 <div className="relative">
                   <input
@@ -1338,6 +1389,78 @@ export function JobCardNew({
               department={department as Department}
             />
           )}
+          {/* Archive to Flex Dialog */}
+          <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Archive documents to Flex</DialogTitle>
+                <DialogDescription>
+                  Uploads all job documents to each department's Documentación Técnica in Flex and removes them from Supabase.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Mode</Label>
+                    <Select value={archiveMode} onValueChange={(v) => setArchiveMode(v as 'by-prefix' | 'all-tech')}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="by-prefix">By prefix (default)</SelectItem>
+                        <SelectItem value="all-tech">All technical depts</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2 mt-6 sm:mt-[30px]">
+                    <Checkbox id="includeTemplates" checked={archiveIncludeTemplates} onCheckedChange={(v) => setArchiveIncludeTemplates(Boolean(v))} />
+                    <Label htmlFor="includeTemplates">Include templates</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="dryRun" checked={archiveDryRun} onCheckedChange={(v) => setArchiveDryRun(Boolean(v))} />
+                    <Label htmlFor="dryRun">Dry run (no delete)</Label>
+                  </div>
+                </div>
+
+                {archiving && (
+                  <div className="flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Archiving...</div>
+                )}
+
+                {archiveError && (
+                  <div className="text-sm text-red-600">{archiveError}</div>
+                )}
+
+                {archiveResult && (
+                  <div className="space-y-3">
+                    <div className="text-sm">Summary</div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>Attempted: <span className="font-medium">{archiveResult.attempted ?? 0}</span></div>
+                      <div>Uploaded: <span className="font-medium">{archiveResult.uploaded ?? 0}</span></div>
+                      <div>Skipped: <span className="font-medium">{archiveResult.skipped ?? 0}</span></div>
+                      <div>Failed: <span className="font-medium">{archiveResult.failed ?? 0}</span></div>
+                    </div>
+                    {archiveResult.details && Array.isArray(archiveResult.details) && (
+                      <div className="max-h-48 overflow-auto border rounded p-2 text-xs">
+                        {archiveResult.details.map((d: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between py-0.5">
+                            <div className="truncate mr-2" title={d.file}>{d.file}</div>
+                            <div className="text-muted-foreground">{d.status}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={archiving}>Close</Button>
+                <Button onClick={handleArchiveToFlex} disabled={archiving}>
+                  {archiving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {archiveDryRun ? 'Run Dry' : 'Start'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>
