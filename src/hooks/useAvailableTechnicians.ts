@@ -19,6 +19,7 @@ interface UseAvailableTechniciansOptions {
   jobId: string;
   jobStartTime: string;
   jobEndTime: string;
+  assignmentDate?: string | null;
   enabled?: boolean;
 }
 
@@ -27,13 +28,14 @@ export function useAvailableTechnicians({
   jobId,
   jobStartTime,
   jobEndTime,
+  assignmentDate,
   enabled = true
 }: UseAvailableTechniciansOptions) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ["available-technicians", department, jobId, jobStartTime, jobEndTime],
+    queryKey: ["available-technicians", department, jobId, jobStartTime, jobEndTime, assignmentDate ?? null],
     queryFn: async () => {
       if (!department || !jobId || !jobStartTime || !jobEndTime) {
         return [];
@@ -44,7 +46,8 @@ export function useAvailableTechnicians({
           department,
           jobId,
           jobStartTime,
-          jobEndTime
+          jobEndTime,
+          assignmentDate
         );
         
         console.log(`Found ${technicians.length} available ${department} technicians for job ${jobId}`);
@@ -108,7 +111,7 @@ export function useAvailableTechnicians({
       console.log('Cleaning up technician availability subscription');
       supabase.removeChannel(channel);
     };
-  }, [enabled, department, jobId, jobStartTime, jobEndTime, queryClient]);
+  }, [enabled, department, jobId, jobStartTime, jobEndTime, assignmentDate, queryClient]);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);

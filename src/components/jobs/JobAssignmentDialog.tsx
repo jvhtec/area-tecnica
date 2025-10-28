@@ -80,12 +80,24 @@ const formatAvailableTechnicianName = (technician: { first_name: string; last_na
   return `${technician.first_name} ${technician.last_name}${suffix}`;
 };
 
+const formatJobDateLabel = (date: string | null | undefined) => {
+  if (!date) return '';
+  try {
+    return new Intl.DateTimeFormat('es-ES', { dateStyle: 'full' }).format(new Date(date));
+  } catch (error) {
+    console.warn('Failed to format job date', error);
+    return date;
+  }
+};
+
 export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
   const { user, userRole } = useOptimizedAuth();
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [soundRole, setSoundRole] = useState<string>("none");
   const [lightsRole, setLightsRole] = useState<string>("none");
+  const [singleDay, setSingleDay] = useState(false);
+  const [assignmentDate, setAssignmentDate] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -101,7 +113,17 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     queryFn: async () => {
       const { data, error } = await supabase
         .from("jobs")
-        .select("id, start_time, end_time, title")
+        .select(`
+          id,
+          start_time,
+          end_time,
+          title,
+          job_date_types (
+            id,
+            date,
+            type
+          )
+        `)
         .eq("id", jobId)
         .single();
 
@@ -112,21 +134,86 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   });
 
   // Use the available technicians hook with proper filtering
-  const { 
-    technicians: availableTechnicians, 
-    isLoading: isLoadingTechnicians 
+  const {
+    technicians: availableTechnicians,
+    isLoading: isLoadingTechnicians
   } = useAvailableTechnicians({
     department: currentDepartment,
     jobId: jobId,
     jobStartTime: jobData?.start_time || "",
     jobEndTime: jobData?.end_time || "",
+    assignmentDate: singleDay ? assignmentDate ?? null : null,
     enabled: isOpen && !!jobData && !!jobId
   });
 
   // Filter technicians: include technicians, house techs, and flagged management
-  const filteredTechnicians = availableTechnicians.filter(tech => 
+  const filteredTechnicians = availableTechnicians.filter(tech =>
     tech.role === 'technician' || tech.role === 'house_tech' || tech.role === 'management'
   );
+
+  const jobDateOptions = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    const dateTypes = Array.isArray(jobData?.job_date_types) ? jobData.job_date_types : [];
+
+    dateTypes.forEach((entry: any) => {
+      if (!entry?.date) return;
+      const key = entry.date;
+      if (!map.has(key)) {
+        map.set(key, new Set<string>());
+      }
+      if (entry.type) {
+        map.get(key)?.add(entry.type);
+      }
+    });
+
+    if (map.size === 0 && jobData?.start_time) {
+      const start = new Date(jobData.start_time);
+      const end = jobData?.end_time ? new Date(jobData.end_time) : start;
+      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+        const cursor = new Date(start);
+        cursor.setHours(0, 0, 0, 0);
+        const endCursor = new Date(end);
+        endCursor.setHours(0, 0, 0, 0);
+        while (cursor <= endCursor) {
+          const iso = cursor.toISOString().split('T')[0];
+          if (!map.has(iso)) {
+            map.set(iso, new Set<string>());
+          }
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      }
+    }
+
+    return Array.from(map.entries())
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([date, types]) => ({
+        date,
+        types: Array.from(types.values()),
+      }));
+  }, [jobData?.job_date_types, jobData?.start_time, jobData?.end_time]);
+
+  const canUseSingleDay = jobDateOptions.length > 0;
+
+  useEffect(() => {
+    if (!singleDay) {
+      return;
+    }
+    if (!canUseSingleDay) {
+      setSingleDay(false);
+      setAssignmentDate(null);
+      return;
+    }
+    if (!assignmentDate && jobDateOptions.length > 0) {
+      setAssignmentDate(jobDateOptions[0].date);
+    }
+  }, [singleDay, canUseSingleDay, assignmentDate, jobDateOptions]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSingleDay(false);
+      setAssignmentDate(null);
+    }
+  }, [isOpen]);
 
   // Fetch crew call data for the current job and department
   const { data: crewCallData, isLoading: isLoadingCrewCall } = useCrewCallData(jobId, currentDepartment);
@@ -162,6 +249,14 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       return;
     }
 
+    if (singleDay && !assignmentDate) {
+      toast({
+        title: "Warning",
+        description: "Selecciona una fecha del trabajo",
+      });
+      return;
+    }
+
     setIsAdding(true);
 
     try {
@@ -175,7 +270,10 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
           return;
         }
       }
-      await addAssignment(selectedTechnician, soundRole, lightsRole);
+      await addAssignment(selectedTechnician, soundRole, lightsRole, {
+        singleDay,
+        assignmentDate: singleDay ? assignmentDate : null,
+      });
 
       toast({
         title: "Success",
@@ -442,6 +540,63 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
             </div>
           )}
 
+          <div className="flex items-center justify-between rounded-md border px-3 py-2">
+            <div className="pr-3">
+              <p className="text-xs md:text-sm font-medium">Asignar un solo día</p>
+              <p className="text-[11px] md:text-xs text-muted-foreground">
+                Limita la asignación a una fecha específica del trabajo.
+              </p>
+            </div>
+            <Switch
+              checked={singleDay && canUseSingleDay}
+              onCheckedChange={(checked) => {
+                if (!checked) {
+                  setSingleDay(false);
+                  setAssignmentDate(null);
+                  return;
+                }
+                if (!canUseSingleDay) {
+                  setSingleDay(false);
+                  return;
+                }
+                setSingleDay(true);
+                if (!assignmentDate && jobDateOptions.length > 0) {
+                  setAssignmentDate(jobDateOptions[0].date);
+                }
+              }}
+              disabled={!canUseSingleDay}
+              aria-label="Asignar un solo día"
+            />
+          </div>
+
+          {singleDay && canUseSingleDay && (
+            <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
+              <Label className="md:text-right text-xs md:text-sm">Fecha del trabajo</Label>
+              <Select value={assignmentDate ?? ""} onValueChange={setAssignmentDate}>
+                <SelectTrigger className="md:col-span-3">
+                  <SelectValue placeholder="Selecciona una fecha" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobDateOptions.map((option) => {
+                    const formatted = formatJobDateLabel(option.date);
+                    const typeSuffix = option.types.length ? ` — ${option.types.join(', ')}` : '';
+                    return (
+                      <SelectItem key={option.date} value={option.date}>
+                        {formatted}{typeSuffix}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {!canUseSingleDay && (
+            <p className="text-[11px] md:text-xs text-muted-foreground">
+              Este trabajo no tiene fechas detalladas para asignaciones por día. Se utilizará la duración completa del trabajo.
+            </p>
+          )}
+
           <Button
             onClick={handleAddTechnician}
             disabled={isAdding || !selectedTechnician || isLoadingTechnicians || isLoadingJob}
@@ -474,10 +629,17 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                     <div className="text-sm md:text-base font-medium truncate">
                       {formatAssignmentTechnicianName(assignment)}
                     </div>
-                    <p className="text-xs md:text-sm text-muted-foreground">
-                      {currentDepartment === "sound" && `Sound: ${labelForCode(assignment.sound_role) || "None"}`}
-                      {currentDepartment === "lights" && `Lights: ${labelForCode(assignment.lights_role) || "None"}`}
-                    </p>
+                    <div className="text-xs md:text-sm text-muted-foreground flex flex-col gap-0.5">
+                      {assignment.single_day && (
+                        <span>Solo día: {formatJobDateLabel(assignment.assignment_date)}</span>
+                      )}
+                      {currentDepartment === "sound" && (
+                        <span>Sound: {labelForCode(assignment.sound_role) || "None"}</span>
+                      )}
+                      {currentDepartment === "lights" && (
+                        <span>Lights: {labelForCode(assignment.lights_role) || "None"}</span>
+                      )}
+                    </div>
                   </div>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

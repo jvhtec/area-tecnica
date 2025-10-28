@@ -498,8 +498,24 @@ async function handleBroadcast(
   const actor = body.actor_name || (await getProfileDisplayName(client, userId)) || 'Alguien';
   const recipName = body.recipient_name || (await getProfileDisplayName(client, body.recipient_id)) || '';
   const ch = channelEs(body.channel);
-  const metaExtras: { view?: string; department?: string; targetUrl?: string } = {};
+  const metaExtras: { view?: string; department?: string; targetUrl?: string; targetDate?: string; singleDay?: boolean } = {};
   let changeSummary: string | undefined;
+
+  const rawTargetDate = typeof (body as any)?.target_date === 'string' ? (body as any).target_date as string : undefined;
+  const parsedTargetDate = rawTargetDate ? new Date(rawTargetDate) : null;
+  const normalizedTargetDate = parsedTargetDate && !Number.isNaN(parsedTargetDate.getTime())
+    ? parsedTargetDate.toISOString().split('T')[0]
+    : null;
+  const formattedTargetDate = normalizedTargetDate
+    ? (() => {
+        try {
+          return new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium' }).format(new Date(`${normalizedTargetDate}T00:00:00Z`));
+        } catch (_) {
+          return normalizedTargetDate;
+        }
+      })()
+    : null;
+  const singleDayFlag = Boolean((body as any)?.single_day);
 
   if (type === 'job.created') {
     title = 'Trabajo creado';
@@ -587,10 +603,26 @@ async function handleBroadcast(
     addUsers(Array.from(participants));
   } else if (type === 'job.assignment.confirmed') {
     title = 'Asignación confirmada';
-    if (recipName) {
-      text = `${recipName}, has sido asignado a "${jobTitle || 'Trabajo'}".`;
+    if (singleDayFlag && formattedTargetDate) {
+      if (recipName) {
+        text = `${recipName}, has sido asignado a "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`;
+      } else {
+        text = `Has sido asignado a "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`;
+      }
+      if (normalizedTargetDate) {
+        metaExtras.singleDay = true;
+        metaExtras.targetDate = normalizedTargetDate;
+      }
     } else {
-      text = `Has sido asignado a "${jobTitle || 'Trabajo'}".`;
+      if (recipName) {
+        text = `${recipName}, has sido asignado a "${jobTitle || 'Trabajo'}".`;
+      } else {
+        text = `Has sido asignado a "${jobTitle || 'Trabajo'}".`;
+      }
+      if (singleDayFlag && normalizedTargetDate) {
+        metaExtras.singleDay = true;
+        metaExtras.targetDate = normalizedTargetDate;
+      }
     }
     addUsers([body.recipient_id]);
   } else if (type === 'task.assigned') {

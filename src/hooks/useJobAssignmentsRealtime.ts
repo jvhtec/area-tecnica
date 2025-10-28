@@ -101,7 +101,12 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
   const { manageFlexCrewAssignment } = useFlexCrewAssignments();
 
-  const addAssignment = async (technicianId: string, soundRole: string, lightsRole: string) => {
+  const addAssignment = async (
+    technicianId: string,
+    soundRole: string,
+    lightsRole: string,
+    options?: { singleDay?: boolean; assignmentDate?: string | null }
+  ) => {
     try {
       // Optimistic cache update for 'jobs' list so cards update instantly
       queryClient.setQueryData(['jobs'], (old: any) => {
@@ -113,6 +118,8 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
             technician_id: technicianId,
             sound_role: soundRole !== 'none' ? soundRole : null,
             lights_role: lightsRole !== 'none' ? lightsRole : null,
+            single_day: options?.singleDay ?? false,
+            assignment_date: options?.assignmentDate ?? null,
             profiles: { first_name: '', last_name: '' },
           };
           const current = Array.isArray(j.job_assignments) ? j.job_assignments : [];
@@ -129,6 +136,8 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           lights_role: lightsRole !== 'none' ? lightsRole : null,
           assigned_by: (await supabase.auth.getUser()).data.user?.id,
           assigned_at: new Date().toISOString(),
+          single_day: options?.singleDay ?? false,
+          assignment_date: options?.singleDay ? options?.assignmentDate ?? null : null,
         });
 
       if (error) {
