@@ -76,14 +76,17 @@ function detectDeptFromFilename(name: string): Dept | null {
   return null;
 }
 
-async function addRemoteFileLine(remoteFileListId: string, payload: {
+type FlexAddLinePayload = {
   filename: string;
   mimetype: string;
   filesize: number;
   url?: string;
-  content?: string[];
+  // Flex API accepts raw byte content as JSON array of numbers too
+  content?: number[] | number[][];
   notes?: string;
-}): Promise<{ ok: true; data: any } | { ok: false; status: number; error?: any }> {
+};
+
+async function addRemoteFileLine(remoteFileListId: string, payload: FlexAddLinePayload): Promise<{ ok: true; data: any } | { ok: false; status: number; error?: any }> {
   if (!FLEX_AUTH_TOKEN) {
     return { ok: false, status: 500, error: "Missing FLEX auth token" };
   }
@@ -94,6 +97,7 @@ async function addRemoteFileLine(remoteFileListId: string, payload: {
         "accept": "*/*",
         "Content-Type": "application/json",
         "X-Auth-Token": FLEX_AUTH_TOKEN,
+        "apikey": FLEX_AUTH_TOKEN,
       },
       body: JSON.stringify(payload),
     });
@@ -106,6 +110,15 @@ async function addRemoteFileLine(remoteFileListId: string, payload: {
   } catch (e) {
     return { ok: false, status: 500, error: String(e) };
   }
+}
+
+async function fetchFileBytes(url: string): Promise<number[]> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Fetch file failed ${res.status}`);
+  const ab = await res.arrayBuffer();
+  const bytes = new Uint8Array(ab);
+  // Convert to plain numbers for JSON
+  return Array.from(bytes);
 }
 
 // Flex element definition IDs we care about
@@ -375,7 +388,7 @@ serve(async (req) => {
     skipped: 0,
     failed: 0,
     perDepartment: {} as Record<string, { attempted: number; uploaded: number; failed: number; skipped: number }>,
-    details: [] as Array<{ docId: string; file: string; deptTargets: Dept[]; rflIds: string[]; status: string; error?: unknown }>,
+    details: [] as Array<{ docId: string; file: string; deptTargets: Dept[]; rflIds: string[]; status: string; error?: unknown; flex?: Array<{ rflId: string; mode: 'content' | 'url'; status: number; data?: unknown; error?: unknown }> }>,
   };
 
   function bump(dept: string, key: "attempted" | "uploaded" | "failed" | "skipped") {
@@ -531,18 +544,46 @@ serve(async (req) => {
     }
 
     let allOk = true;
+    // Default to content-first. Set FLEX_UPLOAD_MODE=url to prefer URL first.
+    const MODE = (Deno.env.get('FLEX_UPLOAD_MODE') || '').toLowerCase();
+    const contentFirst = MODE !== 'url';
+    let contentBytes: number[] | null = null;
+    const flexResponses: Array<{ rflId: string; mode: 'content' | 'url'; status: number; data?: unknown; error?: unknown }> = [];
     for (let i = 0; i < rflIds.length; i++) {
-      const payload = {
-        filename,
-        mimetype,
-        filesize,
-        url: signed.signedUrl,
-        notes: `Imported from Sector Pro (job ${jobId})`,
-      };
-      const res = await addRemoteFileLine(rflIds[i], payload);
-      if (!res.ok) {
-        allOk = false;
-        console.error("[archive-to-flex] add-line failed", { rflId: rflIds[i], status: res.status, error: res.error });
+      let res;
+      if (contentFirst) {
+        try {
+          if (!contentBytes) {
+            contentBytes = await fetchFileBytes(signed.signedUrl);
+          }
+          const payloadContent: FlexAddLinePayload = {
+            filename,
+            mimetype,
+            filesize,
+            content: contentBytes,
+            notes: `Imported from Sector Pro (job ${jobId})`,
+          };
+          res = await addRemoteFileLine(rflIds[i], payloadContent);
+          if (res) flexResponses.push({ rflId: rflIds[i], mode: 'content', status: (res as any).status ?? (res.ok ? 200 : 500), data: (res as any).data, error: (res as any).error });
+        } catch (e) {
+          console.error('[archive-to-flex] content-first exception', e);
+        }
+      }
+      if (!res || !res.ok) {
+        // Try URL mode as fallback (or primary if MODE=url)
+        const payloadUrl: FlexAddLinePayload = {
+          filename,
+          mimetype,
+          filesize,
+          url: signed.signedUrl,
+          notes: `Imported from Sector Pro (job ${jobId})`,
+        };
+        const res2 = await addRemoteFileLine(rflIds[i], payloadUrl);
+        flexResponses.push({ rflId: rflIds[i], mode: 'url', status: (res2 as any).status ?? (res2.ok ? 200 : 500), data: (res2 as any).data, error: (res2 as any).error });
+        if (!res2.ok) {
+          allOk = false;
+          console.error("[archive-to-flex] add-line failed", { rflId: rflIds[i], status: res2.status, error: res2.error });
+        }
       }
     }
 
@@ -566,7 +607,7 @@ serve(async (req) => {
 
     result.uploaded += 1;
     for (const d of effectiveDepts) bump(d, "uploaded");
-    result.details.push({ docId: doc.id, file: filename, deptTargets: effectiveDepts, rflIds, status: "uploaded_and_deleted" });
+    result.details.push({ docId: doc.id, file: filename, deptTargets: effectiveDepts, rflIds, status: "uploaded_and_deleted", flex: flexResponses });
   }
 
   return json(result);

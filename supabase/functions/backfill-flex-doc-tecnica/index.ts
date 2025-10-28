@@ -151,7 +151,7 @@ serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Not found' }, 404);
   try { ensureAuth(req); } catch (e) { return e as Response; }
 
-  const { job_id, departments } = await req.json().catch(() => ({}));
+  const { job_id, departments, manual } = await req.json().catch(() => ({}));
   if (!job_id) return json({ error: 'Missing job_id' }, 400);
 
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -185,6 +185,47 @@ serve(async (req) => {
   let inserted = 0;
   let already = 0;
   const details: Array<{ dept: string; elementId: string; status: string }> = [];
+
+  // 0) Manual overrides
+  if (Array.isArray(manual) && manual.length) {
+    for (const m of manual) {
+      try {
+        const dept = (m?.dept || m?.department || '').toString();
+        const elementId = (m?.element_id || m?.elementId || '').toString();
+        if (!dept || !elementId) {
+          details.push({ dept: dept || 'unknown', elementId: elementId || 'missing', status: 'error:invalid_manual_entry' });
+          continue;
+        }
+        const { data: exists } = await sb
+          .from('flex_folders')
+          .select('id')
+          .eq('job_id', job_id)
+          .eq('folder_type', 'doc_tecnica')
+          .eq('department', dept)
+          .maybeSingle();
+        if (exists?.id) {
+          already += 1;
+          details.push({ dept, elementId, status: 'exists' });
+          continue;
+        }
+        const { error: insErr } = await sb.from('flex_folders').insert({
+          job_id,
+          parent_id: null,
+          element_id: elementId,
+          department: dept,
+          folder_type: 'doc_tecnica',
+        });
+        if (insErr) {
+          details.push({ dept, elementId, status: `error:${insErr.message}` });
+        } else {
+          inserted += 1;
+          details.push({ dept, elementId, status: 'manual_inserted' });
+        }
+      } catch (e: any) {
+        details.push({ dept: (m?.dept || m?.department || 'unknown').toString(), elementId: (m?.element_id || m?.elementId || 'unknown').toString(), status: `error:${e?.message || e}` });
+      }
+    }
+  }
 
   for (const row of candidates) {
     try {
