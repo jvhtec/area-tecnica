@@ -31,6 +31,7 @@ import type { Restaurant } from "@/types/hoja-de-ruta";
 import { labelForCode } from '@/utils/roles';
 import { TourRatesPanel } from '@/components/tours/TourRatesPanel';
 import { JobExtrasManagement } from '@/components/jobs/JobExtrasManagement';
+import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 import { useJobExtras } from '@/hooks/useJobExtras';
@@ -566,6 +567,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                       )}
                 </div>
               </Card>
+
+              {isManager && resolvedJobId && (
+                <JobPayoutTotalsPanel jobId={resolvedJobId} />
+              )}
+
               {isManager && !isDryhire && (
                 <Card className="p-3">
                   <div className="flex items-center justify-between gap-3">
