@@ -69,10 +69,10 @@ function detectDeptFromPath(path: string): Dept | null {
 
 function detectDeptFromFilename(name: string): Dept | null {
   const n = (name || '').toLowerCase();
-  if (n.includes('sound')) return 'sound';
-  if (n.includes('lights') || n.includes('light')) return 'lights';
-  if (n.includes('video')) return 'video';
-  if (n.includes('prod')) return 'production';
+  if (n.includes('sound') || n.includes('sonido')) return 'sound';
+  if (n.includes('lights') || n.includes('light') || n.includes('iluminacion') || n.includes('iluminación')) return 'lights';
+  if (n.includes('video') || n.includes('vídeo')) return 'video';
+  if (n.includes('rigging') || n.includes('prod')) return 'production';
   return null;
 }
 
@@ -165,6 +165,7 @@ async function fetchElementTree(elementId: string): Promise<any[]> {
     headers: {
       "Content-Type": "application/json",
       "X-Auth-Token": FLEX_AUTH_TOKEN,
+      "apikey": FLEX_AUTH_TOKEN,
       "accept": "*/*",
     },
   });
@@ -245,6 +246,36 @@ async function getMainElementId(
     // Fallback: any row without a parent_id
     const root = data.find((r: any) => !r.parent_id && r.element_id);
     return root?.element_id ?? null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function getTourDeptFolderElementId(
+  sb: ReturnType<typeof createClient>,
+  jobId: string,
+  dept: Dept,
+): Promise<string | null> {
+  try {
+    const { data: job, error: jobErr } = await sb.from('jobs').select('tour_id').eq('id', jobId).maybeSingle();
+    if (jobErr || !job?.tour_id) return null;
+    const { data: tour, error: tourErr } = await sb
+      .from('tours')
+      .select('flex_main_folder_id, flex_sound_folder_id, flex_lights_folder_id, flex_video_folder_id, flex_production_folder_id, flex_personnel_folder_id, flex_comercial_folder_id')
+      .eq('id', job.tour_id)
+      .maybeSingle();
+    if (tourErr || !tour) return null;
+    const map: Record<string, string | null | undefined> = {
+      sound: tour.flex_sound_folder_id,
+      lights: tour.flex_lights_folder_id,
+      video: tour.flex_video_folder_id,
+      production: tour.flex_production_folder_id,
+      personnel: tour.flex_personnel_folder_id,
+      comercial: tour.flex_comercial_folder_id,
+      logistics: null,
+      administrative: null,
+    };
+    return (map[dept] as string | null | undefined) ?? null;
   } catch (_) {
     return null;
   }
@@ -405,6 +436,26 @@ serve(async (req) => {
             }
           }
         } catch (_) {}
+
+        // Fallback 1a: tour-level department folder
+        if (!rfl) {
+          try {
+            const tourDeptFolderId = await getTourDeptFolderElementId(sb, jobId, dept);
+            if (tourDeptFolderId) {
+              const docTecId = await resolveDocTecnicaByTree(tourDeptFolderId);
+              if (docTecId) {
+                targets.set(dept, docTecId);
+                rfl = docTecId;
+                await sb.from('flex_folders').insert({
+                  job_id: jobId,
+                  element_id: docTecId,
+                  department: dept,
+                  folder_type: 'doc_tecnica',
+                }).select().limit(1);
+              }
+            }
+          } catch (_) {}
+        }
 
         // Fallback 2: from main element tree by matching department in the name
         if (!rfl) {

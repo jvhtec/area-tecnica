@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
-import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle, ExternalLink, Info, ListChecks, Settings, ScrollText, Archive } from "lucide-react";
+import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle, ExternalLink, Info, ListChecks, Settings, ScrollText, Archive, RotateCw } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -117,6 +117,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   const [archiveMode, setArchiveMode] = React.useState<'by-prefix' | 'all-tech'>('by-prefix');
   const [archiveIncludeTemplates, setArchiveIncludeTemplates] = React.useState(false);
   const [archiveDryRun, setArchiveDryRun] = React.useState(false);
+  // Backfill state
+  const [backfilling, setBackfilling] = React.useState(false);
+  const [backfillMsg, setBackfillMsg] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (job?.job_type !== "dryhire") {
@@ -198,6 +201,26 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       toast({ title: 'Archive failed', description: err?.message || 'Failed to archive', variant: 'destructive' });
     } finally {
       setArchiving(false);
+    }
+  };
+
+  const handleBackfillDocTec = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setBackfilling(true);
+    setBackfillMsg(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('backfill-flex-doc-tecnica', {
+        body: { job_id: job.id }
+      });
+      if (error) throw error;
+      setBackfillMsg(`Inserted ${data?.inserted ?? 0}, already ${data?.already ?? 0}`);
+      toast({ title: 'Backfill complete', description: `Inserted ${data?.inserted ?? 0}, already ${data?.already ?? 0}` });
+    } catch (err: any) {
+      console.error('[JobCardActions] Backfill error', err);
+      setBackfillMsg(err?.message || 'Backfill failed');
+      toast({ title: 'Backfill failed', description: err?.message || 'Backfill failed', variant: 'destructive' });
+    } finally {
+      setBackfilling(false);
     }
   };
 
@@ -893,6 +916,17 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           <span className="hidden sm:inline">Archive</span>
         </Button>
       )}
+      {/* Backfill Doc Técnica */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleBackfillDocTec}
+        disabled={backfilling}
+        title={backfilling ? 'Backfilling…' : 'Backfill Doc Técnica'}
+        className={backfilling ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/50'}
+      >
+        {backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+      </Button>
       {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (
         <div className="relative">
           <input

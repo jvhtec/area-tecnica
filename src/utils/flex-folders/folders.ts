@@ -1021,7 +1021,24 @@ export async function createAllFoldersForJob(
           personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
         };
 
-        await createFlexFolder(subPayload);
+        const created = await createFlexFolder(subPayload);
+
+        // Persist Documentación Técnica element for reliable lookups
+        if (sf.key === 'documentacionTecnica' && created?.elementId) {
+          try {
+            await supabase
+              .from('flex_folders')
+              .insert({
+                job_id: job.id,
+                parent_id: deptFolderId,
+                element_id: created.elementId,
+                folder_type: 'doc_tecnica',
+                department: dept,
+              });
+          } catch (persistErr) {
+            console.warn('[folders] Failed to persist doc_tecnica row', persistErr);
+          }
+        }
       }
     } else if (dept === "comercial") {
       await createComercialExtras(
