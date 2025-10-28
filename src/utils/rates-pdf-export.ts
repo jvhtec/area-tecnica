@@ -7,8 +7,10 @@ import { formatCurrency } from '@/lib/utils';
 
 interface TechnicianProfile {
   id: string;
-  first_name: string;
-  last_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  default_timesheet_category?: string | null;
+  role?: string | null;
 }
 
 interface JobDetails {
@@ -16,6 +18,12 @@ interface JobDetails {
   title: string;
   start_time: string;
   end_time?: string;
+}
+
+interface TourSummaryJob {
+  job: JobDetails;
+  quotes: TourJobRateQuote[];
+  lpoMap?: Map<string, string | null>;
 }
 
 interface PayoutData {
@@ -36,35 +44,134 @@ interface PayoutData {
   vehicle_disclaimer_text?: string;
 }
 
-// Add logo and header to PDF
-function addHeaderWithLogo(doc: jsPDF, title: string) {
-  // Add title
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text(title, 14, 20);
-  
-  // Add generation date
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Generado: ${format(new Date(), 'PPP', { locale: es })}`, 14, 28);
-  
-  return 35; // Return Y position after header
+const ACCENT_COLOR: [number, number, number] = [16, 36, 94];
+const MUTED_TEXT_COLOR: [number, number, number] = [71, 85, 105];
+const LIGHT_BACKGROUND: [number, number, number] = [241, 245, 249];
+const TABLE_STRIPE_COLOR: [number, number, number] = [248, 250, 252];
+const HEADER_HEIGHT = 42;
+const HEADER_CONTENT_OFFSET = HEADER_HEIGHT + 12;
+const FOOTER_HEIGHT = 24;
+const COMPANY_LOGO_PATHS = [
+  '/sector pro logo.png',
+  './sector pro logo.png',
+  'sector pro logo.png',
+  '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png',
+];
+
+const loadImageSafely = (src: string, description: string): Promise<HTMLImageElement | null> => {
+  return new Promise((resolve) => {
+    if (!src || typeof Image === 'undefined') {
+      resolve(null);
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      console.warn(`Failed to load ${description} from`, src);
+      resolve(null);
+    };
+    img.src = src;
+  });
+};
+
+let cachedCompanyLogoPromise: Promise<HTMLImageElement | null> | null = null;
+
+async function getCompanyLogo(): Promise<HTMLImageElement | null> {
+  if (!cachedCompanyLogoPromise) {
+    cachedCompanyLogoPromise = (async () => {
+      for (const path of COMPANY_LOGO_PATHS) {
+        const img = await loadImageSafely(path, 'Sector Pro logo');
+        if (img) return img;
+      }
+      return null;
+    })();
+  }
+
+  return cachedCompanyLogoPromise;
 }
 
-// Add footer to all pages
-function addFooter(doc: jsPDF) {
-  const pageCount = doc.getNumberOfPages();
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'italic');
-  
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    const pageText = `Página ${i} de ${pageCount}`;
-    const textWidth = doc.getTextWidth(pageText);
-    doc.text(pageText, doc.internal.pageSize.width - textWidth - 14, doc.internal.pageSize.height - 10);
-    doc.text('Sector-Pro', 14, doc.internal.pageSize.height - 10);
+function addHeaderWithBranding(doc: jsPDF, title: string, logo: HTMLImageElement | null) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  doc.setFillColor(...ACCENT_COLOR);
+  doc.rect(0, 0, pageWidth, HEADER_HEIGHT, 'F');
+
+  let textX = 18;
+
+  if (logo) {
+    const ratio = logo.width && logo.height ? logo.width / logo.height : 1;
+    const logoHeight = Math.min(24, logo.height || 24);
+    const logoWidth = logoHeight * ratio;
+    doc.addImage(logo, 'PNG', 14, 9, logoWidth, logoHeight);
+    textX = 14 + logoWidth + 10;
   }
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text(title, textX, 22);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Generado: ${format(new Date(), 'PPP', { locale: es })}`, textX, 32);
+
+  doc.setTextColor(0, 0, 0);
+  doc.setDrawColor(...ACCENT_COLOR);
+  doc.setLineWidth(0.6);
+  doc.line(14, HEADER_HEIGHT, pageWidth - 14, HEADER_HEIGHT);
+
+  return HEADER_CONTENT_OFFSET;
 }
+
+function addFooter(doc: jsPDF, logo: HTMLImageElement | null) {
+  const pageCount = doc.getNumberOfPages();
+
+  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
+    doc.setPage(pageNumber);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    doc.setFillColor(...LIGHT_BACKGROUND);
+    doc.rect(0, pageHeight - FOOTER_HEIGHT, pageWidth, FOOTER_HEIGHT, 'F');
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...MUTED_TEXT_COLOR);
+
+    const footerY = pageHeight - 8;
+    doc.text('Sector-Pro', 14, footerY);
+
+    const pageText = `Página ${pageNumber} de ${pageCount}`;
+    const textWidth = doc.getTextWidth(pageText);
+    doc.text(pageText, pageWidth - 14 - textWidth, footerY);
+
+    if (logo) {
+      const ratio = logo.width && logo.height ? logo.width / logo.height : 1;
+      const logoHeight = 12;
+      const logoWidth = logoHeight * ratio;
+      const logoX = (pageWidth - logoWidth) / 2;
+      const logoY = pageHeight - FOOTER_HEIGHT + (FOOTER_HEIGHT - logoHeight) / 2;
+      doc.addImage(logo, 'PNG', logoX, logoY, logoWidth, logoHeight);
+    }
+  }
+
+  doc.setTextColor(0, 0, 0);
+}
+
+const getTechNameFactory = (profiles: TechnicianProfile[]) => {
+  return (id: string) => {
+    const profile = profiles.find((p) => p.id === id);
+    if (!profile) return 'Unknown';
+    const name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
+    return name || 'Unknown';
+  };
+};
+
+const formatJobDate = (date: string) => format(new Date(date), 'PPP', { locale: es });
+
+const withLpo = (name: string, lpo?: string | null) => (lpo ? `${name}\nLPO: ${lpo}` : name);
 
 // Generate PDF for individual rate quote (single job date)
 export async function generateRateQuotePDF(
@@ -74,188 +181,310 @@ export async function generateRateQuotePDF(
   lpoMap?: Map<string, string | null>
 ) {
   const doc = new jsPDF();
-  
-  let yPos = addHeaderWithLogo(doc, 'Presupuesto de Tarifas - Fecha de Gira');
-  
-  // Job details section
-  doc.setFontSize(12);
+  const companyLogo = await getCompanyLogo();
+  const headerTitle = 'Presupuesto de Tarifas - Fecha de Gira';
+  const contentTop = addHeaderWithBranding(doc, headerTitle, companyLogo);
+
+  let yPos = contentTop;
+
   doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...ACCENT_COLOR);
   doc.text('Detalles del Trabajo', 14, yPos);
-  yPos += 7;
-  
-  doc.setFontSize(10);
+  yPos += 6;
+
   doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...MUTED_TEXT_COLOR);
   doc.text(`Nombre: ${jobDetails.title}`, 14, yPos);
   yPos += 5;
-  doc.text(`Fecha: ${format(new Date(jobDetails.start_time), 'PPP', { locale: es })}`, 14, yPos);
+  doc.text(`Fecha: ${formatJobDate(jobDetails.start_time)}`, 14, yPos);
   yPos += 10;
-  
-  // Rates breakdown table
-  const getTechName = (id: string) => {
-    const p = profiles.find(x => x.id === id);
-    return p ? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unknown' : 'Unknown';
-  };
-  
-  const tableData = quotes.map(q => {
-    const name = getTechName(q.technician_id);
-    const lpo = lpoMap?.get(q.technician_id);
+
+  const getTechName = getTechNameFactory(profiles);
+
+  const tableData = quotes.map((quote) => {
+    const name = getTechName(quote.technician_id);
+    const lpo = lpoMap?.get(quote.technician_id) ?? null;
     return [
-      name + (lpo ? `\n(LPO: ${lpo})` : ''),
-      q.is_house_tech ? 'Plantilla' : (q.category || '—'),
-      formatCurrency(q.base_day_eur),
-      q.multiplier > 1 ? `×${q.multiplier}` : '—',
-      formatCurrency(q.extras_total_eur || 0),
-      formatCurrency(q.total_with_extras_eur || q.total_eur)
+      withLpo(name, lpo),
+      quote.is_house_tech ? 'Plantilla' : quote.category || '—',
+      formatCurrency(quote.base_day_eur),
+      quote.multiplier > 1 ? `×${quote.multiplier}` : '—',
+      formatCurrency(quote.extras_total_eur || 0),
+      formatCurrency(quote.total_with_extras_eur || quote.total_eur || 0),
     ];
   });
-  
+
   autoTable(doc, {
     startY: yPos,
     head: [['Técnico', 'Categoría', 'Base', 'Mult.', 'Extras', 'Total']],
     body: tableData,
     theme: 'grid',
-    headStyles: { fillColor: [59, 130, 246], textColor: 255 },
-    styles: { fontSize: 9 },
+    headStyles: { fillColor: ACCENT_COLOR as number[], textColor: 255, fontStyle: 'bold' },
+    styles: { fontSize: 9, cellPadding: 3 },
+    alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR as number[] },
     columnStyles: {
       2: { halign: 'right' },
       3: { halign: 'center' },
       4: { halign: 'right' },
-      5: { halign: 'right', fontStyle: 'bold' }
-    }
+      5: { halign: 'right', fontStyle: 'bold' },
+    },
+    margin: { left: 14, right: 14, top: contentTop },
+    didDrawPage: (data) => {
+      if (data.pageNumber > 1) {
+        addHeaderWithBranding(doc, headerTitle, companyLogo);
+      }
+    },
   });
-  
-  // Summary
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
-  const totalBase = quotes.reduce((sum, q) => sum + (q.base_day_eur * (q.multiplier || 1)), 0);
-  const totalExtras = quotes.reduce((sum, q) => sum + (q.extras_total_eur || 0), 0);
-  const grandTotal = quotes.reduce((sum, q) => sum + (q.total_with_extras_eur || q.total_eur), 0);
-  
-  doc.setFontSize(11);
+
+  const finalY = ((doc as any).lastAutoTable?.finalY ?? yPos) + 10;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const summaryWidth = pageWidth - 28;
+
+  const totalBase = quotes.reduce((sum, quote) => sum + quote.base_day_eur * (quote.multiplier || 1), 0);
+  const totalExtras = quotes.reduce((sum, quote) => sum + (quote.extras_total_eur || 0), 0);
+  const grandTotal = quotes.reduce(
+    (sum, quote) => sum + (quote.total_with_extras_eur || quote.total_eur || 0),
+    0
+  );
+
+  doc.setFillColor(...LIGHT_BACKGROUND);
+  doc.roundedRect(14, finalY, summaryWidth, 32, 3, 3, 'F');
+
   doc.setFont('helvetica', 'bold');
-  doc.text('Resumen', 14, finalY);
-  
-  doc.setFontSize(10);
+  doc.setFontSize(11);
+  doc.setTextColor(...ACCENT_COLOR);
+  doc.text('Resumen', 18, finalY + 10);
+
   doc.setFont('helvetica', 'normal');
-  doc.text(`Total Base: ${formatCurrency(totalBase)}`, 14, finalY + 7);
-  doc.text(`Total Extras: ${formatCurrency(totalExtras)}`, 14, finalY + 14);
-  
+  doc.setFontSize(10);
+  doc.setTextColor(...MUTED_TEXT_COLOR);
+  doc.text(`Total Base: ${formatCurrency(totalBase)}`, 18, finalY + 18);
+  doc.text(`Total Extras: ${formatCurrency(totalExtras)}`, 18, finalY + 26);
+
+  const totalText = `Total General: ${formatCurrency(grandTotal)}`;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text(`Total General: ${formatCurrency(grandTotal)}`, 14, finalY + 23);
-  
-  addFooter(doc);
-  
-  const filename = `presupuesto_${jobDetails.title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+  doc.setTextColor(...ACCENT_COLOR);
+  const totalWidth = doc.getTextWidth(totalText);
+  doc.text(totalText, 14 + summaryWidth - totalWidth - 6, finalY + 22);
+
+  addFooter(doc, companyLogo);
+
+  const filename = `presupuesto_${jobDetails.title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
+    new Date(),
+    'yyyy-MM-dd'
+  )}.pdf`;
   doc.save(filename);
 }
 
 // Generate PDF for entire tour (all dates)
 export async function generateTourRatesSummaryPDF(
   tourName: string,
-  jobsWithQuotes: Array<{ job: JobDetails; quotes: TourJobRateQuote[] }>,
+  jobsWithQuotes: TourSummaryJob[],
   profiles: TechnicianProfile[]
 ) {
   const doc = new jsPDF();
-  
-  let yPos = addHeaderWithLogo(doc, `Resumen de Tarifas - ${tourName}`);
-  
-  doc.setFontSize(11);
+  const companyLogo = await getCompanyLogo();
+  const headerTitle = `Resumen de Tarifas - ${tourName}`;
+  const contentTop = addHeaderWithBranding(doc, headerTitle, companyLogo);
+
+  const getTechName = getTechNameFactory(profiles);
+  const sortedJobs = [...jobsWithQuotes].sort(
+    (a, b) => new Date(a.job.start_time).getTime() - new Date(b.job.start_time).getTime()
+  );
+
+  let yPos = contentTop;
+
   doc.setFont('helvetica', 'bold');
-  doc.text(`Total de fechas: ${jobsWithQuotes.length}`, 14, yPos);
-  yPos += 10;
-  
-  const getTechName = (id: string) => {
-    const p = profiles.find(x => x.id === id);
-    return p ? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unknown' : 'Unknown';
-  };
-  
-  // Aggregated totals by technician
-  const techTotals = new Map<string, { name: string; dates: number; total: number }>();
-  
-  jobsWithQuotes.forEach(({ quotes }) => {
-    quotes.forEach(q => {
-      const existing = techTotals.get(q.technician_id) || { 
-        name: getTechName(q.technician_id), 
-        dates: 0, 
-        total: 0 
-      };
+  doc.setFontSize(11);
+  doc.setTextColor(...ACCENT_COLOR);
+  doc.text(`Total de fechas: ${sortedJobs.length}`, 14, yPos);
+  yPos += 6;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...MUTED_TEXT_COLOR);
+  doc.text('Resumen general por técnico', 14, yPos);
+  yPos += 6;
+
+  const techTotals = new Map<string, { name: string; dates: number; total: number; lpos: Set<string> }>();
+
+  sortedJobs.forEach(({ quotes, lpoMap }) => {
+    quotes.forEach((quote) => {
+      const techId = quote.technician_id;
+      if (!techId) return;
+
+      const existing =
+        techTotals.get(techId) || {
+          name: getTechName(techId),
+          dates: 0,
+          total: 0,
+          lpos: new Set<string>(),
+        };
+
       existing.dates += 1;
-      existing.total += (q.total_with_extras_eur || q.total_eur);
-      techTotals.set(q.technician_id, existing);
+      existing.total += quote.total_with_extras_eur || quote.total_eur || 0;
+
+      const lpo = lpoMap?.get(techId);
+      if (lpo) existing.lpos.add(lpo);
+
+      techTotals.set(techId, existing);
     });
   });
-  
-  const summaryData = Array.from(techTotals.values()).map(t => [
-    t.name,
-    t.dates.toString(),
-    formatCurrency(t.total)
-  ]);
-  
+
+  const summaryRows = Array.from(techTotals.values())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((item) => [
+      item.name,
+      item.dates.toString(),
+      item.lpos.size ? Array.from(item.lpos).join(', ') : '—',
+      formatCurrency(item.total),
+    ]);
+
   autoTable(doc, {
     startY: yPos,
-    head: [['Técnico', 'Fechas', 'Total Gira']],
-    body: summaryData,
+    head: [['Técnico', 'Fechas', 'LPOs', 'Total Gira']],
+    body: summaryRows,
     theme: 'grid',
-    headStyles: { fillColor: [59, 130, 246], textColor: 255 },
-    styles: { fontSize: 10 },
+    headStyles: { fillColor: ACCENT_COLOR as number[], textColor: 255, fontStyle: 'bold' },
+    styles: { fontSize: 10, cellPadding: 3 },
+    alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR as number[] },
     columnStyles: {
       1: { halign: 'center' },
-      2: { halign: 'right', fontStyle: 'bold' }
-    }
+      2: { halign: 'left' },
+      3: { halign: 'right', fontStyle: 'bold' },
+    },
+    margin: { left: 14, right: 14, top: contentTop },
+    didDrawPage: (data) => {
+      if (data.pageNumber > 1) {
+        addHeaderWithBranding(doc, headerTitle, companyLogo);
+      }
+    },
   });
-  
-  // Grand total
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
-  const tourGrandTotal = Array.from(techTotals.values()).reduce((sum, t) => sum + t.total, 0);
-  
+
+  const summaryFinalY = ((doc as any).lastAutoTable?.finalY ?? yPos) + 10;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const boxWidth = pageWidth - 28;
+  const tourGrandTotal = Array.from(techTotals.values()).reduce((sum, item) => sum + item.total, 0);
+
+  doc.setFillColor(...LIGHT_BACKGROUND);
+  doc.roundedRect(14, summaryFinalY, boxWidth, 26, 3, 3, 'F');
+
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`Total General de Gira: ${formatCurrency(tourGrandTotal)}`, 14, finalY);
-  
-  // Detailed breakdown by date (new page)
+  doc.setTextColor(...ACCENT_COLOR);
+  doc.text(`Total General de Gira: ${formatCurrency(tourGrandTotal)}`, 18, summaryFinalY + 16);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...MUTED_TEXT_COLOR);
+  doc.text(`Total de técnicos: ${techTotals.size}`, 18, summaryFinalY + 22);
+
   doc.addPage();
-  yPos = 20;
-  doc.setFontSize(14);
+  let headerOffset = addHeaderWithBranding(doc, headerTitle, companyLogo);
   doc.setFont('helvetica', 'bold');
-  doc.text('Desglose por Fecha', 14, yPos);
-  yPos += 10;
-  
-  jobsWithQuotes.forEach(({ job, quotes }) => {
-    if (yPos > 250) {
+  doc.setFontSize(14);
+  doc.setTextColor(...ACCENT_COLOR);
+  doc.text('Desglose por Fecha', 14, headerOffset);
+
+  let breakdownY = headerOffset + 8;
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  sortedJobs.forEach((item, index) => {
+    if (!item.quotes.length) return;
+
+    if (breakdownY > pageHeight - 60) {
       doc.addPage();
-      yPos = 20;
+      headerOffset = addHeaderWithBranding(doc, headerTitle, companyLogo);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(...ACCENT_COLOR);
+      doc.text('Desglose por Fecha (cont.)', 14, headerOffset);
+      breakdownY = headerOffset + 8;
     }
-    
-    doc.setFontSize(11);
+
     doc.setFont('helvetica', 'bold');
-    doc.text(`${format(new Date(job.start_time), 'PPP', { locale: es })} - ${job.title}`, 14, yPos);
-    yPos += 7;
-    
-    const dateTableData = quotes.map(q => [
-      getTechName(q.technician_id),
-      q.is_house_tech ? 'Plantilla' : (q.category || '—'),
-      formatCurrency(q.total_with_extras_eur || q.total_eur)
-    ]);
-    
-    autoTable(doc, {
-      startY: yPos,
-      head: [['Técnico', 'Categoría', 'Total']],
-      body: dateTableData,
-      theme: 'plain',
-      headStyles: { fillColor: [229, 231, 235], textColor: 0 },
-      styles: { fontSize: 9 },
-      columnStyles: {
-        2: { halign: 'right', fontStyle: 'bold' }
-      },
-      margin: { left: 20 }
+    doc.setFontSize(11);
+    doc.setTextColor(...ACCENT_COLOR);
+    doc.text(`${formatJobDate(item.job.start_time)} • ${item.job.title}`, 14, breakdownY);
+    breakdownY += 6;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...MUTED_TEXT_COLOR);
+    doc.text(`${item.quotes.length} asignaciones`, 14, breakdownY);
+    breakdownY += 4;
+
+    const jobTableRows = item.quotes.map((quote) => {
+      const name = getTechName(quote.technician_id);
+      const lpo = item.lpoMap?.get(quote.technician_id) ?? null;
+      const baseText =
+        quote.multiplier > 1
+          ? `${formatCurrency(quote.base_day_eur)} ×${quote.multiplier}`
+          : formatCurrency(quote.base_day_eur);
+      return [
+        withLpo(name, lpo),
+        quote.is_house_tech ? 'Plantilla' : quote.category || '—',
+        baseText,
+        formatCurrency(quote.extras_total_eur || 0),
+        formatCurrency(quote.total_with_extras_eur || quote.total_eur || 0),
+      ];
     });
-    
-    yPos = (doc as any).lastAutoTable.finalY + 8;
+
+    autoTable(doc, {
+      startY: breakdownY,
+      head: [['Técnico', 'Categoría', 'Base', 'Extras', 'Total']],
+      body: jobTableRows,
+      theme: 'grid',
+      headStyles: { fillColor: ACCENT_COLOR as number[], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 3 },
+      alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR as number[] },
+      columnStyles: {
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'right', fontStyle: 'bold' },
+      },
+      margin: { left: 14, right: 14, top: headerOffset },
+      didDrawPage: (data) => {
+        if (data.pageNumber > 1) {
+          addHeaderWithBranding(doc, headerTitle, companyLogo);
+        }
+      },
+    });
+
+    breakdownY = ((doc as any).lastAutoTable?.finalY ?? breakdownY) + 6;
+
+    const jobBaseTotal = item.quotes.reduce(
+      (sum, quote) => sum + quote.base_day_eur * (quote.multiplier || 1),
+      0
+    );
+    const jobExtrasTotal = item.quotes.reduce((sum, quote) => sum + (quote.extras_total_eur || 0), 0);
+    const jobGrandTotal = item.quotes.reduce(
+      (sum, quote) => sum + (quote.total_with_extras_eur || quote.total_eur || 0),
+      0
+    );
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...ACCENT_COLOR);
+    doc.text(
+      `Totales — Base: ${formatCurrency(jobBaseTotal)} · Extras: ${formatCurrency(jobExtrasTotal)} · General: ${formatCurrency(jobGrandTotal)}`,
+      18,
+      breakdownY
+    );
+
+    breakdownY += 10;
+    doc.setTextColor(0, 0, 0);
   });
-  
-  addFooter(doc);
-  
-  const filename = `resumen_gira_${tourName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+
+  addFooter(doc, companyLogo);
+
+  const filename = `resumen_gira_${tourName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
+    new Date(),
+    'yyyy-MM-dd'
+  )}.pdf`;
   doc.save(filename);
 }
 
@@ -267,103 +496,152 @@ export async function generateJobPayoutPDF(
   lpoMap?: Map<string, string | null>
 ) {
   const doc = new jsPDF();
-  
-  let yPos = addHeaderWithLogo(doc, 'Informe de Pagos - Trabajo');
-  
-  // Job details
-  doc.setFontSize(12);
+  const companyLogo = await getCompanyLogo();
+  const headerTitle = 'Informe de Pagos - Trabajo';
+  const contentTop = addHeaderWithBranding(doc, headerTitle, companyLogo);
+
+  let yPos = contentTop;
+
   doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...ACCENT_COLOR);
   doc.text('Detalles del Trabajo', 14, yPos);
-  yPos += 7;
-  
-  doc.setFontSize(10);
+  yPos += 6;
+
   doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...MUTED_TEXT_COLOR);
   doc.text(`Nombre: ${jobDetails.title}`, 14, yPos);
   yPos += 5;
-  doc.text(`Fecha: ${format(new Date(jobDetails.start_time), 'PPP', { locale: es })}`, 14, yPos);
+  doc.text(`Fecha: ${formatJobDate(jobDetails.start_time)}`, 14, yPos);
   yPos += 10;
-  
-  const getTechName = (id: string) => {
-    const p = profiles.find(x => x.id === id);
-    return p ? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unknown' : 'Unknown';
-  };
-  
-  // Payout breakdown table
-  const tableData = payouts.map(p => {
-    const name = getTechName(p.technician_id);
-    const lpo = lpoMap?.get(p.technician_id);
+
+  const getTechName = getTechNameFactory(profiles);
+
+  const tableData = payouts.map((payout) => {
+    const name = getTechName(payout.technician_id);
+    const lpo = lpoMap?.get(payout.technician_id) ?? null;
     return [
-      name + (lpo ? `\n(LPO: ${lpo})` : ''),
-      formatCurrency(p.timesheets_total_eur),
-      formatCurrency(p.extras_total_eur),
-      formatCurrency(p.total_eur)
+      withLpo(name, lpo),
+      formatCurrency(payout.timesheets_total_eur),
+      formatCurrency(payout.extras_total_eur),
+      formatCurrency(payout.total_eur),
     ];
   });
-  
+
   autoTable(doc, {
     startY: yPos,
     head: [['Técnico', 'Partes', 'Extras', 'Total']],
     body: tableData,
     theme: 'grid',
-    headStyles: { fillColor: [59, 130, 246], textColor: 255 },
-    styles: { fontSize: 10 },
+    headStyles: { fillColor: ACCENT_COLOR as number[], textColor: 255, fontStyle: 'bold' },
+    styles: { fontSize: 10, cellPadding: 3 },
+    alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR as number[] },
     columnStyles: {
       1: { halign: 'right' },
       2: { halign: 'right' },
-      3: { halign: 'right', fontStyle: 'bold' }
-    }
+      3: { halign: 'right', fontStyle: 'bold' },
+    },
+    margin: { left: 14, right: 14, top: contentTop },
+    didDrawPage: (data) => {
+      if (data.pageNumber > 1) {
+        addHeaderWithBranding(doc, headerTitle, companyLogo);
+      }
+    },
   });
-  
-  let finalY = (doc as any).lastAutoTable.finalY + 10;
-  
-  // Detailed extras breakdown (if any)
-  const payoutsWithExtras = payouts.filter(p => p.extras_breakdown?.items && p.extras_breakdown.items.length > 0);
+
+  let currentY = ((doc as any).lastAutoTable?.finalY ?? yPos) + 12;
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  const payoutsWithExtras = payouts.filter(
+    (payout) => payout.extras_breakdown?.items && payout.extras_breakdown.items.length > 0
+  );
+
   if (payoutsWithExtras.length > 0) {
-    doc.setFontSize(11);
+    if (currentY > pageHeight - 60) {
+      doc.addPage();
+      currentY = addHeaderWithBranding(doc, headerTitle, companyLogo) + 2;
+    }
+
     doc.setFont('helvetica', 'bold');
-    doc.text('Desglose de Extras', 14, finalY);
-    finalY += 7;
-    
-    payoutsWithExtras.forEach(p => {
-      const name = getTechName(p.technician_id);
+    doc.setFontSize(11);
+    doc.setTextColor(...ACCENT_COLOR);
+    doc.text('Desglose de Extras', 14, currentY);
+    currentY += 7;
+
+    payoutsWithExtras.forEach((payout) => {
+      if (currentY > pageHeight - 40) {
+        doc.addPage();
+        currentY = addHeaderWithBranding(doc, headerTitle, companyLogo) + 2;
+      }
+
+      const name = getTechName(payout.technician_id);
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
+      doc.setTextColor(...ACCENT_COLOR);
+      doc.text(name, 14, currentY);
+      currentY += 5;
+
       doc.setFont('helvetica', 'normal');
-      doc.text(`${name}:`, 14, finalY);
-      finalY += 5;
-      
-      p.extras_breakdown!.items!.forEach(item => {
-        const itemText = `  • ${item.extra_type.replace('_', ' ')} × ${item.quantity} = ${formatCurrency(item.amount_eur)}`;
-        doc.text(itemText, 20, finalY);
-        finalY += 5;
+      doc.setFontSize(9);
+      doc.setTextColor(...MUTED_TEXT_COLOR);
+
+      payout.extras_breakdown!.items!.forEach((item) => {
+        const itemText = `• ${item.extra_type.replace('_', ' ')} × ${item.quantity} = ${formatCurrency(item.amount_eur)}`;
+        doc.text(itemText, 18, currentY);
+        currentY += 5;
+
+        if (currentY > pageHeight - 20) {
+          doc.addPage();
+          currentY = addHeaderWithBranding(doc, headerTitle, companyLogo) + 2;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(...MUTED_TEXT_COLOR);
+        }
       });
-      
-      finalY += 3;
+
+      currentY += 4;
     });
   }
-  
-  // Grand totals
-  const totalTimesheets = payouts.reduce((sum, p) => sum + p.timesheets_total_eur, 0);
-  const totalExtras = payouts.reduce((sum, p) => sum + p.extras_total_eur, 0);
-  const grandTotal = payouts.reduce((sum, p) => sum + p.total_eur, 0);
-  
-  doc.setFontSize(11);
+
+  if (currentY > pageHeight - 40) {
+    doc.addPage();
+    currentY = addHeaderWithBranding(doc, headerTitle, companyLogo) + 4;
+  }
+
+  const totalTimesheets = payouts.reduce((sum, payout) => sum + payout.timesheets_total_eur, 0);
+  const totalExtras = payouts.reduce((sum, payout) => sum + payout.extras_total_eur, 0);
+  const grandTotal = payouts.reduce((sum, payout) => sum + payout.total_eur, 0);
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const summaryWidth = pageWidth - 28;
+
+  doc.setFillColor(...LIGHT_BACKGROUND);
+  doc.roundedRect(14, currentY, summaryWidth, 32, 3, 3, 'F');
+
   doc.setFont('helvetica', 'bold');
-  doc.text('Totales del Trabajo', 14, finalY);
-  finalY += 7;
-  
-  doc.setFontSize(10);
+  doc.setFontSize(11);
+  doc.setTextColor(...ACCENT_COLOR);
+  doc.text('Totales del Trabajo', 18, currentY + 10);
+
   doc.setFont('helvetica', 'normal');
-  doc.text(`Total Partes: ${formatCurrency(totalTimesheets)}`, 14, finalY);
-  finalY += 5;
-  doc.text(`Total Extras: ${formatCurrency(totalExtras)}`, 14, finalY);
-  finalY += 7;
-  
+  doc.setFontSize(10);
+  doc.setTextColor(...MUTED_TEXT_COLOR);
+  doc.text(`Total Partes: ${formatCurrency(totalTimesheets)}`, 18, currentY + 18);
+  doc.text(`Total Extras: ${formatCurrency(totalExtras)}`, 18, currentY + 26);
+
+  const totalText = `Total General: ${formatCurrency(grandTotal)}`;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text(`Total General: ${formatCurrency(grandTotal)}`, 14, finalY);
-  
-  addFooter(doc);
-  
-  const filename = `pago_${jobDetails.title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+  doc.setTextColor(...ACCENT_COLOR);
+  const totalWidth = doc.getTextWidth(totalText);
+  doc.text(totalText, 14 + summaryWidth - totalWidth - 6, currentY + 22);
+
+  addFooter(doc, companyLogo);
+
+  const filename = `pago_${jobDetails.title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
+    new Date(),
+    'yyyy-MM-dd'
+  )}.pdf`;
   doc.save(filename);
 }

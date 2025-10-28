@@ -13,8 +13,8 @@ import { es } from 'date-fns/locale';
 import { FileDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { generateTourRatesSummaryPDF } from '@/utils/rates-pdf-export';
+import { buildTourRatesExportPayload } from '@/services/tourRatesExport';
 import { toast } from 'sonner';
-import { TourJobRateQuote } from '@/types/tourRates';
 
 interface RatesApprovalsTableProps {
   onManageTour: (tourId: string) => void;
@@ -150,58 +150,52 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
                     <TableCell className="text-right space-x-2">
                       {row.entityType === 'tour' ? (
                         <>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={async () => {
-                              const { data: tourJobs } = await supabase
-                                .from('jobs')
-                                .select('id, title, start_time')
-                                .eq('tour_id', row.id)
-                                .eq('job_type', 'tourdate')
-                                .order('start_time', { ascending: true });
-                              
-                              if (!tourJobs || tourJobs.length === 0) {
-                                toast.error('No hay fechas de gira para exportar');
-                                return;
+                              try {
+                                const { data: tourJobs, error } = await supabase
+                                  .from('jobs')
+                                  .select('id, title, start_time, end_time')
+                                  .eq('tour_id', row.id)
+                                  .eq('job_type', 'tourdate')
+                                  .order('start_time', { ascending: true });
+
+                                if (error) throw error;
+
+                                if (!tourJobs || tourJobs.length === 0) {
+                                  toast.error('No hay fechas de gira para exportar');
+                                  return;
+                                }
+
+                                const jobsForExport = tourJobs.map((job) => ({
+                                  id: job.id,
+                                  title: job.title,
+                                  start_time: job.start_time,
+                                  end_time: job.end_time ?? null,
+                                }));
+
+                                const { jobsWithQuotes, profiles } = await buildTourRatesExportPayload(
+                                  row.id,
+                                  jobsForExport
+                                );
+
+                                if (!jobsWithQuotes.length) {
+                                  toast.error('No hay asignaciones con tarifas para exportar.');
+                                  return;
+                                }
+
+                                await generateTourRatesSummaryPDF(
+                                  row.name,
+                                  jobsWithQuotes,
+                                  profiles
+                                );
+                                toast.success('PDF de gira generado');
+                              } catch (err) {
+                                console.error('Error exporting tour summary', err);
+                                toast.error('No se pudo generar el PDF de la gira');
                               }
-                              
-                              const jobsWithQuotes = await Promise.all(
-                                tourJobs.map(async (job) => {
-                                  const { data: assignments } = await supabase
-                                    .from('job_assignments')
-                                    .select('technician_id')
-                                    .eq('job_id', job.id);
-                                  
-                                  const quotes = await Promise.all(
-                                    (assignments || []).map(async (a) => {
-                                      const { data } = await supabase.rpc('compute_tour_job_rate_quote_2025', {
-                                        _job_id: job.id,
-                                        _tech_id: a.technician_id
-                                      });
-                                      return data as unknown as TourJobRateQuote;
-                                    })
-                                  );
-                                  
-                                  return { job, quotes: quotes.filter(Boolean) as TourJobRateQuote[] };
-                                })
-                              );
-                              
-                              const allTechIds = [...new Set(
-                                jobsWithQuotes.flatMap(j => j.quotes.map((q: any) => q.technician_id))
-                              )];
-                              
-                              const { data: profiles } = await supabase
-                                .from('profiles')
-                                .select('id, first_name, last_name')
-                                .in('id', allTechIds);
-                              
-                              await generateTourRatesSummaryPDF(
-                                row.name,
-                                jobsWithQuotes,
-                                profiles || []
-                              );
-                              toast.success('PDF de gira generado');
                             }}
                           >
                             <FileDown className="h-4 w-4" />
