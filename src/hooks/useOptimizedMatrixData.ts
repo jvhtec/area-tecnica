@@ -22,11 +22,9 @@ interface AssignmentWithJob {
   lights_role?: string;
   video_role?: string;
   single_day?: boolean | null;
-  single_day_date?: string | null;
+  assignment_date?: string | null;
   status: string;
   assigned_at: string;
-  single_day?: boolean;
-  assignment_date?: string | null;
   job: {
     id: string;
     title: string;
@@ -52,9 +50,9 @@ export const buildAssignmentDateMap = (
   assignments.forEach((assignment) => {
     if (!assignment.job) return;
 
-    if (assignment.single_day && assignment.single_day_date) {
-      if (visibleDateKeys.size === 0 || visibleDateKeys.has(assignment.single_day_date)) {
-        map.set(`${assignment.technician_id}-${assignment.single_day_date}`, assignment);
+    if (assignment.single_day && assignment.assignment_date) {
+      if (visibleDateKeys.size === 0 || visibleDateKeys.has(assignment.assignment_date)) {
+        map.set(`${assignment.technician_id}-${assignment.assignment_date}`, assignment);
       }
       return;
     }
@@ -113,11 +111,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
               lights_role,
               video_role,
               single_day,
-              single_day_date,
+              assignment_date,
               status,
               assigned_at,
-              single_day,
-              assignment_date,
               jobs!job_id (
                 id,
                 title,
@@ -152,11 +148,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           lights_role: item.lights_role,
           video_role: item.video_role,
           single_day: item.single_day,
-          single_day_date: item.single_day_date,
+          assignment_date: item.assignment_date,
           status: item.status,
           assigned_at: item.assigned_at,
-          single_day: item.single_day,
-          assignment_date: item.assignment_date,
           job: Array.isArray(item.jobs) ? item.jobs[0] : item.jobs
         })).filter(item => item.job); // Filter out items without job data
         

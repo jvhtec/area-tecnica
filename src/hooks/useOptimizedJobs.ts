@@ -61,7 +61,7 @@ export const useOptimizedJobs = (
           lights_role,
           video_role,
           single_day,
-          single_day_date,
+          assignment_date,
           status,
           assigned_at,
           profiles!inner(
