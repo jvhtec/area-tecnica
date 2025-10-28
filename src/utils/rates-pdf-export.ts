@@ -53,13 +53,6 @@ const TABLE_STRIPE_COLOR: [number, number, number] = [248, 248, 248];
 const SUMMARY_BACKGROUND: [number, number, number] = [250, 250, 250];
 const HEADER_HEIGHT = 44;
 const HEADER_CONTENT_OFFSET = HEADER_HEIGHT + 18;
-const COMPANY_LOGO_PATHS = [
-  '/sector pro logo.png',
-  './sector pro logo.png',
-  'sector pro logo.png',
-  '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png',
-];
-
 const loadImageSafely = (src: string, description: string): Promise<HTMLImageElement | null> => {
   return new Promise((resolve) => {
     if (!src || typeof Image === 'undefined') {
@@ -77,22 +70,6 @@ const loadImageSafely = (src: string, description: string): Promise<HTMLImageEle
     img.src = src;
   });
 };
-
-let cachedCompanyLogoPromise: Promise<HTMLImageElement | null> | null = null;
-
-async function getCompanyLogo(): Promise<HTMLImageElement | null> {
-  if (!cachedCompanyLogoPromise) {
-    cachedCompanyLogoPromise = (async () => {
-      for (const path of COMPANY_LOGO_PATHS) {
-        const img = await loadImageSafely(path, 'Sector Pro logo');
-        if (img) return img;
-      }
-      return null;
-    })();
-  }
-
-  return cachedCompanyLogoPromise;
-}
 
 interface HeaderOptions {
   title: string;
@@ -175,28 +152,24 @@ const drawCorporateFooter = (doc: jsPDF, logo: HTMLImageElement | null) => {
   doc.setTextColor(...TEXT_PRIMARY);
 };
 
-const resolveBrandingLogo = async ({
+const resolveHeaderLogo = async ({
   jobId,
   tourId,
 }: {
   jobId?: string;
   tourId?: string | null;
 }): Promise<HTMLImageElement | null> => {
-  const [companyLogo, tourLogoUrl, jobLogoUrl] = await Promise.all([
-    getCompanyLogo(),
+  const [tourLogoUrl, jobLogoUrl] = await Promise.all([
     tourId ? fetchTourLogo(tourId) : Promise.resolve(undefined),
     jobId ? fetchJobLogo(jobId) : Promise.resolve(undefined),
   ]);
 
   const brandingUrl = tourLogoUrl || jobLogoUrl;
-  if (brandingUrl) {
-    const logo = await loadImageSafely(brandingUrl, 'tour or job logo');
-    if (logo) {
-      return logo;
-    }
+  if (!brandingUrl) {
+    return null;
   }
 
-  return companyLogo;
+  return loadImageSafely(brandingUrl, 'tour or job logo');
 };
 
 const getTechNameFactory = (profiles: TechnicianProfile[]) => {
@@ -221,12 +194,15 @@ export async function generateRateQuotePDF(
 ) {
   const doc = new jsPDF();
   const tourIdFromQuotes = quotes.find((quote) => quote.tour_id)?.tour_id;
-  const brandingLogo = await resolveBrandingLogo({ jobId: jobDetails.id, tourId: jobDetails.tour_id ?? tourIdFromQuotes });
+  const headerLogo = await resolveHeaderLogo({
+    jobId: jobDetails.id,
+    tourId: jobDetails.tour_id ?? tourIdFromQuotes,
+  });
   const headerOptions: HeaderOptions = {
     title: 'Presupuesto de Tarifas',
     subtitle: jobDetails.title,
     metadata: `Generado: ${format(new Date(), 'PPP', { locale: es })}`,
-    logo: brandingLogo,
+    logo: headerLogo,
   };
   const contentTop = drawCorporateHeader(doc, headerOptions);
 
@@ -317,7 +293,7 @@ export async function generateRateQuotePDF(
   const totalWidth = doc.getTextWidth(totalText);
   doc.text(totalText, 14 + summaryWidth - totalWidth - 6, finalY + 22);
 
-  drawCorporateFooter(doc, brandingLogo);
+  drawCorporateFooter(doc, headerLogo);
 
   const filename = `presupuesto_${jobDetails.title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
     new Date(),
@@ -334,12 +310,12 @@ export async function generateTourRatesSummaryPDF(
 ) {
   const doc = new jsPDF();
   const tourId = jobsWithQuotes.find((job) => job.quotes.length)?.quotes[0]?.tour_id;
-  const brandingLogo = await resolveBrandingLogo({ tourId });
+  const headerLogo = await resolveHeaderLogo({ tourId });
   const headerOptions: HeaderOptions = {
     title: 'Resumen de Tarifas',
     subtitle: tourName,
     metadata: `Generado: ${format(new Date(), 'PPP', { locale: es })}`,
-    logo: brandingLogo,
+    logo: headerLogo,
   };
   const contentTop = drawCorporateHeader(doc, headerOptions);
 
@@ -534,7 +510,7 @@ export async function generateTourRatesSummaryPDF(
     doc.setTextColor(...TEXT_PRIMARY);
   });
 
-  drawCorporateFooter(doc, brandingLogo);
+  drawCorporateFooter(doc, headerLogo);
 
   const filename = `resumen_gira_${tourName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
     new Date(),
@@ -551,12 +527,15 @@ export async function generateJobPayoutPDF(
   lpoMap?: Map<string, string | null>
 ) {
   const doc = new jsPDF();
-  const brandingLogo = await resolveBrandingLogo({ jobId: jobDetails.id, tourId: jobDetails.tour_id });
+  const headerLogo = await resolveHeaderLogo({
+    jobId: jobDetails.id,
+    tourId: jobDetails.tour_id,
+  });
   const headerOptions: HeaderOptions = {
     title: 'Informe de Pagos',
     subtitle: jobDetails.title,
     metadata: `Generado: ${format(new Date(), 'PPP', { locale: es })}`,
-    logo: brandingLogo,
+    logo: headerLogo,
   };
   const contentTop = drawCorporateHeader(doc, headerOptions);
 
@@ -699,7 +678,7 @@ export async function generateJobPayoutPDF(
   const totalWidth = doc.getTextWidth(totalText);
   doc.text(totalText, 14 + summaryWidth - totalWidth - 6, currentY + 22);
 
-  drawCorporateFooter(doc, brandingLogo);
+  drawCorporateFooter(doc, headerLogo);
 
   const filename = `pago_${jobDetails.title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
     new Date(),
