@@ -2661,48 +2661,42 @@ export type Database = {
       }
       job_assignments: {
         Row: {
-          assignment_date: string | null
           assigned_at: string
           assigned_by: string | null
+          assignment_date: string | null
           assignment_source: string | null
           job_id: string
           lights_role: string | null
-          single_day: boolean
           response_time: string | null
-          single_day: boolean | null
-          single_day_date: string | null
+          single_day: boolean
           sound_role: string | null
           status: Database["public"]["Enums"]["assignment_status"] | null
           technician_id: string
           video_role: string | null
         }
         Insert: {
-          assignment_date?: string | null
           assigned_at?: string
           assigned_by?: string | null
+          assignment_date?: string | null
           assignment_source?: string | null
           job_id: string
           lights_role?: string | null
-          single_day?: boolean
           response_time?: string | null
-          single_day?: boolean | null
-          single_day_date?: string | null
+          single_day?: boolean
           sound_role?: string | null
           status?: Database["public"]["Enums"]["assignment_status"] | null
           technician_id: string
           video_role?: string | null
         }
         Update: {
-          assignment_date?: string | null
           assigned_at?: string
           assigned_by?: string | null
+          assignment_date?: string | null
           assignment_source?: string | null
           job_id?: string
           lights_role?: string | null
-          single_day?: boolean
           response_time?: string | null
-          single_day?: boolean | null
-          single_day_date?: string | null
+          single_day?: boolean
           sound_role?: string | null
           status?: Database["public"]["Enums"]["assignment_status"] | null
           technician_id?: string
@@ -6232,6 +6226,51 @@ export type Database = {
           },
         ]
       }
+      wallboard_presets: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_url: string
+          highlight_ttl_seconds: number
+          id: string
+          name: string
+          panel_durations: Json
+          panel_order: string[]
+          rotation_fallback_seconds: number
+          slug: string
+          ticker_poll_interval_seconds: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_url?: string
+          highlight_ttl_seconds?: number
+          id?: string
+          name: string
+          panel_durations: Json
+          panel_order: string[]
+          rotation_fallback_seconds?: number
+          slug: string
+          ticker_poll_interval_seconds?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_url?: string
+          highlight_ttl_seconds?: number
+          id?: string
+          name?: string
+          panel_durations?: Json
+          panel_order?: string[]
+          rotation_fallback_seconds?: number
+          slug?: string
+          ticker_poll_interval_seconds?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       current_stock_levels: {
@@ -6411,51 +6450,6 @@ export type Database = {
         Row: {
           department: string | null
           need: number | null
-        }
-        Relationships: []
-      }
-      wallboard_presets: {
-        Row: {
-          created_at: string
-          description: string | null
-          display_url: string
-          highlight_ttl_seconds: number
-          id: string
-          name: string
-          panel_durations: Json
-          panel_order: string[]
-          rotation_fallback_seconds: number
-          slug: string
-          ticker_poll_interval_seconds: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          display_url: string
-          highlight_ttl_seconds?: number
-          id?: string
-          name: string
-          panel_durations: Json
-          panel_order: string[]
-          rotation_fallback_seconds?: number
-          slug: string
-          ticker_poll_interval_seconds?: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          display_url?: string
-          highlight_ttl_seconds?: number
-          id?: string
-          name?: string
-          panel_durations?: Json
-          panel_order?: string[]
-          rotation_fallback_seconds?: number
-          slug?: string
-          ticker_poll_interval_seconds?: number
-          updated_at?: string
         }
         Relationships: []
       }
