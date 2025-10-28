@@ -221,7 +221,9 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
     }
   }
 
-  // 2) Fetch standalone jobs (exclude dry hire and tour dates; exclude cancelled)
+  // 2) Fetch jobs that follow the timesheet approval flow
+  //    Include standalone jobs and also tour-linked jobs that are not tour dates (e.g. 'single', 'festival').
+  //    Always exclude dry hire and tour dates from this list.
   const { data: jobsList, error: jobsError2 } = await supabase
     .from('jobs')
     .select('id, title, start_time, end_time, job_type, status, rates_approved, tour_id')
@@ -232,10 +234,12 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
 
   if (jobsError2) throw jobsError2;
 
-  const standaloneJobs = (jobsList || []).filter(
-    (j) => !j.tour_id && (j.job_type ?? '').toLowerCase() !== 'tour'
+  // Keep jobs even if they belong to a tour, as long as they are not 'tourdate'.
+  // This ensures tour-linked 'single' jobs appear in the approvals table as individual jobs.
+  const jobsNeedingTimesheetApproval = (jobsList || []).filter(
+    (j) => (j.job_type ?? '').toLowerCase() !== 'tour'
   );
-  const jobIds = standaloneJobs.map((j) => j.id);
+  const jobIds = jobsNeedingTimesheetApproval.map((j) => j.id);
   jobIds.forEach((id) => jobReviewIds.add(id));
 
   const assignmentCountByJob: Record<string, number> = {};
@@ -340,7 +344,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
     };
   });
 
-  const jobRows: RatesApprovalRow[] = standaloneJobs.map((job) => {
+  const jobRows: RatesApprovalRow[] = jobsNeedingTimesheetApproval.map((job) => {
     const pendingIssues: string[] = [];
     const assignmentCount = assignmentCountByJob[job.id] || 0;
     if (!job.rates_approved) pendingIssues.push('Approval required');

@@ -20,6 +20,7 @@ interface JobDetails {
   start_time: string;
   end_time?: string;
   tour_id?: string | null;
+  job_type?: string | null;
 }
 
 interface TourSummaryJob {
@@ -46,6 +47,18 @@ interface PayoutData {
   vehicle_disclaimer_text?: string;
 }
 
+interface TimesheetLine {
+  date?: string | null;
+  hours_rounded?: number;
+  base_day_eur?: number;
+  plus_10_12_hours?: number;
+  plus_10_12_amount_eur?: number;
+  overtime_hours?: number;
+  overtime_hour_eur?: number;
+  overtime_amount_eur?: number;
+  total_eur?: number;
+}
+
 const CORPORATE_RED: [number, number, number] = [125, 1, 1];
 const TEXT_PRIMARY: [number, number, number] = [31, 41, 55];
 const TEXT_MUTED: [number, number, number] = [100, 116, 139];
@@ -53,6 +66,8 @@ const TABLE_STRIPE_COLOR: [number, number, number] = [248, 248, 248];
 const SUMMARY_BACKGROUND: [number, number, number] = [250, 250, 250];
 const HEADER_HEIGHT = 44;
 const HEADER_CONTENT_OFFSET = HEADER_HEIGHT + 18;
+// Reserve space at the bottom for footer so tables/text never collide with it
+const FOOTER_RESERVED = 38; // px, keep enough room for logo + page text
 const loadImageSafely = (src: string, description: string): Promise<HTMLImageElement | null> => {
   return new Promise((resolve) => {
     if (!src || typeof Image === 'undefined') {
@@ -256,7 +271,7 @@ export async function generateRateQuotePDF(
       4: { halign: 'right' },
       5: { halign: 'right', fontStyle: 'bold' },
     },
-    margin: { left: 14, right: 14, top: contentTop },
+    margin: { left: 14, right: 14, top: contentTop, bottom: FOOTER_RESERVED },
     didDrawPage: (data) => {
       if (data.pageNumber > 1) {
         drawCorporateHeader(doc, headerOptions);
@@ -394,7 +409,7 @@ export async function generateTourRatesSummaryPDF(
       2: { halign: 'left' },
       3: { halign: 'right', fontStyle: 'bold' },
     },
-    margin: { left: 14, right: 14, top: contentTop },
+    margin: { left: 14, right: 14, top: contentTop, bottom: FOOTER_RESERVED },
     didDrawPage: (data) => {
       if (data.pageNumber > 1) {
         drawCorporateHeader(doc, headerOptions);
@@ -433,7 +448,7 @@ export async function generateTourRatesSummaryPDF(
   sortedJobs.forEach((item, index) => {
     if (!item.quotes.length) return;
 
-    if (breakdownY > pageHeight - 60) {
+    if (breakdownY > pageHeight - (FOOTER_RESERVED + 60)) {
       doc.addPage();
       headerOffset = drawCorporateHeader(doc, headerOptions);
       doc.setFont('helvetica', 'bold');
@@ -458,12 +473,29 @@ export async function generateTourRatesSummaryPDF(
     const jobTableRows = item.quotes.map((quote) => {
       const name = getTechName(quote.technician_id);
       const lpo = item.lpoMap?.get(quote.technician_id) ?? null;
+      const isTourDate = String(quote.job_type || '').toLowerCase() === 'tourdate';
       const baseText =
         quote.multiplier > 1
           ? `${formatCurrency(quote.base_day_eur)} ×${quote.multiplier}`
           : formatCurrency(quote.base_day_eur);
+
+      let nameCell = withLpo(name, lpo);
+      const hrs = Number(
+        (quote.breakdown && (quote.breakdown.single_hours_total ?? quote.breakdown.hours_rounded ?? quote.breakdown.worked_hours_rounded)) || 0
+      );
+      const plus = Number(quote.breakdown?.single_plus_10_12_total_eur ?? 0);
+      const otH = Number(quote.breakdown?.single_overtime_hours_total ?? 0);
+      const otAmt = Number(quote.breakdown?.single_overtime_amount_total_eur ?? 0);
+      const parts: string[] = [];
+      if (hrs > 0) parts.push(`Horas: ${hrs}h`);
+      if (plus > 0) parts.push(`+10–12: ${formatCurrency(plus)}`);
+      if (otH > 0) parts.push(`HE: ${otH}h = ${formatCurrency(otAmt)}`);
+      if (parts.length) {
+        nameCell = `${nameCell}\n${parts.join(' · ')}`;
+      }
+
       return [
-        withLpo(name, lpo),
+        nameCell,
         quote.is_house_tech ? 'Plantilla' : quote.category || '—',
         baseText,
         formatCurrency(quote.extras_total_eur || 0),
@@ -484,7 +516,7 @@ export async function generateTourRatesSummaryPDF(
         3: { halign: 'right' },
         4: { halign: 'right', fontStyle: 'bold' },
       },
-      margin: { left: 14, right: 14, top: headerOffset },
+      margin: { left: 14, right: 14, top: headerOffset, bottom: FOOTER_RESERVED },
       didDrawPage: (data) => {
         if (data.pageNumber > 1) {
           drawCorporateHeader(doc, headerOptions);
@@ -503,6 +535,13 @@ export async function generateTourRatesSummaryPDF(
       (sum, quote) => sum + (quote.total_with_extras_eur || quote.total_eur || 0),
       0
     );
+
+    // If there isn't enough room for the totals line, continue on a new page
+    if (breakdownY > pageHeight - (FOOTER_RESERVED + 16)) {
+      doc.addPage();
+      headerOffset = drawCorporateHeader(doc, headerOptions);
+      breakdownY = headerOffset + 8;
+    }
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
@@ -532,8 +571,10 @@ export async function generateJobPayoutPDF(
   payouts: PayoutData[],
   jobDetails: JobDetails,
   profiles: TechnicianProfile[],
-  lpoMap?: Map<string, string | null>
-) {
+  lpoMap?: Map<string, string | null>,
+  timesheetMap?: Map<string, TimesheetLine[]>,
+  options?: { download?: boolean }
+): Promise<Blob | void> {
   const doc = new jsPDF();
   const [headerLogo, companyLogo] = await Promise.all([
     resolveHeaderLogo({
@@ -594,7 +635,7 @@ export async function generateJobPayoutPDF(
       2: { halign: 'right' },
       3: { halign: 'right', fontStyle: 'bold' },
     },
-    margin: { left: 14, right: 14, top: contentTop },
+    margin: { left: 14, right: 14, top: contentTop, bottom: FOOTER_RESERVED },
     didDrawPage: (data) => {
       if (data.pageNumber > 1) {
         drawCorporateHeader(doc, headerOptions);
@@ -609,8 +650,80 @@ export async function generateJobPayoutPDF(
     (payout) => payout.extras_breakdown?.items && payout.extras_breakdown.items.length > 0
   );
 
+  // Detailed timesheets breakdown section
+  const techIdsWithTimesheets = Array.from(new Set((payouts || []).map(p => p.technician_id))).filter(
+    (id) => (timesheetMap?.get(id) || []).length > 0
+  );
+  if (techIdsWithTimesheets.length > 0) {
+    if (currentY > pageHeight - (FOOTER_RESERVED + 60)) {
+      doc.addPage();
+      currentY = drawCorporateHeader(doc, headerOptions) + 2;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...CORPORATE_RED);
+    doc.text('Desglose de Partes', 14, currentY);
+    currentY += 7;
+
+    for (const payout of payouts) {
+      const lines = timesheetMap?.get(payout.technician_id) || [];
+      if (!lines.length) continue;
+
+      if (currentY > pageHeight - (FOOTER_RESERVED + 40)) {
+        doc.addPage();
+        currentY = drawCorporateHeader(doc, headerOptions) + 2;
+      }
+
+      const name = getTechName(payout.technician_id);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...CORPORATE_RED);
+      doc.text(name, 14, currentY);
+      currentY += 5;
+
+      const tableRows = lines.map((ln) => [
+        ln.date ? format(new Date(ln.date), 'P', { locale: es }) : '—',
+        `${ln.hours_rounded ?? 0}h`,
+        formatCurrency(ln.base_day_eur ?? 0),
+        ln.plus_10_12_amount_eur ? `${ln.plus_10_12_hours ?? 0}h = ${formatCurrency(ln.plus_10_12_amount_eur)}` : '—',
+        (ln.overtime_hours ?? 0) > 0
+          ? `${ln.overtime_hours}h × ${formatCurrency(ln.overtime_hour_eur ?? 0)} = ${formatCurrency(
+              ln.overtime_amount_eur ?? 0
+            )}`
+          : '—',
+        formatCurrency(ln.total_eur ?? 0),
+      ]);
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Fecha', 'Horas', 'Base día', '+10–12', 'OT', 'Total Parte']],
+        body: tableRows,
+        theme: 'grid',
+        headStyles: { fillColor: CORPORATE_RED as number[], textColor: 255, fontStyle: 'bold' },
+        styles: { fontSize: 9, cellPadding: 3 },
+        alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR as number[] },
+        columnStyles: {
+          1: { halign: 'center' },
+          2: { halign: 'right' },
+          3: { halign: 'right' },
+          4: { halign: 'right' },
+          5: { halign: 'right', fontStyle: 'bold' },
+        },
+        margin: { left: 14, right: 14, top: contentTop, bottom: FOOTER_RESERVED },
+        didDrawPage: (data) => {
+          if (data.pageNumber > 1) {
+            drawCorporateHeader(doc, headerOptions);
+          }
+        },
+      });
+
+      currentY = ((doc as any).lastAutoTable?.finalY ?? currentY) + 8;
+    }
+  }
+
   if (payoutsWithExtras.length > 0) {
-    if (currentY > pageHeight - 60) {
+    if (currentY > pageHeight - (FOOTER_RESERVED + 60)) {
       doc.addPage();
       currentY = drawCorporateHeader(doc, headerOptions) + 2;
     }
@@ -622,7 +735,7 @@ export async function generateJobPayoutPDF(
     currentY += 7;
 
     payoutsWithExtras.forEach((payout) => {
-      if (currentY > pageHeight - 40) {
+      if (currentY > pageHeight - (FOOTER_RESERVED + 40)) {
         doc.addPage();
         currentY = drawCorporateHeader(doc, headerOptions) + 2;
       }
@@ -643,7 +756,7 @@ export async function generateJobPayoutPDF(
         doc.text(itemText, 18, currentY);
         currentY += 5;
 
-        if (currentY > pageHeight - 20) {
+        if (currentY > pageHeight - (FOOTER_RESERVED + 20)) {
           doc.addPage();
           currentY = drawCorporateHeader(doc, headerOptions) + 2;
           doc.setFont('helvetica', 'normal');
@@ -656,7 +769,7 @@ export async function generateJobPayoutPDF(
     });
   }
 
-  if (currentY > pageHeight - 40) {
+  if (currentY > pageHeight - (FOOTER_RESERVED + 40)) {
     doc.addPage();
     currentY = drawCorporateHeader(doc, headerOptions) + 4;
   }
@@ -696,5 +809,9 @@ export async function generateJobPayoutPDF(
     new Date(),
     'yyyy-MM-dd'
   )}.pdf`;
+  if (options?.download === false) {
+    const blob = doc.output('blob') as Blob;
+    return blob;
+  }
   doc.save(filename);
 }

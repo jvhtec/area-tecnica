@@ -40,6 +40,9 @@ import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { toast } from 'sonner';
 import { syncFlexWorkOrdersForJob } from '@/services/flexWorkOrders';
 import { resolveJobDocBucket } from '@/utils/jobDocuments';
+import { mergePDFs } from '@/utils/pdf/pdfMerge';
+import { generateTimesheetPDF } from '@/utils/timesheet-pdf';
+import { generateJobPayoutPDF } from '@/utils/rates-pdf-export';
 
 interface JobDetailsDialogProps {
   open: boolean;
@@ -376,7 +379,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   if (isJobLoading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col overflow-y-auto">
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
@@ -399,7 +402,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col overflow-y-auto">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
             <Calendar className="h-4 w-4 md:h-5 md:w-5" />
@@ -407,7 +410,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex-1 flex flex-col overflow-hidden">
+        {/* Scroll wrapper to ensure the dialog always scrolls regardless of layout */}
+        <div className="min-h-0 overflow-y-auto max-h-[75vh]">
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-col">
           <TabsList className={`grid w-full ${gridColsClass} flex-shrink-0 h-auto text-xs md:text-sm`}>
             <TabsTrigger value="info" className="py-2">Info</TabsTrigger>
             {!isDryhire && <TabsTrigger value="location" className="py-2">Ubicación</TabsTrigger>}
@@ -420,7 +425,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
             {!isDryhire && showExtrasTab && <TabsTrigger value="extras" className="py-2">Extras</TabsTrigger>}
           </TabsList>
 
-          <ScrollArea className="flex-1 mt-3 md:mt-4 px-1">
+          <div className="mt-3 md:mt-4 px-1 pr-1">
             <TabsContent value="info" className="space-y-4">
               <Card className="p-4">
                 <div className="space-y-3">
@@ -617,6 +622,106 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 <Card className="p-3 mt-2">
                   <div className="text-sm space-y-2">
                     <div className="flex items-center justify-between gap-2">
+                      <div className="font-medium">Impresión rápida</div>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={async () => {
+                          try {
+                            // 1) Fetch approved timesheets for this job
+                            const { data: ts } = await supabase
+                              .from('timesheets')
+                              .select('*')
+                              .eq('job_id', resolvedJobId)
+                              .eq('approved_by_manager', true);
+
+                            // Fallback to visibility function when RLS blocks
+                            let timesheets = ts || [];
+                            if (!timesheets.length) {
+                              const { data: visible } = await supabase.rpc('get_timesheet_amounts_visible');
+                              timesheets = (visible as any[] | null)?.filter((r) => r.job_id === resolvedJobId) || [];
+                            }
+
+                            // 2) Build job object for timesheet PDF
+                            const jobObj = {
+                              id: resolvedJobId,
+                              title: jobDetails?.title || job?.title || 'Job',
+                              start_time: jobDetails?.start_time || job?.start_time,
+                              end_time: jobDetails?.end_time || job?.end_time,
+                              job_type: jobDetails?.job_type || job?.job_type,
+                              created_at: jobDetails?.created_at || new Date().toISOString(),
+                            } as any;
+
+                            const tsDoc = await generateTimesheetPDF({ job: jobObj, timesheets: timesheets as any, date: 'all-dates' });
+                            const tsBlob = tsDoc.output('blob') as Blob;
+
+                            // 3) Build inputs for payout PDF
+                            const { data: payouts } = await supabase
+                              .from('v_job_tech_payout_2025')
+                              .select('*')
+                              .eq('job_id', resolvedJobId);
+
+                            const { data: lpoRows } = await supabase
+                              .from('flex_work_orders')
+                              .select('technician_id, lpo_number')
+                              .eq('job_id', resolvedJobId);
+                            const lpoMap = new Map((lpoRows || []).map((r: any) => [r.technician_id, r.lpo_number || null]));
+
+                            // Timesheet breakdowns for payout details
+                            const tsByTech = new Map<string, any[]>();
+                            (timesheets || []).forEach((row: any) => {
+                              const b = (row.amount_breakdown || row.amount_breakdown_visible || {}) as any;
+                              const line = {
+                                date: row.date,
+                                hours_rounded: Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0,
+                                base_day_eur: b.base_day_eur != null ? Number(b.base_day_eur) : undefined,
+                                plus_10_12_hours: b.plus_10_12_hours != null ? Number(b.plus_10_12_hours) : undefined,
+                                plus_10_12_amount_eur: b.plus_10_12_amount_eur != null ? Number(b.plus_10_12_amount_eur) : undefined,
+                                overtime_hours: b.overtime_hours != null ? Number(b.overtime_hours) : undefined,
+                                overtime_hour_eur: b.overtime_hour_eur != null ? Number(b.overtime_hour_eur) : undefined,
+                                overtime_amount_eur: b.overtime_amount_eur != null ? Number(b.overtime_amount_eur) : undefined,
+                                total_eur: b.total_eur != null ? Number(b.total_eur) : undefined,
+                              };
+                              const arr = tsByTech.get(row.technician_id) || [];
+                              arr.push(line);
+                              tsByTech.set(row.technician_id, arr);
+                            });
+
+                            const techIds = Array.from(new Set((payouts || []).map((p: any) => p.technician_id)));
+                            const { data: profiles } = await supabase
+                              .from('profiles')
+                              .select('id, first_name, last_name')
+                              .in('id', techIds);
+
+                            const payoutBlob = (await generateJobPayoutPDF(
+                              (payouts || []) as any,
+                              { id: jobObj.id, title: jobObj.title, start_time: jobObj.start_time, end_time: jobObj.end_time, tour_id: jobDetails?.tour_id ?? null },
+                              (profiles || []) as any,
+                              lpoMap,
+                              tsByTech as any,
+                              { download: false }
+                            )) as Blob;
+
+                            // 4) Merge into a single pack and download
+                            const merged = await mergePDFs([tsBlob, payoutBlob]);
+                            const url = URL.createObjectURL(merged);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `pack_${(jobObj.title || 'job').replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            URL.revokeObjectURL(url);
+                          } catch (e) {
+                            console.error('Failed to generate document pack', e);
+                            toast.error('No se pudo generar el pack de documentos');
+                          }
+                        }}
+                      >
+                        Imprimir Pack (Partes + Pagos)
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
                       <div>
                         <div className="font-medium">Mapa de LPO (depuración)</div>
                         <div className="text-muted-foreground">
@@ -637,7 +742,19 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                             <div key={`${row.technician_id}-${elementId}`} className="flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="truncate"><span className="font-medium">{name}</span></div>
-                                <div className="text-xs text-muted-foreground truncate">LPO: {elementId}</div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  LPO: {elementId}
+                                  {elementId && (
+                                    <a
+                                      className="ml-2 text-primary hover:underline inline-flex items-center"
+                                      href={`https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#fin-doc/${encodeURIComponent(elementId)}/doc-view/8238f39c-f42e-11e0-a8de-00e08175e43e/detail`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      <ExternalLink className="h-3 w-3 mr-1" /> Abrir en Flex
+                                    </a>
+                                  )}
+                                </div>
                                 <div className="text-xs text-muted-foreground truncate">Vendor: {vendorId}</div>
                                 <div className="text-xs text-muted-foreground truncate">Número: {lpoNumber}</div>
                               </div>
@@ -990,8 +1107,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 />
               </TabsContent>
             )}
-          </ScrollArea>
+          </div>
         </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );

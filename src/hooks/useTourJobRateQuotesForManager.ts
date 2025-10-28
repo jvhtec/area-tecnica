@@ -13,27 +13,44 @@ export function useTourJobRateQuotesForManager(jobId?: string, tourId?: string) 
     queryFn: async (): Promise<TourJobRateQuote[]> => {
       if (!jobId || !tourId) return []
 
-      // Get all internal technician assignments at tour-level
-      const { data: tourAssignments, error: taErr } = await supabase
-        .from('tour_assignments')
+      // Get technician assignments for the selected tour date (job-level)
+      const { data: jobAssignments, error: jaErr } = await supabase
+        .from('job_assignments')
         .select('technician_id')
-        .eq('tour_id', tourId)
+        .eq('job_id', jobId)
 
-      if (taErr) throw taErr
+      if (jaErr) throw jaErr
 
       const techIds = Array.from(
         new Set(
-          (tourAssignments || [])
+          (jobAssignments || [])
             .map((a: any) => a.technician_id)
             .filter((id: string | null): id is string => !!id)
         )
       )
 
-      if (techIds.length === 0) return []
+      // If the job has no per-date assignments, fall back to tour-level team list
+      let resolvedTechIds = techIds
+      if (resolvedTechIds.length === 0) {
+        const { data: tourAssignments, error: taErr } = await supabase
+          .from('tour_assignments')
+          .select('technician_id')
+          .eq('tour_id', tourId)
+        if (taErr) throw taErr
+        resolvedTechIds = Array.from(
+          new Set(
+            (tourAssignments || [])
+              .map((a: any) => a.technician_id)
+              .filter((id: string | null): id is string => !!id)
+          )
+        )
+      }
+
+      if (resolvedTechIds.length === 0) return []
 
       // Compute quotes for each technician via RPC (security definer function)
       const results = await Promise.all(
-        techIds.map(async (techId) => {
+        resolvedTechIds.map(async (techId) => {
           const { data, error } = await supabase.rpc('compute_tour_job_rate_quote_2025', {
             _job_id: jobId,
             _tech_id: techId,
@@ -96,4 +113,3 @@ export function useTourJobRateQuotesForManager(jobId?: string, tourId?: string) 
     staleTime: 30 * 1000,
   })
 }
-

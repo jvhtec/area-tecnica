@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Euro, AlertCircle, Clock, CheckCircle, FileDown } from 'lucide-react';
+import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink } from 'lucide-react';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { formatCurrency } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
@@ -31,6 +31,43 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     staleTime: 30_000,
   });
   const lpoMap = React.useMemo(() => new Map(lpoRows.map(r => [r.technician_id, r.lpo_number || null])), [lpoRows]);
+  const flexElementMap = React.useMemo(() => new Map(lpoRows.map(r => [r.technician_id, r.flex_element_id || null])), [lpoRows]);
+  const FLEX_UI_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
+  const FIN_DOC_VIEW_ID = '8238f39c-f42e-11e0-a8de-00e08175e43e'; // fixed view id for fin-doc
+  const buildFinDocUrl = React.useCallback((elementId: string | null | undefined) => {
+    if (!elementId) return null;
+    return `${FLEX_UI_BASE_URL}#fin-doc/${encodeURIComponent(elementId)}/doc-view/${FIN_DOC_VIEW_ID}/detail`;
+  }, []);
+
+  // Fetch profile names for technicians shown in the payout list
+  const techIds = React.useMemo(
+    () => Array.from(new Set(payoutTotals.map((p) => p.technician_id).filter(Boolean))) as string[],
+    [payoutTotals]
+  );
+  const { data: profiles = [] } = useQuery({
+    queryKey: ['profiles-for-job-payout', jobId, techIds],
+    enabled: techIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', techIds);
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; first_name: string | null; last_name: string | null }>;
+    },
+    staleTime: 60_000,
+  });
+  const getTechName = React.useCallback(
+    (id: string) => {
+      const p = (profiles as Array<{ id: string; first_name: string | null; last_name: string | null }>).find(
+        (x) => x.id === id
+      );
+      if (!p) return id;
+      const name = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
+      return name || id;
+    },
+    [profiles]
+  );
 
   if (isLoading) {
     return (
@@ -108,12 +145,58 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                 .from('profiles')
                 .select('id, first_name, last_name')
                 .in('id', techIds);
+
+              // Fetch approved timesheets breakdowns for detailed PDF section
+              let { data: tsRows } = await supabase
+                .from('timesheets')
+                .select('technician_id, job_id, date, amount_breakdown, amount_breakdown_visible, approved_by_manager')
+                .eq('job_id', jobId)
+                .eq('approved_by_manager', true);
+
+              // Fallback to security-definer helper if direct timesheet read is empty (RLS/path issues)
+              if (!tsRows || tsRows.length === 0) {
+                const { data: visible } = await supabase.rpc('get_timesheet_amounts_visible');
+                tsRows = (visible as any[] | null)?.filter(
+                  (r) => r.job_id === jobId && r.approved_by_manager === true
+                ) || [];
+              }
+
+              type TimesheetLine = {
+                date?: string | null;
+                hours_rounded?: number;
+                base_day_eur?: number;
+                plus_10_12_hours?: number;
+                plus_10_12_amount_eur?: number;
+                overtime_hours?: number;
+                overtime_hour_eur?: number;
+                overtime_amount_eur?: number;
+                total_eur?: number;
+              };
+              const timesheetMap = new Map<string, TimesheetLine[]>();
+              (tsRows || []).forEach((row: any) => {
+                const b = (row.amount_breakdown || row.amount_breakdown_visible || {}) as Record<string, any>;
+                const line: TimesheetLine = {
+                  date: row.date ?? null,
+                  hours_rounded: Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0,
+                  base_day_eur: b.base_day_eur != null ? Number(b.base_day_eur) : undefined,
+                  plus_10_12_hours: b.plus_10_12_hours != null ? Number(b.plus_10_12_hours) : undefined,
+                  plus_10_12_amount_eur: b.plus_10_12_amount_eur != null ? Number(b.plus_10_12_amount_eur) : undefined,
+                  overtime_hours: b.overtime_hours != null ? Number(b.overtime_hours) : undefined,
+                  overtime_hour_eur: b.overtime_hour_eur != null ? Number(b.overtime_hour_eur) : undefined,
+                  overtime_amount_eur: b.overtime_amount_eur != null ? Number(b.overtime_amount_eur) : undefined,
+                  total_eur: b.total_eur != null ? Number(b.total_eur) : undefined,
+                };
+                const arr = timesheetMap.get(row.technician_id) || [];
+                arr.push(line);
+                timesheetMap.set(row.technician_id, arr);
+              });
               
               await generateJobPayoutPDF(
                 payoutTotals,
                 jobData,
                 profiles || [],
-                lpoMap
+                lpoMap,
+                timesheetMap
               );
               toast.success('PDF de pagos generado');
             }}
@@ -128,10 +211,28 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           <div key={payout.technician_id} className="border rounded-lg p-4 space-y-3">
             <div className="flex items-start justify-between">
               <div>
-                <h4 className="font-medium text-base">Technician ID: {payout.technician_id}</h4>
+                <h4 className="font-medium text-base">{getTechName(payout.technician_id)}</h4>
                 <p className="text-sm text-muted-foreground">Job: {payout.job_id}</p>
                 {lpoMap.has(payout.technician_id) && (
-                  <p className="text-xs text-muted-foreground">LPO Nº: {lpoMap.get(payout.technician_id) || '—'}</p>
+                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                    <span>LPO Nº: {lpoMap.get(payout.technician_id) || '—'}</span>
+                    {(() => {
+                      const elId = flexElementMap.get(payout.technician_id) || null;
+                      const url = buildFinDocUrl(elId);
+                      if (!url) return null;
+                      return (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center text-primary hover:underline"
+                          title="Abrir en Flex"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" /> Abrir en Flex
+                        </a>
+                      );
+                    })()}
+                  </div>
                 )}
               </div>
               <div className="text-right">

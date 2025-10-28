@@ -195,6 +195,7 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
                                   title: job.title,
                                   start_time: job.start_time,
                                   end_time: job.end_time ?? null,
+                                  job_type: job.job_type ?? null,
                                 }));
 
                                 const { jobsWithQuotes, profiles } = await buildTourRatesExportPayload(

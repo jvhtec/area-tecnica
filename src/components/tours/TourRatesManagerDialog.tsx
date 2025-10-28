@@ -12,7 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useTourJobRateQuotesForManager } from '@/hooks/useTourJobRateQuotesForManager';
+import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import { useSaveHouseTechRate } from '@/hooks/useHouseTechRates';
 import { JobExtrasEditor } from '@/components/jobs/JobExtrasEditor';
 import { formatCurrency } from '@/lib/utils';
@@ -32,7 +32,7 @@ type TourRatesManagerDialogProps = {
 };
 
 export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRatesManagerDialogProps) {
-  // Fetch tour dates (jobs)
+  // Fetch tour jobs (include tour dates + single/festival; exclude dryhire)
   const { data: tourJobs = [] } = useQuery({
     queryKey: ['tour-jobs-for-rates', tourId],
     queryFn: async () => {
@@ -40,7 +40,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
         .from('jobs')
         .select('id, title, start_time, end_time, job_type, tour_id')
         .eq('tour_id', tourId)
-        .eq('job_type', 'tourdate')
+        .neq('job_type', 'dryhire')
         .order('start_time', { ascending: true });
       if (error) throw error;
       return data || [];
@@ -56,8 +56,9 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
     }
   }, [open, tourJobs, selectedJobId]);
 
-  // Manager view: compute quotes for all tour assignments regardless of auth.uid()
-  const { data: quotes = [], isLoading: quotesLoading } = useTourJobRateQuotesForManager(selectedJobId, tourId);
+  // Manager view: compute quotes for selected job (tourdate -> RPC; single/festival -> payout totals)
+  const selectedJob = useMemo(() => tourJobs.find((j: any) => j.id === selectedJobId), [tourJobs, selectedJobId]);
+  const { data: quotes = [], isLoading: quotesLoading } = useManagerJobQuotes(selectedJobId, selectedJob?.job_type, tourId);
 
   const jobIds = useMemo(() => tourJobs.map((job: any) => job.id).filter(Boolean), [tourJobs]);
   const { data: jobApprovalMap } = useJobRatesApprovalMap(jobIds);
@@ -214,7 +215,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
               <Button
                 variant="outline"
                 size="sm"
-                disabled={exportingTour || tourJobs.length === 0}
+                disabled={exportingTour}
                 onClick={async () => {
                   setExportingTour(true);
                   try {
@@ -224,11 +225,21 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                       .eq('id', tourId)
                       .single();
 
-                    const jobsForExport = tourJobs.map((job: any) => ({
+                    // Fetch all eligible jobs for export (include 'single'/'festival' linked to this tour; exclude dryhire)
+                    const { data: allJobs, error: jobsError } = await supabase
+                      .from('jobs')
+                      .select('id, title, start_time, end_time, job_type')
+                      .eq('tour_id', tourId)
+                      .order('start_time', { ascending: true });
+                    if (jobsError) throw jobsError;
+
+                    const eligible = (allJobs || []).filter((j: any) => (j.job_type ?? '').toLowerCase() !== 'dryhire');
+                    const jobsForExport = eligible.map((job: any) => ({
                       id: job.id,
                       title: job.title,
                       start_time: job.start_time,
                       end_time: job.end_time ?? null,
+                      job_type: job.job_type ?? null,
                     }));
 
                     const { jobsWithQuotes, profiles: exportProfiles } = await buildTourRatesExportPayload(
