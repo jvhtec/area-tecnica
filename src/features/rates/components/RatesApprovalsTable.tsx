@@ -15,6 +15,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { generateTourRatesSummaryPDF } from '@/utils/rates-pdf-export';
 import { buildTourRatesExportPayload } from '@/services/tourRatesExport';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import type { RatesApprovalRow } from '@/services/ratesService';
 
 interface RatesApprovalsTableProps {
   onManageTour: (tourId: string) => void;
@@ -26,7 +30,25 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
   const [typeFilter, setTypeFilter] = React.useState<'all'|'tour'|'job'>('all');
   const [approvalFilter, setApprovalFilter] = React.useState<'all'|'pending'|'approved'>('all');
   const [page, setPage] = React.useState(1);
+  const [selectedJob, setSelectedJob] = React.useState<RatesApprovalRow | null>(null);
   const PAGE_SIZE = 10;
+  const { userRole } = useOptimizedAuth();
+  const isManagementUser = React.useMemo(() => ['management', 'admin'].includes(userRole || ''), [userRole]);
+
+  const handleOpenJob = React.useCallback((row: RatesApprovalRow) => {
+    setSelectedJob(row);
+  }, []);
+
+  const resetSelectedJob = React.useCallback(() => setSelectedJob(null), []);
+
+  const getJobTypeLabel = React.useCallback((jobType?: string | null) => {
+    const normalized = (jobType || '').toLowerCase();
+    if (normalized === 'festival') return 'Festival';
+    if (normalized === 'single') return 'Trabajo';
+    if (normalized === 'tour') return 'Gira';
+    if (!jobType) return 'Trabajo';
+    return jobType;
+  }, []);
 
   const filtered = React.useMemo(() => {
     let list = rows;
@@ -112,9 +134,7 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
                       {row.entityType === 'tour' ? (
                         <Badge variant="outline">Gira</Badge>
                       ) : (
-                        <Badge variant="secondary">{
-                          row.jobType === 'festival' ? 'Festival' : row.jobType === 'single' ? 'Trabajo' : (row.jobType || 'Trabajo')
-                        }</Badge>
+                        <Badge variant="secondary">{getJobTypeLabel(row.jobType)}</Badge>
                       )}
                     </TableCell>
                     <TableCell>
@@ -147,9 +167,9 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
+                    <TableCell className="text-right">
                       {row.entityType === 'tour' ? (
-                        <>
+                        <div className="flex justify-end gap-2">
                           <Button
                             size="sm"
                             variant="outline"
@@ -204,11 +224,18 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
                           <Button size="sm" onClick={() => onManageTour(row.id)}>
                             Gestionar
                           </Button>
-                        </>
+                        </div>
                       ) : (
-                        <Button size="sm" variant="outline" asChild>
-                          <Link to={`/management/rates?tab=timesheets&jobId=${row.id}`}>Revisar partes</Link>
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          {isManagementUser && (
+                            <Button size="sm" onClick={() => handleOpenJob(row)}>
+                              Ver totales
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" asChild>
+                            <Link to={`/management/rates?tab=timesheets&jobId=${row.id}`}>Revisar partes</Link>
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -227,6 +254,43 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
           </div>
         )}
       </CardContent>
+      <Dialog open={Boolean(selectedJob)} onOpenChange={(open) => {
+        if (!open) {
+          resetSelectedJob();
+        }
+      }}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Totales de pagos del trabajo</DialogTitle>
+            <DialogDescription>
+              Consulta los totales aprobados, LPO y exporta el PDF con el mismo formato que las giras.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedJob && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium text-base leading-tight">{selectedJob.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {selectedJob.startDate
+                        ? `Comienza ${format(new Date(selectedJob.startDate), 'PPP', { locale: es })}`
+                        : 'Fecha de inicio por definir'}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary">{getJobTypeLabel(selectedJob.jobType)}</Badge>
+                    <Badge variant={selectedJob.ratesApproved ? 'outline' : 'destructive'}>
+                      {selectedJob.ratesApproved ? 'Tarifas aprobadas' : 'Aprobación pendiente'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <JobPayoutTotalsPanel jobId={selectedJob.id} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
