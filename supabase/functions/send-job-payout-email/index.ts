@@ -97,6 +97,11 @@ serve(async (req) => {
 
     const results: Array<{ technician_id: string; sent: boolean; error?: string }> = [];
 
+    // Corporate assets (logos)
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+    const COMPANY_LOGO_URL = Deno.env.get('COMPANY_LOGO_URL_W') || (SUPABASE_URL ? `${SUPABASE_URL}/storage/v1/object/public/company-assets/sectorlogow.png` : '');
+    const AT_LOGO_URL = Deno.env.get('AT_LOGO_URL') || (SUPABASE_URL ? `${SUPABASE_URL}/storage/v1/object/public/company-assets/area-tecnica-logo.png` : '');
+
     for (const tech of body.technicians) {
       const trimmedEmail = (tech.email || '').trim();
       const pdfBase64 = (tech.pdf_base64 || '').trim();
@@ -111,18 +116,87 @@ serve(async (req) => {
       }
 
       const subject = `Resumen de pagos · ${body.job.title}`;
-      const htmlContent = `
-        <p>Hola ${tech.full_name || 'equipo'},</p>
-        <p>Adjuntamos tu resumen de pagos correspondiente al trabajo <strong>${body.job.title}</strong>, programado para el <strong>${formatJobDate(body.job.start_time)}</strong>.</p>
-        <p>Totales registrados:</p>
-        <ul>
-          <li>Partes aprobados: <strong>${formatCurrency(tech.totals?.timesheets_total_eur)}</strong></li>
-          <li>Extras: <strong>${formatCurrency(tech.totals?.extras_total_eur)}</strong></li>
-          <li>Total general: <strong>${formatCurrency(tech.totals?.total_eur)}</strong></li>
-        </ul>
-        <p>Si detectas alguna incidencia puedes responder a este mensaje o contactar con administración.</p>
-        <p>Saludos,<br/>Área Técnica</p>
-      `;
+
+      // Corporate-styled HTML, aligned with other emails
+      const safeName = tech.full_name || '';
+      const jobDate = formatJobDate(body.job.start_time);
+      const parts = formatCurrency(tech.totals?.timesheets_total_eur);
+      const extras = formatCurrency(tech.totals?.extras_total_eur);
+      const grand = formatCurrency(tech.totals?.total_eur);
+
+      const htmlContent = `<!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>${subject}</title>
+      </head>
+      <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f7fb;padding:24px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.06);">
+                <tr>
+                  <td style="padding:16px 20px;background:#0b0b0b;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td align="left" style="vertical-align:middle;">
+                          ${COMPANY_LOGO_URL ? `<img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />` : ''}
+                        </td>
+                        <td align="right" style="vertical-align:middle;">
+                          ${AT_LOGO_URL ? `<img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />` : ''}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:24px 24px 8px 24px;">
+                    <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeName || 'equipo'},</h2>
+                    <p style="margin:0;color:#374151;line-height:1.55;">
+                      Adjuntamos tu resumen de pagos correspondiente al trabajo <b>${body.job.title}</b>, programado para el <b>${jobDate}</b>.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 24px 0 24px;">
+                    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;color:#374151;font-size:14px;">
+                      <b>Totales registrados</b>
+                      <ul style="margin:10px 0 0 18px;padding:0;line-height:1.55;">
+                        <li><b>Partes aprobados:</b> ${parts}</li>
+                        <li><b>Extras:</b> ${extras}</li>
+                        <li><b>Total general:</b> ${grand}</li>
+                      </ul>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 24px 8px 24px;">
+                    <p style="margin:0;color:#374151;line-height:1.55;">
+                      El documento PDF con el detalle va adjunto a este correo.
+                    </p>
+                    <p style="margin:8px 0 0 0;color:#374151;line-height:1.55;">
+                      Si detectas alguna incidencia no respondas a este mensaje y contacta con administración.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 24px;background:#f9fafb;color:#6b7280;font-size:12px;line-height:1.5;border-top:1px solid #e5e7eb;">
+                    <div style="margin-bottom:8px;">
+                      Este correo es confidencial y puede contener información privilegiada. Si no eres el destinatario, por favor notifícanos y elimina este mensaje.
+                    </div>
+                    <div>
+                      Sector Pro · <a href="https://www.sector-pro.com" style="color:#6b7280;text-decoration:underline;">www.sector-pro.com</a>
+                      &nbsp;|&nbsp; Área Técnica · <a href="https://area-tecnica.lovable.app" style="color:#6b7280;text-decoration:underline;">area-tecnica.lovable.app</a>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>`;
 
       const emailPayload: Record<string, unknown> = {
         sender: { email: BREVO_FROM, name: 'Área Técnica' },

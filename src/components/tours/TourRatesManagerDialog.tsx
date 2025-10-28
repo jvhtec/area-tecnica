@@ -23,6 +23,7 @@ import { invalidateRatesContext } from '@/services/ratesService';
 import { syncFlexWorkOrdersForJob, FlexWorkOrderSyncResult } from '@/services/flexWorkOrders';
 import { toast } from 'sonner';
 import { generateRateQuotePDF, generateTourRatesSummaryPDF } from '@/utils/rates-pdf-export';
+import { sendTourJobEmails } from '@/lib/tour-payout-email';
 import { buildTourRatesExportPayload } from '@/services/tourRatesExport';
 
 type TourRatesManagerDialogProps = {
@@ -75,7 +76,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, default_timesheet_category, role')
+        .select('id, first_name, last_name, email, default_timesheet_category, role')
         .in('id', techIds);
       if (error) throw error;
       return data || [];
@@ -87,6 +88,9 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
     const p = profiles.find((x: any) => x.id === id);
     return p ? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unknown' : 'Unknown';
   };
+
+  const [isSendingEmails, setIsSendingEmails] = useState(false);
+  const [sendingByTech, setSendingByTech] = useState<Record<string, boolean>>({});
 
   // House rates in bulk (to show current values when fixing)
   const { data: houseRates = [] } = useQuery({
@@ -369,12 +373,52 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                         (lpoRows || []).map(r => [r.technician_id, r.lpo_number])
                       );
                       
-                      await generateRateQuotePDF(quotes, job, profiles, lpoMap);
+                      await generateRateQuotePDF(quotes, job, profiles as any, lpoMap);
                       toast.success('PDF generado');
                     }}
                   >
                     <FileDown className="h-4 w-4 mr-1" />
                     Exportar Fecha
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!selectedJobId || quotes.length === 0 || !selectedJobApproved || isSendingEmails}
+                    onClick={async () => {
+                      if (!selectedJobId) return;
+                      setIsSendingEmails(true);
+                      try {
+                        const result = await sendTourJobEmails({
+                          jobId: selectedJobId,
+                          supabase,
+                          quotes,
+                          profiles: profiles as any,
+                        });
+                        if (result.error) {
+                          console.error('[TourRatesManagerDialog] Error sending tour-date emails', result.error);
+                          toast.error('No se pudieron enviar los correos');
+                        } else {
+                          const partialFailures = Array.isArray(result.response?.results)
+                            ? (result.response.results as Array<{ sent: boolean }>).some((r) => !r.sent)
+                            : false;
+                          if (result.success && !partialFailures) {
+                            toast.success('Correos enviados');
+                          } else {
+                            toast.warning('Algunos correos no se pudieron enviar');
+                          }
+                          if (result.missingEmails.length) {
+                            toast.warning('Hay técnicos sin correo configurado');
+                          }
+                        }
+                      } catch (err) {
+                        console.error('[TourRatesManagerDialog] Unexpected error sending emails', err);
+                        toast.error('Se produjo un error al enviar');
+                      } finally {
+                        setIsSendingEmails(false);
+                      }
+                    }}
+                    title={selectedJobApproved ? 'Enviar correos a los técnicos de esta fecha' : 'Liberar pago final para habilitar envío'}
+                  >
+                    {isSendingEmails ? 'Enviando…' : 'Enviar por correo'}
                   </Button>
                 </div>
               </CardContent>
@@ -405,11 +449,52 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                             <Badge variant="outline">{q.category}</Badge>
                           )}
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex flex-col items-end gap-2">
                           <div className="font-semibold">{formatCurrency(q.total_with_extras_eur || q.total_eur)}</div>
                           <div className="text-xs text-muted-foreground">
                             Base {formatCurrency(q.base_day_eur)} {q.multiplier > 1 ? `× ${q.multiplier}` : ''}
                           </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={
+                              !selectedJobId || !selectedJobApproved || !!sendingByTech[q.technician_id] ||
+                              !(profiles.find((p: any) => p.id === q.technician_id)?.email)
+                            }
+                            onClick={async () => {
+                              if (!selectedJobId) return;
+                              setSendingByTech((s) => ({ ...s, [q.technician_id]: true }));
+                              try {
+                                const result = await sendTourJobEmails({
+                                  jobId: selectedJobId,
+                                  supabase,
+                                  quotes: quotes.filter(qq => qq.technician_id === q.technician_id),
+                                  profiles: profiles as any,
+                                  technicianIds: [q.technician_id],
+                                });
+                                if (result.error) {
+                                  toast.error('No se pudo enviar el correo a este técnico');
+                                } else {
+                                  const r = Array.isArray(result.response?.results)
+                                    ? (result.response.results as Array<{ technician_id: string; sent: boolean }>).
+                                        find((x) => x.technician_id === q.technician_id)
+                                    : { sent: result.success } as any;
+                                  if (r?.sent) {
+                                    toast.success('Correo enviado a este técnico');
+                                  } else {
+                                    toast.warning('No se pudo enviar el correo a este técnico');
+                                  }
+                                }
+                              } catch (e) {
+                                toast.error('Se produjo un error al enviar');
+                              } finally {
+                                setSendingByTech((s) => ({ ...s, [q.technician_id]: false }));
+                              }
+                            }}
+                            title={selectedJobApproved ? (profiles.find((p: any) => p.id === q.technician_id)?.email ? 'Enviar a este técnico' : 'Sin correo configurado') : 'Liberar pago final para habilitar envío'}
+                          >
+                            {sendingByTech[q.technician_id] ? 'Enviando…' : 'Enviar'}
+                          </Button>
                         </div>
                       </div>
 

@@ -205,8 +205,9 @@ export async function generateRateQuotePDF(
   quotes: TourJobRateQuote[],
   jobDetails: JobDetails,
   profiles: TechnicianProfile[],
-  lpoMap?: Map<string, string | null>
-) {
+  lpoMap?: Map<string, string | null>,
+  options?: { download?: boolean }
+): Promise<Blob | void> {
   const doc = new jsPDF();
   const tourIdFromQuotes = quotes.find((quote) => quote.tour_id)?.tour_id;
   const [headerLogo, companyLogo] = await Promise.all([
@@ -318,6 +319,10 @@ export async function generateRateQuotePDF(
     new Date(),
     'yyyy-MM-dd'
   )}.pdf`;
+  if (options?.download === false) {
+    const blob = doc.output('blob') as Blob;
+    return blob;
+  }
   doc.save(filename);
 }
 

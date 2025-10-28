@@ -99,6 +99,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const jobRatesApproved = Boolean(jobMeta?.rates_approved);
   const [isExporting, setIsExporting] = React.useState(false);
   const [isSendingEmails, setIsSendingEmails] = React.useState(false);
+  const [sendingByTech, setSendingByTech] = React.useState<Record<string, boolean>>({});
   const [missingEmailTechIds, setMissingEmailTechIds] = React.useState<string[]>([]);
   const lastPreparedContext = React.useRef<JobPayoutEmailContextResult | null>(null);
 
@@ -179,6 +180,49 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
       setIsSendingEmails(false);
     }
   }, [jobId, payoutTotals, profilesWithEmail, lpoMap, jobMeta]);
+
+  const handleSendEmailForTech = React.useCallback(
+    async (techId: string) => {
+      if (!jobId) return;
+      const hasEmail = Boolean(profileMap.get(techId)?.email);
+      if (!hasEmail) {
+        toast.warning('Este técnico no tiene correo configurado.');
+        return;
+      }
+      setSendingByTech((s) => ({ ...s, [techId]: true }));
+      try {
+        const result = await sendJobPayoutEmails({
+          jobId,
+          supabase,
+          payouts: payoutTotals.filter((p) => p.technician_id === techId),
+          profiles: profilesWithEmail.filter((p) => p.id === techId),
+          lpoMap,
+          jobDetails: jobMeta || undefined,
+        });
+
+        if (result.error) {
+          console.error('[JobPayoutTotalsPanel] Error sending payout email (single)', result.error);
+          toast.error('No se pudo enviar el correo a este técnico');
+        } else {
+          const sent = Array.isArray(result.response?.results)
+            ? (result.response.results as Array<{ technician_id: string; sent: boolean }>).
+                find((r) => r.technician_id === techId)?.sent
+            : true;
+          if (result.success && sent) {
+            toast.success('Correo enviado a este técnico');
+          } else {
+            toast.warning('No se pudo enviar el correo a este técnico');
+          }
+        }
+      } catch (err) {
+        console.error('[JobPayoutTotalsPanel] Unexpected error sending single payout email', err);
+        toast.error('Se produjo un error al enviar el correo');
+      } finally {
+        setSendingByTech((s) => ({ ...s, [techId]: false }));
+      }
+    },
+    [jobId, payoutTotals, profilesWithEmail, lpoMap, jobMeta, profileMap]
+  );
 
   if (isLoading) {
     return (
@@ -318,10 +362,28 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                   </div>
                 )}
               </div>
-              <div className="text-right">
+              <div className="text-right flex flex-col items-end gap-2">
                 <div className="text-xl font-bold text-primary">
                   {formatCurrency(payout.total_eur)}
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSendEmailForTech(payout.technician_id)}
+                  disabled={
+                    sendingByTech[payout.technician_id] ||
+                    !jobRatesApproved ||
+                    !profileMap.get(payout.technician_id)?.email
+                  }
+                  title={
+                    jobRatesApproved
+                      ? (profileMap.get(payout.technician_id)?.email ? 'Enviar sólo a este técnico' : 'Sin correo configurado')
+                      : 'Aprueba las tarifas para habilitar el envío'
+                  }
+                >
+                  <Send className="h-3.5 w-3.5 mr-1" />
+                  {sendingByTech[payout.technician_id] ? 'Enviando…' : 'Enviar a este técnico'}
+                </Button>
               </div>
             </div>
 
