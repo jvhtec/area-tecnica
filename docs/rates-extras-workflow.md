@@ -32,7 +32,9 @@ The application supports two pay-processing paths: **regular jobs** (single-day 
 
 4. **Job Approval & Visibility**
    - A management toggle (`rates_approved`) on each job governs when technicians can view totals and extras. Until it is set true, technicians see a “pending approval” notice in job totals, even if timesheets were approved. 【F:src/components/jobs/JobDetailsDialog.tsx†L398-L444】【F:src/components/timesheet/MyJobTotal.tsx†L70-L90】
-   - Once approved, technicians can see their aggregated totals, which combine approved timesheet amounts and extras from the `v_job_tech_payout_2025` view. 【F:src/hooks/useJobPayoutTotals.ts†L5-L24】【F:src/components/timesheet/MyJobTotal.tsx†L94-L137】
+- Once approved, technicians can see their aggregated totals, which combine approved timesheet amounts and extras from the `v_job_tech_payout_2025` view. 【F:src/hooks/useJobPayoutTotals.ts†L5-L24】【F:src/components/timesheet/MyJobTotal.tsx†L94-L137】
+- Managers pueden enviar los resúmenes de pagos directamente por correo electrónico una vez aprobadas las tarifas. El diálogo de detalles del trabajo muestra un aviso inmediato tras pulsar “Aprobar” y el panel de totales incorpora la acción “Enviar por correo”, que genera PDFs por técnico y llama a la nueva función Edge `send-job-payout-email`. Las tarjetas resaltan a los técnicos sin correo para evitar omisiones. 【F:src/components/jobs/JobDetailsDialog.tsx†L520-L609】【F:src/components/jobs/JobPayoutTotalsPanel.tsx†L1-L347】【F:supabase/functions/send-job-payout-email/index.ts†L1-L176】
+- Configure `BREVO_API_KEY`, `BREVO_FROM`, and optional `PAYOUT_EMAIL_BCC` so the email function can authenticate with Brevo and copy administration on each payout message. 【F:supabase/functions/send-job-payout-email/index.ts†L1-L176】
 
 5. **Aggregation & Dashboard Display**
    - The dashboard aggregates job totals across all approved jobs, separating pending and approved amounts. Multi-day jobs are rolled up automatically by the payout view, and managers can access detailed breakdowns in job management screens. 【F:src/components/dashboard/MyJobTotalsSection.tsx†L105-L215】【F:src/hooks/useJobTotals.ts†L5-L33】

@@ -6,7 +6,7 @@ import { TourJobRateQuote } from '@/types/tourRates';
 import { formatCurrency } from '@/lib/utils';
 import { fetchJobLogo, fetchTourLogo, getCompanyLogo } from '@/utils/pdf/logoUtils';
 
-interface TechnicianProfile {
+export interface TechnicianProfile {
   id: string;
   first_name?: string | null;
   last_name?: string | null;
@@ -14,7 +14,7 @@ interface TechnicianProfile {
   role?: string | null;
 }
 
-interface JobDetails {
+export interface JobDetails {
   id: string;
   title: string;
   start_time: string;
@@ -47,7 +47,7 @@ interface PayoutData {
   vehicle_disclaimer_text?: string;
 }
 
-interface TimesheetLine {
+export interface TimesheetLine {
   date?: string | null;
   hours_rounded?: number;
   base_day_eur?: number;
