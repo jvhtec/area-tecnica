@@ -34,16 +34,18 @@ import { useToast } from "@/hooks/use-toast";
 import { Job } from "@/types/job";
 import { User } from "@/types/user";
 import { useEffect, useState, useMemo } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, ExternalLink, CalendarIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 import { useAvailableTechnicians } from "@/hooks/useAvailableTechnicians";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink } from "lucide-react";
 import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
 interface JobAssignmentDialogProps {
   isOpen: boolean;
@@ -89,6 +91,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [singleDay, setSingleDay] = useState(false);
+  const [selectedJobDate, setSelectedJobDate] = useState<Date | null>(null);
   const { assignments, addAssignment, removeAssignment, isRemoving } = useJobAssignmentsRealtime(jobId);
   const { manageFlexCrewAssignment, useCrewCallData } = useFlexCrewAssignments();
 
@@ -101,7 +105,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     queryFn: async () => {
       const { data, error } = await supabase
         .from("jobs")
-        .select("id, start_time, end_time, title")
+        .select("id, start_time, end_time, title, job_date_types(date, type)")
         .eq("id", jobId)
         .single();
 
@@ -124,9 +128,75 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   });
 
   // Filter technicians: include technicians, house techs, and flagged management
-  const filteredTechnicians = availableTechnicians.filter(tech => 
+  const filteredTechnicians = availableTechnicians.filter(tech =>
     tech.role === 'technician' || tech.role === 'house_tech' || tech.role === 'management'
   );
+
+  const jobDates = useMemo(() => {
+    if (!jobData) return [] as Date[];
+
+    const typedDates = Array.isArray((jobData as any).job_date_types)
+      ? (jobData as any).job_date_types
+          .filter((dt: any) => dt?.date)
+          .filter((dt: any) => {
+            const type = (dt?.type || '').toLowerCase();
+            return type !== 'off' && type !== 'travel';
+          })
+          .map((dt: any) => {
+            const d = new Date(`${dt.date}T00:00:00`);
+            d.setHours(0, 0, 0, 0);
+            return d;
+          })
+      : [];
+
+    if (typedDates.length > 0) {
+      return typedDates.sort((a, b) => a.getTime() - b.getTime());
+    }
+
+    if (jobData.start_time) {
+      const start = new Date(jobData.start_time);
+      start.setHours(0, 0, 0, 0);
+      if (jobData.end_time) {
+        const end = new Date(jobData.end_time);
+        end.setHours(0, 0, 0, 0);
+        const result: Date[] = [];
+        const cursor = new Date(start);
+        while (cursor <= end) {
+          result.push(new Date(cursor));
+          cursor.setDate(cursor.getDate() + 1);
+        }
+        return result;
+      }
+      return [start];
+    }
+
+    return [] as Date[];
+  }, [jobData]);
+
+  const allowedJobDateSet = useMemo(() => {
+    return new Set(jobDates.map(date => format(date, "yyyy-MM-dd")));
+  }, [jobDates]);
+
+  useEffect(() => {
+    if (!singleDay) return;
+
+    if (jobDates.length === 0) {
+      setSelectedJobDate(null);
+      return;
+    }
+
+    const currentKey = selectedJobDate ? format(selectedJobDate, "yyyy-MM-dd") : null;
+    if (!currentKey || !allowedJobDateSet.has(currentKey)) {
+      setSelectedJobDate(jobDates[0]);
+    }
+  }, [jobDates, singleDay, allowedJobDateSet, selectedJobDate]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSingleDay(false);
+      setSelectedJobDate(null);
+    }
+  }, [isOpen]);
 
   // Fetch crew call data for the current job and department
   const { data: crewCallData, isLoading: isLoadingCrewCall } = useCrewCallData(jobId, currentDepartment);
@@ -162,6 +232,15 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       return;
     }
 
+    const singleDayDateKey = selectedJobDate ? format(selectedJobDate, "yyyy-MM-dd") : null;
+    if (singleDay && !singleDayDateKey) {
+      toast({
+        title: "Select a date",
+        description: "Choose the job date this assignment should cover.",
+      });
+      return;
+    }
+
     setIsAdding(true);
 
     try {
@@ -175,7 +254,17 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
           return;
         }
       }
-      await addAssignment(selectedTechnician, soundRole, lightsRole);
+      await addAssignment(
+        selectedTechnician,
+        soundRole,
+        lightsRole,
+        singleDay
+          ? {
+              singleDay: true,
+              singleDayDate: singleDayDateKey,
+            }
+          : undefined
+      );
 
       toast({
         title: "Success",
@@ -185,6 +274,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       setSelectedTechnician(null);
       setSoundRole("none");
       setLightsRole("none");
+      setSingleDay(false);
+      setSelectedJobDate(null);
       onAssignmentChange();
     } catch (error: any) {
       console.error("Error adding technician:", error);
@@ -442,6 +533,84 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
             </div>
           )}
 
+          <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
+            <Label htmlFor="single-day-toggle" className="md:text-right text-xs md:text-sm">
+              Coverage
+            </Label>
+            <div className="md:col-span-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="single-day-toggle"
+                  checked={singleDay}
+                  onCheckedChange={(checked) => {
+                    setSingleDay(checked);
+                    if (checked) {
+                      if (jobDates.length > 0) {
+                        setSelectedJobDate((current) => {
+                          if (current) {
+                            const key = format(current, "yyyy-MM-dd");
+                            if (allowedJobDateSet.has(key)) {
+                              const normalized = new Date(current);
+                              normalized.setHours(0, 0, 0, 0);
+                              return normalized;
+                            }
+                          }
+                          const fallback = new Date(jobDates[0]);
+                          fallback.setHours(0, 0, 0, 0);
+                          return fallback;
+                        });
+                      }
+                    } else {
+                      setSelectedJobDate(null);
+                    }
+                  }}
+                  disabled={jobDates.length === 0}
+                />
+                <Label htmlFor="single-day-toggle" className="text-sm font-medium">
+                  Single-day assignment
+                </Label>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="justify-start w-full sm:w-auto"
+                      disabled={!singleDay || jobDates.length === 0}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedJobDate ? format(selectedJobDate, "PPP") : "Select job date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedJobDate ?? undefined}
+                      onSelect={(date) => {
+                        if (!date) return;
+                        const key = format(date, "yyyy-MM-dd");
+                        if (!allowedJobDateSet.has(key)) return;
+                        const normalized = new Date(date);
+                        normalized.setHours(0, 0, 0, 0);
+                        setSelectedJobDate(normalized);
+                      }}
+                      disabled={(date) => !allowedJobDateSet.has(format(date, "yyyy-MM-dd"))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-muted-foreground">
+                  {jobDates.length === 0
+                    ? 'No job dates available'
+                    : singleDay
+                      ? 'Only covers the selected day.'
+                      : 'Toggle to limit this assignment to a single day.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <Button
             onClick={handleAddTechnician}
             disabled={isAdding || !selectedTechnician || isLoadingTechnicians || isLoadingJob}
@@ -478,6 +647,11 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                       {currentDepartment === "sound" && `Sound: ${labelForCode(assignment.sound_role) || "None"}`}
                       {currentDepartment === "lights" && `Lights: ${labelForCode(assignment.lights_role) || "None"}`}
                     </p>
+                    {assignment.single_day && assignment.single_day_date && (
+                      <p className="text-xs md:text-sm text-muted-foreground">
+                        Single-day: {format(new Date(`${assignment.single_day_date}T00:00:00`), "PPP")}
+                      </p>
+                    )}
                   </div>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

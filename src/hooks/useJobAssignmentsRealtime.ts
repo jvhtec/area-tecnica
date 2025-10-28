@@ -7,6 +7,35 @@ import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 
+export interface AssignmentInsertOptions {
+  singleDay?: boolean;
+  singleDayDate?: string | null;
+}
+
+export const buildAssignmentInsertPayload = (
+  jobId: string,
+  technicianId: string,
+  soundRole: string,
+  lightsRole: string,
+  assignedBy: string | null,
+  options?: AssignmentInsertOptions
+) => {
+  const normalizedSound = soundRole !== "none" ? soundRole : null;
+  const normalizedLights = lightsRole !== "none" ? lightsRole : null;
+  const shouldFlagSingleDay = !!options?.singleDay && !!options?.singleDayDate;
+
+  return {
+    job_id: jobId,
+    technician_id: technicianId,
+    sound_role: normalizedSound,
+    lights_role: normalizedLights,
+    assigned_by: assignedBy,
+    assigned_at: new Date().toISOString(),
+    single_day: shouldFlagSingleDay,
+    single_day_date: shouldFlagSingleDay ? options?.singleDayDate ?? null : null,
+  };
+};
+
 export const useJobAssignmentsRealtime = (jobId: string) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isRemoving, setIsRemoving] = useState<Record<string, boolean>>({});
@@ -101,8 +130,24 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
   const { manageFlexCrewAssignment } = useFlexCrewAssignments();
 
-  const addAssignment = async (technicianId: string, soundRole: string, lightsRole: string) => {
+  const addAssignment = async (
+    technicianId: string,
+    soundRole: string,
+    lightsRole: string,
+    options?: AssignmentInsertOptions
+  ) => {
     try {
+      const { data: authData } = await supabase.auth.getUser();
+      const assignedBy = authData?.user?.id ?? null;
+      const payload = buildAssignmentInsertPayload(
+        jobId,
+        technicianId,
+        soundRole,
+        lightsRole,
+        assignedBy,
+        options
+      );
+
       // Optimistic cache update for 'jobs' list so cards update instantly
       queryClient.setQueryData(['jobs'], (old: any) => {
         if (!Array.isArray(old)) return old;
@@ -111,8 +156,12 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           const optimist = {
             job_id: jobId,
             technician_id: technicianId,
-            sound_role: soundRole !== 'none' ? soundRole : null,
-            lights_role: lightsRole !== 'none' ? lightsRole : null,
+            sound_role: payload.sound_role,
+            lights_role: payload.lights_role,
+            single_day: payload.single_day,
+            single_day_date: payload.single_day_date,
+            assigned_at: payload.assigned_at,
+            assigned_by: payload.assigned_by,
             profiles: { first_name: '', last_name: '' },
           };
           const current = Array.isArray(j.job_assignments) ? j.job_assignments : [];
@@ -122,14 +171,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
       const { error } = await supabase
         .from('job_assignments')
-        .insert({
-          job_id: jobId,
-          technician_id: technicianId,
-          sound_role: soundRole !== 'none' ? soundRole : null,
-          lights_role: lightsRole !== 'none' ? lightsRole : null,
-          assigned_by: (await supabase.auth.getUser()).data.user?.id,
-          assigned_at: new Date().toISOString(),
-        });
+        .insert(payload);
 
       if (error) {
         console.error('Error adding assignment:', error);

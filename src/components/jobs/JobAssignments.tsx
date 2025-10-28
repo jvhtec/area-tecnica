@@ -10,6 +10,7 @@ import { SubscriptionIndicator } from "../ui/subscription-indicator";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useEffect, useState } from "react";
 import { labelForCode } from '@/utils/roles';
+import { format } from "date-fns";
 
 interface JobAssignmentsProps {
   jobId: string;
@@ -201,10 +202,19 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
           >
             <div className="flex items-center gap-2">
               <User className="h-4 w-4" />
-              <span className="font-medium">
-                {assignment.profiles.first_name} {assignment.profiles.last_name}
-              </span>
-              <span className="text-xs">({displayRole})</span>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">
+                    {assignment.profiles.first_name} {assignment.profiles.last_name}
+                  </span>
+                  <span className="text-xs">({displayRole})</span>
+                </div>
+                {assignment.single_day && assignment.single_day_date && (
+                  <span className="text-xs text-muted-foreground">
+                    Single-day: {format(new Date(`${assignment.single_day_date}T00:00:00`), "PPP")}
+                  </span>
+                )}
+              </div>
             </div>
             {userRole !== 'logistics' && (
               <Button

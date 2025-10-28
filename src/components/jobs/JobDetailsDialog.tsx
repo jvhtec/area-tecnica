@@ -773,6 +773,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               Vídeo: {labelForCode(assignment.video_role)}
                             </Badge>
                           )}
+                          {assignment.single_day && assignment.single_day_date && (
+                            <Badge variant="secondary" className="text-xs">
+                              Single-day: {format(new Date(`${assignment.single_day_date}T00:00:00`), "PPP")}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     ))}

@@ -405,13 +405,18 @@ export const OptimizedMatrixCell = memo(({
           >
             {assignment.job?.title || 'Assignment'}
           </div>
-          <div 
+          <div
             className={cn('text-xs truncate', assignment.status === 'confirmed' ? '' : 'text-muted-foreground')}
             style={{ color: assignment.status === 'confirmed' ? confirmedSubTextColor : undefined }}
           >
             {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
           </div>
-          
+          {assignment.single_day && assignment.single_day_date && (
+            <div className="text-[10px] text-muted-foreground truncate">
+              Single-day: {format(new Date(`${assignment.single_day_date}T00:00:00`), 'MMM d')}
+            </div>
+          )}
+
           {/* Status Actions */}
           {assignment.status === 'invited' && (
             <div className="flex gap-1 mt-1">
@@ -629,6 +634,11 @@ export const OptimizedMatrixCell = memo(({
               <div className="text-muted-foreground">
                 {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
               </div>
+              {assignment.single_day && assignment.single_day_date && (
+                <div className="text-muted-foreground">
+                  Single-day: {format(new Date(`${assignment.single_day_date}T00:00:00`), 'MMM d')}
+                </div>
+              )}
               <div className={`capitalize ${assignment.status === 'confirmed' ? 'text-green-600' : assignment.status === 'declined' ? 'text-red-600' : 'text-yellow-600'}`}>
                 {assignment.status}
               </div>

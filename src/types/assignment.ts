@@ -7,6 +7,8 @@ export interface Assignment {
   sound_role: string | null;
   lights_role: string | null;
   video_role: string | null;
+  single_day?: boolean | null;
+  single_day_date?: string | null;
   profiles: {
     first_name: string;
     nickname?: string | null;
