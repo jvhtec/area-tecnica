@@ -23,6 +23,7 @@ import { invalidateRatesContext } from '@/services/ratesService';
 import { syncFlexWorkOrdersForJob, FlexWorkOrderSyncResult } from '@/services/flexWorkOrders';
 import { toast } from 'sonner';
 import { generateRateQuotePDF, generateTourRatesSummaryPDF } from '@/utils/rates-pdf-export';
+import { buildTourRatesExportPayload } from '@/services/tourRatesExport';
 
 type TourRatesManagerDialogProps = {
   open: boolean;
@@ -37,7 +38,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, title, start_time, job_type')
+        .select('id, title, start_time, end_time, job_type')
         .eq('tour_id', tourId)
         .eq('job_type', 'tourdate')
         .order('start_time', { ascending: true });
@@ -123,6 +124,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   });
 
   const [activeTab, setActiveTab] = useState('by-date');
+  const [exportingTour, setExportingTour] = useState(false);
   const { data: approvalRow, refetch: refetchApproval } = useTourRatesApproval(tourId);
   const approved = !!approvalRow?.rates_approved;
 
@@ -212,29 +214,45 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
               <Button
                 variant="outline"
                 size="sm"
+                disabled={exportingTour || tourJobs.length === 0}
                 onClick={async () => {
-                  const { data: tourData } = await supabase
-                    .from('tours')
-                    .select('name')
-                    .eq('id', tourId)
-                    .single();
-                  
-                  const jobsWithQuotes = await Promise.all(
-                    tourJobs.map(async (job: any) => {
-                      const { data: jobQuotes } = await supabase.rpc('compute_tour_job_rate_quote_2025', {
-                        _job_id: job.id,
-                        _tech_id: profiles[0]?.id
-                      });
-                      return { job, quotes: quotes.filter(q => q.job_id === job.id) };
-                    })
-                  );
-                  
-                  await generateTourRatesSummaryPDF(
-                    tourData?.name || 'Tour',
-                    jobsWithQuotes.filter(j => j.quotes.length > 0),
-                    profiles
-                  );
-                  toast.success('PDF de gira generado');
+                  setExportingTour(true);
+                  try {
+                    const { data: tourData } = await supabase
+                      .from('tours')
+                      .select('name')
+                      .eq('id', tourId)
+                      .single();
+
+                    const jobsForExport = tourJobs.map((job: any) => ({
+                      id: job.id,
+                      title: job.title,
+                      start_time: job.start_time,
+                      end_time: job.end_time ?? null,
+                    }));
+
+                    const { jobsWithQuotes, profiles: exportProfiles } = await buildTourRatesExportPayload(
+                      tourId,
+                      jobsForExport
+                    );
+
+                    if (!jobsWithQuotes.length) {
+                      toast.error('No hay asignaciones con tarifas para exportar.');
+                      return;
+                    }
+
+                    await generateTourRatesSummaryPDF(
+                      tourData?.name || 'Tour',
+                      jobsWithQuotes,
+                      exportProfiles
+                    );
+                    toast.success('PDF de gira generado');
+                  } catch (error) {
+                    console.error('Error generating tour PDF', error);
+                    toast.error('No se pudo generar el PDF de la gira');
+                  } finally {
+                    setExportingTour(false);
+                  }
                 }}
                 className="flex items-center gap-1"
               >
