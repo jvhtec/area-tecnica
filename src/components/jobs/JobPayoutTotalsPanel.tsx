@@ -2,14 +2,20 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink } from 'lucide-react';
+import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send } from 'lucide-react';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
-import { formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { generateJobPayoutPDF } from '@/utils/rates-pdf-export';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import {
+  prepareJobPayoutEmailContext,
+  sendJobPayoutEmails,
+  type JobPayoutEmailContextResult,
+  type TechnicianProfileWithEmail,
+} from '@/lib/job-payout-email';
+import { generateJobPayoutPDF } from '@/utils/rates-pdf-export';
 
 interface JobPayoutTotalsPanelProps {
   jobId: string;
@@ -50,24 +56,129 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, email')
         .in('id', techIds);
       if (error) throw error;
-      return (data || []) as Array<{ id: string; first_name: string | null; last_name: string | null }>;
+      return (data || []) as TechnicianProfileWithEmail[];
     },
     staleTime: 60_000,
   });
+  const profilesWithEmail = profiles as TechnicianProfileWithEmail[];
+  const profileMap = React.useMemo(() => new Map(profilesWithEmail.map((p) => [p.id, p])), [profilesWithEmail]);
   const getTechName = React.useCallback(
     (id: string) => {
-      const p = (profiles as Array<{ id: string; first_name: string | null; last_name: string | null }>).find(
-        (x) => x.id === id
-      );
+      const p = profileMap.get(id);
       if (!p) return id;
       const name = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
       return name || id;
     },
-    [profiles]
+    [profileMap]
   );
+
+  const { data: jobMeta } = useQuery({
+    queryKey: ['job-payout-metadata', jobId],
+    enabled: !!jobId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('id, title, start_time, tour_id, rates_approved')
+        .eq('id', jobId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as {
+        id: string;
+        title: string;
+        start_time: string;
+        tour_id: string | null;
+        rates_approved: boolean | null;
+      };
+    },
+    staleTime: 60_000,
+  });
+
+  const jobRatesApproved = Boolean(jobMeta?.rates_approved);
+  const [isExporting, setIsExporting] = React.useState(false);
+  const [isSendingEmails, setIsSendingEmails] = React.useState(false);
+  const [missingEmailTechIds, setMissingEmailTechIds] = React.useState<string[]>([]);
+  const lastPreparedContext = React.useRef<JobPayoutEmailContextResult | null>(null);
+
+  const handlePrepareContext = React.useCallback(async () => {
+    const context = await prepareJobPayoutEmailContext({
+      jobId,
+      supabase,
+      payouts: payoutTotals,
+      profiles: profilesWithEmail,
+      lpoMap,
+      jobDetails: jobMeta || undefined,
+    });
+    lastPreparedContext.current = context;
+    setMissingEmailTechIds(context.missingEmails);
+    return context;
+  }, [jobId, payoutTotals, profilesWithEmail, lpoMap, jobMeta]);
+
+  const handleExport = React.useCallback(async () => {
+    if (!jobId || payoutTotals.length === 0) return;
+    setIsExporting(true);
+    try {
+      const context = await handlePrepareContext();
+      await generateJobPayoutPDF(
+        context.payouts,
+        context.job,
+        context.profiles,
+        context.lpoMap ?? lpoMap,
+        context.timesheetMap
+      );
+      toast.success('PDF de pagos generado');
+    } catch (err) {
+      console.error('[JobPayoutTotalsPanel] Error generating payout PDF', err);
+      toast.error('No se pudo generar el PDF de pagos');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [jobId, payoutTotals.length, handlePrepareContext, lpoMap]);
+
+  const handleSendEmails = React.useCallback(async () => {
+    if (!jobId || payoutTotals.length === 0) return;
+    setIsSendingEmails(true);
+    try {
+      const result = await sendJobPayoutEmails({
+        jobId,
+        supabase,
+        payouts: payoutTotals,
+        profiles: profilesWithEmail,
+        lpoMap,
+        jobDetails: jobMeta || undefined,
+        existingContext: lastPreparedContext.current ?? undefined,
+      });
+      lastPreparedContext.current = result.context;
+      setMissingEmailTechIds(result.context.missingEmails);
+
+      if (result.error) {
+        console.error('[JobPayoutTotalsPanel] Error sending payout emails', result.error);
+        toast.error('No se pudieron enviar los correos de pagos');
+        return;
+      }
+
+      const partialFailures = Array.isArray(result.response?.results)
+        ? (result.response.results as Array<{ sent: boolean }>).some((r) => !r.sent)
+        : false;
+
+      if (result.success && !partialFailures) {
+        toast.success('Pagos enviados por correo');
+      } else {
+        toast.warning('Algunos correos no se pudieron enviar. Revisa el registro.');
+      }
+
+      if (result.missingEmails.length) {
+        toast.warning('Hay técnicos sin correo configurado.');
+      }
+    } catch (err) {
+      console.error('[JobPayoutTotalsPanel] Unexpected error sending payout emails', err);
+      toast.error('Se produjo un error al enviar los correos de pagos');
+    } finally {
+      setIsSendingEmails(false);
+    }
+  }, [jobId, payoutTotals, profilesWithEmail, lpoMap, jobMeta]);
 
   if (isLoading) {
     return (
@@ -120,99 +231,71 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Euro className="h-5 w-5" />
             Job Payout Totals
           </CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              const { data: jobData } = await supabase
-                .from('jobs')
-                .select('id, title, start_time, tour_id')
-                .eq('id', jobId)
-                .single();
-              
-              if (!jobData) {
-                toast.error('No se pudo cargar la información del trabajo');
-                return;
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={isExporting || payoutTotals.length === 0}
+            >
+              <FileDown className="h-4 w-4 mr-1" />
+              {isExporting ? 'Generando…' : 'Exportar PDF'}
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSendEmails}
+              disabled={isSendingEmails || !jobRatesApproved || payoutTotals.length === 0}
+              variant={jobRatesApproved ? 'default' : 'secondary'}
+              title={
+                jobRatesApproved
+                  ? 'Enviar los resúmenes por correo'
+                  : 'Aprueba las tarifas para habilitar el envío'
               }
-              
-              const techIds = [...new Set(payoutTotals.map(p => p.technician_id))];
-              const { data: profiles } = await supabase
-                .from('profiles')
-                .select('id, first_name, last_name')
-                .in('id', techIds);
-
-              // Fetch approved timesheets breakdowns for detailed PDF section
-              let { data: tsRows } = await supabase
-                .from('timesheets')
-                .select('technician_id, job_id, date, amount_breakdown, amount_breakdown_visible, approved_by_manager')
-                .eq('job_id', jobId)
-                .eq('approved_by_manager', true);
-
-              // Fallback to security-definer helper if direct timesheet read is empty (RLS/path issues)
-              if (!tsRows || tsRows.length === 0) {
-                const { data: visible } = await supabase.rpc('get_timesheet_amounts_visible');
-                tsRows = (visible as any[] | null)?.filter(
-                  (r) => r.job_id === jobId && r.approved_by_manager === true
-                ) || [];
-              }
-
-              type TimesheetLine = {
-                date?: string | null;
-                hours_rounded?: number;
-                base_day_eur?: number;
-                plus_10_12_hours?: number;
-                plus_10_12_amount_eur?: number;
-                overtime_hours?: number;
-                overtime_hour_eur?: number;
-                overtime_amount_eur?: number;
-                total_eur?: number;
-              };
-              const timesheetMap = new Map<string, TimesheetLine[]>();
-              (tsRows || []).forEach((row: any) => {
-                const b = (row.amount_breakdown || row.amount_breakdown_visible || {}) as Record<string, any>;
-                const line: TimesheetLine = {
-                  date: row.date ?? null,
-                  hours_rounded: Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0,
-                  base_day_eur: b.base_day_eur != null ? Number(b.base_day_eur) : undefined,
-                  plus_10_12_hours: b.plus_10_12_hours != null ? Number(b.plus_10_12_hours) : undefined,
-                  plus_10_12_amount_eur: b.plus_10_12_amount_eur != null ? Number(b.plus_10_12_amount_eur) : undefined,
-                  overtime_hours: b.overtime_hours != null ? Number(b.overtime_hours) : undefined,
-                  overtime_hour_eur: b.overtime_hour_eur != null ? Number(b.overtime_hour_eur) : undefined,
-                  overtime_amount_eur: b.overtime_amount_eur != null ? Number(b.overtime_amount_eur) : undefined,
-                  total_eur: b.total_eur != null ? Number(b.total_eur) : undefined,
-                };
-                const arr = timesheetMap.get(row.technician_id) || [];
-                arr.push(line);
-                timesheetMap.set(row.technician_id, arr);
-              });
-              
-              await generateJobPayoutPDF(
-                payoutTotals,
-                jobData,
-                profiles || [],
-                lpoMap,
-                timesheetMap
-              );
-              toast.success('PDF de pagos generado');
-            }}
-          >
-            <FileDown className="h-4 w-4 mr-1" />
-            Exportar PDF
-          </Button>
+            >
+              <Send className="h-4 w-4 mr-1" />
+              {isSendingEmails ? 'Enviando…' : 'Enviar por correo'}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {payoutTotals.map((payout) => (
-          <div key={payout.technician_id} className="border rounded-lg p-4 space-y-3">
+          <div
+            key={payout.technician_id}
+            className={cn(
+              'border rounded-lg p-4 space-y-3 transition-colors',
+              (!profileMap.get(payout.technician_id)?.email ||
+                missingEmailTechIds.includes(payout.technician_id)) &&
+                'border-amber-400/70 bg-amber-50/80 dark:border-amber-400/60 dark:bg-amber-500/10'
+            )}
+          >
             <div className="flex items-start justify-between">
               <div>
                 <h4 className="font-medium text-base">{getTechName(payout.technician_id)}</h4>
-                <p className="text-sm text-muted-foreground">Job: {payout.job_id}</p>
+                <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                  <span>Job: {payout.job_id}</span>
+                  <span>
+                    Correo:{' '}
+                    {profileMap.get(payout.technician_id)?.email ? (
+                      profileMap.get(payout.technician_id)?.email
+                    ) : (
+                      <span className="text-amber-700 dark:text-amber-400 font-medium">Sin correo configurado</span>
+                    )}
+                  </span>
+                </div>
+                {!profileMap.get(payout.technician_id)?.email && (
+                  <Badge
+                    variant="outline"
+                    className="mt-2 text-amber-700 border-amber-300 bg-amber-100/60 dark:border-amber-500/50 dark:text-amber-200 dark:bg-amber-500/10"
+                  >
+                    Sin correo
+                  </Badge>
+                )}
                 {lpoMap.has(payout.technician_id) && (
                   <div className="text-xs text-muted-foreground flex items-center gap-2">
                     <span>LPO Nº: {lpoMap.get(payout.technician_id) || '—'}</span>

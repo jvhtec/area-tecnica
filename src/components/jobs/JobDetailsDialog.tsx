@@ -43,6 +43,7 @@ import { resolveJobDocBucket } from '@/utils/jobDocuments';
 import { mergePDFs } from '@/utils/pdf/pdfMerge';
 import { generateTimesheetPDF } from '@/utils/timesheet-pdf';
 import { generateJobPayoutPDF } from '@/utils/rates-pdf-export';
+import { sendJobPayoutEmails } from '@/lib/job-payout-email';
 
 interface JobDetailsDialogProps {
   open: boolean;
@@ -62,6 +63,41 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const isManager = ['admin','management'].includes(userRole || '');
   const isTechnicianRole = ['technician', 'house_tech'].includes(userRole || '');
   const queryClient = useQueryClient();
+  const [isSendingPayoutEmails, setIsSendingPayoutEmails] = useState(false);
+  const triggerPayoutEmails = React.useCallback(
+    async (jobId: string) => {
+      if (!jobId || isSendingPayoutEmails) return;
+      setIsSendingPayoutEmails(true);
+      try {
+        const result = await sendJobPayoutEmails({ jobId, supabase });
+
+        if (result.error) {
+          console.error('[JobDetailsDialog] Error sending payout emails', result.error);
+          toast.error('No se pudieron enviar los correos de pagos');
+        } else {
+          const partialFailures = Array.isArray(result.response?.results)
+            ? (result.response.results as Array<{ sent: boolean }>).some((r) => !r.sent)
+            : false;
+
+          if (result.success && !partialFailures) {
+            toast.success('Pagos enviados por correo');
+          } else {
+            toast.warning('Algunos correos no se pudieron enviar. Revisa el registro.');
+          }
+
+          if (result.missingEmails.length) {
+            toast.warning('Hay técnicos sin correo configurado.');
+          }
+        }
+      } catch (err) {
+        console.error('[JobDetailsDialog] Unexpected error sending payout emails', err);
+        toast.error('Se produjo un error al enviar los correos de pagos');
+      } finally {
+        setIsSendingPayoutEmails(false);
+      }
+    },
+    [isSendingPayoutEmails, supabase]
+  );
 
   // Fetch comprehensive job data
   const { data: jobDetails, isLoading: isJobLoading } = useQuery({
@@ -496,6 +532,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 toast.error(reasons ? `No se puede aprobar: ${reasons}` : 'No se puede aprobar mientras haya elementos pendientes');
                                 return;
                               }
+                              let approvalSucceeded = false;
                               try {
                                 const { data: u } = await supabase.auth.getUser();
                                 const { error: approvalError } = await supabase
@@ -508,6 +545,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                   .eq('id', resolvedJobId);
 
                                 if (approvalError) throw approvalError;
+                                approvalSucceeded = true;
 
                                 try {
                                   const result = await syncFlexWorkOrdersForJob(resolvedJobId);
@@ -529,6 +567,20 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
                                 queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
                                 queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
+                                if (approvalSucceeded) {
+                                  toast.success('Tarifas aprobadas', {
+                                    description: '¿Quieres enviar los resúmenes de pagos por correo ahora?',
+                                    action: resolvedJobId
+                                      ? {
+                                          label: 'Enviar ahora',
+                                          onClick: () => {
+                                            if (isSendingPayoutEmails) return;
+                                            triggerPayoutEmails(resolvedJobId);
+                                          },
+                                        }
+                                      : undefined,
+                                  });
+                                }
                               }
                             }}
                           >

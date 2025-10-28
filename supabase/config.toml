@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.push]
 verify_jwt = true
+
+[functions.send-job-payout-email]
+verify_jwt = true
