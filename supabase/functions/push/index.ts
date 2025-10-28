@@ -475,7 +475,8 @@ async function handleBroadcast(
   const recipients = new Set<string>();
   const management = new Set(await getManagementUserIds(client));
   const soundDept = new Set(await getSoundDepartmentUserIds(client));
-  const mgmt = new Set<string>([...management, ...soundDept]);
+  // Management audience should not include department-specific users by default
+  const mgmt = new Set<string>(management);
   const participants = new Set(await getJobParticipantUserIds(client, jobId || ''));
 
   const addUsers = (ids: (string | null | undefined)[]) => {
@@ -560,7 +561,7 @@ async function handleBroadcast(
     title = 'Oferta aceptada';
     text = `${recipName || 'Técnico'} aceptó oferta para "${jobTitle || 'Trabajo'}".`;
     addUsers(Array.from(mgmt));
-    addUsers(Array.from(participants));
+    // No need to notify all participants here; keep it to management
   } else if (type === 'staffing.offer.declined') {
     title = 'Oferta rechazada';
     text = `${recipName || 'Técnico'} rechazó oferta para "${jobTitle || 'Trabajo'}".`;
@@ -791,8 +792,9 @@ async function handleBroadcast(
     title = type === 'soundvision.file.uploaded' ? 'Archivo SoundVision subido' : 'Archivo SoundVision descargado';
     text = `${actor} ha ${action} un archivo SoundVision ${venueName} a la base de datos.`;
     url = body.url || '/soundvision-files';
-    addUsers(Array.from(management));
-    addUsers(Array.from(soundDept));
+    // Notify only users who are both management and in the sound department
+    const soundManagement = Array.from(management).filter((id) => soundDept.has(id));
+    addUsers(soundManagement);
   } else {
     // Generic fallback using activity catalog label if available
     try {
