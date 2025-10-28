@@ -58,8 +58,10 @@ export const useOptimizedJobs = (
         job_assignments(
           technician_id,
           sound_role,
-          lights_role, 
+          lights_role,
           video_role,
+          single_day,
+          single_day_date,
           status,
           assigned_at,
           profiles!inner(

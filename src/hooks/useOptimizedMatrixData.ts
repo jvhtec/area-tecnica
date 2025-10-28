@@ -21,6 +21,8 @@ interface AssignmentWithJob {
   sound_role?: string;
   lights_role?: string;
   video_role?: string;
+  single_day?: boolean | null;
+  single_day_date?: string | null;
   status: string;
   assigned_at: string;
   job: {
@@ -37,6 +39,41 @@ interface OptimizedMatrixDataProps {
   dates: Date[];
   jobs: MatrixJob[];
 }
+
+export const buildAssignmentDateMap = (
+  assignments: AssignmentWithJob[],
+  dates: Date[]
+) => {
+  const map = new Map<string, AssignmentWithJob>();
+  const visibleDateKeys = new Set(dates.map(date => format(date, 'yyyy-MM-dd')));
+
+  assignments.forEach((assignment) => {
+    if (!assignment.job) return;
+
+    if (assignment.single_day && assignment.single_day_date) {
+      if (visibleDateKeys.size === 0 || visibleDateKeys.has(assignment.single_day_date)) {
+        map.set(`${assignment.technician_id}-${assignment.single_day_date}`, assignment);
+      }
+      return;
+    }
+
+    const jobStart = new Date(assignment.job.start_time);
+    const jobEnd = new Date(assignment.job.end_time);
+
+    dates.forEach(date => {
+      if (
+        isWithinInterval(date, { start: jobStart, end: jobEnd }) ||
+        isSameDay(date, jobStart) ||
+        isSameDay(date, jobEnd)
+      ) {
+        const key = `${assignment.technician_id}-${format(date, 'yyyy-MM-dd')}`;
+        map.set(key, assignment);
+      }
+    });
+  });
+
+  return map;
+};
 
 export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMatrixDataProps) => {
   const queryClient = useQueryClient();
@@ -73,6 +110,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
               sound_role,
               lights_role,
               video_role,
+              single_day,
+              single_day_date,
               status,
               assigned_at,
               jobs!job_id (
@@ -108,6 +147,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           sound_role: item.sound_role,
           lights_role: item.lights_role,
           video_role: item.video_role,
+          single_day: item.single_day,
+          single_day_date: item.single_day_date,
           status: item.status,
           assigned_at: item.assigned_at,
           job: Array.isArray(item.jobs) ? item.jobs[0] : item.jobs
@@ -280,25 +321,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
   // Memoized helper functions
   const getAssignmentForCell = useMemo(() => {
-    const assignmentMap = new Map();
-    
-    allAssignments.forEach(assignment => {
-      if (!assignment.job) return;
-      
-      // assignment.job is a single job object from the inner join
-      const jobStart = new Date(assignment.job.start_time);
-      const jobEnd = new Date(assignment.job.end_time);
-      
-      dates.forEach(date => {
-        if (isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
-            isSameDay(date, jobStart) || 
-            isSameDay(date, jobEnd)) {
-          const key = `${assignment.technician_id}-${format(date, 'yyyy-MM-dd')}`;
-          assignmentMap.set(key, assignment);
-        }
-      });
-    });
-    
+    const assignmentMap = buildAssignmentDateMap(allAssignments, dates);
     return (technicianId: string, date: Date) => {
       const key = `${technicianId}-${format(date, 'yyyy-MM-dd')}`;
       return assignmentMap.get(key);
