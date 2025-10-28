@@ -38,7 +38,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, title, start_time, end_time, job_type')
+        .select('id, title, start_time, end_time, job_type, tour_id')
         .eq('tour_id', tourId)
         .eq('job_type', 'tourdate')
         .order('start_time', { ascending: true });

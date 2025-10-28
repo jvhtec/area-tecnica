@@ -94,7 +94,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             onClick={async () => {
               const { data: jobData } = await supabase
                 .from('jobs')
-                .select('id, title, start_time')
+                .select('id, title, start_time, tour_id')
                 .eq('id', jobId)
                 .single();
               
