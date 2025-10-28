@@ -32,7 +32,9 @@ export const buildAssignmentInsertPayload = (
     assigned_by: assignedBy,
     assigned_at: new Date().toISOString(),
     single_day: shouldFlagSingleDay,
+    // Populate both columns for compatibility across older and newer schema
     single_day_date: shouldFlagSingleDay ? options?.singleDayDate ?? null : null,
+    assignment_date: shouldFlagSingleDay ? options?.singleDayDate ?? null : null,
   };
 };
 
@@ -160,6 +162,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
             lights_role: payload.lights_role,
             single_day: payload.single_day,
             single_day_date: payload.single_day_date,
+            assignment_date: (payload as any).assignment_date ?? null,
             assigned_at: payload.assigned_at,
             assigned_by: payload.assigned_by,
             profiles: { first_name: '', last_name: '' },

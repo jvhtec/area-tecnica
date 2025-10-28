@@ -2661,11 +2661,13 @@ export type Database = {
       }
       job_assignments: {
         Row: {
+          assignment_date: string | null
           assigned_at: string
           assigned_by: string | null
           assignment_source: string | null
           job_id: string
           lights_role: string | null
+          single_day: boolean
           response_time: string | null
           single_day: boolean | null
           single_day_date: string | null
@@ -2675,11 +2677,13 @@ export type Database = {
           video_role: string | null
         }
         Insert: {
+          assignment_date?: string | null
           assigned_at?: string
           assigned_by?: string | null
           assignment_source?: string | null
           job_id: string
           lights_role?: string | null
+          single_day?: boolean
           response_time?: string | null
           single_day?: boolean | null
           single_day_date?: string | null
@@ -2689,11 +2693,13 @@ export type Database = {
           video_role?: string | null
         }
         Update: {
+          assignment_date?: string | null
           assigned_at?: string
           assigned_by?: string | null
           assignment_source?: string | null
           job_id?: string
           lights_role?: string | null
+          single_day?: boolean
           response_time?: string | null
           single_day?: boolean | null
           single_day_date?: string | null

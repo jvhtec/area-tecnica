@@ -52,6 +52,7 @@ export const AssignJobDialog = ({
 }: AssignJobDialogProps) => {
   const [selectedJobId, setSelectedJobId] = useState<string>(preSelectedJobId || existingAssignment?.job_id || '');
   const [selectedRole, setSelectedRole] = useState<string>('');
+  const [singleDay, setSingleDay] = useState<boolean>(existingAssignment?.single_day ?? true);
   const [assignAsConfirmed, setAssignAsConfirmed] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
@@ -83,6 +84,7 @@ export const AssignJobDialog = ({
   const selectedJob = filteredJobs.find(job => job.id === selectedJobId);
   const roleOptions = technician ? roleOptionsForDiscipline(technician.department) : [];
   const isReassignment = !!existingAssignment;
+  const assignmentDate = React.useMemo(() => date.toISOString().split('T')[0], [date]);
 
   // Set initial role if reassigning
   React.useEffect(() => {
@@ -100,6 +102,10 @@ export const AssignJobDialog = ({
       }
     }
   }, [existingAssignment, technician]);
+
+  React.useEffect(() => {
+    setSingleDay(existingAssignment?.single_day ?? true);
+  }, [existingAssignment?.single_day]);
 
   // Update selected job when preSelectedJobId changes
   React.useEffect(() => {
@@ -165,7 +171,9 @@ export const AssignJobDialog = ({
         sound_role: soundRole !== 'none' ? soundRole : null,
         lights_role: lightsRole !== 'none' ? lightsRole : null,
         video_role: videoRole !== 'none' ? videoRole : null,
-        status: assignAsConfirmed ? 'confirmed' : 'invited'
+        status: assignAsConfirmed ? 'confirmed' : 'invited',
+        single_day: singleDay,
+        assignment_date: singleDay ? assignmentDate : null
       });
 
       const { error } = await supabase
@@ -180,6 +188,8 @@ export const AssignJobDialog = ({
           assigned_at: new Date().toISOString(),
           status: assignAsConfirmed ? 'confirmed' : 'invited',
           response_time: assignAsConfirmed ? new Date().toISOString() : null,
+          single_day: singleDay,
+          assignment_date: singleDay ? assignmentDate : null,
         });
 
       if (error) {
@@ -243,7 +253,9 @@ export const AssignJobDialog = ({
               type: 'job.assignment.confirmed',
               job_id: selectedJobId,
               recipient_id: technicianId,
-              recipient_name: recipientName || undefined
+              recipient_name: recipientName || undefined,
+              target_date: singleDay ? `${assignmentDate}T00:00:00Z` : undefined,
+              single_day: singleDay
             }
           });
         } catch (_) {
@@ -387,18 +399,33 @@ export const AssignJobDialog = ({
           )}
 
           {selectedJobId && selectedRole && (
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="confirm-assignment" 
-                checked={assignAsConfirmed}
-                onCheckedChange={handleCheckboxChange}
-              />
-              <label 
-                htmlFor="confirm-assignment" 
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Assign as confirmed (skip invitation)
-              </label>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="single-day-assignment"
+                  checked={singleDay}
+                  onCheckedChange={(checked) => setSingleDay(checked === true)}
+                />
+                <label
+                  htmlFor="single-day-assignment"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Limit assignment to {format(date, 'PPP')}
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="confirm-assignment"
+                  checked={assignAsConfirmed}
+                  onCheckedChange={handleCheckboxChange}
+                />
+                <label
+                  htmlFor="confirm-assignment"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Assign as confirmed (skip invitation)
+                </label>
+              </div>
             </div>
           )}
 
@@ -423,6 +450,11 @@ export const AssignJobDialog = ({
               {assignAsConfirmed && (
                 <div className="text-xs text-green-600 mt-1 font-medium">
                   Will be assigned as confirmed
+                </div>
+              )}
+              {singleDay && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Single-day coverage for {format(date, 'PPP')}
                 </div>
               )}
             </div>

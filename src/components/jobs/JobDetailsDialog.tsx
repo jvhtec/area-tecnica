@@ -71,6 +71,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
           job_assignments(
             job_id, technician_id, assigned_by, assigned_at,
             sound_role, lights_role, video_role, status,
+            single_day, assignment_date,
             profiles(id, first_name, last_name, department, role)
           ),
           job_documents(id, file_name, file_path, uploaded_at, file_size, visible_to_tech, read_only, template_type),
@@ -756,6 +757,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                           <p className="text-sm text-muted-foreground">
                             {assignment.profiles?.department || 'Externo'}
                           </p>
+                          {assignment.single_day && (
+                            <p className="text-xs text-muted-foreground">
+                              Solo día: {assignment.assignment_date ? format(new Date(assignment.assignment_date), 'PPP', { locale: es }) : 'Sin fecha definida'}
+                            </p>
+                          )}
                         </div>
                         <div className="flex gap-1">
                           {assignment.sound_role && (

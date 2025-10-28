@@ -25,7 +25,8 @@ export async function getAvailableTechnicians(
   department: string,
   jobId: string,
   jobStartTime: string,
-  jobEndTime: string
+  jobEndTime: string,
+  assignmentDate?: string | null
 ) {
   try {
     // First, get all technicians from the specified department, plus flagged management users
@@ -62,6 +63,8 @@ export async function getAvailableTechnicians(
       .select(`
         technician_id,
         job_id,
+        single_day,
+        assignment_date,
         jobs!inner (
           id,
           start_time,
@@ -76,8 +79,12 @@ export async function getAvailableTechnicians(
     }
 
     // Get availability schedules (including vacation-based unavailability)
-    const jobStartDate = new Date(jobStartTime).toISOString().split('T')[0];
-    const jobEndDate = new Date(jobEndTime).toISOString().split('T')[0];
+    const normalizedTargetDate = assignmentDate
+      ? new Date(assignmentDate).toISOString().split('T')[0]
+      : null;
+
+    const jobStartDate = normalizedTargetDate || new Date(jobStartTime).toISOString().split('T')[0];
+    const jobEndDate = normalizedTargetDate || new Date(jobEndTime).toISOString().split('T')[0];
     
     const { data: unavailabilityData, error: unavailabilityError } = await supabase
       .from("availability_schedules")
@@ -94,11 +101,25 @@ export async function getAvailableTechnicians(
     // Filter out technicians who have conflicts
     const availableTechnicians = eligibleTechnicians.filter((technician: any) => {
       // Check if technician is already assigned to this specific job
-      const assignedToCurrentJob = conflictingAssignments?.some(
-        assignment => 
-          assignment.technician_id === technician.id && 
-          assignment.job_id === jobId
-      );
+      const assignedToCurrentJob = conflictingAssignments?.some(assignment => {
+        if (assignment.technician_id !== technician.id) {
+          return false;
+        }
+        if (assignment.job_id !== jobId) {
+          return false;
+        }
+        if (!assignment.single_day) {
+          return true;
+        }
+        if (!normalizedTargetDate) {
+          // Whole-job assignment - any single-day entry counts as conflict
+          return true;
+        }
+        if (!assignment.assignment_date) {
+          return true;
+        }
+        return assignment.assignment_date === normalizedTargetDate;
+      });
 
       if (assignedToCurrentJob) {
         return false;
@@ -110,7 +131,34 @@ export async function getAvailableTechnicians(
           return false;
         }
 
+        // Skip current job - already handled above
+        if (assignment.job_id === jobId) {
+          return false;
+        }
+
         const jobData = assignment.jobs as any;
+        if (assignment.single_day) {
+          if (!assignment.assignment_date) {
+            return true;
+          }
+          if (!normalizedTargetDate) {
+            // For whole-job assignments, treat any single-day overlap within the job range as conflict
+            const jobStartStr = new Date(jobStartTime).toISOString().split('T')[0];
+            const jobEndStr = new Date(jobEndTime).toISOString().split('T')[0];
+            return assignment.assignment_date >= jobStartStr && assignment.assignment_date <= jobEndStr;
+          }
+          return assignment.assignment_date === normalizedTargetDate;
+        }
+
+        if (normalizedTargetDate) {
+          if (!jobData?.start_time || !jobData?.end_time) {
+            return false;
+          }
+          const otherStart = new Date(jobData.start_time).toISOString().split('T')[0];
+          const otherEnd = new Date(jobData.end_time).toISOString().split('T')[0];
+          return otherStart <= normalizedTargetDate && otherEnd >= normalizedTargetDate;
+        }
+
         return datesOverlap(
           jobStartTime,
           jobEndTime,

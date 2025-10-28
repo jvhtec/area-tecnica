@@ -68,8 +68,15 @@ serve(async (req) => {
     const body = await req.json();
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
     
-    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path } = body;
+    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day } = body;
     const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp') ? 'whatsapp' : 'email';
+    const rawTargetDate = typeof target_date === 'string' && target_date ? target_date : null;
+    const normalizedTargetDate = rawTargetDate ? (() => {
+      const parsed = new Date(rawTargetDate);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.toISOString().split('T')[0];
+    })() : null;
+    const isSingleDayRequest = Boolean(single_day) && Boolean(normalizedTargetDate);
     
     // Enhanced validation logging
     console.log('🔍 VALIDATING FIELDS:', {
@@ -77,7 +84,9 @@ serve(async (req) => {
       profile_id: { value: profile_id, type: typeof profile_id, isValid: !!profile_id },
       phase: { value: phase, type: typeof phase, isValidPhase: ["availability","offer"].includes(phase) },
       role: { value: role ?? null },
-      message: { value: message ?? null }
+      message: { value: message ?? null },
+      target_date: { value: target_date ?? null, normalized: normalizedTargetDate },
+      single_day: { value: single_day ?? null, effective: isSingleDayRequest }
     });
     
     if (!job_id || !profile_id || !["availability","offer"].includes(phase)) {
@@ -258,14 +267,23 @@ serve(async (req) => {
         console.log('🕒 CONFLICT CHECK: fetching confirmed assignments for technician...');
         const { data: confirmedAssigns, error: assignErr } = await supabase
           .from('job_assignments')
-          .select('job_id,status')
+          .select('job_id,status,single_day,assignment_date')
           .eq('technician_id', profile_id)
           .eq('status', 'confirmed');
 
         if (assignErr) {
           console.warn('⚠️ Conflict check skipped due to assignment fetch error:', assignErr);
         } else if ((confirmedAssigns?.length ?? 0) > 0) {
-          const otherJobIds = confirmedAssigns!.map(a => a.job_id).filter(id => id !== job_id);
+          const assignments = confirmedAssigns ?? [];
+          const relevantAssignments = assignments
+            .filter(a => a.job_id !== job_id)
+            .filter(a => {
+              if (!normalizedTargetDate) return true;
+              if (!a.single_day) return true;
+              if (!a.assignment_date) return true;
+              return a.assignment_date === normalizedTargetDate;
+            });
+          const otherJobIds = Array.from(new Set(relevantAssignments.map(a => a.job_id)));
           if (otherJobIds.length > 0) {
             const { data: otherJobs, error: jobsErr } = await supabase
               .from('jobs')
@@ -274,16 +292,42 @@ serve(async (req) => {
             if (jobsErr) {
               console.warn('⚠️ Conflict check skipped due to jobs fetch error:', jobsErr);
             } else {
-              const js = (otherJobs ?? []).map(j => ({
-                id: j.id,
-                title: j.title,
-                start: j.start_time ? new Date(j.start_time) : null,
-                end: j.end_time ? new Date(j.end_time) : null
-              }));
-              const targetStart = job.start_time ? new Date(job.start_time) : null;
-              const targetEnd = job.end_time ? new Date(job.end_time) : null;
-              const overlap = targetStart && targetEnd ? js.find(j => j.start && j.end && (j.start < targetEnd) && (j.end > targetStart)) : null;
+              const assignmentByJob = new Map<string, any>();
+              relevantAssignments.forEach(a => {
+                if (!assignmentByJob.has(a.job_id)) {
+                  assignmentByJob.set(a.job_id, a);
+                }
+              });
+              const targetStart = normalizedTargetDate
+                ? new Date(`${normalizedTargetDate}T00:00:00Z`)
+                : job.start_time ? new Date(job.start_time) : null;
+              const targetEnd = normalizedTargetDate
+                ? new Date(`${normalizedTargetDate}T23:59:59Z`)
+                : job.end_time ? new Date(job.end_time) : null;
+              const overlap = targetStart && targetEnd ? (otherJobs ?? []).find(j => {
+                const meta = assignmentByJob.get(j.id);
+                if (!meta) return false;
+                const otherStart = j.start_time ? new Date(j.start_time) : null;
+                const otherEnd = j.end_time ? new Date(j.end_time) : null;
+                if (meta.single_day) {
+                  if (normalizedTargetDate) {
+                    return true;
+                  }
+                  if (!meta.assignment_date) {
+                    return true;
+                  }
+                  const targetStartStr = job.start_time ? new Date(job.start_time).toISOString().split('T')[0] : null;
+                  const targetEndStr = job.end_time ? new Date(job.end_time).toISOString().split('T')[0] : null;
+                  if (!targetStartStr || !targetEndStr) {
+                    return true;
+                  }
+                  return meta.assignment_date >= targetStartStr && meta.assignment_date <= targetEndStr;
+                }
+                return otherStart && otherEnd && (otherStart < targetEnd) && (otherEnd > targetStart);
+              }) : null;
               if (overlap) {
+                const overlapStart = overlap.start_time ? new Date(overlap.start_time) : null;
+                const overlapEnd = overlap.end_time ? new Date(overlap.end_time) : null;
                 console.log('⛔ Conflict detected with confirmed job:', overlap);
                 return new Response(JSON.stringify({
                   error: 'Technician has a confirmed overlapping job',
@@ -291,10 +335,17 @@ serve(async (req) => {
                     conflicting_job: {
                       id: overlap.id,
                       title: overlap.title,
-                      start_time: overlap.start?.toISOString(),
-                      end_time: overlap.end?.toISOString()
+                      start_time: overlapStart?.toISOString(),
+                      end_time: overlapEnd?.toISOString()
                     },
-                    target_job: { id: job.id, title: job.title, start_time: job.start_time, end_time: job.end_time },
+                    target_job: {
+                      id: job.id,
+                      title: job.title,
+                      start_time: job.start_time,
+                      end_time: job.end_time,
+                      single_day: isSingleDayRequest,
+                      target_date: normalizedTargetDate
+                    },
                     technician: { id: tech.id, name: fullName }
                   }
                 }), {
@@ -384,6 +435,7 @@ serve(async (req) => {
       const startDate = fmtDate(job.start_time);
       const endDate = fmtDate(job.end_time);
       const callTime = fmtTime(job.start_time);
+      const targetDateLabel = normalizedTargetDate ? fmtDate(`${normalizedTargetDate}T00:00:00Z`) : null;
       const loc = job.locations?.formatted_address ?? 'Por confirmar';
 
       const safeMessage = (message ?? '').replace(/</g, '&lt;').replace(/\n/g, '<br/>');
@@ -426,10 +478,11 @@ serve(async (req) => {
                   <td style="padding:24px 24px 8px 24px;">
                     <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${fullName || ''},</h2>
                     <p style="margin:0;color:#374151;line-height:1.55;">
-                      ${phase === 'availability' 
+                      ${phase === 'availability'
                         ? `¿Puedes confirmar tu disponibilidad para <b>${job.title}</b>?`
                         : `Tienes una oferta para <b>${job.title}</b>. Por favor, confirma:`}
                     </p>
+                    ${isSingleDayRequest && targetDateLabel ? `<p style="margin:8px 0 0 0;color:#374151;"><b>Día específico:</b> ${targetDateLabel}</p>` : ''}
                     ${phase === 'offer' && role ? `<p style="margin:8px 0 0 0;color:#111827;"><b>Puesto:</b> ${role}</p>` : ''}
                     ${phase === 'offer' && message ? `<p style="margin:12px 0 0 0;color:#374151;">${safeMessage}</p>` : ''}
                   </td>
@@ -442,6 +495,7 @@ serve(async (req) => {
                           <div style="color:#111827;font-weight:bold;margin-bottom:4px;">Detalles del trabajo</div>
                           <div style="color:#374151;line-height:1.55;">
                             <div><b>Fechas:</b> ${startDate}${job.end_time ? ` — ${endDate}` : ''}</div>
+                            ${isSingleDayRequest && targetDateLabel ? `<div><b>Día específico:</b> ${targetDateLabel}</div>` : ''}
                             <div><b>Horario:</b> ${callTime}</div>
                             <div><b>Ubicación:</b> ${loc}</div>
                             ${roleLabel ? `<div><b>Rol:</b> ${roleLabel}</div>` : ''}
@@ -503,6 +557,7 @@ serve(async (req) => {
         lines.push('');
         lines.push('Detalles del trabajo:');
         lines.push(`- Fechas: ${startDate}${job.end_time ? ` — ${endDate}` : ''}`);
+        if (isSingleDayRequest && targetDateLabel) lines.push(`- Día específico: ${targetDateLabel}`);
         lines.push(`- Horario: ${callTime}`);
         lines.push(`- Ubicación: ${loc}`);
         if (roleLabel) lines.push(`- Rol: ${roleLabel}`);

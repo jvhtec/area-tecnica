@@ -25,6 +25,8 @@ interface AssignmentWithJob {
   single_day_date?: string | null;
   status: string;
   assigned_at: string;
+  single_day?: boolean;
+  assignment_date?: string | null;
   job: {
     id: string;
     title: string;
@@ -114,6 +116,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
               single_day_date,
               status,
               assigned_at,
+              single_day,
+              assignment_date,
               jobs!job_id (
                 id,
                 title,
@@ -151,6 +155,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           single_day_date: item.single_day_date,
           status: item.status,
           assigned_at: item.assigned_at,
+          single_day: item.single_day,
+          assignment_date: item.assignment_date,
           job: Array.isArray(item.jobs) ? item.jobs[0] : item.jobs
         })).filter(item => item.job); // Filter out items without job data
         

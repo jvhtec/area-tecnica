@@ -82,16 +82,26 @@ const formatAvailableTechnicianName = (technician: { first_name: string; last_na
   return `${technician.first_name} ${technician.last_name}${suffix}`;
 };
 
+const formatJobDateLabel = (date: string | null | undefined) => {
+  if (!date) return '';
+  try {
+    return new Intl.DateTimeFormat('es-ES', { dateStyle: 'full' }).format(new Date(date));
+  } catch (error) {
+    console.warn('Failed to format job date', error);
+    return date;
+  }
+};
+
 export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
   const { user, userRole } = useOptimizedAuth();
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [soundRole, setSoundRole] = useState<string>("none");
   const [lightsRole, setLightsRole] = useState<string>("none");
+  const [singleDay, setSingleDay] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [singleDay, setSingleDay] = useState(false);
   const [selectedJobDate, setSelectedJobDate] = useState<Date | null>(null);
   const { assignments, addAssignment, removeAssignment, isRemoving } = useJobAssignmentsRealtime(jobId);
   const { manageFlexCrewAssignment, useCrewCallData } = useFlexCrewAssignments();
@@ -116,14 +126,15 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   });
 
   // Use the available technicians hook with proper filtering
-  const { 
-    technicians: availableTechnicians, 
-    isLoading: isLoadingTechnicians 
+  const {
+    technicians: availableTechnicians,
+    isLoading: isLoadingTechnicians
   } = useAvailableTechnicians({
     department: currentDepartment,
     jobId: jobId,
     jobStartTime: jobData?.start_time || "",
     jobEndTime: jobData?.end_time || "",
+    assignmentDate: singleDay ? (selectedJobDate ? format(selectedJobDate, "yyyy-MM-dd") : null) : null,
     enabled: isOpen && !!jobData && !!jobId
   });
 
@@ -190,6 +201,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       setSelectedJobDate(jobDates[0]);
     }
   }, [jobDates, singleDay, allowedJobDateSet, selectedJobDate]);
+ 
 
   useEffect(() => {
     if (!isOpen) {
@@ -610,7 +622,6 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
               </div>
             </div>
           </div>
-
           <Button
             onClick={handleAddTechnician}
             disabled={isAdding || !selectedTechnician || isLoadingTechnicians || isLoadingJob}
@@ -643,15 +654,23 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                     <div className="text-sm md:text-base font-medium truncate">
                       {formatAssignmentTechnicianName(assignment)}
                     </div>
-                    <p className="text-xs md:text-sm text-muted-foreground">
-                      {currentDepartment === "sound" && `Sound: ${labelForCode(assignment.sound_role) || "None"}`}
-                      {currentDepartment === "lights" && `Lights: ${labelForCode(assignment.lights_role) || "None"}`}
-                    </p>
-                    {assignment.single_day && assignment.single_day_date && (
-                      <p className="text-xs md:text-sm text-muted-foreground">
-                        Single-day: {format(new Date(`${assignment.single_day_date}T00:00:00`), "PPP")}
-                      </p>
-                    )}
+                    <div className="text-xs md:text-sm text-muted-foreground flex flex-col gap-0.5">
+                      {assignment.single_day && (
+                        <span>
+                          Single-day: {
+                            formatJobDateLabel(
+                              (assignment as any).single_day_date || (assignment as any).assignment_date
+                            )
+                          }
+                        </span>
+                      )}
+                      {currentDepartment === "sound" && (
+                        <span>Sound: {labelForCode(assignment.sound_role) || "None"}</span>
+                      )}
+                      {currentDepartment === "lights" && (
+                        <span>Lights: {labelForCode(assignment.lights_role) || "None"}</span>
+                      )}
+                    </div>
                   </div>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
