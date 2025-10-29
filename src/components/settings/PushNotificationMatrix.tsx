@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type RecipientType = 'management_user' | 'department' | 'broadcast' | 'natural';
 
@@ -75,6 +76,7 @@ function routeKey(event: string, type: RecipientType, target: string | null) {
 export function PushNotificationMatrix() {
   const { userRole } = useOptimizedAuth();
   const isManagement = ['admin', 'management'].includes(userRole || '');
+  const isMobile = useIsMobile();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -294,14 +296,14 @@ export function PushNotificationMatrix() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
           <div>
             <CardTitle>Push Routing Matrix</CardTitle>
             <CardDescription>
               Configure which management users and departments receive each event. Natural recipients toggle preserves default recipients for that event.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm min-w-0">
             {pendingCount > 0 && (
               <span className="text-muted-foreground">Saving {pendingCount}…</span>
             )}
@@ -315,72 +317,141 @@ export function PushNotificationMatrix() {
         {loading ? (
           <div className="p-4 text-sm text-muted-foreground">Loading…</div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[220px] sticky left-0 z-10 bg-background">Event</TableHead>
-                  <TableHead className="min-w-[120px]">Natural</TableHead>
-                  <TableHead className="min-w-[120px]">Broadcast</TableHead>
-                  {DEPARTMENTS.map((d) => (
-                    <TableHead key={d.id} className="min-w-[140px]">{d.label}</TableHead>
-                  ))}
-                  {sortedUsers.map((u) => (
-                    <TableHead key={u.id} className="min-w-[180px]">{u.name}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {events.map((ev) => {
-                  return (
-                    <TableRow key={ev.code}>
-                      <TableCell className="sticky left-0 z-10 bg-background">
-                        <div className="flex flex-col">
-                          <span className="font-medium">{ev.label}</span>
-                          <span className="text-xs text-muted-foreground">{ev.code}</span>
-                        </div>
-                      </TableCell>
+          <div>
+            {isMobile ? (
+              <div className="space-y-4">
+                {events.map((ev) => (
+                  <div key={ev.code} className="rounded-md border p-3">
+                    <div className="mb-2">
+                      <div className="font-medium leading-tight">{ev.label}</div>
+                      <div className="text-xs text-muted-foreground break-all">{ev.code}</div>
+                    </div>
+                    <div className="space-y-2">
                       {/* Natural recipients */}
-                      <TableCell>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">Natural recipients</div>
                         <Checkbox
                           checked={hasNatural(ev.code)}
                           onCheckedChange={(val) => isManagement && toggleNatural(ev.code, Boolean(val))}
                           disabled={!isManagement || pending.has(routeKey(ev.code, 'natural', '*'))}
                         />
-                      </TableCell>
+                      </div>
                       {/* Broadcast to management */}
-                      <TableCell>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">Broadcast to management</div>
                         <Checkbox
                           checked={hasRoute(ev.code, 'broadcast', null)}
                           onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'broadcast', null, Boolean(val))}
                           disabled={!isManagement || pending.has(routeKey(ev.code, 'broadcast', null))}
                         />
-                      </TableCell>
+                      </div>
                       {/* Departments */}
-                      {DEPARTMENTS.map((d) => (
-                        <TableCell key={`${ev.code}|${d.id}`}>
-                          <Checkbox
-                            checked={hasRoute(ev.code, 'department', d.id)}
-                            onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'department', d.id, Boolean(val))}
-                            disabled={!isManagement || pending.has(routeKey(ev.code, 'department', d.id))}
-                          />
-                        </TableCell>
-                      ))}
+                      <div>
+                        <div className="text-xs font-medium text-muted-foreground mb-1">Departments</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {DEPARTMENTS.map((d) => (
+                            <label key={`${ev.code}|${d.id}`} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
+                              <span>{d.label}</span>
+                              <Checkbox
+                                checked={hasRoute(ev.code, 'department', d.id)}
+                                onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'department', d.id, Boolean(val))}
+                                disabled={!isManagement || pending.has(routeKey(ev.code, 'department', d.id))}
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                       {/* Individual management users */}
+                      {sortedUsers.length > 0 && (
+                        <div>
+                          <div className="text-xs font-medium text-muted-foreground mb-1">Management users</div>
+                          <div className="space-y-2">
+                            {sortedUsers.map((u) => (
+                              <label key={`${ev.code}|${u.id}`} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
+                                <span className="min-w-0 truncate pr-2">{u.name}</span>
+                                <Checkbox
+                                  checked={hasRoute(ev.code, 'management_user', u.id)}
+                                  onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'management_user', u.id, Boolean(val))}
+                                  disabled={!isManagement || pending.has(routeKey(ev.code, 'management_user', u.id))}
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[220px] sticky left-0 z-10 bg-background">Event</TableHead>
+                      <TableHead className="min-w-[120px]">Natural</TableHead>
+                      <TableHead className="min-w-[120px]">Broadcast</TableHead>
+                      {DEPARTMENTS.map((d) => (
+                        <TableHead key={d.id} className="min-w-[140px]">{d.label}</TableHead>
+                      ))}
                       {sortedUsers.map((u) => (
-                        <TableCell key={`${ev.code}|${u.id}`}>
-                          <Checkbox
-                            checked={hasRoute(ev.code, 'management_user', u.id)}
-                            onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'management_user', u.id, Boolean(val))}
-                            disabled={!isManagement || pending.has(routeKey(ev.code, 'management_user', u.id))}
-                          />
-                        </TableCell>
+                        <TableHead key={u.id} className="min-w-[180px]">{u.name}</TableHead>
                       ))}
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {events.map((ev) => {
+                      return (
+                        <TableRow key={ev.code}>
+                          <TableCell className="sticky left-0 z-10 bg-background">
+                            <div className="flex flex-col">
+                              <span className="font-medium">{ev.label}</span>
+                              <span className="text-xs text-muted-foreground">{ev.code}</span>
+                            </div>
+                          </TableCell>
+                          {/* Natural recipients */}
+                          <TableCell>
+                            <Checkbox
+                              checked={hasNatural(ev.code)}
+                              onCheckedChange={(val) => isManagement && toggleNatural(ev.code, Boolean(val))}
+                              disabled={!isManagement || pending.has(routeKey(ev.code, 'natural', '*'))}
+                            />
+                          </TableCell>
+                          {/* Broadcast to management */}
+                          <TableCell>
+                            <Checkbox
+                              checked={hasRoute(ev.code, 'broadcast', null)}
+                              onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'broadcast', null, Boolean(val))}
+                              disabled={!isManagement || pending.has(routeKey(ev.code, 'broadcast', null))}
+                            />
+                          </TableCell>
+                          {/* Departments */}
+                          {DEPARTMENTS.map((d) => (
+                            <TableCell key={`${ev.code}|${d.id}`}>
+                              <Checkbox
+                                checked={hasRoute(ev.code, 'department', d.id)}
+                                onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'department', d.id, Boolean(val))}
+                                disabled={!isManagement || pending.has(routeKey(ev.code, 'department', d.id))}
+                              />
+                            </TableCell>
+                          ))}
+                          {/* Individual management users */}
+                          {sortedUsers.map((u) => (
+                            <TableCell key={`${ev.code}|${u.id}`}>
+                              <Checkbox
+                                checked={hasRoute(ev.code, 'management_user', u.id)}
+                                onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'management_user', u.id, Boolean(val))}
+                                disabled={!isManagement || pending.has(routeKey(ev.code, 'management_user', u.id))}
+                              />
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </div>
         )}
         {!isManagement && (
