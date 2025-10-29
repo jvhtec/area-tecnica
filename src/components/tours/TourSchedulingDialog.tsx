@@ -21,10 +21,16 @@ import {
   Loader2,
   Plus,
   Save,
+  Settings,
+  Users,
+  Map,
 } from "lucide-react";
 import { TourTimelineView } from "./scheduling/TourTimelineView";
 import { TourItineraryBuilder } from "./scheduling/TourItineraryBuilder";
-import { TourTravelPlanner } from "./scheduling/TourTravelPlanner";
+import { EnhancedTourTravelPlanner } from "./scheduling/EnhancedTourTravelPlanner";
+import { TourSettingsPanel } from "./scheduling/TourSettingsPanel";
+import { TourContactsManager } from "./scheduling/TourContactsManager";
+import { TourMapView } from "./scheduling/TourMapView";
 import { generateTourDaySheet, generateTourBook } from "@/utils/tour-scheduling-pdf";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
@@ -214,22 +220,34 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
 
         <div className="flex-1 overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
+            <TabsList className="grid w-full grid-cols-7 flex-shrink-0">
               <TabsTrigger value="timeline" className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                Timeline
+                <span className="hidden sm:inline">Timeline</span>
               </TabsTrigger>
               <TabsTrigger value="itinerary" className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                Itinerarios
+                <span className="hidden sm:inline">Itinerarios</span>
               </TabsTrigger>
               <TabsTrigger value="travel" className="flex items-center gap-2">
                 <Route className="h-4 w-4" />
-                Viajes
+                <span className="hidden sm:inline">Viajes</span>
+              </TabsTrigger>
+              <TabsTrigger value="map" className="flex items-center gap-2">
+                <Map className="h-4 w-4" />
+                <span className="hidden sm:inline">Mapa</span>
+              </TabsTrigger>
+              <TabsTrigger value="contacts" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Contactos</span>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">Configuración</span>
               </TabsTrigger>
               <TabsTrigger value="documents" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                Documentos
+                <span className="hidden sm:inline">Documentos</span>
               </TabsTrigger>
             </TabsList>
 
@@ -274,10 +292,51 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
                 ) : (
-                  <TourTravelPlanner
+                  <EnhancedTourTravelPlanner
                     tourData={tourData}
                     tourDates={tourDates}
                     canEdit={canEdit}
+                    onSave={loadTourSchedulingData}
+                  />
+                )}
+              </TabsContent>
+
+              <TabsContent value="map" className="h-full m-0">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <TourMapView
+                    tourData={tourData}
+                    tourDates={tourDates}
+                    homeBase={tourData?.tour_settings}
+                  />
+                )}
+              </TabsContent>
+
+              <TabsContent value="contacts" className="h-full m-0">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <TourContactsManager
+                    tourId={tourId}
+                    canEdit={canEdit}
+                    onSave={loadTourSchedulingData}
+                  />
+                )}
+              </TabsContent>
+
+              <TabsContent value="settings" className="h-full m-0">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <TourSettingsPanel
+                    tourId={tourId}
                     onSave={loadTourSchedulingData}
                   />
                 )}
