@@ -35,11 +35,12 @@ interface StaffingJobSelectionDialogProps {
   declinedJobIds?: string[];
   preselectedJobId?: string | null;
   forcedAction?: 'availability' | 'offer';
+  forcedChannel?: 'email' | 'whatsapp';
 }
 
-export const StaffingJobSelectionDialog = ({ 
-  open, 
-  onClose, 
+export const StaffingJobSelectionDialog = ({
+  open,
+  onClose,
   onStaffingActionSelected,
   technicianId,
   technicianName,
@@ -47,7 +48,8 @@ export const StaffingJobSelectionDialog = ({
   availableJobs,
   declinedJobIds = [],
   preselectedJobId = null,
-  forcedAction
+  forcedAction,
+  forcedChannel
 }: StaffingJobSelectionDialogProps) => {
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedAction, setSelectedAction] = useState<'availability' | 'offer'>('availability');
@@ -56,6 +58,7 @@ export const StaffingJobSelectionDialog = ({
   // No direct email sending here; parent handles the action.
 
   const effectiveAction: 'availability' | 'offer' = forcedAction || selectedAction;
+  const forcedChannelLabel = forcedChannel === 'whatsapp' ? 'WhatsApp' : forcedChannel === 'email' ? 'Email' : null;
 
   const handleJobSelect = (jobId: string) => {
     setSelectedJobId(jobId);
@@ -65,12 +68,12 @@ export const StaffingJobSelectionDialog = ({
     if (selectedJobId) {
       console.log('🚀 StaffingJobSelectionDialog: handleContinue called', {
         job_id: selectedJobId,
-        action: selectedAction,
+        action: effectiveAction,
         technician: technicianName,
         date: format(date, 'yyyy-MM-dd'),
         singleDay
       });
-      
+
       // Call the callback to let parent handle it.
       // Do NOT call onClose() here to avoid racing with parent state transitions (e.g., opening OfferDetails).
       onStaffingActionSelected(selectedJobId, effectiveAction, { singleDay });
@@ -92,6 +95,15 @@ export const StaffingJobSelectionDialog = ({
     }
   }, [open, preselectedJobId]);
 
+  React.useEffect(() => {
+    if (forcedAction) {
+      setSelectedAction(forcedAction);
+    }
+  }, [forcedAction]);
+
+  const primaryActionLabel = effectiveAction === 'availability' ? 'Ask Availability' : 'Send Offer';
+  const primaryButtonLabel = forcedChannelLabel ? `${primaryActionLabel} via ${forcedChannelLabel}` : primaryActionLabel;
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
@@ -104,6 +116,14 @@ export const StaffingJobSelectionDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
+          {forcedAction && (
+            <div className="rounded-md border border-muted-foreground/30 bg-muted/40 p-3 text-sm text-muted-foreground">
+              {forcedAction === 'availability'
+                ? `This shortcut will ask for availability${forcedChannelLabel ? ` via ${forcedChannelLabel}` : ''}.`
+                : `This shortcut will send a job offer${forcedChannelLabel ? ` via ${forcedChannelLabel}` : ''}.`}
+            </div>
+          )}
+
           {/* Job Selection */}
           <div className="space-y-3">
             <h4 className="text-sm font-medium">Select Job</h4>
@@ -203,11 +223,11 @@ export const StaffingJobSelectionDialog = ({
           <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleContinue}
             disabled={!selectedJobId}
           >
-            {effectiveAction === 'availability' ? 'Ask Availability' : 'Send Offer'}
+            {primaryButtonLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

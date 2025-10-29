@@ -60,6 +60,8 @@ interface CellAction {
   assignment?: any;
   selectedJobId?: string;
   singleDay?: boolean;
+  intendedPhase?: 'availability' | 'offer';
+  intendedChannel?: 'email' | 'whatsapp';
 }
 
 interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignmentMatrixProps {
@@ -321,6 +323,26 @@ export const OptimizedAssignmentMatrix = ({
   const [offerPreferredChannel, setOfferPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
   const [availabilityDialog, setAvailabilityDialog] = useState<null | { open: boolean; jobId: string; profileId: string; dateIso: string; singleDay: boolean }>(null);
 
+  const forcedStaffingAction = useMemo<undefined | 'availability' | 'offer'>(() => {
+    if (cellAction?.type !== 'select-job-for-staffing') return undefined;
+    if (cellAction.intendedPhase) return cellAction.intendedPhase;
+    if (availabilityPreferredChannel) return 'availability';
+    if (offerPreferredChannel) return 'offer';
+    return undefined;
+  }, [cellAction, availabilityPreferredChannel, offerPreferredChannel]);
+
+  const forcedStaffingChannel = useMemo<undefined | 'email' | 'whatsapp'>(() => {
+    if (cellAction?.type !== 'select-job-for-staffing') return undefined;
+    if (cellAction.intendedChannel) return cellAction.intendedChannel;
+    if (forcedStaffingAction === 'availability') {
+      return availabilityPreferredChannel ?? undefined;
+    }
+    if (forcedStaffingAction === 'offer') {
+      return offerPreferredChannel ?? undefined;
+    }
+    return undefined;
+  }, [cellAction, forcedStaffingAction, availabilityPreferredChannel, offerPreferredChannel]);
+
   const closeDialogs = useCallback(() => {
     setCellAction(null);
     setSelectedCells(new Set());
@@ -362,7 +384,7 @@ export const OptimizedAssignmentMatrix = ({
         }
         if (targetJobId) {
           sendStaffingEmail(
-            ({ job_id: targetJobId, profile_id: technicianId, phase: 'availability', channel: 'whatsapp' } as any),
+            ({ job_id: targetJobId, profile_id: technicianId, phase: 'availability', channel: 'whatsapp', target_date: date.toISOString() } as any),
             {
               onSuccess: () => {
                 toast({ title: 'Request sent', description: 'Availability request sent via WhatsApp.' });
@@ -374,9 +396,8 @@ export const OptimizedAssignmentMatrix = ({
             }
           );
         } else {
-          console.log('Setting availabilityPreferredChannel to whatsapp');
-          setAvailabilityPreferredChannel('whatsapp');
-          setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
+          console.log('Setting WhatsApp intent for staffing job selection');
+          setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment, intendedPhase: 'availability', intendedChannel: 'whatsapp' });
         }
       })();
       return;
@@ -492,9 +513,10 @@ export const OptimizedAssignmentMatrix = ({
         setCellAction({ ...cellAction, type: 'offer-details', selectedJobId: jobId, singleDay: options?.singleDay });
         return;
       }
-      // Availability: pre-check conflicts, then direct-send via preferred channel if set, else ask
+      // Availability: pre-check conflicts, then direct-send via intent/preference if set, else ask
       (async () => {
-        const conflict = await checkTimeConflict(cellAction.technicianId, jobId);
+        const technicianId = cellAction.technicianId;
+        const conflict = await checkTimeConflict(technicianId, jobId);
         if (conflict) {
           toast({
             title: 'Conflicto de horarios',
@@ -503,14 +525,22 @@ export const OptimizedAssignmentMatrix = ({
           });
           return;
         }
-        console.log('Checking availabilityPreferredChannel:', availabilityPreferredChannel);
-        if (availabilityPreferredChannel === 'whatsapp' || availabilityPreferredChannel === 'email') {
-          const chosen = availabilityPreferredChannel;
+
+        const intentPhase = cellAction.intendedPhase;
+        const intentChannel = cellAction.intendedChannel;
+        const sendAvailabilityRequest = (channel: 'email' | 'whatsapp') => {
           sendStaffingEmail(
-            ({ job_id: jobId, profile_id: cellAction.technicianId, phase: 'availability', channel: chosen, target_date: cellAction.date.toISOString(), single_day: !!options?.singleDay } as any),
+            ({
+              job_id: jobId,
+              profile_id: technicianId,
+              phase: 'availability',
+              channel,
+              target_date: cellAction.date.toISOString(),
+              single_day: !!options?.singleDay
+            } as any),
             {
               onSuccess: () => {
-                toast({ title: 'Request sent', description: `Availability request sent via ${chosen}.` });
+                toast({ title: 'Request sent', description: `Availability request sent via ${channel}.` });
                 setAvailabilityPreferredChannel(null);
                 closeDialogs();
               },
@@ -520,14 +550,26 @@ export const OptimizedAssignmentMatrix = ({
               }
             }
           );
+        };
+
+        if (intentPhase === 'availability' && intentChannel) {
+          console.log('Using stored staffing intent', { intentPhase, intentChannel });
+          sendAvailabilityRequest(intentChannel);
+          return;
+        }
+
+        console.log('Checking availabilityPreferredChannel:', availabilityPreferredChannel);
+        if (availabilityPreferredChannel === 'whatsapp' || availabilityPreferredChannel === 'email') {
+          const chosen = availabilityPreferredChannel;
+          sendAvailabilityRequest(chosen);
         } else {
-          setAvailabilityDialog({ open: true, jobId, profileId: cellAction.technicianId, dateIso: cellAction.date.toISOString(), singleDay: !!options?.singleDay });
+          setAvailabilityDialog({ open: true, jobId, profileId: technicianId, dateIso: cellAction.date.toISOString(), singleDay: !!options?.singleDay });
         }
       })();
     } else {
       // no-op
     }
-  }, [cellAction, sendStaffingEmail, toast, closeDialogs, availabilityPreferredChannel, offerPreferredChannel]);
+  }, [cellAction, sendStaffingEmail, toast, closeDialogs, availabilityPreferredChannel, offerPreferredChannel, setAvailabilityPreferredChannel]);
 
   const handleCellPrefetch = useCallback((technicianId: string) => {
     prefetchTechnicianData(technicianId);
@@ -966,7 +1008,8 @@ export const OptimizedAssignmentMatrix = ({
           availableJobs={getJobsForDate(cellAction.date)}
           declinedJobIds={Array.from(declinedJobsByTech.get(cellAction.technicianId) || [])}
           preselectedJobId={cellAction.selectedJobId || null}
-          forcedAction={availabilityPreferredChannel ? 'availability' : (offerPreferredChannel ? 'offer' : undefined)}
+          forcedAction={forcedStaffingAction}
+          forcedChannel={forcedStaffingChannel}
         />
       )}
 
