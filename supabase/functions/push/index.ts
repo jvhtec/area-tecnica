@@ -883,7 +883,7 @@ async function handleBroadcast(
     text = recipName
       ? `${actor} asignó ${taskLabel} a ${recipName} en "${jobLabel}".`
       : `${actor} asignó ${taskLabel} en "${jobLabel}".`;
-    url = body.url || (jobId ? `/job-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
+    url = body.url || (jobId ? `/festival-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
     addRecipients([body.recipient_id]);
   } else if (type === 'task.updated') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
@@ -893,7 +893,7 @@ async function handleBroadcast(
     text = changeSummary
       ? `${actor} actualizó ${taskLabel} en "${jobLabel}". Cambios: ${changeSummary}.`
       : `${actor} actualizó ${taskLabel} en "${jobLabel}".`;
-    url = body.url || (jobId ? `/job-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
+    url = body.url || (jobId ? `/festival-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
     clearAllRecipients();
     addRecipients([body.recipient_id]);
   } else if (type === 'task.completed') {
@@ -903,7 +903,7 @@ async function handleBroadcast(
     text = recipName
       ? `${actor} marcó como completada ${taskLabel} de ${recipName} en "${jobLabel}".`
       : `${actor} marcó como completada ${taskLabel} en "${jobLabel}".`;
-    url = body.url || (jobId ? `/job-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
+    url = body.url || (jobId ? `/festival-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
     addRecipients([body.recipient_id]);
   } else if (type === 'logistics.transport.requested') {
     const department = (body as any)?.department as string | undefined;

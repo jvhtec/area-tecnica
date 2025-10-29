@@ -49,7 +49,6 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AppInit } from "@/components/AppInit";
 import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper";
 import Timesheets from '@/pages/Timesheets';
-import JobManagement from '@/pages/JobManagement';
 import { UserManual } from '@/components/UserManual';
 import IncidentReports from '@/pages/IncidentReports';
 import Wallboard from '@/pages/Wallboard';
@@ -169,12 +168,6 @@ export default function App() {
                         <Route path="/festival-management/:jobId/artists" element={<FestivalArtistManagement />} />
                         <Route path="/festival-management/:jobId/gear" element={<FestivalGearManagement />} />
                         <Route path="/festival-management/:jobId/scheduling" element={<FestivalManagement />} />
-
-                        {/* Job Management Routes */}
-                        <Route path="/job-management/:jobId" element={<JobManagement />} />
-                        <Route path="/job-management/:jobId/artists" element={<FestivalArtistManagement />} />
-                        <Route path="/job-management/:jobId/gear" element={<FestivalGearManagement />} />
-                        <Route path="/job-management/:jobId/scheduling" element={<JobManagement />} />
                       </Route>
                     </Routes>
                     {/* Radix-based toaster (legacy) and Sonner toaster for activity + app toasts */}
