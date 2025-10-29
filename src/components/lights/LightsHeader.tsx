@@ -12,16 +12,16 @@ interface LightsHeaderProps {
 
 export const LightsHeader = ({ onCreateJob, department = "Lights", canCreate = true }: LightsHeaderProps) => {
   return (
-    <div className="flex justify-between items-center">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <h1 className="text-2xl font-semibold">Departmento de {department}</h1>
-      <div className="flex gap-2">
-        <div className="flex">
+      <div className="flex w-full sm:w-auto flex-wrap gap-2 sm:justify-end">
+        <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2 sm:gap-0">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button 
+                <Button
                   onClick={() => onCreateJob()}
-                  className="gap-2 rounded-r-none"
+                  className="w-full sm:w-auto gap-2 sm:rounded-r-none"
                   aria-label="Create job"
                   disabled={!canCreate}
                 >
@@ -36,7 +36,7 @@ export const LightsHeader = ({ onCreateJob, department = "Lights", canCreate = t
           </TooltipProvider>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="px-2 rounded-l-none" disabled={!canCreate} aria-label="Choose preset">
+              <Button variant="outline" className="w-full sm:w-auto px-2 sm:rounded-l-none" disabled={!canCreate} aria-label="Choose preset">
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
