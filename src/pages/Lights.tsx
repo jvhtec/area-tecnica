@@ -153,7 +153,7 @@ const Lights = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto px-3 py-4 sm:px-6 sm:py-6 space-y-6">
       <LightsHeader 
         onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
         department="Luces"
@@ -182,35 +182,35 @@ const Lights = () => {
         </div>
       </div>
 
-      <div className="flex gap-4 justify-end mt-4">
-        <Button 
-          variant="outline" 
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center sm:justify-end mt-4">
+        <Button
+          variant="outline"
           onClick={() => navigate('/lights-disponibilidad')}
-          className="flex items-center gap-2"
+          className="w-full sm:w-auto flex items-center gap-2"
         >
           <Calendar className="h-4 w-4" />
           Disponibilidad
         </Button>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           onClick={() => navigate('/lights-pesos-tool')}
-          className="flex items-center gap-2"
+          className="w-full sm:w-auto flex items-center gap-2"
         >
           <Scale className="h-4 w-4" />
           Calculadora de Peso
         </Button>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           onClick={() => navigate('/lights-consumos-tool')}
-          className="flex items-center gap-2"
+          className="w-full sm:w-auto flex items-center gap-2"
         >
           <Zap className="h-4 w-4" />
           Calculadora de Potencia
         </Button>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           onClick={() => navigate('/lights-memoria-tecnica')}
-          className="flex items-center gap-2"
+          className="w-full sm:w-auto flex items-center gap-2"
         >
           <FileText className="h-4 w-4" />
           Memoria Técnica
