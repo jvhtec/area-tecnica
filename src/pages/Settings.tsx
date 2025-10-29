@@ -23,6 +23,7 @@ import { toast } from "@/hooks/use-toast";
 import { Bell, Bug } from "lucide-react";
 import { useEffect, useState } from 'react'
 import { usePushDebug } from '@/hooks/usePushDebug'
+import { PushNotificationMatrix } from '@/components/settings/PushNotificationMatrix'
 
 const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -283,6 +284,10 @@ const Settings = () => {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {isManagementUser && (
+            <PushNotificationMatrix />
           )}
 
           <Card>

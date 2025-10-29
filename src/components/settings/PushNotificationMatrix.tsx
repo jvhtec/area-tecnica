@@ -1,0 +1,394 @@
+import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { toast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+
+type RecipientType = 'management_user' | 'department' | 'broadcast' | 'natural';
+
+type RouteRow = {
+  id: string;
+  event_code: string;
+  recipient_type: RecipientType;
+  target_id: string | null;
+  include_natural_recipients: boolean;
+};
+
+type EventInfo = { code: string; label: string };
+
+type ManagementUser = {
+  id: string;
+  name: string;
+  email: string;
+  department?: string | null;
+};
+
+const DEPARTMENTS: Array<{ id: string; label: string }> = [
+  { id: 'sound', label: 'Sound' },
+  { id: 'lights', label: 'Lights' },
+  { id: 'video', label: 'Video' },
+  { id: 'logistics', label: 'Logistics' },
+  { id: 'production', label: 'Production' },
+];
+
+const FALLBACK_EVENTS: EventInfo[] = [
+  { code: 'job.created', label: 'Job created' },
+  { code: 'job.updated', label: 'Job updated' },
+  { code: 'job.status.confirmed', label: 'Job confirmed' },
+  { code: 'job.status.cancelled', label: 'Job cancelled' },
+  { code: 'job.assignment.confirmed', label: 'Assignment confirmed' },
+  { code: 'document.uploaded', label: 'Document uploaded' },
+  { code: 'document.deleted', label: 'Document deleted' },
+  { code: 'document.tech_visible.enabled', label: 'Document visible to technicians' },
+  { code: 'document.tech_visible.disabled', label: 'Document hidden from technicians' },
+  { code: 'staffing.availability.sent', label: 'Availability requested' },
+  { code: 'staffing.availability.confirmed', label: 'Availability confirmed' },
+  { code: 'staffing.availability.declined', label: 'Availability declined' },
+  { code: 'staffing.availability.cancelled', label: 'Availability cancelled' },
+  { code: 'staffing.offer.sent', label: 'Offer sent' },
+  { code: 'staffing.offer.confirmed', label: 'Offer accepted' },
+  { code: 'staffing.offer.declined', label: 'Offer declined' },
+  { code: 'task.assigned', label: 'Task assigned' },
+  { code: 'task.updated', label: 'Task updated' },
+  { code: 'task.completed', label: 'Task completed' },
+  { code: 'logistics.transport.requested', label: 'Transport requested' },
+  { code: 'logistics.event.created', label: 'Logistics event created' },
+  { code: 'logistics.event.updated', label: 'Logistics event updated' },
+  { code: 'logistics.event.cancelled', label: 'Logistics event cancelled' },
+  { code: 'flex.folders.created', label: 'Flex folders created' },
+  { code: 'flex.tourdate_folder.created', label: 'Tour date folder created' },
+  { code: 'message.received', label: 'Message received' },
+  { code: 'tourdate.created', label: 'Tour date created' },
+  { code: 'tourdate.updated', label: 'Tour date updated' },
+  { code: 'tourdate.deleted', label: 'Tour date deleted' },
+  { code: 'soundvision.file.uploaded', label: 'SoundVision file uploaded' },
+  { code: 'soundvision.file.downloaded', label: 'SoundVision file downloaded' },
+];
+
+function routeKey(event: string, type: RecipientType, target: string | null) {
+  return `${event}|${type}|${target ?? ''}`;
+}
+
+export function PushNotificationMatrix() {
+  const { userRole } = useOptimizedAuth();
+  const isManagement = ['admin', 'management'].includes(userRole || '');
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [events, setEvents] = useState<EventInfo[]>([]);
+  const [users, setUsers] = useState<ManagementUser[]>([]);
+  const [routesByEvent, setRoutesByEvent] = useState<Record<string, RouteRow[]>>({});
+  const [pending, setPending] = useState<Set<string>>(new Set());
+
+  const pendingCount = pending.size;
+
+  const sortedUsers = useMemo(() => {
+    return users.slice().sort((a, b) => a.name.localeCompare(b.name));
+  }, [users]);
+
+  const hasRoute = (ev: string, type: RecipientType, target: string | null) => {
+    const list = routesByEvent[ev] || [];
+    return list.some(r => r.recipient_type === type && (r.target_id ?? '') === (target ?? ''));
+  };
+
+  const hasNatural = (ev: string) => {
+    const list = routesByEvent[ev] || [];
+    return list.some(r => r.recipient_type === 'natural' || r.include_natural_recipients === true);
+  };
+
+  const setRoutePresentOptimistic = (ev: string, type: RecipientType, target: string | null, present: boolean) => {
+    setRoutesByEvent((prev) => {
+      const copy = { ...prev };
+      const current = (copy[ev] || []).slice();
+      const idx = current.findIndex(r => r.recipient_type === type && (r.target_id ?? '') === (target ?? ''));
+      if (present) {
+        if (idx === -1) {
+          current.push({
+            id: `temp-${Math.random().toString(36).slice(2)}`,
+            event_code: ev,
+            recipient_type: type,
+            target_id: target,
+            include_natural_recipients: type === 'natural',
+          });
+        }
+      } else {
+        if (idx !== -1) current.splice(idx, 1);
+      }
+      copy[ev] = current;
+      return copy;
+    });
+  };
+
+  const setNaturalOptimistic = (ev: string, present: boolean) => {
+    setRoutesByEvent((prev) => {
+      const copy = { ...prev };
+      let current = (copy[ev] || []).slice();
+      if (present) {
+        // ensure a dedicated 'natural' row exists
+        const exists = current.some(r => r.recipient_type === 'natural');
+        if (!exists) {
+          current.push({
+            id: `temp-${Math.random().toString(36).slice(2)}`,
+            event_code: ev,
+            recipient_type: 'natural',
+            target_id: null,
+            include_natural_recipients: true,
+          });
+        }
+      } else {
+        // remove all natural markers and clear include_natural flags client-side
+        current = current
+          .filter(r => r.recipient_type !== 'natural')
+          .map(r => ({ ...r, include_natural_recipients: false }));
+      }
+      copy[ev] = current;
+      return copy;
+    });
+  };
+
+  const toggleRoute = async (ev: string, type: RecipientType, target: string | null, next: boolean) => {
+    const key = routeKey(ev, type, target);
+    setPending(prev => new Set(prev).add(key));
+    const revert = () => setPending(prev => { const n = new Set(prev); n.delete(key); return n; });
+
+    // optimistic
+    setRoutePresentOptimistic(ev, type, target, next);
+
+    try {
+      if (next) {
+        // create if not present
+        const { error } = await supabase.from('push_notification_routes').insert({
+          event_code: ev,
+          recipient_type: type,
+          target_id: target,
+          include_natural_recipients: type === 'natural',
+        });
+        if (error) throw error;
+        toast({ title: 'Saved', description: 'Routing updated.' });
+      } else {
+        // delete matching rows
+        let q = supabase
+          .from('push_notification_routes')
+          .delete()
+          .eq('event_code', ev)
+          .eq('recipient_type', type);
+        if (target === null) {
+          q = q.is('target_id', null);
+        } else {
+          q = q.eq('target_id', target);
+        }
+        const { error } = await q;
+        if (error) throw error;
+        toast({ title: 'Removed', description: 'Routing removed.' });
+      }
+    } catch (e: any) {
+      // revert optimistic change
+      setRoutePresentOptimistic(ev, type, target, !next);
+      toast({ title: 'Save failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+    } finally {
+      revert();
+    }
+  };
+
+  const toggleNatural = async (ev: string, next: boolean) => {
+    const key = routeKey(ev, 'natural', '*');
+    setPending(prev => new Set(prev).add(key));
+    const revert = () => setPending(prev => { const n = new Set(prev); n.delete(key); return n; });
+
+    setNaturalOptimistic(ev, next);
+
+    try {
+      if (next) {
+        const { error } = await supabase.from('push_notification_routes').insert({
+          event_code: ev,
+          recipient_type: 'natural',
+          target_id: null,
+          include_natural_recipients: true,
+        });
+        if (error) throw error;
+        toast({ title: 'Enabled', description: 'Natural recipients will be included.' });
+      } else {
+        // remove any 'natural' rows and also clear include_natural flags on other rows for this event
+        const { error: delErr } = await supabase
+          .from('push_notification_routes')
+          .delete()
+          .eq('event_code', ev)
+          .eq('recipient_type', 'natural');
+        if (delErr) throw delErr;
+        // best-effort: set include_natural_recipients=false on remaining rows
+        await supabase
+          .from('push_notification_routes')
+          .update({ include_natural_recipients: false })
+          .eq('event_code', ev);
+        toast({ title: 'Disabled', description: 'Natural recipients excluded for this event.' });
+      }
+    } catch (e: any) {
+      setNaturalOptimistic(ev, !next);
+      toast({ title: 'Save failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+    } finally {
+      revert();
+    }
+  };
+
+  const load = async () => {
+    setRefreshing(true);
+    try {
+      const [usersRes, eventsRes, routesRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, first_name, last_name, nickname, email, department, role')
+          .in('role', ['admin', 'management']),
+        supabase
+          .from('activity_catalog')
+          .select('code, label')
+          .order('code', { ascending: true }),
+        supabase
+          .from('push_notification_routes')
+          .select('id, event_code, recipient_type, target_id, include_natural_recipients'),
+      ]);
+
+      // users
+      const uData = (usersRes.data || []).map((u: any) => ({
+        id: u.id as string,
+        name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || (u.nickname as string) || (u.email as string),
+        email: u.email as string,
+        department: (u as any).department ?? null,
+      })) as ManagementUser[];
+      setUsers(uData);
+
+      // events
+      // Merge catalog with fallback so important push codes always appear
+      const catalog: EventInfo[] = Array.isArray(eventsRes.data)
+        ? (eventsRes.data as any[]).map((r) => ({ code: r.code as string, label: (r.label as string) || (r.code as string) }))
+        : [];
+      const byCode = new Map<string, EventInfo>();
+      for (const e of FALLBACK_EVENTS) byCode.set(e.code, e);
+      for (const e of catalog) byCode.set(e.code, e); // prefer catalog label when present
+      const merged = Array.from(byCode.values()).sort((a, b) => a.code.localeCompare(b.code));
+      setEvents(merged);
+
+      // routes
+      const byEvent: Record<string, RouteRow[]> = {};
+      for (const r of (routesRes.data || []) as RouteRow[]) {
+        byEvent[r.event_code] = byEvent[r.event_code] || [];
+        byEvent[r.event_code].push(r);
+      }
+      setRoutesByEvent(byEvent);
+    } catch (e: any) {
+      toast({ title: 'Load failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+      // fallback minimal state
+      if (events.length === 0) setEvents(FALLBACK_EVENTS);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <CardTitle>Push Routing Matrix</CardTitle>
+            <CardDescription>
+              Configure which management users and departments receive each event. Natural recipients toggle preserves default recipients for that event.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            {pendingCount > 0 && (
+              <span className="text-muted-foreground">Saving {pendingCount}…</span>
+            )}
+            <Button variant="outline" size="sm" onClick={() => void load()} disabled={refreshing}>
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="p-4 text-sm text-muted-foreground">Loading…</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[220px] sticky left-0 z-10 bg-background">Event</TableHead>
+                  <TableHead className="min-w-[120px]">Natural</TableHead>
+                  <TableHead className="min-w-[120px]">Broadcast</TableHead>
+                  {DEPARTMENTS.map((d) => (
+                    <TableHead key={d.id} className="min-w-[140px]">{d.label}</TableHead>
+                  ))}
+                  {sortedUsers.map((u) => (
+                    <TableHead key={u.id} className="min-w-[180px]">{u.name}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {events.map((ev) => {
+                  return (
+                    <TableRow key={ev.code}>
+                      <TableCell className="sticky left-0 z-10 bg-background">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{ev.label}</span>
+                          <span className="text-xs text-muted-foreground">{ev.code}</span>
+                        </div>
+                      </TableCell>
+                      {/* Natural recipients */}
+                      <TableCell>
+                        <Checkbox
+                          checked={hasNatural(ev.code)}
+                          onCheckedChange={(val) => isManagement && toggleNatural(ev.code, Boolean(val))}
+                          disabled={!isManagement || pending.has(routeKey(ev.code, 'natural', '*'))}
+                        />
+                      </TableCell>
+                      {/* Broadcast to management */}
+                      <TableCell>
+                        <Checkbox
+                          checked={hasRoute(ev.code, 'broadcast', null)}
+                          onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'broadcast', null, Boolean(val))}
+                          disabled={!isManagement || pending.has(routeKey(ev.code, 'broadcast', null))}
+                        />
+                      </TableCell>
+                      {/* Departments */}
+                      {DEPARTMENTS.map((d) => (
+                        <TableCell key={`${ev.code}|${d.id}`}>
+                          <Checkbox
+                            checked={hasRoute(ev.code, 'department', d.id)}
+                            onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'department', d.id, Boolean(val))}
+                            disabled={!isManagement || pending.has(routeKey(ev.code, 'department', d.id))}
+                          />
+                        </TableCell>
+                      ))}
+                      {/* Individual management users */}
+                      {sortedUsers.map((u) => (
+                        <TableCell key={`${ev.code}|${u.id}`}>
+                          <Checkbox
+                            checked={hasRoute(ev.code, 'management_user', u.id)}
+                            onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'management_user', u.id, Boolean(val))}
+                            disabled={!isManagement || pending.has(routeKey(ev.code, 'management_user', u.id))}
+                          />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        {!isManagement && (
+          <p className="mt-3 text-xs text-muted-foreground">Viewing only — editing requires management role.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default PushNotificationMatrix;
