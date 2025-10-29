@@ -49,6 +49,7 @@ import { TourDateFlexButton } from "@/components/tours/TourDateFlexButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { openFlexElement } from "@/utils/flex-folders";
 import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
+import { TourSchedulingDialog } from "@/components/tours/TourSchedulingDialog";
 
 interface TourManagementProps {
   tour: any;
@@ -84,6 +85,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   const [isRatesManagerOpen, setIsRatesManagerOpen] = useState(false);
   const [isLogisticsOpen, setIsLogisticsOpen] = useState(false);
   const [isTourTasksOpen, setIsTourTasksOpen] = useState(false);
+  const [isSchedulingOpen, setIsSchedulingOpen] = useState(false);
   const [tourLogoUrl, setTourLogoUrl] = useState<string | undefined>();
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
   const [isWaDialogOpen, setIsWaDialogOpen] = useState(false);
@@ -310,9 +312,10 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       title: "Scheduling & Timeline",
       description: "Tour timeline and scheduling management",
       icon: Clock,
-      onClick: () => {},
-      badge: "Coming Soon",
-      viewOnly: true
+      onClick: () => setIsSchedulingOpen(true),
+      badge: "Available",
+      viewOnly: false,
+      showForTechnician: false
     },
     {
       title: "Logistics",
@@ -856,6 +859,17 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
           onOpenChange={setIsTourTasksOpen}
           tourId={tour.id}
           userRole={userRole}
+        />
+      )}
+
+      {/* Tour Scheduling Dialog */}
+      {!isTechnicianView && (
+        <TourSchedulingDialog
+          open={isSchedulingOpen}
+          onOpenChange={setIsSchedulingOpen}
+          tourId={tour.id}
+          tourDates={sortedTourDates}
+          tourName={tour.name}
         />
       )}
 
