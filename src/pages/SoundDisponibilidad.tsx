@@ -16,6 +16,8 @@ import { DepartmentProvider } from '@/contexts/DepartmentContext';
 import { fetchJobLogo } from '@/utils/pdf/logoUtils';
 import { useOptimizedJobs } from '@/hooks/useOptimizedJobs';
 import { useOptimizedTableSubscriptions } from '@/hooks/useOptimizedSubscriptions';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 export default function SoundDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -24,6 +26,7 @@ export default function SoundDisponibilidad() {
   const navigate = useNavigate();
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const dayStart = startOfDay(selectedDate);
   const dayEnd = endOfDay(selectedDate);
@@ -101,19 +104,28 @@ export default function SoundDisponibilidad() {
 
   return (
     <DepartmentProvider department="sound">
-      <div className="container mx-auto py-6 space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="w-full max-w-6xl mx-auto px-3 py-4 sm:px-6 sm:py-6 space-y-6">
+        <div
+          className={cn(
+            "flex items-center",
+            isMobile ? "flex-col gap-3 w-full" : "justify-between"
+          )}
+        >
           <h1 className="text-2xl font-bold">Presets de Sonido</h1>
-          <div className="flex gap-2">
-            <Button 
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <Button
               variant="outline"
+              size="sm"
+              className="w-full md:w-auto"
               onClick={() => navigate('/equipment-management')}
             >
               <Box className="mr-2 h-4 w-4" />
               Gestionar Inventario
             </Button>
-            <Button 
+            <Button
               variant="outline"
+              size="sm"
+              className="w-full md:w-auto"
               onClick={() => setShowPresetDialog(true)}
             >
               <Settings className="mr-2 h-4 w-4" />
@@ -123,16 +135,26 @@ export default function SoundDisponibilidad() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-6">
-            <DisponibilidadCalendar onDateSelect={setSelectedDate} selectedDate={selectedDate} />
-            <div className="flex justify-end">
-              <QuickPresetAssignment selectedDate={selectedDate} />
+          <div className="space-y-4">
+            <div className="rounded-xl border shadow-sm">
+              <DisponibilidadCalendar onDateSelect={setSelectedDate} selectedDate={selectedDate} />
+            </div>
+            <div
+              className={cn(
+                "flex",
+                isMobile ? "justify-center w-full" : "justify-end"
+              )}
+            >
+              <QuickPresetAssignment
+                selectedDate={selectedDate}
+                className={isMobile ? "w-full" : ""}
+              />
             </div>
           </div>
           <div className="space-y-4">
             {selectedDate && (
-              <div className="rounded-lg border p-4 max-w-md mx-auto lg:mx-0">
-                <h2 className="text-lg font-semibold mb-4">
+              <div className="rounded-xl border shadow-sm p-4 sm:p-5 w-full md:max-w-md lg:max-w-lg mx-auto lg:mx-0">
+                <h2 className="text-base md:text-lg font-semibold mb-4">
                   {format(selectedDate, 'PPP')}
                 </h2>
                 {(jobsToday && jobsToday.length > 0) ? (
