@@ -122,7 +122,7 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
         const groupId = isJob ? `job-${task.job_id}` : `tour-${task.tour_id}`;
         const name = isJob ? task.job_name || 'Unknown Job' : task.tour_name || 'Unknown Tour';
         const detailLink = isJob
-          ? `/job-management/${task.job_id}`
+          ? `/festival-management/${task.job_id}`
           : `/tour-management/${task.tour_id}`;
 
         if (!grouped.has(groupId)) {

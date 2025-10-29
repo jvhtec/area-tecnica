@@ -266,9 +266,9 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
       // Redirect to management page
       try {
-        const dest = job.job_type === 'dryhire'
-          ? `/job-management/${job.id}`
-          : `/festival-management/${job.id}`;
+        const dest = job.job_type === 'festival'
+          ? `/festival-management/${job.id}`
+          : `/festival-management/${job.id}?singleJob=true`;
         navigate(dest);
       } catch {}
 
