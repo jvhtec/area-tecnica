@@ -86,6 +86,13 @@ type PushSendResult =
   | { ok: false; skipped: true }
   | { ok: false; status: number };
 
+type PushNotificationRoute = {
+  event_code: string;
+  recipient_type: 'management_user' | 'department' | 'broadcast' | 'natural';
+  target_id: string | null;
+  include_natural_recipients: boolean;
+};
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
@@ -203,6 +210,133 @@ async function sendPushNotification(
     return { ok: false, status };
   }
 }
+
+async function getPushNotificationRoutes(
+  client: ReturnType<typeof createClient>,
+  eventCode: string,
+): Promise<PushNotificationRoute[]> {
+  if (!eventCode) return [];
+  try {
+    const { data, error } = await client
+      .from('push_notification_routes')
+      .select('event_code, recipient_type, target_id, include_natural_recipients')
+      .eq('event_code', eventCode)
+      .returns<PushNotificationRoute[]>();
+    if (error) {
+      console.error('push routing fetch error', { eventCode, error });
+      return [];
+    }
+    return data ?? [];
+  } catch (error) {
+    console.error('push routing fetch error', { eventCode, error });
+    return [];
+  }
+}
+
+type RoutingOverrideOptions = {
+  routes: PushNotificationRoute[];
+  recipients: Set<string>;
+  naturalRecipients: Set<string>;
+  management: Set<string>;
+  getDepartmentRecipients: (department: string) => Promise<string[]>;
+};
+
+async function applyRoutingOverrides({
+  routes,
+  recipients,
+  naturalRecipients,
+  management,
+  getDepartmentRecipients,
+}: RoutingOverrideOptions): Promise<void> {
+  if (!routes.length) return;
+
+  let includeNatural = false;
+  for (const route of routes) {
+    if (route.include_natural_recipients === true || route.recipient_type === 'natural') {
+      includeNatural = true;
+      break;
+    }
+  }
+
+  if (!includeNatural) {
+    for (const id of naturalRecipients) {
+      recipients.delete(id);
+    }
+  }
+
+  const departmentCache = new Map<string, string[]>();
+  const add = (id: string | null | undefined) => {
+    if (id) {
+      recipients.add(id);
+    }
+  };
+
+  for (const route of routes) {
+    switch (route.recipient_type) {
+      case 'broadcast':
+        for (const id of management) add(id);
+        break;
+      case 'management_user':
+        if (route.target_id) {
+          add(route.target_id);
+        } else {
+          for (const id of management) add(id);
+        }
+        break;
+      case 'department':
+        if (route.target_id) {
+          const key = route.target_id;
+          let deptRecipients = departmentCache.get(key);
+          if (!deptRecipients) {
+            const fetched = await getDepartmentRecipients(route.target_id);
+            deptRecipients = Array.isArray(fetched) ? fetched : [];
+            departmentCache.set(key, deptRecipients);
+          }
+          for (const id of deptRecipients) add(id);
+        }
+        break;
+      case 'natural':
+        // no-op; handled by includeNatural flag
+        break;
+    }
+  }
+}
+
+async function runRoutingSelfTests() {
+  try {
+    const recipients = new Set<string>(['actor', 'natural-recipient']);
+    const naturalRecipients = new Set<string>(['natural-recipient']);
+    const management = new Set<string>(['manager-a']);
+    const routes: PushNotificationRoute[] = [
+      {
+        event_code: 'unit.test',
+        recipient_type: 'department',
+        target_id: 'sound',
+        include_natural_recipients: false,
+      },
+    ];
+    const departmentMap = new Map<string, string[]>([['sound', ['dept-manager']]]);
+    await applyRoutingOverrides({
+      routes,
+      recipients,
+      naturalRecipients,
+      management,
+      getDepartmentRecipients: async (department) => departmentMap.get(department) ?? [],
+    });
+    console.assert(
+      !recipients.has('natural-recipient'),
+      'Natural recipients should be removed when include_natural_recipients is false',
+    );
+    console.assert(
+      recipients.has('dept-manager'),
+      'Department routes should include department-specific management users',
+    );
+  } catch (error) {
+    console.error('push routing self-test failed', error);
+  }
+}
+
+void runRoutingSelfTests();
 
 async function getManagementUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
   const { data, error } = await client
@@ -554,25 +688,42 @@ async function handleBroadcast(
   const tourId = body.tour_id;
   const tourName = body.tour_name || (await getTourName(client, tourId)) || null;
 
+  const routes = await getPushNotificationRoutes(client, type);
+
   // Determine recipients
   const recipients = new Set<string>();
+  const naturalRecipients = new Set<string>();
   const management = new Set(await getManagementUserIds(client));
   const soundDept = new Set(await getSoundDepartmentUserIds(client));
   // Management audience should not include department-specific users by default
   const mgmt = new Set<string>(management);
   const participants = new Set(await getJobParticipantUserIds(client, jobId || ''));
 
-  const addUsers = (ids: (string | null | undefined)[]) => {
-    for (const id of ids) { if (id) recipients.add(id); }
+  const addRecipients = (ids: (string | null | undefined)[]) => {
+    for (const id of ids) {
+      if (id) recipients.add(id);
+    }
+  };
+  const addNaturalRecipients = (ids: (string | null | undefined)[]) => {
+    for (const id of ids) {
+      if (id) {
+        recipients.add(id);
+        naturalRecipients.add(id);
+      }
+    }
+  };
+  const clearAllRecipients = () => {
+    recipients.clear();
+    naturalRecipients.clear();
   };
 
   // Prefer explicit recipients if provided
   if (Array.isArray((body as any).user_ids) && (body as any).user_ids.length) {
-    addUsers(((body as any).user_ids as string[]));
+    addRecipients(((body as any).user_ids as string[]));
   }
 
   // Always include the actor so they receive pushes across their own devices
-  addUsers([userId]);
+  addRecipients([userId]);
 
   // Compose Spanish title/body and choose default audience
   let title = '';
@@ -604,7 +755,7 @@ async function handleBroadcast(
   if (type === 'job.created') {
     title = 'Trabajo creado';
     text = `${actor} creó "${jobTitle || 'Trabajo'}".`;
-    addUsers(Array.from(mgmt));
+    addNaturalRecipients(Array.from(mgmt));
   } else if (type === 'timesheet.submitted') {
     // Department-scoped management notification for timesheet submissions.
     // We target: management users whose department matches the submitting technician, plus all admins.
@@ -618,9 +769,9 @@ async function handleBroadcast(
     const mgmtDeptIds = dept ? await getManagementByDepartmentUserIds(client, dept) : [];
 
     // Only scoped-management recipients + admins; skip generic management broadcast
-    recipients.clear();
-    addUsers([userId]); // keep actor self-notification across devices
-    addUsers(Array.from(new Set([...adminIds, ...mgmtDeptIds])));
+    clearAllRecipients();
+    addRecipients([userId]); // keep actor self-notification across devices
+    addNaturalRecipients(Array.from(new Set([...adminIds, ...mgmtDeptIds])));
   } else if (type === 'job.updated') {
     title = 'Trabajo actualizado';
     if (body.changes && typeof body.changes === 'object') {
@@ -630,77 +781,77 @@ async function handleBroadcast(
     } else {
       text = `${actor} actualizó "${jobTitle || 'Trabajo'}".`;
     }
-    addUsers(Array.from(mgmt));
-    addUsers(Array.from(participants));
+    addNaturalRecipients(Array.from(mgmt));
+    addNaturalRecipients(Array.from(participants));
   } else if (type === 'document.uploaded') {
     title = 'Nuevo documento';
     const fname = body.file_name || 'documento';
     text = `${actor} subió "${fname}" a "${jobTitle || 'Trabajo'}".`;
-    addUsers(Array.from(mgmt));
-    addUsers(Array.from(participants));
+    addNaturalRecipients(Array.from(mgmt));
+    addNaturalRecipients(Array.from(participants));
   } else if (type === 'document.deleted') {
     title = 'Documento eliminado';
     const fname = body.file_name || 'documento';
     text = `${actor} eliminó "${fname}" de "${jobTitle || 'Trabajo'}".`;
-    addUsers(Array.from(mgmt));
-    addUsers(Array.from(participants));
+    addNaturalRecipients(Array.from(mgmt));
+    addNaturalRecipients(Array.from(participants));
   } else if (type === 'document.tech_visible.enabled') {
     title = 'Documento disponible para técnicos';
     const fname = body.file_name || 'documento';
     text = `Nuevo documento visible: "${fname}" en "${jobTitle || 'Trabajo'}".`;
-    addUsers(Array.from(participants));
+    addNaturalRecipients(Array.from(participants));
   } else if (type === 'document.tech_visible.disabled') {
     title = 'Documento oculto para técnicos';
     const fname = body.file_name || 'documento';
     text = `El documento "${fname}" dejó de estar visible en "${jobTitle || 'Trabajo'}".`;
-    addUsers(Array.from(participants));
+    addNaturalRecipients(Array.from(participants));
   } else if (type === 'staffing.availability.sent') {
     title = 'Solicitud de disponibilidad enviada';
     text = `${actor} envió solicitud a ${recipName || 'técnico'} (${ch}).`;
-    addUsers(Array.from(mgmt));
-    addUsers([body.recipient_id]);
+    addNaturalRecipients(Array.from(mgmt));
+    addRecipients([body.recipient_id]);
   } else if (type === 'staffing.offer.sent') {
     title = 'Oferta enviada';
     text = `${actor} envió oferta a ${recipName || 'técnico'} (${ch}).`;
-    addUsers(Array.from(mgmt));
-    addUsers([body.recipient_id]);
+    addNaturalRecipients(Array.from(mgmt));
+    addRecipients([body.recipient_id]);
   } else if (type === 'staffing.availability.confirmed') {
     title = 'Disponibilidad confirmada';
     text = `${recipName || 'Técnico'} confirmó disponibilidad para "${jobTitle || 'Trabajo'}".`;
-    addUsers(Array.from(mgmt));
+    addNaturalRecipients(Array.from(mgmt));
   } else if (type === 'staffing.availability.declined') {
     title = 'Disponibilidad rechazada';
     text = `${recipName || 'Técnico'} rechazó disponibilidad para "${jobTitle || 'Trabajo'}".`;
-    addUsers(Array.from(mgmt));
+    addNaturalRecipients(Array.from(mgmt));
   } else if (type === 'staffing.offer.confirmed') {
     title = 'Oferta aceptada';
     text = `${recipName || 'Técnico'} aceptó oferta para "${jobTitle || 'Trabajo'}".`;
-    addUsers(Array.from(mgmt));
+    addNaturalRecipients(Array.from(mgmt));
     // No need to notify all participants here; keep it to management
   } else if (type === 'staffing.offer.declined') {
     title = 'Oferta rechazada';
     text = `${recipName || 'Técnico'} rechazó oferta para "${jobTitle || 'Trabajo'}".`;
-    addUsers(Array.from(mgmt));
+    addNaturalRecipients(Array.from(mgmt));
   } else if (type === 'staffing.availability.cancelled') {
     title = 'Disponibilidad cancelada';
     text = `Solicitud de disponibilidad cancelada para "${jobTitle || 'Trabajo'}".`;
-    addUsers(Array.from(mgmt));
-    addUsers([body.recipient_id]);
+    addNaturalRecipients(Array.from(mgmt));
+    addRecipients([body.recipient_id]);
   } else if (type === 'staffing.offer.cancelled') {
     title = 'Oferta cancelada';
     text = `Oferta cancelada para "${jobTitle || 'Trabajo'}".`;
-    addUsers(Array.from(mgmt));
-    addUsers([body.recipient_id]);
+    addNaturalRecipients(Array.from(mgmt));
+    addRecipients([body.recipient_id]);
   } else if (type === 'job.status.confirmed') {
     title = 'Trabajo confirmado';
     text = `"${jobTitle || 'Trabajo'}" ha sido confirmado.`;
-    addUsers(Array.from(mgmt));
-    addUsers(Array.from(participants));
+    addNaturalRecipients(Array.from(mgmt));
+    addNaturalRecipients(Array.from(participants));
   } else if (type === 'job.status.cancelled') {
     title = 'Trabajo cancelado';
     text = `"${jobTitle || 'Trabajo'}" ha sido cancelado.`;
-    addUsers(Array.from(mgmt));
-    addUsers(Array.from(participants));
+    addNaturalRecipients(Array.from(mgmt));
+    addNaturalRecipients(Array.from(participants));
   } else if (type === 'job.assignment.confirmed') {
     title = 'Asignación confirmada';
     if (singleDayFlag && formattedTargetDate) {
@@ -724,7 +875,7 @@ async function handleBroadcast(
         metaExtras.targetDate = normalizedTargetDate;
       }
     }
-    addUsers([body.recipient_id]);
+    addRecipients([body.recipient_id]);
   } else if (type === 'task.assigned') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
     const jobLabel = jobId ? (jobTitle || 'Trabajo') : (tourName || 'Tour');
@@ -733,7 +884,7 @@ async function handleBroadcast(
       ? `${actor} asignó ${taskLabel} a ${recipName} en "${jobLabel}".`
       : `${actor} asignó ${taskLabel} en "${jobLabel}".`;
     url = body.url || (jobId ? `/job-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
-    addUsers([body.recipient_id]);
+    addRecipients([body.recipient_id]);
   } else if (type === 'task.updated') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
     const jobLabel = jobId ? (jobTitle || 'Trabajo') : (tourName || 'Tour');
@@ -743,8 +894,8 @@ async function handleBroadcast(
       ? `${actor} actualizó ${taskLabel} en "${jobLabel}". Cambios: ${changeSummary}.`
       : `${actor} actualizó ${taskLabel} en "${jobLabel}".`;
     url = body.url || (jobId ? `/job-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
-    recipients.clear();
-    addUsers([body.recipient_id]);
+    clearAllRecipients();
+    addRecipients([body.recipient_id]);
   } else if (type === 'task.completed') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
     const jobLabel = jobId ? (jobTitle || 'Trabajo') : (tourName || 'Tour');
@@ -753,7 +904,7 @@ async function handleBroadcast(
       ? `${actor} marcó como completada ${taskLabel} de ${recipName} en "${jobLabel}".`
       : `${actor} marcó como completada ${taskLabel} en "${jobLabel}".`;
     url = body.url || (jobId ? `/job-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
-    addUsers([body.recipient_id]);
+    addRecipients([body.recipient_id]);
   } else if (type === 'logistics.transport.requested') {
     const department = (body as any)?.department as string | undefined;
     const departmentLabel = department ? department.charAt(0).toUpperCase() + department.slice(1) : undefined;
@@ -766,9 +917,9 @@ async function handleBroadcast(
     }
     const logisticsUrl = jobId ? `/jobs/${jobId}` : '/logistics';
     url = body.url || logisticsUrl;
-    recipients.clear();
+    clearAllRecipients();
     const logisticsRecipients = await getLogisticsManagementRecipients(client);
-    addUsers(logisticsRecipients);
+    addNaturalRecipients(logisticsRecipients);
     metaExtras.view = 'logistics';
     metaExtras.department = department;
     metaExtras.targetUrl = logisticsUrl;
@@ -796,9 +947,9 @@ async function handleBroadcast(
         ? Object.keys(rawChanges as Record<string, unknown>)
         : []);
 
-    recipients.clear();
+    clearAllRecipients();
     const managementOnly = await getManagementOnlyUserIds(client);
-    addUsers(managementOnly);
+    addNaturalRecipients(managementOnly);
 
     const logisticsUrl = body.url || (jobId ? `/jobs/${jobId}` : '/logistics/calendar');
     url = logisticsUrl;
@@ -868,8 +1019,8 @@ async function handleBroadcast(
     text = jobTitle
       ? `Se han creado las carpetas de Flex para "${jobTitle}".`
       : 'Se han creado carpetas de Flex.';
-    addUsers(Array.from(mgmt));
-    addUsers(Array.from(participants));
+    addNaturalRecipients(Array.from(mgmt));
+    addNaturalRecipients(Array.from(participants));
   } else if (type === 'flex.tourdate_folder.created') {
     title = 'Carpeta de fecha creada';
     const tn = body.tour_name || '';
@@ -884,21 +1035,21 @@ async function handleBroadcast(
       text = 'Se ha creado carpeta de fecha.';
     }
     url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
-    addUsers(Array.from(mgmt));
+    addNaturalRecipients(Array.from(mgmt));
   } else if (type === 'message.received') {
     title = 'Nuevo mensaje';
     const preview = body.message_preview || '';
     text = `${actor}: ${preview}`;
     url = body.url || '/messages';
     // Only notify the recipient, not the sender
-    recipients.clear();
-    addUsers([body.recipient_id]);
+    clearAllRecipients();
+    addRecipients([body.recipient_id]);
   } else if (type === 'tourdate.created') {
     title = 'Fecha de tour creada';
     const tn = body.tour_name || '';
     text = tn ? `${actor} creó una fecha en "${tn}".` : `${actor} creó una nueva fecha de tour.`;
     url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
-    addUsers(Array.from(mgmt));
+    addNaturalRecipients(Array.from(mgmt));
   } else if (type === 'tourdate.updated') {
     title = 'Fecha de tour actualizada';
     if (body.changes && typeof body.changes === 'object') {
@@ -909,13 +1060,13 @@ async function handleBroadcast(
       text = `${actor} actualizó una fecha de tour.`;
     }
     url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
-    addUsers(Array.from(mgmt));
+    addNaturalRecipients(Array.from(mgmt));
   } else if (type === 'tourdate.deleted') {
     title = 'Fecha de tour eliminada';
     const tn = body.tour_name || '';
     text = tn ? `${actor} eliminó una fecha de "${tn}".` : `${actor} eliminó una fecha de tour.`;
     url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
-    addUsers(Array.from(mgmt));
+    addNaturalRecipients(Array.from(mgmt));
   } else if (type === 'soundvision.file.uploaded' || type === 'soundvision.file.downloaded') {
     // SoundVision payloads should provide venue_name, or file_id/venue_id for lookup so we can compose contextual notifications.
     const venueName = (await resolveSoundVisionVenueName(client, body)) || 'desconocido';
@@ -925,7 +1076,7 @@ async function handleBroadcast(
     url = body.url || '/soundvision-files';
     // Notify only users who are both management and in the sound department
     const soundManagement = Array.from(management).filter((id) => soundDept.has(id));
-    addUsers(soundManagement);
+    addNaturalRecipients(soundManagement);
   } else {
     // Generic fallback using activity catalog label if available
     try {
@@ -935,8 +1086,17 @@ async function handleBroadcast(
       title = body.type || 'Nueva actividad';
     }
     text = jobTitle ? `${actor} — ${title} en "${jobTitle}".` : `${actor} — ${title}.`;
-    addUsers(Array.from(mgmt));
+    addNaturalRecipients(Array.from(mgmt));
   }
+
+  await applyRoutingOverrides({
+    routes,
+    recipients,
+    naturalRecipients,
+    management: mgmt,
+    getDepartmentRecipients: async (department: string) =>
+      getManagementByDepartmentUserIds(client, department),
+  });
 
   if (type === 'job.assignment.confirmed') {
     if (!body.recipient_id || body.recipient_id !== userId) {

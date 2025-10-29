@@ -4195,6 +4195,33 @@ export type Database = {
         }
         Relationships: []
       }
+      push_notification_routes: {
+        Row: {
+          created_at: string
+          event_code: string
+          id: string
+          include_natural_recipients: boolean
+          recipient_type: Database["public"]["Enums"]["push_notification_recipient_type"]
+          target_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_code: string
+          id?: string
+          include_natural_recipients?: boolean
+          recipient_type: Database["public"]["Enums"]["push_notification_recipient_type"]
+          target_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_code?: string
+          id?: string
+          include_natural_recipients?: boolean
+          recipient_type?: Database["public"]["Enums"]["push_notification_recipient_type"]
+          target_id?: string | null
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string | null
@@ -6768,6 +6795,11 @@ export type Database = {
         | "assignments"
         | "form_submissions"
         | "gear_movements"
+      push_notification_recipient_type:
+        | "management_user"
+        | "department"
+        | "broadcast"
+        | "natural"
       project_status: "pending" | "in_progress" | "completed" | "cancelled"
       provider_type: "festival" | "band" | "mixed"
       room_type: "single" | "double"
