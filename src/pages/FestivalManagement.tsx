@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Music2, Layout, Calendar, Printer, Loader2, FileText, Download, Eye, Clock, FolderPlus, RefreshCw, MapPin, Link as LinkIcon, Box } from "lucide-react";
+import { Users, Music2, Layout, Calendar, Printer, Loader2, FileText, Download, Eye, Clock, FolderPlus, RefreshCw, MapPin, Link as LinkIcon, Box, Upload, Trash2, Archive, RotateCw, MessageCircle, Scale, Zap, AlertCircle } from "lucide-react";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -22,13 +22,16 @@ import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CrewCallLinkerDialog } from "@/components/jobs/CrewCallLinker";
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { createAllFoldersForJob, openFlexElement } from "@/utils/flex-folders";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { JobPresetManagerDialog } from "@/components/jobs/JobPresetManagerDialog";
 import { resolveJobDocBucket } from "@/utils/jobDocuments";
+import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 interface FestivalJob {
   id: string;
@@ -114,6 +117,35 @@ const FestivalManagement = () => {
   const [flexPickerOptions, setFlexPickerOptions] = useState<CreateFoldersOptions | undefined>(undefined);
   const [flexPickerMode, setFlexPickerMode] = useState<'create' | 'add'>('add');
   const [isJobPresetsOpen, setIsJobPresetsOpen] = useState(false);
+
+  // New action states
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [archiveResult, setArchiveResult] = useState<any | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [archiveMode, setArchiveMode] = useState<'by-prefix' | 'all-tech'>('by-prefix');
+  const [archiveIncludeTemplates, setArchiveIncludeTemplates] = useState(false);
+  const [archiveDryRun, setArchiveDryRun] = useState(false);
+  const [isBackfillDialogOpen, setIsBackfillDialogOpen] = useState(false);
+  const [isBackfilling, setIsBackfilling] = useState(false);
+  const [backfillMessage, setBackfillMessage] = useState<string | null>(null);
+  const [backfillResult, setBackfillResult] = useState<any | null>(null);
+  const [bfSound, setBfSound] = useState(true);
+  const [bfLights, setBfLights] = useState(true);
+  const [bfVideo, setBfVideo] = useState(true);
+  const [bfProduction, setBfProduction] = useState(true);
+  const [uuidSound, setUuidSound] = useState('');
+  const [uuidLights, setUuidLights] = useState('');
+  const [uuidVideo, setUuidVideo] = useState('');
+  const [uuidProduction, setUuidProduction] = useState('');
+  const [isWhatsappDialogOpen, setIsWhatsappDialogOpen] = useState(false);
+  const [isAlmacenDialogOpen, setIsAlmacenDialogOpen] = useState(false);
+  const [waMessage, setWaMessage] = useState<string>("");
+  const [isSendingWa, setIsSendingWa] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const resolveJobDocumentBucket = useCallback((path: string) => resolveJobDocBucket(path), []);
 
@@ -752,6 +784,222 @@ const FestivalManagement = () => {
     }
   };
 
+  // New action handlers
+  const handleDocumentUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !jobId) return;
+
+    setIsUploadingDocument(true);
+    try {
+      const filePath = `${jobId}/${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('job_documents')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { error: dbError } = await supabase
+        .from('job_documents')
+        .insert({
+          job_id: jobId,
+          file_name: file.name,
+          file_path: filePath,
+        });
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: "Success",
+        description: "Document uploaded successfully",
+      });
+
+      fetchDocuments();
+    } catch (error: any) {
+      console.error('Error uploading document:', error);
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload document",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingDocument(false);
+      e.target.value = '';
+    }
+  }, [jobId, toast, fetchDocuments]);
+
+  const handleCreateLocalFolders = useCallback(async () => {
+    if (!job) return;
+
+    setIsCreatingLocalFolders(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-local-folders', {
+        body: { job_id: job.id }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: data?.message || "Local folders created successfully",
+      });
+    } catch (error: any) {
+      console.error('Error creating local folders:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create local folders",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingLocalFolders(false);
+    }
+  }, [job, toast]);
+
+  const handleArchiveToFlex = useCallback(async () => {
+    setIsArchiving(true);
+    setArchiveError(null);
+    setArchiveResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('archive-to-flex', {
+        body: {
+          job_id: jobId,
+          mode: archiveMode,
+          include_templates: archiveIncludeTemplates,
+          dry_run: archiveDryRun,
+        }
+      });
+      if (error) throw error;
+      setArchiveResult(data);
+      toast({
+        title: archiveDryRun ? 'Dry run complete' : 'Archive complete',
+        description: `${data?.uploaded ?? 0} uploaded, ${data?.failed ?? 0} failed`,
+      });
+      if (!archiveDryRun && (data?.uploaded ?? 0) > 0) {
+        fetchDocuments();
+      }
+    } catch (err: any) {
+      console.error('Archive error', err);
+      setArchiveError(err?.message || 'Failed to archive');
+      toast({ title: 'Archive failed', description: err?.message || 'Failed to archive', variant: 'destructive' });
+    } finally {
+      setIsArchiving(false);
+    }
+  }, [jobId, archiveMode, archiveIncludeTemplates, archiveDryRun, toast, fetchDocuments]);
+
+  const handleBackfill = useCallback(async () => {
+    setIsBackfilling(true);
+    setBackfillMessage(null);
+    setBackfillResult(null);
+    try {
+      const depts: string[] = [];
+      if (bfSound) depts.push('sound');
+      if (bfLights) depts.push('lights');
+      if (bfVideo) depts.push('video');
+      if (bfProduction) depts.push('production');
+      const body: any = { job_id: jobId };
+      if (depts.length) body.departments = depts;
+      const manual: Array<{ dept: string; element_id: string }> = [];
+      if (uuidSound.trim()) manual.push({ dept: 'sound', element_id: uuidSound.trim() });
+      if (uuidLights.trim()) manual.push({ dept: 'lights', element_id: uuidLights.trim() });
+      if (uuidVideo.trim()) manual.push({ dept: 'video', element_id: uuidVideo.trim() });
+      if (uuidProduction.trim()) manual.push({ dept: 'production', element_id: uuidProduction.trim() });
+      if (manual.length) body.manual = manual;
+      const { data, error } = await supabase.functions.invoke('backfill-flex-doc-tecnica', { body });
+      if (error) throw error;
+      setBackfillResult(data);
+      setBackfillMessage(`Inserted ${data?.inserted ?? 0}, already ${data?.already ?? 0}`);
+      toast({ title: 'Backfill complete', description: `Inserted ${data?.inserted ?? 0}, already ${data?.already ?? 0}` });
+    } catch (err: any) {
+      console.error('Backfill error', err);
+      setBackfillMessage(err?.message || 'Backfill failed');
+      toast({ title: 'Backfill failed', description: err?.message || 'Backfill failed', variant: 'destructive' });
+    } finally {
+      setIsBackfilling(false);
+    }
+  }, [jobId, bfSound, bfLights, bfVideo, bfProduction, uuidSound, uuidLights, uuidVideo, uuidProduction, toast]);
+
+  const handleCreateWhatsappGroup = useCallback(async () => {
+    try {
+      setIsSendingWa(true);
+      const { error } = await supabase.functions.invoke('create-whatsapp-group', {
+        body: { job_id: jobId }
+      });
+      if (error) throw error;
+      toast({
+        title: "Success",
+        description: "WhatsApp group created successfully",
+      });
+      setIsWhatsappDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error creating WhatsApp group:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create WhatsApp group",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingWa(false);
+    }
+  }, [jobId, toast]);
+
+  const handleSendToAlmacen = useCallback(async () => {
+    try {
+      setIsSendingWa(true);
+      const defaultMsg = `He hecho cambios en el PS del ${job?.title || 'trabajo'} por favor echad un vistazo`;
+      const trimmed = (waMessage || '').trim();
+      const finalMsg = trimmed || defaultMsg;
+      const isDefault = finalMsg.trim().toLowerCase() === defaultMsg.trim().toLowerCase();
+      const { error } = await supabase
+        .functions.invoke('send-warehouse-message', { body: { message: finalMsg, job_id: jobId, highlight: isDefault } });
+      if (error) {
+        toast({ title: 'Error al enviar', description: error.message, variant: 'destructive' });
+      } else {
+        toast({ title: 'Enviado', description: 'Mensaje enviado a Almacén sonido.' });
+        setIsAlmacenDialogOpen(false);
+      }
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
+    } finally {
+      setIsSendingWa(false);
+    }
+  }, [job?.title, jobId, waMessage, toast]);
+
+  const handleDeleteJob = useCallback(async () => {
+    if (!jobId) return;
+
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .delete()
+        .eq('id', jobId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Job deleted successfully",
+      });
+
+      navigate('/project-management');
+    } catch (error: any) {
+      console.error('Error deleting job:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete job",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
+    }
+  }, [jobId, toast, navigate]);
+
+  const navigateToCalculator = useCallback((type: 'pesos' | 'consumos') => {
+    const params = new URLSearchParams({ jobId: jobId || '' });
+    const path = type === 'pesos' ? '/sound/pesos' : '/sound/consumos';
+    navigate(`${path}?${params.toString()}`);
+  }, [jobId, navigate]);
+
   if (!jobId) {
     return <div>Job ID is required</div>;
   }
@@ -766,70 +1014,93 @@ const FestivalManagement = () => {
 
   return (
     <div className="container mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-xl md:text-2xl flex items-center gap-2">
-                {isSingleJobMode ? (
-                  <FileText className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" />
-                ) : (
-                  <Music2 className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" />
-                )}
-                <span className="truncate">{job?.title}</span>
+      {/* Modern Header Card with Gradient */}
+      <Card className="border-0 shadow-lg bg-gradient-to-br from-background via-background to-accent/5">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+            <div className="min-w-0 flex-1 space-y-3">
+              <CardTitle className="text-2xl md:text-3xl font-bold flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                  {isSingleJobMode ? (
+                    <FileText className="h-6 w-6 md:h-7 md:w-7" />
+                  ) : (
+                    <Music2 className="h-6 w-6 md:h-7 md:w-7" />
+                  )}
+                </div>
+                <span className="truncate bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  {job?.title}
+                </span>
               </CardTitle>
-              <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                {isSingleJobMode ? 'Single Job Management' : 'Festival Management'} •
-                {' '}
-                {new Date(job?.start_time || '').toLocaleDateString()} - {new Date(job?.end_time || '').toLocaleDateString()}
-              </p>
+              <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm text-muted-foreground">
+                <Badge variant="secondary" className="font-normal">
+                  {isSingleJobMode ? 'Single Job' : 'Festival'}
+                </Badge>
+                <span className="hidden sm:inline">•</span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {new Date(job?.start_time || '').toLocaleDateString()} - {new Date(job?.end_time || '').toLocaleDateString()}
+                </span>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2 items-center">
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2 items-start">
               {canEdit && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                  onClick={handlePrintButtonClick}
-                  disabled={isPrinting}
-                >
-                  {isPrinting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Printer className="h-4 w-4" />
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2 hover:bg-accent/50 transition-all"
+                    onClick={handlePrintButtonClick}
+                    disabled={isPrinting}
+                  >
+                    {isPrinting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Printer className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">{isPrinting ? 'Generating...' : 'Print'}</span>
+                  </Button>
+
+                  {(folderExists || isFlexLoading) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2 hover:bg-accent/50 transition-all"
+                      onClick={handleFlexClick}
+                      disabled={!flexUuid || isFlexLoading}
+                    >
+                      {isFlexLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
+                      )}
+                      <span className="hidden sm:inline">{isFlexLoading ? 'Loading...' : 'Flex'}</span>
+                    </Button>
                   )}
-                  <span className="hidden sm:inline">{isPrinting ? 'Generating...' : 'Print Documentation'}</span>
-                  <span className="sm:hidden">Print</span>
-                </Button>
-              )}
-              {/* Only show Flex button if folder exists or is loading */}
-              {canEdit && (folderExists || isFlexLoading) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                  onClick={handleFlexClick}
-                  disabled={!flexUuid || isFlexLoading}
-                >
-                  {isFlexLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
-                  )}
-                  {isFlexLoading ? 'Loading...' : 'Flex'}
-                </Button>
-              )}
-              {canEdit && <FestivalLogoManager jobId={jobId} />}
-              {canEdit && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                  onClick={() => setIsJobPresetsOpen(true)}
-                >
-                  <Box className="h-4 w-4" />
-                  <span className="hidden sm:inline">Presets</span>
-                </Button>
+
+                  <FestivalLogoManager jobId={jobId} />
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2 hover:bg-accent/50 transition-all"
+                    onClick={() => setIsJobPresetsOpen(true)}
+                  >
+                    <Box className="h-4 w-4" />
+                    <span className="hidden sm:inline">Presets</span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2 hover:bg-destructive/10 hover:text-destructive transition-all"
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Delete</span>
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -838,18 +1109,26 @@ const FestivalManagement = () => {
 
       {!isSchedulingRoute && !isArtistRoute && !isGearRoute && (
         <>
+          {/* Modern Navigation Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
+            <Card
+              className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
+              onClick={() => navigate(`/festival-management/${jobId}/artists`)}
+            >
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                  <Users className="h-4 w-4 md:h-5 md:w-5" />
-                  Artists
+                <CardTitle className="flex items-center gap-3 text-base md:text-lg">
+                  <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors">
+                    <Users className="h-5 w-5 md:h-6 md:w-6" />
+                  </div>
+                  <span className="group-hover:text-primary transition-colors">Artists</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-2xl md:text-3xl font-bold">{artistCount}</p>
-                <p className="text-xs md:text-sm text-muted-foreground">Total Artists</p>
-                <Button className="w-full" size="sm" onClick={(e) => {
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">{artistCount}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Total Artists</p>
+                </div>
+                <Button className="w-full group-hover:shadow-md transition-shadow" size="sm" onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/festival-management/${jobId}/artists`);
                 }}>
@@ -858,16 +1137,23 @@ const FestivalManagement = () => {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/gear`)}>
+            <Card
+              className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
+              onClick={() => navigate(`/festival-management/${jobId}/gear`)}
+            >
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                  <Layout className="h-4 w-4 md:h-5 md:w-5" />
-                  Stages & Gear
+                <CardTitle className="flex items-center gap-3 text-base md:text-lg">
+                  <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20 transition-colors">
+                    <Layout className="h-5 w-5 md:h-6 md:w-6" />
+                  </div>
+                  <span className="group-hover:text-primary transition-colors">Stages & Gear</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-xs md:text-sm text-muted-foreground">Manage stages and technical equipment</p>
-                <Button className="w-full" size="sm" onClick={(e) => {
+                <p className="text-xs md:text-sm text-muted-foreground min-h-[2.5rem]">
+                  Manage stages and technical equipment
+                </p>
+                <Button className="w-full group-hover:shadow-md transition-shadow" size="sm" onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/festival-management/${jobId}/gear`);
                 }}>
@@ -876,16 +1162,23 @@ const FestivalManagement = () => {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}>
+            <Card
+              className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
+              onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}
+            >
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                  <Calendar className="h-4 w-4 md:h-5 md:w-5" />
-                  Scheduling
+                <CardTitle className="flex items-center gap-3 text-base md:text-lg">
+                  <div className="p-2 rounded-lg bg-green-500/10 text-green-500 group-hover:bg-green-500/20 transition-colors">
+                    <Calendar className="h-5 w-5 md:h-6 md:w-6" />
+                  </div>
+                  <span className="group-hover:text-primary transition-colors">Scheduling</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-xs md:text-sm text-muted-foreground">Manage shifts and staff assignments</p>
-                <Button className="w-full" size="sm" onClick={(e) => {
+                <p className="text-xs md:text-sm text-muted-foreground min-h-[2.5rem]">
+                  Manage shifts and staff assignments
+                </p>
+                <Button className="w-full group-hover:shadow-md transition-shadow" size="sm" onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/festival-management/${jobId}/scheduling`);
                 }}>
@@ -1075,6 +1368,214 @@ const FestivalManagement = () => {
                     View Job Details
                   </Button>
                 </div>
+
+                {/* Upload Documents */}
+                {canEdit && (
+                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-blue-500/5">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <Upload className="h-4 w-4 flex-shrink-0 text-blue-500" />
+                      Upload Documents
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Upload job documents and technical files.
+                    </p>
+                    <div className="relative">
+                      <input
+                        type="file"
+                        onChange={handleDocumentUpload}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        disabled={isUploadingDocument}
+                      />
+                      <Button
+                        disabled={isUploadingDocument}
+                        size="sm"
+                        className="w-full relative"
+                      >
+                        {isUploadingDocument ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          'Choose File'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Create Local Folders */}
+                {canEdit && (
+                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-purple-500/5">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <FolderPlus className="h-4 w-4 flex-shrink-0 text-purple-500" />
+                      Local Folders
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Create local folder structure for this job.
+                    </p>
+                    <Button
+                      onClick={handleCreateLocalFolders}
+                      disabled={isCreatingLocalFolders}
+                      size="sm"
+                      className="w-full"
+                    >
+                      {isCreatingLocalFolders ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Folders'
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Archive to Flex */}
+                {canEdit && (
+                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-orange-500/5">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <Archive className="h-4 w-4 flex-shrink-0 text-orange-500" />
+                      Archive to Flex
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Archive documents to Flex Documentación Técnica.
+                    </p>
+                    <Button
+                      onClick={() => setIsArchiveDialogOpen(true)}
+                      disabled={isArchiving}
+                      size="sm"
+                      className="w-full"
+                      variant="outline"
+                    >
+                      {isArchiving ? 'Archiving...' : 'Open Archive'}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Backfill Doc Técnica */}
+                {canEdit && (
+                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-cyan-500/5">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <RotateCw className="h-4 w-4 flex-shrink-0 text-cyan-500" />
+                      Backfill Doc Técnica
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Find and persist missing technical documentation.
+                    </p>
+                    <Button
+                      onClick={() => setIsBackfillDialogOpen(true)}
+                      disabled={isBackfilling}
+                      size="sm"
+                      className="w-full"
+                      variant="outline"
+                    >
+                      {isBackfilling ? 'Backfilling...' : 'Open Backfill'}
+                    </Button>
+                  </div>
+                )}
+
+                {/* WhatsApp Group */}
+                {(userRole === 'management' || userRole === 'admin') && (
+                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-green-500/5">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <MessageCircle className="h-4 w-4 flex-shrink-0 text-green-500" />
+                      WhatsApp Group
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Create WhatsApp group for job coordination.
+                    </p>
+                    <Button
+                      onClick={() => setIsWhatsappDialogOpen(true)}
+                      size="sm"
+                      className="w-full"
+                      variant="outline"
+                    >
+                      Create Group
+                    </Button>
+                  </div>
+                )}
+
+                {/* Almacén Messaging */}
+                {(userRole === 'management' || userRole === 'admin') && (
+                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-amber-500/5">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <MessageCircle className="h-4 w-4 flex-shrink-0 text-amber-500" />
+                      Almacén Sonido
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Send message to warehouse team.
+                    </p>
+                    <Button
+                      onClick={() => {
+                        setWaMessage(`He hecho cambios en el PS del ${job?.title} por favor echad un vistazo`);
+                        setIsAlmacenDialogOpen(true);
+                      }}
+                      size="sm"
+                      className="w-full"
+                      variant="outline"
+                    >
+                      Send Message
+                    </Button>
+                  </div>
+                )}
+
+                {/* Pesos Calculator */}
+                {userRole === 'management' && (
+                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-indigo-500/5">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <Scale className="h-4 w-4 flex-shrink-0 text-indigo-500" />
+                      Pesos Calculator
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Calculate weights and load distribution.
+                    </p>
+                    <Button
+                      onClick={() => navigateToCalculator('pesos')}
+                      size="sm"
+                      className="w-full"
+                      variant="outline"
+                    >
+                      Open Calculator
+                    </Button>
+                  </div>
+                )}
+
+                {/* Consumos Calculator */}
+                {userRole === 'management' && (
+                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-yellow-500/5">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <Zap className="h-4 w-4 flex-shrink-0 text-yellow-500" />
+                      Consumos Calculator
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Calculate power consumption and requirements.
+                    </p>
+                    <Button
+                      onClick={() => navigateToCalculator('consumos')}
+                      size="sm"
+                      className="w-full"
+                      variant="outline"
+                    >
+                      Open Calculator
+                    </Button>
+                  </div>
+                )}
+
+                {/* Incident Report */}
+                {userRole === 'technician' && (
+                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-red-500/5">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
+                      Incident Report
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Create an incident report for this job.
+                    </p>
+                    <TechnicianIncidentReportDialog job={job} techName={userRole} />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1333,6 +1834,253 @@ const FestivalManagement = () => {
           jobId={jobId}
         />
       )}
+
+      {/* Archive to Flex Dialog */}
+      <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Archive documents to Flex</DialogTitle>
+            <DialogDescription>
+              Uploads all job documents to each department's Documentación Técnica in Flex and removes them from Supabase.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Mode</label>
+                <select
+                  className="w-full h-9 rounded-md border bg-background px-3 text-sm"
+                  value={archiveMode}
+                  onChange={(e) => setArchiveMode(e.target.value as 'by-prefix' | 'all-tech')}
+                >
+                  <option value="by-prefix">By prefix (default)</option>
+                  <option value="all-tech">All technical depts</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2 mt-6 sm:mt-[30px]">
+                <input
+                  id="includeTemplates"
+                  type="checkbox"
+                  checked={archiveIncludeTemplates}
+                  onChange={(e) => setArchiveIncludeTemplates(e.target.checked)}
+                />
+                <label htmlFor="includeTemplates" className="text-sm">Include templates</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="dryRun"
+                  type="checkbox"
+                  checked={archiveDryRun}
+                  onChange={(e) => setArchiveDryRun(e.target.checked)}
+                />
+                <label htmlFor="dryRun" className="text-sm">Dry run (no delete)</label>
+              </div>
+            </div>
+
+            {isArchiving && (
+              <div className="flex items-center gap-2 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" /> Archiving...
+              </div>
+            )}
+
+            {archiveError && (
+              <div className="text-sm text-red-600">{archiveError}</div>
+            )}
+
+            {archiveResult && (
+              <div className="space-y-3">
+                <div className="text-sm">Summary</div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>Attempted: <span className="font-medium">{archiveResult.attempted ?? 0}</span></div>
+                  <div>Uploaded: <span className="font-medium">{archiveResult.uploaded ?? 0}</span></div>
+                  <div>Skipped: <span className="font-medium">{archiveResult.skipped ?? 0}</span></div>
+                  <div>Failed: <span className="font-medium">{archiveResult.failed ?? 0}</span></div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)} disabled={isArchiving}>
+              Close
+            </Button>
+            <Button onClick={handleArchiveToFlex} disabled={isArchiving}>
+              {isArchiving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {archiveDryRun ? 'Run Dry' : 'Start'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Backfill Dialog */}
+      <Dialog open={isBackfillDialogOpen} onOpenChange={setIsBackfillDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Backfill Documentación Técnica</DialogTitle>
+            <DialogDescription>
+              Finds and persists missing Documentación Técnica elements for this job so archiving can target them reliably.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={bfSound} onChange={(e) => setBfSound(e.target.checked)} /> Sound
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={bfLights} onChange={(e) => setBfLights(e.target.checked)} /> Lights
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={bfVideo} onChange={(e) => setBfVideo(e.target.checked)} /> Video
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={bfProduction} onChange={(e) => setBfProduction(e.target.checked)} /> Production
+              </label>
+            </div>
+            <div className="mt-2">
+              <div className="text-xs text-muted-foreground mb-1">Manual UUIDs (optional)</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs">Sound UUID</label>
+                  <input
+                    className="w-full h-8 rounded border px-2 text-xs"
+                    value={uuidSound}
+                    onChange={(e) => setUuidSound(e.target.value)}
+                    placeholder="paste elementId"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs">Lights UUID</label>
+                  <input
+                    className="w-full h-8 rounded border px-2 text-xs"
+                    value={uuidLights}
+                    onChange={(e) => setUuidLights(e.target.value)}
+                    placeholder="paste elementId"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs">Video UUID</label>
+                  <input
+                    className="w-full h-8 rounded border px-2 text-xs"
+                    value={uuidVideo}
+                    onChange={(e) => setUuidVideo(e.target.value)}
+                    placeholder="paste elementId"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs">Production UUID</label>
+                  <input
+                    className="w-full h-8 rounded border px-2 text-xs"
+                    value={uuidProduction}
+                    onChange={(e) => setUuidProduction(e.target.value)}
+                    placeholder="paste elementId"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {isBackfilling && (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Backfilling…
+              </div>
+            )}
+            {backfillMessage && <div className="text-muted-foreground">{backfillMessage}</div>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBackfillDialogOpen(false)} disabled={isBackfilling}>
+              Close
+            </Button>
+            <Button onClick={handleBackfill} disabled={isBackfilling}>
+              {isBackfilling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Start
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp Group Dialog */}
+      <Dialog open={isWhatsappDialogOpen} onOpenChange={setIsWhatsappDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create WhatsApp Group</DialogTitle>
+            <DialogDescription>
+              Create a WhatsApp group for coordinating this job with your team.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              A WhatsApp group will be created with the job title: <span className="font-semibold">{job?.title}</span>
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsWhatsappDialogOpen(false)} disabled={isSendingWa}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateWhatsappGroup} disabled={isSendingWa}>
+              {isSendingWa ? 'Creating...' : 'Create Group'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Almacén Messaging Dialog */}
+      <Dialog open={isAlmacenDialogOpen} onOpenChange={setIsAlmacenDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar a Almacén sonido</DialogTitle>
+            <DialogDescription>
+              Este mensaje se enviará al grupo de WhatsApp "Almacén sonido" desde tu endpoint WAHA.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Mensaje</label>
+            <Textarea
+              value={waMessage}
+              onChange={(e) => setWaMessage(e.target.value)}
+              placeholder="Escribe tu mensaje…"
+              className="min-h-[100px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAlmacenDialogOpen(false)} disabled={isSendingWa}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSendToAlmacen} disabled={isSendingWa}>
+              {isSendingWa ? 'Enviando…' : 'Enviar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Job Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Job</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this job? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm">
+              Job: <span className="font-semibold">{job?.title}</span>
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteJob} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
