@@ -112,6 +112,7 @@ const FestivalManagement = () => {
   const [isCreatingFlexFolders, setIsCreatingFlexFolders] = useState(false);
   const [isFlexPickerOpen, setIsFlexPickerOpen] = useState(false);
   const [flexPickerOptions, setFlexPickerOptions] = useState<CreateFoldersOptions | undefined>(undefined);
+  const [flexPickerMode, setFlexPickerMode] = useState<'create' | 'add'>('add');
   const [isJobPresetsOpen, setIsJobPresetsOpen] = useState(false);
 
   const resolveJobDocumentBucket = useCallback((path: string) => resolveJobDocBucket(path), []);
@@ -502,6 +503,8 @@ const FestivalManagement = () => {
     if (!job || isCreatingFlexFolders) {
       return;
     }
+    // Open the FlexFolderPicker in 'add' mode
+    setFlexPickerMode('add');
     setIsFlexPickerOpen(true);
   }, [job, isCreatingFlexFolders]);
 
@@ -511,34 +514,58 @@ const FestivalManagement = () => {
     refetchFlexUuid();
   }, [fetchJobDetails, fetchDocuments, refetchFlexUuid]);
 
-  const handleCreateFlexFolders = useCallback(async () => {
-    if (!job || !jobId || isCreatingFlexFolders) return;
+  const handleCreateFlexFolders = useCallback(() => {
+    if (!job || isCreatingFlexFolders) return;
 
-    try {
-      setIsCreatingFlexFolders(true);
+    // Open the FlexFolderPicker in 'create' mode
+    setFlexPickerMode('create');
+    setIsFlexPickerOpen(true);
+  }, [job, isCreatingFlexFolders]);
 
-      const { data: existingFolders, error: existingError } = await supabase
-        .from('flex_folders')
-        .select('id')
-        .eq('job_id', jobId)
-        .limit(1);
-
-      if (existingError) {
-        throw existingError;
+  const handleFlexPickerConfirm = useCallback(
+    async (options?: CreateFoldersOptions) => {
+      if (!job || !jobId) {
+        return;
       }
 
-      if (existingFolders && existingFolders.length > 0) {
-        toast({
-          title: 'Folders already exist',
-          description: 'Flex folders have already been created for this job.',
-        });
-        return;
+      setFlexPickerOptions(options);
+      setIsFlexPickerOpen(false);
+
+      // Check for existing folders if in 'create' mode
+      if (flexPickerMode === 'create') {
+        try {
+          const { data: existingFolders, error: existingError } = await supabase
+            .from('flex_folders')
+            .select('id')
+            .eq('job_id', jobId)
+            .limit(1);
+
+          if (existingError) {
+            throw existingError;
+          }
+
+          if (existingFolders && existingFolders.length > 0) {
+            toast({
+              title: 'Folders already exist',
+              description: 'Flex folders have already been created for this job.',
+            });
+            return;
+          }
+        } catch (error: any) {
+          console.error('Error checking existing folders:', error);
+          toast({
+            title: 'Error checking folders',
+            description: error.message || 'Please try again in a moment.',
+            variant: 'destructive',
+          });
+          return;
+        }
       }
 
       if (!job.start_time || !job.end_time) {
         toast({
           title: 'Missing job dates',
-          description: 'Update the job dates before creating Flex folders.',
+          description: `Update the job dates before ${flexPickerMode === 'create' ? 'creating' : 'adding'} Flex folders.`,
           variant: 'destructive',
         });
         return;
@@ -556,67 +583,6 @@ const FestivalManagement = () => {
         return;
       }
 
-      const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, '');
-      const formattedStartDate = startDate.toISOString().split('.')[0] + '.000Z';
-      const formattedEndDate = endDate.toISOString().split('.')[0] + '.000Z';
-
-      toast({
-        title: 'Creating Flex folders…',
-        description: 'This may take a few seconds.',
-      });
-
-      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
-
-      toast({
-        title: 'Flex folders ready',
-        description: 'Folders have been created successfully.',
-      });
-
-      await refetchFlexUuid();
-      await fetchJobDetails({ silent: true });
-      await fetchDocuments();
-    } catch (error: any) {
-      console.error('Error creating Flex folders:', error);
-      toast({
-        title: 'Flex folder creation failed',
-        description: error.message || 'Please try again in a moment.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsCreatingFlexFolders(false);
-    }
-  }, [job, jobId, isCreatingFlexFolders, toast, refetchFlexUuid, fetchJobDetails, fetchDocuments]);
-
-  const handleFlexPickerConfirm = useCallback(
-    async (options?: CreateFoldersOptions) => {
-      if (!job || !jobId) {
-        return;
-      }
-
-      setFlexPickerOptions(options);
-      setIsFlexPickerOpen(false);
-
-      if (!job.start_time || !job.end_time) {
-        toast({
-          title: 'Missing job dates',
-          description: 'Update the job dates before adding Flex folders.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const startDate = new Date(job.start_time);
-      const endDate = new Date(job.end_time);
-
-      if (!isValid(startDate) || !isValid(endDate)) {
-        toast({
-          title: 'Invalid job dates',
-          description: 'Please verify the job dates before adding Flex folders.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
       try {
         setIsCreatingFlexFolders(true);
 
@@ -625,8 +591,8 @@ const FestivalManagement = () => {
         const formattedEndDate = endDate.toISOString().split('.')[0] + '.000Z';
 
         toast({
-          title: 'Adding Flex folders…',
-          description: 'Selected folders will be created in Flex.',
+          title: flexPickerMode === 'create' ? 'Creating Flex folders…' : 'Adding Flex folders…',
+          description: flexPickerMode === 'create' ? 'This may take a few seconds.' : 'Selected folders will be created in Flex.',
         });
 
         await createAllFoldersForJob(
@@ -638,8 +604,8 @@ const FestivalManagement = () => {
         );
 
         toast({
-          title: 'Flex folders updated',
-          description: 'Selected folders have been added successfully.',
+          title: flexPickerMode === 'create' ? 'Flex folders ready' : 'Flex folders updated',
+          description: flexPickerMode === 'create' ? 'Folders have been created successfully.' : 'Selected folders have been added successfully.',
         });
 
         await Promise.all([
@@ -658,7 +624,7 @@ const FestivalManagement = () => {
         setIsCreatingFlexFolders(false);
       }
     },
-    [job, jobId, toast, refetchFlexUuid, fetchJobDetails, fetchDocuments],
+    [job, jobId, flexPickerMode, toast, refetchFlexUuid, fetchJobDetails, fetchDocuments],
   );
 
   const flexStatus = useMemo(() => {
