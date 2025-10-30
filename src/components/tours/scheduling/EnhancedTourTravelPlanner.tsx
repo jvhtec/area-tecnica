@@ -76,10 +76,10 @@ export const EnhancedTourTravelPlanner: React.FC<
   const defaultReturnTime = tourData?.tour_settings?.defaultReturnTime || "18:00";
 
   useEffect(() => {
-    if (tourData?.travel_plan) {
+    if (Array.isArray(tourData?.travel_plan) && tourData.travel_plan.length > 0) {
       setTravelPlan(tourData.travel_plan);
     } else if (homeBase && sortedDates.length > 0) {
-      // Auto-generate initial travel plan
+      // Auto-generate initial travel plan when none saved
       generateIntelligentTravelPlan();
     }
   }, [tourData, tourDates]);
@@ -113,14 +113,15 @@ export const EnhancedTourTravelPlanner: React.FC<
     const segments: TravelSegment[] = [];
 
     try {
-      // 1. Travel from home to first venue
-      const firstDate = sortedDates[0];
-      if (firstDate.locations?.latitude && firstDate.locations?.longitude) {
+      // 1. Travel from home to the first date that has coordinates
+      const firstDate = sortedDates.find(d => d.location?.latitude != null && d.location?.longitude != null);
+      const firstLoc = firstDate?.location;
+      if (firstDate && firstLoc) {
         const distance = calculateDistance(
           homeBase.latitude,
           homeBase.longitude,
-          firstDate.locations.latitude,
-          firstDate.locations.longitude
+          firstLoc.latitude,
+          firstLoc.longitude
         );
 
         segments.push({
@@ -129,7 +130,7 @@ export const EnhancedTourTravelPlanner: React.FC<
           fromType: "home",
           toType: "venue",
           toDateId: firstDate.id,
-          toLocation: firstDate.locations,
+          toLocation: firstLoc,
           transportType: "bus",
           departureTime: defaultDepartureTime,
           arrivalTime: "",
@@ -144,10 +145,17 @@ export const EnhancedTourTravelPlanner: React.FC<
         const currentDate = sortedDates[i];
         const nextDate = sortedDates[i + 1];
 
-        const currentLocation = currentDate.locations;
-        const nextLocation = nextDate.locations;
+        const currentLocation = currentDate.location;
+        const nextLocation = nextDate.location;
 
-        if (!currentLocation?.latitude || !nextLocation?.latitude) continue;
+        if (
+          currentLocation?.latitude == null ||
+          currentLocation?.longitude == null ||
+          nextLocation?.latitude == null ||
+          nextLocation?.longitude == null
+        ) {
+          continue;
+        }
 
         const dayGap = differenceInDays(
           new Date(nextDate.date),
@@ -231,12 +239,13 @@ export const EnhancedTourTravelPlanner: React.FC<
         }
       }
 
-      // 3. Return home from last venue
-      const lastDate = sortedDates[sortedDates.length - 1];
-      if (lastDate.locations?.latitude && lastDate.locations?.longitude) {
+      // 3. Return home from the last date that has coordinates
+      const lastDate = [...sortedDates].reverse().find(d => d.location?.latitude != null && d.location?.longitude != null);
+      const lastLoc = lastDate?.location;
+      if (lastDate && lastLoc) {
         const distance = calculateDistance(
-          lastDate.locations.latitude,
-          lastDate.locations.longitude,
+          lastLoc.latitude,
+          lastLoc.longitude,
           homeBase.latitude,
           homeBase.longitude
         );
@@ -247,7 +256,7 @@ export const EnhancedTourTravelPlanner: React.FC<
           fromType: "venue",
           toType: "home",
           fromDateId: lastDate.id,
-          fromLocation: lastDate.locations,
+          fromLocation: lastLoc,
           transportType: "bus",
           departureTime: defaultReturnTime,
           arrivalTime: "",
@@ -460,7 +469,7 @@ export const EnhancedTourTravelPlanner: React.FC<
                               <span className="font-medium">
                                 {segment.fromType === "home"
                                   ? homeBase.name
-                                  : segment.fromLocation?.venue_name || "Venue"}
+                                  : segment.fromLocation?.name || "Venue"}
                               </span>
                             </div>
                             <div>
@@ -468,7 +477,7 @@ export const EnhancedTourTravelPlanner: React.FC<
                               <span className="font-medium">
                                 {segment.toType === "home"
                                   ? homeBase.name
-                                  : segment.toLocation?.venue_name || "Venue"}
+                                  : segment.toLocation?.name || "Venue"}
                               </span>
                             </div>
                           </div>

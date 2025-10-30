@@ -188,8 +188,8 @@ export const generateTravelDaySheet = async (
   currentY += 10;
 
   const homeBase = tourData?.tour_settings?.homeBase;
-  const fromLocation = direction === 'to' ? homeBase?.name : tourDate.locations?.venue_name;
-  const toLocation = direction === 'to' ? tourDate.locations?.venue_name : homeBase?.name;
+  const fromLocation = direction === 'to' ? homeBase?.name : tourDate.location?.name;
+  const toLocation = direction === 'to' ? tourDate.location?.name : homeBase?.name;
 
   const travelInfo = [
     ['Fecha de Viaje', dateStr],
@@ -229,9 +229,9 @@ export const generateTravelDaySheet = async (
     currentY += 8;
 
     const venueInfo = [
-      ['Venue', tourDate.locations?.venue_name || 'Por confirmar'],
-      ['Dirección', tourDate.locations?.address || 'Por confirmar'],
-      ['Ciudad', `${tourDate.locations?.city || ''}, ${tourDate.locations?.state || ''}`],
+      ['Venue', tourDate.location?.name || 'Por confirmar'],
+      ['Dirección', tourDate.location?.formatted_address || 'Por confirmar'],
+      ['Ciudad', `${tourDate.location?.city || ''}, ${tourDate.location?.state || ''}`],
       ['Call Time', tourDate.call_time || 'Por confirmar'],
     ];
 
@@ -398,9 +398,9 @@ export const generateEnhancedEventDaySheet = async (
 
   const eventInfo = [
     ['Fecha', format(new Date(tourDate.date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })],
-    ['Venue', tourDate.locations?.venue_name || 'Por confirmar'],
-    ['Dirección', tourDate.locations?.address || 'Por confirmar'],
-    ['Ciudad', `${tourDate.locations?.city || ''}, ${tourDate.locations?.state || ''}`],
+    ['Venue', tourDate.location?.name || 'Por confirmar'],
+    ['Dirección', tourDate.location?.formatted_address || 'Por confirmar'],
+    ['Ciudad', `${tourDate.location?.city || ''}, ${tourDate.location?.state || ''}`],
     ['Call Time', tourDate.call_time || 'Por confirmar'],
     ['Showtime', tourDate.showtime || 'Por confirmar'],
   ];
@@ -540,12 +540,12 @@ export const generateEnhancedEventDaySheet = async (
       .eq('tour_date_id', tourDate.id)
       .maybeSingle();
 
-    if (jobQuery.data?.id && tourDate.locations?.address) {
+    if (jobQuery.data?.id && tourDate.location?.formatted_address) {
       const weatherData = await getWeatherForJob(
         jobQuery.data.id,
         tourDate.date,
         tourDate.date,
-        tourDate.locations.address
+        tourDate.location.formatted_address
       );
 
       if (weatherData && weatherData.length > 0) {
