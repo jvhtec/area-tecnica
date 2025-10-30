@@ -67,28 +67,47 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [accommodations, setAccommodations] = useState<any[]>([]);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
+  const [isLoadingMapboxToken, setIsLoadingMapboxToken] = useState(false);
+  const [mapboxTokenError, setMapboxTokenError] = useState<string | null>(null);
 
   const canEdit = userRole === 'admin' || userRole === 'management';
 
   // Pre-fetch Mapbox token to avoid connection contention
   useEffect(() => {
-    if (open && !mapboxToken) {
+    if (open && !mapboxToken && !isLoadingMapboxToken) {
       const fetchMapboxToken = async () => {
+        setIsLoadingMapboxToken(true);
+        setMapboxTokenError(null);
         try {
           console.log('Pre-fetching Mapbox token...');
-          const { data } = await supabase.functions.invoke('get-mapbox-token');
+          const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+          
+          if (error) {
+            throw error;
+          }
+          
           if (data?.token) {
             setMapboxToken(data.token);
             console.log('Mapbox token pre-fetched successfully');
+          } else {
+            throw new Error('No token received from server');
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Failed to pre-fetch Mapbox token:', error);
+          setMapboxTokenError(error?.message || 'Error loading map token');
+          toast({
+            title: "Error cargando mapa",
+            description: "No se pudo cargar el token del mapa. Intenta de nuevo.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingMapboxToken(false);
         }
       };
       
       fetchMapboxToken();
     }
-  }, [open, mapboxToken]);
+  }, [open, mapboxToken, isLoadingMapboxToken, toast]);
 
   // Load tour data and associated hoja de ruta records
   useEffect(() => {
@@ -287,9 +306,22 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                 <Users className="h-4 w-4" />
                 Contactos
               </TabsTrigger>
-              <TabsTrigger value="map" className="flex items-center gap-2">
+              <TabsTrigger 
+                value="map" 
+                className="flex items-center gap-2" 
+                disabled={isLoadingMapboxToken || !!mapboxTokenError}
+              >
                 <Map className="h-4 w-4" />
-                Mapa
+                {isLoadingMapboxToken ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Preparando...</span>
+                  </>
+                ) : mapboxTokenError ? (
+                  <span>Mapa (Error)</span>
+                ) : (
+                  <span>Mapa</span>
+                )}
               </TabsTrigger>
               <TabsTrigger value="documents" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
@@ -395,18 +427,38 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
               </TabsContent>
 
               <TabsContent value="map" className="h-full m-0">
-                {isLoading ? (
-                  <div className="flex items-center justify-center h-64">
+                {isLoading || isLoadingMapboxToken ? (
+                  <div className="flex flex-col items-center justify-center h-64 gap-4">
                     <Loader2 className="h-8 w-8 animate-spin" />
+                    <p className="text-sm text-muted-foreground">
+                      {isLoadingMapboxToken ? 'Preparando el mapa...' : 'Cargando datos...'}
+                    </p>
                   </div>
-                ) : (
+                ) : mapboxTokenError ? (
+                  <div className="flex flex-col items-center justify-center h-64 gap-4">
+                    <Map className="h-12 w-12 text-muted-foreground" />
+                    <div className="text-center">
+                      <p className="text-sm font-medium mb-2">No se pudo cargar el mapa</p>
+                      <p className="text-xs text-muted-foreground mb-4">{mapboxTokenError}</p>
+                      <Button 
+                        size="sm" 
+                        onClick={() => {
+                          setMapboxToken(null);
+                          setMapboxTokenError(null);
+                        }}
+                      >
+                        Reintentar
+                      </Button>
+                    </div>
+                  </div>
+                ) : mapboxToken ? (
                   <TourMapViewMapbox
                     tourData={tourData}
                     tourDates={tourDates}
                     accommodations={accommodations}
                     mapboxToken={mapboxToken}
                   />
-                )}
+                ) : null}
               </TabsContent>
 
               <TabsContent value="documents" className="h-full m-0">

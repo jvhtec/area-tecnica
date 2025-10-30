@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { Map, MapPin, Home, Loader2, AlertCircle, Hotel } from "lucide-react";
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -11,7 +10,7 @@ interface TourMapViewMapboxProps {
   tourData: any;
   tourDates: any[];
   accommodations?: any[];
-  mapboxToken?: string | null;
+  mapboxToken: string; // Required prop - must be pre-fetched by parent
 }
 
 export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
@@ -42,29 +41,8 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
         setIsLoading(true);
         setError(null);
 
-        // Use provided token or fetch as fallback
-        let token = mapboxToken;
-        
-        if (!token) {
-          console.log('Fetching Mapbox token (fallback)...');
-          const { data, error: tokenError } = await supabase.functions.invoke('get-mapbox-token');
-
-          if (tokenError) {
-            console.error('Token fetch error:', tokenError);
-            throw new Error(`Error al obtener el token de Mapbox: ${tokenError.message}`);
-          }
-
-          if (!data?.token) {
-            console.error('No token in response:', data);
-            throw new Error('No se encontró el token de Mapbox en la respuesta');
-          }
-
-          token = data.token;
-        } else {
-          console.log('Using pre-fetched Mapbox token');
-        }
-
-        mapboxgl.accessToken = token;
+        console.log('Initializing map with pre-fetched token');
+        mapboxgl.accessToken = mapboxToken;
 
         // Create map instance with dark style
         const mapInstance = new mapboxgl.Map({
@@ -128,7 +106,7 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
       map.current?.remove();
       map.current = null;
     };
-  }, [mapboxToken]);
+  }, []); // Only run once on mount - token is guaranteed to be provided
 
   useEffect(() => {
     if (!mapLoaded || !map.current) return;
