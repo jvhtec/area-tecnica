@@ -21,11 +21,24 @@ import {
   Loader2,
   Plus,
   Save,
+  Settings,
+  Users,
+  Map,
+  Home,
 } from "lucide-react";
 import { TourTimelineView } from "./scheduling/TourTimelineView";
 import { TourItineraryBuilder } from "./scheduling/TourItineraryBuilder";
 import { TourTravelPlanner } from "./scheduling/TourTravelPlanner";
+import { EnhancedTourTravelPlanner } from "./scheduling/EnhancedTourTravelPlanner";
+import { TourSettingsPanel } from "./scheduling/TourSettingsPanel";
+import { TourContactsManager } from "./scheduling/TourContactsManager";
+import { TourMapView } from "./scheduling/TourMapView";
 import { generateTourDaySheet, generateTourBook } from "@/utils/tour-scheduling-pdf";
+import {
+  generateEnhancedEventDaySheet,
+  generateTravelDaySheet,
+  generateCompleteDaySheetSet,
+} from "@/utils/tour-scheduling-pdf-enhanced";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 interface TourSchedulingDialogProps {
@@ -214,7 +227,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
 
         <div className="flex-1 overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
+            <TabsList className="grid w-full grid-cols-7 flex-shrink-0">
               <TabsTrigger value="timeline" className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 Timeline
@@ -226,6 +239,18 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
               <TabsTrigger value="travel" className="flex items-center gap-2">
                 <Route className="h-4 w-4" />
                 Viajes
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Configuración
+              </TabsTrigger>
+              <TabsTrigger value="contacts" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Contactos
+              </TabsTrigger>
+              <TabsTrigger value="map" className="flex items-center gap-2">
+                <Map className="h-4 w-4" />
+                Mapa
               </TabsTrigger>
               <TabsTrigger value="documents" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
@@ -274,11 +299,55 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
                 ) : (
-                  <TourTravelPlanner
+                  <EnhancedTourTravelPlanner
+                    tourId={tourId}
                     tourData={tourData}
                     tourDates={tourDates}
                     canEdit={canEdit}
                     onSave={loadTourSchedulingData}
+                  />
+                )}
+              </TabsContent>
+
+              <TabsContent value="settings" className="h-full m-0">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <TourSettingsPanel
+                    tourId={tourId}
+                    tourData={tourData}
+                    canEdit={canEdit}
+                    onSave={loadTourSchedulingData}
+                  />
+                )}
+              </TabsContent>
+
+              <TabsContent value="contacts" className="h-full m-0">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <TourContactsManager
+                    tourId={tourId}
+                    tourData={tourData}
+                    canEdit={canEdit}
+                    onSave={loadTourSchedulingData}
+                  />
+                )}
+              </TabsContent>
+
+              <TabsContent value="map" className="h-full m-0">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <TourMapView
+                    tourData={tourData}
+                    tourDates={tourDates}
                   />
                 )}
               </TabsContent>
@@ -290,28 +359,114 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                       Generación de Documentos
                     </h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Genera day sheets individuales o un tour book completo con toda la información del tour
+                      Genera day sheets (viaje + evento), sets completos, o un tour book profesional
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="border rounded-lg p-6 space-y-4">
                       <div className="flex items-start gap-3">
-                        <FileText className="h-6 w-6 text-blue-600 mt-1" />
+                        <Route className="h-6 w-6 text-blue-600 mt-1" />
                         <div className="flex-1">
-                          <h4 className="font-semibold">Day Sheets</h4>
+                          <h4 className="font-semibold">Day Sheets de Viaje</h4>
                           <p className="text-sm text-muted-foreground">
-                            Documentos diarios para cada fecha del tour
+                            Hojas de ruta de viajes (ida y vuelta)
                           </p>
                         </div>
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {tourDates.map((date) => (
+                          <div key={date.id} className="space-y-1">
+                            <div className="text-xs font-medium text-muted-foreground">
+                              {new Date(date.date).toLocaleDateString('es-ES', {
+                                weekday: 'short',
+                                day: 'numeric',
+                                month: 'short',
+                              })}
+                            </div>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                onClick={async () => {
+                                  setIsGenerating(true);
+                                  try {
+                                    const travelPlan = tourData?.travel_plan || [];
+                                    const segment = travelPlan.find((s: any) => s.toDateId === date.id);
+                                    await generateTravelDaySheet(tourData, segment, date, 'to');
+                                  } catch (error) {
+                                    console.error(error);
+                                  } finally {
+                                    setIsGenerating(false);
+                                  }
+                                }}
+                                disabled={isGenerating}
+                              >
+                                Ida
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                onClick={async () => {
+                                  setIsGenerating(true);
+                                  try {
+                                    const travelPlan = tourData?.travel_plan || [];
+                                    const segment = travelPlan.find((s: any) => s.fromDateId === date.id);
+                                    await generateTravelDaySheet(tourData, segment, date, 'from');
+                                  } catch (error) {
+                                    console.error(error);
+                                  } finally {
+                                    setIsGenerating(false);
+                                  }
+                                }}
+                                disabled={isGenerating}
+                              >
+                                Vuelta
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="border rounded-lg p-6 space-y-4">
+                      <div className="flex items-start gap-3">
+                        <FileText className="h-6 w-6 text-purple-600 mt-1" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold">Sets Completos</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Viaje IDA + Evento + Viaje VUELTA
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
                         {tourDates.map((date) => (
                           <Button
                             key={date.id}
                             variant="outline"
                             className="w-full justify-between"
-                            onClick={() => handleGenerateDaySheet(date.id)}
+                            onClick={async () => {
+                              setIsGenerating(true);
+                              try {
+                                const travelPlan = tourData?.travel_plan || [];
+                                await generateCompleteDaySheetSet(tourData, date, travelPlan);
+                                toast({
+                                  title: "Sets generados",
+                                  description: "Se generaron todos los documentos para esta fecha",
+                                });
+                              } catch (error) {
+                                console.error(error);
+                                toast({
+                                  title: "Error",
+                                  description: "No se pudieron generar los documentos",
+                                  variant: "destructive",
+                                });
+                              } finally {
+                                setIsGenerating(false);
+                              }
+                            }}
                             disabled={isGenerating}
                           >
                             <span className="flex items-center gap-2">
@@ -334,17 +489,18 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                         <div className="flex-1">
                           <h4 className="font-semibold">Tour Book Completo</h4>
                           <p className="text-sm text-muted-foreground">
-                            Documento completo con toda la información del tour
+                            Documento profesional completo
                           </p>
                         </div>
                       </div>
                       <ul className="text-sm space-y-1 text-muted-foreground">
-                        <li>• Todas las fechas y ubicaciones</li>
-                        <li>• Itinerarios completos</li>
-                        <li>• Información de viajes y alojamiento</li>
-                        <li>• Contactos y personal</li>
-                        <li>• Logística y transporte</li>
-                        <li>• Mapas y pronósticos meteorológicos</li>
+                        <li>• Portada corporativa</li>
+                        <li>• Índice y resumen</li>
+                        <li>• Calendario completo</li>
+                        <li>• Páginas por fecha</li>
+                        <li>• Contactos del tour</li>
+                        <li>• Información de viajes</li>
+                        <li>• Pronósticos meteorológicos</li>
                       </ul>
                       <Button
                         className="w-full"
