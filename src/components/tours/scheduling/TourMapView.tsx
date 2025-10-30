@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { Map, MapPin, Home, Loader2, AlertCircle } from "lucide-react";
 
 interface TourMapViewProps {
@@ -18,6 +19,7 @@ export const TourMapView: React.FC<TourMapViewProps> = ({
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState<string | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
 
@@ -25,9 +27,40 @@ export const TourMapView: React.FC<TourMapViewProps> = ({
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
+  // Fetch Google Maps API key from Supabase
   useEffect(() => {
-    loadGoogleMaps();
+    const fetchApiKey = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+
+        if (error) {
+          console.error('Failed to fetch Google Maps API key:', error);
+          setError('Failed to load Google Maps API key');
+          setIsLoading(false);
+          return;
+        }
+
+        if (data?.apiKey) {
+          setApiKey(data.apiKey);
+        } else {
+          setError('Google Maps API key not found');
+          setIsLoading(false);
+        }
+      } catch (err) {
+        setError('Failed to fetch Google Maps API key');
+        setIsLoading(false);
+        console.error('Error fetching API key:', err);
+      }
+    };
+
+    fetchApiKey();
   }, []);
+
+  useEffect(() => {
+    if (apiKey) {
+      loadGoogleMaps();
+    }
+  }, [apiKey]);
 
   useEffect(() => {
     if (mapInstance && tourData && tourDates.length > 0) {
@@ -43,8 +76,7 @@ export const TourMapView: React.FC<TourMapViewProps> = ({
         return;
       }
 
-      // Load Google Maps script
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      // Load Google Maps script with the fetched API key
       if (!apiKey) {
         throw new Error("Google Maps API key not configured");
       }
