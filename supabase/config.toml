@@ -9,6 +9,9 @@ verify_jwt = true
 [functions.get-google-maps-key]
 verify_jwt = false
 
+[functions.get-mapbox-token]
+verify_jwt = false
+
 [functions.place-photos]
 verify_jwt = false
 
