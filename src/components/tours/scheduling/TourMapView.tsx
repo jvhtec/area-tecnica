@@ -173,7 +173,7 @@ export const TourMapView: React.FC<TourMapViewProps> = ({
 
     // Add venue markers
     sortedDates.forEach((date, index) => {
-      const location = date.location;
+      const location = date.locations;
       if (location?.latitude == null || location?.longitude == null) return;
 
       const venueMarker = new google.maps.Marker({
@@ -228,8 +228,8 @@ export const TourMapView: React.FC<TourMapViewProps> = ({
 
     // Line from home to first venue with coordinates
     if (homeBase?.latitude != null && homeBase?.longitude != null) {
-      const firstDateWithLoc = sortedDates.find(d => d.location?.latitude != null && d.location?.longitude != null);
-      const firstVenue = firstDateWithLoc?.location;
+      const firstDateWithLoc = sortedDates.find(d => d.locations?.latitude != null && d.locations?.longitude != null);
+      const firstVenue = firstDateWithLoc?.locations;
       if (firstVenue && firstVenue.latitude != null && firstVenue.longitude != null) {
         const homeLine = new google.maps.Polyline({
           path: [
@@ -248,8 +248,8 @@ export const TourMapView: React.FC<TourMapViewProps> = ({
 
     // Lines between consecutive venues
     for (let i = 0; i < sortedDates.length - 1; i++) {
-      const fromLocation = sortedDates[i].location;
-      const toLocation = sortedDates[i + 1].location;
+      const fromLocation = sortedDates[i].locations;
+      const toLocation = sortedDates[i + 1].locations;
 
       if (
         fromLocation?.latitude != null &&
@@ -274,8 +274,8 @@ export const TourMapView: React.FC<TourMapViewProps> = ({
 
     // Line from last venue with coordinates to home
     if (homeBase?.latitude != null && homeBase?.longitude != null && sortedDates.length > 0) {
-      const lastDateWithLoc = [...sortedDates].reverse().find(d => d.location?.latitude != null && d.location?.longitude != null);
-      const lastVenue = lastDateWithLoc?.location;
+      const lastDateWithLoc = [...sortedDates].reverse().find(d => d.locations?.latitude != null && d.locations?.longitude != null);
+      const lastVenue = lastDateWithLoc?.locations;
       if (lastVenue && lastVenue.latitude != null && lastVenue.longitude != null) {
         const returnLine = new google.maps.Polyline({
           path: [

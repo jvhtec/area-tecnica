@@ -382,7 +382,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                 ) : (
                   <TourMapView
                     tourData={tourData}
-                    tourDates={tourDates}
+                    tourDates={tourData?.tour_dates || []}
                   />
                 )}
               </TabsContent>
