@@ -55,6 +55,21 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
       if (error) throw error;
 
+      // Broadcast push: job date type changed (per-job, per-day)
+      try {
+        void supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: `jobdate.type.changed.${type}`,
+            job_id: jobId,
+            // Helpful metadata for clients and templates
+            target_date: formattedDate,
+            single_day: true,
+            url: `/jobs/${jobId}`
+          }
+        });
+      } catch (_) { /* ignore push errors */ }
+
       // Invalidate all date-types queries so CalendarSection refreshes icons
       queryClient.invalidateQueries({
         predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'date-types'

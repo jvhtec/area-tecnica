@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-type RecipientType = 'management_user' | 'department' | 'broadcast' | 'natural';
+type RecipientType = 'management_user' | 'department' | 'broadcast' | 'natural' | 'assigned_technicians';
 
 type RouteRow = {
   id: string;
@@ -78,6 +78,12 @@ const FALLBACK_EVENTS: EventInfo[] = [
   { code: 'tourdate.type.changed.travel', label: 'Tour date changed to Travel' },
   { code: 'tourdate.type.changed.setup', label: 'Tour date changed to Setup' },
   { code: 'tourdate.type.changed.off', label: 'Tour date changed to Day Off' },
+  { code: 'jobdate.type.changed', label: 'Job date type changed' },
+  { code: 'jobdate.type.changed.show', label: 'Job date changed to Show' },
+  { code: 'jobdate.type.changed.rehearsal', label: 'Job date changed to Rehearsal' },
+  { code: 'jobdate.type.changed.travel', label: 'Job date changed to Travel' },
+  { code: 'jobdate.type.changed.setup', label: 'Job date changed to Setup' },
+  { code: 'jobdate.type.changed.off', label: 'Job date changed to Day Off' },
   { code: 'soundvision.file.uploaded', label: 'SoundVision file uploaded' },
   { code: 'soundvision.file.downloaded', label: 'SoundVision file downloaded' },
 ];
@@ -107,6 +113,16 @@ export function PushNotificationMatrix() {
   const hasRoute = (ev: string, type: RecipientType, target: string | null) => {
     const list = routesByEvent[ev] || [];
     return list.some(r => r.recipient_type === type && (r.target_id ?? '') === (target ?? ''));
+  };
+
+  const isAssignedTechRelevant = (code: string) => {
+    return (
+      code.startsWith('job.') ||
+      code.startsWith('document.') ||
+      code.startsWith('staffing.') ||
+      code.startsWith('jobdate.') ||
+      code === 'flex.folders.created'
+    );
   };
 
   const hasNatural = (ev: string) => {
@@ -313,7 +329,7 @@ export function PushNotificationMatrix() {
           <div>
             <CardTitle>Push Routing Matrix</CardTitle>
             <CardDescription>
-              Configure which management users and departments receive each event. Natural recipients toggle preserves default recipients for that event.
+              Configure which management users, departments, and assigned technicians receive each event. Natural recipients toggle preserves default recipients.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm min-w-0">
@@ -358,6 +374,17 @@ export function PushNotificationMatrix() {
                           disabled={!isManagement || pending.has(routeKey(ev.code, 'broadcast', null))}
                         />
                       </div>
+                      {/* Assigned technicians */}
+                      {isAssignedTechRelevant(ev.code) && (
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm">Assigned technicians</div>
+                          <Checkbox
+                            checked={hasRoute(ev.code, 'assigned_technicians', null)}
+                            onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'assigned_technicians', null, Boolean(val))}
+                            disabled={!isManagement || pending.has(routeKey(ev.code, 'assigned_technicians', null))}
+                          />
+                        </div>
+                      )}
                       {/* Departments */}
                       <div>
                         <div className="text-xs font-medium text-muted-foreground mb-1">Departments</div>
@@ -404,6 +431,7 @@ export function PushNotificationMatrix() {
                       <TableHead className="min-w-[220px] sticky left-0 z-10 bg-background">Event</TableHead>
                       <TableHead className="min-w-[120px]">Natural</TableHead>
                       <TableHead className="min-w-[120px]">Broadcast</TableHead>
+                      <TableHead className="min-w-[180px]">Assigned technicians</TableHead>
                       {DEPARTMENTS.map((d) => (
                         <TableHead key={d.id} className="min-w-[140px]">{d.label}</TableHead>
                       ))}
@@ -436,6 +464,14 @@ export function PushNotificationMatrix() {
                               checked={hasRoute(ev.code, 'broadcast', null)}
                               onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'broadcast', null, Boolean(val))}
                               disabled={!isManagement || pending.has(routeKey(ev.code, 'broadcast', null))}
+                            />
+                          </TableCell>
+                          {/* Assigned technicians */}
+                          <TableCell>
+                            <Checkbox
+                              checked={hasRoute(ev.code, 'assigned_technicians', null)}
+                              onCheckedChange={(val) => isManagement && toggleRoute(ev.code, 'assigned_technicians', null, Boolean(val))}
+                              disabled={!isManagement || !isAssignedTechRelevant(ev.code) || pending.has(routeKey(ev.code, 'assigned_technicians', null))}
                             />
                           </TableCell>
                           {/* Departments */}

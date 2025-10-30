@@ -93,7 +93,7 @@ type PushSendResult =
 
 type PushNotificationRoute = {
   event_code: string;
-  recipient_type: 'management_user' | 'department' | 'broadcast' | 'natural';
+  recipient_type: 'management_user' | 'department' | 'broadcast' | 'natural' | 'assigned_technicians';
   target_id: string | null;
   include_natural_recipients: boolean;
 };
@@ -244,6 +244,7 @@ type RoutingOverrideOptions = {
   naturalRecipients: Set<string>;
   management: Set<string>;
   getDepartmentRecipients: (department: string) => Promise<string[]>;
+  participants?: Set<string>;
 };
 
 async function applyRoutingOverrides({
@@ -252,6 +253,7 @@ async function applyRoutingOverrides({
   naturalRecipients,
   management,
   getDepartmentRecipients,
+  participants,
 }: RoutingOverrideOptions): Promise<void> {
   if (!routes.length) return;
 
@@ -303,6 +305,11 @@ async function applyRoutingOverrides({
       case 'natural':
         // no-op; handled by includeNatural flag
         break;
+      case 'assigned_technicians':
+        if (participants && participants.size) {
+          for (const id of participants) add(id);
+        }
+        break;
     }
   }
 }
@@ -319,13 +326,21 @@ async function runRoutingSelfTests() {
         target_id: 'sound',
         include_natural_recipients: false,
       },
+      {
+        event_code: 'unit.test',
+        recipient_type: 'assigned_technicians',
+        target_id: null,
+        include_natural_recipients: false,
+      },
     ];
     const departmentMap = new Map<string, string[]>([['sound', ['dept-manager']]]);
+    const participants = new Set<string>(['tech-a', 'tech-b']);
     await applyRoutingOverrides({
       routes,
       recipients,
       naturalRecipients,
       management,
+      participants,
       getDepartmentRecipients: async (department) => departmentMap.get(department) ?? [],
     });
     console.assert(
@@ -335,6 +350,10 @@ async function runRoutingSelfTests() {
     console.assert(
       recipients.has('dept-manager'),
       'Department routes should include department-specific management users',
+    );
+    console.assert(
+      recipients.has('tech-a') && recipients.has('tech-b'),
+      'Assigned technicians route should include job participants',
     );
   } catch (error) {
     console.error('push routing self-test failed', error);
@@ -1159,6 +1178,50 @@ async function handleBroadcast(
 
     url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
     addNaturalRecipients(Array.from(mgmt));
+  } else if (type.startsWith('jobdate.type.changed')) {
+    // Per-job per-day date type change events (from job_date_types)
+    const jobName = jobTitle || 'trabajo';
+    const newType = (body as any).new_type || (typeof type === 'string' ? type.split('.').pop() : '') || '';
+    const targetDate = (body as any)?.target_date as string | undefined;
+
+    const typeLabels: Record<string, string> = {
+      'show': 'Concierto',
+      'rehearsal': 'Ensayo',
+      'travel': 'Viaje',
+      'setup': 'Montaje',
+      'off': 'Día libre',
+    };
+
+    const label = typeLabels[newType] || newType || 'actualizada';
+
+    if (type === 'jobdate.type.changed.show') {
+      title = 'Fecha del trabajo: Concierto';
+    } else if (type === 'jobdate.type.changed.rehearsal') {
+      title = 'Fecha del trabajo: Ensayo';
+    } else if (type === 'jobdate.type.changed.travel') {
+      title = 'Fecha del trabajo: Viaje';
+    } else if (type === 'jobdate.type.changed.setup') {
+      title = 'Fecha del trabajo: Montaje';
+    } else if (type === 'jobdate.type.changed.off') {
+      title = 'Fecha del trabajo: Día libre';
+    } else {
+      title = 'Tipo de fecha del trabajo cambiado';
+    }
+
+    if (targetDate) {
+      try {
+        const formatted = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium' }).format(new Date(`${targetDate}T00:00:00Z`));
+        text = `${actor} marcó "${jobName}" como ${label} para ${formatted}.`;
+      } catch (_) {
+        text = `${actor} marcó "${jobName}" como ${label}.`;
+      }
+    } else {
+      text = `${actor} marcó "${jobName}" como ${label}.`;
+    }
+
+    url = body.url || (jobId ? `/jobs/${jobId}` : url);
+    addNaturalRecipients(Array.from(mgmt));
+    addNaturalRecipients(Array.from(participants));
   } else if (type.startsWith('job.type.changed')) {
     // Job type change events
     const jobName = jobTitle || 'trabajo';
@@ -1234,6 +1297,7 @@ async function handleBroadcast(
     management: mgmt,
     getDepartmentRecipients: async (department: string) =>
       getManagementByDepartmentUserIds(client, department),
+    participants,
   });
 
   if (type === 'job.assignment.confirmed' || type === 'job.assignment.direct') {

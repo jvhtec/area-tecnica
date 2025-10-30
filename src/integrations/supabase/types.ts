@@ -6800,6 +6800,7 @@ export type Database = {
         | "department"
         | "broadcast"
         | "natural"
+        | "assigned_technicians"
       project_status: "pending" | "in_progress" | "completed" | "cancelled"
       provider_type: "festival" | "band" | "mixed"
       room_type: "single" | "double"
