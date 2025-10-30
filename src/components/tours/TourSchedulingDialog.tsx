@@ -66,8 +66,29 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
   const [tourData, setTourData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [accommodations, setAccommodations] = useState<any[]>([]);
+  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
 
   const canEdit = userRole === 'admin' || userRole === 'management';
+
+  // Pre-fetch Mapbox token to avoid connection contention
+  useEffect(() => {
+    if (open && !mapboxToken) {
+      const fetchMapboxToken = async () => {
+        try {
+          console.log('Pre-fetching Mapbox token...');
+          const { data } = await supabase.functions.invoke('get-mapbox-token');
+          if (data?.token) {
+            setMapboxToken(data.token);
+            console.log('Mapbox token pre-fetched successfully');
+          }
+        } catch (error) {
+          console.error('Failed to pre-fetch Mapbox token:', error);
+        }
+      };
+      
+      fetchMapboxToken();
+    }
+  }, [open, mapboxToken]);
 
   // Load tour data and associated hoja de ruta records
   useEffect(() => {
@@ -383,6 +404,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                     tourData={tourData}
                     tourDates={tourDates}
                     accommodations={accommodations}
+                    mapboxToken={mapboxToken}
                   />
                 )}
               </TabsContent>

@@ -11,12 +11,14 @@ interface TourMapViewMapboxProps {
   tourData: any;
   tourDates: any[];
   accommodations?: any[];
+  mapboxToken?: string | null;
 }
 
 export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
   tourData,
   tourDates,
   accommodations = [],
+  mapboxToken,
 }) => {
   const { toast } = useToast();
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -40,21 +42,29 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
         setIsLoading(true);
         setError(null);
 
-        // Fetch Mapbox token
-        const { data, error: tokenError } = await supabase.functions.invoke('get-mapbox-token');
+        // Use provided token or fetch as fallback
+        let token = mapboxToken;
+        
+        if (!token) {
+          console.log('Fetching Mapbox token (fallback)...');
+          const { data, error: tokenError } = await supabase.functions.invoke('get-mapbox-token');
 
-        if (tokenError) {
-          console.error('Token fetch error:', tokenError);
-          throw new Error(`Error al obtener el token de Mapbox: ${tokenError.message}`);
+          if (tokenError) {
+            console.error('Token fetch error:', tokenError);
+            throw new Error(`Error al obtener el token de Mapbox: ${tokenError.message}`);
+          }
+
+          if (!data?.token) {
+            console.error('No token in response:', data);
+            throw new Error('No se encontró el token de Mapbox en la respuesta');
+          }
+
+          token = data.token;
+        } else {
+          console.log('Using pre-fetched Mapbox token');
         }
 
-        if (!data?.token) {
-          console.error('No token in response:', data);
-          throw new Error('No se encontró el token de Mapbox en la respuesta');
-        }
-
-        console.log('Mapbox token retrieved successfully');
-        mapboxgl.accessToken = data.token;
+        mapboxgl.accessToken = token;
 
         // Create map instance with dark style
         const mapInstance = new mapboxgl.Map({
@@ -118,7 +128,7 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
       map.current?.remove();
       map.current = null;
     };
-  }, []);
+  }, [mapboxToken]);
 
   useEffect(() => {
     if (!mapLoaded || !map.current) return;
