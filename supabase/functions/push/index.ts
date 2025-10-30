@@ -55,6 +55,7 @@ type BroadcastBody = {
   recipient_name?: string;
   channel?: 'email' | 'whatsapp';
   status?: string; // confirmed | cancelled | declined
+  assignment_status?: string; // confirmed | invited (for direct assignments)
   changes?: Record<string, { from?: unknown; to?: unknown } | unknown> | Record<string, unknown>;
   message_preview?: string;
   message_id?: string;
@@ -876,6 +877,33 @@ async function handleBroadcast(
       }
     }
     addRecipients([body.recipient_id]);
+  } else if (type === 'job.assignment.direct') {
+    title = 'Nueva asignación';
+    const statusText = (body as any)?.assignment_status === 'confirmed' ? 'confirmado' : 'asignado';
+    if (singleDayFlag && formattedTargetDate) {
+      if (recipName) {
+        text = `${actor} te ha ${statusText} a "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`;
+      } else {
+        text = `Has sido ${statusText} a "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`;
+      }
+      if (normalizedTargetDate) {
+        metaExtras.singleDay = true;
+        metaExtras.targetDate = normalizedTargetDate;
+      }
+    } else {
+      if (recipName) {
+        text = `${actor} te ha ${statusText} a "${jobTitle || 'Trabajo'}".`;
+      } else {
+        text = `Has sido ${statusText} a "${jobTitle || 'Trabajo'}".`;
+      }
+      if (singleDayFlag && normalizedTargetDate) {
+        metaExtras.singleDay = true;
+        metaExtras.targetDate = normalizedTargetDate;
+      }
+    }
+    // By default, notify the assigned technician + management
+    addRecipients([body.recipient_id]);
+    addNaturalRecipients(Array.from(mgmt));
   } else if (type === 'task.assigned') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
     const jobLabel = jobId ? (jobTitle || 'Trabajo') : (tourName || 'Tour');
@@ -1098,7 +1126,7 @@ async function handleBroadcast(
       getManagementByDepartmentUserIds(client, department),
   });
 
-  if (type === 'job.assignment.confirmed') {
+  if (type === 'job.assignment.confirmed' || type === 'job.assignment.direct') {
     if (!body.recipient_id || body.recipient_id !== userId) {
       recipients.delete(userId);
     }

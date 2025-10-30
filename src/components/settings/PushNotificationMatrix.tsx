@@ -41,6 +41,7 @@ const FALLBACK_EVENTS: EventInfo[] = [
   { code: 'job.status.confirmed', label: 'Job confirmed' },
   { code: 'job.status.cancelled', label: 'Job cancelled' },
   { code: 'job.assignment.confirmed', label: 'Assignment confirmed' },
+  { code: 'job.assignment.direct', label: 'Direct job assignment' },
   { code: 'document.uploaded', label: 'Document uploaded' },
   { code: 'document.deleted', label: 'Document deleted' },
   { code: 'document.tech_visible.enabled', label: 'Document visible to technicians' },

@@ -244,23 +244,23 @@ export const AssignJobDialog = ({
         `${isReassignment ? 'Reassigned' : 'Assigned'} ${technician.first_name} ${technician.last_name} to ${selectedJob?.title} (${statusText})`
       );
 
-      if (assignAsConfirmed) {
-        const recipientName = `${technician.first_name ?? ''} ${technician.last_name ?? ''}`.trim();
-        try {
-          void supabase.functions.invoke('push', {
-            body: {
-              action: 'broadcast',
-              type: 'job.assignment.confirmed',
-              job_id: selectedJobId,
-              recipient_id: technicianId,
-              recipient_name: recipientName || undefined,
-              target_date: singleDay ? `${assignmentDate}T00:00:00Z` : undefined,
-              single_day: singleDay
-            }
-          });
-        } catch (_) {
-          // Non-blocking push failure
-        }
+      // Send push notification for direct assignments
+      const recipientName = `${technician.first_name ?? ''} ${technician.last_name ?? ''}`.trim();
+      try {
+        void supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'job.assignment.direct',
+            job_id: selectedJobId,
+            recipient_id: technicianId,
+            recipient_name: recipientName || undefined,
+            assignment_status: assignAsConfirmed ? 'confirmed' : 'invited',
+            target_date: singleDay ? `${assignmentDate}T00:00:00Z` : undefined,
+            single_day: singleDay
+          }
+        });
+      } catch (_) {
+        // Non-blocking push failure
       }
 
       // Force refresh of queries by dispatching a custom event
