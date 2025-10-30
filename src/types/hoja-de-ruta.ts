@@ -260,3 +260,9 @@ export type PDFGenerationOptions = {
   toast?: any;
   accommodations?: Accommodation[];
 };
+
+// ============================================================================
+// EXTENDED DAY SHEET TYPES
+// ============================================================================
+// Re-export extended day sheet types for comprehensive tour scheduling
+export * from './daySheetExtended';
