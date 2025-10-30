@@ -49,6 +49,29 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+
+  // Fetch Google Maps API key from Supabase
+  useEffect(() => {
+    const fetchApiKey = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+
+        if (error) {
+          console.error('Failed to fetch Google Maps API key:', error);
+          return;
+        }
+
+        if (data?.apiKey) {
+          setApiKey(data.apiKey);
+        }
+      } catch (err) {
+        console.error('Error fetching API key:', err);
+      }
+    };
+
+    fetchApiKey();
+  }, []);
 
   useEffect(() => {
     if (tourData?.tour_settings) {
@@ -66,14 +89,22 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
+    if (!apiKey) {
+      toast({
+        title: "Error",
+        description: "Google Maps API key no disponible. Intenta de nuevo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSearching(true);
     try {
       // Use Google Places API for location search
-      // Note: This requires the API key to be configured in the environment
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(
           searchQuery
-        )}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
+        )}&key=${apiKey}`
       );
 
       if (!response.ok) {
@@ -198,7 +229,7 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
               />
               <Button
                 onClick={handleSearch}
-                disabled={isSearching || !canEdit || !searchQuery.trim()}
+                disabled={isSearching || !canEdit || !searchQuery.trim() || !apiKey}
               >
                 {isSearching ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
