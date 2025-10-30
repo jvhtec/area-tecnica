@@ -356,7 +356,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
             )}
 
             {!canEdit && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-sm text-amber-800 dark:text-amber-300">
                 <strong>Modo solo lectura:</strong> No tienes permisos para editar el itinerario.
                 Solo usuarios con rol de administrador o management pueden hacer cambios.
               </div>

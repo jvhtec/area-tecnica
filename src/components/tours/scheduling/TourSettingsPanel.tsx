@@ -177,8 +177,8 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
           )}
 
           {settings.latitude && settings.longitude && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2">
-              <div className="flex items-center gap-2 text-green-700 font-medium">
+            <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 space-y-2">
+              <div className="flex items-center gap-2 text-green-700 dark:text-green-300 font-medium">
                 <MapPin className="h-4 w-4" />
                 Ubicación Base Configurada
               </div>
@@ -257,7 +257,7 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
       )}
 
       {!canEdit && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
+        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-sm text-amber-700 dark:text-amber-300">
           ⚠ No tienes permisos para editar la configuración del tour
         </div>
       )}

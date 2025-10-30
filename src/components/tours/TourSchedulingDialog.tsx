@@ -32,7 +32,8 @@ import { TourTravelPlanner } from "./scheduling/TourTravelPlanner";
 import { EnhancedTourTravelPlanner } from "./scheduling/EnhancedTourTravelPlanner";
 import { TourSettingsPanel } from "./scheduling/TourSettingsPanel";
 import { TourContactsManager } from "./scheduling/TourContactsManager";
-import { TourMapView } from "./scheduling/TourMapView";
+import { TourMapViewMapbox } from "./scheduling/TourMapViewMapbox";
+import { TourAccommodationsManager } from "./scheduling/TourAccommodationsManager";
 import { generateTourDaySheet, generateTourBook } from "@/utils/tour-scheduling-pdf";
 import {
   generateEnhancedEventDaySheet,
@@ -64,6 +65,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
   const [selectedDateId, setSelectedDateId] = useState<string | null>(null);
   const [tourData, setTourData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [accommodations, setAccommodations] = useState<any[]>([]);
 
   const canEdit = userRole === 'admin' || userRole === 'management';
 
@@ -100,6 +102,18 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
         .in('tour_date_id', dateIds);
 
       if (hojaError) throw hojaError;
+
+      // Load accommodations for the tour
+      const { data: accommodationsData, error: accommodationsError } = await supabase
+        .from('tour_accommodations')
+        .select('*')
+        .eq('tour_id', tourId);
+
+      if (accommodationsError) {
+        console.error('Error loading accommodations:', accommodationsError);
+      } else {
+        setAccommodations(accommodationsData || []);
+      }
 
       setTourData({
         ...tour,
@@ -227,7 +241,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
 
         <div className="flex-1 overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-7 flex-shrink-0">
+            <TabsList className="grid w-full grid-cols-8 flex-shrink-0">
               <TabsTrigger value="timeline" className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 Timeline
@@ -239,6 +253,10 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
               <TabsTrigger value="travel" className="flex items-center gap-2">
                 <Route className="h-4 w-4" />
                 Viajes
+              </TabsTrigger>
+              <TabsTrigger value="accommodations" className="flex items-center gap-2">
+                <Home className="h-4 w-4" />
+                Alojamientos
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
@@ -309,6 +327,22 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                 )}
               </TabsContent>
 
+              <TabsContent value="accommodations" className="h-full m-0">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <TourAccommodationsManager
+                    tourId={tourId}
+                    tourDates={tourDates}
+                    tourData={tourData}
+                    canEdit={canEdit}
+                    onSave={loadTourSchedulingData}
+                  />
+                )}
+              </TabsContent>
+
               <TabsContent value="settings" className="h-full m-0">
                 {isLoading ? (
                   <div className="flex items-center justify-center h-64">
@@ -345,9 +379,10 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
                 ) : (
-                  <TourMapView
+                  <TourMapViewMapbox
                     tourData={tourData}
                     tourDates={tourDates}
+                    accommodations={accommodations}
                   />
                 )}
               </TabsContent>
