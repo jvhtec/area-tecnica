@@ -5,13 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import {
   Home,
   MapPin,
   Clock,
   Save,
   Loader2,
-  Search,
 } from "lucide-react";
 
 interface TourSettingsPanelProps {
@@ -45,108 +45,48 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
     defaultDepartureTime: "08:00",
     defaultReturnTime: "18:00",
   });
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [apiKey, setApiKey] = useState<string | null>(null);
-
-  // Fetch Google Maps API key from Supabase
-  useEffect(() => {
-    const fetchApiKey = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('get-google-maps-key');
-
-        if (error) {
-          console.error('Failed to fetch Google Maps API key:', error);
-          return;
-        }
-
-        if (data?.apiKey) {
-          setApiKey(data.apiKey);
-        }
-      } catch (err) {
-        console.error('Error fetching API key:', err);
-      }
-    };
-
-    fetchApiKey();
-  }, []);
+  const [locationInput, setLocationInput] = useState("");
 
   useEffect(() => {
     if (tourData?.tour_settings) {
+      const homeBase = tourData.tour_settings.homeBase;
       setSettings({
-        name: tourData.tour_settings.homeBase?.name || "",
-        address: tourData.tour_settings.homeBase?.address || "",
-        latitude: tourData.tour_settings.homeBase?.latitude || null,
-        longitude: tourData.tour_settings.homeBase?.longitude || null,
+        name: homeBase?.name || "",
+        address: homeBase?.address || "",
+        latitude: homeBase?.latitude || null,
+        longitude: homeBase?.longitude || null,
         defaultDepartureTime: tourData.tour_settings.defaultDepartureTime || "08:00",
         defaultReturnTime: tourData.tour_settings.defaultReturnTime || "18:00",
       });
+      // Set initial location input if address exists
+      if (homeBase?.address) {
+        setLocationInput(homeBase.address);
+      }
     }
   }, [tourData]);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-
-    if (!apiKey) {
-      toast({
-        title: "Error",
-        description: "Google Maps API key no disponible. Intenta de nuevo.",
-        variant: "destructive",
+  const handlePlaceSelect = (details: {
+    name: string;
+    address: string;
+    coordinates?: { lat: number; lng: number };
+    place_id?: string;
+  }) => {
+    if (details.coordinates) {
+      setSettings({
+        ...settings,
+        name: details.name,
+        address: details.address,
+        latitude: details.coordinates.lat,
+        longitude: details.coordinates.lng,
       });
-      return;
-    }
+      setLocationInput(details.address);
 
-    setIsSearching(true);
-    try {
-      // Use Google Places API for location search
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(
-          searchQuery
-        )}&key=${apiKey}`
-      );
-
-      if (!response.ok) {
-        throw new Error("Search failed");
-      }
-
-      const data = await response.json();
-      setSearchResults(data.results || []);
-
-      if (data.results.length === 0) {
-        toast({
-          title: "Sin resultados",
-          description: "No se encontraron ubicaciones para tu búsqueda",
-        });
-      }
-    } catch (error: any) {
-      console.error("Error searching location:", error);
       toast({
-        title: "Error",
-        description: "No se pudo buscar la ubicación",
-        variant: "destructive",
+        title: "Ubicación seleccionada",
+        description: `${details.name} - ${details.address}`,
       });
-    } finally {
-      setIsSearching(false);
     }
-  };
-
-  const handleSelectLocation = (place: any) => {
-    setSettings({
-      ...settings,
-      name: place.name,
-      address: place.formatted_address,
-      latitude: place.geometry.location.lat,
-      longitude: place.geometry.location.lng,
-    });
-    setSearchResults([]);
-    setSearchQuery("");
-
-    toast({
-      title: "Ubicación seleccionada",
-      description: `${place.name} - ${place.formatted_address}`,
-    });
   };
 
   const handleSave = async () => {
@@ -216,48 +156,23 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="location-search">Buscar Ubicación</Label>
-            <div className="flex gap-2">
-              <Input
-                id="location-search"
+          {canEdit ? (
+            <div className="space-y-2">
+              <PlaceAutocomplete
+                value={locationInput}
+                onInputChange={(value) => setLocationInput(value)}
+                onSelect={handlePlaceSelect}
                 placeholder="Buscar ciudad, dirección o lugar..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                disabled={!canEdit}
+                label="Buscar Ubicación"
               />
-              <Button
-                onClick={handleSearch}
-                disabled={isSearching || !canEdit || !searchQuery.trim() || !apiKey}
-              >
-                {isSearching ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-              </Button>
+              <p className="text-xs text-muted-foreground">
+                Busca y selecciona la ubicación base de operaciones del tour
+              </p>
             </div>
-          </div>
-
-          {searchResults.length > 0 && (
-            <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
-              {searchResults.map((place, index) => (
-                <button
-                  key={index}
-                  className="w-full p-3 text-left hover:bg-muted/50 transition-colors flex items-start gap-3"
-                  onClick={() => handleSelectLocation(place)}
-                  disabled={!canEdit}
-                >
-                  <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium">{place.name}</div>
-                    <div className="text-sm text-muted-foreground truncate">
-                      {place.formatted_address}
-                    </div>
-                  </div>
-                </button>
-              ))}
+          ) : settings.address && (
+            <div className="space-y-2">
+              <Label>Ubicación</Label>
+              <div className="text-sm text-muted-foreground">{settings.address}</div>
             </div>
           )}
 
