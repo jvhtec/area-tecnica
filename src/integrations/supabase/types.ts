@@ -2668,6 +2668,7 @@ export type Database = {
           job_id: string
           lights_role: string | null
           response_time: string | null
+          single_day_date: string | null
           single_day: boolean
           sound_role: string | null
           status: Database["public"]["Enums"]["assignment_status"] | null
@@ -2682,6 +2683,7 @@ export type Database = {
           job_id: string
           lights_role?: string | null
           response_time?: string | null
+          single_day_date?: string | null
           single_day?: boolean
           sound_role?: string | null
           status?: Database["public"]["Enums"]["assignment_status"] | null
@@ -2696,6 +2698,7 @@ export type Database = {
           job_id?: string
           lights_role?: string | null
           response_time?: string | null
+          single_day_date?: string | null
           single_day?: boolean
           sound_role?: string | null
           status?: Database["public"]["Enums"]["assignment_status"] | null
