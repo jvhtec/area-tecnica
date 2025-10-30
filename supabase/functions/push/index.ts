@@ -64,6 +64,10 @@ type BroadcastBody = {
   tour_date_id?: string;
   tour_name?: string;
   dates_count?: number;
+  // Tour date type change hints
+  location_name?: string;
+  old_type?: string;
+  new_type?: string;
 };
 
 type RequestBody = SubscribeBody | UnsubscribeBody | TestBody | BroadcastBody;
@@ -1095,6 +1099,112 @@ async function handleBroadcast(
     text = tn ? `${actor} eliminó una fecha de "${tn}".` : `${actor} eliminó una fecha de tour.`;
     url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
     addNaturalRecipients(Array.from(mgmt));
+  } else if (type.startsWith('tourdate.type.changed')) {
+    // Tour date type change events
+    const locationName = (body as any).location_name || 'fecha de tour';
+    const oldType = (body as any).old_type || '';
+    const newType = (body as any).new_type || '';
+    const tourName = body.tour_name || '';
+
+    // Map type names to Spanish
+    const typeLabels: Record<string, string> = {
+      'show': 'Concierto',
+      'rehearsal': 'Ensayo',
+      'travel': 'Viaje',
+      'setup': 'Montaje',
+      'off': 'Día libre'
+    };
+
+    const oldTypeLabel = typeLabels[oldType] || oldType;
+    const newTypeLabel = typeLabels[newType] || newType;
+
+    if (type === 'tourdate.type.changed.show') {
+      title = 'Fecha cambiada a Concierto';
+      text = tourName
+        ? `${actor} cambió "${locationName}" a Concierto en "${tourName}".`
+        : `${actor} cambió "${locationName}" a Concierto.`;
+    } else if (type === 'tourdate.type.changed.rehearsal') {
+      title = 'Fecha cambiada a Ensayo';
+      text = tourName
+        ? `${actor} cambió "${locationName}" a Ensayo en "${tourName}".`
+        : `${actor} cambió "${locationName}" a Ensayo.`;
+    } else if (type === 'tourdate.type.changed.travel') {
+      title = 'Fecha cambiada a Viaje';
+      text = tourName
+        ? `${actor} cambió "${locationName}" a Viaje en "${tourName}".`
+        : `${actor} cambió "${locationName}" a Viaje.`;
+    } else if (type === 'tourdate.type.changed.setup') {
+      title = 'Fecha cambiada a Montaje';
+      text = tourName
+        ? `${actor} cambió "${locationName}" a Montaje en "${tourName}".`
+        : `${actor} cambió "${locationName}" a Montaje.`;
+    } else if (type === 'tourdate.type.changed.off') {
+      title = 'Fecha cambiada a Día libre';
+      text = tourName
+        ? `${actor} cambió "${locationName}" a Día libre en "${tourName}".`
+        : `${actor} cambió "${locationName}" a Día libre.`;
+    } else {
+      // Generic type change
+      title = 'Tipo de fecha cambiado';
+      if (oldType && newType) {
+        text = tourName
+          ? `${actor} cambió "${locationName}" de ${oldTypeLabel} a ${newTypeLabel} en "${tourName}".`
+          : `${actor} cambió "${locationName}" de ${oldTypeLabel} a ${newTypeLabel}.`;
+      } else {
+        text = tourName
+          ? `${actor} cambió el tipo de "${locationName}" en "${tourName}".`
+          : `${actor} cambió el tipo de "${locationName}".`;
+      }
+    }
+
+    url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
+    addNaturalRecipients(Array.from(mgmt));
+  } else if (type.startsWith('job.type.changed')) {
+    // Job type change events
+    const jobName = jobTitle || 'trabajo';
+    const oldType = (body as any).old_type || '';
+    const newType = (body as any).new_type || '';
+
+    // Map type names to Spanish
+    const jobTypeLabels: Record<string, string> = {
+      'single': 'Trabajo individual',
+      'tour': 'Gira',
+      'festival': 'Festival',
+      'dryhire': 'Alquiler seco',
+      'tourdate': 'Fecha de gira'
+    };
+
+    const oldTypeLabel = jobTypeLabels[oldType] || oldType;
+    const newTypeLabel = jobTypeLabels[newType] || newType;
+
+    if (type === 'job.type.changed.single') {
+      title = 'Trabajo cambiado a Individual';
+      text = `${actor} cambió "${jobName}" a Trabajo individual.`;
+    } else if (type === 'job.type.changed.tour') {
+      title = 'Trabajo cambiado a Gira';
+      text = `${actor} cambió "${jobName}" a Gira.`;
+    } else if (type === 'job.type.changed.festival') {
+      title = 'Trabajo cambiado a Festival';
+      text = `${actor} cambió "${jobName}" a Festival.`;
+    } else if (type === 'job.type.changed.dryhire') {
+      title = 'Trabajo cambiado a Alquiler seco';
+      text = `${actor} cambió "${jobName}" a Alquiler seco.`;
+    } else if (type === 'job.type.changed.tourdate') {
+      title = 'Trabajo cambiado a Fecha de gira';
+      text = `${actor} cambió "${jobName}" a Fecha de gira.`;
+    } else {
+      // Generic type change
+      title = 'Tipo de trabajo cambiado';
+      if (oldType && newType) {
+        text = `${actor} cambió "${jobName}" de ${oldTypeLabel} a ${newTypeLabel}.`;
+      } else {
+        text = `${actor} cambió el tipo de "${jobName}".`;
+      }
+    }
+
+    url = body.url || (jobId ? `/jobs/${jobId}` : url);
+    addNaturalRecipients(Array.from(mgmt));
+    addNaturalRecipients(Array.from(participants));
   } else if (type === 'soundvision.file.uploaded' || type === 'soundvision.file.downloaded') {
     // SoundVision payloads should provide venue_name, or file_id/venue_id for lookup so we can compose contextual notifications.
     const venueName = (await resolveSoundVisionVenueName(client, body)) || 'desconocido';

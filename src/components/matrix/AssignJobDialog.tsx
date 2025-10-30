@@ -84,7 +84,8 @@ export const AssignJobDialog = ({
   const selectedJob = filteredJobs.find(job => job.id === selectedJobId);
   const roleOptions = technician ? roleOptionsForDiscipline(technician.department) : [];
   const isReassignment = !!existingAssignment;
-  const assignmentDate = React.useMemo(() => date.toISOString().split('T')[0], [date]);
+  // IMPORTANT: use local yyyy-MM-dd, not toISOString (which is UTC)
+  const assignmentDate = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
 
   // Set initial role if reassigning
   React.useEffect(() => {

@@ -529,7 +529,7 @@ export const OptimizedMatrixCell = memo(({
                 if (!pendingRetry) return;
                 setAvailabilityRetrying(true);
                 sendStaffingEmail(
-                  ({ job_id: pendingRetry.jobId, profile_id: technician.id, phase: 'availability', channel: retryChannel, target_date: date.toISOString(), single_day: true } as any),
+                  ({ job_id: pendingRetry.jobId, profile_id: technician.id, phase: 'availability', channel: retryChannel, target_date: format(date, 'yyyy-MM-dd'), single_day: true } as any),
                   {
                     onSuccess: () => {
                       setAvailabilityRetrying(false);

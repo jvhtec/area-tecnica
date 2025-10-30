@@ -384,7 +384,7 @@ export const OptimizedAssignmentMatrix = ({
         }
         if (targetJobId) {
           sendStaffingEmail(
-            ({ job_id: targetJobId, profile_id: technicianId, phase: 'availability', channel: 'whatsapp', target_date: date.toISOString() } as any),
+            ({ job_id: targetJobId, profile_id: technicianId, phase: 'availability', channel: 'whatsapp', target_date: format(date, 'yyyy-MM-dd') } as any),
             {
               onSuccess: () => {
                 toast({ title: 'Request sent', description: 'Availability request sent via WhatsApp.' });
@@ -418,7 +418,7 @@ export const OptimizedAssignmentMatrix = ({
         }
         if (targetJobId) {
           sendStaffingEmail(
-            ({ job_id: targetJobId, profile_id: technicianId, phase: 'availability', channel: 'email', target_date: date.toISOString(), single_day: true } as any),
+            ({ job_id: targetJobId, profile_id: technicianId, phase: 'availability', channel: 'email', target_date: format(date, 'yyyy-MM-dd'), single_day: true } as any),
             {
               onSuccess: () => {
                 toast({ title: 'Request sent', description: 'Availability request sent via Email.' });
@@ -535,7 +535,7 @@ export const OptimizedAssignmentMatrix = ({
               profile_id: technicianId,
               phase: 'availability',
               channel,
-              target_date: cellAction.date.toISOString(),
+              target_date: format(cellAction.date, 'yyyy-MM-dd'),
               single_day: !!options?.singleDay
             } as any),
             {
@@ -563,7 +563,8 @@ export const OptimizedAssignmentMatrix = ({
           const chosen = availabilityPreferredChannel;
           sendAvailabilityRequest(chosen);
         } else {
-          setAvailabilityDialog({ open: true, jobId, profileId: technicianId, dateIso: cellAction.date.toISOString(), singleDay: !!options?.singleDay });
+          // Store date as yyyy-MM-dd for consistency
+          setAvailabilityDialog({ open: true, jobId, profileId: technicianId, dateIso: format(cellAction.date, 'yyyy-MM-dd'), singleDay: !!options?.singleDay });
         }
       })();
     } else {
@@ -1057,7 +1058,7 @@ export const OptimizedAssignmentMatrix = ({
                 return;
               }
               sendStaffingEmail(
-                ({ job_id: cellAction.selectedJobId, profile_id: currentTechnician.id, phase: 'offer', role, message, channel: offerChannel, target_date: cellAction.date.toISOString(), single_day: !!singleDay } as any),
+                ({ job_id: cellAction.selectedJobId, profile_id: currentTechnician.id, phase: 'offer', role, message, channel: offerChannel, target_date: format(cellAction.date, 'yyyy-MM-dd'), single_day: !!singleDay } as any),
                 {
                   onSuccess: (data: any) => {
                     const via = data?.channel || offerChannel;
