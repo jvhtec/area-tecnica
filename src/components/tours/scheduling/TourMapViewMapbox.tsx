@@ -385,46 +385,48 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-[600px]">
-              <Loader2 className="h-8 w-8 animate-spin mb-4" />
-              <p className="text-muted-foreground">Cargando mapa...</p>
-            </div>
-          ) : (
-            <>
-              <div
-                ref={mapContainer}
-                className="w-full h-[600px] rounded-lg border"
-                style={{ minHeight: "600px" }}
-              />
+          <div className="relative">
+            {/* Always render the map container so the ref is available */}
+            <div
+              ref={mapContainer}
+              className="w-full h-[600px] rounded-lg border"
+              style={{ minHeight: "600px" }}
+            />
 
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="w-4 h-4 rounded-full bg-green-500"></div>
-                  <span>Base de Operaciones</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="w-4 h-4 rounded-full bg-red-500"></div>
-                  <span>Venues del Tour</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="w-4 h-1 bg-purple-500"></div>
-                  <span>Rutas de Viaje</span>
-                </div>
-                {accommodations.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-lg">🏨</span>
-                    <span>Alojamientos</span>
-                  </div>
-                )}
+            {/* Show loading overlay on top when loading */}
+            {isLoading && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm rounded-lg">
+                <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                <p className="text-muted-foreground">Cargando mapa...</p>
               </div>
+            )}
+          </div>
 
-              {sortedDates.length === 0 && (
-                <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-sm text-amber-700 dark:text-amber-300">
-                  ⚠ No hay fechas con ubicaciones configuradas para mostrar en el mapa
-                </div>
-              )}
-            </>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-4 h-4 rounded-full bg-green-500"></div>
+              <span>Base de Operaciones</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-4 h-4 rounded-full bg-red-500"></div>
+              <span>Venues del Tour</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-4 h-1 bg-purple-500"></div>
+              <span>Rutas de Viaje</span>
+            </div>
+            {accommodations.length > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-lg">🏨</span>
+                <span>Alojamientos</span>
+              </div>
+            )}
+          </div>
+
+          {sortedDates.length === 0 && (
+            <div className="mt-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-sm text-amber-700 dark:text-amber-300">
+              ⚠ No hay fechas con ubicaciones configuradas para mostrar en el mapa
+            </div>
           )}
         </CardContent>
       </Card>
