@@ -32,7 +32,7 @@ import { TourTravelPlanner } from "./scheduling/TourTravelPlanner";
 import { EnhancedTourTravelPlanner } from "./scheduling/EnhancedTourTravelPlanner";
 import { TourSettingsPanel } from "./scheduling/TourSettingsPanel";
 import { TourContactsManager } from "./scheduling/TourContactsManager";
-import { TourMapView } from "./scheduling/TourMapView";
+import { TourMapViewMapbox } from "./scheduling/TourMapViewMapbox";
 import { TourAccommodationsManager } from "./scheduling/TourAccommodationsManager";
 import { generateTourDaySheet, generateTourBook } from "@/utils/tour-scheduling-pdf";
 import {
@@ -66,6 +66,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
   const [tourData, setTourData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [accommodations, setAccommodations] = useState<any[]>([]);
+  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
 
   const canEdit = userRole === 'admin' || userRole === 'management';
 
@@ -113,6 +114,14 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
         console.error('Error loading accommodations:', accommodationsError);
       } else {
         setAccommodations(accommodationsData || []);
+      }
+
+      // Fetch Mapbox token
+      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-mapbox-token');
+      if (tokenError) {
+        console.error('Error fetching Mapbox token:', tokenError);
+      } else if (tokenData?.token) {
+        setMapboxToken(tokenData.token);
       }
 
       setTourData({
@@ -374,15 +383,19 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
               </TabsContent>
 
               <TabsContent value="map" className="h-full m-0">
-                {isLoading ? (
+                {isLoading || !mapboxToken ? (
                   <div className="flex items-center justify-center h-64">
                     <Loader2 className="h-8 w-8 animate-spin" />
-                    <p className="text-sm text-muted-foreground">Cargando datos...</p>
+                    <p className="text-sm text-muted-foreground ml-2">
+                      {isLoading ? 'Cargando datos...' : 'Cargando mapa...'}
+                    </p>
                   </div>
                 ) : (
-                  <TourMapView
+                  <TourMapViewMapbox
                     tourData={tourData}
                     tourDates={tourData?.tour_dates || []}
+                    accommodations={accommodations}
+                    mapboxToken={mapboxToken}
                   />
                 )}
               </TabsContent>
