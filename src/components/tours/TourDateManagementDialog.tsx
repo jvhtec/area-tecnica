@@ -717,6 +717,27 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw dateError;
       }
 
+      // Send push notification if tour date type changed
+      if (editingTourDate && editingTourDate.tour_date_type !== tourDateType) {
+        try {
+          void supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: `tourdate.type.changed.${tourDateType}`,
+              tour_id: tourId,
+              tour_date_id: dateId,
+              tour_name: tourData.name,
+              location_name: newLocation || updatedDate?.location?.name || '',
+              old_type: editingTourDate.tour_date_type,
+              new_type: tourDateType,
+              url: `/tours/${tourId}`
+            }
+          });
+        } catch (err) {
+          console.error('Failed to send push notification:', err);
+        }
+      }
+
       const { data: jobs, error: jobsError } = await supabase
         .from("jobs")
         .update({

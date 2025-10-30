@@ -234,12 +234,29 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         if ((job.start_time || '') !== toISO(startTimeUTC)) changes.start_time = { from: job.start_time, to: toISO(startTimeUTC) };
         if ((job.end_time || '') !== toISO(endTimeUTC)) changes.end_time = { from: job.end_time, to: toISO(endTimeUTC) };
         if ((job.timezone || '') !== (timezone || '')) changes.timezone = { from: job.timezone, to: timezone };
-        if ((job.job_type || '') !== (jobType || '')) changes.job_type = { from: job.job_type, to: jobType };
+        const jobTypeChanged = (job.job_type || '') !== (jobType || '');
+        if (jobTypeChanged) changes.job_type = { from: job.job_type, to: jobType };
         if ((job.location_id || null) !== (locationId || null)) changes.location_id = { from: job.location_id, to: locationId };
         if ((job.color || '') !== (color || '')) changes.color = { from: job.color, to: color };
+
+        // Send general job.updated notification
         void supabase.functions.invoke('push', {
           body: { action: 'broadcast', type: 'job.updated', job_id: job.id, changes }
         });
+
+        // Send specific job type change notification if job type changed
+        if (jobTypeChanged && job.job_type && jobType) {
+          void supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: `job.type.changed.${jobType}`,
+              job_id: job.id,
+              old_type: job.job_type,
+              new_type: jobType,
+              url: `/jobs/${job.id}`
+            }
+          });
+        }
       } catch {}
 
       toast({
