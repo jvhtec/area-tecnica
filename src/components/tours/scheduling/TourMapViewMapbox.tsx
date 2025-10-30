@@ -26,6 +26,7 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [hasRoute, setHasRoute] = useState(false);
 
   const sortedDates = [...tourDates].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -255,57 +256,112 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
     }
 
     const routeCoordinates: [number, number][] = [];
+    const travelPlan = Array.isArray(tourData?.travel_plan)
+      ? tourData.travel_plan
+      : [];
 
-    // Line from home to first venue
-    if (homeBase?.latitude != null && homeBase?.longitude != null) {
-      const firstDateWithLoc = sortedDates.find(d => {
-        const loc = d.locations || d.location;
-        return loc?.latitude != null && loc?.longitude != null;
-      });
-      const firstVenue = firstDateWithLoc?.locations || firstDateWithLoc?.location;
-      if (firstVenue?.latitude != null && firstVenue?.longitude != null) {
-        routeCoordinates.push([homeBase.longitude, homeBase.latitude]);
-        routeCoordinates.push([firstVenue.longitude, firstVenue.latitude]);
-      }
-    }
+    const getLocationFromDateId = (dateId?: string) => {
+      if (!dateId) return null;
+      const matchingDate = sortedDates.find((date) => date.id === dateId);
+      if (!matchingDate) return null;
+      return matchingDate.locations || matchingDate.location || null;
+    };
 
-    // Lines between consecutive venues
-    for (let i = 0; i < sortedDates.length - 1; i++) {
-      const fromLoc = sortedDates[i].locations || sortedDates[i].location;
-      const toLoc = sortedDates[i + 1].locations || sortedDates[i + 1].location;
-
+    const appendCoordinate = (coord: [number, number] | null | undefined) => {
+      if (!coord) return;
       if (
-        fromLoc?.latitude != null &&
-        fromLoc?.longitude != null &&
-        toLoc?.latitude != null &&
-        toLoc?.longitude != null
+        routeCoordinates.length === 0 ||
+        routeCoordinates[routeCoordinates.length - 1][0] !== coord[0] ||
+        routeCoordinates[routeCoordinates.length - 1][1] !== coord[1]
       ) {
-        if (routeCoordinates.length === 0) {
-          routeCoordinates.push([fromLoc.longitude, fromLoc.latitude]);
-        }
-        routeCoordinates.push([toLoc.longitude, toLoc.latitude]);
+        routeCoordinates.push(coord);
       }
+      bounds.extend(coord);
+      hasCoordinates = true;
+    };
+
+    if (travelPlan.length > 0) {
+      travelPlan.forEach((segment: any) => {
+        const fromLocation =
+          segment.fromType === 'home'
+            ? homeBase
+            : segment.fromLocation || getLocationFromDateId(segment.fromDateId);
+        const toLocation =
+          segment.toType === 'home'
+            ? homeBase
+            : segment.toLocation || getLocationFromDateId(segment.toDateId);
+
+        const fromCoords =
+          fromLocation?.longitude != null && fromLocation?.latitude != null
+            ? [fromLocation.longitude, fromLocation.latitude]
+            : null;
+        const toCoords =
+          toLocation?.longitude != null && toLocation?.latitude != null
+            ? [toLocation.longitude, toLocation.latitude]
+            : null;
+
+        appendCoordinate(fromCoords as [number, number] | null);
+        appendCoordinate(toCoords as [number, number] | null);
+      });
     }
 
-    // Line from last venue to home
-    if (homeBase?.latitude != null && homeBase?.longitude != null && sortedDates.length > 0) {
-      const lastDateWithLoc = [...sortedDates].reverse().find(d => {
-        const loc = d.locations || d.location;
-        return loc?.latitude != null && loc?.longitude != null;
-      });
-      const lastVenue = lastDateWithLoc?.locations || lastDateWithLoc?.location;
-      if (lastVenue?.latitude != null && lastVenue?.longitude != null) {
-        if (routeCoordinates.length > 0 &&
-            (routeCoordinates[routeCoordinates.length - 1][0] !== lastVenue.longitude ||
-             routeCoordinates[routeCoordinates.length - 1][1] !== lastVenue.latitude)) {
-          routeCoordinates.push([lastVenue.longitude, lastVenue.latitude]);
+    if (travelPlan.length === 0) {
+      // Fallback to deriving the route from the sorted dates when no travel plan exists
+      // Line from home to first venue
+      if (homeBase?.latitude != null && homeBase?.longitude != null) {
+        const firstDateWithLoc = sortedDates.find(d => {
+          const loc = d.locations || d.location;
+          return loc?.latitude != null && loc?.longitude != null;
+        });
+        const firstVenue = firstDateWithLoc?.locations || firstDateWithLoc?.location;
+        if (firstVenue?.latitude != null && firstVenue?.longitude != null) {
+          appendCoordinate([homeBase.longitude, homeBase.latitude] as [number, number]);
+          appendCoordinate([firstVenue.longitude, firstVenue.latitude] as [number, number]);
         }
-        routeCoordinates.push([homeBase.longitude, homeBase.latitude]);
+      }
+
+      // Lines between consecutive venues
+      for (let i = 0; i < sortedDates.length - 1; i++) {
+        const fromLoc = sortedDates[i].locations || sortedDates[i].location;
+        const toLoc = sortedDates[i + 1].locations || sortedDates[i + 1].location;
+
+        if (
+          fromLoc?.latitude != null &&
+          fromLoc?.longitude != null &&
+          toLoc?.latitude != null &&
+          toLoc?.longitude != null
+        ) {
+          if (routeCoordinates.length === 0) {
+            appendCoordinate([fromLoc.longitude, fromLoc.latitude] as [number, number]);
+          }
+          appendCoordinate([toLoc.longitude, toLoc.latitude] as [number, number]);
+        }
+      }
+
+      // Line from last venue to home
+      if (homeBase?.latitude != null && homeBase?.longitude != null && sortedDates.length > 0) {
+        const lastDateWithLoc = [...sortedDates].reverse().find(d => {
+          const loc = d.locations || d.location;
+          return loc?.latitude != null && loc?.longitude != null;
+        });
+        const lastVenue = lastDateWithLoc?.locations || lastDateWithLoc?.location;
+        if (lastVenue?.latitude != null && lastVenue?.longitude != null) {
+          if (
+            routeCoordinates.length > 0 &&
+            (routeCoordinates[routeCoordinates.length - 1][0] !== lastVenue.longitude ||
+              routeCoordinates[routeCoordinates.length - 1][1] !== lastVenue.latitude)
+          ) {
+            appendCoordinate([lastVenue.longitude, lastVenue.latitude] as [number, number]);
+          }
+          appendCoordinate([homeBase.longitude, homeBase.latitude] as [number, number]);
+        }
       }
     }
 
     // Add route line to map
-    if (routeCoordinates.length > 1) {
+    const routeDrawn = routeCoordinates.length > 1;
+
+    if (routeDrawn) {
       map.current.addSource('tour-route', {
         type: 'geojson',
         data: {
@@ -332,6 +388,10 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
           'line-opacity': 0.7,
         },
       });
+    }
+
+    if (hasRoute !== routeDrawn) {
+      setHasRoute(routeDrawn);
     }
 
     // Fit map to bounds
@@ -375,6 +435,12 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
                 <MapPin className="h-3 w-3 mr-1" />
                 Venues
               </Badge>
+              {hasRoute && (
+                <Badge variant="outline" className="bg-violet-50 dark:bg-violet-950">
+                  <span className="mr-1 inline-block h-[6px] w-4 rounded-full bg-violet-500" />
+                  Ruta
+                </Badge>
+              )}
               {accommodations.length > 0 && (
                 <Badge variant="outline" className="bg-purple-50 dark:bg-purple-950">
                   <Hotel className="h-3 w-3 mr-1" />
@@ -412,8 +478,8 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
               <span>Venues del Tour</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <div className="w-4 h-1 bg-purple-500"></div>
-              <span>Rutas de Viaje</span>
+              <div className="w-4 h-1 bg-violet-500"></div>
+              <span>Ruta del Viaje</span>
             </div>
             {accommodations.length > 0 && (
               <div className="flex items-center gap-2 text-sm">
