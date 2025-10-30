@@ -74,44 +74,50 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
 
   // Pre-fetch Mapbox token to avoid connection contention
   useEffect(() => {
-    if (open && !mapboxToken && !isLoadingMapboxToken && !mapboxTokenError) {
-      const fetchMapboxToken = async () => {
-        setIsLoadingMapboxToken(true);
-        setMapboxTokenError(null);
-        try {
-          console.log('Pre-fetching Mapbox token...');
-          const { data, error } = await supabase.functions.invoke('get-mapbox-token');
-          
-          if (error) {
-            throw error;
-          }
-          
-          if (data?.token) {
-            setMapboxToken(data.token);
-            console.log('Mapbox token pre-fetched successfully');
-          } else {
-            throw new Error('No token received from server');
-          }
-        } catch (error: any) {
-          console.error('Failed to pre-fetch Mapbox token:', error);
-          setMapboxTokenError(error?.message || 'Error loading map token');
-          toast({
-            title: "Error cargando mapa",
-            description: "No se pudo cargar el token del mapa. Intenta de nuevo.",
-            variant: "destructive",
-          });
-        } finally {
-          setIsLoadingMapboxToken(false);
+    // Only fetch if dialog is open and we don't have a token yet
+    if (!open) return;
+    if (mapboxToken) return;
+    if (isLoadingMapboxToken) return;
+    
+    const fetchMapboxToken = async () => {
+      setIsLoadingMapboxToken(true);
+      setMapboxTokenError(null);
+      
+      try {
+        console.log('🗺️ Pre-fetching Mapbox token...');
+        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+        
+        if (error) {
+          console.error('❌ Mapbox token fetch error:', error);
+          throw error;
         }
-      };
-
-      fetchMapboxToken();
-    }
-  }, [open, mapboxTokenError]);
+        
+        if (data?.token) {
+          setMapboxToken(data.token);
+          console.log('✅ Mapbox token pre-fetched successfully');
+        } else {
+          throw new Error('No token received from server');
+        }
+      } catch (error: any) {
+        console.error('❌ Failed to pre-fetch Mapbox token:', error);
+        setMapboxTokenError(error?.message || 'Error loading map token');
+        toast({
+          title: "Error cargando mapa",
+          description: "No se pudo cargar el token del mapa. Intenta de nuevo.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingMapboxToken(false);
+      }
+    };
+    
+    fetchMapboxToken();
+  }, [open, mapboxToken, isLoadingMapboxToken]);
 
   // Reset Mapbox state when the dialog closes
   useEffect(() => {
     if (!open) {
+      console.log('🔄 Resetting Mapbox token state (dialog closed)');
       setMapboxToken(null);
       setMapboxTokenError(null);
       setIsLoadingMapboxToken(false);
@@ -452,8 +458,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                       <Button 
                         size="sm" 
                         onClick={() => {
-                          setIsLoadingMapboxToken(false);
-                          setMapboxToken(null);
+                          console.log('🔄 Retrying Mapbox token fetch...');
                           setMapboxTokenError(null);
                         }}
                       >
