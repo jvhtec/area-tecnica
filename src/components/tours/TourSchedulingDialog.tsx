@@ -74,7 +74,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
 
   // Pre-fetch Mapbox token to avoid connection contention
   useEffect(() => {
-    if (open && !mapboxToken && !isLoadingMapboxToken) {
+    if (open && !mapboxToken && !isLoadingMapboxToken && !mapboxTokenError) {
       const fetchMapboxToken = async () => {
         setIsLoadingMapboxToken(true);
         setMapboxTokenError(null);
@@ -104,10 +104,19 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
           setIsLoadingMapboxToken(false);
         }
       };
-      
+
       fetchMapboxToken();
     }
-  }, [open, mapboxToken, isLoadingMapboxToken, toast]);
+  }, [open, mapboxTokenError]);
+
+  // Reset Mapbox state when the dialog closes
+  useEffect(() => {
+    if (!open) {
+      setMapboxToken(null);
+      setMapboxTokenError(null);
+      setIsLoadingMapboxToken(false);
+    }
+  }, [open]);
 
   // Load tour data and associated hoja de ruta records
   useEffect(() => {
@@ -443,6 +452,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                       <Button 
                         size="sm" 
                         onClick={() => {
+                          setIsLoadingMapboxToken(false);
                           setMapboxToken(null);
                           setMapboxTokenError(null);
                         }}
