@@ -224,72 +224,114 @@ export const TourMapView: React.FC<TourMapViewProps> = ({
     });
 
     // Draw route lines
-    const routePoints: google.maps.LatLng[] = [];
+    const travelPlan = Array.isArray(tourData?.travel_plan)
+      ? tourData.travel_plan
+      : [];
 
-    // Line from home to first venue with coordinates
-    if (homeBase?.latitude != null && homeBase?.longitude != null) {
-      const firstDateWithLoc = sortedDates.find(d => d.locations?.latitude != null && d.locations?.longitude != null);
-      const firstVenue = firstDateWithLoc?.locations;
-      if (firstVenue && firstVenue.latitude != null && firstVenue.longitude != null) {
-        const homeLine = new google.maps.Polyline({
-          path: [
-            { lat: homeBase.latitude, lng: homeBase.longitude },
-            { lat: firstVenue.latitude, lng: firstVenue.longitude },
-          ],
-          geodesic: true,
-          strokeColor: "#3b82f6",
-          strokeOpacity: 0.7,
-          strokeWeight: 3,
-          map: mapInstance,
-        });
-        polylinesRef.current.push(homeLine);
-      }
-    }
+    const routeCoordinates: google.maps.LatLngLiteral[] = [];
 
-    // Lines between consecutive venues
-    for (let i = 0; i < sortedDates.length - 1; i++) {
-      const fromLocation = sortedDates[i].locations;
-      const toLocation = sortedDates[i + 1].locations;
+    const getLocationFromDateId = (dateId?: string) => {
+      if (!dateId) return null;
+      const matchingDate = sortedDates.find((date) => date.id === dateId);
+      if (!matchingDate) return null;
+      return matchingDate.locations || matchingDate.location || null;
+    };
 
+    const appendCoordinate = (coord?: google.maps.LatLngLiteral | null) => {
+      if (!coord) return;
       if (
-        fromLocation?.latitude != null &&
-        fromLocation?.longitude != null &&
-        toLocation?.latitude != null &&
-        toLocation?.longitude != null
+        routeCoordinates.length === 0 ||
+        routeCoordinates[routeCoordinates.length - 1].lat !== coord.lat ||
+        routeCoordinates[routeCoordinates.length - 1].lng !== coord.lng
       ) {
-        const venueLine = new google.maps.Polyline({
-          path: [
-            { lat: fromLocation.latitude, lng: fromLocation.longitude },
-            { lat: toLocation.latitude, lng: toLocation.longitude },
-          ],
-          geodesic: true,
-          strokeColor: "#8b5cf6",
-          strokeOpacity: 0.7,
-          strokeWeight: 3,
-          map: mapInstance,
-        });
-        polylinesRef.current.push(venueLine);
+        routeCoordinates.push(coord);
+      }
+      bounds.extend(coord);
+    };
+
+    if (travelPlan.length > 0) {
+      travelPlan.forEach((segment: any) => {
+        const fromLocation =
+          segment.fromType === "home"
+            ? homeBase
+            : segment.fromLocation || getLocationFromDateId(segment.fromDateId);
+        const toLocation =
+          segment.toType === "home"
+            ? homeBase
+            : segment.toLocation || getLocationFromDateId(segment.toDateId);
+
+        const fromCoords =
+          fromLocation?.latitude != null && fromLocation?.longitude != null
+            ? { lat: fromLocation.latitude, lng: fromLocation.longitude }
+            : null;
+        const toCoords =
+          toLocation?.latitude != null && toLocation?.longitude != null
+            ? { lat: toLocation.latitude, lng: toLocation.longitude }
+            : null;
+
+        appendCoordinate(fromCoords);
+        appendCoordinate(toCoords);
+      });
+    }
+
+    if (travelPlan.length === 0) {
+      // Fallback to deriving the route from the sorted dates when no travel plan exists
+      if (homeBase?.latitude != null && homeBase?.longitude != null) {
+        const firstDateWithLoc = sortedDates.find(
+          (d) => d.locations?.latitude != null && d.locations?.longitude != null
+        );
+        const firstVenue = firstDateWithLoc?.locations;
+        if (firstVenue && firstVenue.latitude != null && firstVenue.longitude != null) {
+          appendCoordinate({ lat: homeBase.latitude, lng: homeBase.longitude });
+          appendCoordinate({ lat: firstVenue.latitude, lng: firstVenue.longitude });
+        }
+      }
+
+      for (let i = 0; i < sortedDates.length - 1; i++) {
+        const fromLocation = sortedDates[i].locations;
+        const toLocation = sortedDates[i + 1].locations;
+
+        if (
+          fromLocation?.latitude != null &&
+          fromLocation?.longitude != null &&
+          toLocation?.latitude != null &&
+          toLocation?.longitude != null
+        ) {
+          if (routeCoordinates.length === 0) {
+            appendCoordinate({ lat: fromLocation.latitude, lng: fromLocation.longitude });
+          }
+          appendCoordinate({ lat: toLocation.latitude, lng: toLocation.longitude });
+        }
+      }
+
+      if (homeBase?.latitude != null && homeBase?.longitude != null && sortedDates.length > 0) {
+        const lastDateWithLoc = [...sortedDates].reverse().find(
+          (d) => d.locations?.latitude != null && d.locations?.longitude != null
+        );
+        const lastVenue = lastDateWithLoc?.locations;
+        if (lastVenue && lastVenue.latitude != null && lastVenue.longitude != null) {
+          if (
+            routeCoordinates.length > 0 &&
+            (routeCoordinates[routeCoordinates.length - 1].lat !== lastVenue.latitude ||
+              routeCoordinates[routeCoordinates.length - 1].lng !== lastVenue.longitude)
+          ) {
+            appendCoordinate({ lat: lastVenue.latitude, lng: lastVenue.longitude });
+          }
+          appendCoordinate({ lat: homeBase.latitude, lng: homeBase.longitude });
+        }
       }
     }
 
-    // Line from last venue with coordinates to home
-    if (homeBase?.latitude != null && homeBase?.longitude != null && sortedDates.length > 0) {
-      const lastDateWithLoc = [...sortedDates].reverse().find(d => d.locations?.latitude != null && d.locations?.longitude != null);
-      const lastVenue = lastDateWithLoc?.locations;
-      if (lastVenue && lastVenue.latitude != null && lastVenue.longitude != null) {
-        const returnLine = new google.maps.Polyline({
-          path: [
-            { lat: lastVenue.latitude, lng: lastVenue.longitude },
-            { lat: homeBase.latitude, lng: homeBase.longitude },
-          ],
-          geodesic: true,
-          strokeColor: "#10b981",
-          strokeOpacity: 0.7,
-          strokeWeight: 3,
-          map: mapInstance,
-        });
-        polylinesRef.current.push(returnLine);
-      }
+    if (routeCoordinates.length > 1) {
+      const routeLine = new google.maps.Polyline({
+        path: routeCoordinates,
+        geodesic: true,
+        strokeColor: "#8b5cf6",
+        strokeOpacity: 0.7,
+        strokeWeight: 3,
+        map: mapInstance,
+      });
+      polylinesRef.current.push(routeLine);
     }
 
     // Fit map to bounds
@@ -356,8 +398,8 @@ export const TourMapView: React.FC<TourMapViewProps> = ({
                   <span>Venues del Tour</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <div className="w-4 h-1 bg-blue-500"></div>
-                  <span>Rutas de Viaje</span>
+                  <div className="w-4 h-1 bg-violet-500"></div>
+                  <span>Ruta del Viaje</span>
                 </div>
               </div>
 
