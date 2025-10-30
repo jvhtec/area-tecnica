@@ -134,17 +134,7 @@ export const useTourDocuments = (tourId: string) => {
     try {
       console.log('Generating URL for document:', document.file_name, 'at path:', document.file_path);
       
-      // Check if the bucket is public first by trying to get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('tour-documents')
-        .getPublicUrl(document.file_path);
-      
-      if (publicUrlData?.publicUrl) {
-        console.log('Using public URL:', publicUrlData.publicUrl);
-        return publicUrlData.publicUrl;
-      }
-
-      // Fallback to signed URL if public URL doesn't work
+      // Always use a signed URL since the bucket is private
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from('tour-documents')
         .createSignedUrl(document.file_path, 3600); // 1 hour expiry

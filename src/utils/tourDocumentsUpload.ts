@@ -41,11 +41,7 @@ export async function uploadTourPdfWithRecord(
     });
   if (dbError) throw dbError;
 
-  // Prefer public URL; fallback to signed
-  const { data: pub } = supabase.storage.from('tour-documents').getPublicUrl(objectPath);
-  if (pub?.publicUrl) {
-    return { file_path: objectPath, url: pub.publicUrl };
-  }
+  // Always return a signed URL (bucket is private)
   const { data: signed, error: sigErr } = await supabase.storage
     .from('tour-documents')
     .createSignedUrl(objectPath, 3600);
