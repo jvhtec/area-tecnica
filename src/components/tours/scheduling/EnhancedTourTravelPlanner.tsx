@@ -401,19 +401,19 @@ export const EnhancedTourTravelPlanner: React.FC<
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
               <div className="text-sm text-muted-foreground mb-1">
                 Total Segmentos
               </div>
               <div className="text-2xl font-bold">{travelPlan.length}</div>
             </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
               <div className="text-sm text-muted-foreground mb-1">
                 Distancia Total
               </div>
               <div className="text-2xl font-bold">{getTotalDistance()} km</div>
             </div>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div className="bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
               <div className="text-sm text-muted-foreground mb-1">
                 Tiempo Total
               </div>
@@ -421,7 +421,7 @@ export const EnhancedTourTravelPlanner: React.FC<
                 {Math.round(getTotalDuration() / 60)}h
               </div>
             </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
               <div className="text-sm text-muted-foreground mb-1">
                 Regresos a Casa
               </div>
@@ -589,7 +589,7 @@ export const EnhancedTourTravelPlanner: React.FC<
       )}
 
       {!canEdit && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
+        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-sm text-amber-700 dark:text-amber-300">
           ⚠ No tienes permisos para editar el plan de viajes
         </div>
       )}

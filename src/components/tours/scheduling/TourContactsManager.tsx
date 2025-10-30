@@ -237,10 +237,10 @@ export const TourContactsManager: React.FC<TourContactsManagerProps> = ({
           </p>
 
           {primaryContact && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
               <div className="flex items-center gap-2 mb-2">
-                <Star className="h-4 w-4 text-amber-600 fill-amber-600" />
-                <span className="font-medium text-amber-900">Contacto Principal</span>
+                <Star className="h-4 w-4 text-amber-600 dark:text-amber-400 fill-amber-600 dark:fill-amber-400" />
+                <span className="font-medium text-amber-900 dark:text-amber-100">Contacto Principal</span>
               </div>
               <div className="space-y-1">
                 <div className="font-semibold">{primaryContact.name}</div>
@@ -458,7 +458,7 @@ export const TourContactsManager: React.FC<TourContactsManagerProps> = ({
       </Dialog>
 
       {!canEdit && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
+        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-sm text-amber-700 dark:text-amber-300">
           ⚠ No tienes permisos para editar los contactos del tour
         </div>
       )}
