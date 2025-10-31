@@ -328,7 +328,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                   name: result.name,
                   address: result.address,
                   coordinates: result.coordinates,
-                  place_id: undefined, // PlaceAutocomplete doesn't provide place_id
+                  place_id: result.place_id,
                 });
               }}
               placeholder="Enter venue location"
