@@ -29,19 +29,6 @@ interface PredictionItem {
   formatted_address: string;
 }
 
-type PlaceSearchResponse = {
-  suggestions?: PredictionItem[];
-};
-
-type PlaceDetailsResponse = {
-  place?: {
-    place_id?: string;
-    name?: string;
-    formatted_address?: string;
-    coordinates?: { lat: number; lng: number };
-  };
-};
-
 export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   value,
   onSelect,
@@ -55,6 +42,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   const [suggestions, setSuggestions] = useState<PredictionItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<number | undefined>(undefined);
   const cacheRef = useRef<Record<string, PredictionItem[]>>({});
@@ -63,6 +51,28 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   useEffect(() => {
     setInputValue(value || '');
   }, [value]);
+
+  // Fetch Google Maps API key securely (with retry support)
+  const fetchApiKey = async (): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+      if (error) {
+        console.error('Failed to fetch Google Maps API key:', error);
+        return null;
+      }
+      if (data?.apiKey) {
+        setApiKey(data.apiKey);
+        return data.apiKey as string;
+      }
+    } catch (err) {
+      console.error('Error fetching API key:', err);
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    fetchApiKey();
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -75,8 +85,10 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   }, []);
 
   const searchPlaces = async (query: string) => {
-    if (!query || query.length < 2) {
-      console.log('PlacesAutocomplete: Search conditions not met:', { query, queryLength: query?.length || 0 });
+    // Ensure API key is available (retry on demand)
+    const key = apiKey || (await fetchApiKey());
+    if (!key || !query || query.length < 2) {
+      console.log('PlacesAutocomplete: Search conditions not met:', { hasApiKey: !!key, query, queryLength: query?.length || 0 });
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -96,23 +108,77 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     console.log('PlacesAutocomplete: Starting API search...');
 
     try {
-      const { data, error } = await supabase.functions.invoke<PlaceSearchResponse>('place-search', {
-        body: { type: 'search', query },
+      // Try Places Text Search first (good for establishments)
+      console.log('PlacesAutocomplete: Trying text search...');
+      const textSearchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': key,
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
+        },
+        body: JSON.stringify({
+          textQuery: query,
+          maxResultCount: 6,
+        }),
       });
 
-      if (error) {
-        console.error('PlacesAutocomplete: place-search function error:', error);
-        setSuggestions([]);
-        setShowSuggestions(false);
-        return;
+      console.log('PlacesAutocomplete: Text search response status:', textSearchRes.status);
+
+      if (textSearchRes.ok) {
+        const data = await textSearchRes.json();
+        console.log('PlacesAutocomplete: Text search data:', data);
+        if (data.places && data.places.length > 0) {
+          const results: PredictionItem[] = data.places.map((p: any) => ({
+            place_id: p.id,
+            name: p.displayName?.text || p.formattedAddress,
+            formatted_address: p.formattedAddress || '',
+          }));
+          console.log('PlacesAutocomplete: Text search results:', results);
+          cacheRef.current[query] = results;
+          setSuggestions(results);
+          setShowSuggestions(true);
+          setIsLoading(false);
+          return;
+        }
       }
 
-      const suggestions: PredictionItem[] = Array.isArray(data?.suggestions) ? data.suggestions : [];
-      console.log('PlacesAutocomplete: Received suggestions from edge function:', suggestions);
+      // Fallback to Autocomplete API for broader matches (establishments + addresses)
+      console.log('PlacesAutocomplete: Trying autocomplete...');
+      const acRes = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': key,
+          'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
+        },
+          body: JSON.stringify({
+            input: query,
+            maxResultCount: 6,
+          }),
+      });
 
-      cacheRef.current[query] = suggestions;
-      setSuggestions(suggestions);
-      setShowSuggestions(suggestions.length > 0);
+      console.log('PlacesAutocomplete: Autocomplete response status:', acRes.status);
+
+      if (acRes.ok) {
+        const data = await acRes.json();
+        console.log('PlacesAutocomplete: Autocomplete data:', data);
+        const results: PredictionItem[] = (data.suggestions || [])
+          .filter((s: any) => s.placePrediction)
+          .map((s: any) => ({
+            place_id: s.placePrediction.placeId,
+            name: s.placePrediction.structuredFormat?.mainText?.text || s.placePrediction.text?.text,
+            formatted_address: s.placePrediction.structuredFormat?.secondaryText?.text || '',
+          }));
+        console.log('PlacesAutocomplete: Autocomplete results:', results);
+        cacheRef.current[query] = results;
+        setSuggestions(results);
+        setShowSuggestions(results.length > 0);
+      } else {
+        console.error('Places Autocomplete API error:', acRes.status);
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
     } catch (e) {
       console.error('Error searching places:', e);
       setSuggestions([]);
@@ -126,27 +192,40 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   const getPlaceDetails = async (placeId: string, fallbackName: string, fallbackAddress?: string) => {
     console.log('PlacesAutocomplete: Getting place details for:', { placeId, fallbackName, fallbackAddress });
     
+    const key = apiKey || (await fetchApiKey());
+    if (!key) {
+      console.log('PlacesAutocomplete: No API key after retry, using fallback data');
+      onSelect({ name: fallbackName, address: fallbackAddress || '', place_id: placeId });
+      return;
+    }
+    
     try {
       onBusyChange?.(true);
-      const { data, error } = await supabase.functions.invoke<PlaceDetailsResponse>('place-search', {
-        body: { type: 'details', placeId },
+      const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
+        headers: {
+          'X-Goog-Api-Key': key,
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
+        },
       });
-
-      if (error) {
-        console.error('PlacesAutocomplete: place-search details error:', error);
-        throw error;
-      }
-
-      const place = data?.place;
-      console.log('PlacesAutocomplete: Place details data from edge function:', place);
-
+      
+      console.log('PlacesAutocomplete: Place details response status:', res.status);
+      
+      if (!res.ok) throw new Error(`Place Details API error: ${res.status}`);
+      
+      const place = await res.json();
+      console.log('PlacesAutocomplete: Place details data:', place);
+      
+      const coordinates = place.location
+        ? { lat: place.location.latitude, lng: place.location.longitude }
+        : undefined;
+        
       const result: PlaceAutocompleteResult = {
-        name: place?.name || fallbackName,
-        address: place?.formatted_address || fallbackAddress || '',
-        coordinates: place?.coordinates,
-        place_id: place?.place_id || placeId,
+        name: place.displayName?.text || fallbackName,
+        address: place.formattedAddress || fallbackAddress || '',
+        coordinates,
+        place_id: placeId,
       };
-
+      
       console.log('PlacesAutocomplete: Calling onSelect with:', result);
       onSelect(result);
       setInputValue(result.name);
@@ -195,7 +274,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
               e.stopPropagation();
             }
           }}
-          onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+          onFocus={() => { if (!apiKey) { fetchApiKey(); } if (suggestions.length > 0) setShowSuggestions(true); }}
         />
         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
