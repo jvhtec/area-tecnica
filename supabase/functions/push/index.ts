@@ -958,14 +958,22 @@ async function handleBroadcast(
     addRecipients([body.recipient_id]);
   } else if (type === 'logistics.transport.requested') {
     const department = (body as any)?.department as string | undefined;
+    const description = (body as any)?.description as string | undefined;
     const departmentLabel = department ? department.charAt(0).toUpperCase() + department.slice(1) : undefined;
     title = 'Transporte solicitado';
     const context = jobTitle ? ` en "${jobTitle}"` : '';
-    if (departmentLabel) {
+
+    // Build notification text with optional description
+    if (departmentLabel && description) {
+      text = `${actor} solicitó transporte para ${departmentLabel}${context}: ${description}`;
+    } else if (departmentLabel) {
       text = `${actor} solicitó transporte para ${departmentLabel}${context}.`;
+    } else if (description) {
+      text = `${actor} solicitó transporte${context}: ${description}`;
     } else {
       text = `${actor} solicitó transporte${context}.`;
     }
+
     const logisticsUrl = jobId ? `/jobs/${jobId}` : '/logistics';
     url = body.url || logisticsUrl;
     clearAllRecipients();
@@ -973,6 +981,7 @@ async function handleBroadcast(
     addNaturalRecipients(logisticsRecipients);
     metaExtras.view = 'logistics';
     metaExtras.department = department;
+    metaExtras.description = description;
     metaExtras.targetUrl = logisticsUrl;
   } else if (
     type === 'logistics.event.created'
