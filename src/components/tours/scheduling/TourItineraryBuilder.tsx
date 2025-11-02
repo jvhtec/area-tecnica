@@ -66,7 +66,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
     try {
       // First, try to find existing hoja de ruta for this tour date
       const { data: existingHoja, error: fetchError } = await supabase
-        .from('hoja_de_ruta')
+        .from('hoja_de_ruta' as any)
         .select('*')
         .eq('tour_date_id', selectedDateId)
         .maybeSingle();
@@ -76,11 +76,11 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
       }
 
       if (existingHoja) {
-        setHojaDeRuta(existingHoja);
+        setHojaDeRuta(existingHoja as any);
 
         // Load program schedule
-        if (existingHoja.program_schedule_json) {
-          setProgramSchedule(existingHoja.program_schedule_json);
+        if ((existingHoja as any).program_schedule_json) {
+          setProgramSchedule((existingHoja as any).program_schedule_json as any);
         } else {
           setProgramSchedule([{ label: 'Día 1', rows: [] }]);
         }
@@ -120,7 +120,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
       const hojaData = {
         job_id: job?.id || null,
         tour_date_id: selectedDateId,
-        program_schedule_json: programSchedule,
+        program_schedule_json: programSchedule as any,
         status: 'draft',
         last_modified: new Date().toISOString(),
       };
@@ -129,7 +129,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
         // Update existing
         const { error: updateError } = await supabase
           .from('hoja_de_ruta')
-          .update(hojaData)
+          .update(hojaData as any)
           .eq('id', hojaDeRuta.id);
 
         if (updateError) throw updateError;
@@ -137,7 +137,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
         // Create new
         const { data: newHoja, error: insertError } = await supabase
           .from('hoja_de_ruta')
-          .insert(hojaData)
+          .insert(hojaData as any)
           .select()
           .single();
 
@@ -170,11 +170,13 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
     try {
       const promises = sortedDates.map(async (date) => {
         // Check if hoja de ruta exists
-        const { data: existing } = await supabase
+        const result = await (supabase as any)
           .from('hoja_de_ruta')
           .select('id')
           .eq('tour_date_id', date.id)
           .maybeSingle();
+        
+        const { data: existing } = result;
 
         if (existing) return; // Skip if already exists
 

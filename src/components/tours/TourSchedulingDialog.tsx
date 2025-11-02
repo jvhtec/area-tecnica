@@ -98,7 +98,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
       // Load hoja de ruta records for each tour date
       const dateIds = tour.tour_dates?.map((d: any) => d.id) || [];
       const { data: hojaDeRutaRecords, error: hojaError } = await supabase
-        .from('hoja_de_ruta')
+        .from('hoja_de_ruta' as any)
         .select('*')
         .in('tour_date_id', dateIds);
 
