@@ -30,10 +30,8 @@ declare namespace google {
       isEmpty(): boolean;
     }
 
-    class LatLng {
-      constructor(lat: number, lng: number);
-      lat(): number;
-      lng(): number;
+    class Geocoder {
+      geocode(request: GeocoderRequest, callback: (results: GeocoderResult[], status: GeocoderStatus) => void): void;
     }
 
     interface LatLngLiteral {
@@ -41,12 +39,15 @@ declare namespace google {
       lng: number;
     }
 
+    interface LatLng extends LatLngLiteral {}
+
     interface MapOptions {
       zoom?: number;
       center?: LatLng | LatLngLiteral;
       mapTypeControl?: boolean;
       streetViewControl?: boolean;
       fullscreenControl?: boolean;
+      mapTypeId?: MapTypeId;
     }
 
     interface MarkerOptions {
@@ -55,6 +56,7 @@ declare namespace google {
       title?: string;
       icon?: any;
       label?: any;
+      draggable?: boolean;
     }
 
     interface InfoWindowOptions {
@@ -70,6 +72,30 @@ declare namespace google {
       map?: Map;
     }
 
+    interface GeocoderRequest {
+      location?: LatLng | LatLngLiteral;
+      address?: string;
+    }
+
+    interface GeocoderResult {
+      formatted_address: string;
+      geometry: {
+        location: LatLng;
+      };
+    }
+
+    enum GeocoderStatus {
+      OK = 'OK',
+      ERROR = 'ERROR',
+    }
+
+    enum MapTypeId {
+      ROADMAP = 'roadmap',
+      SATELLITE = 'satellite',
+      HYBRID = 'hybrid',
+      TERRAIN = 'terrain',
+    }
+
     enum SymbolPath {
       CIRCLE = 0,
       FORWARD_CLOSED_ARROW = 1,
@@ -77,9 +103,38 @@ declare namespace google {
       BACKWARD_CLOSED_ARROW = 3,
       BACKWARD_OPEN_ARROW = 4,
     }
+
+    namespace places {
+      class Autocomplete {
+        constructor(input: HTMLInputElement, opts?: AutocompleteOptions);
+        addListener(event: string, handler: Function): void;
+        getPlace(): PlaceResult;
+      }
+
+      interface AutocompleteOptions {
+        types?: string[];
+        fields?: string[];
+      }
+
+      interface PlaceResult {
+        formatted_address?: string;
+        name?: string;
+        geometry?: {
+          location: LatLng;
+        };
+      }
+    }
+
+    namespace event {
+      function addListener(instance: any, eventName: string, handler: Function): void;
+      function clearInstanceListeners(instance: any): void;
+    }
+
+    function importLibrary(name: string): Promise<any>;
   }
 }
 
 interface Window {
   google: typeof google;
+  initGoogleMaps?: () => void;
 }

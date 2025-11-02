@@ -13,12 +13,7 @@ interface GoogleMapProps {
   onStaticMapUrlChange?: (url: string) => void;
 }
 
-declare global {
-  interface Window {
-    google: any;
-    initGoogleMaps: () => void;
-  }
-}
+// Remove conflicting global type declaration - using typed definitions from src/types/google-maps.d.ts
 
 export const GoogleMap: React.FC<GoogleMapProps> = ({
   address,
