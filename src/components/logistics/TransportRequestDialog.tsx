@@ -35,6 +35,7 @@ export function TransportRequestDialog({
     { transport_type: 'trailer', leftover_space_meters: '' },
   ]);
   const [note, setNote] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -42,11 +43,12 @@ export function TransportRequestDialog({
       if (!requestId) return;
       const { data, error } = await supabase
         .from('transport_requests')
-        .select('id, note, items:transport_request_items(id, transport_type, leftover_space_meters)')
+        .select('id, note, description, items:transport_request_items(id, transport_type, leftover_space_meters)')
         .eq('id', requestId)
         .single();
       if (!error && data) {
         setNote(data.note || '');
+        setDescription((data as any).description || '');
         if (Array.isArray((data as any).items) && (data as any).items.length > 0) {
           const mapped = (data as any).items.map((it: any) => ({
             transport_type: it.transport_type,
@@ -71,6 +73,7 @@ export function TransportRequestDialog({
         job_id: jobId,
         department,
         note: note || null,
+        description: description || null,
         status: 'requested' as const,
         created_by: user.id,
       };
@@ -121,6 +124,7 @@ export function TransportRequestDialog({
               job_id: jobId,
               department,
               request_id,
+              description: description || undefined,
             },
           });
           if (pushError) {
@@ -146,6 +150,14 @@ export function TransportRequestDialog({
           <DialogTitle>{requestId ? 'Edit Transport Request' : 'Request Transport'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="E.g., Subrental pickup from ABC Rental, Return equipment to vendor"
+            />
+          </div>
           <div className="space-y-2">
             <Label>Vehicles</Label>
             <div className="space-y-2">

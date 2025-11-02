@@ -229,7 +229,7 @@ export function JobCardNew({
       if (!userDepartment || !['sound','lights','video'].includes(userDepartment)) return null;
       const { data, error } = await supabase
         .from('transport_requests')
-        .select('id, department, status, note, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
+        .select('id, department, status, note, description, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
         .eq('job_id', job.id)
         .eq('department', userDepartment)
         .order('created_at', { ascending: false })
@@ -246,7 +246,7 @@ export function JobCardNew({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('transport_requests')
-        .select('id, department, status, note, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
+        .select('id, department, status, note, description, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
         .eq('job_id', job.id)
         .eq('status', 'requested')
         .order('created_at', { ascending: false });
@@ -1043,7 +1043,8 @@ export function JobCardNew({
                           <div className="flex items-center justify-between">
                             <div>
                               <div className="font-medium capitalize">{req.department}</div>
-                              {req.note && <div className="text-xs text-muted-foreground">{req.note}</div>}
+                              {req.description && <div className="text-sm">{req.description}</div>}
+                              {req.note && <div className="text-xs text-muted-foreground italic">{req.note}</div>}
                             </div>
                             <button
                               className="px-3 py-1 text-sm rounded border hover:bg-accent"
