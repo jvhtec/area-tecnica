@@ -413,10 +413,11 @@ export function SubRentalManager() {
               <div className="space-y-2">
                 <Label>Link to Job (Optional)</Label>
                 <Select
-                  value={jobId}
+                  value={jobId || "none"}
                   onValueChange={(val) => {
-                    setJobId(val);
-                    if (val) {
+                    const newJobId = val === "none" ? "" : val;
+                    setJobId(newJobId);
+                    if (newJobId) {
                       setIsStockExtension(false); // If job is selected, it's not a stock extension
                     }
                   }}
@@ -425,7 +426,7 @@ export function SubRentalManager() {
                     <SelectValue placeholder="Select a job (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No job (stock extension)</SelectItem>
+                    <SelectItem value="none">No job (stock extension)</SelectItem>
                     {availableJobs?.map((job: any) => (
                       <SelectItem key={job.id} value={job.id}>
                         {job.title} - {job.event_date ? format(new Date(job.event_date), 'PPP') : 'No date'}
