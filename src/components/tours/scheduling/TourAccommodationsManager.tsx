@@ -112,14 +112,14 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
     setIsLoading(true);
     try {
       const { data, error } = await supabase
-        .from('tour_accommodations')
+        .from('tour_accommodations' as any)
         .select('*')
         .eq('tour_id', tourId)
         .order('check_in', { ascending: true });
 
       if (error) throw error;
 
-      setAccommodations(data || []);
+      setAccommodations(data as any || []);
     } catch (error: any) {
       console.error('Error loading accommodations:', error);
       toast({
@@ -217,7 +217,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
       if (editingAccommodation) {
         // Update existing accommodation
         const { error } = await supabase
-          .from('tour_accommodations')
+          .from('tour_accommodations' as any)
           .update(accommodationData)
           .eq('id', editingAccommodation.id);
 
@@ -230,7 +230,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
       } else {
         // Create new accommodation
         const { error } = await supabase
-          .from('tour_accommodations')
+          .from('tour_accommodations' as any)
           .insert([accommodationData]);
 
         if (error) throw error;
@@ -272,7 +272,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
 
     try {
       const { error } = await supabase
-        .from('tour_accommodations')
+        .from('tour_accommodations' as any)
         .delete()
         .eq('id', accommodationId);
 

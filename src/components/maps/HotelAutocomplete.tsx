@@ -6,11 +6,7 @@ import { MapPin, Building, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
-declare global {
-  interface Window {
-    google: any;
-  }
-}
+// Remove conflicting global type declaration - using typed definitions from src/types/google-maps.d.ts
 
 interface HotelAutocompleteProps {
   value: string;

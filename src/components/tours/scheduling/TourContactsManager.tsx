@@ -188,7 +188,7 @@ export const TourContactsManager: React.FC<TourContactsManagerProps> = ({
     try {
       const { error } = await supabase
         .from("tours")
-        .update({ tour_contacts: contacts })
+        .update({ tour_contacts: contacts } as any)
         .eq("id", tourId);
 
       if (error) throw error;

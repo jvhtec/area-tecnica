@@ -123,7 +123,7 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
 
       const { error } = await supabase
         .from("tours")
-        .update({ tour_settings: tourSettings })
+        .update({ tour_settings: tourSettings } as any)
         .eq("id", tourId);
 
       if (error) throw error;

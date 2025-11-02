@@ -106,7 +106,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
 
       // Load accommodations for the tour
       const { data: accommodationsData, error: accommodationsError } = await supabase
-        .from('tour_accommodations')
+        .from('tour_accommodations' as any)
         .select('*')
         .eq('tour_id', tourId);
 

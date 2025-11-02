@@ -304,7 +304,7 @@ export const EnhancedTourTravelPlanner: React.FC<
     try {
       const { error } = await supabase
         .from("tours")
-        .update({ travel_plan: travelPlan })
+        .update({ travel_plan: travelPlan } as any)
         .eq("id", tourId);
 
       if (error) throw error;

@@ -727,7 +727,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
               tour_id: tourId,
               tour_date_id: dateId,
               tour_name: tourData.name,
-              location_name: newLocation || updatedDate?.location?.name || '',
+              location_name: newLocation || (updatedDate?.location as any)?.name || '',
               old_type: editingTourDate.tour_date_type,
               new_type: tourDateType,
               url: `/tours/${tourId}`
