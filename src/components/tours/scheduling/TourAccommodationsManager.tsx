@@ -135,11 +135,13 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
   const loadStaff = async () => {
     try {
       // Load staff members from profiles who are active
-      const { data, error } = await supabase
+      const result = await (supabase as any)
         .from('profiles')
         .select('id, full_name, role')
         .eq('is_active', true)
         .order('full_name');
+      
+      const { data, error } = result;
 
       if (error) throw error;
 

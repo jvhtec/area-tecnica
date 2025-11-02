@@ -140,7 +140,7 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
 
     return () => {
       if (autocompleteRef.current) {
-        window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+        (window.google?.maps?.event as any)?.clearInstanceListeners?.(autocompleteRef.current);
       }
     };
   }, [apiKey, onChange, placeholder]);

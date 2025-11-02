@@ -72,7 +72,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
       script.async = true;
       script.defer = true;
       
-      window.initGoogleMaps = initializeMap;
+      (window as any).initGoogleMaps = initializeMap;
       script.onload = initializeMap;
       script.onerror = () => setError('Failed to load Google Maps');
       
