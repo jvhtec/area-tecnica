@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface SubRental {
   id: string;
@@ -36,6 +37,8 @@ interface SubRental {
   end_date: string;
   notes: string | null;
   created_by: string | null;
+  job_id?: string | null;
+  is_stock_extension?: boolean;
   equipment?: {
     name: string;
     category: string;
@@ -57,6 +60,9 @@ export function SubRentalManager() {
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [notes, setNotes] = useState('');
+  const [jobId, setJobId] = useState<string>('');
+  const [autoCreateTransport, setAutoCreateTransport] = useState(false);
+  const [isStockExtension, setIsStockExtension] = useState(false);
 
   // Realtime: refresh sub-rentals list and stock view when changes occur elsewhere
   useOptimizedTableSubscriptions([
@@ -72,7 +78,23 @@ export function SubRentalManager() {
         .select('*')
         .eq('department', department)
         .order('name');
-      
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Query for jobs that are available (not archived/cancelled) for linking
+  const { data: availableJobs } = useQuery({
+    queryKey: ['jobs-for-subrental', department],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('id, title, event_date, locations(name)')
+        .gte('event_date', format(new Date(), 'yyyy-MM-dd'))
+        .order('event_date', { ascending: true })
+        .limit(50);
+
       if (error) throw error;
       return data;
     }
@@ -139,26 +161,74 @@ export function SubRentalManager() {
         notes: notes || null,
         created_by: session.user.id,
         department: department,
-        batch_id: batchId
+        batch_id: batchId,
+        job_id: jobId || null,
+        is_stock_extension: isStockExtension,
       }));
 
-      const { error } = await supabase.from('sub_rentals').insert(payload);
+      const { data: insertedRentals, error } = await supabase
+        .from('sub_rentals')
+        .insert(payload)
+        .select('id');
 
       if (error) throw error;
+
+      // If auto-create transport is enabled and we have a job_id, create transport request
+      if (autoCreateTransport && jobId && insertedRentals && insertedRentals.length > 0) {
+        try {
+          const vendor_name = notes || 'Vendor';
+          const description = `Subrental pickup: ${vendor_name}`;
+
+          const { error: transportErr } = await supabase.functions.invoke('create-transport-request', {
+            body: {
+              job_id: jobId,
+              subrental_id: insertedRentals[0].id, // Use first item as reference
+              description: description,
+              department: department,
+              note: `Auto-created from sub-rental batch ${batchId}`,
+              auto_created: true,
+            },
+          });
+
+          if (transportErr) {
+            console.error('Failed to create transport request:', transportErr);
+            // Don't fail the entire operation, just log
+            toast({
+              title: "Warning",
+              description: "Sub-rental created but transport request failed. You can create it manually.",
+              variant: "default"
+            });
+          } else {
+            toast({
+              title: "Success",
+              description: "Sub-rental and transport request created successfully"
+            });
+          }
+        } catch (transportErr) {
+          console.error('Error creating transport request:', transportErr);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sub-rentals'] });
       queryClient.invalidateQueries({ queryKey: ['sub-rentals-week'] });
       queryClient.invalidateQueries({ queryKey: ['equipment-with-stock'] });
-      toast({
-        title: "Success",
-        description: "Sub-rental items added successfully"
-      });
+      queryClient.invalidateQueries({ queryKey: ['transport-requests-all'] });
+      // Only show success toast if we didn't already show one in the mutation
+      if (!autoCreateTransport || !jobId) {
+        toast({
+          title: "Success",
+          description: "Sub-rental items added successfully"
+        });
+      }
       // Reset form
       setItems([{ equipment_id: '', quantity: 1 }]);
       setStartDate(undefined);
       setEndDate(undefined);
       setNotes('');
+      setJobId('');
+      setAutoCreateTransport(false);
+      setIsStockExtension(false);
       setIsAdding(false);
     },
     onError: (error) => {
@@ -332,13 +402,69 @@ export function SubRentalManager() {
               </div>
 
               <div className="space-y-2">
-                <Label>Notes</Label>
+                <Label>Notes (Vendor/Provider)</Label>
                 <Textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="e.g., Rented from Company XYZ"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label>Link to Job (Optional)</Label>
+                <Select
+                  value={jobId}
+                  onValueChange={(val) => {
+                    setJobId(val);
+                    if (val) {
+                      setIsStockExtension(false); // If job is selected, it's not a stock extension
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a job (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No job (stock extension)</SelectItem>
+                    {availableJobs?.map((job: any) => (
+                      <SelectItem key={job.id} value={job.id}>
+                        {job.title} - {job.event_date ? format(new Date(job.event_date), 'PPP') : 'No date'}
+                        {job.locations?.name ? ` (${job.locations.name})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is-stock-extension"
+                  checked={isStockExtension}
+                  onCheckedChange={(checked) => {
+                    setIsStockExtension(checked as boolean);
+                    if (checked) {
+                      setJobId(''); // If stock extension, clear job
+                      setAutoCreateTransport(false); // Can't auto-create transport without job
+                    }
+                  }}
+                />
+                <Label htmlFor="is-stock-extension" className="text-sm font-normal cursor-pointer">
+                  Long-term stock extension (not tied to a specific job)
+                </Label>
+              </div>
+
+              {jobId && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="auto-transport"
+                    checked={autoCreateTransport}
+                    onCheckedChange={(checked) => setAutoCreateTransport(checked as boolean)}
+                  />
+                  <Label htmlFor="auto-transport" className="text-sm font-normal cursor-pointer">
+                    Automatically create transport request for this subrental
+                  </Label>
+                </div>
+              )}
 
               <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsAdding(false)} className="w-full sm:w-auto">

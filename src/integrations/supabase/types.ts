@@ -4805,6 +4805,8 @@ export type Database = {
           end_date: string
           equipment_id: string
           id: string
+          is_stock_extension: boolean
+          job_id: string | null
           notes: string | null
           quantity: number
           start_date: string
@@ -4818,6 +4820,8 @@ export type Database = {
           end_date: string
           equipment_id: string
           id?: string
+          is_stock_extension?: boolean
+          job_id?: string | null
           notes?: string | null
           quantity: number
           start_date: string
@@ -4831,6 +4835,8 @@ export type Database = {
           end_date?: string
           equipment_id?: string
           id?: string
+          is_stock_extension?: boolean
+          job_id?: string | null
           notes?: string | null
           quantity?: number
           start_date?: string
@@ -4857,6 +4863,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "equipment_availability_with_rentals"
             referencedColumns: ["equipment_id"]
+          },
+          {
+            foreignKeyName: "sub_rentals_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5866,6 +5879,7 @@ export type Database = {
           created_at: string
           created_by: string
           department: string
+          description: string | null
           fulfilled_by: string | null
           id: string
           job_id: string
@@ -5878,6 +5892,7 @@ export type Database = {
           created_at?: string
           created_by: string
           department: string
+          description?: string | null
           fulfilled_by?: string | null
           id?: string
           job_id: string
@@ -5890,6 +5905,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           department?: string
+          description?: string | null
           fulfilled_by?: string | null
           id?: string
           job_id?: string
