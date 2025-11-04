@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 type RecipientType = 'management_user' | 'department' | 'broadcast' | 'natural' | 'assigned_technicians';
@@ -103,6 +105,7 @@ export function PushNotificationMatrix() {
   const [users, setUsers] = useState<ManagementUser[]>([]);
   const [routesByEvent, setRoutesByEvent] = useState<Record<string, RouteRow[]>>({});
   const [pending, setPending] = useState<Set<string>>(new Set());
+  const [isOpen, setIsOpen] = useState(false);
 
   const pendingCount = pending.size;
 
@@ -322,33 +325,40 @@ export function PushNotificationMatrix() {
     void load();
   }, []);
 
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
-          <div>
-            <CardTitle>Push Routing Matrix</CardTitle>
-            <CardDescription>
-              Configure which management users, departments, and assigned technicians receive each event. Natural recipients toggle preserves default recipients.
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm min-w-0">
-            {pendingCount > 0 && (
-              <span className="text-muted-foreground">Saving {pendingCount}…</span>
-            )}
-            <Button variant="outline" size="sm" onClick={() => void load()} disabled={refreshing}>
-              {refreshing ? 'Refreshing…' : 'Refresh'}
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="p-4 text-sm text-muted-foreground">Loading…</div>
-        ) : (
-          <div>
-            {isMobile ? (
-              <div className="space-y-4">
+  if (isMobile) {
+    return (
+      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="fixed bottom-0 left-0 right-0 z-50">
+        <Card className="rounded-t-lg rounded-b-none border-x-0 border-b-0 shadow-lg">
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors pb-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-base">Push Routing Matrix</CardTitle>
+                  <CardDescription className="text-xs">
+                    {isOpen ? 'Configure notification routing' : 'Tap to configure notifications'}
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {pendingCount > 0 && (
+                    <span className="text-xs text-muted-foreground">Saving {pendingCount}…</span>
+                  )}
+                  {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
+                </div>
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="max-h-[70vh] overflow-y-auto pt-0">
+              {loading ? (
+                <div className="p-4 text-sm text-muted-foreground">Loading…</div>
+              ) : (
+                <div>
+                  <div className="flex justify-end mb-3">
+                    <Button variant="outline" size="sm" onClick={() => void load()} disabled={refreshing}>
+                      {refreshing ? 'Refreshing…' : 'Refresh'}
+                    </Button>
+                  </div>
+                  <div className="space-y-4">
                 {events.map((ev) => (
                   <div key={ev.code} className="rounded-md border p-3">
                     <div className="mb-2">
@@ -419,12 +429,49 @@ export function PushNotificationMatrix() {
                           </div>
                         </div>
                       )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
+            )}
+            {!isManagement && (
+              <p className="mt-3 text-xs text-muted-foreground">Viewing only — editing requires management role.</p>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+    );
+  }
+
+  // Desktop view
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+          <div>
+            <CardTitle>Push Routing Matrix</CardTitle>
+            <CardDescription>
+              Configure which management users, departments, and assigned technicians receive each event. Natural recipients toggle preserves default recipients.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm min-w-0">
+            {pendingCount > 0 && (
+              <span className="text-muted-foreground">Saving {pendingCount}…</span>
+            )}
+            <Button variant="outline" size="sm" onClick={() => void load()} disabled={refreshing}>
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="p-4 text-sm text-muted-foreground">Loading…</div>
+        ) : (
+          <div>
+            <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -500,7 +547,6 @@ export function PushNotificationMatrix() {
                   </TableBody>
                 </Table>
               </div>
-            )}
           </div>
         )}
         {!isManagement && (
