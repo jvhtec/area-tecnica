@@ -137,23 +137,23 @@ const Settings = () => {
   }, [subscription])
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 md:space-y-6 pb-4">
+      <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
         <h1 className="text-2xl font-semibold">Settings</h1>
-        <div className="flex gap-2">
-          <Button onClick={() => setImportUsersOpen(true)} variant="outline">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={() => setImportUsersOpen(true)} variant="outline" className="w-full sm:w-auto">
             <Upload className="mr-2 h-4 w-4" />
             Import Users
           </Button>
-          <Button onClick={() => setCreateUserOpen(true)}>
+          <Button onClick={() => setCreateUserOpen(true)} className="w-full sm:w-auto">
             <UserPlus className="mr-2 h-4 w-4" />
             Add User
           </Button>
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="space-y-6">
+      <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+        <div className="space-y-4 md:space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Push notifications</CardTitle>
@@ -206,12 +206,13 @@ const Settings = () => {
                     </Alert>
                   )}
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Button
                       onClick={() => {
                         void enable().catch(() => undefined);
                       }}
                       disabled={!showEnableButton || isEnabling}
+                      className="w-full"
                     >
                       {isEnabling ? 'Enabling…' : 'Enable push'}
                     </Button>
@@ -221,6 +222,7 @@ const Settings = () => {
                         void disable().catch(() => undefined);
                       }}
                       disabled={!hasSubscription || isDisabling || isInitializing}
+                      className="w-full"
                     >
                       {isDisabling ? 'Disabling…' : 'Disable push'}
                     </Button>
@@ -228,6 +230,7 @@ const Settings = () => {
                     variant="secondary"
                     onClick={handleTestNotification}
                     disabled={!hasSubscription || isInitializing}
+                    className="w-full"
                   >
                     <Bell className="mr-2 h-4 w-4" />
                     Send Test
@@ -237,6 +240,7 @@ const Settings = () => {
                     onClick={handleBackgroundTest}
                     disabled={!hasSubscription || isInitializing}
                     title="Schedules a test push in 5s so you can background the app"
+                    className="w-full"
                   >
                     Background test (5s)
                   </Button>
@@ -260,11 +264,11 @@ const Settings = () => {
                     <p className="break-words"><span className="font-medium">Endpoint:</span> {String(subInfo.endpoint).slice(0, 64)}…</p>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => void showLocalTest()} disabled={permission !== 'granted'}>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button variant="secondary" onClick={() => void showLocalTest()} disabled={permission !== 'granted'} className="w-full sm:w-auto">
                     Show local SW test
                   </Button>
-                  <Button variant="outline" onClick={async () => setSubInfo(await getSubscriptionInfo())}>
+                  <Button variant="outline" onClick={async () => setSubInfo(await getSubscriptionInfo())} className="w-full sm:w-auto">
                     Refresh subscription info
                   </Button>
                 </div>
@@ -314,7 +318,7 @@ const Settings = () => {
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Company Settings</CardTitle>
@@ -337,14 +341,14 @@ const Settings = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-muted-foreground">
                       Manage equipment models used in festival forms and gear setup.
                     </p>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">Department</span>
                       <select
-                        className="border rounded px-2 py-1 text-sm"
+                        className="border rounded px-3 py-2 text-sm min-w-[120px]"
                         value={modelsDepartment}
                         onChange={(e) => setModelsDepartment(e.target.value as Department)}
                       >
