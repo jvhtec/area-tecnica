@@ -588,7 +588,7 @@ const VideoConsumosTool: React.FC = () => {
             <div className="border rounded-lg p-4 bg-green-50">
               <h3 className="font-semibold mb-3 text-green-800">Tour Defaults (Read-Only)</h3>
               {defaultTables.map((table) => (
-                <div key={table.id} className="border rounded-lg overflow-hidden mt-4 bg-white">
+                <div key={table.id} className="border rounded-lg overflow-x-auto mt-4 bg-white">
                   <div className="bg-green-100 px-4 py-3 flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold">{table.name}</h4>
@@ -700,7 +700,7 @@ const VideoConsumosTool: React.FC = () => {
 
           
 
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border rounded-lg overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted">
                 <tr>
@@ -778,7 +778,7 @@ const VideoConsumosTool: React.FC = () => {
 
           {/* Updated tables section to show safety margin adjusted watts */}
           {tables.map((table) => (
-            <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
+            <div key={table.id} className="border rounded-lg overflow-x-auto mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold">{table.name}</h3>

@@ -215,7 +215,7 @@ const Festivals = () => {
   const emptyFunction = () => {};
 
   return (
-    <div className="max-w-7xl mx-auto space-y-4 md:space-y-6 p-4 md:p-0">
+    <div className="max-w-7xl mx-auto space-y-4 md:space-y-6 px-4 sm:px-6 py-4">
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0 pb-2">
           <div className="flex items-center gap-4">

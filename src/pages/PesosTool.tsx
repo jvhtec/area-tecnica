@@ -985,7 +985,7 @@ const PesosTool: React.FC = () => {
             </div>
           </div>
 
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border rounded-lg overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted">
                 <tr>
@@ -1124,7 +1124,7 @@ const PesosTool: React.FC = () => {
 
           {/* Table display with save as default option */}
           {tables.map((table) => (
-            <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
+            <div key={table.id} className="border rounded-lg overflow-x-auto mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold">{table.name}</h3>
