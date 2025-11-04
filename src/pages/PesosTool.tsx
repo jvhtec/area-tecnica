@@ -50,9 +50,6 @@ const soundComponentDatabase = [
   { id: 30, name: ' CABLEADO H ', weight: 250 },
 ];
   
-// Global counter for generating SX numbers.
-let soundTableCounter = 0;
-
 interface TableRow {
   quantity: string;
   componentId: string;
@@ -72,6 +69,7 @@ interface Table {
   defaultTableId?: string;
   overrideId?: string;
   isOverride?: boolean;
+  baseName?: string;
 }
 
 interface SummaryRow {
@@ -114,6 +112,49 @@ const PesosTool: React.FC = () => {
     name: '',
     rows: [{ quantity: '', componentId: '', weight: '' }],
   });
+
+  const deriveBaseName = (name: string) => {
+    const match = name.match(/^(.*?)(?:\s*\(.*\))?$/);
+    return match ? match[1].trim() : name;
+  };
+
+  const formatSuffixNumber = (value: number) => `SX${value.toString().padStart(2, '0')}`;
+
+  const assignSuffixes = (tablesToAssign: Table[]): Table[] => {
+    let counter = 1;
+    return tablesToAssign.map((table) => {
+      const baseName = table.baseName || deriveBaseName(table.name);
+
+      if (table.dualMotors) {
+        const suffixOne = formatSuffixNumber(counter++);
+        const suffixTwo = formatSuffixNumber(counter++);
+        const riggingPoints = `${suffixOne}, ${suffixTwo}`;
+        return {
+          ...table,
+          baseName,
+          name: `${baseName} (${riggingPoints})`,
+          riggingPoints,
+        };
+      }
+
+      const suffix = formatSuffixNumber(counter++);
+      return {
+        ...table,
+        baseName,
+        name: `${baseName} (${suffix})`,
+        riggingPoints: suffix,
+      };
+    });
+  };
+
+  const updateTablesState = (updater: (prev: Table[]) => Table[]): Table[] => {
+    let nextTables: Table[] = [];
+    setTables((prev) => {
+      nextTables = assignSuffixes(updater(prev));
+      return nextTables;
+    });
+    return nextTables;
+  };
 
   // Updated hooks for tour defaults
   const {
@@ -284,9 +325,10 @@ const PesosTool: React.FC = () => {
           clusterId: dt.metadata?.clusterId,
           dualMotors: dt.metadata?.dualMotors,
           riggingPoints: dt.metadata?.riggingPoints,
-          defaultTableId: dt.id
+          defaultTableId: dt.id,
+          baseName: dt.metadata?.baseName || deriveBaseName(dt.table_name)
         }));
-      setTables(convertedTables);
+      setTables(assignSuffixes(convertedTables));
     }
   }, [isDefaults, defaultTables]);
 
@@ -307,28 +349,15 @@ const PesosTool: React.FC = () => {
         clusterId: override.override_data?.tableData?.clusterId,
         dualMotors: override.override_data?.tableData?.dualMotors,
         riggingPoints: override.override_data?.tableData?.riggingPoints,
-        overrideId: override.id
+        overrideId: override.id,
+        baseName:
+          override.override_data?.tableData?.baseName ||
+          deriveBaseName(override.item_name)
       }));
-      setTables(convertedTables);
+      setTables(assignSuffixes(convertedTables));
     }
   }, [isTourDateContext, weightOverrides]);
 
-  // Helper to generate an SX suffix.
-  // Returns a string such as "SX01" or "SX01, SX02" depending on useDualMotors.
-  const getSuffix = () => {
-    // Since this is the PesosTool for sound department
-    if (useDualMotors) {
-      soundTableCounter++;
-      const num1 = soundTableCounter.toString().padStart(2, '0');
-      soundTableCounter++;
-      const num2 = soundTableCounter.toString().padStart(2, '0');
-      return `SX${num1}, SX${num2}`;
-    } else {
-      soundTableCounter++;
-      const num = soundTableCounter.toString().padStart(2, '0');
-      return `SX${num}`;
-    }
-  };
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -407,7 +436,8 @@ const PesosTool: React.FC = () => {
           metadata: {
             dualMotors: table.dualMotors,
             riggingPoints: table.riggingPoints,
-            clusterId: table.clusterId
+            clusterId: table.clusterId,
+            baseName: table.baseName
           }
         });
       }
@@ -449,7 +479,8 @@ const PesosTool: React.FC = () => {
           mirroredCluster: table.clusterId ? true : false,
           riggingPoints: table.riggingPoints,
           cablePick: cablePick,
-          cablePickWeight: cablePickWeight
+          cablePickWeight: cablePickWeight,
+          baseName: table.baseName
         },
         table_type: 'weight',
         total_value: table.totalWeight || 0,
@@ -458,7 +489,8 @@ const PesosTool: React.FC = () => {
           riggingPoints: table.riggingPoints,
           clusterId: table.clusterId,
           cablePick: cablePick,
-          cablePickWeight: cablePickWeight
+          cablePickWeight: cablePickWeight,
+          baseName: table.baseName
         }
       });
 
@@ -576,12 +608,10 @@ const PesosTool: React.FC = () => {
 
     if (mirroredCluster) {
       // For mirrored clusters, generate two tables sharing the same clusterId.
-      const leftSuffix = getSuffix();
-      const rightSuffix = getSuffix();
-
       const leftTable: Table = {
-        name: `${tableName} L (${leftSuffix})`,
-        riggingPoints: leftSuffix,
+        name: `${tableName} L`,
+        baseName: `${tableName} L`,
+        riggingPoints: '',
         rows: calculatedRows,
         totalWeight,
         id: Date.now(),
@@ -590,8 +620,9 @@ const PesosTool: React.FC = () => {
       };
 
       const rightTable: Table = {
-        name: `${tableName} R (${rightSuffix})`,
-        riggingPoints: rightSuffix,
+        name: `${tableName} R`,
+        baseName: `${tableName} R`,
+        riggingPoints: '',
         rows: calculatedRows,
         totalWeight,
         id: Date.now() + 1,
@@ -602,10 +633,10 @@ const PesosTool: React.FC = () => {
       tablesToCreate = [leftTable, rightTable];
     } else {
       // Single table with suffix generation
-      const suffix = getSuffix();
       const newTable: Table = {
-        name: `${tableName} (${suffix})`,
-        riggingPoints: suffix,
+        name: tableName,
+        baseName: tableName,
+        riggingPoints: '',
         rows: calculatedRows,
         totalWeight,
         id: Date.now(),
@@ -616,15 +647,23 @@ const PesosTool: React.FC = () => {
       tablesToCreate = [newTable];
     }
 
-    // Add all tables to state
-    setTables((prev) => [...prev, ...tablesToCreate]);
+    if (isTourDateContext || isJobOverrideMode) {
+      tablesToCreate = tablesToCreate.map((table) => ({ ...table, isOverride: true }));
+    }
+
+    const newTableIds = tablesToCreate.map((table) => table.id ?? 0);
+
+    // Add all tables to state with recalculated suffixes
+    const updatedTables = updateTablesState((prev) => [...prev, ...tablesToCreate]);
+    const createdTablesWithSuffixes = updatedTables.filter((table) =>
+      newTableIds.includes(table.id ?? 0)
+    );
 
     // Handle saving based on mode
-    tablesToCreate.forEach(table => {
+    createdTablesWithSuffixes.forEach(table => {
       if (isTourDefaults) {
         saveAsTourDefaults(table);
       } else if (isTourDateContext || isJobOverrideMode) {
-        table.isOverride = true;
         saveAsOverride(table);
       }
       // For regular defaults mode, tables are just saved to local state
@@ -644,7 +683,7 @@ const PesosTool: React.FC = () => {
   };
 
   const removeTable = (tableId: number) => {
-    setTables((prev) => prev.filter((table) => table.id !== tableId));
+    updateTablesState((prev) => prev.filter((table) => table.id !== tableId));
   };
 
   const handleExportPDF = async () => {
