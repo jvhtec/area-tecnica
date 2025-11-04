@@ -1050,8 +1050,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 h-[60vh] md:h-[60vh] px-4 md:px-6">
-          <div className="space-y-3 md:space-y-4 py-4">
+        <ScrollArea className="flex-1 overflow-auto px-4 md:px-6">
+          <div className="space-y-3 md:space-y-4 py-4 pb-6">
             {/* Bulk folders button removed; availability moved to Team Assignments */}
             
             <div className="space-y-4">
