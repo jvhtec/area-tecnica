@@ -26,6 +26,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   // Keep dialog mounted even if user becomes null to avoid portal teardown race conditions
   const [assignableAsTech, setAssignableAsTech] = useState<boolean>(!!user?.assignable_as_tech);
   const [soundvisionAccessEnabled, setSoundvisionAccessEnabled] = useState<boolean>(!!user?.soundvision_access_enabled);
+  const [isAutonomo, setIsAutonomo] = useState<boolean>(user?.autonomo !== false);
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const [flexUrl, setFlexUrl] = useState<string>("");
@@ -38,6 +39,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     setSoundvisionAccessEnabled(forceSoundvisionForHouseTech ? true : !!user?.soundvision_access_enabled);
     setFlexResourceId(user?.flex_resource_id || "");
     setFlexUrl("");
+    setIsAutonomo(user?.autonomo !== false);
   }, [user?.id]);
 
   const isSoundTechnician = user?.department === 'sound' && user?.role === 'technician';
@@ -83,6 +85,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       assignable_as_tech: assignableAsTech,
       flex_resource_id: (formData.get('flex_resource_id') as string || flexResourceId || '').trim() || null,
       soundvision_access_enabled: forceSoundvisionAccess ? true : soundvisionAccessEnabled,
+      autonomo: isAutonomo,
     };
 
     console.log("Submitting user update with data:", updatedData);
@@ -273,6 +276,23 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
                 </SelectContent>
               </Select>
             </div>
+            {user?.role === 'technician' && (
+              <div className="space-y-2">
+                <Label htmlFor="autonomo">Autónomo (Self-employed)</Label>
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="autonomo"
+                    checked={isAutonomo}
+                    onCheckedChange={(v) => setIsAutonomo(!!v)}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {isAutonomo 
+                      ? 'Technician is autonomous (standard rates apply)' 
+                      : 'Not autonomous (€30/day discount applied)'}
+                  </span>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="dni">DNI/NIE</Label>
               <Input

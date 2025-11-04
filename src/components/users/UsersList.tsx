@@ -81,7 +81,7 @@ export const UsersList = ({
       try {
         let query = supabase
           .from('profiles')
-          .select('id, first_name, nickname, last_name, email, role, phone, department, dni, residencia, assignable_as_tech, flex_resource_id, soundvision_access_enabled', { count: 'exact' });
+          .select('id, first_name, nickname, last_name, email, role, phone, department, dni, residencia, assignable_as_tech, flex_resource_id, soundvision_access_enabled, autonomo', { count: 'exact' });
 
         // Apply filters
         if (roleFilter) {
