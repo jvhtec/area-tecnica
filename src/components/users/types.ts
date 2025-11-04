@@ -14,4 +14,5 @@ export type Profile = {
   assignable_as_tech?: boolean | null;
   flex_resource_id?: string | null;
   soundvision_access_enabled?: boolean | null;
+  autonomo?: boolean | null;
 };

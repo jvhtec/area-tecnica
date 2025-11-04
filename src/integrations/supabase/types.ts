@@ -1877,75 +1877,99 @@ export type Database = {
       }
       hoja_de_ruta: {
         Row: {
+          alerts: Json | null
           approved_at: string | null
           approved_by: string | null
           auxiliary_needs: string | null
           created_at: string | null
           created_by: string | null
+          crew_calls: Json | null
           document_version: number | null
           event_dates: string | null
           event_name: string | null
+          hotel_info: Json | null
           id: string
           job_id: string | null
           last_modified: string | null
           last_modified_by: string | null
+          local_contacts: Json | null
+          logistics_info: Json | null
           power_requirements: string | null
           program_schedule_json: Json | null
+          restaurants_info: Json | null
           schedule: string | null
           status: string | null
+          tour_date_id: string | null
           updated_at: string | null
           venue_address: string | null
           venue_latitude: number | null
           venue_longitude: number | null
           venue_name: string | null
+          venue_technical_specs: Json | null
           weather_data: Json | null
         }
         Insert: {
+          alerts?: Json | null
           approved_at?: string | null
           approved_by?: string | null
           auxiliary_needs?: string | null
           created_at?: string | null
           created_by?: string | null
+          crew_calls?: Json | null
           document_version?: number | null
           event_dates?: string | null
           event_name?: string | null
+          hotel_info?: Json | null
           id?: string
           job_id?: string | null
           last_modified?: string | null
           last_modified_by?: string | null
+          local_contacts?: Json | null
+          logistics_info?: Json | null
           power_requirements?: string | null
           program_schedule_json?: Json | null
+          restaurants_info?: Json | null
           schedule?: string | null
           status?: string | null
+          tour_date_id?: string | null
           updated_at?: string | null
           venue_address?: string | null
           venue_latitude?: number | null
           venue_longitude?: number | null
           venue_name?: string | null
+          venue_technical_specs?: Json | null
           weather_data?: Json | null
         }
         Update: {
+          alerts?: Json | null
           approved_at?: string | null
           approved_by?: string | null
           auxiliary_needs?: string | null
           created_at?: string | null
           created_by?: string | null
+          crew_calls?: Json | null
           document_version?: number | null
           event_dates?: string | null
           event_name?: string | null
+          hotel_info?: Json | null
           id?: string
           job_id?: string | null
           last_modified?: string | null
           last_modified_by?: string | null
+          local_contacts?: Json | null
+          logistics_info?: Json | null
           power_requirements?: string | null
           program_schedule_json?: Json | null
+          restaurants_info?: Json | null
           schedule?: string | null
           status?: string | null
+          tour_date_id?: string | null
           updated_at?: string | null
           venue_address?: string | null
           venue_latitude?: number | null
           venue_longitude?: number | null
           venue_name?: string | null
+          venue_technical_specs?: Json | null
           weather_data?: Json | null
         }
         Relationships: [
@@ -1975,6 +1999,13 @@ export type Database = {
             columns: ["last_modified_by"]
             isOneToOne: false
             referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_de_ruta_tour_date_id_fkey"
+            columns: ["tour_date_id"]
+            isOneToOne: false
+            referencedRelation: "tour_dates"
             referencedColumns: ["id"]
           },
         ]
@@ -2668,7 +2699,6 @@ export type Database = {
           job_id: string
           lights_role: string | null
           response_time: string | null
-          single_day_date: string | null
           single_day: boolean
           sound_role: string | null
           status: Database["public"]["Enums"]["assignment_status"] | null
@@ -2683,7 +2713,6 @@ export type Database = {
           job_id: string
           lights_role?: string | null
           response_time?: string | null
-          single_day_date?: string | null
           single_day?: boolean
           sound_role?: string | null
           status?: Database["public"]["Enums"]["assignment_status"] | null
@@ -2698,7 +2727,6 @@ export type Database = {
           job_id?: string
           lights_role?: string | null
           response_time?: string | null
-          single_day_date?: string | null
           single_day?: boolean
           sound_role?: string | null
           status?: Database["public"]["Enums"]["assignment_status"] | null
@@ -4111,6 +4139,7 @@ export type Database = {
       profiles: {
         Row: {
           assignable_as_tech: boolean
+          autonomo: boolean
           created_at: string
           custom_folder_structure: Json | null
           custom_tour_folder_structure: Json | null
@@ -4140,6 +4169,7 @@ export type Database = {
         }
         Insert: {
           assignable_as_tech?: boolean
+          autonomo?: boolean
           created_at?: string
           custom_folder_structure?: Json | null
           custom_tour_folder_structure?: Json | null
@@ -4169,6 +4199,7 @@ export type Database = {
         }
         Update: {
           assignable_as_tech?: boolean
+          autonomo?: boolean
           created_at?: string
           custom_folder_structure?: Json | null
           custom_tour_folder_structure?: Json | null
@@ -4805,7 +4836,7 @@ export type Database = {
           end_date: string
           equipment_id: string
           id: string
-          is_stock_extension: boolean
+          is_stock_extension: boolean | null
           job_id: string | null
           notes: string | null
           quantity: number
@@ -4820,7 +4851,7 @@ export type Database = {
           end_date: string
           equipment_id: string
           id?: string
-          is_stock_extension?: boolean
+          is_stock_extension?: boolean | null
           job_id?: string | null
           notes?: string | null
           quantity: number
@@ -4835,7 +4866,7 @@ export type Database = {
           end_date?: string
           equipment_id?: string
           id?: string
-          is_stock_extension?: boolean
+          is_stock_extension?: boolean | null
           job_id?: string | null
           notes?: string | null
           quantity?: number
@@ -4870,6 +4901,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_rentals_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -5199,6 +5237,135 @@ export type Database = {
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_accommodations: {
+        Row: {
+          breakfast_included: boolean | null
+          check_in_date: string
+          check_out_date: string
+          confirmation_number: string | null
+          created_at: string | null
+          created_by: string | null
+          hotel_address: string | null
+          hotel_email: string | null
+          hotel_name: string
+          hotel_phone: string | null
+          hotel_website: string | null
+          id: string
+          latitude: number | null
+          location_id: string | null
+          longitude: number | null
+          notes: string | null
+          parking_available: boolean | null
+          rate_per_room_eur: number | null
+          room_allocation: Json | null
+          room_type: string | null
+          rooms_booked: number | null
+          special_requests: string | null
+          status: string | null
+          total_cost_eur: number | null
+          tour_date_id: string | null
+          tour_id: string
+          updated_at: string | null
+          wifi_available: boolean | null
+        }
+        Insert: {
+          breakfast_included?: boolean | null
+          check_in_date: string
+          check_out_date: string
+          confirmation_number?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          hotel_address?: string | null
+          hotel_email?: string | null
+          hotel_name: string
+          hotel_phone?: string | null
+          hotel_website?: string | null
+          id?: string
+          latitude?: number | null
+          location_id?: string | null
+          longitude?: number | null
+          notes?: string | null
+          parking_available?: boolean | null
+          rate_per_room_eur?: number | null
+          room_allocation?: Json | null
+          room_type?: string | null
+          rooms_booked?: number | null
+          special_requests?: string | null
+          status?: string | null
+          total_cost_eur?: number | null
+          tour_date_id?: string | null
+          tour_id: string
+          updated_at?: string | null
+          wifi_available?: boolean | null
+        }
+        Update: {
+          breakfast_included?: boolean | null
+          check_in_date?: string
+          check_out_date?: string
+          confirmation_number?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          hotel_address?: string | null
+          hotel_email?: string | null
+          hotel_name?: string
+          hotel_phone?: string | null
+          hotel_website?: string | null
+          id?: string
+          latitude?: number | null
+          location_id?: string | null
+          longitude?: number | null
+          notes?: string | null
+          parking_available?: boolean | null
+          rate_per_room_eur?: number | null
+          room_allocation?: Json | null
+          room_type?: string | null
+          rooms_booked?: number | null
+          special_requests?: string | null
+          status?: string | null
+          total_cost_eur?: number | null
+          tour_date_id?: string | null
+          tour_id?: string
+          updated_at?: string | null
+          wifi_available?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_accommodations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_accommodations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_accommodations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_accommodations_tour_date_id_fkey"
+            columns: ["tour_date_id"]
+            isOneToOne: false
+            referencedRelation: "tour_dates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_accommodations_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
             referencedColumns: ["id"]
           },
         ]
@@ -5672,6 +5839,293 @@ export type Database = {
           },
         ]
       }
+      tour_schedule_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          default_crew_calls: Json | null
+          default_schedule: Json
+          default_timing: Json | null
+          description: string | null
+          id: string
+          is_global: boolean | null
+          name: string
+          template_type: string
+          tour_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          default_crew_calls?: Json | null
+          default_schedule: Json
+          default_timing?: Json | null
+          description?: string | null
+          id?: string
+          is_global?: boolean | null
+          name: string
+          template_type: string
+          tour_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          default_crew_calls?: Json | null
+          default_schedule?: Json
+          default_timing?: Json | null
+          description?: string | null
+          id?: string
+          is_global?: boolean | null
+          name?: string
+          template_type?: string
+          tour_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_schedule_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_schedule_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_schedule_templates_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_timeline_events: {
+        Row: {
+          all_day: boolean | null
+          created_at: string | null
+          created_by: string | null
+          date: string
+          departments: string[] | null
+          description: string | null
+          end_time: string | null
+          event_type: string
+          id: string
+          location_details: string | null
+          location_id: string | null
+          metadata: Json | null
+          start_time: string | null
+          timezone: string | null
+          title: string
+          tour_id: string
+          updated_at: string | null
+          visible_to_crew: boolean | null
+        }
+        Insert: {
+          all_day?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          date: string
+          departments?: string[] | null
+          description?: string | null
+          end_time?: string | null
+          event_type: string
+          id?: string
+          location_details?: string | null
+          location_id?: string | null
+          metadata?: Json | null
+          start_time?: string | null
+          timezone?: string | null
+          title: string
+          tour_id: string
+          updated_at?: string | null
+          visible_to_crew?: boolean | null
+        }
+        Update: {
+          all_day?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          departments?: string[] | null
+          description?: string | null
+          end_time?: string | null
+          event_type?: string
+          id?: string
+          location_details?: string | null
+          location_id?: string | null
+          metadata?: Json | null
+          start_time?: string | null
+          timezone?: string | null
+          title?: string
+          tour_id?: string
+          updated_at?: string | null
+          visible_to_crew?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_timeline_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_timeline_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_timeline_events_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_timeline_events_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_travel_segments: {
+        Row: {
+          actual_cost_eur: number | null
+          arrival_time: string | null
+          carrier_name: string | null
+          created_at: string | null
+          created_by: string | null
+          crew_manifest: Json | null
+          departure_time: string | null
+          distance_km: number | null
+          estimated_cost_eur: number | null
+          estimated_duration_minutes: number | null
+          from_location_id: string | null
+          from_tour_date_id: string | null
+          id: string
+          luggage_truck: boolean | null
+          route_notes: string | null
+          status: string | null
+          stops: Json | null
+          to_location_id: string | null
+          to_tour_date_id: string | null
+          tour_id: string
+          transportation_type: string
+          updated_at: string | null
+          vehicle_details: Json | null
+        }
+        Insert: {
+          actual_cost_eur?: number | null
+          arrival_time?: string | null
+          carrier_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_manifest?: Json | null
+          departure_time?: string | null
+          distance_km?: number | null
+          estimated_cost_eur?: number | null
+          estimated_duration_minutes?: number | null
+          from_location_id?: string | null
+          from_tour_date_id?: string | null
+          id?: string
+          luggage_truck?: boolean | null
+          route_notes?: string | null
+          status?: string | null
+          stops?: Json | null
+          to_location_id?: string | null
+          to_tour_date_id?: string | null
+          tour_id: string
+          transportation_type: string
+          updated_at?: string | null
+          vehicle_details?: Json | null
+        }
+        Update: {
+          actual_cost_eur?: number | null
+          arrival_time?: string | null
+          carrier_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_manifest?: Json | null
+          departure_time?: string | null
+          distance_km?: number | null
+          estimated_cost_eur?: number | null
+          estimated_duration_minutes?: number | null
+          from_location_id?: string | null
+          from_tour_date_id?: string | null
+          id?: string
+          luggage_truck?: boolean | null
+          route_notes?: string | null
+          status?: string | null
+          stops?: Json | null
+          to_location_id?: string | null
+          to_tour_date_id?: string | null
+          tour_id?: string
+          transportation_type?: string
+          updated_at?: string | null
+          vehicle_details?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_travel_segments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_travel_segments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_travel_segments_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_travel_segments_from_tour_date_id_fkey"
+            columns: ["from_tour_date_id"]
+            isOneToOne: false
+            referencedRelation: "tour_dates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_travel_segments_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_travel_segments_to_tour_date_id_fkey"
+            columns: ["to_tour_date_id"]
+            isOneToOne: false
+            referencedRelation: "tour_dates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_travel_segments_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tour_week_multipliers_2025: {
         Row: {
           max_dates: number
@@ -5739,6 +6193,7 @@ export type Database = {
           color: string | null
           created_at: string
           created_by: string | null
+          default_timezone: string | null
           deleted: boolean | null
           description: string | null
           end_date: string | null
@@ -5762,13 +6217,18 @@ export type Database = {
           rates_approved: boolean
           rates_approved_at: string | null
           rates_approved_by: string | null
+          scheduling_preferences: Json | null
           start_date: string | null
           status: string
+          tour_contacts: Json | null
+          tour_settings: Json | null
+          travel_plan: Json | null
         }
         Insert: {
           color?: string | null
           created_at?: string
           created_by?: string | null
+          default_timezone?: string | null
           deleted?: boolean | null
           description?: string | null
           end_date?: string | null
@@ -5792,13 +6252,18 @@ export type Database = {
           rates_approved?: boolean
           rates_approved_at?: string | null
           rates_approved_by?: string | null
+          scheduling_preferences?: Json | null
           start_date?: string | null
           status?: string
+          tour_contacts?: Json | null
+          tour_settings?: Json | null
+          travel_plan?: Json | null
         }
         Update: {
           color?: string | null
           created_at?: string
           created_by?: string | null
+          default_timezone?: string | null
           deleted?: boolean | null
           description?: string | null
           end_date?: string | null
@@ -5822,8 +6287,12 @@ export type Database = {
           rates_approved?: boolean
           rates_approved_at?: string | null
           rates_approved_by?: string | null
+          scheduling_preferences?: Json | null
           start_date?: string | null
           status?: string
+          tour_contacts?: Json | null
+          tour_settings?: Json | null
+          travel_plan?: Json | null
         }
         Relationships: [
           {
@@ -6567,6 +7036,10 @@ export type Database = {
         Args: { job_id: string }
         Returns: undefined
       }
+      dreamlit_auth_admin_executor: {
+        Args: { command: string }
+        Returns: undefined
+      }
       extras_total_for_job_tech: {
         Args: { _job_id: string; _tech_id: string }
         Returns: Json
@@ -6681,6 +7154,18 @@ export type Database = {
           technician_id: string
           updated_at: string
         }[]
+      }
+      get_tour_complete_timeline: {
+        Args: { p_tour_id: string }
+        Returns: {
+          event_data: Json
+          event_date: string
+          event_type: string
+        }[]
+      }
+      get_tour_date_complete_info: {
+        Args: { p_tour_date_id: string }
+        Returns: Json
       }
       get_user_job_ids: {
         Args: { user_uuid: string }
@@ -6814,14 +7299,14 @@ export type Database = {
         | "assignments"
         | "form_submissions"
         | "gear_movements"
+      project_status: "pending" | "in_progress" | "completed" | "cancelled"
+      provider_type: "festival" | "band" | "mixed"
       push_notification_recipient_type:
         | "management_user"
         | "department"
         | "broadcast"
         | "natural"
         | "assigned_technicians"
-      project_status: "pending" | "in_progress" | "completed" | "cancelled"
-      provider_type: "festival" | "band" | "mixed"
       room_type: "single" | "double"
       task_status: "not_started" | "in_progress" | "completed"
       timesheet_status: "draft" | "submitted" | "approved"
@@ -7029,6 +7514,13 @@ export const Constants = {
       ],
       project_status: ["pending", "in_progress", "completed", "cancelled"],
       provider_type: ["festival", "band", "mixed"],
+      push_notification_recipient_type: [
+        "management_user",
+        "department",
+        "broadcast",
+        "natural",
+        "assigned_technicians",
+      ],
       room_type: ["single", "double"],
       task_status: ["not_started", "in_progress", "completed"],
       timesheet_status: ["draft", "submitted", "approved"],
