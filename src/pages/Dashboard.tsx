@@ -151,7 +151,7 @@ const Dashboard = () => {
   const selectedDateJobs = getSelectedDateJobs(date, jobs);
 
   return (
-    <div className="space-y-4 md:space-y-8 w-full max-w-full">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-4 md:space-y-8">
       <DashboardHeader timeSpan={timeSpan} onTimeSpanChange={setTimeSpan} />
 
       {userRole === "management" && (
