@@ -327,7 +327,7 @@ export function PushNotificationMatrix() {
 
   if (isMobile) {
     return (
-      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="fixed bottom-0 left-0 right-0 z-50">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-30">
         <Card className="rounded-t-lg rounded-b-none border-x-0 border-b-0 shadow-lg">
           <CollapsibleTrigger asChild>
             <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors pb-3">
@@ -348,7 +348,7 @@ export function PushNotificationMatrix() {
             </CardHeader>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="max-h-[70vh] overflow-y-auto pt-0">
+            <CardContent className="max-h-[60vh] overflow-y-auto pt-0">
               {loading ? (
                 <div className="p-4 text-sm text-muted-foreground">Loading…</div>
               ) : (
