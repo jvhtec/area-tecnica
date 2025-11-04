@@ -137,7 +137,7 @@ const Settings = () => {
   }, [subscription])
 
   return (
-    <div className="space-y-4 md:space-y-6 pb-4">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-4 md:space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
         <h1 className="text-2xl font-semibold">Settings</h1>
         <div className="flex flex-col sm:flex-row gap-2">

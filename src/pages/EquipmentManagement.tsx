@@ -85,7 +85,7 @@ export function EquipmentManagement() {
 
   if (!userDepartment) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="container mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center gap-4 mb-6">
           <Button 
             variant="ghost" 
@@ -108,7 +108,7 @@ export function EquipmentManagement() {
   }
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto px-4 sm:px-6 py-6">
       <div className="flex items-center gap-4 mb-6">
         <Button 
           variant="ghost" 
