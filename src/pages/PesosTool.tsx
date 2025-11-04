@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, ArrowLeft, Save } from 'lucide-react';
+import { FileText, ArrowLeft, Save, Trash2 } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
@@ -335,6 +335,16 @@ const PesosTool: React.FC = () => {
       ...prev,
       rows: [...prev.rows, { quantity: '', componentId: '', weight: '' }],
     }));
+  };
+
+  const removeRow = (index: number) => {
+    setCurrentTable((prev) => {
+      const filteredRows = prev.rows.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        rows: filteredRows.length > 0 ? filteredRows : [{ quantity: '', componentId: '', weight: '' }],
+      };
+    });
   };
 
   const updateInput = (index: number, field: keyof TableRow, value: string) => {
@@ -943,6 +953,7 @@ const PesosTool: React.FC = () => {
                   <th className="px-4 py-3 text-left font-medium">Quantity</th>
                   <th className="px-4 py-3 text-left font-medium">Component</th>
                   <th className="px-4 py-3 text-left font-medium">Weight (per unit)</th>
+                  <th className="w-12 px-4 py-3 text-left font-medium">&nbsp;</th>
                 </tr>
               </thead>
               <tbody>
@@ -976,6 +987,18 @@ const PesosTool: React.FC = () => {
                     </td>
                     <td className="p-4">
                       <Input type="number" value={row.weight} readOnly className="w-full bg-muted" />
+                    </td>
+                    <td className="p-4">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeRow(index)}
+                        className="text-destructive hover:text-destructive"
+                        aria-label="Delete row"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </td>
                   </tr>
                 ))}
