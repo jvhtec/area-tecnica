@@ -157,6 +157,16 @@ const ConsumosTool: React.FC = () => {
     }));
   };
 
+  const removeRow = (index: number) => {
+    setCurrentTable((prev) => {
+      const filteredRows = prev.rows.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        rows: filteredRows.length > 0 ? filteredRows : [{ quantity: '', componentId: '', watts: '' }],
+      };
+    });
+  };
+
   const updateInput = (index: number, field: keyof TableRow, value: string) => {
     const newRows = [...currentTable.rows];
     if (field === 'componentId' && value) {
@@ -855,6 +865,7 @@ const ConsumosTool: React.FC = () => {
                     <th className="px-4 py-3 text-left font-medium text-sm">Quantity</th>
                     <th className="px-4 py-3 text-left font-medium text-sm">Component</th>
                     <th className="px-4 py-3 text-left font-medium text-sm">Watts (per unit)</th>
+                    <th className="w-12 px-4 py-3 text-left font-medium text-sm">&nbsp;</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -889,8 +900,20 @@ const ConsumosTool: React.FC = () => {
                       <td className="p-4">
                         <Input type="number" value={row.watts} readOnly className="w-full min-w-[120px] bg-muted" />
                       </td>
-                    </tr>
-                  ))}
+                      <td className="p-4">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeRow(index)}
+                          className="text-destructive hover:text-destructive"
+                          aria-label="Delete row"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                  </tr>
+                ))}
                 </tbody>
               </table>
             </div>

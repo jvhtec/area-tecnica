@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, ArrowLeft } from 'lucide-react';
+import { FileText, ArrowLeft, Trash2 } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
@@ -157,6 +157,16 @@ const LightsConsumosTool: React.FC = () => {
       ...prev,
       rows: [...prev.rows, { quantity: '', componentId: '', watts: '' }],
     }));
+  };
+
+  const removeRow = (index: number) => {
+    setCurrentTable((prev) => {
+      const filteredRows = prev.rows.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        rows: filteredRows.length > 0 ? filteredRows : [{ quantity: '', componentId: '', watts: '' }],
+      };
+    });
   };
 
   const updateInput = (index: number, field: keyof TableRow, value: string) => {
@@ -601,6 +611,7 @@ const LightsConsumosTool: React.FC = () => {
                   <th className="px-4 py-3 text-left font-medium">Cantidad</th>
                   <th className="px-4 py-3 text-left font-medium">Componente</th>
                   <th className="px-4 py-3 text-left font-medium">Vatios (por unidad)</th>
+                  <th className="w-12 px-4 py-3 text-left font-medium">&nbsp;</th>
                 </tr>
               </thead>
               <tbody>
@@ -639,6 +650,18 @@ const LightsConsumosTool: React.FC = () => {
                         readOnly
                         className="w-full bg-muted"
                       />
+                    </td>
+                    <td className="p-4">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeRow(index)}
+                        className="text-destructive hover:text-destructive"
+                        aria-label="Eliminar fila"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </td>
                   </tr>
                 ))}
