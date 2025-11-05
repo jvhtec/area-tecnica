@@ -104,16 +104,16 @@ export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: s
         is_house_tech: false,
         is_tour_team_member: false,
         category: '',
-        base_day_eur: Number(p.timesheets_total_eur || 0),
+        base_day_eur: Number(p.timesheets_total_eur || 0), // Timesheets total (base from worked hours)
         week_count: 1,
         multiplier: 1,
         per_job_multiplier: 1,
         iso_year: null,
         iso_week: null,
-        total_eur: Number(p.total_eur || 0),
+        total_eur: Number(p.timesheets_total_eur || 0), // Base total (same as timesheets for non-tour jobs)
         extras: undefined,
         extras_total_eur: Number(p.extras_total_eur || 0),
-        total_with_extras_eur: Number(p.total_eur || 0),
+        total_with_extras_eur: Number(p.total_eur || 0), // Total including extras
         breakdown: {},
       })) as TourJobRateQuote[];
     },
