@@ -2652,6 +2652,7 @@ export type Database = {
           overtime_hour_eur: number | null
           plus_10_12_eur: number | null
           profile_id: string
+          rehearsal_day_eur: number | null
           updated_at: string
           updated_by: string | null
         }
@@ -2661,6 +2662,7 @@ export type Database = {
           overtime_hour_eur?: number | null
           plus_10_12_eur?: number | null
           profile_id: string
+          rehearsal_day_eur?: number | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -2670,6 +2672,7 @@ export type Database = {
           overtime_hour_eur?: number | null
           plus_10_12_eur?: number | null
           profile_id?: string
+          rehearsal_day_eur?: number | null
           updated_at?: string
           updated_by?: string | null
         }
