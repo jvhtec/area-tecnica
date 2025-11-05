@@ -3,7 +3,11 @@ import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { TourJobRateQuote } from '@/types/tourRates';
-import { formatMultiplier, getPerJobMultiplier } from '@/lib/tourRateMath';
+import {
+  formatMultiplier,
+  getPerJobMultiplier,
+  shouldDisplayMultiplier,
+} from '@/lib/tourRateMath';
 import { formatCurrency } from '@/lib/utils';
 import { fetchJobLogo, fetchTourLogo, getCompanyLogo } from '@/utils/pdf/logoUtils';
 
@@ -291,11 +295,20 @@ export async function generateRateQuotePDF(
   const tableData = quotesWithComputed.map(({ quote, computed }) => {
     const name = getTechName(quote.technician_id);
     const lpo = lpoMap?.get(quote.technician_id) ?? null;
-    const { effectiveBase, extrasTotal, rawMultiplier } = computed;
+    const { effectiveBase, extrasTotal, preMultiplierBase, rawMultiplier, usedFallbackBase } =
+      computed;
+    const displayMultiplier =
+      !usedFallbackBase && rawMultiplier != null && shouldDisplayMultiplier(rawMultiplier);
+    const baseCell =
+      displayMultiplier && rawMultiplier != null
+        ? `${formatCurrency(preMultiplierBase)} ${formatMultiplier(rawMultiplier)} = ${formatCurrency(
+            effectiveBase
+          )}`
+        : formatCurrency(effectiveBase);
     return [
       withLpo(name, lpo),
       quote.is_house_tech ? 'Plantilla' : quote.category || '—',
-      formatCurrency(effectiveBase),
+      baseCell,
       formatMultiplier(rawMultiplier),
       formatCurrency(extrasTotal),
       formatCurrency(effectiveBase + extrasTotal),
@@ -304,14 +317,15 @@ export async function generateRateQuotePDF(
 
   autoTable(doc, {
     startY: yPos,
-    head: [['Técnico', 'Categoría', 'Base', 'Mult.', 'Extras', 'Total']],
+    head: [['Técnico', 'Categoría', 'Base (calc.)', 'Mult.', 'Extras', 'Total']],
     body: tableData,
     theme: 'grid',
     headStyles: { fillColor: CORPORATE_RED, textColor: 255, fontStyle: 'bold' },
     styles: { fontSize: 9, cellPadding: 3 },
     alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR },
     columnStyles: {
-      2: { halign: 'right' },
+      1: { cellWidth: 34 },
+      2: { halign: 'right', cellWidth: 68 },
       3: { halign: 'center' },
       4: { halign: 'right' },
       5: { halign: 'right', fontStyle: 'bold' },
