@@ -221,6 +221,14 @@ export const TechnicianTourRates: React.FC = () => {
                   const baseDayAmount = quote.base_day_eur ?? 0;
                   const extrasAmount = quote.extras_total_eur ?? 0;
                   const perJobMultiplier = getPerJobMultiplier(quote);
+                  const breakdownBase = quote.breakdown?.after_discount ?? quote.breakdown?.base_calculation;
+                  const hasValidMultiplier = typeof perJobMultiplier === 'number' && perJobMultiplier > 0;
+                  const preMultiplierBase =
+                    breakdownBase ?? (hasValidMultiplier ? baseDayAmount / perJobMultiplier : baseDayAmount);
+                  const formattedMultiplier = formatMultiplier(perJobMultiplier);
+                  const trimmedMultiplier = formattedMultiplier.startsWith('×')
+                    ? formattedMultiplier.slice(1)
+                    : formattedMultiplier;
                   return (
                     <div
                       key={quote.job_id}
@@ -255,13 +263,14 @@ export const TechnicianTourRates: React.FC = () => {
                       <div className="sm:text-right">
                         <div className="font-semibold text-lg">{formatCurrency(displayTotal)}</div>
                         <div className="text-xs text-muted-foreground">
-                          Base {formatCurrency(baseDayAmount)}
-                          {quote.is_tour_team_member && shouldDisplayMultiplier(perJobMultiplier) && (
+                          {quote.is_tour_team_member && shouldDisplayMultiplier(perJobMultiplier) ? (
                             <span>
-                              {' '}
-                              {formatMultiplier(perJobMultiplier)} ({quote.week_count}{' '}
+                              Base {formatCurrency(preMultiplierBase)} × {trimmedMultiplier} ={' '}
+                              {formatCurrency(baseDayAmount)} ({quote.week_count}{' '}
                               {quote.week_count === 1 ? 'fecha' : 'fechas'})
                             </span>
+                          ) : (
+                            <span>Base {formatCurrency(baseDayAmount)}</span>
                           )}
                           {extrasAmount > 0 && (
                             <span className="block text-green-600 mt-1">+ Extras {formatCurrency(extrasAmount)}</span>
