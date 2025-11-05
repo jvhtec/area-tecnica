@@ -1,6 +1,28 @@
 import { TourJobRateQuote } from '@/types/tourRates';
 
 const MULTIPLIER_EPSILON = 0.0001;
+const TOTAL_AMOUNT_TOLERANCE = 0.01;
+
+export const calculateQuoteTotal = (
+  quote: Pick<TourJobRateQuote, 'total_with_extras_eur' | 'total_eur' | 'extras_total_eur'>
+): number => {
+  const withExtras = quote.total_with_extras_eur;
+  if (typeof withExtras === 'number' && !Number.isNaN(withExtras)) {
+    return withExtras;
+  }
+
+  const base = typeof quote.total_eur === 'number' && !Number.isNaN(quote.total_eur) ? quote.total_eur : 0;
+  const extras =
+    typeof quote.extras_total_eur === 'number' && !Number.isNaN(quote.extras_total_eur)
+      ? quote.extras_total_eur
+      : 0;
+
+  if (extras !== 0 && Math.abs(extras) <= TOTAL_AMOUNT_TOLERANCE) {
+    return base;
+  }
+
+  return base + extras;
+};
 
 export const getPerJobMultiplier = (
   quote: Pick<TourJobRateQuote, 'per_job_multiplier' | 'multiplier' | 'week_count'>
