@@ -199,6 +199,43 @@ const getTechNameFactory = (profiles: TechnicianProfile[]) => {
 
 const formatJobDate = (date: string) => format(new Date(date), 'PPP', { locale: es });
 
+const BASE_VALUE_EPSILON = 0.5; // tolerate rounding differences when comparing backend totals
+const MULTIPLIER_DISPLAY_EPSILON = 0.0001;
+
+const roundCurrency = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+const computeEffectiveBase = (quote: TourJobRateQuote) => {
+  const rawMultiplier = getPerJobMultiplier(quote);
+  const appliedMultiplier = rawMultiplier ?? 1;
+
+  const breakdownBase =
+    quote.breakdown?.after_discount ?? quote.breakdown?.base_calculation ?? undefined;
+  const backendBase = Number(quote.base_day_eur ?? 0);
+  const preMultiplierBase = Number(breakdownBase ?? backendBase);
+  const recalculated = roundCurrency(preMultiplierBase * appliedMultiplier);
+  const extrasTotal = Number(quote.extras_total_eur ?? 0);
+
+  const usedFallbackBase = breakdownBase == null;
+
+  let effectiveBase = recalculated;
+
+  if (usedFallbackBase || rawMultiplier == null) {
+    // Without explicit multiplier data we trust the backend value to avoid double application.
+    effectiveBase = backendBase;
+  } else if (Math.abs(recalculated - backendBase) <= BASE_VALUE_EPSILON) {
+    // Treat small differences as rounding noise and align with backend totals.
+    effectiveBase = backendBase;
+  }
+
+  return {
+    effectiveBase,
+    extrasTotal,
+    preMultiplierBase,
+    rawMultiplier,
+    usedFallbackBase,
+  };
+};
+
 const withLpo = (name: string, lpo?: string | null) => (lpo ? `${name}\nLPO: ${lpo}` : name);
 
 // Generate PDF for individual rate quote (single job date)
@@ -246,17 +283,22 @@ export async function generateRateQuotePDF(
 
   const getTechName = getTechNameFactory(profiles);
 
-  const tableData = quotes.map((quote) => {
+  const quotesWithComputed = quotes.map((quote) => ({
+    quote,
+    computed: computeEffectiveBase(quote),
+  }));
+
+  const tableData = quotesWithComputed.map(({ quote, computed }) => {
     const name = getTechName(quote.technician_id);
     const lpo = lpoMap?.get(quote.technician_id) ?? null;
-    const perJobMultiplier = getPerJobMultiplier(quote);
+    const { effectiveBase, extrasTotal, rawMultiplier } = computed;
     return [
       withLpo(name, lpo),
       quote.is_house_tech ? 'Plantilla' : quote.category || '—',
-      formatCurrency(quote.base_day_eur),
-      formatMultiplier(perJobMultiplier),
-      formatCurrency(quote.extras_total_eur || 0),
-      formatCurrency(quote.total_with_extras_eur || quote.total_eur || 0),
+      formatCurrency(effectiveBase),
+      formatMultiplier(rawMultiplier),
+      formatCurrency(extrasTotal),
+      formatCurrency(effectiveBase + extrasTotal),
     ];
   });
 
@@ -286,13 +328,16 @@ export async function generateRateQuotePDF(
   const pageWidth = doc.internal.pageSize.getWidth();
   const summaryWidth = pageWidth - 28;
 
-  const totalBase = quotes.reduce(
-    (sum, quote) => sum + (quote.total_eur || quote.base_day_eur || 0),
+  const totalBase = quotesWithComputed.reduce(
+    (sum, { computed }) => sum + computed.effectiveBase,
     0
   );
-  const totalExtras = quotes.reduce((sum, quote) => sum + (quote.extras_total_eur || 0), 0);
-  const grandTotal = quotes.reduce(
-    (sum, quote) => sum + (quote.total_with_extras_eur || quote.total_eur || 0),
+  const totalExtras = quotesWithComputed.reduce(
+    (sum, { computed }) => sum + computed.extrasTotal,
+    0
+  );
+  const grandTotal = quotesWithComputed.reduce(
+    (sum, { computed }) => sum + computed.effectiveBase + computed.extrasTotal,
     0
   );
 
@@ -379,6 +424,8 @@ export async function generateTourRatesSummaryPDF(
       const techId = quote.technician_id;
       if (!techId) return;
 
+      const { effectiveBase, extrasTotal } = computeEffectiveBase(quote);
+      const effectiveTotal = effectiveBase + extrasTotal;
       const existing =
         techTotals.get(techId) || {
           name: getTechName(techId),
@@ -388,7 +435,7 @@ export async function generateTourRatesSummaryPDF(
         };
 
       existing.dates += 1;
-      existing.total += quote.total_with_extras_eur || quote.total_eur || 0;
+      existing.total += effectiveTotal;
 
       const lpo = lpoMap?.get(techId);
       if (lpo) existing.lpos.add(lpo);
@@ -483,16 +530,19 @@ export async function generateTourRatesSummaryPDF(
     const jobTableRows = item.quotes.map((quote) => {
       const name = getTechName(quote.technician_id);
       const lpo = item.lpoMap?.get(quote.technician_id) ?? null;
-      const perJobMultiplier = getPerJobMultiplier(quote);
-      const baseBeforeMultiplier = Number(
-        quote.breakdown?.after_discount ??
-          quote.breakdown?.base_calculation ??
-          quote.base_day_eur
-      );
-      const baseText =
-        perJobMultiplier && perJobMultiplier > 1
-          ? `${formatCurrency(baseBeforeMultiplier)} ${formatMultiplier(perJobMultiplier)} = ${formatCurrency(quote.base_day_eur)}`
-          : formatCurrency(quote.base_day_eur);
+      const {
+        effectiveBase,
+        extrasTotal,
+        preMultiplierBase,
+        rawMultiplier,
+        usedFallbackBase,
+      } = computeEffectiveBase(quote);
+
+      const shouldDisplayMultiplier =
+        !usedFallbackBase && rawMultiplier != null && Math.abs(rawMultiplier - 1) >= MULTIPLIER_DISPLAY_EPSILON;
+      const baseText = shouldDisplayMultiplier
+        ? `${formatCurrency(preMultiplierBase)} ${formatMultiplier(rawMultiplier)} = ${formatCurrency(effectiveBase)}`
+        : formatCurrency(effectiveBase);
 
       let nameCell = withLpo(name, lpo);
       const hrs = Number(
@@ -513,8 +563,8 @@ export async function generateTourRatesSummaryPDF(
         nameCell,
         quote.is_house_tech ? 'Plantilla' : quote.category || '—',
         baseText,
-        formatCurrency(quote.extras_total_eur || 0),
-        formatCurrency(quote.total_with_extras_eur || quote.total_eur || 0),
+        formatCurrency(extrasTotal),
+        formatCurrency(effectiveBase + extrasTotal),
       ];
     });
 
@@ -541,14 +591,15 @@ export async function generateTourRatesSummaryPDF(
 
     breakdownY = ((doc as any).lastAutoTable?.finalY ?? breakdownY) + 6;
 
-    const jobBaseTotal = item.quotes.reduce(
-      (sum, quote) => sum + (quote.total_eur || quote.base_day_eur || 0),
-      0
-    );
-    const jobExtrasTotal = item.quotes.reduce((sum, quote) => sum + (quote.extras_total_eur || 0), 0);
-    const jobGrandTotal = item.quotes.reduce(
-      (sum, quote) => sum + (quote.total_with_extras_eur || quote.total_eur || 0),
-      0
+    const { jobBaseTotal, jobExtrasTotal, jobGrandTotal } = item.quotes.reduce(
+      (acc, quote) => {
+        const { effectiveBase, extrasTotal } = computeEffectiveBase(quote);
+        acc.jobBaseTotal += effectiveBase;
+        acc.jobExtrasTotal += extrasTotal;
+        acc.jobGrandTotal += effectiveBase + extrasTotal;
+        return acc;
+      },
+      { jobBaseTotal: 0, jobExtrasTotal: 0, jobGrandTotal: 0 }
     );
 
     // If there isn't enough room for the totals line, continue on a new page
