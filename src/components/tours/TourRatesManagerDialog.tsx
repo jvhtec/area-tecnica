@@ -436,6 +436,15 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                 const errorCode = q.breakdown?.error as string | undefined;
                 const house = q.is_house_tech;
                 const perJobMultiplier = getPerJobMultiplier(q);
+                const breakdownBase = q.breakdown?.after_discount ?? q.breakdown?.base_calculation;
+                const baseDayAmount = q.base_day_eur ?? 0;
+                const hasValidMultiplier = typeof perJobMultiplier === 'number' && perJobMultiplier > 0;
+                const preMultiplierBase =
+                  breakdownBase ?? (hasValidMultiplier ? baseDayAmount / perJobMultiplier : baseDayAmount);
+                const formattedMultiplier = formatMultiplier(perJobMultiplier);
+                const trimmedMultiplier = formattedMultiplier.startsWith('×')
+                  ? formattedMultiplier.slice(1)
+                  : formattedMultiplier;
 
                 return (
                   <Card key={q.technician_id + q.job_id}>
@@ -454,12 +463,15 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                         <div className="text-right flex flex-col items-end gap-2">
                           <div className="font-semibold">{formatCurrency(q.total_with_extras_eur || q.total_eur)}</div>
                           <div className="text-xs text-muted-foreground">
-                            Base {formatCurrency(q.base_day_eur)}{' '}
-                            {shouldDisplayMultiplier(perJobMultiplier)
-                              ? `${formatMultiplier(perJobMultiplier)}${
-                                  q.week_count > 1 ? ` (${q.week_count} fechas en la semana)` : ''
-                                }`
-                              : ''}
+                            {shouldDisplayMultiplier(perJobMultiplier) ? (
+                              <>
+                                Base {formatCurrency(preMultiplierBase)} × {trimmedMultiplier} ={' '}
+                                {formatCurrency(baseDayAmount)}
+                                {q.week_count > 1 ? ` (${q.week_count} fechas en la semana)` : ''}
+                              </>
+                            ) : (
+                              <>Base {formatCurrency(baseDayAmount)}</>
+                            )}
                           </div>
                           <Button
                             size="sm"

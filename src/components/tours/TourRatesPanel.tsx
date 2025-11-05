@@ -187,8 +187,20 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {weekQuotes.map((quote) => (
-                <div key={`${quote.job_id}-${quote.technician_id}`} className="space-y-3">
+              {weekQuotes.map((quote) => {
+                const perJobMultiplier = getPerJobMultiplier(quote);
+                const breakdownBase = quote.breakdown?.after_discount ?? quote.breakdown?.base_calculation;
+                const baseDayAmount = quote.base_day_eur ?? 0;
+                const hasValidMultiplier = typeof perJobMultiplier === 'number' && perJobMultiplier > 0;
+                const preMultiplierBase =
+                  breakdownBase ?? (hasValidMultiplier ? baseDayAmount / perJobMultiplier : baseDayAmount);
+                const formattedMultiplier = formatMultiplier(perJobMultiplier);
+                const trimmedMultiplier = formattedMultiplier.startsWith('×')
+                  ? formattedMultiplier.slice(1)
+                  : formattedMultiplier;
+
+                return (
+                  <div key={`${quote.job_id}-${quote.technician_id}`} className="space-y-3">
                   {/* Main quote card */}
                   <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                     <div className="flex-1">
@@ -212,18 +224,15 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                         {formatCurrency(quote.total_with_extras_eur || quote.total_eur)}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Base {formatCurrency(quote.base_day_eur)}
-                        {(() => {
-                          const perJobMultiplier = getPerJobMultiplier(quote);
-                          if (!shouldDisplayMultiplier(perJobMultiplier)) return null;
-                          return (
-                            <>
-                              {" "}
-                              {formatMultiplier(perJobMultiplier)}
-                              {quote.week_count > 1 && ` (${quote.week_count} fechas en la semana)`}
-                            </>
-                          );
-                        })()}
+                        {shouldDisplayMultiplier(perJobMultiplier) ? (
+                          <>
+                            Base {formatCurrency(preMultiplierBase)} × {trimmedMultiplier} ={' '}
+                            {formatCurrency(baseDayAmount)}
+                            {quote.week_count > 1 && ` (${quote.week_count} fechas en la semana)`}
+                          </>
+                        ) : (
+                          <>Base {formatCurrency(baseDayAmount)}</>
+                        )}
                         {quote.extras_total_eur && quote.extras_total_eur > 0 && (
                           <div className="text-green-600 mt-1">
                             +{formatCurrency(quote.extras_total_eur)} extras
@@ -311,8 +320,9 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                       </AlertDescription>
                     </Alert>
                   )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
             
             {/* Week total */}
