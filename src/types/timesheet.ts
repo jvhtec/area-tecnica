@@ -35,6 +35,10 @@ export interface Timesheet {
     overtime_amount_eur: number;
     total_eur: number;
     notes: string[];
+    is_rehearsal_flat_rate?: boolean;
+    rehearsal_rate_eur?: number;
+    autonomo_discount_eur?: number;
+    base_day_before_discount_eur?: number;
   };
   // Visible-only fields (DB visibility rules applied via RPC)
   amount_eur_visible?: number | null;
@@ -50,6 +54,10 @@ export interface Timesheet {
     overtime_amount_eur: number;
     total_eur: number;
     notes: string[];
+    is_rehearsal_flat_rate?: boolean;
+    rehearsal_rate_eur?: number;
+    autonomo_discount_eur?: number;
+    base_day_before_discount_eur?: number;
   } | null;
   approved_by_manager?: boolean;
   technician?: {
