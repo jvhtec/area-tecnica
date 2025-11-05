@@ -28,6 +28,8 @@ export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: s
               _tech_id: techId,
             });
             if (error) {
+              console.error(`RPC error for job ${jobId}, tech ${techId}:`, error);
+              const errorMsg = error.message || error.details || error.hint || String(error);
               return {
                 job_id: jobId,
                 technician_id: techId,
@@ -49,7 +51,7 @@ export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: s
                 extras: undefined,
                 extras_total_eur: undefined,
                 total_with_extras_eur: undefined,
-                breakdown: { error: error.message },
+                breakdown: { error: errorMsg, error_details: error },
               } as TourJobRateQuote;
             }
             const q = (data || {}) as Record<string, any>;

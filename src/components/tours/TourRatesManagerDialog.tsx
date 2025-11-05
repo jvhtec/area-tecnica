@@ -90,6 +90,29 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
     return p ? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unknown' : 'Unknown';
   };
 
+  // Debug logging for manager view
+  useEffect(() => {
+    if (quotes.length > 0 && selectedJobId) {
+      console.log('TourRatesManagerDialog - Quotes for job:', selectedJobId, quotes);
+      quotes.forEach((q, idx) => {
+        if ((q.total_eur ?? 0) === 0) {
+          console.warn(`Manager view - Quote ${idx} has zero total:`, {
+            technician: getTechName(q.technician_id),
+            job_id: q.job_id,
+            category: q.category,
+            base_day_eur: q.base_day_eur,
+            multiplier: q.multiplier,
+            per_job_multiplier: q.per_job_multiplier,
+            week_count: q.week_count,
+            is_tour_team_member: q.is_tour_team_member,
+            total_eur: q.total_eur,
+            breakdown: q.breakdown,
+          });
+        }
+      });
+    }
+  }, [quotes, selectedJobId]);
+
   const [isSendingEmails, setIsSendingEmails] = useState(false);
   const [sendingByTech, setSendingByTech] = useState<Record<string, boolean>>({});
 
