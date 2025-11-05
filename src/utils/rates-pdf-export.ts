@@ -297,21 +297,34 @@ export async function generateRateQuotePDF(
     const lpo = lpoMap?.get(quote.technician_id) ?? null;
     const { effectiveBase, extrasTotal, preMultiplierBase, rawMultiplier, usedFallbackBase } =
       computed;
+    const hasError = quote.breakdown?.error;
     const displayMultiplier =
       !usedFallbackBase && rawMultiplier != null && shouldDisplayMultiplier(rawMultiplier);
-    const baseCell =
-      displayMultiplier && rawMultiplier != null
-        ? `${formatCurrency(preMultiplierBase)} ${formatMultiplier(rawMultiplier)} = ${formatCurrency(
-            effectiveBase
-          )}`
-        : formatCurrency(effectiveBase);
+
+    let baseCell: string;
+    if (hasError) {
+      // Show error indicator instead of calculation
+      const errorMsg =
+        quote.breakdown.error === 'category_missing' ? 'ERROR: Falta categoría' :
+        quote.breakdown.error === 'house_rate_missing' ? 'ERROR: Falta tarifa' :
+        quote.breakdown.error === 'tour_base_missing' ? 'ERROR: Falta tarifa base' :
+        'ERROR: ' + quote.breakdown.error;
+      baseCell = errorMsg;
+    } else if (displayMultiplier && rawMultiplier != null) {
+      baseCell = `${formatCurrency(preMultiplierBase)} ${formatMultiplier(rawMultiplier)} = ${formatCurrency(
+          effectiveBase
+        )}`;
+    } else {
+      baseCell = formatCurrency(effectiveBase);
+    }
+
     return [
       withLpo(name, lpo),
       quote.is_house_tech ? 'Plantilla' : quote.category || '—',
       baseCell,
-      formatMultiplier(rawMultiplier),
-      formatCurrency(extrasTotal),
-      formatCurrency(effectiveBase + extrasTotal),
+      hasError ? '—' : formatMultiplier(rawMultiplier),
+      hasError ? '—' : formatCurrency(extrasTotal),
+      hasError ? '€0.00' : formatCurrency(effectiveBase + extrasTotal),
     ];
   });
 
@@ -438,6 +451,10 @@ export async function generateTourRatesSummaryPDF(
       const techId = quote.technician_id;
       if (!techId) return;
 
+      // Skip quotes with errors from totals aggregation
+      const hasError = quote.breakdown?.error;
+      if (hasError) return;
+
       const { effectiveBase, extrasTotal } = computeEffectiveBase(quote);
       const effectiveTotal = effectiveBase + extrasTotal;
       const existing =
@@ -544,6 +561,7 @@ export async function generateTourRatesSummaryPDF(
     const jobTableRows = item.quotes.map((quote) => {
       const name = getTechName(quote.technician_id);
       const lpo = item.lpoMap?.get(quote.technician_id) ?? null;
+      const hasError = quote.breakdown?.error;
       const {
         effectiveBase,
         extrasTotal,
@@ -552,33 +570,45 @@ export async function generateTourRatesSummaryPDF(
         usedFallbackBase,
       } = computeEffectiveBase(quote);
 
-      const shouldDisplayMultiplier =
-        !usedFallbackBase && rawMultiplier != null && Math.abs(rawMultiplier - 1) >= MULTIPLIER_DISPLAY_EPSILON;
-      const baseText = shouldDisplayMultiplier
-        ? `${formatCurrency(preMultiplierBase)} ${formatMultiplier(rawMultiplier)} = ${formatCurrency(effectiveBase)}`
-        : formatCurrency(effectiveBase);
+      let baseText: string;
+      if (hasError) {
+        const errorMsg =
+          quote.breakdown.error === 'category_missing' ? 'ERROR: Falta categoría' :
+          quote.breakdown.error === 'house_rate_missing' ? 'ERROR: Falta tarifa' :
+          quote.breakdown.error === 'tour_base_missing' ? 'ERROR: Falta tarifa base' :
+          'ERROR: ' + quote.breakdown.error;
+        baseText = errorMsg;
+      } else {
+        const shouldDisplayMultiplier =
+          !usedFallbackBase && rawMultiplier != null && Math.abs(rawMultiplier - 1) >= MULTIPLIER_DISPLAY_EPSILON;
+        baseText = shouldDisplayMultiplier
+          ? `${formatCurrency(preMultiplierBase)} ${formatMultiplier(rawMultiplier)} = ${formatCurrency(effectiveBase)}`
+          : formatCurrency(effectiveBase);
+      }
 
       let nameCell = withLpo(name, lpo);
-      const hrs = Number(
-        (quote.breakdown && (quote.breakdown.single_hours_total ?? quote.breakdown.hours_rounded ?? quote.breakdown.worked_hours_rounded)) || 0
-      );
-      const plus = Number(quote.breakdown?.single_plus_10_12_total_eur ?? 0);
-      const otH = Number(quote.breakdown?.single_overtime_hours_total ?? 0);
-      const otAmt = Number(quote.breakdown?.single_overtime_amount_total_eur ?? 0);
-      const parts: string[] = [];
-      if (hrs > 0) parts.push(`Horas: ${hrs}h`);
-      if (plus > 0) parts.push(`+10–12: ${formatCurrency(plus)}`);
-      if (otH > 0) parts.push(`HE: ${otH}h = ${formatCurrency(otAmt)}`);
-      if (parts.length) {
-        nameCell = `${nameCell}\n${parts.join(' · ')}`;
+      if (!hasError) {
+        const hrs = Number(
+          (quote.breakdown && (quote.breakdown.single_hours_total ?? quote.breakdown.hours_rounded ?? quote.breakdown.worked_hours_rounded)) || 0
+        );
+        const plus = Number(quote.breakdown?.single_plus_10_12_total_eur ?? 0);
+        const otH = Number(quote.breakdown?.single_overtime_hours_total ?? 0);
+        const otAmt = Number(quote.breakdown?.single_overtime_amount_total_eur ?? 0);
+        const parts: string[] = [];
+        if (hrs > 0) parts.push(`Horas: ${hrs}h`);
+        if (plus > 0) parts.push(`+10–12: ${formatCurrency(plus)}`);
+        if (otH > 0) parts.push(`HE: ${otH}h = ${formatCurrency(otAmt)}`);
+        if (parts.length) {
+          nameCell = `${nameCell}\n${parts.join(' · ')}`;
+        }
       }
 
       return [
         nameCell,
         quote.is_house_tech ? 'Plantilla' : quote.category || '—',
         baseText,
-        formatCurrency(extrasTotal),
-        formatCurrency(effectiveBase + extrasTotal),
+        hasError ? '—' : formatCurrency(extrasTotal),
+        hasError ? '€0.00' : formatCurrency(effectiveBase + extrasTotal),
       ];
     });
 

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Euro, Info, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { Euro, Info, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { format, getISOWeek, getISOWeekYear, startOfWeek, endOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { useTechnicianTourRateQuotes } from "@/hooks/useTourJobRateQuotes";
@@ -102,15 +102,21 @@ export const TechnicianTourRates: React.FC = () => {
   };
 
   const isQuoteApproved = (quote: TourJobRateQuote) => {
-    // For tour dates, BOTH tour and job must be approved
-    const tourApproved = !quote.tour_id || (tourApprovalMap?.get(quote.tour_id) ?? false);
-    if (!tourApproved) {
-      return false;
-    }
+    // For tour dates, tour must be approved first
+    if (quote.tour_id) {
+      const tourApproved = tourApprovalMap?.get(quote.tour_id) ?? false;
+      if (!tourApproved) {
+        return false;
+      }
 
-    // For tour dates (quotes with tour_id), we ALWAYS need job-level approval
-    if (quote.tour_id && quote.job_id) {
-      return jobApprovalMap?.get(quote.job_id) ?? false;
+      // Job-level approval is only required if extras exist
+      const extrasPresent = quoteHasExtras(quote);
+      if (extrasPresent) {
+        return quote.job_id ? (jobApprovalMap?.get(quote.job_id) ?? false) : false;
+      }
+
+      // No extras = tour approval is sufficient
+      return true;
     }
 
     // For standalone jobs (no tour_id), approval depends on extras
@@ -129,6 +135,31 @@ export const TechnicianTourRates: React.FC = () => {
   const approvedQuotes = selectedQuotes.filter((quote) => isQuoteApproved(quote));
   const pendingQuotes = selectedQuotes.filter((quote) => !isQuoteApproved(quote));
   const isHouseTech = (quotes && quotes[0]) ? quotes[0].is_house_tech : false;
+
+  // Debug logging for zero totals
+  useEffect(() => {
+    if (selectedQuotes.length > 0) {
+      console.log('TechnicianTourRates - Selected quotes:', selectedQuotes);
+      console.log('TechnicianTourRates - Approved quotes:', approvedQuotes);
+      console.log('TechnicianTourRates - Pending quotes:', pendingQuotes);
+      selectedQuotes.forEach((q, idx) => {
+        if ((q.total_eur ?? 0) === 0 || (q.total_with_extras_eur ?? 0) === 0) {
+          console.warn(`Quote ${idx} has zero total:`, {
+            job_id: q.job_id,
+            title: q.title,
+            category: q.category,
+            base_day_eur: q.base_day_eur,
+            multiplier: q.multiplier,
+            per_job_multiplier: q.per_job_multiplier,
+            week_count: q.week_count,
+            is_tour_team_member: q.is_tour_team_member,
+            total_eur: q.total_eur,
+            breakdown: q.breakdown,
+          });
+        }
+      });
+    }
+  }, [selectedQuotes, approvedQuotes, pendingQuotes]);
 
   return (
     <Card>
@@ -229,6 +260,7 @@ export const TechnicianTourRates: React.FC = () => {
                   const trimmedMultiplier = formattedMultiplier.startsWith('×')
                     ? formattedMultiplier.slice(1)
                     : formattedMultiplier;
+                  const hasError = quote.breakdown?.error;
                   return (
                     <div
                       key={quote.job_id}
@@ -254,10 +286,21 @@ export const TechnicianTourRates: React.FC = () => {
                         <div className="text-sm text-muted-foreground mt-1">
                           {format(new Date(quote.start_time), "EEEE, d 'de' MMM, yyyy", { locale: es })}
                         </div>
-                        {!quote.is_tour_team_member && (
+                        {!quote.is_tour_team_member && !hasError && (
                           <div className="text-xs text-muted-foreground mt-2">
                             Multiplicador de gira no aplicado: no formas parte del equipo de la gira para este recorrido.
                           </div>
+                        )}
+                        {hasError && (
+                          <Alert variant="destructive" className="mt-2">
+                            <AlertTriangle className="h-3 w-3" />
+                            <AlertDescription className="text-xs">
+                              {quote.breakdown.error === 'category_missing' && 'Falta configurar tu categoría de técnico. Por favor, contacta con la dirección.'}
+                              {quote.breakdown.error === 'house_rate_missing' && 'Falta configurar tu tarifa de técnico residente. Por favor, contacta con la dirección.'}
+                              {quote.breakdown.error === 'tour_base_missing' && 'Falta la tarifa base de gira para tu categoría. Por favor, contacta con la dirección.'}
+                              {!['category_missing', 'house_rate_missing', 'tour_base_missing'].includes(quote.breakdown.error) && `Error en el cálculo: ${quote.breakdown.error}`}
+                            </AlertDescription>
+                          </Alert>
                         )}
                       </div>
                       <div className="sm:text-right">
