@@ -6,6 +6,7 @@ import { Euro, AlertCircle, Calendar, CheckCircle } from 'lucide-react';
 import { useMyJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useTechnicianTourRateQuotes } from '@/hooks/useTourJobRateQuotes';
 import { formatCurrency } from '@/lib/utils';
+import { calculateQuoteTotal } from '@/lib/tourRateMath';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTourRatesApprovalMap } from '@/hooks/useTourRatesApproval';
@@ -106,10 +107,7 @@ export function MyJobTotalsSection() {
   const approvedPayouts = payoutTotals.filter(p => jobApprovalMap?.get(p.job_id) ?? false);
   const pendingPayouts = payoutTotals.filter(p => !(jobApprovalMap?.get(p.job_id) ?? false));
   const totalNonTourAmount = approvedPayouts.reduce((sum, payout) => sum + payout.total_eur, 0);
-  const totalTourAmount = approvedTourQuotes.reduce((sum, quote) => {
-    const base = quote.total_with_extras_eur ?? quote.total_eur ?? 0;
-    return sum + base;
-  }, 0);
+  const totalTourAmount = approvedTourQuotes.reduce((sum, quote) => sum + calculateQuoteTotal(quote), 0);
   const grandTotal = totalNonTourAmount + totalTourAmount;
 
   return (
@@ -201,7 +199,7 @@ export function MyJobTotalsSection() {
                     )}
                   </div>
                   <Badge variant="outline">
-                    {formatCurrency((quote.total_with_extras_eur ?? quote.total_eur ?? 0))}
+                    {formatCurrency(calculateQuoteTotal(quote))}
                   </Badge>
                 </div>
               ))}

@@ -8,7 +8,7 @@ import { useTourJobRateQuotes } from "@/hooks/useTourJobRateQuotes";
 import { TourJobRateQuote } from "@/types/tourRates";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { formatMultiplier, getPerJobMultiplier, shouldDisplayMultiplier } from "@/lib/tourRateMath";
+import { calculateQuoteTotal, formatMultiplier, getPerJobMultiplier, shouldDisplayMultiplier } from "@/lib/tourRateMath";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -221,7 +221,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                     </div>
                     <div className="text-right flex flex-col items-end gap-2">
                       <div className="font-semibold text-lg">
-                        {formatCurrency(quote.total_with_extras_eur || quote.total_eur)}
+                        {formatCurrency(calculateQuoteTotal(quote))}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {shouldDisplayMultiplier(perJobMultiplier) ? (
@@ -330,7 +330,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
               <div className="flex justify-between items-center font-semibold">
                 <span>Week Total:</span>
                 <span className="text-lg">
-                  {formatCurrency(weekQuotes.reduce((sum, quote) => sum + (quote.total_with_extras_eur || quote.total_eur), 0))}
+                  {formatCurrency(weekQuotes.reduce((sum, quote) => sum + calculateQuoteTotal(quote), 0))}
                 </span>
               </div>
               
@@ -358,7 +358,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
           <div className="flex justify-between items-center font-bold text-lg">
             <span>Total Job Amount:</span>
             <span className="text-xl">
-              {formatCurrency(quotes.reduce((sum, quote) => sum + (quote.total_with_extras_eur || quote.total_eur), 0))}
+              {formatCurrency(quotes.reduce((sum, quote) => sum + calculateQuoteTotal(quote), 0))}
             </span>
           </div>
           

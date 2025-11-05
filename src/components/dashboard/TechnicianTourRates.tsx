@@ -10,7 +10,7 @@ import { useTechnicianTourRateQuotes } from "@/hooks/useTourJobRateQuotes";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useTourRatesApprovalMap } from "@/hooks/useTourRatesApproval";
 import { useJobRatesApprovalMap } from "@/hooks/useJobRatesApproval";
-import { formatMultiplier, getPerJobMultiplier, shouldDisplayMultiplier } from "@/lib/tourRateMath";
+import { calculateQuoteTotal, formatMultiplier, getPerJobMultiplier, shouldDisplayMultiplier } from "@/lib/tourRateMath";
 import type { TourJobRateQuote } from "@/types/tourRates";
 
 export const TechnicianTourRates: React.FC = () => {
@@ -248,7 +248,7 @@ export const TechnicianTourRates: React.FC = () => {
             <div className="space-y-3">
               {approvedQuotes.length > 0 ? (
                 approvedQuotes.map((quote) => {
-                  const displayTotal = quote.total_with_extras_eur ?? quote.total_eur ?? 0;
+                  const displayTotal = calculateQuoteTotal(quote);
                   const baseDayAmount = quote.base_day_eur ?? 0;
                   const extrasAmount = quote.extras_total_eur ?? 0;
                   const perJobMultiplier = getPerJobMultiplier(quote);
