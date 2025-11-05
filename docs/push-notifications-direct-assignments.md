@@ -31,15 +31,25 @@ VALUES (
 
 The push notification function now handles the `job.assignment.direct` event with Spanish messaging:
 
-**Notification Title:** "Nueva asignación" (New assignment)
+**Notification Titles and Messages:**
 
-**Message Format:**
-- If confirmed: `[Manager] te ha confirmado a "[Job Title]" para [Date]`
-- If invited: `[Manager] te ha asignado a "[Job Title]" para [Date]`
+The system sends **two different notifications** with different messages depending on the recipient:
+
+**For the assigned technician:**
+- Title: "Nueva asignación" (New assignment)
+- Message format:
+  - If confirmed: `[Manager] te ha confirmado a "[Job Title]" para [Date]`
+  - If invited: `[Manager] te ha asignado a "[Job Title]" para [Date]`
+
+**For management users:**
+- Title: "Asignación directa" (Direct assignment)
+- Message format:
+  - If confirmed: `[Manager] ha confirmado a [Tech Name] a "[Job Title]" para [Date]`
+  - If invited: `[Manager] ha asignado a [Tech Name] a "[Job Title]" para [Date]`
 
 **Default Recipients:**
-- The assigned technician (always)
-- Management users (configurable via Push Notification Matrix)
+- The assigned technician (always receives personalized "you" message)
+- Management users (receive message with technician's name)
 
 ### 3. Updated Components
 
