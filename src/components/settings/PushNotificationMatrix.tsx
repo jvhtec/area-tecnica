@@ -471,11 +471,11 @@ export function PushNotificationMatrix() {
           <div className="p-4 text-sm text-muted-foreground">Loading…</div>
         ) : (
           <div>
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto border rounded-md">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="min-w-[220px] sticky left-0 z-10 bg-background">Event</TableHead>
+                      <TableHead className="min-w-[220px] sticky left-0 z-20 bg-background border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Event</TableHead>
                       <TableHead className="min-w-[120px]">Natural</TableHead>
                       <TableHead className="min-w-[120px]">Broadcast</TableHead>
                       <TableHead className="min-w-[180px]">Assigned technicians</TableHead>
@@ -491,7 +491,7 @@ export function PushNotificationMatrix() {
                     {events.map((ev) => {
                       return (
                         <TableRow key={ev.code}>
-                          <TableCell className="sticky left-0 z-10 bg-background">
+                          <TableCell className="sticky left-0 z-10 bg-background border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                             <div className="flex flex-col">
                               <span className="font-medium">{ev.label}</span>
                               <span className="text-xs text-muted-foreground">{ev.code}</span>
