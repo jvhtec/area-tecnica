@@ -48,6 +48,8 @@ const mapRpcResultToQuote = (
   base_day_eur: Number(raw.base_day_eur ?? 0),
   week_count: Number(raw.week_count ?? 1),
   multiplier: Number(raw.multiplier ?? 1),
+  per_job_multiplier:
+    raw.per_job_multiplier != null ? Number(raw.per_job_multiplier) : undefined,
   iso_year: raw.iso_year ?? null,
   iso_week: raw.iso_week ?? null,
   total_eur: Number(raw.total_eur ?? 0),
@@ -172,6 +174,7 @@ export async function buildTourRatesExportPayload(
               base_day_eur: 0,
               week_count: 1,
               multiplier: 1,
+              per_job_multiplier: 1,
               iso_year: null,
               iso_week: null,
               total_eur: 0,

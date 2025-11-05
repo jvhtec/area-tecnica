@@ -19,6 +19,10 @@ export function useTourJobRateQuotes(jobId?: string) {
       if (error) throw error;
       return (data || []).map(item => ({
         ...item,
+        per_job_multiplier:
+          (item as any).per_job_multiplier != null
+            ? Number((item as any).per_job_multiplier)
+            : undefined,
         is_tour_team_member: (item as any).is_tour_team_member ?? false,
         extras_total_eur: (item as any).extras_total_eur ?? undefined,
         total_with_extras_eur: (item as any).total_with_extras_eur ?? undefined,
@@ -42,6 +46,10 @@ export function useTechnicianTourRateQuotes() {
       if (error) throw error;
       return (data || []).map(item => ({
         ...item,
+        per_job_multiplier:
+          (item as any).per_job_multiplier != null
+            ? Number((item as any).per_job_multiplier)
+            : undefined,
         is_tour_team_member: (item as any).is_tour_team_member ?? false,
         extras_total_eur: (item as any).extras_total_eur ?? undefined,
         total_with_extras_eur: (item as any).total_with_extras_eur ?? undefined,
