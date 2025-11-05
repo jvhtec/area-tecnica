@@ -27,13 +27,12 @@ export function useJobExtras(jobId: string, technicianId?: string) {
   });
 }
 
-interface SubmitJobExtraPayload {
+interface UpsertJobExtraPayload {
   jobId: string;
   technicianId: string;
   extraType: JobExtraType;
-  approvedQuantity: number;
-  requestedQuantity: number;
-  hasExistingRow: boolean;
+  quantity: number;
+  amountOverrideEur?: number;
 }
 
 const invalidateJobExtrasContext = (queryClient: ReturnType<typeof useQueryClient>, jobId: string) => {
@@ -49,59 +48,45 @@ export function useUpsertJobExtra() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ jobId, technicianId, extraType, approvedQuantity, requestedQuantity, hasExistingRow }: SubmitJobExtraPayload) => {
+    mutationFn: async ({ jobId, technicianId, extraType, quantity, amountOverrideEur }: UpsertJobExtraPayload) => {
       const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user?.id) throw new Error('Not authenticated');
+
       const now = new Date().toISOString();
-      const hasChange = approvedQuantity !== requestedQuantity;
 
-      if (!hasChange) {
-        if (!hasExistingRow) {
-          return {
-            job_id: jobId,
-            technician_id: technicianId,
-            extra_type: extraType,
-            quantity: approvedQuantity,
-            pending_quantity: null,
-            status: 'approved',
-            updated_at: now,
-          } as unknown as JobExtra;
-        }
-
-        // No difference; clear pending state if present but avoid creating empty rows
-        const { data, error } = await supabase
+      // If quantity is 0, delete the row instead of upserting
+      if (quantity === 0) {
+        const { error } = await supabase
           .from('job_rate_extras')
-          .upsert({
-            job_id: jobId,
-            technician_id: technicianId,
-            extra_type: extraType,
-            quantity: approvedQuantity,
-            pending_quantity: null,
-            status: 'approved',
-            rejection_reason: null,
-            updated_at: now,
-            updated_by: auth.user?.id ?? null,
-          })
-          .select()
-          .single();
+          .delete()
+          .eq('job_id', jobId)
+          .eq('technician_id', technicianId)
+          .eq('extra_type', extraType);
 
         if (error) throw error;
-        return data as JobExtra;
+
+        return {
+          job_id: jobId,
+          technician_id: technicianId,
+          extra_type: extraType,
+          quantity: 0,
+          status: 'approved',
+          updated_at: now,
+        } as JobExtra;
       }
 
+      // Simple direct upsert - managers set quantities directly, no approval workflow
       const { data, error } = await supabase
         .from('job_rate_extras')
         .upsert({
           job_id: jobId,
           technician_id: technicianId,
           extra_type: extraType,
-          quantity: approvedQuantity,
-          pending_quantity: requestedQuantity,
-          status: 'pending',
-          submitted_by: auth.user?.id ?? null,
-          submitted_at: now,
-          rejection_reason: null,
+          quantity: quantity,
+          amount_override_eur: amountOverrideEur,
+          status: 'approved', // Always approved since managers set directly
+          updated_by: auth.user.id,
           updated_at: now,
-          updated_by: auth.user?.id ?? null,
         })
         .select()
         .single();
@@ -111,116 +96,11 @@ export function useUpsertJobExtra() {
     },
     onSuccess: (data) => {
       invalidateJobExtrasContext(queryClient, data.job_id);
-      toast.success('Extra change submitted for approval');
+      toast.success('Extra saved successfully');
     },
     onError: (error) => {
-      console.error('Error updating job extras:', error);
-      toast.error('Failed to submit extra change');
+      console.error('Error saving job extra:', error);
+      toast.error('Failed to save extra');
     },
   });
-}
-
-interface ReviewJobExtraPayload {
-  jobId: string;
-  technicianId: string;
-  extraType: JobExtraType;
-  reason?: string;
-}
-
-export function useReviewJobExtra() {
-  const queryClient = useQueryClient();
-
-  const approve = useMutation({
-    mutationFn: async ({ jobId, technicianId, extraType }: Omit<ReviewJobExtraPayload, 'reason'>) => {
-      const { data: existing, error: fetchError } = await supabase
-        .from('job_rate_extras')
-        .select('*')
-        .eq('job_id', jobId)
-        .eq('technician_id', technicianId)
-        .eq('extra_type', extraType)
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
-      if (!existing) throw new Error('Extra not found');
-
-      const pendingQuantity = (existing as any).pending_quantity;
-      const newQuantity = pendingQuantity ?? (existing as any).quantity ?? 0;
-
-      const { data: auth } = await supabase.auth.getUser();
-      const now = new Date().toISOString();
-
-      const { error: updateError } = await supabase
-        .from('job_rate_extras')
-        .update({
-          quantity: newQuantity,
-          pending_quantity: null,
-          status: 'approved',
-          approved_at: now,
-          approved_by: auth.user?.id ?? null,
-          rejection_reason: null,
-          updated_at: now,
-          updated_by: auth.user?.id ?? null,
-        })
-        .eq('job_id', jobId)
-        .eq('technician_id', technicianId)
-        .eq('extra_type', extraType);
-
-      if (updateError) throw updateError;
-
-      if (!newQuantity || newQuantity <= 0) {
-        await supabase
-          .from('job_rate_extras')
-          .delete()
-          .eq('job_id', jobId)
-          .eq('technician_id', technicianId)
-          .eq('extra_type', extraType);
-      }
-
-      return { job_id: jobId };
-    },
-    onSuccess: (data) => {
-      invalidateJobExtrasContext(queryClient, data.job_id);
-      toast.success('Extra approved');
-    },
-    onError: (error) => {
-      console.error('Error approving job extra:', error);
-      toast.error('Failed to approve extra');
-    },
-  });
-
-  const reject = useMutation({
-    mutationFn: async ({ jobId, technicianId, extraType, reason }: ReviewJobExtraPayload) => {
-      const { data: auth } = await supabase.auth.getUser();
-      const now = new Date().toISOString();
-
-      const { error } = await supabase
-        .from('job_rate_extras')
-        .update({
-          pending_quantity: null,
-          status: 'rejected',
-          rejection_reason: reason ?? null,
-          approved_at: null,
-          approved_by: null,
-          updated_at: now,
-          updated_by: auth.user?.id ?? null,
-        })
-        .eq('job_id', jobId)
-        .eq('technician_id', technicianId)
-        .eq('extra_type', extraType);
-
-      if (error) throw error;
-
-      return { job_id: jobId };
-    },
-    onSuccess: (data) => {
-      invalidateJobExtrasContext(queryClient, data.job_id);
-      toast.success('Extra rejected');
-    },
-    onError: (error) => {
-      console.error('Error rejecting job extra:', error);
-      toast.error('Failed to reject extra');
-    },
-  });
-
-  return { approve, reject };
 }
