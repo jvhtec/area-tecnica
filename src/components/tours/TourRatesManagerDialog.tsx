@@ -98,6 +98,13 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
     if (quotes.length > 0 && selectedJobId) {
       console.log('TourRatesManagerDialog - Quotes for job:', selectedJobId, quotes);
       quotes.forEach((q, idx) => {
+        console.log(`Quote ${idx} - ${getTechName(q.technician_id)}:`, {
+          base_day_eur: q.base_day_eur,
+          total_eur: q.total_eur,
+          extras_total_eur: q.extras_total_eur,
+          total_with_extras_eur: q.total_with_extras_eur,
+          extras: q.extras,
+        });
         if ((q.total_eur ?? 0) === 0) {
           console.warn(`Manager view - Quote ${idx} has zero total:`, {
             technician: getTechName(q.technician_id),
@@ -109,6 +116,8 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
             week_count: q.week_count,
             is_tour_team_member: q.is_tour_team_member,
             total_eur: q.total_eur,
+            extras_total_eur: q.extras_total_eur,
+            total_with_extras_eur: q.total_with_extras_eur,
             breakdown: q.breakdown,
           });
         }
