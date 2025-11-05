@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { TourJobRateQuote } from '@/types/tourRates';
+import { formatMultiplier, getPerJobMultiplier } from '@/lib/tourRateMath';
 import { formatCurrency } from '@/lib/utils';
 import { fetchJobLogo, fetchTourLogo, getCompanyLogo } from '@/utils/pdf/logoUtils';
 
@@ -248,11 +249,12 @@ export async function generateRateQuotePDF(
   const tableData = quotes.map((quote) => {
     const name = getTechName(quote.technician_id);
     const lpo = lpoMap?.get(quote.technician_id) ?? null;
+    const perJobMultiplier = getPerJobMultiplier(quote);
     return [
       withLpo(name, lpo),
       quote.is_house_tech ? 'Plantilla' : quote.category || '—',
       formatCurrency(quote.base_day_eur),
-      quote.multiplier > 1 ? `×${quote.multiplier}` : '—',
+      formatMultiplier(perJobMultiplier),
       formatCurrency(quote.extras_total_eur || 0),
       formatCurrency(quote.total_with_extras_eur || quote.total_eur || 0),
     ];
@@ -284,7 +286,10 @@ export async function generateRateQuotePDF(
   const pageWidth = doc.internal.pageSize.getWidth();
   const summaryWidth = pageWidth - 28;
 
-  const totalBase = quotes.reduce((sum, quote) => sum + quote.base_day_eur * (quote.multiplier || 1), 0);
+  const totalBase = quotes.reduce(
+    (sum, quote) => sum + (quote.total_eur || quote.base_day_eur || 0),
+    0
+  );
   const totalExtras = quotes.reduce((sum, quote) => sum + (quote.extras_total_eur || 0), 0);
   const grandTotal = quotes.reduce(
     (sum, quote) => sum + (quote.total_with_extras_eur || quote.total_eur || 0),
@@ -478,10 +483,15 @@ export async function generateTourRatesSummaryPDF(
     const jobTableRows = item.quotes.map((quote) => {
       const name = getTechName(quote.technician_id);
       const lpo = item.lpoMap?.get(quote.technician_id) ?? null;
-      const isTourDate = String(quote.job_type || '').toLowerCase() === 'tourdate';
+      const perJobMultiplier = getPerJobMultiplier(quote);
+      const baseBeforeMultiplier = Number(
+        quote.breakdown?.after_discount ??
+          quote.breakdown?.base_calculation ??
+          quote.base_day_eur
+      );
       const baseText =
-        quote.multiplier > 1
-          ? `${formatCurrency(quote.base_day_eur)} ×${quote.multiplier}`
+        perJobMultiplier && perJobMultiplier > 1
+          ? `${formatCurrency(baseBeforeMultiplier)} ${formatMultiplier(perJobMultiplier)} = ${formatCurrency(quote.base_day_eur)}`
           : formatCurrency(quote.base_day_eur);
 
       let nameCell = withLpo(name, lpo);
@@ -532,7 +542,7 @@ export async function generateTourRatesSummaryPDF(
     breakdownY = ((doc as any).lastAutoTable?.finalY ?? breakdownY) + 6;
 
     const jobBaseTotal = item.quotes.reduce(
-      (sum, quote) => sum + quote.base_day_eur * (quote.multiplier || 1),
+      (sum, quote) => sum + (quote.total_eur || quote.base_day_eur || 0),
       0
     );
     const jobExtrasTotal = item.quotes.reduce((sum, quote) => sum + (quote.extras_total_eur || 0), 0);
