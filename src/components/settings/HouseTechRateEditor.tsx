@@ -28,6 +28,8 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
   const logActivityMutation = useLogRateActivity();
   
   const [baseDayEur, setBaseDayEur] = useState<string>('');
+  const [tourBaseResponsableEur, setTourBaseResponsableEur] = useState<string>('');
+  const [tourBaseOtherEur, setTourBaseOtherEur] = useState<string>('');
   const [plus1012Eur, setPlus1012Eur] = useState<string>('30');
   const [overtimeHourEur, setOvertimeHourEur] = useState<string>('');
 
@@ -49,6 +51,8 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
   useEffect(() => {
     if (currentRate) {
       setBaseDayEur(currentRate.base_day_eur.toString());
+      setTourBaseResponsableEur(currentRate.tour_base_responsable_eur?.toString() || '');
+      setTourBaseOtherEur(currentRate.tour_base_other_eur?.toString() || '');
       setPlus1012Eur(currentRate.plus_10_12_eur?.toString() || '30');
       setOvertimeHourEur(currentRate.overtime_hour_eur?.toString() || '');
     }
@@ -62,6 +66,8 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
     await saveRateMutation.mutateAsync({
       profile_id: profileId,
       base_day_eur: parseFloat(baseDayEur),
+      tour_base_responsable_eur: tourBaseResponsableEur ? parseFloat(tourBaseResponsableEur) : null,
+      tour_base_other_eur: tourBaseOtherEur ? parseFloat(tourBaseOtherEur) : null,
       plus_10_12_eur: plus1012Eur ? parseFloat(plus1012Eur) : null,
       overtime_hour_eur: overtimeHourEur ? parseFloat(overtimeHourEur) : null,
     });
@@ -136,7 +142,39 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
               placeholder="Introduce la tarifa de día base"
             />
             <p className="text-xs text-muted-foreground">
-              Se usa para turnos de hasta 10 horas
+              Se usa para eventos de house y turnos de hasta 10 horas
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tour-base-responsable">Tarifa día base para tours - Responsable (€)</Label>
+            <Input
+              id="tour-base-responsable"
+              type="number"
+              step="0.01"
+              min="0"
+              value={tourBaseResponsableEur}
+              onChange={(e) => setTourBaseResponsableEur(e.target.value)}
+              placeholder="Dejar vacío para usar tarifa estándar"
+            />
+            <p className="text-xs text-muted-foreground">
+              Tarifa cuando trabaja como responsable en tours. Si está vacío, se usará la tarifa día base estándar.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tour-base-other">Tarifa día base para tours - Técnico/Especialista (€)</Label>
+            <Input
+              id="tour-base-other"
+              type="number"
+              step="0.01"
+              min="0"
+              value={tourBaseOtherEur}
+              onChange={(e) => setTourBaseOtherEur(e.target.value)}
+              placeholder="Dejar vacío para usar tarifa estándar"
+            />
+            <p className="text-xs text-muted-foreground">
+              Tarifa cuando trabaja como técnico o especialista en tours. Si está vacío, se usará la tarifa día base estándar.
             </p>
           </div>
 
