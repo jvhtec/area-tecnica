@@ -905,6 +905,16 @@ async function handleBroadcast(
     // - To the assigned tech: "Actor te ha confirmado..." (you have been confirmed)
     // - To management: "Actor ha confirmado a TechName..." (has confirmed TechName)
 
+    console.log('📋 Processing job.assignment.direct event', {
+      jobId,
+      jobTitle,
+      recipientId: body.recipient_id,
+      recipientName: recipName,
+      assignmentStatus: (body as any)?.assignment_status,
+      singleDay: singleDayFlag,
+      targetDate: normalizedTargetDate
+    });
+
     // We'll handle this specially by sending two separate notifications
     const statusText = (body as any)?.assignment_status === 'confirmed' ? 'confirmado' : 'asignado';
     const assignedTechId = body.recipient_id;
@@ -938,10 +948,18 @@ async function handleBroadcast(
         techText = `${actor} te ha ${statusText} a "${jobTitle || 'Trabajo'}".`;
       }
 
+      console.log('👤 Fetching subscriptions for technician', {
+        techId: assignedTechId,
+        title: techTitle,
+        message: techText
+      });
+
       const { data: techSubs } = await client
         .from('push_subscriptions')
         .select('endpoint, p256dh, auth, user_id')
         .eq('user_id', assignedTechId);
+
+      console.log('👤 Found technician subscriptions:', techSubs?.length || 0);
 
       if (techSubs && techSubs.length > 0) {
         techSubsCount = techSubs.length;
@@ -956,7 +974,10 @@ async function handleBroadcast(
         await Promise.all(techSubs.map(async (sub: any) => {
           await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, techPayload);
         }));
+        console.log(`✅ Sent ${techSubsCount} notification(s) to technician`);
       }
+    } else {
+      console.warn('⚠️ No assignedTechId provided');
     }
 
     // 2. Send notification to management (using tech's name)
@@ -976,10 +997,18 @@ async function handleBroadcast(
       }
     }
 
+    console.log('👥 Fetching subscriptions for management', {
+      managementCount: mgmt.size,
+      title: mgmtTitle,
+      message: mgmtText
+    });
+
     const { data: mgmtSubs } = await client
       .from('push_subscriptions')
       .select('endpoint, p256dh, auth, user_id')
       .in('user_id', Array.from(mgmt));
+
+    console.log('👥 Found management subscriptions:', mgmtSubs?.length || 0);
 
     if (mgmtSubs && mgmtSubs.length > 0) {
       mgmtSubsCount = mgmtSubs.length;
@@ -994,7 +1023,14 @@ async function handleBroadcast(
       await Promise.all(mgmtSubs.map(async (sub: any) => {
         await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
       }));
+      console.log(`✅ Sent ${mgmtSubsCount} notification(s) to management`);
     }
+
+    console.log('📤 Direct assignment notifications complete', {
+      techNotifications: techSubsCount,
+      managementNotifications: mgmtSubsCount,
+      total: techSubsCount + mgmtSubsCount
+    });
 
     // Return early since we've already sent the notifications
     return jsonResponse({ status: 'sent', count: techSubsCount + mgmtSubsCount });

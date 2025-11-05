@@ -248,7 +248,17 @@ export const AssignJobDialog = ({
       // Send push notification for direct assignments
       const recipientName = `${technician.first_name ?? ''} ${technician.last_name ?? ''}`.trim();
       try {
-        void supabase.functions.invoke('push', {
+        console.log('📤 Sending push notification for direct assignment', {
+          jobId: selectedJobId,
+          jobTitle: selectedJob?.title,
+          recipientId: technicianId,
+          recipientName,
+          status: assignAsConfirmed ? 'confirmed' : 'invited',
+          singleDay,
+          date: assignmentDate
+        });
+
+        const pushResponse = await supabase.functions.invoke('push', {
           body: {
             action: 'broadcast',
             type: 'job.assignment.direct',
@@ -260,8 +270,11 @@ export const AssignJobDialog = ({
             single_day: singleDay
           }
         });
-      } catch (_) {
+
+        console.log('✅ Push notification response:', pushResponse);
+      } catch (error) {
         // Non-blocking push failure
+        console.error('❌ Push notification failed:', error);
       }
 
       // Force refresh of queries by dispatching a custom event
