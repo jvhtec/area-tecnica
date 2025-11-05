@@ -10,6 +10,7 @@ export interface TourJobRateQuote {
   title: string;
   is_house_tech: boolean;
   is_tour_team_member?: boolean;
+  use_tour_multipliers?: boolean; // Override flag to force tour multipliers even if not tour-wide assigned
   category: string;
   base_day_eur: number;
   week_count: number;

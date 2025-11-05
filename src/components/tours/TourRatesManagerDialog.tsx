@@ -6,14 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Euro, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX, FileDown } from 'lucide-react';
+import { Euro, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX, FileDown, Info } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import { useSaveHouseTechRate } from '@/hooks/useHouseTechRates';
+import { useUpdateMultiplierOverride } from '@/hooks/useJobAssignments';
 import { JobExtrasEditor } from '@/components/jobs/JobExtrasEditor';
 import { formatMultiplier, getPerJobMultiplier, shouldDisplayMultiplier } from '@/lib/tourRateMath';
 import { formatCurrency } from '@/lib/utils';
@@ -120,7 +123,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   const { data: houseRates = [] } = useQuery({
     queryKey: ['house-tech-rates-bulk', quotes.map(q => q.technician_id)],
     queryFn: async () => {
-      if (!quotes.length) return [] as Array<{ profile_id: string; base_day_eur: number }>; 
+      if (!quotes.length) return [] as Array<{ profile_id: string; base_day_eur: number }>;
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
       const { data, error } = await supabase
         .from('house_tech_rates')
@@ -137,6 +140,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   // Fixers
   const queryClient = useQueryClient();
   const saveHouseRate = useSaveHouseTechRate();
+  const updateMultiplierOverride = useUpdateMultiplierOverride();
   const fixCategoryMutation = useMutation({
     mutationFn: async ({ technicianId, category }: { technicianId: string; category: 'tecnico' | 'especialista' | 'responsable' }) => {
       const { error } = await supabase
@@ -539,6 +543,59 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                           </Button>
                         </div>
                       </div>
+
+                      {/* Tour Multiplier Override - Only show for non-tour-team members on tour dates */}
+                      {selectedJob?.job_type === 'tourdate' && !q.is_tour_team_member && !house && (
+                        <div className="flex items-start gap-2 p-3 rounded-lg border bg-blue-50 border-blue-200">
+                          <TooltipProvider>
+                            <div className="flex items-center gap-3 w-full">
+                              <Checkbox
+                                id={`override-${q.job_id}-${q.technician_id}`}
+                                checked={q.use_tour_multipliers ?? false}
+                                onCheckedChange={(checked) => {
+                                  updateMultiplierOverride.mutate({
+                                    jobId: q.job_id,
+                                    technicianId: q.technician_id,
+                                    useTourMultipliers: checked as boolean,
+                                  });
+                                }}
+                                disabled={updateMultiplierOverride.isPending}
+                              />
+                              <Label
+                                htmlFor={`override-${q.job_id}-${q.technician_id}`}
+                                className="flex items-center gap-2 cursor-pointer text-sm font-normal"
+                              >
+                                Aplicar multiplicadores tour
+                                {q.use_tour_multipliers && (
+                                  <Badge variant="secondary" className="ml-2">
+                                    Override activo
+                                  </Badge>
+                                )}
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-4 w-4 text-blue-600 cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p>
+                                      Fuerza el cálculo de multiplicadores de tour para este técnico en esta fecha,
+                                      aunque no esté asignado a todo el tour. Útil cuando el técnico solo trabaja
+                                      fechas específicas pero debe recibir multiplicadores.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </Label>
+                            </div>
+                          </TooltipProvider>
+                        </div>
+                      )}
+
+                      {/* Show when tech is already tour-wide assigned */}
+                      {selectedJob?.job_type === 'tourdate' && q.is_tour_team_member && !q.use_tour_multipliers && (
+                        <div className="text-xs text-muted-foreground p-2 bg-muted/30 rounded-md flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">Asignado tour completo</Badge>
+                          <span>Multiplicadores aplicados automáticamente</span>
+                        </div>
+                      )}
 
                       {/* Problem solver */}
                       {hasError && (
