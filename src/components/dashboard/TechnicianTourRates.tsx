@@ -10,6 +10,7 @@ import { useTechnicianTourRateQuotes } from "@/hooks/useTourJobRateQuotes";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useTourRatesApprovalMap } from "@/hooks/useTourRatesApproval";
 import { useJobRatesApprovalMap } from "@/hooks/useJobRatesApproval";
+import { formatMultiplier, getPerJobMultiplier, shouldDisplayMultiplier } from "@/lib/tourRateMath";
 import type { TourJobRateQuote } from "@/types/tourRates";
 
 export const TechnicianTourRates: React.FC = () => {
@@ -219,6 +220,7 @@ export const TechnicianTourRates: React.FC = () => {
                   const displayTotal = quote.total_with_extras_eur ?? quote.total_eur ?? 0;
                   const baseDayAmount = quote.base_day_eur ?? 0;
                   const extrasAmount = quote.extras_total_eur ?? 0;
+                  const perJobMultiplier = getPerJobMultiplier(quote);
                   return (
                     <div
                       key={quote.job_id}
@@ -235,9 +237,9 @@ export const TechnicianTourRates: React.FC = () => {
                           {quote.is_house_tech && (
                             <Badge variant="secondary" className="text-xs">Tarifa fija</Badge>
                           )}
-                          {quote.is_tour_team_member && quote.multiplier > 1 && (
+                          {quote.is_tour_team_member && shouldDisplayMultiplier(quote.multiplier) && (
                             <Badge variant="outline" className="text-xs">
-                              Multiplicador semanal ×{quote.multiplier}
+                              Multiplicador semanal {formatMultiplier(quote.multiplier)}
                             </Badge>
                           )}
                         </div>
@@ -254,8 +256,12 @@ export const TechnicianTourRates: React.FC = () => {
                         <div className="font-semibold text-lg">{formatCurrency(displayTotal)}</div>
                         <div className="text-xs text-muted-foreground">
                           Base {formatCurrency(baseDayAmount)}
-                          {quote.is_tour_team_member && quote.multiplier > 1 && (
-                            <span> × {quote.multiplier} ({quote.week_count} {quote.week_count === 1 ? 'fecha' : 'fechas'})</span>
+                          {quote.is_tour_team_member && shouldDisplayMultiplier(perJobMultiplier) && (
+                            <span>
+                              {' '}
+                              {formatMultiplier(perJobMultiplier)} ({quote.week_count}{' '}
+                              {quote.week_count === 1 ? 'fecha' : 'fechas'})
+                            </span>
                           )}
                           {extrasAmount > 0 && (
                             <span className="block text-green-600 mt-1">+ Extras {formatCurrency(extrasAmount)}</span>

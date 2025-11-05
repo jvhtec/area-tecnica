@@ -8,6 +8,7 @@ import { useTourJobRateQuotes } from "@/hooks/useTourJobRateQuotes";
 import { TourJobRateQuote } from "@/types/tourRates";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatMultiplier, getPerJobMultiplier, shouldDisplayMultiplier } from "@/lib/tourRateMath";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -211,8 +212,18 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                         {formatCurrency(quote.total_with_extras_eur || quote.total_eur)}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {formatCurrency(quote.base_day_eur)} × {quote.multiplier}
-                        {quote.week_count > 1 && ` (${quote.week_count} dates)`}
+                        Base {formatCurrency(quote.base_day_eur)}
+                        {(() => {
+                          const perJobMultiplier = getPerJobMultiplier(quote);
+                          if (!shouldDisplayMultiplier(perJobMultiplier)) return null;
+                          return (
+                            <>
+                              {" "}
+                              {formatMultiplier(perJobMultiplier)}
+                              {quote.week_count > 1 && ` (${quote.week_count} fechas en la semana)`}
+                            </>
+                          );
+                        })()}
                         {quote.extras_total_eur && quote.extras_total_eur > 0 && (
                           <div className="text-green-600 mt-1">
                             +{formatCurrency(quote.extras_total_eur)} extras

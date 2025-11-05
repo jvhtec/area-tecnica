@@ -71,6 +71,7 @@ export function useTourJobRateQuotesForManager(jobId?: string, tourId?: string) 
               base_day_eur: 0,
               week_count: 1,
               multiplier: 1,
+              per_job_multiplier: 1,
               iso_year: null,
               iso_week: null,
               total_eur: 0,
@@ -95,6 +96,8 @@ export function useTourJobRateQuotesForManager(jobId?: string, tourId?: string) 
             base_day_eur: Number(q.base_day_eur ?? 0),
             week_count: Number(q.week_count ?? 1),
             multiplier: Number(q.multiplier ?? 1),
+            per_job_multiplier:
+              q.per_job_multiplier != null ? Number(q.per_job_multiplier) : undefined,
             iso_year: q.iso_year ?? null,
             iso_week: q.iso_week ?? null,
             total_eur: Number(q.total_eur ?? 0),

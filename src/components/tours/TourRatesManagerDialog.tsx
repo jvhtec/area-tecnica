@@ -15,6 +15,7 @@ import { es } from 'date-fns/locale';
 import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import { useSaveHouseTechRate } from '@/hooks/useHouseTechRates';
 import { JobExtrasEditor } from '@/components/jobs/JobExtrasEditor';
+import { formatMultiplier, getPerJobMultiplier, shouldDisplayMultiplier } from '@/lib/tourRateMath';
 import { formatCurrency } from '@/lib/utils';
 import { useTourRatesApproval } from '@/hooks/useTourRatesApproval';
 import { useJobRatesApproval, useJobRatesApprovalMap } from '@/hooks/useJobRatesApproval';
@@ -434,6 +435,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                 const hasError = Boolean(q.breakdown?.error);
                 const errorCode = q.breakdown?.error as string | undefined;
                 const house = q.is_house_tech;
+                const perJobMultiplier = getPerJobMultiplier(q);
 
                 return (
                   <Card key={q.technician_id + q.job_id}>
@@ -442,8 +444,8 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium">{name}</span>
                           {house && <Badge variant="secondary">Técnico en plantilla</Badge>}
-                          {q.is_tour_team_member && q.multiplier > 1 && (
-                            <Badge variant="outline">×{q.multiplier} multiplicador semanal</Badge>
+                          {q.is_tour_team_member && shouldDisplayMultiplier(q.multiplier) && (
+                            <Badge variant="outline">{formatMultiplier(q.multiplier)} multiplicador semanal</Badge>
                           )}
                           {q.category && !house && (
                             <Badge variant="outline">{q.category}</Badge>
@@ -452,7 +454,12 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                         <div className="text-right flex flex-col items-end gap-2">
                           <div className="font-semibold">{formatCurrency(q.total_with_extras_eur || q.total_eur)}</div>
                           <div className="text-xs text-muted-foreground">
-                            Base {formatCurrency(q.base_day_eur)} {q.multiplier > 1 ? `× ${q.multiplier}` : ''}
+                            Base {formatCurrency(q.base_day_eur)}{' '}
+                            {shouldDisplayMultiplier(perJobMultiplier)
+                              ? `${formatMultiplier(perJobMultiplier)}${
+                                  q.week_count > 1 ? ` (${q.week_count} fechas en la semana)` : ''
+                                }`
+                              : ''}
                           </div>
                           <Button
                             size="sm"
