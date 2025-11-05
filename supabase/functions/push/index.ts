@@ -901,32 +901,103 @@ async function handleBroadcast(
     }
     addRecipients([body.recipient_id]);
   } else if (type === 'job.assignment.direct') {
-    title = 'Nueva asignación';
+    // For direct assignments, we need to send different messages:
+    // - To the assigned tech: "Actor te ha confirmado..." (you have been confirmed)
+    // - To management: "Actor ha confirmado a TechName..." (has confirmed TechName)
+
+    // We'll handle this specially by sending two separate notifications
     const statusText = (body as any)?.assignment_status === 'confirmed' ? 'confirmado' : 'asignado';
-    if (singleDayFlag && formattedTargetDate) {
-      if (recipName) {
-        text = `${actor} te ha ${statusText} a "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`;
+    const assignedTechId = body.recipient_id;
+    const assignedTechName = recipName;
+
+    // Prepare metadata
+    if (singleDayFlag && normalizedTargetDate) {
+      metaExtras.singleDay = true;
+      metaExtras.targetDate = normalizedTargetDate;
+    }
+
+    const baseMeta = {
+      jobId: jobId,
+      tourId,
+      tourName: tourName ?? undefined,
+      actor,
+      recipient: assignedTechName,
+      ...metaExtras,
+    };
+
+    let techSubsCount = 0;
+    let mgmtSubsCount = 0;
+
+    // 1. Send notification to the assigned technician (personalized: "you")
+    if (assignedTechId) {
+      const techTitle = 'Nueva asignación';
+      let techText = '';
+      if (singleDayFlag && formattedTargetDate) {
+        techText = `${actor} te ha ${statusText} a "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`;
       } else {
-        text = `Has sido ${statusText} a "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`;
+        techText = `${actor} te ha ${statusText} a "${jobTitle || 'Trabajo'}".`;
       }
-      if (normalizedTargetDate) {
-        metaExtras.singleDay = true;
-        metaExtras.targetDate = normalizedTargetDate;
-      }
-    } else {
-      if (recipName) {
-        text = `${actor} te ha ${statusText} a "${jobTitle || 'Trabajo'}".`;
-      } else {
-        text = `Has sido ${statusText} a "${jobTitle || 'Trabajo'}".`;
-      }
-      if (singleDayFlag && normalizedTargetDate) {
-        metaExtras.singleDay = true;
-        metaExtras.targetDate = normalizedTargetDate;
+
+      const { data: techSubs } = await client
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth, user_id')
+        .eq('user_id', assignedTechId);
+
+      if (techSubs && techSubs.length > 0) {
+        techSubsCount = techSubs.length;
+        const techPayload: PushPayload = {
+          title: techTitle,
+          body: techText,
+          url,
+          type,
+          meta: baseMeta,
+        };
+
+        await Promise.all(techSubs.map(async (sub: any) => {
+          await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, techPayload);
+        }));
       }
     }
-    // By default, notify the assigned technician + management
-    addRecipients([body.recipient_id]);
-    addNaturalRecipients(Array.from(mgmt));
+
+    // 2. Send notification to management (using tech's name)
+    const mgmtTitle = 'Asignación directa';
+    let mgmtText = '';
+    if (assignedTechName) {
+      if (singleDayFlag && formattedTargetDate) {
+        mgmtText = `${actor} ha ${statusText} a ${assignedTechName} a "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`;
+      } else {
+        mgmtText = `${actor} ha ${statusText} a ${assignedTechName} a "${jobTitle || 'Trabajo'}".`;
+      }
+    } else {
+      if (singleDayFlag && formattedTargetDate) {
+        mgmtText = `${actor} ha ${statusText} un técnico a "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`;
+      } else {
+        mgmtText = `${actor} ha ${statusText} un técnico a "${jobTitle || 'Trabajo'}".`;
+      }
+    }
+
+    const { data: mgmtSubs } = await client
+      .from('push_subscriptions')
+      .select('endpoint, p256dh, auth, user_id')
+      .in('user_id', Array.from(mgmt));
+
+    if (mgmtSubs && mgmtSubs.length > 0) {
+      mgmtSubsCount = mgmtSubs.length;
+      const mgmtPayload: PushPayload = {
+        title: mgmtTitle,
+        body: mgmtText,
+        url,
+        type,
+        meta: baseMeta,
+      };
+
+      await Promise.all(mgmtSubs.map(async (sub: any) => {
+        await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
+      }));
+    }
+
+    // Return early since we've already sent the notifications
+    return jsonResponse({ status: 'sent', count: techSubsCount + mgmtSubsCount });
   } else if (type === 'task.assigned') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
     const jobLabel = jobId ? (jobTitle || 'Trabajo') : (tourName || 'Tour');
