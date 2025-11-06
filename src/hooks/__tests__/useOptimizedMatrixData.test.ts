@@ -11,7 +11,7 @@ describe('buildAssignmentDateMap', () => {
         technician_id: 'tech-a',
         sound_role: 'mix',
         single_day: false,
-        single_day_date: null,
+        assignment_date: null,
         job: {
           id: 'job-a',
           title: 'Main Show',
@@ -24,7 +24,7 @@ describe('buildAssignmentDateMap', () => {
         technician_id: 'tech-b',
         lights_role: 'lx-lead',
         single_day: true,
-        single_day_date: '2025-03-02',
+        assignment_date: '2025-03-02',
         job: {
           id: 'job-b',
           title: 'Support Day',
