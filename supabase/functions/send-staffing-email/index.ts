@@ -290,13 +290,17 @@ serve(async (req) => {
           console.warn('⚠️ Conflict check skipped due to assignment fetch error:', assignErr);
         } else if ((confirmedAssigns?.length ?? 0) > 0) {
           const assignments = confirmedAssigns ?? [];
+          const targetDatesToEvaluate = normalizedDates.length > 0
+            ? normalizedDates
+            : (normalizedTargetDate ? [normalizedTargetDate] : []);
+          const targetDateSet = new Set(targetDatesToEvaluate);
           const relevantAssignments = assignments
             .filter(a => a.job_id !== job_id)
             .filter(a => {
-              if (!normalizedTargetDate) return true;
+              if (targetDateSet.size === 0) return true;
               if (!a.single_day) return true;
               if (!a.assignment_date) return true;
-              return a.assignment_date === normalizedTargetDate;
+              return targetDateSet.has(a.assignment_date);
             });
           const otherJobIds = Array.from(new Set(relevantAssignments.map(a => a.job_id)));
           if (otherJobIds.length > 0) {
@@ -313,60 +317,67 @@ serve(async (req) => {
                   assignmentByJob.set(a.job_id, a);
                 }
               });
-              const targetStart = normalizedTargetDate
-                ? new Date(`${normalizedTargetDate}T00:00:00Z`)
-                : job.start_time ? new Date(job.start_time) : null;
-              const targetEnd = normalizedTargetDate
-                ? new Date(`${normalizedTargetDate}T23:59:59Z`)
-                : job.end_time ? new Date(job.end_time) : null;
-              const overlap = targetStart && targetEnd ? (otherJobs ?? []).find(j => {
-                const meta = assignmentByJob.get(j.id);
-                if (!meta) return false;
-                const otherStart = j.start_time ? new Date(j.start_time) : null;
-                const otherEnd = j.end_time ? new Date(j.end_time) : null;
-                if (meta.single_day) {
-                  if (normalizedTargetDate) {
-                    return true;
+              const rangesToCheck: (string | null)[] = targetDatesToEvaluate.length > 0 ? targetDatesToEvaluate : [null];
+              const findOverlapForDate = (dateToCheck: string | null) => {
+                const targetStart = dateToCheck
+                  ? new Date(`${dateToCheck}T00:00:00Z`)
+                  : job.start_time ? new Date(job.start_time) : null;
+                const targetEnd = dateToCheck
+                  ? new Date(`${dateToCheck}T23:59:59Z`)
+                  : job.end_time ? new Date(job.end_time) : null;
+                return targetStart && targetEnd ? (otherJobs ?? []).find(j => {
+                  const meta = assignmentByJob.get(j.id);
+                  if (!meta) return false;
+                  const otherStart = j.start_time ? new Date(j.start_time) : null;
+                  const otherEnd = j.end_time ? new Date(j.end_time) : null;
+                  if (meta.single_day) {
+                    if (dateToCheck) {
+                      return true;
+                    }
+                    if (!meta.assignment_date) {
+                      return true;
+                    }
+                    const targetStartStr = job.start_time ? new Date(job.start_time).toISOString().split('T')[0] : null;
+                    const targetEndStr = job.end_time ? new Date(job.end_time).toISOString().split('T')[0] : null;
+                    if (!targetStartStr || !targetEndStr) {
+                      return true;
+                    }
+                    return meta.assignment_date >= targetStartStr && meta.assignment_date <= targetEndStr;
                   }
-                  if (!meta.assignment_date) {
-                    return true;
-                  }
-                  const targetStartStr = job.start_time ? new Date(job.start_time).toISOString().split('T')[0] : null;
-                  const targetEndStr = job.end_time ? new Date(job.end_time).toISOString().split('T')[0] : null;
-                  if (!targetStartStr || !targetEndStr) {
-                    return true;
-                  }
-                  return meta.assignment_date >= targetStartStr && meta.assignment_date <= targetEndStr;
+                  return otherStart && otherEnd && (otherStart < targetEnd) && (otherEnd > targetStart);
+                }) : null;
+              };
+              for (const dateToCheck of rangesToCheck) {
+                const overlap = findOverlapForDate(dateToCheck);
+                if (overlap) {
+                  const overlapStart = overlap.start_time ? new Date(overlap.start_time) : null;
+                  const overlapEnd = overlap.end_time ? new Date(overlap.end_time) : null;
+                  const conflictTargetDate = dateToCheck ?? normalizedTargetDate ?? null;
+                  console.log('⛔ Conflict detected with confirmed job:', overlap);
+                  return new Response(JSON.stringify({
+                    error: 'Technician has a confirmed overlapping job',
+                    details: {
+                      conflicting_job: {
+                        id: overlap.id,
+                        title: overlap.title,
+                        start_time: overlapStart?.toISOString(),
+                        end_time: overlapEnd?.toISOString()
+                      },
+                      target_job: {
+                        id: job.id,
+                        title: job.title,
+                        start_time: job.start_time,
+                        end_time: job.end_time,
+                        single_day: isSingleDayRequest,
+                        target_date: conflictTargetDate
+                      },
+                      technician: { id: tech.id, name: fullName }
+                    }
+                  }), {
+                    status: 409,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                  });
                 }
-                return otherStart && otherEnd && (otherStart < targetEnd) && (otherEnd > targetStart);
-              }) : null;
-              if (overlap) {
-                const overlapStart = overlap.start_time ? new Date(overlap.start_time) : null;
-                const overlapEnd = overlap.end_time ? new Date(overlap.end_time) : null;
-                console.log('⛔ Conflict detected with confirmed job:', overlap);
-                return new Response(JSON.stringify({
-                  error: 'Technician has a confirmed overlapping job',
-                  details: {
-                    conflicting_job: {
-                      id: overlap.id,
-                      title: overlap.title,
-                      start_time: overlapStart?.toISOString(),
-                      end_time: overlapEnd?.toISOString()
-                    },
-                    target_job: {
-                      id: job.id,
-                      title: job.title,
-                      start_time: job.start_time,
-                      end_time: job.end_time,
-                      single_day: isSingleDayRequest,
-                      target_date: normalizedTargetDate
-                    },
-                    technician: { id: tech.id, name: fullName }
-                  }
-                }), {
-                  status: 409,
-                  headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
               }
             }
           }
