@@ -329,6 +329,12 @@ serve(async (req) => {
           if (!hasConflict) {
             // 4) Upsert assignment(s): handles single or batch dates
             async function upsertAssignmentFor(targetDate: string | null) {
+              console.log('🧾 upsertAssignmentFor invoked', {
+                job_id: row.job_id,
+                technician_id: row.profile_id,
+                targetDate,
+                batch_id: (row as any)?.batch_id || null,
+              });
               const rolePatch: Record<string, string | null> = {};
               if (prof.department === 'sound') rolePatch['sound_role'] = chosenRole;
               else if (prof.department === 'lights') rolePatch['lights_role'] = chosenRole;
@@ -346,13 +352,86 @@ serve(async (req) => {
                 upsertPayload.single_day = true;
                 upsertPayload.assignment_date = targetDate;
               }
-              const { error: upsertErr } = await supabase
-                .from('job_assignments')
-                .upsert(upsertPayload, { onConflict: 'job_id,technician_id' });
-              if (upsertErr) {
-                await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_error', meta: { message: upsertErr.message, target_date: targetDate } });
+              const onConflictKeys = targetDate ? 'job_id,technician_id,assignment_date' : 'job_id,technician_id';
+              let upsertErr: any = null;
+              let upsertAttemptSummary: string | null = null;
+
+              const attemptUpsert = async () => {
+                const { error } = await supabase
+                  .from('job_assignments')
+                  .upsert(upsertPayload, { onConflict: onConflictKeys });
+                return error;
+              };
+
+              if (targetDate) {
+                upsertErr = await attemptUpsert();
+                if (upsertErr && /no unique/i.test(upsertErr.message) && /constraint/i.test(upsertErr.message)) {
+                  console.warn('⚠️ job_assignments per-day upsert missing composite constraint, falling back to manual flow', {
+                    job_id: row.job_id,
+                    technician_id: row.profile_id,
+                    targetDate,
+                  });
+                  const { data: existingRow } = await supabase
+                    .from('job_assignments')
+                    .select('id')
+                    .eq('job_id', row.job_id)
+                    .eq('technician_id', row.profile_id)
+                    .eq('assignment_date', targetDate)
+                    .maybeSingle();
+
+                  if (existingRow?.id) {
+                    const { error: updateErr } = await supabase
+                      .from('job_assignments')
+                      .update(upsertPayload)
+                      .eq('id', existingRow.id);
+                    upsertErr = updateErr;
+                    upsertAttemptSummary = 'updated-existing';
+                  } else {
+                    const { error: insertErr } = await supabase
+                      .from('job_assignments')
+                      .insert(upsertPayload);
+                    upsertErr = insertErr;
+                    upsertAttemptSummary = 'inserted-new';
+                  }
+                }
               } else {
-                await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_ok', meta: { role: chosenRole, department: prof.department, target_date: targetDate } });
+                upsertErr = await attemptUpsert();
+              }
+
+              if (!upsertErr && !upsertAttemptSummary) {
+                upsertAttemptSummary = targetDate ? 'direct-upsert-per-day' : 'direct-upsert';
+              }
+
+              if (upsertErr) {
+                console.error('❌ job_assignments upsert failed', {
+                  job_id: row.job_id,
+                  technician_id: row.profile_id,
+                  targetDate,
+                  onConflictKeys,
+                  attemptSummary: upsertAttemptSummary,
+                  error: upsertErr,
+                });
+                await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_error', meta: { message: upsertErr.message, target_date: targetDate, on_conflict: onConflictKeys, attempt: upsertAttemptSummary } });
+              } else {
+                const { data: assignmentProbe, error: probeErr } = await supabase
+                  .from('job_assignments')
+                  .select('id,assignment_date,status')
+                  .eq('job_id', row.job_id)
+                  .eq('technician_id', row.profile_id)
+                  .order('assignment_date', { ascending: true });
+                if (probeErr) {
+                  console.warn('⚠️ Unable to verify job_assignments after upsert', { job_id: row.job_id, technician_id: row.profile_id, error: probeErr });
+                } else {
+                  console.log('✅ job_assignments per-day verification', {
+                    job_id: row.job_id,
+                    technician_id: row.profile_id,
+                    targetDate,
+                    onConflictKeys,
+                    attemptSummary: upsertAttemptSummary,
+                    assignmentDates: (assignmentProbe || []).map(a => ({ id: a.id, assignment_date: a.assignment_date, status: a.status })),
+                  });
+                }
+                await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_ok', meta: { role: chosenRole, department: prof.department, target_date: targetDate, attempt: upsertAttemptSummary } });
               }
             }
 
@@ -384,9 +463,21 @@ serve(async (req) => {
                 }
 
                 const assignmentDate = isSingleDay && hasDate ? br.target_date : null;
+                console.log('📅 Processing batch assignment row', {
+                  request_id: br.id,
+                  job_id: row.job_id,
+                  technician_id: row.profile_id,
+                  batch_id: (row as any).batch_id,
+                  assignmentDate,
+                });
                 await upsertAssignmentFor(assignmentDate);
               }
             } else {
+              console.log('📅 Processing single assignment row', {
+                job_id: row.job_id,
+                technician_id: row.profile_id,
+                targetDate: (row as any).single_day && (row as any).target_date ? (row as any).target_date : null,
+              });
               await upsertAssignmentFor((row as any).single_day && (row as any).target_date ? (row as any).target_date : null);
             }
 
