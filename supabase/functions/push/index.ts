@@ -892,10 +892,19 @@ async function handleBroadcast(
     : null;
   const singleDayFlag = Boolean((body as any)?.single_day);
 
+  // ========================================================================
+  // JOB EVENTS (7 events)
+  // ========================================================================
+
   if (type === 'job.created') {
     title = 'Trabajo creado';
     text = `${actor} creó "${jobTitle || 'Trabajo'}".`;
     addNaturalRecipients(Array.from(mgmt));
+
+  // ========================================================================
+  // TIMESHEET EVENTS (3 events)
+  // ========================================================================
+
   } else if (type === 'timesheet.submitted') {
     // Department-scoped management notification for timesheet submissions.
     // We target: management users whose department matches the submitting technician, plus all admins.
@@ -949,6 +958,11 @@ async function handleBroadcast(
     if (techId) {
       addRecipients([techId]);
     }
+
+  // ========================================================================
+  // JOB EVENTS CONTINUED (update, type change, calltime)
+  // ========================================================================
+
   } else if (type === 'job.updated') {
     title = 'Trabajo actualizado';
     if (body.changes && typeof body.changes === 'object') {
@@ -960,6 +974,11 @@ async function handleBroadcast(
     }
     addNaturalRecipients(Array.from(mgmt));
     addNaturalRecipients(Array.from(participants));
+
+  // ========================================================================
+  // DOCUMENT EVENTS (4 events)
+  // ========================================================================
+
   } else if (type === 'document.uploaded') {
     title = 'Nuevo documento';
     const fname = body.file_name || 'documento';
@@ -982,6 +1001,11 @@ async function handleBroadcast(
     const fname = body.file_name || 'documento';
     text = `El documento "${fname}" dejó de estar visible en "${jobTitle || 'Trabajo'}".`;
     addNaturalRecipients(Array.from(participants));
+
+  // ========================================================================
+  // INCIDENT REPORTS (1 event - CRITICAL for safety)
+  // ========================================================================
+
   } else if (type === EVENT_TYPES.INCIDENT_REPORT_UPLOADED) {
     // CRITICAL: Incident reports are safety-critical and need immediate visibility
     title = '⚠️ Reporte de incidencia';
@@ -1005,6 +1029,11 @@ async function handleBroadcast(
     metaExtras.targetUrl = `/incident-reports`;
 
     console.log('🚨 Incident report notification - recipients:', recipients.size);
+
+  // ========================================================================
+  // STAFFING EVENTS (8 events)
+  // ========================================================================
+
   } else if (type === 'staffing.availability.sent') {
     title = 'Solicitud de disponibilidad enviada';
     text = `${actor} envió solicitud a ${recipName || 'técnico'} (${ch}).`;
@@ -1052,6 +1081,11 @@ async function handleBroadcast(
     text = `"${jobTitle || 'Trabajo'}" ha sido cancelado.`;
     addNaturalRecipients(Array.from(mgmt));
     addNaturalRecipients(Array.from(participants));
+
+  // ========================================================================
+  // JOB DELETION (1 event - CRITICAL)
+  // ========================================================================
+
   } else if (type === EVENT_TYPES.JOB_DELETED) {
     // CRITICAL: Job deletion notification - all assigned technicians need to know
     title = 'Trabajo eliminado';
@@ -1064,6 +1098,11 @@ async function handleBroadcast(
     addNaturalRecipients(Array.from(participants));
 
     console.log('🗑️ Job deletion notification - participants:', participants.size, 'management:', mgmt.size);
+
+  // ========================================================================
+  // ASSIGNMENT EVENTS (3 events)
+  // ========================================================================
+
   } else if (type === 'job.assignment.confirmed') {
     title = 'Asignación confirmada';
     if (singleDayFlag && formattedTargetDate) {
@@ -1268,6 +1307,11 @@ async function handleBroadcast(
 
     console.log('🚫 Assignment removal notification sent');
     return jsonResponse({ status: 'sent', count: techSubsCount + mgmtSubsCount });
+
+  // ========================================================================
+  // TASK EVENTS (3 events)
+  // ========================================================================
+
   } else if (type === 'task.assigned') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
     const jobLabel = jobId ? (jobTitle || 'Trabajo') : (tourName || 'Tour');
@@ -1297,6 +1341,11 @@ async function handleBroadcast(
       : `${actor} marcó como completada ${taskLabel} en "${jobLabel}".`;
     url = body.url || (jobId ? `/festival-management/${jobId}` : tourId ? `/tours/${tourId}` : url);
     addRecipients([body.recipient_id]);
+
+  // ========================================================================
+  // LOGISTICS EVENTS (4 events)
+  // ========================================================================
+
   } else if (type === 'logistics.transport.requested') {
     const department = (body as any)?.department as string | undefined;
     const description = (body as any)?.description as string | undefined;
@@ -1415,6 +1464,11 @@ async function handleBroadcast(
     if (deptText) {
       text += deptText;
     }
+
+  // ========================================================================
+  // FLEX EVENTS (2 events)
+  // ========================================================================
+
   } else if (type === 'flex.folders.created') {
     title = 'Carpetas Flex creadas';
     text = jobTitle
@@ -1437,6 +1491,11 @@ async function handleBroadcast(
     }
     url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
     addNaturalRecipients(Array.from(mgmt));
+
+  // ========================================================================
+  // MESSAGING (1 event)
+  // ========================================================================
+
   } else if (type === 'message.received') {
     title = 'Nuevo mensaje';
     const preview = body.message_preview || '';
@@ -1445,6 +1504,11 @@ async function handleBroadcast(
     // Only notify the recipient, not the sender
     clearAllRecipients();
     addRecipients([body.recipient_id]);
+
+  // ========================================================================
+  // TOUR EVENTS (3 events)
+  // ========================================================================
+
   } else if (type === 'tourdate.created') {
     title = 'Fecha de tour creada';
     const tn = body.tour_name || '';
@@ -1468,6 +1532,11 @@ async function handleBroadcast(
     text = tn ? `${actor} eliminó una fecha de "${tn}".` : `${actor} eliminó una fecha de tour.`;
     url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
     addNaturalRecipients(Array.from(mgmt));
+
+  // ========================================================================
+  // TOUR DATE TYPE CHANGE EVENTS (6 events)
+  // ========================================================================
+
   } else if (type.startsWith('tourdate.type.changed')) {
     // Tour date type change events
     const locationName = (body as any).location_name || 'fecha de tour';
@@ -1528,6 +1597,11 @@ async function handleBroadcast(
 
     url = body.url || (body.tour_id ? `/tours/${body.tour_id}` : url);
     addNaturalRecipients(Array.from(mgmt));
+
+  // ========================================================================
+  // JOB DATE TYPE CHANGE EVENTS (6 events)
+  // ========================================================================
+
   } else if (type.startsWith('jobdate.type.changed')) {
     // Per-job per-day date type change events (from job_date_types)
     const jobName = jobTitle || 'trabajo';
@@ -1572,6 +1646,11 @@ async function handleBroadcast(
     url = body.url || (jobId ? `/jobs/${jobId}` : url);
     addNaturalRecipients(Array.from(mgmt));
     addNaturalRecipients(Array.from(participants));
+
+  // ========================================================================
+  // JOB TYPE CHANGE EVENTS (6 events)
+  // ========================================================================
+
   } else if (type.startsWith('job.type.changed')) {
     // Job type change events
     const jobName = jobTitle || 'trabajo';
@@ -1618,6 +1697,11 @@ async function handleBroadcast(
     url = body.url || (jobId ? `/jobs/${jobId}` : url);
     addNaturalRecipients(Array.from(mgmt));
     addNaturalRecipients(Array.from(participants));
+
+  // ========================================================================
+  // SOUNDVISION EVENTS (2 events)
+  // ========================================================================
+
   } else if (type === 'soundvision.file.uploaded' || type === 'soundvision.file.downloaded') {
     // SoundVision payloads should provide venue_name, or file_id/venue_id for lookup so we can compose contextual notifications.
     const venueName = (await resolveSoundVisionVenueName(client, body)) || 'desconocido';
@@ -1628,6 +1712,11 @@ async function handleBroadcast(
     // Notify only users who are both management and in the sound department
     const soundManagement = Array.from(management).filter((id) => soundDept.has(id));
     addNaturalRecipients(soundManagement);
+
+  // ========================================================================
+  // FALLBACK (Unknown event types)
+  // ========================================================================
+
   } else {
     // Generic fallback using activity catalog label if available
     try {
