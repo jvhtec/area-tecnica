@@ -49,17 +49,25 @@ export function useStaffingStatus(jobId: string, profileId: string) {
   })
 }
 
+// Custom error type for conflicts
+export class ConflictError extends Error {
+  constructor(message: string, public details: any) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
 export function useSendStaffingEmail() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer', role?: string | null, message?: string | null, channel?: 'email' | 'whatsapp', target_date?: string | null, single_day?: boolean, dates?: string[] }) => {
+    mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer', role?: string | null, message?: string | null, channel?: 'email' | 'whatsapp', target_date?: string | null, single_day?: boolean, dates?: string[], override_conflicts?: boolean }) => {
       console.log('🚀 SENDING STAFFING EMAIL:', {
         payload,
         job_id_type: typeof payload.job_id,
         profile_id_type: typeof payload.profile_id,
         phase_valid: ['availability', 'offer'].includes(payload.phase)
       });
-      
+
       const { data, error } = await supabase.functions.invoke('send-staffing-email', {
         body: payload
       })
@@ -77,9 +85,15 @@ export function useSendStaffingEmail() {
       if (data?.error) {
         console.error('❌ EMAIL API ERROR:', data);
         console.error('❌ API ERROR DETAILS:', JSON.stringify(data.details || data, null, 2));
+
+        // If this is a conflict error (409), throw a special error type with details
+        if (data.details?.conflict_type || data.details?.conflicts || data.details?.unavailability) {
+          throw new ConflictError(data.error, data.details);
+        }
+
         throw new Error(data.error + (data.details ? `: ${JSON.stringify(data.details)}` : ''))
       }
-      
+
       console.log('✅ STAFFING REQUEST SENT SUCCESSFULLY');
       return data
     },

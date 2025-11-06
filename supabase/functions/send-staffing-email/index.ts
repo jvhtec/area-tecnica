@@ -98,9 +98,10 @@ serve(async (req) => {
     const actorId = await resolveActorId(supabase, req);
     const body = await req.json();
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
-    
-    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day } = body;
+
+    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts } = body;
     const datesArrayRaw: unknown = (body as any)?.dates;
+    const shouldOverrideConflicts = Boolean(override_conflicts);
     const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp') ? 'whatsapp' : 'email';
     const rawTargetDate = typeof target_date === 'string' && target_date ? target_date : null;
     let normalizedTargetDate = rawTargetDate ? (() => {
@@ -310,27 +311,31 @@ serve(async (req) => {
 
       // Step 2b: Enhanced conflict check using RPC function
       // Checks for both hard conflicts (confirmed) and soft conflicts (pending)
-      try {
-        console.log('🕒 CONFLICT CHECK: using enhanced RPC conflict checker...');
+      // Can be overridden with override_conflicts flag
+      if (shouldOverrideConflicts) {
+        console.log('⚠️ CONFLICT CHECK OVERRIDDEN by user - skipping conflict detection');
+      } else {
+        try {
+          console.log('🕒 CONFLICT CHECK: using enhanced RPC conflict checker...');
 
-        // Check conflicts for each date if multi-date, otherwise for single date or whole job
-        const datesToCheck = normalizedDates.length > 0 ? normalizedDates : [normalizedTargetDate];
+          // Check conflicts for each date if multi-date, otherwise for single date or whole job
+          const datesToCheck = normalizedDates.length > 0 ? normalizedDates : [normalizedTargetDate];
 
-        for (const dateToCheck of datesToCheck) {
-          const { data: conflictResult, error: conflictErr } = await supabase.rpc(
-            'check_technician_conflicts',
-            {
-              _technician_id: profile_id,
-              _target_job_id: job_id,
-              _target_date: dateToCheck,
-              _single_day: isSingleDayRequest,
-              _include_pending: true // Check both confirmed and pending assignments
-            }
-          );
+          for (const dateToCheck of datesToCheck) {
+            const { data: conflictResult, error: conflictErr } = await supabase.rpc(
+              'check_technician_conflicts',
+              {
+                _technician_id: profile_id,
+                _target_job_id: job_id,
+                _target_date: dateToCheck,
+                _single_day: isSingleDayRequest,
+                _include_pending: true // Check both confirmed and pending assignments
+              }
+            );
 
-          if (conflictErr) {
-            console.warn('⚠️ Conflict check failed, continuing to send email:', conflictErr);
-          } else if (conflictResult && (conflictResult.hasHardConflict || conflictResult.hasSoftConflict)) {
+            if (conflictErr) {
+              console.warn('⚠️ Conflict check failed, continuing to send email:', conflictErr);
+            } else if (conflictResult && (conflictResult.hasHardConflict || conflictResult.hasSoftConflict)) {
             const hasJobConflicts = (conflictResult.hardConflicts?.length > 0) || (conflictResult.softConflicts?.length > 0);
             const hasUnavailability = conflictResult.unavailabilityConflicts?.length > 0;
 
@@ -375,9 +380,10 @@ serve(async (req) => {
           }
         }
 
-        console.log('✅ No conflicts detected, proceeding to send email');
-      } catch (conflictCheckErr) {
-        console.warn('⚠️ Conflict check encountered an error, continuing to send email:', conflictCheckErr);
+          console.log('✅ No conflicts detected, proceeding to send email');
+        } catch (conflictCheckErr) {
+          console.warn('⚠️ Conflict check encountered an error, continuing to send email:', conflictCheckErr);
+        }
       }
 
       // Step 3: Generate token
