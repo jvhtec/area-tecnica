@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
 import { pickTextColor, rgbaFromHex } from '@/utils/color';
+import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
 
 interface OptimizedMatrixCellProps {
   technician: {
@@ -601,6 +602,28 @@ export const OptimizedMatrixCell = memo(({
                   try {
                     if (!assignment?.job_id) { setPendingRemoveAssignment(false); return; }
                     await supabase.from('job_assignments').delete().eq('job_id', assignment.job_id).eq('technician_id', technician.id)
+
+                    const flexDepartments = determineFlexDepartmentsForAssignment(assignment, technician.department);
+                    if (flexDepartments.length > 0) {
+                      await Promise.allSettled(flexDepartments.map(async (department) => {
+                        try {
+                          const { error } = await supabase.functions.invoke('manage-flex-crew-assignments', {
+                            body: {
+                              job_id: assignment.job_id,
+                              technician_id: technician.id,
+                              department,
+                              action: 'remove'
+                            }
+                          });
+                          if (error) {
+                            console.error('Error removing Flex crew assignment:', error);
+                          }
+                        } catch (flexError) {
+                          console.error('Failed to remove Flex crew assignment:', flexError);
+                        }
+                      }));
+                    }
+
                     setPendingRemoveAssignment(false)
                     toast.success('Assignment removed')
                     window.dispatchEvent(new CustomEvent('assignment-updated'))

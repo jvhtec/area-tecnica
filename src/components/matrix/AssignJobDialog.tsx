@@ -35,6 +35,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
+import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
 import { checkTimeConflict, TechnicianJobConflict } from '@/utils/technicianAvailability';
 
 interface AssignJobDialogProps {
@@ -218,6 +219,28 @@ export const AssignJobDialog = ({
           console.error('Error removing old assignment:', deleteError);
           throw deleteError;
         }
+
+        const departmentsToRemove = determineFlexDepartmentsForAssignment(existingAssignment, technician?.department);
+        if (existingAssignment?.job_id && departmentsToRemove.length > 0) {
+          await Promise.allSettled(departmentsToRemove.map(async (department) => {
+            try {
+              const { error: flexError } = await supabase.functions.invoke('manage-flex-crew-assignments', {
+                body: {
+                  job_id: existingAssignment.job_id,
+                  technician_id: technicianId,
+                  department,
+                  action: 'remove'
+                }
+              });
+
+              if (flexError) {
+                console.error(`Error removing from Flex crew (${department}):`, flexError);
+              }
+            } catch (flexError) {
+              console.error(`Failed to remove from Flex crew (${department}):`, flexError);
+            }
+          }));
+        }
       }
 
       const basePayload = {
@@ -353,6 +376,29 @@ export const AssignJobDialog = ({
         .eq('job_id', existingAssignment.job_id)
         .eq('technician_id', technicianId);
       if (error) throw error;
+
+      const departmentsToRemove = determineFlexDepartmentsForAssignment(existingAssignment, technician?.department);
+      if (existingAssignment?.job_id && departmentsToRemove.length > 0) {
+        await Promise.allSettled(departmentsToRemove.map(async (department) => {
+          try {
+            const { error: flexError } = await supabase.functions.invoke('manage-flex-crew-assignments', {
+              body: {
+                job_id: existingAssignment.job_id,
+                technician_id: technicianId,
+                department,
+                action: 'remove'
+              }
+            });
+
+            if (flexError) {
+              console.error(`Error removing from Flex crew (${department}):`, flexError);
+            }
+          } catch (flexError) {
+            console.error(`Failed to remove from Flex crew (${department}):`, flexError);
+          }
+        }));
+      }
+
       toast.success('Assignment removed');
       window.dispatchEvent(new CustomEvent('assignment-updated', { detail: { technicianId, jobId: existingAssignment.job_id } }));
       onClose();
