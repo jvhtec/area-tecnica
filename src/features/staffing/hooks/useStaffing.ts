@@ -63,17 +63,21 @@ export function useSendStaffingEmail() {
       const { data, error } = await supabase.functions.invoke('send-staffing-email', {
         body: payload
       })
-      
+
       console.log('📨 EMAIL RESPONSE:', { data, error });
-      
+
       if (error) {
         console.error('❌ EMAIL ERROR:', error);
-        throw new Error(error.message || 'Failed to send email')
+        console.error('❌ ERROR DETAILS:', JSON.stringify(error, null, 2));
+        // Try to extract more details from the error
+        const errorDetails = error.context ? JSON.stringify(error.context) : error.message;
+        throw new Error(`Email function error: ${errorDetails}`)
       }
-      
+
       if (data?.error) {
         console.error('❌ EMAIL API ERROR:', data);
-        throw new Error(data.error || 'Email API returned an error')
+        console.error('❌ API ERROR DETAILS:', JSON.stringify(data.details || data, null, 2));
+        throw new Error(data.error + (data.details ? `: ${JSON.stringify(data.details)}` : ''))
       }
       
       console.log('✅ STAFFING REQUEST SENT SUCCESSFULLY');

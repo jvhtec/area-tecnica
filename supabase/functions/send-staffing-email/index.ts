@@ -331,15 +331,29 @@ serve(async (req) => {
           if (conflictErr) {
             console.warn('⚠️ Conflict check failed, continuing to send email:', conflictErr);
           } else if (conflictResult && (conflictResult.hasHardConflict || conflictResult.hasSoftConflict)) {
+            const hasJobConflicts = (conflictResult.hardConflicts?.length > 0) || (conflictResult.softConflicts?.length > 0);
+            const hasUnavailability = conflictResult.unavailabilityConflicts?.length > 0;
+
             const conflictType = conflictResult.hasHardConflict ? 'confirmed' : 'pending';
             const conflicts = conflictResult.hasHardConflict
               ? conflictResult.hardConflicts
               : conflictResult.softConflicts;
 
-            console.log(`⛔ ${conflictType} conflict detected:`, conflicts);
+            console.log(`⛔ ${conflictType} conflict detected:`, {
+              jobConflicts: conflicts,
+              unavailability: conflictResult.unavailabilityConflicts
+            });
+
+            // Build error message based on conflict types
+            let errorMessage = 'Technician has conflicts';
+            if (hasUnavailability && !hasJobConflicts) {
+              errorMessage = 'Technician is unavailable on these dates';
+            } else if (hasJobConflicts) {
+              errorMessage = `Technician has ${conflictType} overlapping assignment`;
+            }
 
             return new Response(JSON.stringify({
-              error: `Technician has ${conflictType} overlapping assignment`,
+              error: errorMessage,
               details: {
                 conflict_type: conflictType,
                 conflicts: conflicts,
