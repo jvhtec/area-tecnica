@@ -66,10 +66,23 @@ BEGIN
       RAISE NOTICE 'Keeping assignment_date values for mismatched rows';
     END IF;
 
+    -- Drop the existing unique index that uses COALESCE
+    DROP INDEX IF EXISTS job_assignments_single_day_unique;
+    RAISE NOTICE 'Dropped old single_day_unique index that referenced single_day_date';
+
     -- Drop the redundant column
     ALTER TABLE job_assignments DROP COLUMN single_day_date;
-
     RAISE NOTICE '✅ Dropped single_day_date column successfully';
+
+    -- Recreate the unique index using only assignment_date
+    CREATE UNIQUE INDEX job_assignments_single_day_unique
+      ON job_assignments (job_id, technician_id, assignment_date)
+      WHERE (single_day = true AND assignment_date IS NOT NULL);
+
+    COMMENT ON INDEX job_assignments_single_day_unique IS
+      'Ensures a technician can only have one single-day assignment per job per date. Applied only when single_day=true and assignment_date is set. Updated to use only assignment_date after single_day_date column was dropped.';
+
+    RAISE NOTICE '✅ Recreated single_day_unique index with only assignment_date';
   ELSE
     RAISE NOTICE 'Column single_day_date does not exist, nothing to migrate';
   END IF;
