@@ -1017,8 +1017,11 @@ export const OptimizedAssignmentMatrix = ({
                     return;
                   }
                 }
-                const targetDate = selectedDates[0];
-                sendStaffingEmail(({ job_id: jobId, profile_id: profileId, phase: 'offer', role, message, channel: via, single_day: true, dates: selectedDates, target_date: targetDate } as any), {
+                const payload: any = { job_id: jobId, profile_id: profileId, phase: 'offer', role, message, channel: via, single_day: true, dates: selectedDates };
+                if (selectedDates.length === 1) {
+                  payload.target_date = selectedDates[0];
+                }
+                sendStaffingEmail(payload, {
                   onSuccess: (data: any) => {
                     const ch = data?.channel || via;
                     toast({ title: 'Offer sent', description: `${role} offer sent via ${ch} (${selectedDates.length} day${selectedDates.length>1?'s':''}).` });
@@ -1200,8 +1203,11 @@ export const OptimizedAssignmentMatrix = ({
                     toast({ title: 'Select date(s)', description: 'Choose at least one date within the job span.', variant: 'destructive' });
                     return;
                   }
-                  const targetDate = dates[0];
-                  sendStaffingEmail(({ job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, single_day: true, dates, target_date: targetDate } as any), {
+                  const payload: any = { job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, single_day: true, dates };
+                  if (availabilityCoverage === 'single' || dates.length === 1) {
+                    payload.target_date = dates[0];
+                  }
+                  sendStaffingEmail(payload, {
                     onSuccess: (data: any) => {
                       setAvailabilitySending(false);
                       setAvailabilityDialog(null);
