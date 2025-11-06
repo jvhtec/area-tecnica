@@ -1,6 +1,13 @@
 
 import { supabase } from "@/lib/supabase";
 
+export interface TechnicianJobConflict {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+}
+
 /**
  * Check if two date ranges overlap
  */
@@ -187,6 +194,103 @@ export async function getAvailableTechnicians(
   } catch (error) {
     console.error("Error getting available technicians:", error);
     throw error;
+  }
+}
+
+/**
+ * Check if a technician has a confirmed overlapping job for the given target job.
+ * When `singleDayOnly` and `targetDateIso` are provided, the check is scoped to a
+ * specific day instead of the full job span.
+ */
+export async function checkTimeConflict(
+  technicianId: string,
+  targetJobId: string,
+  targetDateIso?: string,
+  singleDayOnly?: boolean
+): Promise<TechnicianJobConflict | null> {
+  try {
+    const { data: targetJob, error: jobError } = await supabase
+      .from("jobs")
+      .select("id,title,start_time,end_time")
+      .eq("id", targetJobId)
+      .maybeSingle();
+
+    if (jobError || !targetJob) {
+      return null;
+    }
+
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from("job_assignments")
+      .select("job_id,status,single_day,assignment_date")
+      .eq("technician_id", technicianId)
+      .eq("status", "confirmed");
+
+    if (assignmentsError || !assignments?.length) {
+      return null;
+    }
+
+    const filteredAssignments = assignments.filter((assignment) => {
+      if (assignment.job_id === targetJobId) {
+        return false;
+      }
+
+      if (singleDayOnly && targetDateIso) {
+        if (assignment.single_day && assignment.assignment_date && assignment.assignment_date !== targetDateIso) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    const otherIds = filteredAssignments.map((assignment) => assignment.job_id);
+    if (!otherIds.length) {
+      return null;
+    }
+
+    const { data: jobs, error: jobsError } = await supabase
+      .from("jobs")
+      .select("id,title,start_time,end_time")
+      .in("id", otherIds);
+
+    if (jobsError || !jobs?.length) {
+      return null;
+    }
+
+    const targetStart = singleDayOnly && targetDateIso
+      ? new Date(`${targetDateIso}T00:00:00Z`)
+      : (targetJob.start_time ? new Date(targetJob.start_time) : null);
+
+    const targetEnd = singleDayOnly && targetDateIso
+      ? new Date(`${targetDateIso}T23:59:59Z`)
+      : (targetJob.end_time ? new Date(targetJob.end_time) : null);
+
+    if (!targetStart || !targetEnd) {
+      return null;
+    }
+
+    const overlap = jobs.find((job) => {
+      if (!job.start_time || !job.end_time) {
+        return false;
+      }
+
+      const jobStart = new Date(job.start_time);
+      const jobEnd = new Date(job.end_time);
+
+      return jobStart < targetEnd && jobEnd > targetStart;
+    });
+
+    return overlap
+      ? {
+          id: overlap.id,
+          title: overlap.title,
+          start_time: overlap.start_time!,
+          end_time: overlap.end_time!,
+        }
+      : null;
+  } catch (error) {
+    console.warn("Conflict pre-check error", error);
+    return null;
   }
 }
 
