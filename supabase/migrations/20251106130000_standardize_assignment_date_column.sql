@@ -102,7 +102,7 @@ RETURNS TRIGGER AS $$
 DECLARE
     job_start_date date;
     job_end_date date;
-    current_date date;
+    loop_date date;
     job_type_val text;
 BEGIN
     -- Get job information including type
@@ -137,8 +137,8 @@ BEGIN
 
     -- Fallback to legacy behaviour (cover full job range)
     -- Job dates already fetched above
-    current_date := job_start_date;
-    WHILE current_date <= job_end_date LOOP
+    loop_date := job_start_date;
+    WHILE loop_date <= job_end_date LOOP
         INSERT INTO timesheets (
             job_id,
             technician_id,
@@ -147,12 +147,12 @@ BEGIN
         ) VALUES (
             NEW.job_id,
             NEW.technician_id,
-            current_date,
+            loop_date,
             NEW.assigned_by
         )
         ON CONFLICT (job_id, technician_id, date) DO NOTHING;
 
-        current_date := current_date + INTERVAL '1 day';
+        loop_date := loop_date + INTERVAL '1 day';
     END LOOP;
 
     RETURN NEW;
