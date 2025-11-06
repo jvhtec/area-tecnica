@@ -157,6 +157,7 @@ serve(async (req) => {
     console.log('💾 ATTEMPTING DB UPDATE:', { rid, newStatus, action, batch_id: (row as any).batch_id || null });
     let updRow: any = null;
     let updErr: any = null;
+    let updatedBatchRows: any[] | null = null;
     if ((row as any)?.batch_id) {
       const { data, error } = await supabase
         .from('staffing_requests')
@@ -166,8 +167,9 @@ serve(async (req) => {
         .eq('profile_id', row.profile_id)
         .eq('phase', row.phase)
         .eq('status', 'pending')
-        .select('id,status')
+        .select('id,status,target_date,single_day')
         ;
+      updatedBatchRows = Array.isArray(data) ? data : null;
       updRow = Array.isArray(data) && data.length ? data[0] : null;
       updErr = error;
     } else {
@@ -355,16 +357,34 @@ serve(async (req) => {
             }
 
             if ((row as any)?.batch_id) {
-              const { data: batchRows } = await supabase
-                .from('staffing_requests')
-                .select('id,target_date,single_day,status')
-                .eq('batch_id', (row as any).batch_id)
-                .eq('job_id', row.job_id)
-                .eq('profile_id', row.profile_id)
-                .eq('phase', row.phase);
-              const targets = (batchRows || []).filter(r => r.status === 'pending');
-              for (const br of targets) {
-                await upsertAssignmentFor(br.single_day ? (br.target_date as any) : null);
+              const updatedIds = new Set((updatedBatchRows ?? []).map(r => r.id));
+              let targetRows = updatedBatchRows ?? [];
+
+              if (!targetRows.length) {
+                const { data: batchRows } = await supabase
+                  .from('staffing_requests')
+                  .select('id,target_date,single_day,status')
+                  .eq('batch_id', (row as any).batch_id)
+                  .eq('job_id', row.job_id)
+                  .eq('profile_id', row.profile_id)
+                  .eq('phase', row.phase);
+                targetRows = (batchRows || []).filter(r => !updatedIds.size || updatedIds.has(r.id));
+              }
+
+              for (const br of targetRows) {
+                const isSingleDay = !!br.single_day;
+                const hasDate = typeof br.target_date === 'string' && br.target_date.trim().length > 0;
+                if (isSingleDay && !hasDate) {
+                  await supabase.from('staffing_events').insert({
+                    staffing_request_id: rid,
+                    event: 'auto_assign_skipped_no_date',
+                    meta: { request_id: br.id }
+                  });
+                  continue;
+                }
+
+                const assignmentDate = isSingleDay && hasDate ? br.target_date : null;
+                await upsertAssignmentFor(assignmentDate);
               }
             } else {
               await upsertAssignmentFor((row as any).single_day && (row as any).target_date ? (row as any).target_date : null);
