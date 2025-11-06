@@ -68,30 +68,46 @@ export function useSendStaffingEmail() {
         phase_valid: ['availability', 'offer'].includes(payload.phase)
       });
 
-      const { data, error } = await supabase.functions.invoke('send-staffing-email', {
-        body: payload
-      })
+      // Use fetch directly to get full control over error responses
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
 
-      console.log('📨 EMAIL RESPONSE:', { data, error });
+      // Get Supabase URL and construct functions URL
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const functionUrl = `${supabaseUrl}/functions/v1/send-staffing-email`;
 
-      if (error) {
-        console.error('❌ EMAIL ERROR:', error);
-        console.error('❌ ERROR DETAILS:', JSON.stringify(error, null, 2));
-        // Try to extract more details from the error
-        const errorDetails = error.context ? JSON.stringify(error.context) : error.message;
-        throw new Error(`Email function error: ${errorDetails}`)
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': anonKey,
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      console.log('📨 EMAIL RESPONSE:', { status: response.status, data });
+
+      // Check for 409 Conflict with structured error details
+      if (response.status === 409) {
+        console.error('❌ 409 CONFLICT:', data);
+        if (data.details?.conflict_type || data.details?.conflicts || data.details?.unavailability) {
+          throw new ConflictError(data.error || 'Conflict detected', data.details);
+        }
+      }
+
+      // Check for other errors
+      if (!response.ok) {
+        console.error('❌ HTTP ERROR:', { status: response.status, data });
+        throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       if (data?.error) {
-        console.error('❌ EMAIL API ERROR:', data);
-        console.error('❌ API ERROR DETAILS:', JSON.stringify(data.details || data, null, 2));
-
-        // If this is a conflict error (409), throw a special error type with details
-        if (data.details?.conflict_type || data.details?.conflicts || data.details?.unavailability) {
-          throw new ConflictError(data.error, data.details);
-        }
-
-        throw new Error(data.error + (data.details ? `: ${JSON.stringify(data.details)}` : ''))
+        console.error('❌ API ERROR:', data);
+        throw new Error(data.error)
       }
 
       console.log('✅ STAFFING REQUEST SENT SUCCESSFULLY');
