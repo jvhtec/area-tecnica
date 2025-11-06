@@ -70,10 +70,14 @@ export const MarkUnavailableDialog = ({
       // Include additional dates from multi-select matching this technician
       for (const key of selectedCells) {
         // Keys are formatted as `${technicianId}-yyyy-MM-dd`
-        if (key.startsWith(`${technicianId}-`)) {
-          const parts = key.split('-');
-          const d = parts.slice(1).join('-'); // yyyy-MM-dd
-          if (d && d.length === 10) selectedDates.add(d);
+        const prefix = `${technicianId}-`;
+        if (!key.startsWith(prefix)) continue;
+
+        const datePortion = key.slice(prefix.length);
+        const isValidDateKey = /^\d{4}-\d{2}-\d{2}$/.test(datePortion);
+
+        if (isValidDateKey) {
+          selectedDates.add(datePortion);
         }
       }
 
