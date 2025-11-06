@@ -324,7 +324,7 @@ export const OptimizedAssignmentMatrix = ({
   const [availabilityPreferredChannel, setAvailabilityPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
   const [offerChannel, setOfferChannel] = useState<'email' | 'whatsapp'>('email');
   const [offerPreferredChannel, setOfferPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
-  const [availabilityDialog, setAvailabilityDialog] = useState<null | { open: boolean; jobId: string; profileId: string; dateIso: string; singleDay: boolean }>(null);
+  const [availabilityDialog, setAvailabilityDialog] = useState<null | { open: boolean; jobId: string; profileId: string; dateIso: string; singleDay: boolean; channel: 'email' | 'whatsapp' }>(null);
 
   const forcedStaffingAction = useMemo<undefined | 'availability' | 'offer'>(() => {
     if (cellAction?.type !== 'select-job-for-staffing') return undefined;
@@ -377,7 +377,7 @@ export const OptimizedAssignmentMatrix = ({
       const targetJobId = selectedJobId || assignment?.job_id || undefined;
       if (targetJobId) {
         setAvailabilityChannel('whatsapp');
-        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true });
+        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true, channel: 'whatsapp' });
       } else {
         console.log('Setting WhatsApp intent for staffing job selection');
         setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment, intendedPhase: 'availability', intendedChannel: 'whatsapp' });
@@ -390,7 +390,7 @@ export const OptimizedAssignmentMatrix = ({
       const targetJobId = selectedJobId || assignment?.job_id || undefined;
       if (targetJobId) {
         setAvailabilityChannel('email');
-        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true });
+        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true, channel: 'email' });
       } else {
         setAvailabilityPreferredChannel('email');
         setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
@@ -494,24 +494,18 @@ export const OptimizedAssignmentMatrix = ({
 
         const intentPhase = cellAction.intendedPhase;
         const intentChannel = cellAction.intendedChannel;
-        const openAvailabilityDialogWith = (channel: 'email' | 'whatsapp') => {
-          setAvailabilityChannel(channel);
-          setAvailabilityDialog({ open: true, jobId, profileId: technicianId, dateIso: format(cellAction.date, 'yyyy-MM-dd'), singleDay: !!options?.singleDay });
-        };
+        const defaultChannel = intentChannel || availabilityPreferredChannel || 'email';
 
-        if (intentPhase === 'availability' && intentChannel) {
-          console.log('Using stored staffing intent', { intentPhase, intentChannel });
-          openAvailabilityDialogWith(intentChannel);
-          return;
-        }
-
-        console.log('Checking availabilityPreferredChannel:', availabilityPreferredChannel);
-        if (availabilityPreferredChannel === 'whatsapp' || availabilityPreferredChannel === 'email') {
-          openAvailabilityDialogWith(availabilityPreferredChannel);
-        } else {
-          // Store date as yyyy-MM-dd for consistency and open dialog (channel selectable inside)
-          setAvailabilityDialog({ open: true, jobId, profileId: technicianId, dateIso: format(cellAction.date, 'yyyy-MM-dd'), singleDay: !!options?.singleDay });
-        }
+        console.log('Opening availability dialog with channel:', defaultChannel);
+        setAvailabilityChannel(defaultChannel);
+        setAvailabilityDialog({
+          open: true,
+          jobId,
+          profileId: technicianId,
+          dateIso: format(cellAction.date, 'yyyy-MM-dd'),
+          singleDay: !!options?.singleDay,
+          channel: defaultChannel
+        });
       })();
     } else {
       // no-op
@@ -1100,35 +1094,12 @@ export const OptimizedAssignmentMatrix = ({
             <DialogHeader>
               <DialogTitle>Send availability request</DialogTitle>
               <DialogDescription>
-                Choose how to contact {currentTechnician?.first_name} {currentTechnician?.last_name}.
+                Request availability from {currentTechnician?.first_name} {currentTechnician?.last_name} via {availabilityDialog.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}.
               </DialogDescription>
             </DialogHeader>
             <div className="py-2">
-              <div className="space-y-3">
-                <label className="font-medium text-sm text-foreground">Channel</label>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="availability-channel"
-                      checked={availabilityChannel === 'email'}
-                      onChange={() => setAvailabilityChannel('email')}
-                    />
-                    <span>Email</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="availability-channel"
-                      checked={availabilityChannel === 'whatsapp'}
-                      onChange={() => setAvailabilityChannel('whatsapp')}
-                    />
-                    <span>WhatsApp</span>
-                  </label>
-                </div>
-              </div>
               {/* Coverage selection */}
-              <div className="space-y-3 mt-4">
+              <div className="space-y-3">
                 <label className="font-medium text-sm text-foreground">Coverage</label>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -1219,7 +1190,7 @@ export const OptimizedAssignmentMatrix = ({
                   setAvailabilitySending(true);
                   const jobId = availabilityDialog.jobId;
                   const profileId = availabilityDialog.profileId;
-                  const via = availabilityChannel;
+                  const via = availabilityDialog.channel;
                   if (availabilityCoverage === 'full') {
                     const payload = { job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, single_day: false };
                     sendStaffingEmail(payload as any, {
@@ -1301,15 +1272,15 @@ export const OptimizedAssignmentMatrix = ({
               {/* Hard Conflicts (Job Assignments) */}
               {conflictDialog.details?.conflicts && conflictDialog.details.conflicts.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-red-900">Overlapping Assignments:</h4>
+                  <h4 className="font-semibold text-red-600 dark:text-red-400">Overlapping Assignments:</h4>
                   <div className="space-y-2">
                     {conflictDialog.details.conflicts.map((conflict: any, idx: number) => (
-                      <div key={idx} className="p-3 bg-red-50 border border-red-200 rounded text-sm">
-                        <div className="font-medium">{conflict.title}</div>
+                      <div key={idx} className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded text-sm">
+                        <div className="font-medium text-foreground">{conflict.title}</div>
                         <div className="text-muted-foreground">
                           {format(new Date(conflict.start_time), 'MMM d, yyyy')} - {format(new Date(conflict.end_time), 'MMM d, yyyy')}
                         </div>
-                        <div className="text-xs text-red-700 mt-1">Status: {conflict.status}</div>
+                        <div className="text-xs text-red-600 dark:text-red-400 mt-1">Status: {conflict.status}</div>
                       </div>
                     ))}
                   </div>
@@ -1319,17 +1290,17 @@ export const OptimizedAssignmentMatrix = ({
               {/* Unavailability */}
               {conflictDialog.details?.unavailability && conflictDialog.details.unavailability.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-orange-900">Unavailability:</h4>
+                  <h4 className="font-semibold text-orange-600 dark:text-orange-400">Unavailability:</h4>
                   <div className="space-y-2">
                     {conflictDialog.details.unavailability.map((unavail: any, idx: number) => (
-                      <div key={idx} className="p-3 bg-orange-50 border border-orange-200 rounded text-sm">
+                      <div key={idx} className="p-3 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded text-sm">
                         <div className="flex justify-between items-start">
                           <div>
-                            <div className="font-medium">{format(new Date(unavail.date), 'MMM d, yyyy')}</div>
+                            <div className="font-medium text-foreground">{format(new Date(unavail.date), 'MMM d, yyyy')}</div>
                             <div className="text-muted-foreground">{unavail.reason}</div>
                             {unavail.notes && <div className="text-xs text-muted-foreground mt-1">{unavail.notes}</div>}
                           </div>
-                          <span className="text-xs px-2 py-1 bg-orange-100 rounded">{unavail.source}</span>
+                          <span className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/50 text-orange-900 dark:text-orange-200 rounded">{unavail.source}</span>
                         </div>
                       </div>
                     ))}
