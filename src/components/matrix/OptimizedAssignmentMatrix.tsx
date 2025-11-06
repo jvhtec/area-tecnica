@@ -1094,35 +1094,12 @@ export const OptimizedAssignmentMatrix = ({
             <DialogHeader>
               <DialogTitle>Send availability request</DialogTitle>
               <DialogDescription>
-                Choose how to contact {currentTechnician?.first_name} {currentTechnician?.last_name}.
+                Request availability from {currentTechnician?.first_name} {currentTechnician?.last_name} via {availabilityDialog.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}.
               </DialogDescription>
             </DialogHeader>
             <div className="py-2">
-              <div className="space-y-3">
-                <label className="font-medium text-sm text-foreground">Channel</label>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="availability-channel"
-                      checked={availabilityChannel === 'email'}
-                      onChange={() => setAvailabilityChannel('email')}
-                    />
-                    <span>Email</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="availability-channel"
-                      checked={availabilityChannel === 'whatsapp'}
-                      onChange={() => setAvailabilityChannel('whatsapp')}
-                    />
-                    <span>WhatsApp</span>
-                  </label>
-                </div>
-              </div>
               {/* Coverage selection */}
-              <div className="space-y-3 mt-4">
+              <div className="space-y-3">
                 <label className="font-medium text-sm text-foreground">Coverage</label>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -1213,19 +1190,17 @@ export const OptimizedAssignmentMatrix = ({
                   setAvailabilitySending(true);
                   const jobId = availabilityDialog.jobId;
                   const profileId = availabilityDialog.profileId;
-                  const via = availabilityChannel;
+                  const via = availabilityDialog.channel;
                   if (availabilityCoverage === 'full') {
-                    sendStaffingEmail(({ job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, single_day: false } as any), {
+                    const payload = { job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, single_day: false };
+                    sendStaffingEmail(payload as any, {
                       onSuccess: (data: any) => {
                         setAvailabilitySending(false);
                         setAvailabilityDialog(null);
                         toast({ title: 'Request sent', description: `Availability request sent via ${data?.channel || via}.` });
                         closeDialogs();
                       },
-                      onError: (error: any) => {
-                        setAvailabilitySending(false);
-                        toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
-                      }
+                      onError: (error: any) => handleEmailError(error, payload)
                     });
                     return;
                   }
@@ -1248,10 +1223,7 @@ export const OptimizedAssignmentMatrix = ({
                       toast({ title: 'Request sent', description: `Availability request sent for ${dates.length} day${dates.length>1?'s':''} via ${data?.channel || via}.` });
                       closeDialogs();
                     },
-                    onError: (error: any) => {
-                      setAvailabilitySending(false);
-                      toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
-                    }
+                    onError: (error: any) => handleEmailError(error, payload)
                   });
                 }}
                 disabled={availabilitySending}
@@ -1283,6 +1255,114 @@ export const OptimizedAssignmentMatrix = ({
             setCreateUserOpen(open);
           }}
         />
+      )}
+
+      {/* Conflict Dialog */}
+      {conflictDialog?.open && (
+        <Dialog open={true} onOpenChange={(v) => { if (!v) setConflictDialog(null) }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Scheduling Conflict Detected</DialogTitle>
+              <DialogDescription>
+                The technician has conflicts or unavailability during this job period.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto">
+              {/* Overlapping Job Assignments - Red */}
+              {conflictDialog.details?.conflicts && conflictDialog.details.conflicts.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-red-600 dark:text-red-400">Overlapping Job Assignments:</h4>
+                  <div className="space-y-1">
+                    {conflictDialog.details.conflicts.map((conflict: any, idx: number) => (
+                      <div key={idx} className="text-sm p-2 rounded bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900">
+                        <div className="font-medium text-red-900 dark:text-red-100">
+                          {conflict.job_name || 'Unnamed Job'}
+                        </div>
+                        <div className="text-red-700 dark:text-red-300">
+                          {conflict.job_type && <span className="capitalize">{conflict.job_type}</span>}
+                          {conflict.start_time && conflict.end_time && (
+                            <span className="ml-2">
+                              {new Date(conflict.start_time).toLocaleDateString()} - {new Date(conflict.end_time).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                        {conflict.role && (
+                          <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+                            Role: {conflict.role}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Unavailability Periods - Orange */}
+              {conflictDialog.details?.unavailability && conflictDialog.details.unavailability.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-orange-600 dark:text-orange-400">Unavailable Dates:</h4>
+                  <div className="space-y-1">
+                    {conflictDialog.details.unavailability.map((unavail: any, idx: number) => (
+                      <div key={idx} className="text-sm p-2 rounded bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900">
+                        <div className="text-orange-900 dark:text-orange-100">
+                          {unavail.start_date && unavail.end_date ? (
+                            <>
+                              {new Date(unavail.start_date).toLocaleDateString()} - {new Date(unavail.end_date).toLocaleDateString()}
+                            </>
+                          ) : unavail.date ? (
+                            new Date(unavail.date).toLocaleDateString()
+                          ) : (
+                            'Date not specified'
+                          )}
+                        </div>
+                        {unavail.reason && (
+                          <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                            {unavail.reason}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setConflictDialog(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  const payloadWithOverride = {
+                    ...conflictDialog.originalPayload,
+                    override_conflicts: true
+                  };
+                  setConflictDialog(null);
+                  sendStaffingEmailMut.mutate(payloadWithOverride, {
+                    onSuccess: () => {
+                      setAvailabilityDialog(null);
+                      setAvailabilitySending(false);
+                      toast({
+                        title: 'Request sent',
+                        description: 'Staffing request sent successfully (conflicts overridden)',
+                      });
+                    },
+                    onError: (error: any) => {
+                      setAvailabilitySending(false);
+                      toast({
+                        title: 'Send failed',
+                        description: error.message || 'Failed to send staffing request',
+                        variant: 'destructive'
+                      });
+                    }
+                  });
+                }}
+              >
+                Send Anyway
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
