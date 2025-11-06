@@ -655,13 +655,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                       {formatAssignmentTechnicianName(assignment)}
                     </div>
                     <div className="text-xs md:text-sm text-muted-foreground flex flex-col gap-0.5">
-                      {assignment.single_day && (
+                      {assignment.single_day && assignment.assignment_date && (
                         <span>
-                          Single-day: {
-                            formatJobDateLabel(
-                              (assignment as any).single_day_date || (assignment as any).assignment_date
-                            )
-                          }
+                          Single-day: {formatJobDateLabel(assignment.assignment_date)}
                         </span>
                       )}
                       {currentDepartment === "sound" && (

@@ -9,6 +9,22 @@ export interface TechnicianJobConflict {
 }
 
 /**
+ * Enhanced conflict check result with hard/soft conflict distinction
+ */
+export interface ConflictCheckResult {
+  hasHardConflict: boolean;
+  hasSoftConflict: boolean;
+  hardConflicts: Array<TechnicianJobConflict & { status: string }>;
+  softConflicts: Array<TechnicianJobConflict & { status: string }>;
+  unavailabilityConflicts: Array<{
+    date: string;
+    reason: string;
+    source: string;
+    notes?: string;
+  }>;
+}
+
+/**
  * Check if two date ranges overlap
  */
 export function datesOverlap(
@@ -361,5 +377,51 @@ export async function getTechnicianConflicts(
   } catch (error) {
     console.error("Error getting technician conflicts:", error);
     throw error;
+  }
+}
+
+/**
+ * Enhanced conflict checking using the database RPC function
+ * Distinguishes between hard conflicts (confirmed) and soft conflicts (pending)
+ */
+export async function checkTimeConflictEnhanced(
+  technicianId: string,
+  targetJobId: string,
+  options?: {
+    targetDateIso?: string;
+    singleDayOnly?: boolean;
+    includePending?: boolean;
+  }
+): Promise<ConflictCheckResult> {
+  try {
+    const { data, error } = await supabase.rpc('check_technician_conflicts', {
+      _technician_id: technicianId,
+      _target_job_id: targetJobId,
+      _target_date: options?.targetDateIso || null,
+      _single_day: options?.singleDayOnly || false,
+      _include_pending: options?.includePending !== false, // Default to true
+    });
+
+    if (error) {
+      console.error('Enhanced conflict check error:', error);
+      return {
+        hasHardConflict: false,
+        hasSoftConflict: false,
+        hardConflicts: [],
+        softConflicts: [],
+        unavailabilityConflicts: [],
+      };
+    }
+
+    return data as ConflictCheckResult;
+  } catch (error) {
+    console.error('Enhanced conflict check error:', error);
+    return {
+      hasHardConflict: false,
+      hasSoftConflict: false,
+      hardConflicts: [],
+      softConflicts: [],
+      unavailabilityConflicts: [],
+    };
   }
 }

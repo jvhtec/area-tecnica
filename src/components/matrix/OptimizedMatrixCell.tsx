@@ -412,9 +412,9 @@ export const OptimizedMatrixCell = memo(({
           >
             {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
           </div>
-          {assignment.single_day && assignment.single_day_date && (
+          {assignment.single_day && assignment.assignment_date && (
             <div className="text-[10px] text-muted-foreground truncate">
-              Single-day: {format(new Date(`${assignment.single_day_date}T00:00:00`), 'MMM d')}
+              Single-day: {format(new Date(`${assignment.assignment_date}T00:00:00`), 'MMM d')}
             </div>
           )}
 
@@ -657,9 +657,9 @@ export const OptimizedMatrixCell = memo(({
               <div className="text-muted-foreground">
                 {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
               </div>
-              {assignment.single_day && assignment.single_day_date && (
+              {assignment.single_day && assignment.assignment_date && (
                 <div className="text-muted-foreground">
-                  Single-day: {format(new Date(`${assignment.single_day_date}T00:00:00`), 'MMM d')}
+                  Single-day: {format(new Date(`${assignment.assignment_date}T00:00:00`), 'MMM d')}
                 </div>
               )}
               <div className={`capitalize ${assignment.status === 'confirmed' ? 'text-green-600' : assignment.status === 'declined' ? 'text-red-600' : 'text-yellow-600'}`}>

@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { AssignJobDialog } from '../AssignJobDialog';
 
 const useQueryMock = vi.fn();
-const checkTimeConflictMock = vi.fn();
+const checkTimeConflictEnhancedMock = vi.fn();
 const insertMock = vi.fn();
 const deleteMock = vi.fn();
 const fromMock = vi.fn();
@@ -16,11 +16,12 @@ const toastFn = Object.assign(vi.fn(), {
   success: vi.fn(),
 });
 
-type TechnicianJobConflict = {
-  id: string;
-  title: string;
-  start_time: string;
-  end_time: string;
+type ConflictCheckResult = {
+  hasHardConflict: boolean;
+  hasSoftConflict: boolean;
+  hardConflicts: Array<{ id: string; title: string; start_time: string; end_time: string; status: string }>;
+  softConflicts: Array<{ id: string; title: string; start_time: string; end_time: string; status: string }>;
+  unavailabilityConflicts: Array<{ date: string; reason: string; source: string; notes?: string }>;
 };
 
 vi.mock('@tanstack/react-query', async () => {
@@ -35,7 +36,7 @@ vi.mock('@/utils/technicianAvailability', async () => {
   const actual = await vi.importActual<typeof import('@/utils/technicianAvailability')>('@/utils/technicianAvailability');
   return {
     ...actual,
-    checkTimeConflict: checkTimeConflictMock,
+    checkTimeConflictEnhanced: checkTimeConflictEnhancedMock,
   };
 });
 
@@ -97,13 +98,20 @@ afterEach(() => {
 
 describe('AssignJobDialog conflict handling', () => {
   it('prompts for confirmation when a conflict is detected before proceeding', async () => {
-    const conflict: TechnicianJobConflict = {
-      id: 'conflict-1',
-      title: 'Overlapping Show',
-      start_time: '2024-05-01T08:00:00Z',
-      end_time: '2024-05-01T20:00:00Z',
+    const conflictResult: ConflictCheckResult = {
+      hasHardConflict: true,
+      hasSoftConflict: false,
+      hardConflicts: [{
+        id: 'conflict-1',
+        title: 'Overlapping Show',
+        start_time: '2024-05-01T08:00:00Z',
+        end_time: '2024-05-01T20:00:00Z',
+        status: 'confirmed',
+      }],
+      softConflicts: [],
+      unavailabilityConflicts: [],
     };
-    checkTimeConflictMock.mockResolvedValue(conflict);
+    checkTimeConflictEnhancedMock.mockResolvedValue(conflictResult);
 
     const user = userEvent.setup();
     const onClose = vi.fn();
@@ -124,21 +132,21 @@ describe('AssignJobDialog conflict handling', () => {
 
     await user.click(screen.getByRole('button', { name: /assign job/i }));
 
-    expect(await screen.findByText(/potential scheduling conflict/i)).toBeInTheDocument();
-    expect(checkTimeConflictMock).toHaveBeenCalledWith('tech-1', 'job-1');
+    expect(await screen.findByText(/scheduling conflict/i)).toBeInTheDocument();
+    expect(checkTimeConflictEnhancedMock).toHaveBeenCalledWith('tech-1', 'job-1', expect.objectContaining({ includePending: true }));
     expect(insertMock).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: /go back/i }));
 
     await waitFor(() => {
-      expect(screen.queryByText(/potential scheduling conflict/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/scheduling conflict/i)).not.toBeInTheDocument();
     });
     expect(insertMock).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: /assign job/i }));
-    expect(await screen.findByText(/potential scheduling conflict/i)).toBeInTheDocument();
+    expect(await screen.findByText(/scheduling conflict/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /proceed anyway/i }));
+    await user.click(screen.getByRole('button', { name: /(force assign anyway|proceed anyway)/i }));
 
     await waitFor(() => {
       expect(insertMock).toHaveBeenCalledTimes(1);
@@ -146,11 +154,18 @@ describe('AssignJobDialog conflict handling', () => {
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
     });
-    expect(checkTimeConflictMock).toHaveBeenCalledTimes(2);
+    expect(checkTimeConflictEnhancedMock).toHaveBeenCalledTimes(2);
   });
 
   it('creates the assignment immediately when no conflict exists', async () => {
-    checkTimeConflictMock.mockResolvedValue(null);
+    const noConflictResult: ConflictCheckResult = {
+      hasHardConflict: false,
+      hasSoftConflict: false,
+      hardConflicts: [],
+      softConflicts: [],
+      unavailabilityConflicts: [],
+    };
+    checkTimeConflictEnhancedMock.mockResolvedValue(noConflictResult);
 
     const user = userEvent.setup();
     const onClose = vi.fn();
@@ -174,8 +189,8 @@ describe('AssignJobDialog conflict handling', () => {
     await waitFor(() => {
       expect(insertMock).toHaveBeenCalledTimes(1);
     });
-    expect(checkTimeConflictMock).toHaveBeenCalledWith('tech-2', 'job-1');
-    expect(screen.queryByText(/potential scheduling conflict/i)).not.toBeInTheDocument();
+    expect(checkTimeConflictEnhancedMock).toHaveBeenCalledWith('tech-2', 'job-1', expect.objectContaining({ includePending: true }));
+    expect(screen.queryByText(/scheduling conflict/i)).not.toBeInTheDocument();
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
     });

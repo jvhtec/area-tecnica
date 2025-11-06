@@ -277,111 +277,60 @@ serve(async (req) => {
       const fullName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim();
       console.log('👤 TECH INFO:', { fullName, email: '***@***.***' });
 
-      // Step 2b: Conflict check — avoid sending if overlaps with confirmed assignment
+      // Step 2b: Enhanced conflict check using RPC function
+      // Checks for both hard conflicts (confirmed) and soft conflicts (pending)
       try {
-        console.log('🕒 CONFLICT CHECK: fetching confirmed assignments for technician...');
-        const { data: confirmedAssigns, error: assignErr } = await supabase
-          .from('job_assignments')
-          .select('job_id,status,single_day,assignment_date')
-          .eq('technician_id', profile_id)
-          .eq('status', 'confirmed');
+        console.log('🕒 CONFLICT CHECK: using enhanced RPC conflict checker...');
 
-        if (assignErr) {
-          console.warn('⚠️ Conflict check skipped due to assignment fetch error:', assignErr);
-        } else if ((confirmedAssigns?.length ?? 0) > 0) {
-          const assignments = confirmedAssigns ?? [];
-          const targetDatesToEvaluate = normalizedDates.length > 0
-            ? normalizedDates
-            : (normalizedTargetDate ? [normalizedTargetDate] : []);
-          const targetDateSet = new Set(targetDatesToEvaluate);
-          const relevantAssignments = assignments
-            .filter(a => a.job_id !== job_id)
-            .filter(a => {
-              if (targetDateSet.size === 0) return true;
-              if (!a.single_day) return true;
-              if (!a.assignment_date) return true;
-              return targetDateSet.has(a.assignment_date);
-            });
-          const otherJobIds = Array.from(new Set(relevantAssignments.map(a => a.job_id)));
-          if (otherJobIds.length > 0) {
-            const { data: otherJobs, error: jobsErr } = await supabase
-              .from('jobs')
-              .select('id,title,start_time,end_time')
-              .in('id', otherJobIds);
-            if (jobsErr) {
-              console.warn('⚠️ Conflict check skipped due to jobs fetch error:', jobsErr);
-            } else {
-              const assignmentByJob = new Map<string, any>();
-              relevantAssignments.forEach(a => {
-                if (!assignmentByJob.has(a.job_id)) {
-                  assignmentByJob.set(a.job_id, a);
-                }
-              });
-              const rangesToCheck: (string | null)[] = targetDatesToEvaluate.length > 0 ? targetDatesToEvaluate : [null];
-              const findOverlapForDate = (dateToCheck: string | null) => {
-                const targetStart = dateToCheck
-                  ? new Date(`${dateToCheck}T00:00:00Z`)
-                  : job.start_time ? new Date(job.start_time) : null;
-                const targetEnd = dateToCheck
-                  ? new Date(`${dateToCheck}T23:59:59Z`)
-                  : job.end_time ? new Date(job.end_time) : null;
-                return targetStart && targetEnd ? (otherJobs ?? []).find(j => {
-                  const meta = assignmentByJob.get(j.id);
-                  if (!meta) return false;
-                  const otherStart = j.start_time ? new Date(j.start_time) : null;
-                  const otherEnd = j.end_time ? new Date(j.end_time) : null;
-                  if (meta.single_day) {
-                    if (dateToCheck) {
-                      return true;
-                    }
-                    if (!meta.assignment_date) {
-                      return true;
-                    }
-                    const targetStartStr = job.start_time ? new Date(job.start_time).toISOString().split('T')[0] : null;
-                    const targetEndStr = job.end_time ? new Date(job.end_time).toISOString().split('T')[0] : null;
-                    if (!targetStartStr || !targetEndStr) {
-                      return true;
-                    }
-                    return meta.assignment_date >= targetStartStr && meta.assignment_date <= targetEndStr;
-                  }
-                  return otherStart && otherEnd && (otherStart < targetEnd) && (otherEnd > targetStart);
-                }) : null;
-              };
-              for (const dateToCheck of rangesToCheck) {
-                const overlap = findOverlapForDate(dateToCheck);
-                if (overlap) {
-                  const overlapStart = overlap.start_time ? new Date(overlap.start_time) : null;
-                  const overlapEnd = overlap.end_time ? new Date(overlap.end_time) : null;
-                  const conflictTargetDate = dateToCheck ?? normalizedTargetDate ?? null;
-                  console.log('⛔ Conflict detected with confirmed job:', overlap);
-                  return new Response(JSON.stringify({
-                    error: 'Technician has a confirmed overlapping job',
-                    details: {
-                      conflicting_job: {
-                        id: overlap.id,
-                        title: overlap.title,
-                        start_time: overlapStart?.toISOString(),
-                        end_time: overlapEnd?.toISOString()
-                      },
-                      target_job: {
-                        id: job.id,
-                        title: job.title,
-                        start_time: job.start_time,
-                        end_time: job.end_time,
-                        single_day: isSingleDayRequest,
-                        target_date: conflictTargetDate
-                      },
-                      technician: { id: tech.id, name: fullName }
-                    }
-                  }), {
-                    status: 409,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                  });
-                }
-              }
+        // Check conflicts for each date if multi-date, otherwise for single date or whole job
+        const datesToCheck = normalizedDates.length > 0 ? normalizedDates : [normalizedTargetDate];
+
+        for (const dateToCheck of datesToCheck) {
+          const { data: conflictResult, error: conflictErr } = await supabase.rpc(
+            'check_technician_conflicts',
+            {
+              _technician_id: profile_id,
+              _target_job_id: job_id,
+              _target_date: dateToCheck,
+              _single_day: isSingleDayRequest,
+              _include_pending: true // Check both confirmed and pending assignments
             }
+          );
+
+          if (conflictErr) {
+            console.warn('⚠️ Conflict check failed, continuing to send email:', conflictErr);
+          } else if (conflictResult && (conflictResult.hasHardConflict || conflictResult.hasSoftConflict)) {
+            const conflictType = conflictResult.hasHardConflict ? 'confirmed' : 'pending';
+            const conflicts = conflictResult.hasHardConflict
+              ? conflictResult.hardConflicts
+              : conflictResult.softConflicts;
+
+            console.log(`⛔ ${conflictType} conflict detected:`, conflicts);
+
+            return new Response(JSON.stringify({
+              error: `Technician has ${conflictType} overlapping assignment`,
+              details: {
+                conflict_type: conflictType,
+                conflicts: conflicts,
+                unavailability: conflictResult.unavailabilityConflicts,
+                target_job: {
+                  id: job.id,
+                  title: job.title,
+                  start_time: job.start_time,
+                  end_time: job.end_time,
+                  single_day: isSingleDayRequest,
+                  target_date: dateToCheck
+                },
+                technician: { id: tech.id, name: fullName }
+              }
+            }), {
+              status: 409,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
           }
         }
+
+        console.log('✅ No conflicts detected, proceeding to send email');
       } catch (conflictCheckErr) {
         console.warn('⚠️ Conflict check encountered an error, continuing to send email:', conflictCheckErr);
       }
