@@ -1,6 +1,37 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { labelForCode as labelForRoleCode } from "./roles.ts";
+
+// Inlined from roles.ts for dashboard deployment compatibility
+const CODE_TO_LABEL: Record<string, string> = {
+  // Sound
+  'SND-FOH-R': 'FOH — Responsable',
+  'SND-MON-R': 'Monitores — Responsable',
+  'SND-SYS-R': 'Sistemas — Responsable',
+  'SND-FOH-E': 'FOH — Especialista',
+  'SND-MON-E': 'Monitores — Especialista',
+  'SND-RF-E':  'RF — Especialista',
+  'SND-SYS-E': 'Sistemas — Especialista',
+  'SND-PA-T':  'PA — Técnico',
+  // Lights
+  'LGT-BRD-R': 'Mesa — Responsable',
+  'LGT-SYS-R': 'Sistema/Rig — Responsable',
+  'LGT-BRD-E': 'Mesa — Especialista',
+  'LGT-SYS-E': 'Sistema/Rig — Especialista',
+  'LGT-FOLO-E': 'Follow Spot — Especialista',
+  'LGT-PA-T':  'PA — Técnico',
+  // Video
+  'VID-SW-R':  'Switcher/TD — Responsable',
+  'VID-DIR-E': 'Director — Especialista',
+  'VID-CAM-E': 'Cámara — Especialista',
+  'VID-LED-E': 'LED — Especialista',
+  'VID-PROJ-E': 'Proyección — Especialista',
+  'VID-PA-T':  'PA — Técnico',
+}
+
+function labelForRoleCode(value?: string | null): string | null {
+  if (!value) return null
+  return CODE_TO_LABEL[value] ?? value
+}
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -67,9 +98,10 @@ serve(async (req) => {
     const actorId = await resolveActorId(supabase, req);
     const body = await req.json();
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
-    
-    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day } = body;
+
+    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts } = body;
     const datesArrayRaw: unknown = (body as any)?.dates;
+    const shouldOverrideConflicts = Boolean(override_conflicts);
     const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp') ? 'whatsapp' : 'email';
     const rawTargetDate = typeof target_date === 'string' && target_date ? target_date : null;
     let normalizedTargetDate = rawTargetDate ? (() => {
@@ -279,60 +311,79 @@ serve(async (req) => {
 
       // Step 2b: Enhanced conflict check using RPC function
       // Checks for both hard conflicts (confirmed) and soft conflicts (pending)
-      try {
-        console.log('🕒 CONFLICT CHECK: using enhanced RPC conflict checker...');
+      // Can be overridden with override_conflicts flag
+      if (shouldOverrideConflicts) {
+        console.log('⚠️ CONFLICT CHECK OVERRIDDEN by user - skipping conflict detection');
+      } else {
+        try {
+          console.log('🕒 CONFLICT CHECK: using enhanced RPC conflict checker...');
 
-        // Check conflicts for each date if multi-date, otherwise for single date or whole job
-        const datesToCheck = normalizedDates.length > 0 ? normalizedDates : [normalizedTargetDate];
+          // Check conflicts for each date if multi-date, otherwise for single date or whole job
+          const datesToCheck = normalizedDates.length > 0 ? normalizedDates : [normalizedTargetDate];
 
-        for (const dateToCheck of datesToCheck) {
-          const { data: conflictResult, error: conflictErr } = await supabase.rpc(
-            'check_technician_conflicts',
-            {
-              _technician_id: profile_id,
-              _target_job_id: job_id,
-              _target_date: dateToCheck,
-              _single_day: isSingleDayRequest,
-              _include_pending: true // Check both confirmed and pending assignments
-            }
-          );
-
-          if (conflictErr) {
-            console.warn('⚠️ Conflict check failed, continuing to send email:', conflictErr);
-          } else if (conflictResult && (conflictResult.hasHardConflict || conflictResult.hasSoftConflict)) {
-            const conflictType = conflictResult.hasHardConflict ? 'confirmed' : 'pending';
-            const conflicts = conflictResult.hasHardConflict
-              ? conflictResult.hardConflicts
-              : conflictResult.softConflicts;
-
-            console.log(`⛔ ${conflictType} conflict detected:`, conflicts);
-
-            return new Response(JSON.stringify({
-              error: `Technician has ${conflictType} overlapping assignment`,
-              details: {
-                conflict_type: conflictType,
-                conflicts: conflicts,
-                unavailability: conflictResult.unavailabilityConflicts,
-                target_job: {
-                  id: job.id,
-                  title: job.title,
-                  start_time: job.start_time,
-                  end_time: job.end_time,
-                  single_day: isSingleDayRequest,
-                  target_date: dateToCheck
-                },
-                technician: { id: tech.id, name: fullName }
+          for (const dateToCheck of datesToCheck) {
+            const { data: conflictResult, error: conflictErr } = await supabase.rpc(
+              'check_technician_conflicts',
+              {
+                _technician_id: profile_id,
+                _target_job_id: job_id,
+                _target_date: dateToCheck,
+                _single_day: isSingleDayRequest,
+                _include_pending: true // Check both confirmed and pending assignments
               }
-            }), {
-              status: 409,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-          }
-        }
+            );
 
-        console.log('✅ No conflicts detected, proceeding to send email');
-      } catch (conflictCheckErr) {
-        console.warn('⚠️ Conflict check encountered an error, continuing to send email:', conflictCheckErr);
+            if (conflictErr) {
+              console.warn('⚠️ Conflict check failed, continuing to send email:', conflictErr);
+            } else if (conflictResult && (conflictResult.hasHardConflict || conflictResult.hasSoftConflict)) {
+              const hasJobConflicts = (conflictResult.hardConflicts?.length > 0) || (conflictResult.softConflicts?.length > 0);
+              const hasUnavailability = conflictResult.unavailabilityConflicts?.length > 0;
+
+              const conflictType = conflictResult.hasHardConflict ? 'confirmed' : 'pending';
+              const conflicts = conflictResult.hasHardConflict
+                ? conflictResult.hardConflicts
+                : conflictResult.softConflicts;
+
+              console.log(`⛔ ${conflictType} conflict detected:`, {
+                jobConflicts: conflicts,
+                unavailability: conflictResult.unavailabilityConflicts
+              });
+
+              // Build error message based on conflict types
+              let errorMessage = 'Technician has conflicts';
+              if (hasUnavailability && !hasJobConflicts) {
+                errorMessage = 'Technician is unavailable on these dates';
+              } else if (hasJobConflicts) {
+                errorMessage = `Technician has ${conflictType} overlapping assignment`;
+              }
+
+              return new Response(JSON.stringify({
+                error: errorMessage,
+                details: {
+                  conflict_type: conflictType,
+                  conflicts: conflicts,
+                  unavailability: conflictResult.unavailabilityConflicts,
+                  target_job: {
+                    id: job.id,
+                    title: job.title,
+                    start_time: job.start_time,
+                    end_time: job.end_time,
+                    single_day: isSingleDayRequest,
+                    target_date: dateToCheck
+                  },
+                  technician: { id: tech.id, name: fullName }
+                }
+              }), {
+                status: 409,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              });
+            }
+          }
+
+          console.log('✅ No conflicts detected, proceeding to send email');
+        } catch (conflictCheckErr) {
+          console.warn('⚠️ Conflict check encountered an error, continuing to send email:', conflictCheckErr);
+        }
       }
 
       // Step 3: Generate token

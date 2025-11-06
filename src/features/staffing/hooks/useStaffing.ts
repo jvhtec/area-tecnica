@@ -49,33 +49,67 @@ export function useStaffingStatus(jobId: string, profileId: string) {
   })
 }
 
+// Custom error type for conflicts
+export class ConflictError extends Error {
+  constructor(message: string, public details: any) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
 export function useSendStaffingEmail() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer', role?: string | null, message?: string | null, channel?: 'email' | 'whatsapp', target_date?: string | null, single_day?: boolean, dates?: string[] }) => {
+    mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer', role?: string | null, message?: string | null, channel?: 'email' | 'whatsapp', target_date?: string | null, single_day?: boolean, dates?: string[], override_conflicts?: boolean }) => {
       console.log('🚀 SENDING STAFFING EMAIL:', {
         payload,
         job_id_type: typeof payload.job_id,
         profile_id_type: typeof payload.profile_id,
         phase_valid: ['availability', 'offer'].includes(payload.phase)
       });
-      
-      const { data, error } = await supabase.functions.invoke('send-staffing-email', {
-        body: payload
-      })
-      
-      console.log('📨 EMAIL RESPONSE:', { data, error });
-      
-      if (error) {
-        console.error('❌ EMAIL ERROR:', error);
-        throw new Error(error.message || 'Failed to send email')
+
+      // Use fetch directly to get full control over error responses
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+
+      // Get Supabase URL and construct functions URL
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const functionUrl = `${supabaseUrl}/functions/v1/send-staffing-email`;
+
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': anonKey,
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      console.log('📨 EMAIL RESPONSE:', { status: response.status, data });
+
+      // Check for 409 Conflict with structured error details
+      if (response.status === 409) {
+        console.error('❌ 409 CONFLICT:', data);
+        if (data.details?.conflict_type || data.details?.conflicts || data.details?.unavailability) {
+          throw new ConflictError(data.error || 'Conflict detected', data.details);
+        }
       }
-      
+
+      // Check for other errors
+      if (!response.ok) {
+        console.error('❌ HTTP ERROR:', { status: response.status, data });
+        throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
       if (data?.error) {
-        console.error('❌ EMAIL API ERROR:', data);
-        throw new Error(data.error || 'Email API returned an error')
+        console.error('❌ API ERROR:', data);
+        throw new Error(data.error)
       }
-      
+
       console.log('✅ STAFFING REQUEST SENT SUCCESSFULLY');
       return data
     },

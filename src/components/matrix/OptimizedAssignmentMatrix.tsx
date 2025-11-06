@@ -13,7 +13,7 @@ import { MarkUnavailableDialog } from './MarkUnavailableDialog';
 import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
-import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
+import { useSendStaffingEmail, ConflictError } from '@/features/staffing/hooks/useStaffing';
 import { useToast } from '@/hooks/use-toast';
 import { OfferDetailsDialog } from './OfferDetailsDialog';
 import { supabase } from '@/lib/supabase';
@@ -324,7 +324,14 @@ export const OptimizedAssignmentMatrix = ({
   const [availabilityPreferredChannel, setAvailabilityPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
   const [offerChannel, setOfferChannel] = useState<'email' | 'whatsapp'>('email');
   const [offerPreferredChannel, setOfferPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
-  const [availabilityDialog, setAvailabilityDialog] = useState<null | { open: boolean; jobId: string; profileId: string; dateIso: string; singleDay: boolean }>(null);
+  const [availabilityDialog, setAvailabilityDialog] = useState<null | { open: boolean; jobId: string; profileId: string; dateIso: string; singleDay: boolean; channel: 'email' | 'whatsapp' }>(null);
+
+  // Conflict dialog state
+  const [conflictDialog, setConflictDialog] = useState<{
+    open: boolean;
+    details: any;
+    originalPayload: any;
+  } | null>(null);
 
   const forcedStaffingAction = useMemo<undefined | 'availability' | 'offer'>(() => {
     if (cellAction?.type !== 'select-job-for-staffing') return undefined;
@@ -377,7 +384,7 @@ export const OptimizedAssignmentMatrix = ({
       const targetJobId = selectedJobId || assignment?.job_id || undefined;
       if (targetJobId) {
         setAvailabilityChannel('whatsapp');
-        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true });
+        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true, channel: 'whatsapp' });
       } else {
         console.log('Setting WhatsApp intent for staffing job selection');
         setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment, intendedPhase: 'availability', intendedChannel: 'whatsapp' });
@@ -390,7 +397,7 @@ export const OptimizedAssignmentMatrix = ({
       const targetJobId = selectedJobId || assignment?.job_id || undefined;
       if (targetJobId) {
         setAvailabilityChannel('email');
-        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true });
+        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true, channel: 'email' });
       } else {
         setAvailabilityPreferredChannel('email');
         setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
@@ -494,24 +501,18 @@ export const OptimizedAssignmentMatrix = ({
 
         const intentPhase = cellAction.intendedPhase;
         const intentChannel = cellAction.intendedChannel;
-        const openAvailabilityDialogWith = (channel: 'email' | 'whatsapp') => {
-          setAvailabilityChannel(channel);
-          setAvailabilityDialog({ open: true, jobId, profileId: technicianId, dateIso: format(cellAction.date, 'yyyy-MM-dd'), singleDay: !!options?.singleDay });
-        };
+        const defaultChannel = intentChannel || availabilityPreferredChannel || 'email';
 
-        if (intentPhase === 'availability' && intentChannel) {
-          console.log('Using stored staffing intent', { intentPhase, intentChannel });
-          openAvailabilityDialogWith(intentChannel);
-          return;
-        }
-
-        console.log('Checking availabilityPreferredChannel:', availabilityPreferredChannel);
-        if (availabilityPreferredChannel === 'whatsapp' || availabilityPreferredChannel === 'email') {
-          openAvailabilityDialogWith(availabilityPreferredChannel);
-        } else {
-          // Store date as yyyy-MM-dd for consistency and open dialog (channel selectable inside)
-          setAvailabilityDialog({ open: true, jobId, profileId: technicianId, dateIso: format(cellAction.date, 'yyyy-MM-dd'), singleDay: !!options?.singleDay });
-        }
+        console.log('Opening availability dialog with channel:', defaultChannel);
+        setAvailabilityChannel(defaultChannel);
+        setAvailabilityDialog({
+          open: true,
+          jobId,
+          profileId: technicianId,
+          dateIso: format(cellAction.date, 'yyyy-MM-dd'),
+          singleDay: !!options?.singleDay,
+          channel: defaultChannel
+        });
       })();
     } else {
       // no-op
@@ -722,6 +723,26 @@ export const OptimizedAssignmentMatrix = ({
   const [availabilityCoverage, setAvailabilityCoverage] = useState<'full' | 'single' | 'multi'>('single');
   const [availabilitySingleDate, setAvailabilitySingleDate] = useState<Date | null>(null);
   const [availabilityMultiDates, setAvailabilityMultiDates] = useState<Date[]>([]);
+
+  // Helper to handle conflict errors
+  const handleEmailError = (error: any, payload: any) => {
+    setAvailabilitySending(false);
+    if (error instanceof ConflictError) {
+      // Show conflict dialog with details and option to override
+      setConflictDialog({
+        open: true,
+        details: error.details,
+        originalPayload: payload
+      });
+    } else {
+      // Show regular error toast
+      toast({
+        title: 'Send failed',
+        description: error.message || 'Failed to send staffing request',
+        variant: 'destructive'
+      });
+    }
+  };
 
   useEffect(() => {
     if (availabilityDialog?.open) {
