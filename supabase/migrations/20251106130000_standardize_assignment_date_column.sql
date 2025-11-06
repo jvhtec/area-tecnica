@@ -96,13 +96,26 @@ COMMENT ON COLUMN job_assignments.single_day IS
   'True when the assignment covers only a single day (assignment_date must be set). False for whole-job assignments covering the entire job span.';
 
 -- Update the timesheet generation trigger to use assignment_date instead of single_day_date
+-- Also preserves job_type filtering to skip dryhire and tourdate jobs
 CREATE OR REPLACE FUNCTION public.create_timesheets_for_assignment()
 RETURNS TRIGGER AS $$
 DECLARE
     job_start_date date;
     job_end_date date;
     current_date date;
+    job_type_val text;
 BEGIN
+    -- Get job information including type
+    SELECT DATE(start_time), DATE(end_time), job_type
+    INTO job_start_date, job_end_date, job_type_val
+    FROM jobs
+    WHERE id = NEW.job_id;
+
+    -- Skip timesheet creation for dryhire and tourdate jobs (business rule)
+    IF job_type_val IN ('dryhire', 'tourdate') THEN
+        RETURN NEW;
+    END IF;
+
     -- When explicitly marked as single-day, only create a timesheet for that date
     -- UPDATED: Now uses assignment_date instead of single_day_date
     IF COALESCE(NEW.single_day, false) = true AND NEW.assignment_date IS NOT NULL THEN
@@ -123,11 +136,7 @@ BEGIN
     END IF;
 
     -- Fallback to legacy behaviour (cover full job range)
-    SELECT DATE(start_time), DATE(end_time)
-    INTO job_start_date, job_end_date
-    FROM jobs
-    WHERE id = NEW.job_id;
-
+    -- Job dates already fetched above
     current_date := job_start_date;
     WHILE current_date <= job_end_date LOOP
         INSERT INTO timesheets (
