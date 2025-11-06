@@ -78,9 +78,19 @@ export const uploadJobPdfWithCleanup = async (
     if (insertError) throw insertError;
 
     // Broadcast push: new document uploaded (fire-and-forget)
+    // CRITICAL: Use incident.report.uploaded for incident reports
     try {
+      const pushEventType = category === 'incident-reports'
+        ? 'incident.report.uploaded'
+        : 'document.uploaded';
+
       void supabase.functions.invoke('push', {
-        body: { action: 'broadcast', type: 'document.uploaded', job_id: jobId, file_name: sanitizedFileName }
+        body: {
+          action: 'broadcast',
+          type: pushEventType,
+          job_id: jobId,
+          file_name: sanitizedFileName
+        }
       });
     } catch {}
   } catch (err) {
