@@ -171,6 +171,26 @@ export const StaffingJobSelectionDialog = ({
             )}
           </div>
 
+          {/* Single-Day Scope - Always show when job is selected */}
+          {selectedJobId && (
+            <div className="space-y-2 pt-2 border-t">
+              <div className="flex items-center gap-2">
+                <input 
+                  id="scope-single-day" 
+                  type="checkbox" 
+                  checked={singleDay} 
+                  onChange={(e) => setSingleDay(e.target.checked)} 
+                />
+                <Label htmlFor="scope-single-day" className="text-sm cursor-pointer">
+                  Request for this single day only
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground ml-6">
+                For multi-day jobs, check this to request availability/offer for just this specific date
+              </p>
+            </div>
+          )}
+
           {/* Action Selection (hidden if forced) */}
           {selectedJobId && !forcedAction && (
             <div className="space-y-3">
@@ -197,11 +217,6 @@ export const StaffingJobSelectionDialog = ({
                   </Label>
                 </div>
               </RadioGroup>
-
-              <div className="flex items-center gap-2">
-                <input id="scope-single-day" type="checkbox" checked={singleDay} onChange={(e) => setSingleDay(e.target.checked)} />
-                <Label htmlFor="scope-single-day">Substitute only for this day</Label>
-              </div>
 
               <div className="flex items-center justify-between pt-2">
                 <Button 
