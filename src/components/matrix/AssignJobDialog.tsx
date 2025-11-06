@@ -19,12 +19,23 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 import { Loader2, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
+import { checkTimeConflict, TechnicianJobConflict } from '@/utils/technicianAvailability';
 
 interface AssignJobDialogProps {
   open: boolean;
@@ -61,6 +72,11 @@ export const AssignJobDialog = ({
   const [assignAsConfirmed, setAssignAsConfirmed] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [conflictWarning, setConflictWarning] = useState<{
+    conflict: TechnicianJobConflict;
+    targetDate?: string;
+    mode: 'full' | 'single' | 'multi';
+  } | null>(null);
 
   // Get technician details
   const { data: technician } = useQuery({
@@ -122,13 +138,41 @@ export const AssignJobDialog = ({
     }
   }, [preSelectedJobId]);
 
-  const handleAssign = async () => {
+  const checkForConflicts = async (): Promise<{
+    conflict: TechnicianJobConflict;
+    targetDate?: string;
+    mode: 'full' | 'single' | 'multi';
+  } | null> => {
+    if (!selectedJobId) {
+      return null;
+    }
+
+    if (coverageMode === 'multi') {
+      const uniqueKeys = Array.from(new Set((multiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
+      for (const key of uniqueKeys) {
+        const conflict = await checkTimeConflict(technicianId, selectedJobId, key, true);
+        if (conflict) {
+          return { conflict, targetDate: key, mode: 'multi' };
+        }
+      }
+      return null;
+    }
+
+    if (coverageMode === 'single') {
+      const conflict = await checkTimeConflict(technicianId, selectedJobId, assignmentDate, true);
+      return conflict ? { conflict, targetDate: assignmentDate, mode: 'single' } : null;
+    }
+
+    const conflict = await checkTimeConflict(technicianId, selectedJobId);
+    return conflict ? { conflict, mode: 'full' } : null;
+  };
+
+  const attemptAssign = async (skipConflictCheck = false) => {
     if (!selectedJobId || !selectedRole || !technician) {
       toast.error('Please select both a job and role');
       return;
     }
 
-    // Prevent re-assigning a declined technician to the same job
     if (existingAssignment?.status === 'declined' && selectedJobId === existingAssignment.job_id) {
       toast.error('This technician already declined this job');
       return;
@@ -139,18 +183,24 @@ export const AssignJobDialog = ({
       return;
     }
 
+    if (!skipConflictCheck) {
+      const conflict = await checkForConflicts();
+      if (conflict) {
+        setConflictWarning(conflict);
+        return;
+      }
+    }
+
     setIsAssigning(true);
     console.log('Starting assignment:', { selectedJobId, selectedRole, technicianId, isReassignment });
 
-    // Add timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       console.error('Assignment timeout after 10 seconds');
       setIsAssigning(false);
       toast.error('Assignment timed out - please try again');
     }, 10000);
 
     try {
-      // Determine role assignment based on department
       const soundRole = technician.department === 'sound' ? selectedRole : 'none';
       const lightsRole = technician.department === 'lights' ? selectedRole : 'none';
       const videoRole = technician.department === 'video' ? selectedRole : 'none';
@@ -158,8 +208,6 @@ export const AssignJobDialog = ({
       console.log('Role assignments:', { soundRole, lightsRole, videoRole, department: technician.department });
 
       if (isReassignment) {
-        // For reassignments, we need to remove the old assignment and create a new one
-        // First remove the old assignment
         const { error: deleteError } = await supabase
           .from('job_assignments')
           .delete()
@@ -172,7 +220,6 @@ export const AssignJobDialog = ({
         }
       }
 
-      // Create new assignment(s)
       const basePayload = {
         job_id: selectedJobId,
         technician_id: technicianId,
@@ -209,7 +256,6 @@ export const AssignJobDialog = ({
 
       console.log('Assignment created successfully, now handling Flex crew assignments...');
 
-      // Handle Flex crew assignments for sound/lights departments
       try {
         if (soundRole && soundRole !== 'none') {
           const { error: flexError } = await supabase.functions.invoke('manage-flex-crew-assignments', {
@@ -220,13 +266,12 @@ export const AssignJobDialog = ({
               action: 'add'
             }
           });
-          
+
           if (flexError) {
             console.error('Error adding to Flex crew (sound):', flexError);
-            // Don't fail the whole assignment for Flex errors
           }
         }
-        
+
         if (lightsRole && lightsRole !== 'none') {
           const { error: flexError } = await supabase.functions.invoke('manage-flex-crew-assignments', {
             body: {
@@ -236,25 +281,22 @@ export const AssignJobDialog = ({
               action: 'add'
             }
           });
-          
+
           if (flexError) {
             console.error('Error adding to Flex crew (lights):', flexError);
-            // Don't fail the whole assignment for Flex errors
           }
         }
       } catch (flexError) {
         console.error('Error with Flex crew assignments:', flexError);
-        // Continue without failing the assignment
       }
-      
+
       const statusText = assignAsConfirmed ? 'confirmed' : 'invited';
       console.log('Assignment completed successfully');
-      clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
       toast.success(
         `${isReassignment ? 'Reassigned' : 'Assigned'} ${technician.first_name} ${technician.last_name} to ${selectedJob?.title} (${statusText})`
       );
 
-      // Send push notification for direct assignments
       const recipientName = `${technician.first_name ?? ''} ${technician.last_name ?? ''}`.trim();
       try {
         void supabase.functions.invoke('push', {
@@ -270,23 +312,19 @@ export const AssignJobDialog = ({
           }
         });
       } catch (_) {
-        // Non-blocking push failure
       }
 
-      // Force refresh of queries by dispatching a custom event
       window.dispatchEvent(new CustomEvent('assignment-updated', {
         detail: { technicianId, jobId: selectedJobId }
       }));
-      
-      // Small delay to ensure the toast is visible before closing
+
       setTimeout(() => {
         onClose();
       }, 100);
     } catch (error: any) {
-      clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
       console.error('Error assigning job:', error);
-      
-      // Provide more specific error messages
+
       if (error.code === '23505') {
         toast.error('This technician is already assigned to this job');
       } else if (error.message?.includes('timeout') || error.message?.includes('network')) {
@@ -295,9 +333,13 @@ export const AssignJobDialog = ({
         toast.error(`Failed to assign job: ${error.message || 'Unknown error'}`);
       }
     } finally {
-      clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
       setIsAssigning(false);
     }
+  };
+
+  const handleAssign = () => {
+    void attemptAssign();
   };
 
   const handleRemoveAssignment = async () => {
@@ -343,13 +385,36 @@ export const AssignJobDialog = ({
     return t >= selectedJobMeta.start && t <= selectedJobMeta.end;
   };
 
+  const formatJobRange = (start?: string | null, end?: string | null) => {
+    if (!start || !end) return null;
+    try {
+      return `${format(new Date(start), 'PPP')} – ${format(new Date(end), 'PPP')}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const formatDateLabel = (iso?: string) => {
+    if (!iso) return null;
+    try {
+      return format(new Date(`${iso}T00:00:00`), 'PPP');
+    } catch {
+      return null;
+    }
+  };
+
+  const conflictJobRange = conflictWarning ? formatJobRange(conflictWarning.conflict.start_time, conflictWarning.conflict.end_time) : null;
+  const targetJobRange = selectedJob ? formatJobRange(selectedJob.start_time, selectedJob.end_time) : null;
+  const conflictTargetDateLabel = formatDateLabel(conflictWarning?.targetDate);
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isReassignment ? 'Reassign Job' : 'Assign Job'}</DialogTitle>
-          <DialogDescription>
-            {isReassignment ? 'Reassign' : 'Assign'} {technician?.first_name} {technician?.last_name} to a job on{' '}
+    <>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{isReassignment ? 'Reassign Job' : 'Assign Job'}</DialogTitle>
+            <DialogDescription>
+              {isReassignment ? 'Reassign' : 'Assign'} {technician?.first_name} {technician?.last_name} to a job on{' '}
             {format(date, 'EEEE, MMMM d, yyyy')}
           </DialogDescription>
         </DialogHeader>
@@ -553,7 +618,7 @@ export const AssignJobDialog = ({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleAssign}
             disabled={!selectedJobId || !selectedRole || isAssigning}
           >
@@ -568,6 +633,45 @@ export const AssignJobDialog = ({
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+      <AlertDialog
+        open={!!conflictWarning}
+        onOpenChange={(openState) => {
+          if (!openState) {
+            setConflictWarning(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Potential scheduling conflict</AlertDialogTitle>
+            <AlertDialogDescription>
+              {conflictWarning && (
+                <>
+                  {technician ? `${technician.first_name} ${technician.last_name}` : 'This technician'} is already confirmed for{' '}
+                  <strong>{conflictWarning.conflict.title}</strong>
+                  {conflictJobRange ? ` (${conflictJobRange})` : ''}.
+                  {' '}This overlaps with <strong>{selectedJob?.title}</strong>
+                  {conflictWarning.mode === 'full' && targetJobRange ? ` (${targetJobRange})` : ''}
+                  {conflictWarning.mode !== 'full' && conflictTargetDateLabel ? ` on ${conflictTargetDateLabel}` : ''}.
+                  {' '}Do you want to proceed?
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConflictWarning(null)}>Go back</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConflictWarning(null);
+                void attemptAssign(true);
+              }}
+            >
+              Proceed anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
