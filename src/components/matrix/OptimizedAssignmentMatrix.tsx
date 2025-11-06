@@ -1009,7 +1009,6 @@ export const OptimizedAssignmentMatrix = ({
               const via = offerChannel;
               if (singleDay) {
                 const selectedDates = Array.isArray(dates) && dates.length ? dates : [format(cellAction.date, 'yyyy-MM-dd')];
-                // Pre-check all dates
                 for (const d of selectedDates) {
                   const conflict = await checkTimeConflict(profileId, jobId, d, true);
                   if (conflict) {
@@ -1017,22 +1016,16 @@ export const OptimizedAssignmentMatrix = ({
                     return;
                   }
                 }
-                let sent = 0, failed = 0;
-                await Promise.all(selectedDates.map(d => new Promise<void>((resolve) => {
-                  sendStaffingEmail(
-                    ({ job_id: jobId, profile_id: profileId, phase: 'offer', role, message, channel: via, target_date: d, single_day: true } as any),
-                    {
-                      onSuccess: () => { sent++; resolve(); },
-                      onError: () => { failed++; resolve(); }
-                    }
-                  );
-                })));
-                if (failed === 0) {
-                  toast({ title: 'Offer sent', description: `${role} offer sent via ${via} (${sent} day${sent>1?'s':''}).` });
-                  closeDialogs();
-                } else {
-                  toast({ title: 'Some offers failed', description: `Sent ${sent}, failed ${failed}.`, variant: 'destructive' });
-                }
+                sendStaffingEmail(({ job_id: jobId, profile_id: profileId, phase: 'offer', role, message, channel: via, single_day: true, dates: selectedDates } as any), {
+                  onSuccess: (data: any) => {
+                    const ch = data?.channel || via;
+                    toast({ title: 'Offer sent', description: `${role} offer sent via ${ch} (${selectedDates.length} day${selectedDates.length>1?'s':''}).` });
+                    closeDialogs();
+                  },
+                  onError: (error: any) => {
+                    toast({ title: 'Failed to send offer', description: error.message, variant: 'destructive' });
+                  }
+                });
                 return;
               }
               // Full span
@@ -1205,20 +1198,16 @@ export const OptimizedAssignmentMatrix = ({
                     toast({ title: 'Select date(s)', description: 'Choose at least one date within the job span.', variant: 'destructive' });
                     return;
                   }
-                  let sent = 0, failed = 0;
-                  Promise.all(dates.map(d => new Promise<void>((resolve) => {
-                    sendStaffingEmail(({ job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, target_date: d, single_day: true } as any), {
-                      onSuccess: () => { sent++; resolve(); },
-                      onError: () => { failed++; resolve(); }
-                    });
-                  })) ).then(() => {
-                    setAvailabilitySending(false);
-                    setAvailabilityDialog(null);
-                    if (failed === 0) {
-                      toast({ title: 'Request sent', description: `Availability request sent for ${sent} day${sent>1?'s':''} via ${via}.` });
+                  sendStaffingEmail(({ job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, single_day: true, dates } as any), {
+                    onSuccess: (data: any) => {
+                      setAvailabilitySending(false);
+                      setAvailabilityDialog(null);
+                      toast({ title: 'Request sent', description: `Availability request sent for ${dates.length} day${dates.length>1?'s':''} via ${data?.channel || via}.` });
                       closeDialogs();
-                    } else {
-                      toast({ title: 'Some requests failed', description: `Sent ${sent}, failed ${failed}.`, variant: 'destructive' });
+                    },
+                    onError: (error: any) => {
+                      setAvailabilitySending(false);
+                      toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
                     }
                   });
                 }}
