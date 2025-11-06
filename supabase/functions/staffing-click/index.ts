@@ -153,14 +153,33 @@ serve(async (req) => {
     
     const newStatus = action === "confirm" ? "confirmed" : "declined";
     
-    // Update and verify row was affected
-    console.log('💾 ATTEMPTING DB UPDATE:', { rid, newStatus, action });
-    const { data: updRow, error: updErr } = await supabase
-      .from("staffing_requests")
-      .update({ status: newStatus })
-      .eq("id", rid)
-      .select('id,status')
-      .maybeSingle();
+    // Update and verify row was affected (batch-aware)
+    console.log('💾 ATTEMPTING DB UPDATE:', { rid, newStatus, action, batch_id: (row as any).batch_id || null });
+    let updRow: any = null;
+    let updErr: any = null;
+    if ((row as any)?.batch_id) {
+      const { data, error } = await supabase
+        .from('staffing_requests')
+        .update({ status: newStatus })
+        .eq('batch_id', (row as any).batch_id)
+        .eq('job_id', row.job_id)
+        .eq('profile_id', row.profile_id)
+        .eq('phase', row.phase)
+        .eq('status', 'pending')
+        .select('id,status')
+        ;
+      updRow = Array.isArray(data) && data.length ? data[0] : null;
+      updErr = error;
+    } else {
+      const { data, error } = await supabase
+        .from("staffing_requests")
+        .update({ status: newStatus })
+        .eq("id", rid)
+        .select('id,status')
+        .maybeSingle();
+      updRow = data;
+      updErr = error;
+    }
     
     if (updErr || !updRow) {
       console.error('❌ STAFFING STATUS UPDATE FAILED:', { updErr, rid, newStatus });
@@ -306,58 +325,61 @@ serve(async (req) => {
           }
 
           if (!hasConflict) {
-            // 4) Upsert assignment: set confirmed + role field based on department
-            const rolePatch: Record<string, string | null> = {};
-            if (prof.department === 'sound') rolePatch['sound_role'] = chosenRole;
-            else if (prof.department === 'lights') rolePatch['lights_role'] = chosenRole;
-            else if (prof.department === 'video') rolePatch['video_role'] = chosenRole;
-
-            const upsertPayload: any = {
-              job_id: row.job_id,
-              technician_id: row.profile_id,
-              status: 'confirmed',
-              assigned_at: new Date().toISOString(),
-              assignment_source: 'staffing',
-              response_time: new Date().toISOString(),
-              ...rolePatch
-            };
-            const { data: upserted, error: upsertErr } = await supabase
-              .from('job_assignments')
-              .upsert(upsertPayload, { onConflict: 'job_id,technician_id' })
-              .select('job_id, technician_id')
-              .maybeSingle();
-
-            if (upsertErr) {
-              await supabase.from('staffing_events').insert({
-                staffing_request_id: rid,
-                event: 'auto_assign_upsert_error',
-                meta: { message: upsertErr.message }
-              });
-            } else {
-              await supabase.from('staffing_events').insert({
-                staffing_request_id: rid,
-                event: 'auto_assign_upsert_ok',
-                meta: { role: chosenRole, department: prof.department }
-              });
-              try {
-                await fetch(`${SUPABASE_URL}/functions/v1/push`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${SERVICE_ROLE}`
-                  },
-                  body: JSON.stringify({
-                    action: 'broadcast',
-                    type: 'job.assignment.confirmed',
-                    job_id: row.job_id,
-                    recipient_id: row.profile_id,
-                    recipient_name: techName
-                  })
-                });
-              } catch (_) {
-                // non-blocking push failure
+            // 4) Upsert assignment(s): handles single or batch dates
+            async function upsertAssignmentFor(targetDate: string | null) {
+              const rolePatch: Record<string, string | null> = {};
+              if (prof.department === 'sound') rolePatch['sound_role'] = chosenRole;
+              else if (prof.department === 'lights') rolePatch['lights_role'] = chosenRole;
+              else if (prof.department === 'video') rolePatch['video_role'] = chosenRole;
+              const upsertPayload: any = {
+                job_id: row.job_id,
+                technician_id: row.profile_id,
+                status: 'confirmed',
+                assigned_at: new Date().toISOString(),
+                assignment_source: 'staffing',
+                response_time: new Date().toISOString(),
+                ...rolePatch
+              };
+              if (targetDate) {
+                upsertPayload.single_day = true;
+                upsertPayload.assignment_date = targetDate;
+              }
+              const { error: upsertErr } = await supabase
+                .from('job_assignments')
+                .upsert(upsertPayload, { onConflict: 'job_id,technician_id' });
+              if (upsertErr) {
+                await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_error', meta: { message: upsertErr.message, target_date: targetDate } });
+              } else {
+                await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_ok', meta: { role: chosenRole, department: prof.department, target_date: targetDate } });
               }
             }
+
+            if ((row as any)?.batch_id) {
+              const { data: batchRows } = await supabase
+                .from('staffing_requests')
+                .select('id,target_date,single_day,status')
+                .eq('batch_id', (row as any).batch_id)
+                .eq('job_id', row.job_id)
+                .eq('profile_id', row.profile_id)
+                .eq('phase', row.phase);
+              const targets = (batchRows || []).filter(r => r.status === 'pending');
+              for (const br of targets) {
+                await upsertAssignmentFor(br.single_day ? (br.target_date as any) : null);
+              }
+            } else {
+              await upsertAssignmentFor((row as any).single_day && (row as any).target_date ? (row as any).target_date : null);
+            }
+
+            try {
+              await fetch(`${SUPABASE_URL}/functions/v1/push`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${SERVICE_ROLE}`
+                },
+                body: JSON.stringify({ action: 'broadcast', type: 'job.assignment.confirmed', job_id: row.job_id, recipient_id: row.profile_id, recipient_name: techName })
+              });
+            } catch (_) { /* non-blocking */ }
 
             // 5) Try to add to Flex crew for sound/lights (best-effort)
             try {

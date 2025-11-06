@@ -69,6 +69,7 @@ serve(async (req) => {
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
     
     const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day } = body;
+    const datesArrayRaw: unknown = (body as any)?.dates;
     const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp') ? 'whatsapp' : 'email';
     const rawTargetDate = typeof target_date === 'string' && target_date ? target_date : null;
     const normalizedTargetDate = rawTargetDate ? (() => {
@@ -77,6 +78,16 @@ serve(async (req) => {
       return parsed.toISOString().split('T')[0];
     })() : null;
     const isSingleDayRequest = Boolean(single_day) && Boolean(normalizedTargetDate);
+    const normalizedDates: string[] = Array.isArray(datesArrayRaw)
+      ? Array.from(new Set((datesArrayRaw as any[])
+        .map((d) => {
+          if (typeof d !== 'string') return null;
+          const p = new Date(d);
+          if (Number.isNaN(p.getTime())) return null;
+          return p.toISOString().split('T')[0];
+        })
+        .filter((d): d is string => typeof d === 'string')))
+      : [];
     
     // Enhanced validation logging
     console.log('🔍 VALIDATING FIELDS:', {
@@ -86,7 +97,8 @@ serve(async (req) => {
       role: { value: role ?? null },
       message: { value: message ?? null },
       target_date: { value: target_date ?? null, normalized: normalizedTargetDate },
-      single_day: { value: single_day ?? null, effective: isSingleDayRequest }
+      single_day: { value: single_day ?? null, effective: isSingleDayRequest },
+      dates: normalizedDates
     });
     
     if (!job_id || !profile_id || !["availability","offer"].includes(phase)) {
@@ -375,47 +387,83 @@ serve(async (req) => {
       const token_hash = Array.from(digest).map(x=>x.toString(16).padStart(2,'0')).join('');
       console.log('🔐 TOKEN GENERATED:', { rid, expires: exp });
 
-      // Step 4: Insert/update staffing request
+      // Step 4: Insert/update staffing request(s)
       console.log('💾 SAVING STAFFING REQUEST...');
       let insertedId = rid;
-      const insertRes = await supabase.from("staffing_requests").insert({
-        id: rid,
-        job_id,
-        profile_id,
-        phase,
-        status: "pending",
-        token_hash,
-        token_expires_at: exp,
-        single_day: isSingleDayRequest,
-        target_date: normalizedTargetDate,
-      });
-      
-      console.log('💾 INSERT RESULT:', { error: insertRes.error });
-      
-      if (insertRes.error && insertRes.error.code === "23505") {
-        console.log('🔄 DUPLICATE FOUND, UPDATING...');
-        const upd = await supabase.from("staffing_requests")
-          .update({
-            token_hash,
-            token_expires_at: exp,
-            updated_at: new Date().toISOString(),
-            single_day: isSingleDayRequest,
-            target_date: normalizedTargetDate,
-          })
-          .eq("job_id", job_id).eq("profile_id", profile_id).eq("phase", phase).eq("status", "pending")
-          .select("id").maybeSingle();
-        
-        console.log('🔄 UPDATE RESULT:', { data: upd.data, error: upd.error });
-        if (upd.data?.id) insertedId = upd.data.id;
-      } else if (insertRes.error) {
-        console.error('❌ STAFFING REQUEST INSERT ERROR:', insertRes.error);
-        return new Response(JSON.stringify({ 
-          error: "Database error saving request", 
-          details: insertRes.error 
-        }), { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      // If multiple dates are provided, create a batch of single-day requests and use one of them for the email link
+      const isBatch = normalizedDates.length > 1;
+      let batchId: string | null = null;
+      if (isBatch) {
+        batchId = crypto.randomUUID();
+        // Choose the first date to own the clickable rid
+        const firstDate = normalizedDates[0];
+        const firstInsert = await supabase.from('staffing_requests').insert({
+          id: rid,
+          job_id,
+          profile_id,
+          phase,
+          status: 'pending',
+          token_hash,
+          token_expires_at: exp,
+          single_day: true,
+          target_date: firstDate,
+          batch_id: batchId,
         });
+        if (firstInsert.error) {
+          console.error('❌ STAFFING REQUEST BATCH FIRST INSERT ERROR:', firstInsert.error);
+          return new Response(JSON.stringify({ error: 'Database error saving first batch request', details: firstInsert.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        // Insert remaining dates with upsert to avoid duplicates
+        const rest = normalizedDates.slice(1).map(d => ({
+          job_id,
+          profile_id,
+          phase,
+          status: 'pending',
+          token_hash, // placeholder; not used for click on these rows
+          token_expires_at: exp,
+          single_day: true,
+          target_date: d,
+          batch_id: batchId,
+        }));
+        if (rest.length) {
+          const up = await supabase
+            .from('staffing_requests')
+            .upsert(rest, { onConflict: 'job_id,profile_id,phase,target_date' });
+          if (up.error) {
+            console.warn('⚠️ Batch upsert had errors:', up.error);
+          }
+        }
+      } else {
+        // Single request as before
+        const insertRes = await supabase.from("staffing_requests").insert({
+          id: rid,
+          job_id,
+          profile_id,
+          phase,
+          status: "pending",
+          token_hash,
+          token_expires_at: exp,
+          single_day: isSingleDayRequest,
+          target_date: normalizedTargetDate,
+        });
+        if (insertRes.error && insertRes.error.code === "23505") {
+          console.log('🔄 DUPLICATE FOUND, UPDATING...');
+          const upd = await supabase.from("staffing_requests")
+            .update({
+              token_hash,
+              token_expires_at: exp,
+              updated_at: new Date().toISOString(),
+              single_day: isSingleDayRequest,
+              target_date: normalizedTargetDate,
+            })
+            .eq("job_id", job_id).eq("profile_id", profile_id).eq("phase", phase).eq("status", "pending")
+            .select("id").maybeSingle();
+          console.log('🔄 UPDATE RESULT:', { data: upd.data, error: upd.error });
+          if (upd.data?.id) insertedId = upd.data.id;
+        } else if (insertRes.error) {
+          console.error('❌ STAFFING REQUEST INSERT ERROR:', insertRes.error);
+          return new Response(JSON.stringify({ error: "Database error saving request", details: insertRes.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
       }
 
       // Optional: generate signed URL for a tour schedule PDF
@@ -455,7 +503,14 @@ serve(async (req) => {
 
       const primaryCta = phase === 'availability' ? 'Estoy disponible' : 'Acepto la oferta';
       const secondaryCta = phase === 'availability' ? 'No estoy disponible' : 'Rechazo la oferta';
+      // Build date row depending on single-day vs span
+      const datesRowHtml = (isSingleDayRequest && targetDateLabel)
+        ? `<div><b>Fecha:</b> ${targetDateLabel}</div>`
+        : `<div><b>Fechas:</b> ${startDate}${job.end_time ? ` — ${endDate}` : ''}</div>`;
 
+      const multiDatesHtml = normalizedDates.length > 1
+        ? `<div><b>Fechas seleccionadas:</b></div><ul style="margin:8px 0 0 16px;padding:0;">${normalizedDates.map(d => `<li>${fmtDate(`${d}T00:00:00Z`)}</li>`).join('')}</ul>`
+        : '';
       const html = `
       <!doctype html>
       <html>
@@ -495,7 +550,7 @@ serve(async (req) => {
                         ? `¿Puedes confirmar tu disponibilidad para <b>${job.title}</b>?`
                         : `Tienes una oferta para <b>${job.title}</b>. Por favor, confirma:`}
                     </p>
-                    ${isSingleDayRequest && targetDateLabel ? `<p style="margin:8px 0 0 0;color:#374151;"><b>Día específico:</b> ${targetDateLabel}</p>` : ''}
+                    
                     ${phase === 'offer' && role ? `<p style="margin:8px 0 0 0;color:#111827;"><b>Puesto:</b> ${role}</p>` : ''}
                     ${phase === 'offer' && message ? `<p style="margin:12px 0 0 0;color:#374151;">${safeMessage}</p>` : ''}
                   </td>
@@ -507,8 +562,7 @@ serve(async (req) => {
                         <td style="padding:16px;">
                           <div style="color:#111827;font-weight:bold;margin-bottom:4px;">Detalles del trabajo</div>
                           <div style="color:#374151;line-height:1.55;">
-                            <div><b>Fechas:</b> ${startDate}${job.end_time ? ` — ${endDate}` : ''}</div>
-                            ${isSingleDayRequest && targetDateLabel ? `<div><b>Día específico:</b> ${targetDateLabel}</div>` : ''}
+                            ${normalizedDates.length > 1 ? multiDatesHtml : datesRowHtml}
                             <div><b>Horario:</b> ${callTime}</div>
                             <div><b>Ubicación:</b> ${loc}</div>
                             ${roleLabel ? `<div><b>Rol:</b> ${roleLabel}</div>` : ''}
@@ -569,8 +623,14 @@ serve(async (req) => {
         if (phase === 'offer' && roleLabel) lines.push(`Puesto: ${roleLabel}`);
         lines.push('');
         lines.push('Detalles del trabajo:');
-        lines.push(`- Fechas: ${startDate}${job.end_time ? ` — ${endDate}` : ''}`);
-        if (isSingleDayRequest && targetDateLabel) lines.push(`- Día específico: ${targetDateLabel}`);
+        if (normalizedDates.length > 1) {
+          lines.push('- Fechas seleccionadas:');
+          normalizedDates.forEach(d => lines.push(`  • ${fmtDate(`${d}T00:00:00Z`)}`));
+        } else if (isSingleDayRequest && targetDateLabel) {
+          lines.push(`- Fecha: ${targetDateLabel}`);
+        } else {
+          lines.push(`- Fechas: ${startDate}${job.end_time ? ` — ${endDate}` : ''}`);
+        }
         lines.push(`- Horario: ${callTime}`);
         lines.push(`- Ubicación: ${loc}`);
         if (roleLabel) lines.push(`- Rol: ${roleLabel}`);
@@ -637,7 +697,7 @@ serve(async (req) => {
         await supabase.from('staffing_events').insert({
           staffing_request_id: insertedId,
           event: 'whatsapp_sent',
-          meta: { phase, status: waRes.status, role: role ?? null, single_day: isSingleDayRequest, target_date: normalizedTargetDate }
+          meta: { phase, status: waRes.status, role: role ?? null, single_day: isSingleDayRequest || isBatch, target_date: normalizedTargetDate, dates: normalizedDates }
         });
         if (waRes.ok) {
           try {
@@ -683,7 +743,7 @@ serve(async (req) => {
         await supabase.from("staffing_events").insert({
           staffing_request_id: insertedId,
           event: "email_sent",
-          meta: { phase, status: sendRes.status, role: role ?? null, message: message ?? null, single_day: isSingleDayRequest, target_date: normalizedTargetDate }
+          meta: { phase, status: sendRes.status, role: role ?? null, message: message ?? null, single_day: isSingleDayRequest || isBatch, target_date: normalizedTargetDate, dates: normalizedDates }
         });
         if (sendRes.ok) {
           try {
