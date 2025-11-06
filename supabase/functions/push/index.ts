@@ -1055,7 +1055,9 @@ async function handleBroadcast(
   } else if (type === EVENT_TYPES.JOB_DELETED) {
     // CRITICAL: Job deletion notification - all assigned technicians need to know
     title = 'Trabajo eliminado';
-    text = `${actor} ha eliminado "${jobTitle || 'Trabajo'}". Este trabajo ya no está disponible.`;
+    // Use title from body if provided (job is already deleted), otherwise try to resolve from job_id
+    const deletedJobTitle = body.title || jobTitle || 'Trabajo';
+    text = `${actor} ha eliminado "${deletedJobTitle}". Este trabajo ya no está disponible.`;
 
     // Notify all participants and management
     addNaturalRecipients(Array.from(mgmt));

@@ -65,6 +65,19 @@ export const deleteJobWithCleanup = async (jobId: string): Promise<void> => {
   try {
     console.log(`Starting deletion process for job ${jobId}`);
 
+    // Get job title before deletion for notification
+    let jobTitle: string | null = null;
+    try {
+      const { data: jobData } = await supabase
+        .from('jobs')
+        .select('title')
+        .eq('id', jobId)
+        .single();
+      jobTitle = jobData?.title || null;
+    } catch (err) {
+      console.warn('Could not fetch job title for notification:', err);
+    }
+
     // Remove Flex crew assignments first
     await removeFlexCrewAssignments(jobId);
 
@@ -95,6 +108,22 @@ export const deleteJobWithCleanup = async (jobId: string): Promise<void> => {
     }
 
     console.log(`Job ${jobId} and all related data deleted successfully`);
+
+    // Send push notification after successful deletion (fire-and-forget, non-blocking)
+    try {
+      void supabase.functions.invoke('push', {
+        body: {
+          action: 'broadcast',
+          type: 'job.deleted',
+          job_id: jobId,
+          // Pass job title in body since job is already deleted
+          title: jobTitle
+        }
+      });
+    } catch (pushErr) {
+      // Non-blocking: log but don't fail the deletion
+      console.warn('Failed to send job deletion notification:', pushErr);
+    }
   } catch (error) {
     console.error(`Error deleting job ${jobId}:`, error);
     throw error;

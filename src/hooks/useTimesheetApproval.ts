@@ -29,6 +29,24 @@ export function useTimesheetApproval() {
         _persist: true
       });
 
+      // Send push notification to technician (fire-and-forget, non-blocking)
+      if (data?.job_id && data?.technician_id) {
+        try {
+          void supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: 'timesheet.approved',
+              job_id: data.job_id,
+              recipient_id: data.technician_id,
+              technician_id: data.technician_id
+            }
+          });
+        } catch (pushErr) {
+          // Non-blocking: log but don't fail the approval
+          console.warn('Failed to send timesheet approval notification:', pushErr);
+        }
+      }
+
       return data;
     },
     onSuccess: (_data, timesheetId) => {

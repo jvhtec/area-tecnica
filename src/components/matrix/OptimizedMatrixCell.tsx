@@ -624,6 +624,22 @@ export const OptimizedMatrixCell = memo(({
                       }));
                     }
 
+                    // Send push notification for assignment removal (fire-and-forget, non-blocking)
+                    try {
+                      void supabase.functions.invoke('push', {
+                        body: {
+                          action: 'broadcast',
+                          type: 'assignment.removed',
+                          job_id: assignment.job_id,
+                          recipient_id: technician.id,
+                          technician_id: technician.id
+                        }
+                      });
+                    } catch (pushErr) {
+                      // Non-blocking: log but don't fail the removal
+                      console.warn('Failed to send assignment removal notification:', pushErr);
+                    }
+
                     setPendingRemoveAssignment(false)
                     toast.success('Assignment removed')
                     window.dispatchEvent(new CustomEvent('assignment-updated'))
