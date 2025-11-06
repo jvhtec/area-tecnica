@@ -384,6 +384,25 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       await fetchTimesheets();
       toast.success('Timesheet rejected');
       invalidateApprovalContext();
+
+      // Send push notification to technician (fire-and-forget, non-blocking)
+      if (updated.job_id && updated.technician_id) {
+        try {
+          void supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: 'timesheet.rejected',
+              job_id: updated.job_id,
+              recipient_id: updated.technician_id,
+              technician_id: updated.technician_id,
+              rejection_reason: reason || undefined
+            }
+          });
+        } catch (pushErr) {
+          // Non-blocking: log but don't fail the rejection
+          console.warn('Failed to send timesheet rejection notification:', pushErr);
+        }
+      }
     }
 
     return updated;
