@@ -5,7 +5,7 @@ export interface JobExtra {
   technician_id: string;
   extra_type: JobExtraType;
   quantity: number;
-  status?: 'approved'; // Always approved for manager-only workflow
+  status?: 'pending' | 'approved' | 'rejected';
   amount_override_eur?: number;
   updated_by?: string;
   updated_at: string;
