@@ -179,6 +179,11 @@ export default function JobAssignmentMatrix() {
       const startDate = rangeInfo.start;
       const endDate = rangeInfo.end;
 
+      // Use interval overlap logic to show all jobs that overlap with the visible date range
+      // This ensures long-running jobs (e.g., multi-month tours) are visible even if they
+      // extend beyond the current range. A job overlaps if:
+      // - Job starts before range ends AND
+      // - Job ends after range starts
       let query = supabase
         .from('jobs')
         .select(`
@@ -186,8 +191,8 @@ export default function JobAssignmentMatrix() {
           job_departments!inner(department),
           job_assignments!job_id(technician_id)
         `)
-        .gte('start_time', startDate.toISOString())
-        .lte('end_time', endDate.toISOString())
+        .lte('start_time', endDate.toISOString())    // Job starts before range ends
+        .gte('end_time', startDate.toISOString())    // Job ends after range starts
         .in('job_type', ['single', 'festival', 'tourdate'])
         .limit(500); // Limit for performance
 
