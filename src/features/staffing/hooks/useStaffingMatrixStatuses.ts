@@ -97,7 +97,7 @@ export function useStaffingMatrixStatuses(
             promises.push(
               Promise.resolve(supabase
                 .from('staffing_requests')
-                .select('job_id, profile_id, phase, status, updated_at')
+                .select('job_id, profile_id, phase, status, updated_at, single_day, target_date')
                 .in('profile_id', tb)
                 .in('job_id', jb))
             )
@@ -141,7 +141,15 @@ export function useStaffingMatrixStatuses(
           const overlapping = reqs.filter(r => {
             const job = jobLookup.get(r.job_id)
             if (!job) return false
-            return isWithinInterval(d, { start: job.start, end: job.end }) || isSameDay(d, job.start) || isSameDay(d, job.end)
+            const dateOverlapsJob = isWithinInterval(d, { start: job.start, end: job.end }) || isSameDay(d, job.start) || isSameDay(d, job.end)
+            if (!dateOverlapsJob) return false
+            // Respect single-day scoping when present
+            if (r.single_day && r.target_date) {
+              const rDate = typeof r.target_date === 'string' ? r.target_date : format(r.target_date, 'yyyy-MM-dd')
+              const dStr = format(d, 'yyyy-MM-dd')
+              return rDate === dStr
+            }
+            return true
           })
           if (!overlapping.length) return
 
