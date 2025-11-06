@@ -36,7 +36,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
-import { checkTimeConflict, TechnicianJobConflict } from '@/utils/technicianAvailability';
+import { checkTimeConflictEnhanced, ConflictCheckResult } from '@/utils/technicianAvailability';
 
 interface AssignJobDialogProps {
   open: boolean;
@@ -74,7 +74,7 @@ export const AssignJobDialog = ({
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [conflictWarning, setConflictWarning] = useState<{
-    conflict: TechnicianJobConflict;
+    result: ConflictCheckResult;
     targetDate?: string;
     mode: 'full' | 'single' | 'multi';
   } | null>(null);
@@ -140,7 +140,7 @@ export const AssignJobDialog = ({
   }, [preSelectedJobId]);
 
   const checkForConflicts = async (): Promise<{
-    conflict: TechnicianJobConflict;
+    result: ConflictCheckResult;
     targetDate?: string;
     mode: 'full' | 'single' | 'multi';
   } | null> => {
@@ -151,21 +151,35 @@ export const AssignJobDialog = ({
     if (coverageMode === 'multi') {
       const uniqueKeys = Array.from(new Set((multiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
       for (const key of uniqueKeys) {
-        const conflict = await checkTimeConflict(technicianId, selectedJobId, key, true);
-        if (conflict) {
-          return { conflict, targetDate: key, mode: 'multi' };
+        const result = await checkTimeConflictEnhanced(technicianId, selectedJobId, {
+          targetDateIso: key,
+          singleDayOnly: true,
+          includePending: true,
+        });
+        if (result.hasHardConflict || result.hasSoftConflict) {
+          return { result, targetDate: key, mode: 'multi' };
         }
       }
       return null;
     }
 
     if (coverageMode === 'single') {
-      const conflict = await checkTimeConflict(technicianId, selectedJobId, assignmentDate, true);
-      return conflict ? { conflict, targetDate: assignmentDate, mode: 'single' } : null;
+      const result = await checkTimeConflictEnhanced(technicianId, selectedJobId, {
+        targetDateIso: assignmentDate,
+        singleDayOnly: true,
+        includePending: true,
+      });
+      return (result.hasHardConflict || result.hasSoftConflict)
+        ? { result, targetDate: assignmentDate, mode: 'single' }
+        : null;
     }
 
-    const conflict = await checkTimeConflict(technicianId, selectedJobId);
-    return conflict ? { conflict, mode: 'full' } : null;
+    const result = await checkTimeConflictEnhanced(technicianId, selectedJobId, {
+      includePending: true,
+    });
+    return (result.hasHardConflict || result.hasSoftConflict)
+      ? { result, mode: 'full' }
+      : null;
   };
 
   const attemptAssign = async (skipConflictCheck = false) => {
@@ -449,7 +463,6 @@ export const AssignJobDialog = ({
     }
   };
 
-  const conflictJobRange = conflictWarning ? formatJobRange(conflictWarning.conflict.start_time, conflictWarning.conflict.end_time) : null;
   const targetJobRange = selectedJob ? formatJobRange(selectedJob.start_time, selectedJob.end_time) : null;
   const conflictTargetDateLabel = formatDateLabel(conflictWarning?.targetDate);
 
@@ -688,21 +701,78 @@ export const AssignJobDialog = ({
           }
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <AlertDialogHeader>
-            <AlertDialogTitle>Potential scheduling conflict</AlertDialogTitle>
-            <AlertDialogDescription>
-              {conflictWarning && (
-                <>
-                  {technician ? `${technician.first_name} ${technician.last_name}` : 'This technician'} is already confirmed for{' '}
-                  <strong>{conflictWarning.conflict.title}</strong>
-                  {conflictJobRange ? ` (${conflictJobRange})` : ''}.
-                  {' '}This overlaps with <strong>{selectedJob?.title}</strong>
-                  {conflictWarning.mode === 'full' && targetJobRange ? ` (${targetJobRange})` : ''}
-                  {conflictWarning.mode !== 'full' && conflictTargetDateLabel ? ` on ${conflictTargetDateLabel}` : ''}.
-                  {' '}Do you want to proceed?
-                </>
-              )}
+            <AlertDialogTitle>
+              {conflictWarning?.result.hasHardConflict ? '⛔ Scheduling Conflict' : '⚠️ Potential Conflict'}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {conflictWarning && (
+                  <>
+                    <p className="text-sm">
+                      {technician ? `${technician.first_name} ${technician.last_name}` : 'This technician'} has conflicts
+                      with <strong>{selectedJob?.title}</strong>
+                      {conflictWarning.mode === 'full' && targetJobRange ? ` (${targetJobRange})` : ''}
+                      {conflictWarning.mode !== 'full' && conflictTargetDateLabel ? ` on ${conflictTargetDateLabel}` : ''}:
+                    </p>
+
+                    {/* Hard Conflicts */}
+                    {conflictWarning.result.hardConflicts.length > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded p-3">
+                        <div className="font-semibold text-red-900 mb-2">Confirmed Assignments:</div>
+                        <ul className="list-disc list-inside space-y-1">
+                          {conflictWarning.result.hardConflicts.map((conflict, idx) => (
+                            <li key={idx} className="text-red-800 text-sm">
+                              <strong>{conflict.title}</strong>
+                              {' '}({formatJobRange(conflict.start_time, conflict.end_time)})
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Soft Conflicts */}
+                    {conflictWarning.result.softConflicts.length > 0 && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+                        <div className="font-semibold text-yellow-900 mb-2">Pending Invitations:</div>
+                        <ul className="list-disc list-inside space-y-1">
+                          {conflictWarning.result.softConflicts.map((conflict, idx) => (
+                            <li key={idx} className="text-yellow-800 text-sm">
+                              <strong>{conflict.title}</strong>
+                              {' '}({formatJobRange(conflict.start_time, conflict.end_time)})
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="text-xs text-yellow-700 mt-2">
+                          Technician has not yet responded to these invitations.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Unavailability */}
+                    {conflictWarning.result.unavailabilityConflicts.length > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded p-3">
+                        <div className="font-semibold text-red-900 mb-2">Unavailable Dates:</div>
+                        <ul className="list-disc list-inside space-y-1">
+                          {conflictWarning.result.unavailabilityConflicts.map((unav, idx) => (
+                            <li key={idx} className="text-red-800 text-sm">
+                              {formatDateLabel(unav.date)} - {unav.reason}
+                              {unav.notes && <span className="text-xs"> ({unav.notes})</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="text-sm text-gray-600 mt-3">
+                      {conflictWarning.result.hasHardConflict
+                        ? 'Proceeding will create a double-booking. Are you sure?'
+                        : 'Technician may not be available. Do you want to proceed anyway?'}
+                    </div>
+                  </>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -712,8 +782,9 @@ export const AssignJobDialog = ({
                 setConflictWarning(null);
                 void attemptAssign(true);
               }}
+              className={conflictWarning?.result.hasHardConflict ? 'bg-red-600 hover:bg-red-700' : ''}
             >
-              Proceed anyway
+              {conflictWarning?.result.hasHardConflict ? 'Force assign anyway' : 'Proceed anyway'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
