@@ -104,6 +104,88 @@ const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 const CONTACT_EMAIL = Deno.env.get("PUSH_CONTACT_EMAIL") ?? "mailto:dev@sectorpro.com";
 
+// Event type constants for type safety and consistency
+const EVENT_TYPES = {
+  // Job events
+  JOB_CREATED: 'job.created',
+  JOB_UPDATED: 'job.updated',
+  JOB_DELETED: 'job.deleted',
+  JOB_STATUS_CONFIRMED: 'job.status.confirmed',
+  JOB_STATUS_CANCELLED: 'job.status.cancelled',
+  JOB_CALLTIME_UPDATED: 'job.calltime.updated',
+  JOB_TYPE_CHANGED: 'job.type.changed',
+
+  // Assignment events
+  JOB_ASSIGNMENT_CONFIRMED: 'job.assignment.confirmed',
+  JOB_ASSIGNMENT_DIRECT: 'job.assignment.direct',
+  ASSIGNMENT_REMOVED: 'assignment.removed',
+
+  // Document events
+  DOCUMENT_UPLOADED: 'document.uploaded',
+  DOCUMENT_DELETED: 'document.deleted',
+  DOCUMENT_TECH_VISIBLE_ENABLED: 'document.tech_visible.enabled',
+  DOCUMENT_TECH_VISIBLE_DISABLED: 'document.tech_visible.disabled',
+
+  // Incident reports
+  INCIDENT_REPORT_UPLOADED: 'incident.report.uploaded',
+
+  // Staffing events
+  STAFFING_AVAILABILITY_SENT: 'staffing.availability.sent',
+  STAFFING_AVAILABILITY_CONFIRMED: 'staffing.availability.confirmed',
+  STAFFING_AVAILABILITY_DECLINED: 'staffing.availability.declined',
+  STAFFING_AVAILABILITY_CANCELLED: 'staffing.availability.cancelled',
+  STAFFING_OFFER_SENT: 'staffing.offer.sent',
+  STAFFING_OFFER_CONFIRMED: 'staffing.offer.confirmed',
+  STAFFING_OFFER_DECLINED: 'staffing.offer.declined',
+  STAFFING_OFFER_CANCELLED: 'staffing.offer.cancelled',
+
+  // Timesheet events
+  TIMESHEET_SUBMITTED: 'timesheet.submitted',
+  TIMESHEET_APPROVED: 'timesheet.approved',
+  TIMESHEET_REJECTED: 'timesheet.rejected',
+
+  // Task events
+  TASK_ASSIGNED: 'task.assigned',
+  TASK_UPDATED: 'task.updated',
+  TASK_COMPLETED: 'task.completed',
+
+  // Logistics events
+  LOGISTICS_TRANSPORT_REQUESTED: 'logistics.transport.requested',
+  LOGISTICS_EVENT_CREATED: 'logistics.event.created',
+  LOGISTICS_EVENT_UPDATED: 'logistics.event.updated',
+  LOGISTICS_EVENT_CANCELLED: 'logistics.event.cancelled',
+
+  // Tour events
+  TOURDATE_CREATED: 'tourdate.created',
+  TOURDATE_UPDATED: 'tourdate.updated',
+  TOURDATE_DELETED: 'tourdate.deleted',
+
+  // Flex events
+  FLEX_FOLDERS_CREATED: 'flex.folders.created',
+  FLEX_TOURDATE_FOLDER_CREATED: 'flex.tourdate_folder.created',
+
+  // Messaging
+  MESSAGE_RECEIVED: 'message.received',
+
+  // SoundVision
+  SOUNDVISION_FILE_UPLOADED: 'soundvision.file.uploaded',
+  SOUNDVISION_FILE_DOWNLOADED: 'soundvision.file.downloaded',
+
+  // Hoja de ruta
+  HOJA_UPDATED: 'hoja.updated',
+} as const;
+
+// Push notification configuration
+const PUSH_CONFIG = {
+  TTL_SECONDS: 3600, // 1 hour for devices to come online
+  URGENCY_HIGH: 'high' as const,
+  URGENCY_NORMAL: 'normal' as const,
+  URGENCY_LOW: 'low' as const,
+  MAX_RETRIES: 3,
+  DEFAULT_ICON: '/icon-192.png',
+  DEFAULT_BADGE: '/badge-72.png',
+};
+
 console.log('🔐 VAPID keys loaded:', {
   publicKeyPresent: !!VAPID_PUBLIC_KEY,
   privateKeyPresent: !!VAPID_PRIVATE_KEY,
@@ -191,8 +273,8 @@ async function sendPushNotification(
       },
       JSON.stringify(payload),
       {
-        TTL: 3600, // allow up to 1 hour for devices to come online
-        urgency: 'high',
+        TTL: PUSH_CONFIG.TTL_SECONDS,
+        urgency: PUSH_CONFIG.URGENCY_HIGH,
       },
     );
 
@@ -204,12 +286,19 @@ async function sendPushNotification(
       status,
       message: (err as any)?.message,
       body: (err as any)?.body,
+      endpoint: subscription.endpoint.substring(0, 50) + '...',
       error: err
     });
 
+    // Clean up expired/invalid subscriptions (410 Gone, 404 Not Found)
     if (status === 404 || status === 410) {
       console.log('🗑️ Cleaning up expired subscription');
-      await client.from("push_subscriptions").delete().eq("endpoint", subscription.endpoint);
+      try {
+        await client.from("push_subscriptions").delete().eq("endpoint", subscription.endpoint);
+      } catch (cleanupErr) {
+        console.error('⚠️ Failed to cleanup subscription:', cleanupErr);
+        // Don't fail the whole operation if cleanup fails
+      }
     }
 
     return { ok: false, status };
@@ -495,28 +584,55 @@ async function getJobParticipantUserIds(client: ReturnType<typeof createClient>,
 
 async function getJobTitle(client: ReturnType<typeof createClient>, jobId?: string): Promise<string | null> {
   if (!jobId) return null;
-  const { data } = await client.from('jobs').select('title').eq('id', jobId).maybeSingle();
-  return data?.title ?? null;
+  try {
+    const { data, error } = await client.from('jobs').select('title').eq('id', jobId).maybeSingle();
+    if (error) {
+      console.error('⚠️ Failed to fetch job title:', { jobId, error });
+      return null;
+    }
+    return data?.title ?? null;
+  } catch (err) {
+    console.error('⚠️ Exception fetching job title:', { jobId, err });
+    return null;
+  }
 }
 
 async function getTourName(client: ReturnType<typeof createClient>, tourId?: string): Promise<string | null> {
   if (!tourId) return null;
-  const { data } = await client.from('tours').select('name').eq('id', tourId).maybeSingle();
-  return data?.name ?? null;
+  try {
+    const { data, error } = await client.from('tours').select('name').eq('id', tourId).maybeSingle();
+    if (error) {
+      console.error('⚠️ Failed to fetch tour name:', { tourId, error });
+      return null;
+    }
+    return data?.name ?? null;
+  } catch (err) {
+    console.error('⚠️ Exception fetching tour name:', { tourId, err });
+    return null;
+  }
 }
 
 async function getProfileDisplayName(client: ReturnType<typeof createClient>, userId?: string | null): Promise<string | null> {
   if (!userId) return null;
-  const { data } = await client
-    .from('profiles')
-    .select('first_name,last_name,nickname,email')
-    .eq('id', userId)
-    .maybeSingle();
-  if (!data) return null;
-  const full = `${data.first_name || ''} ${data.last_name || ''}`.trim();
-  if (full) return full;
-  if (data.nickname) return data.nickname;
-  return data.email || null;
+  try {
+    const { data, error } = await client
+      .from('profiles')
+      .select('first_name,last_name,nickname,email')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) {
+      console.error('⚠️ Failed to fetch profile display name:', { userId, error });
+      return null;
+    }
+    if (!data) return null;
+    const full = `${data.first_name || ''} ${data.last_name || ''}`.trim();
+    if (full) return full;
+    if (data.nickname) return data.nickname;
+    return data.email || null;
+  } catch (err) {
+    console.error('⚠️ Exception fetching profile display name:', { userId, err });
+    return null;
+  }
 }
 
 async function resolveSoundVisionVenueName(
@@ -796,6 +912,43 @@ async function handleBroadcast(
     clearAllRecipients();
     addRecipients([userId]); // keep actor self-notification across devices
     addNaturalRecipients(Array.from(new Set([...adminIds, ...mgmtDeptIds])));
+  } else if (type === EVENT_TYPES.TIMESHEET_APPROVED) {
+    // Notify technician that their timesheet was approved
+    title = 'Parte aprobado';
+    const techId = body.recipient_id || (body as any)?.technician_id;
+    const techName = recipName || (await getProfileDisplayName(client, techId)) || 'Tu';
+
+    if (techId === userId) {
+      text = `Tu parte para "${jobTitle || 'Trabajo'}" ha sido aprobado.`;
+    } else {
+      text = `El parte de ${techName} para "${jobTitle || 'Trabajo'}" ha sido aprobado.`;
+    }
+
+    clearAllRecipients();
+    if (techId) {
+      addRecipients([techId]);
+    }
+  } else if (type === EVENT_TYPES.TIMESHEET_REJECTED) {
+    // Notify technician that their timesheet was rejected
+    title = 'Parte rechazado';
+    const techId = body.recipient_id || (body as any)?.technician_id;
+    const techName = recipName || (await getProfileDisplayName(client, techId)) || 'Tu';
+    const reason = (body as any)?.rejection_reason;
+
+    if (techId === userId) {
+      text = reason
+        ? `Tu parte para "${jobTitle || 'Trabajo'}" ha sido rechazado. Motivo: ${reason}`
+        : `Tu parte para "${jobTitle || 'Trabajo'}" ha sido rechazado.`;
+    } else {
+      text = reason
+        ? `El parte de ${techName} para "${jobTitle || 'Trabajo'}" ha sido rechazado. Motivo: ${reason}`
+        : `El parte de ${techName} para "${jobTitle || 'Trabajo'}" ha sido rechazado.`;
+    }
+
+    clearAllRecipients();
+    if (techId) {
+      addRecipients([techId]);
+    }
   } else if (type === 'job.updated') {
     title = 'Trabajo actualizado';
     if (body.changes && typeof body.changes === 'object') {
@@ -829,6 +982,29 @@ async function handleBroadcast(
     const fname = body.file_name || 'documento';
     text = `El documento "${fname}" dejó de estar visible en "${jobTitle || 'Trabajo'}".`;
     addNaturalRecipients(Array.from(participants));
+  } else if (type === EVENT_TYPES.INCIDENT_REPORT_UPLOADED) {
+    // CRITICAL: Incident reports are safety-critical and need immediate visibility
+    title = '⚠️ Reporte de incidencia';
+    const fname = body.file_name || 'reporte de incidencia';
+    text = `${actor} ha reportado una incidencia en "${jobTitle || 'Trabajo'}": ${fname}`;
+
+    // Target: Sound department management + all admins + job participants
+    clearAllRecipients();
+    addRecipients([userId]); // keep actor self-notification
+
+    // Get sound department management users
+    const soundMgmt = Array.from(management).filter((id) => soundDept.has(id));
+    const adminIds = await getAdminUserIds(client);
+
+    // Add all critical recipients
+    addNaturalRecipients([...soundMgmt, ...adminIds]);
+    addNaturalRecipients(Array.from(participants));
+
+    // Mark as high priority in metadata
+    metaExtras.view = 'incident-reports';
+    metaExtras.targetUrl = `/incident-reports`;
+
+    console.log('🚨 Incident report notification - recipients:', recipients.size);
   } else if (type === 'staffing.availability.sent') {
     title = 'Solicitud de disponibilidad enviada';
     text = `${actor} envió solicitud a ${recipName || 'técnico'} (${ch}).`;
@@ -876,6 +1052,16 @@ async function handleBroadcast(
     text = `"${jobTitle || 'Trabajo'}" ha sido cancelado.`;
     addNaturalRecipients(Array.from(mgmt));
     addNaturalRecipients(Array.from(participants));
+  } else if (type === EVENT_TYPES.JOB_DELETED) {
+    // CRITICAL: Job deletion notification - all assigned technicians need to know
+    title = 'Trabajo eliminado';
+    text = `${actor} ha eliminado "${jobTitle || 'Trabajo'}". Este trabajo ya no está disponible.`;
+
+    // Notify all participants and management
+    addNaturalRecipients(Array.from(mgmt));
+    addNaturalRecipients(Array.from(participants));
+
+    console.log('🗑️ Job deletion notification - participants:', participants.size, 'management:', mgmt.size);
   } else if (type === 'job.assignment.confirmed') {
     title = 'Asignación confirmada';
     if (singleDayFlag && formattedTargetDate) {
@@ -997,6 +1183,88 @@ async function handleBroadcast(
     }
 
     // Return early since we've already sent the notifications
+    return jsonResponse({ status: 'sent', count: techSubsCount + mgmtSubsCount });
+  } else if (type === EVENT_TYPES.ASSIGNMENT_REMOVED) {
+    // CRITICAL: Technician needs to know they've been removed from a job
+    title = 'Asignación eliminada';
+    const removedTechId = body.recipient_id || (body as any)?.technician_id;
+    const removedTechName = recipName || (await getProfileDisplayName(client, removedTechId)) || 'Un técnico';
+
+    // Different messages for the removed technician vs management
+    clearAllRecipients();
+
+    let techSubsCount = 0;
+    let mgmtSubsCount = 0;
+
+    // Notify the removed technician
+    if (removedTechId) {
+      const techTitle = 'Asignación eliminada';
+      const techText = singleDayFlag && formattedTargetDate
+        ? `${actor} te ha eliminado de "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`
+        : `${actor} te ha eliminado de "${jobTitle || 'Trabajo'}".`;
+
+      const { data: techSubs } = await client
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth, user_id')
+        .eq('user_id', removedTechId);
+
+      if (techSubs && techSubs.length > 0) {
+        techSubsCount = techSubs.length;
+        const techPayload: PushPayload = {
+          title: techTitle,
+          body: techText,
+          url,
+          type,
+          meta: {
+            jobId: jobId,
+            tourId,
+            tourName: tourName ?? undefined,
+            actor,
+            recipient: removedTechName,
+            ...metaExtras,
+          },
+        };
+
+        await Promise.all(techSubs.map(async (sub: any) => {
+          await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, techPayload);
+        }));
+      }
+    }
+
+    // Notify management
+    const mgmtTitle = 'Asignación eliminada';
+    const mgmtText = singleDayFlag && formattedTargetDate
+      ? `${actor} ha eliminado a ${removedTechName} de "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`
+      : `${actor} ha eliminado a ${removedTechName} de "${jobTitle || 'Trabajo'}".`;
+
+    const { data: mgmtSubs } = await client
+      .from('push_subscriptions')
+      .select('endpoint, p256dh, auth, user_id')
+      .in('user_id', Array.from(mgmt));
+
+    if (mgmtSubs && mgmtSubs.length > 0) {
+      mgmtSubsCount = mgmtSubs.length;
+      const mgmtPayload: PushPayload = {
+        title: mgmtTitle,
+        body: mgmtText,
+        url,
+        type,
+        meta: {
+          jobId: jobId,
+          tourId,
+          tourName: tourName ?? undefined,
+          actor,
+          recipient: removedTechName,
+          ...metaExtras,
+        },
+      };
+
+      await Promise.all(mgmtSubs.map(async (sub: any) => {
+        await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
+      }));
+    }
+
+    console.log('🚫 Assignment removal notification sent');
     return jsonResponse({ status: 'sent', count: techSubsCount + mgmtSubsCount });
   } else if (type === 'task.assigned') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';

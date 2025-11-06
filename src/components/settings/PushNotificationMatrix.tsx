@@ -38,22 +38,36 @@ const DEPARTMENTS: Array<{ id: string; label: string }> = [
 ];
 
 const FALLBACK_EVENTS: EventInfo[] = [
+  // Job events
   { code: 'job.created', label: 'Job created' },
   { code: 'job.updated', label: 'Job updated' },
+  { code: 'job.deleted', label: '🗑️ Job deleted (CRITICAL)' },
   { code: 'job.status.confirmed', label: 'Job confirmed' },
   { code: 'job.status.cancelled', label: 'Job cancelled' },
+
+  // Assignment events
   { code: 'job.assignment.confirmed', label: 'Assignment confirmed' },
   { code: 'job.assignment.direct', label: 'Direct job assignment' },
+  { code: 'assignment.removed', label: '🚫 Assignment removed (CRITICAL)' },
+
+  // Job type changes
   { code: 'job.type.changed', label: 'Job type changed' },
   { code: 'job.type.changed.single', label: 'Job changed to Single' },
   { code: 'job.type.changed.tour', label: 'Job changed to Tour' },
   { code: 'job.type.changed.festival', label: 'Job changed to Festival' },
   { code: 'job.type.changed.dryhire', label: 'Job changed to Dry Hire' },
   { code: 'job.type.changed.tourdate', label: 'Job changed to Tour Date' },
+
+  // Document events
   { code: 'document.uploaded', label: 'Document uploaded' },
   { code: 'document.deleted', label: 'Document deleted' },
   { code: 'document.tech_visible.enabled', label: 'Document visible to technicians' },
   { code: 'document.tech_visible.disabled', label: 'Document hidden from technicians' },
+
+  // Incident reports (CRITICAL - Safety)
+  { code: 'incident.report.uploaded', label: '⚠️ Incident report uploaded (CRITICAL)' },
+
+  // Staffing events
   { code: 'staffing.availability.sent', label: 'Availability requested' },
   { code: 'staffing.availability.confirmed', label: 'Availability confirmed' },
   { code: 'staffing.availability.declined', label: 'Availability declined' },
@@ -61,16 +75,31 @@ const FALLBACK_EVENTS: EventInfo[] = [
   { code: 'staffing.offer.sent', label: 'Offer sent' },
   { code: 'staffing.offer.confirmed', label: 'Offer accepted' },
   { code: 'staffing.offer.declined', label: 'Offer declined' },
+
+  // Timesheet events
+  { code: 'timesheet.submitted', label: 'Timesheet submitted' },
+  { code: 'timesheet.approved', label: '✅ Timesheet approved' },
+  { code: 'timesheet.rejected', label: '❌ Timesheet rejected' },
+
+  // Task events
   { code: 'task.assigned', label: 'Task assigned' },
   { code: 'task.updated', label: 'Task updated' },
   { code: 'task.completed', label: 'Task completed' },
+
+  // Logistics events
   { code: 'logistics.transport.requested', label: 'Transport requested' },
   { code: 'logistics.event.created', label: 'Logistics event created' },
   { code: 'logistics.event.updated', label: 'Logistics event updated' },
   { code: 'logistics.event.cancelled', label: 'Logistics event cancelled' },
+
+  // Flex events
   { code: 'flex.folders.created', label: 'Flex folders created' },
   { code: 'flex.tourdate_folder.created', label: 'Tour date folder created' },
+
+  // Messaging
   { code: 'message.received', label: 'Message received' },
+
+  // Tour date events
   { code: 'tourdate.created', label: 'Tour date created' },
   { code: 'tourdate.updated', label: 'Tour date updated' },
   { code: 'tourdate.deleted', label: 'Tour date deleted' },
@@ -80,12 +109,16 @@ const FALLBACK_EVENTS: EventInfo[] = [
   { code: 'tourdate.type.changed.travel', label: 'Tour date changed to Travel' },
   { code: 'tourdate.type.changed.setup', label: 'Tour date changed to Setup' },
   { code: 'tourdate.type.changed.off', label: 'Tour date changed to Day Off' },
+
+  // Job date events
   { code: 'jobdate.type.changed', label: 'Job date type changed' },
   { code: 'jobdate.type.changed.show', label: 'Job date changed to Show' },
   { code: 'jobdate.type.changed.rehearsal', label: 'Job date changed to Rehearsal' },
   { code: 'jobdate.type.changed.travel', label: 'Job date changed to Travel' },
   { code: 'jobdate.type.changed.setup', label: 'Job date changed to Setup' },
   { code: 'jobdate.type.changed.off', label: 'Job date changed to Day Off' },
+
+  // SoundVision
   { code: 'soundvision.file.uploaded', label: 'SoundVision file uploaded' },
   { code: 'soundvision.file.downloaded', label: 'SoundVision file downloaded' },
 ];
