@@ -51,7 +51,7 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
         role: role ? labelForCode(role) : null,
         isFromTour,
         isExternal: !assignment.profiles && assignment.external_technician_name,
-        singleDayDate: assignment.single_day && assignment.single_day_date ? assignment.single_day_date : null,
+        singleDayDate: assignment.single_day && assignment.assignment_date ? assignment.assignment_date : null,
       };
     })
     .filter(Boolean);

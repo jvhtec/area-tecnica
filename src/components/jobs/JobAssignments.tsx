@@ -209,9 +209,9 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
                   </span>
                   <span className="text-xs">({displayRole})</span>
                 </div>
-                {assignment.single_day && assignment.single_day_date && (
+                {assignment.single_day && assignment.assignment_date && (
                   <span className="text-xs text-muted-foreground">
-                    Single-day: {format(new Date(`${assignment.single_day_date}T00:00:00`), "PPP")}
+                    Single-day: {format(new Date(`${assignment.assignment_date}T00:00:00`), "PPP")}
                   </span>
                 )}
               </div>

@@ -26,7 +26,7 @@ describe('buildAssignmentInsertPayload', () => {
       lights_role: 'lx-main',
       assigned_by: 'manager-1',
       single_day: false,
-      single_day_date: null,
+      assignment_date: null,
     });
     expect(payload.assigned_at).toBe(fixedDate.toISOString());
   });
@@ -54,7 +54,7 @@ describe('buildAssignmentInsertPayload', () => {
       lights_role: null,
       assigned_by: 'manager-2',
       single_day: true,
-      single_day_date: '2025-04-20',
+      assignment_date: '2025-04-20',
     });
     expect(payload.assigned_at).toBe(fixedDate.toISOString());
   });

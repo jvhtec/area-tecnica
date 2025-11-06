@@ -363,43 +363,12 @@ serve(async (req) => {
                 return error;
               };
 
-              if (targetDate) {
-                upsertErr = await attemptUpsert();
-                if (upsertErr && /no unique/i.test(upsertErr.message) && /constraint/i.test(upsertErr.message)) {
-                  console.warn('⚠️ job_assignments per-day upsert missing composite constraint, falling back to manual flow', {
-                    job_id: row.job_id,
-                    technician_id: row.profile_id,
-                    targetDate,
-                  });
-                  const { data: existingRow } = await supabase
-                    .from('job_assignments')
-                    .select('id')
-                    .eq('job_id', row.job_id)
-                    .eq('technician_id', row.profile_id)
-                    .eq('assignment_date', targetDate)
-                    .maybeSingle();
+              // Attempt upsert - now that unique constraints are in place, this should work reliably
+              upsertErr = await attemptUpsert();
 
-                  if (existingRow?.id) {
-                    const { error: updateErr } = await supabase
-                      .from('job_assignments')
-                      .update(upsertPayload)
-                      .eq('id', existingRow.id);
-                    upsertErr = updateErr;
-                    upsertAttemptSummary = 'updated-existing';
-                  } else {
-                    const { error: insertErr } = await supabase
-                      .from('job_assignments')
-                      .insert(upsertPayload);
-                    upsertErr = insertErr;
-                    upsertAttemptSummary = 'inserted-new';
-                  }
-                }
-              } else {
-                upsertErr = await attemptUpsert();
-              }
-
-              if (!upsertErr && !upsertAttemptSummary) {
-                upsertAttemptSummary = targetDate ? 'direct-upsert-per-day' : 'direct-upsert';
+              // Set attempt summary based on operation type
+              if (!upsertErr) {
+                upsertAttemptSummary = targetDate ? 'direct-upsert-per-day' : 'direct-upsert-whole-job';
               }
 
               if (upsertErr) {
