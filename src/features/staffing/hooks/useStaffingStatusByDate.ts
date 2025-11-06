@@ -37,7 +37,7 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
       const jobIds = jobs.map(j => j.id)
       const { data: rawStatuses, error: statusesError } = await supabase
         .from('staffing_requests')
-        .select('job_id, phase, status, updated_at')
+        .select('job_id, phase, status, updated_at, single_day, target_date')
         .eq('profile_id', profileId)
         .in('job_id', jobIds)
 
@@ -50,7 +50,16 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
       }
 
       // Transform raw statuses to separate availability and offer statuses
-      const statuses = rawStatuses.map(r => ({
+      const dStr = format(date, 'yyyy-MM-dd')
+      const statuses = rawStatuses
+        // Respect single-day scoping: only include requests whose target_date matches this day when flagged
+        .filter(r => {
+          if ((r as any).single_day) {
+            return (r as any).target_date === dStr
+          }
+          return true
+        })
+        .map(r => ({
         job_id: r.job_id,
         availability_status: r.phase === 'availability' ? (r.status === 'pending' ? 'requested' : r.status) : null,
         availability_updated_at: r.phase === 'availability' ? r.updated_at : null,

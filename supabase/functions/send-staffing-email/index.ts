@@ -379,8 +379,15 @@ serve(async (req) => {
       console.log('💾 SAVING STAFFING REQUEST...');
       let insertedId = rid;
       const insertRes = await supabase.from("staffing_requests").insert({
-        id: rid, job_id, profile_id, phase, status: "pending",
-        token_hash, token_expires_at: exp
+        id: rid,
+        job_id,
+        profile_id,
+        phase,
+        status: "pending",
+        token_hash,
+        token_expires_at: exp,
+        single_day: isSingleDayRequest,
+        target_date: normalizedTargetDate,
       });
       
       console.log('💾 INSERT RESULT:', { error: insertRes.error });
@@ -388,7 +395,13 @@ serve(async (req) => {
       if (insertRes.error && insertRes.error.code === "23505") {
         console.log('🔄 DUPLICATE FOUND, UPDATING...');
         const upd = await supabase.from("staffing_requests")
-          .update({ token_hash, token_expires_at: exp, updated_at: new Date().toISOString() })
+          .update({
+            token_hash,
+            token_expires_at: exp,
+            updated_at: new Date().toISOString(),
+            single_day: isSingleDayRequest,
+            target_date: normalizedTargetDate,
+          })
           .eq("job_id", job_id).eq("profile_id", profile_id).eq("phase", phase).eq("status", "pending")
           .select("id").maybeSingle();
         
@@ -621,7 +634,11 @@ serve(async (req) => {
         const waRes = await fetch(sendUrl, { method: 'POST', headers: headersWA, body: JSON.stringify(msgBody), signal: controller.signal });
         clearTimeout(to);
         console.log('📤 WAHA RESPONSE:', { status: waRes.status, ok: waRes.ok });
-        await supabase.from('staffing_events').insert({ staffing_request_id: insertedId, event: 'whatsapp_sent', meta: { phase, status: waRes.status, role: role ?? null } });
+        await supabase.from('staffing_events').insert({
+          staffing_request_id: insertedId,
+          event: 'whatsapp_sent',
+          meta: { phase, status: waRes.status, role: role ?? null, single_day: isSingleDayRequest, target_date: normalizedTargetDate }
+        });
         if (waRes.ok) {
           try {
             const activityCode = phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent';
@@ -663,7 +680,11 @@ serve(async (req) => {
         console.log('📤 EMAIL PAYLOAD:', { sender: emailPayload.sender, to: [{ email: '***@***.***' }], subject: emailPayload.subject });
         const sendRes = await fetch("https://api.brevo.com/v3/smtp/email", { method: "POST", headers: { "api-key": BREVO_KEY, "Content-Type": "application/json" }, body: JSON.stringify(emailPayload) });
         console.log('📤 BREVO RESPONSE:', { status: sendRes.status, statusText: sendRes.statusText, ok: sendRes.ok });
-        await supabase.from("staffing_events").insert({ staffing_request_id: insertedId, event: "email_sent", meta: { phase, status: sendRes.status, role: role ?? null, message: message ?? null } });
+        await supabase.from("staffing_events").insert({
+          staffing_request_id: insertedId,
+          event: "email_sent",
+          meta: { phase, status: sendRes.status, role: role ?? null, message: message ?? null, single_day: isSingleDayRequest, target_date: normalizedTargetDate }
+        });
         if (sendRes.ok) {
           try {
             const activityCode = phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent';

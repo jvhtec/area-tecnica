@@ -19,11 +19,13 @@ import { OfferDetailsDialog } from './OfferDetailsDialog';
 import { supabase } from '@/lib/supabase';
 import { useStaffingMatrixStatuses } from '@/features/staffing/hooks/useStaffingMatrixStatuses';
 import { Button } from '@/components/ui/button';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Calendar as CalendarIcon } from 'lucide-react';
 import { CreateUserDialog } from '@/components/users/CreateUserDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 interface MatrixJob {
@@ -370,70 +372,28 @@ export const OptimizedAssignmentMatrix = ({
 
     // Special flows
     if (action === 'availability-wa') {
-      // Prefer WhatsApp for availability
+      // Open dialog with WhatsApp channel and single-day default
       const targetJobId = selectedJobId || assignment?.job_id || undefined;
-      (async () => {
-        const conflict = targetJobId ? await checkTimeConflict(technicianId, targetJobId) : null;
-        if (conflict) {
-          toast({
-            title: 'Conflicto de horarios',
-            description: `Ya tiene confirmado: ${conflict.title} (${new Date(conflict.start_time).toLocaleString()} - ${new Date(conflict.end_time).toLocaleString()})`,
-            variant: 'destructive'
-          });
-          return;
-        }
-        if (targetJobId) {
-          sendStaffingEmail(
-            ({ job_id: targetJobId, profile_id: technicianId, phase: 'availability', channel: 'whatsapp', target_date: format(date, 'yyyy-MM-dd') } as any),
-            {
-              onSuccess: () => {
-                toast({ title: 'Request sent', description: 'Availability request sent via WhatsApp.' });
-                closeDialogs();
-              },
-              onError: (error: any) => {
-                toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
-              }
-            }
-          );
-        } else {
-          console.log('Setting WhatsApp intent for staffing job selection');
-          setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment, intendedPhase: 'availability', intendedChannel: 'whatsapp' });
-        }
-      })();
+      if (targetJobId) {
+        setAvailabilityChannel('whatsapp');
+        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true });
+      } else {
+        console.log('Setting WhatsApp intent for staffing job selection');
+        setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment, intendedPhase: 'availability', intendedChannel: 'whatsapp' });
+      }
       return;
     }
 
     if (action === 'availability-email') {
-      // Prefer Email for availability, and skip channel dialog
+      // Open dialog with Email channel and single-day default
       const targetJobId = selectedJobId || assignment?.job_id || undefined;
-      (async () => {
-        const conflict = targetJobId ? await checkTimeConflict(technicianId, targetJobId) : null;
-        if (conflict) {
-          toast({
-            title: 'Conflicto de horarios',
-            description: `Ya tiene confirmado: ${conflict.title} (${new Date(conflict.start_time).toLocaleString()} - ${new Date(conflict.end_time).toLocaleString()})`,
-            variant: 'destructive'
-          });
-          return;
-        }
-        if (targetJobId) {
-          sendStaffingEmail(
-            ({ job_id: targetJobId, profile_id: technicianId, phase: 'availability', channel: 'email', target_date: format(date, 'yyyy-MM-dd'), single_day: true } as any),
-            {
-              onSuccess: () => {
-                toast({ title: 'Request sent', description: 'Availability request sent via Email.' });
-                closeDialogs();
-              },
-              onError: (error: any) => {
-                toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
-              }
-            }
-          );
-        } else {
-          setAvailabilityPreferredChannel('email');
-          setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
-        }
-      })();
+      if (targetJobId) {
+        setAvailabilityChannel('email');
+        setAvailabilityDialog({ open: true, jobId: targetJobId, profileId: technicianId, dateIso: format(date, 'yyyy-MM-dd'), singleDay: true });
+      } else {
+        setAvailabilityPreferredChannel('email');
+        setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
+      }
       return;
     }
 
@@ -516,7 +476,7 @@ export const OptimizedAssignmentMatrix = ({
       // Availability: pre-check conflicts, then direct-send via intent/preference if set, else ask
       (async () => {
         const technicianId = cellAction.technicianId;
-        const conflict = await checkTimeConflict(technicianId, jobId);
+        const conflict = await checkTimeConflict(technicianId, jobId, format(cellAction.date, 'yyyy-MM-dd'), !!options?.singleDay);
         if (conflict) {
           toast({
             title: 'Conflicto de horarios',
@@ -528,42 +488,22 @@ export const OptimizedAssignmentMatrix = ({
 
         const intentPhase = cellAction.intendedPhase;
         const intentChannel = cellAction.intendedChannel;
-        const sendAvailabilityRequest = (channel: 'email' | 'whatsapp') => {
-          sendStaffingEmail(
-            ({
-              job_id: jobId,
-              profile_id: technicianId,
-              phase: 'availability',
-              channel,
-              target_date: format(cellAction.date, 'yyyy-MM-dd'),
-              single_day: !!options?.singleDay
-            } as any),
-            {
-              onSuccess: () => {
-                toast({ title: 'Request sent', description: `Availability request sent via ${channel}.` });
-                setAvailabilityPreferredChannel(null);
-                closeDialogs();
-              },
-              onError: (error: any) => {
-                toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
-                setAvailabilityPreferredChannel(null);
-              }
-            }
-          );
+        const openAvailabilityDialogWith = (channel: 'email' | 'whatsapp') => {
+          setAvailabilityChannel(channel);
+          setAvailabilityDialog({ open: true, jobId, profileId: technicianId, dateIso: format(cellAction.date, 'yyyy-MM-dd'), singleDay: !!options?.singleDay });
         };
 
         if (intentPhase === 'availability' && intentChannel) {
           console.log('Using stored staffing intent', { intentPhase, intentChannel });
-          sendAvailabilityRequest(intentChannel);
+          openAvailabilityDialogWith(intentChannel);
           return;
         }
 
         console.log('Checking availabilityPreferredChannel:', availabilityPreferredChannel);
         if (availabilityPreferredChannel === 'whatsapp' || availabilityPreferredChannel === 'email') {
-          const chosen = availabilityPreferredChannel;
-          sendAvailabilityRequest(chosen);
+          openAvailabilityDialogWith(availabilityPreferredChannel);
         } else {
-          // Store date as yyyy-MM-dd for consistency
+          // Store date as yyyy-MM-dd for consistency and open dialog (channel selectable inside)
           setAvailabilityDialog({ open: true, jobId, profileId: technicianId, dateIso: format(cellAction.date, 'yyyy-MM-dd'), singleDay: !!options?.singleDay });
         }
       })();
@@ -773,6 +713,19 @@ export const OptimizedAssignmentMatrix = ({
   // Availability channel dialog state (moved up before usage)
   const [availabilityChannel, setAvailabilityChannel] = useState<'email' | 'whatsapp'>('email');
   const [availabilitySending, setAvailabilitySending] = useState(false);
+  const [availabilityCoverage, setAvailabilityCoverage] = useState<'full' | 'single' | 'multi'>('single');
+  const [availabilitySingleDate, setAvailabilitySingleDate] = useState<Date | null>(null);
+  const [availabilityMultiDates, setAvailabilityMultiDates] = useState<Date[]>([]);
+
+  useEffect(() => {
+    if (availabilityDialog?.open) {
+      setAvailabilityCoverage(availabilityDialog.singleDay ? 'single' : 'full');
+      try {
+        setAvailabilitySingleDate(availabilityDialog.dateIso ? new Date(`${availabilityDialog.dateIso}T00:00:00`) : null);
+        setAvailabilityMultiDates(availabilityDialog.dateIso ? [new Date(`${availabilityDialog.dateIso}T00:00:00`)] : []);
+      } catch { /* ignore */ }
+    }
+  }, [availabilityDialog?.open]);
 
   if (isLoading) {
     return (
@@ -1045,31 +998,59 @@ export const OptimizedAssignmentMatrix = ({
           jobTitle={jobs.find(j => j.id === cellAction.selectedJobId)?.title}
           technicianDepartment={currentTechnician.department}
           defaultSingleDay={cellAction.singleDay}
-          onSubmit={({ role, message, singleDay }) => {
+          jobStartTimeIso={jobs.find(j => j.id === cellAction.selectedJobId)?.start_time}
+          jobEndTimeIso={jobs.find(j => j.id === cellAction.selectedJobId)?.end_time}
+          defaultDateIso={format(cellAction.date, 'yyyy-MM-dd')}
+          onSubmit={({ role, message, singleDay, dates }) => {
             if (!cellAction.selectedJobId) return;
             (async () => {
-              const conflict = await checkTimeConflict(currentTechnician.id, cellAction.selectedJobId!);
-              if (conflict) {
-                toast({
-                  title: 'Conflicto de horarios',
-                  description: `Ya tiene confirmado: ${conflict.title} (${new Date(conflict.start_time).toLocaleString()} - ${new Date(conflict.end_time).toLocaleString()})`,
-                  variant: 'destructive'
-                });
-                return;
-              }
-              sendStaffingEmail(
-                ({ job_id: cellAction.selectedJobId, profile_id: currentTechnician.id, phase: 'offer', role, message, channel: offerChannel, target_date: format(cellAction.date, 'yyyy-MM-dd'), single_day: !!singleDay } as any),
-                {
-                  onSuccess: (data: any) => {
-                    const via = data?.channel || offerChannel;
-                    toast({ title: 'Offer sent', description: `${role} offer sent via ${via}.` });
-                    closeDialogs();
-                  },
-                  onError: (error: any) => {
-                    toast({ title: 'Failed to send offer', description: error.message, variant: 'destructive' });
+              const jobId = cellAction.selectedJobId!;
+              const profileId = currentTechnician.id;
+              const via = offerChannel;
+              if (singleDay) {
+                const selectedDates = Array.isArray(dates) && dates.length ? dates : [format(cellAction.date, 'yyyy-MM-dd')];
+                // Pre-check all dates
+                for (const d of selectedDates) {
+                  const conflict = await checkTimeConflict(profileId, jobId, d, true);
+                  if (conflict) {
+                    toast({ title: 'Conflicto de horarios', description: `(${d}) Ya tiene confirmado: ${conflict.title}`, variant: 'destructive' });
+                    return;
                   }
                 }
-              )
+                let sent = 0, failed = 0;
+                await Promise.all(selectedDates.map(d => new Promise<void>((resolve) => {
+                  sendStaffingEmail(
+                    ({ job_id: jobId, profile_id: profileId, phase: 'offer', role, message, channel: via, target_date: d, single_day: true } as any),
+                    {
+                      onSuccess: () => { sent++; resolve(); },
+                      onError: () => { failed++; resolve(); }
+                    }
+                  );
+                })));
+                if (failed === 0) {
+                  toast({ title: 'Offer sent', description: `${role} offer sent via ${via} (${sent} day${sent>1?'s':''}).` });
+                  closeDialogs();
+                } else {
+                  toast({ title: 'Some offers failed', description: `Sent ${sent}, failed ${failed}.`, variant: 'destructive' });
+                }
+                return;
+              }
+              // Full span
+              const conflict = await checkTimeConflict(profileId, jobId);
+              if (conflict) {
+                toast({ title: 'Conflicto de horarios', description: `Ya tiene confirmado: ${conflict.title}`, variant: 'destructive' });
+                return;
+              }
+              sendStaffingEmail(({ job_id: jobId, profile_id: profileId, phase: 'offer', role, message, channel: via, single_day: false } as any), {
+                onSuccess: (data: any) => {
+                  const ch = data?.channel || via;
+                  toast({ title: 'Offer sent', description: `${role} offer sent via ${ch}.` });
+                  closeDialogs();
+                },
+                onError: (error: any) => {
+                  toast({ title: 'Failed to send offer', description: error.message, variant: 'destructive' });
+                }
+              });
             })();
           }}
         />
@@ -1108,6 +1089,89 @@ export const OptimizedAssignmentMatrix = ({
                   </label>
                 </div>
               </div>
+              {/* Coverage selection */}
+              <div className="space-y-3 mt-4">
+                <label className="font-medium text-sm text-foreground">Coverage</label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="availability-coverage"
+                      checked={availabilityCoverage === 'full'}
+                      onChange={() => setAvailabilityCoverage('full')}
+                    />
+                    <span>Full job span</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="availability-coverage"
+                      checked={availabilityCoverage === 'single'}
+                      onChange={() => setAvailabilityCoverage('single')}
+                    />
+                    <span>Single day</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="availability-coverage"
+                      checked={availabilityCoverage === 'multi'}
+                      onChange={() => setAvailabilityCoverage('multi')}
+                    />
+                    <span>Multiple days</span>
+                  </label>
+                </div>
+                {(() => {
+                  const job = jobs.find(j => j.id === availabilityDialog.jobId);
+                  const start = job?.start_time ? new Date(job.start_time) : undefined;
+                  const end = job?.end_time ? new Date(job.end_time) : start;
+                  if (start) start.setHours(0,0,0,0);
+                  if (end) end.setHours(0,0,0,0);
+                  const isAllowed = (d: Date) => {
+                    if (!start || !end) return true;
+                    const t = new Date(d); t.setHours(0,0,0,0);
+                    return t >= start && t <= end;
+                  };
+                  return (
+                    <>
+                      {availabilityCoverage === 'single' && (
+                        <div className="flex items-center gap-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="gap-2">
+                                <CalendarIcon className="h-4 w-4" />
+                                {availabilitySingleDate ? format(availabilitySingleDate, 'PPP') : availabilityDialog.dateIso}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarPicker
+                                mode="single"
+                                selected={availabilitySingleDate ?? undefined}
+                                onSelect={(d) => { if (d && isAllowed(d)) setAvailabilitySingleDate(d); }}
+                                disabled={(d) => !isAllowed(d)}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <p className="text-xs text-muted-foreground">Send for the selected date only.</p>
+                        </div>
+                      )}
+                      {availabilityCoverage === 'multi' && (
+                        <div className="space-y-2">
+                          <CalendarPicker
+                            mode="multiple"
+                            selected={availabilityMultiDates}
+                            onSelect={(ds) => setAvailabilityMultiDates((ds || []).filter(d => isAllowed(d)))}
+                            disabled={(d) => !isAllowed(d)}
+                            numberOfMonths={2}
+                          />
+                          <p className="text-xs text-muted-foreground">Creates one single-day request per selected date.</p>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setAvailabilityDialog(null)}>Cancel</Button>
@@ -1115,22 +1179,48 @@ export const OptimizedAssignmentMatrix = ({
                 onClick={() => {
                   if (!availabilityDialog) return;
                   setAvailabilitySending(true);
-                  sendStaffingEmail(
-                    ({ job_id: availabilityDialog.jobId, profile_id: availabilityDialog.profileId, phase: 'availability', channel: availabilityChannel, target_date: availabilityDialog.dateIso, single_day: availabilityDialog.singleDay } as any),
-                    {
+                  const jobId = availabilityDialog.jobId;
+                  const profileId = availabilityDialog.profileId;
+                  const via = availabilityChannel;
+                  if (availabilityCoverage === 'full') {
+                    sendStaffingEmail(({ job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, single_day: false } as any), {
                       onSuccess: (data: any) => {
                         setAvailabilitySending(false);
                         setAvailabilityDialog(null);
-                        const via = data?.channel || availabilityChannel;
-                        toast({ title: 'Request sent', description: `Availability request sent via ${via}.` });
+                        toast({ title: 'Request sent', description: `Availability request sent via ${data?.channel || via}.` });
                         closeDialogs();
                       },
                       onError: (error: any) => {
                         setAvailabilitySending(false);
                         toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
                       }
+                    });
+                    return;
+                  }
+                  const dates = availabilityCoverage === 'single'
+                    ? (availabilitySingleDate ? [format(availabilitySingleDate, 'yyyy-MM-dd')] : [availabilityDialog.dateIso])
+                    : Array.from(new Set((availabilityMultiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
+                  if (dates.length === 0) {
+                    setAvailabilitySending(false);
+                    toast({ title: 'Select date(s)', description: 'Choose at least one date within the job span.', variant: 'destructive' });
+                    return;
+                  }
+                  let sent = 0, failed = 0;
+                  Promise.all(dates.map(d => new Promise<void>((resolve) => {
+                    sendStaffingEmail(({ job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, target_date: d, single_day: true } as any), {
+                      onSuccess: () => { sent++; resolve(); },
+                      onError: () => { failed++; resolve(); }
+                    });
+                  })) ).then(() => {
+                    setAvailabilitySending(false);
+                    setAvailabilityDialog(null);
+                    if (failed === 0) {
+                      toast({ title: 'Request sent', description: `Availability request sent for ${sent} day${sent>1?'s':''} via ${via}.` });
+                      closeDialogs();
+                    } else {
+                      toast({ title: 'Some requests failed', description: `Sent ${sent}, failed ${failed}.`, variant: 'destructive' });
                     }
-                  );
+                  });
                 }}
                 disabled={availabilitySending}
               >
@@ -1167,7 +1257,13 @@ export const OptimizedAssignmentMatrix = ({
 };
 
 // Helper: check if technician has a confirmed overlapping job
-async function checkTimeConflict(technicianId: string, targetJobId: string): Promise<{ id: string, title: string, start_time: string, end_time: string } | null> {
+// Helper: check for conflicts, with optional single-day scope when a target date is specified
+async function checkTimeConflict(
+  technicianId: string,
+  targetJobId: string,
+  targetDateIso?: string,
+  singleDayOnly?: boolean
+): Promise<{ id: string, title: string, start_time: string, end_time: string } | null> {
   try {
     const { data: targetJob, error: jErr } = await supabase
       .from('jobs')
@@ -1178,12 +1274,21 @@ async function checkTimeConflict(technicianId: string, targetJobId: string): Pro
 
     const { data: assignments, error: aErr } = await supabase
       .from('job_assignments')
-      .select('job_id,status')
+      .select('job_id,status,single_day,assignment_date')
       .eq('technician_id', technicianId)
       .eq('status', 'confirmed');
     if (aErr || !assignments?.length) return null;
 
-    const otherIds = assignments.map(a => a.job_id).filter(id => id !== targetJobId);
+    // If we're checking a single-day scope, ignore single-day assignments on different days
+    const filteredAssignments = assignments.filter(a => {
+      if (a.job_id === targetJobId) return false;
+      if (singleDayOnly && targetDateIso) {
+        if (a.single_day && a.assignment_date && a.assignment_date !== targetDateIso) return false;
+      }
+      return true;
+    });
+
+    const otherIds = filteredAssignments.map(a => a.job_id);
     if (!otherIds.length) return null;
     const { data: jobs, error: jobsErr } = await supabase
       .from('jobs')
@@ -1191,8 +1296,9 @@ async function checkTimeConflict(technicianId: string, targetJobId: string): Pro
       .in('id', otherIds);
     if (jobsErr || !jobs?.length) return null;
 
-    const ts = targetJob.start_time ? new Date(targetJob.start_time) : null;
-    const te = targetJob.end_time ? new Date(targetJob.end_time) : null;
+    // Compute the target interval: either the specific day or the full job window
+    const ts = singleDayOnly && targetDateIso ? new Date(`${targetDateIso}T00:00:00Z`) : (targetJob.start_time ? new Date(targetJob.start_time) : null);
+    const te = singleDayOnly && targetDateIso ? new Date(`${targetDateIso}T23:59:59Z`) : (targetJob.end_time ? new Date(targetJob.end_time) : null);
     if (!ts || !te) return null;
     const overlap = jobs.find(j => j.start_time && j.end_time && (new Date(j.start_time) < te) && (new Date(j.end_time) > ts));
     return overlap ? { id: overlap.id, title: overlap.title, start_time: overlap.start_time!, end_time: overlap.end_time! } : null;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Calendar, Clock } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import { Loader2, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -52,7 +54,10 @@ export const AssignJobDialog = ({
 }: AssignJobDialogProps) => {
   const [selectedJobId, setSelectedJobId] = useState<string>(preSelectedJobId || existingAssignment?.job_id || '');
   const [selectedRole, setSelectedRole] = useState<string>('');
-  const [singleDay, setSingleDay] = useState<boolean>(existingAssignment?.single_day ?? true);
+  // Coverage mode: full job span, single day, multiple days
+  const [coverageMode, setCoverageMode] = useState<'full' | 'single' | 'multi'>(existingAssignment?.single_day ? 'single' : 'full');
+  const [singleDate, setSingleDate] = useState<Date | null>(date);
+  const [multiDates, setMultiDates] = useState<Date[]>(date ? [date] : []);
   const [assignAsConfirmed, setAssignAsConfirmed] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
@@ -85,7 +90,7 @@ export const AssignJobDialog = ({
   const roleOptions = technician ? roleOptionsForDiscipline(technician.department) : [];
   const isReassignment = !!existingAssignment;
   // IMPORTANT: use local yyyy-MM-dd, not toISOString (which is UTC)
-  const assignmentDate = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
+  const assignmentDate = React.useMemo(() => format((singleDate ?? date), 'yyyy-MM-dd'), [date, singleDate]);
 
   // Set initial role if reassigning
   React.useEffect(() => {
@@ -105,8 +110,10 @@ export const AssignJobDialog = ({
   }, [existingAssignment, technician]);
 
   React.useEffect(() => {
-    setSingleDay(existingAssignment?.single_day ?? true);
-  }, [existingAssignment?.single_day]);
+    if (existingAssignment?.single_day && existingAssignment?.assignment_date) {
+      try { setSingleDate(new Date(`${existingAssignment.assignment_date}T00:00:00`)); } catch {}
+    }
+  }, [existingAssignment?.single_day, existingAssignment?.assignment_date]);
 
   // Update selected job when preSelectedJobId changes
   React.useEffect(() => {
@@ -165,37 +172,39 @@ export const AssignJobDialog = ({
         }
       }
 
-      // Create new assignment using the same logic as the robust hook
-      console.log('Creating assignment with data:', {
+      // Create new assignment(s)
+      const basePayload = {
         job_id: selectedJobId,
         technician_id: technicianId,
         sound_role: soundRole !== 'none' ? soundRole : null,
         lights_role: lightsRole !== 'none' ? lightsRole : null,
         video_role: videoRole !== 'none' ? videoRole : null,
+        assigned_by: (await supabase.auth.getUser()).data.user?.id,
+        assigned_at: new Date().toISOString(),
         status: assignAsConfirmed ? 'confirmed' : 'invited',
-        single_day: singleDay,
-        assignment_date: singleDay ? assignmentDate : null
-      });
+        response_time: assignAsConfirmed ? new Date().toISOString() : null,
+      } as const;
 
-      const { error } = await supabase
-        .from('job_assignments')
-        .insert({
-          job_id: selectedJobId,
-          technician_id: technicianId,
-          sound_role: soundRole !== 'none' ? soundRole : null,
-          lights_role: lightsRole !== 'none' ? lightsRole : null,
-          video_role: videoRole !== 'none' ? videoRole : null,
-          assigned_by: (await supabase.auth.getUser()).data.user?.id,
-          assigned_at: new Date().toISOString(),
-          status: assignAsConfirmed ? 'confirmed' : 'invited',
-          response_time: assignAsConfirmed ? new Date().toISOString() : null,
-          single_day: singleDay,
-          assignment_date: singleDay ? assignmentDate : null,
-        });
+      let insertError: any = null;
+      if (coverageMode === 'multi') {
+        const uniqueKeys = Array.from(new Set((multiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
+        if (uniqueKeys.length === 0) {
+          throw new Error('Select at least one date');
+        }
+        const rows = uniqueKeys.map(dk => ({ ...basePayload, single_day: true, assignment_date: dk }));
+        console.log('Creating multi single-day assignments:', rows);
+        const { error } = await supabase.from('job_assignments').insert(rows);
+        insertError = error;
+      } else {
+        const payload = { ...basePayload, single_day: coverageMode === 'single', assignment_date: coverageMode === 'single' ? assignmentDate : null };
+        console.log('Creating assignment with data:', payload);
+        const { error } = await supabase.from('job_assignments').insert(payload);
+        insertError = error;
+      }
 
-      if (error) {
-        console.error('Error creating assignment:', error);
-        throw error;
+      if (insertError) {
+        console.error('Error creating assignment:', insertError);
+        throw insertError;
       }
 
       console.log('Assignment created successfully, now handling Flex crew assignments...');
@@ -256,8 +265,8 @@ export const AssignJobDialog = ({
             recipient_id: technicianId,
             recipient_name: recipientName || undefined,
             assignment_status: assignAsConfirmed ? 'confirmed' : 'invited',
-            target_date: singleDay ? `${assignmentDate}T00:00:00Z` : undefined,
-            single_day: singleDay
+            target_date: coverageMode === 'single' ? `${assignmentDate}T00:00:00Z` : undefined,
+            single_day: coverageMode !== 'full'
           }
         });
       } catch (_) {
@@ -315,6 +324,23 @@ export const AssignJobDialog = ({
   const handleCheckboxChange = (checked: boolean | "indeterminate") => {
     // Convert CheckedState to boolean, treating "indeterminate" as false
     setAssignAsConfirmed(checked === true);
+  };
+
+  // Build selected job date range to constrain calendar selection
+  const selectedJobMeta = useMemo(() => {
+    const j = selectedJob;
+    if (!j) return null as null | { start?: Date; end?: Date };
+    const s = j.start_time ? new Date(j.start_time) : undefined;
+    const e = j.end_time ? new Date(j.end_time) : s;
+    if (s) s.setHours(0,0,0,0);
+    if (e) e.setHours(0,0,0,0);
+    return { start: s, end: e };
+  }, [selectedJob]);
+
+  const isAllowedDate = (d: Date) => {
+    if (!selectedJobMeta?.start || !selectedJobMeta?.end) return true;
+    const t = new Date(d); t.setHours(0,0,0,0);
+    return t >= selectedJobMeta.start && t <= selectedJobMeta.end;
   };
 
   return (
@@ -401,19 +427,57 @@ export const AssignJobDialog = ({
 
           {selectedJobId && selectedRole && (
             <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="single-day-assignment"
-                  checked={singleDay}
-                  onCheckedChange={(checked) => setSingleDay(checked === true)}
-                />
-                <label
-                  htmlFor="single-day-assignment"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Limit assignment to {format(date, 'PPP')}
-                </label>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Coverage</label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="coverage" checked={coverageMode === 'full'} onChange={() => setCoverageMode('full')} />
+                    <span>Full job span</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="coverage" checked={coverageMode === 'single'} onChange={() => setCoverageMode('single')} />
+                    <span>Single day</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="coverage" checked={coverageMode === 'multi'} onChange={() => setCoverageMode('multi')} />
+                    <span>Multiple days</span>
+                  </label>
+                </div>
               </div>
+              {coverageMode === 'single' && (
+                <div className="flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        {singleDate ? format(singleDate, 'PPP') : 'Select date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarPicker
+                        mode="single"
+                        selected={singleDate ?? undefined}
+                        onSelect={(d) => { if (d && isAllowedDate(d)) setSingleDate(d); }}
+                        disabled={(d) => !isAllowedDate(d)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground">Creates one single-day assignment.</p>
+                </div>
+              )}
+              {coverageMode === 'multi' && (
+                <div className="space-y-2">
+                  <CalendarPicker
+                    mode="multiple"
+                    selected={multiDates}
+                    onSelect={(ds) => setMultiDates((ds || []).filter(d => isAllowedDate(d)))}
+                    disabled={(d) => !isAllowedDate(d)}
+                    numberOfMonths={2}
+                  />
+                  <p className="text-xs text-muted-foreground">Creates one single-day assignment per selected date.</p>
+                </div>
+              )}
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="confirm-assignment"
@@ -433,7 +497,7 @@ export const AssignJobDialog = ({
           {selectedJob && (
             <div className="bg-muted p-3 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
-                <Calendar className="h-4 w-4" />
+                <CalendarIcon className="h-4 w-4" />
                 <span className="font-medium">{selectedJob.title}</span>
                 <Badge variant="secondary">{selectedJob.status}</Badge>
               </div>
@@ -453,9 +517,14 @@ export const AssignJobDialog = ({
                   Will be assigned as confirmed
                 </div>
               )}
-              {singleDay && (
+              {coverageMode === 'single' && (
                 <div className="text-xs text-muted-foreground mt-1">
-                  Single-day coverage for {format(date, 'PPP')}
+                  Single-day coverage for {singleDate ? format(singleDate, 'PPP') : format(date, 'PPP')}
+                </div>
+              )}
+              {coverageMode === 'multi' && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  {multiDates.length} day(s) selected for single-day coverage
                 </div>
               )}
             </div>
