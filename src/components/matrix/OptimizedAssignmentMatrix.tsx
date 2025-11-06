@@ -17,6 +17,7 @@ import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { useToast } from '@/hooks/use-toast';
 import { OfferDetailsDialog } from './OfferDetailsDialog';
 import { supabase } from '@/lib/supabase';
+import { checkTimeConflict } from '@/utils/technicianAvailability';
 import { useStaffingMatrixStatuses } from '@/features/staffing/hooks/useStaffingMatrixStatuses';
 import { Button } from '@/components/ui/button';
 import { UserPlus, Calendar as CalendarIcon } from 'lucide-react';
@@ -1247,54 +1248,3 @@ export const OptimizedAssignmentMatrix = ({
   );
 };
 
-// Helper: check if technician has a confirmed overlapping job
-// Helper: check for conflicts, with optional single-day scope when a target date is specified
-async function checkTimeConflict(
-  technicianId: string,
-  targetJobId: string,
-  targetDateIso?: string,
-  singleDayOnly?: boolean
-): Promise<{ id: string, title: string, start_time: string, end_time: string } | null> {
-  try {
-    const { data: targetJob, error: jErr } = await supabase
-      .from('jobs')
-      .select('id,title,start_time,end_time')
-      .eq('id', targetJobId)
-      .maybeSingle();
-    if (jErr || !targetJob) return null;
-
-    const { data: assignments, error: aErr } = await supabase
-      .from('job_assignments')
-      .select('job_id,status,single_day,assignment_date')
-      .eq('technician_id', technicianId)
-      .eq('status', 'confirmed');
-    if (aErr || !assignments?.length) return null;
-
-    // If we're checking a single-day scope, ignore single-day assignments on different days
-    const filteredAssignments = assignments.filter(a => {
-      if (a.job_id === targetJobId) return false;
-      if (singleDayOnly && targetDateIso) {
-        if (a.single_day && a.assignment_date && a.assignment_date !== targetDateIso) return false;
-      }
-      return true;
-    });
-
-    const otherIds = filteredAssignments.map(a => a.job_id);
-    if (!otherIds.length) return null;
-    const { data: jobs, error: jobsErr } = await supabase
-      .from('jobs')
-      .select('id,title,start_time,end_time')
-      .in('id', otherIds);
-    if (jobsErr || !jobs?.length) return null;
-
-    // Compute the target interval: either the specific day or the full job window
-    const ts = singleDayOnly && targetDateIso ? new Date(`${targetDateIso}T00:00:00Z`) : (targetJob.start_time ? new Date(targetJob.start_time) : null);
-    const te = singleDayOnly && targetDateIso ? new Date(`${targetDateIso}T23:59:59Z`) : (targetJob.end_time ? new Date(targetJob.end_time) : null);
-    if (!ts || !te) return null;
-    const overlap = jobs.find(j => j.start_time && j.end_time && (new Date(j.start_time) < te) && (new Date(j.end_time) > ts));
-    return overlap ? { id: overlap.id, title: overlap.title, start_time: overlap.start_time!, end_time: overlap.end_time! } : null;
-  } catch (e) {
-    console.warn('Conflict pre-check error', e);
-    return null;
-  }
-}
