@@ -13,7 +13,7 @@ import { MarkUnavailableDialog } from './MarkUnavailableDialog';
 import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
-import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
+import { useSendStaffingEmail, ConflictError } from '@/features/staffing/hooks/useStaffing';
 import { useToast } from '@/hooks/use-toast';
 import { OfferDetailsDialog } from './OfferDetailsDialog';
 import { supabase } from '@/lib/supabase';
@@ -723,6 +723,33 @@ export const OptimizedAssignmentMatrix = ({
   const [availabilitySingleDate, setAvailabilitySingleDate] = useState<Date | null>(null);
   const [availabilityMultiDates, setAvailabilityMultiDates] = useState<Date[]>([]);
 
+  // Conflict dialog state
+  const [conflictDialog, setConflictDialog] = useState<{
+    open: boolean;
+    details: any;
+    originalPayload: any;
+  } | null>(null);
+
+  // Helper to handle conflict errors
+  const handleEmailError = (error: any, payload: any) => {
+    setAvailabilitySending(false);
+    if (error instanceof ConflictError) {
+      // Show conflict dialog with details and option to override
+      setConflictDialog({
+        open: true,
+        details: error.details,
+        originalPayload: payload
+      });
+    } else {
+      // Show regular error toast
+      toast({
+        title: 'Send failed',
+        description: error.message || 'Failed to send staffing request',
+        variant: 'destructive'
+      });
+    }
+  };
+
   useEffect(() => {
     if (availabilityDialog?.open) {
       setAvailabilityCoverage(availabilityDialog.singleDay ? 'single' : 'full');
@@ -1194,17 +1221,15 @@ export const OptimizedAssignmentMatrix = ({
                   const profileId = availabilityDialog.profileId;
                   const via = availabilityChannel;
                   if (availabilityCoverage === 'full') {
-                    sendStaffingEmail(({ job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, single_day: false } as any), {
+                    const payload = { job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, single_day: false };
+                    sendStaffingEmail(payload as any, {
                       onSuccess: (data: any) => {
                         setAvailabilitySending(false);
                         setAvailabilityDialog(null);
                         toast({ title: 'Request sent', description: `Availability request sent via ${data?.channel || via}.` });
                         closeDialogs();
                       },
-                      onError: (error: any) => {
-                        setAvailabilitySending(false);
-                        toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
-                      }
+                      onError: (error: any) => handleEmailError(error, payload)
                     });
                     return;
                   }
@@ -1227,10 +1252,7 @@ export const OptimizedAssignmentMatrix = ({
                       toast({ title: 'Request sent', description: `Availability request sent for ${dates.length} day${dates.length>1?'s':''} via ${data?.channel || via}.` });
                       closeDialogs();
                     },
-                    onError: (error: any) => {
-                      setAvailabilitySending(false);
-                      toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
-                    }
+                    onError: (error: any) => handleEmailError(error, payload)
                   });
                 }}
                 disabled={availabilitySending}
@@ -1262,6 +1284,103 @@ export const OptimizedAssignmentMatrix = ({
             setCreateUserOpen(open);
           }}
         />
+      )}
+
+      {/* Conflict Dialog */}
+      {conflictDialog?.open && (
+        <Dialog open={true} onOpenChange={(v) => { if (!v) setConflictDialog(null) }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Scheduling Conflict Detected</DialogTitle>
+              <DialogDescription>
+                The technician has conflicts or unavailability during this job period.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 max-h-[400px] overflow-y-auto">
+              {/* Hard Conflicts (Job Assignments) */}
+              {conflictDialog.details?.conflicts && conflictDialog.details.conflicts.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-red-900">Overlapping Assignments:</h4>
+                  <div className="space-y-2">
+                    {conflictDialog.details.conflicts.map((conflict: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-red-50 border border-red-200 rounded text-sm">
+                        <div className="font-medium">{conflict.title}</div>
+                        <div className="text-muted-foreground">
+                          {format(new Date(conflict.start_time), 'MMM d, yyyy')} - {format(new Date(conflict.end_time), 'MMM d, yyyy')}
+                        </div>
+                        <div className="text-xs text-red-700 mt-1">Status: {conflict.status}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Unavailability */}
+              {conflictDialog.details?.unavailability && conflictDialog.details.unavailability.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-orange-900">Unavailability:</h4>
+                  <div className="space-y-2">
+                    {conflictDialog.details.unavailability.map((unavail: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-orange-50 border border-orange-200 rounded text-sm">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-medium">{format(new Date(unavail.date), 'MMM d, yyyy')}</div>
+                            <div className="text-muted-foreground">{unavail.reason}</div>
+                            {unavail.notes && <div className="text-xs text-muted-foreground mt-1">{unavail.notes}</div>}
+                          </div>
+                          <span className="text-xs px-2 py-1 bg-orange-100 rounded">{unavail.source}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setConflictDialog(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  // Send with override flag
+                  const payloadWithOverride = {
+                    ...conflictDialog.originalPayload,
+                    override_conflicts: true
+                  };
+                  setConflictDialog(null);
+                  setAvailabilitySending(true);
+                  sendStaffingEmail(payloadWithOverride, {
+                    onSuccess: (data: any) => {
+                      setAvailabilitySending(false);
+                      setAvailabilityDialog(null);
+                      toast({
+                        title: 'Request sent (override)',
+                        description: `Staffing request sent despite conflicts.`
+                      });
+                      closeDialogs();
+                    },
+                    onError: (error: any) => {
+                      setAvailabilitySending(false);
+                      toast({
+                        title: 'Send failed',
+                        description: error.message,
+                        variant: 'destructive'
+                      });
+                    }
+                  });
+                }}
+              >
+                Send Anyway
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
