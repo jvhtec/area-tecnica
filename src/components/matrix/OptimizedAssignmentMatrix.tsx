@@ -17,7 +17,7 @@ import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { useToast } from '@/hooks/use-toast';
 import { OfferDetailsDialog } from './OfferDetailsDialog';
 import { supabase } from '@/lib/supabase';
-import { checkTimeConflict } from '@/utils/technicianAvailability';
+import { checkTimeConflictEnhanced } from '@/utils/technicianAvailability';
 import { useStaffingMatrixStatuses } from '@/features/staffing/hooks/useStaffingMatrixStatuses';
 import { Button } from '@/components/ui/button';
 import { UserPlus, Calendar as CalendarIcon } from 'lucide-react';
@@ -477,8 +477,13 @@ export const OptimizedAssignmentMatrix = ({
       // Availability: pre-check conflicts, then direct-send via intent/preference if set, else ask
       (async () => {
         const technicianId = cellAction.technicianId;
-        const conflict = await checkTimeConflict(technicianId, jobId, format(cellAction.date, 'yyyy-MM-dd'), !!options?.singleDay);
-        if (conflict) {
+        const conflictResult = await checkTimeConflictEnhanced(technicianId, jobId, {
+          targetDateIso: format(cellAction.date, 'yyyy-MM-dd'),
+          singleDayOnly: !!options?.singleDay,
+          includePending: true,
+        });
+        if (conflictResult.hasHardConflict) {
+          const conflict = conflictResult.hardConflicts[0];
           toast({
             title: 'Conflicto de horarios',
             description: `Ya tiene confirmado: ${conflict.title} (${new Date(conflict.start_time).toLocaleString()} - ${new Date(conflict.end_time).toLocaleString()})`,
@@ -1011,8 +1016,13 @@ export const OptimizedAssignmentMatrix = ({
               if (singleDay) {
                 const selectedDates = Array.isArray(dates) && dates.length ? dates : [format(cellAction.date, 'yyyy-MM-dd')];
                 for (const d of selectedDates) {
-                  const conflict = await checkTimeConflict(profileId, jobId, d, true);
-                  if (conflict) {
+                  const conflictResult = await checkTimeConflictEnhanced(profileId, jobId, {
+                    targetDateIso: d,
+                    singleDayOnly: true,
+                    includePending: true,
+                  });
+                  if (conflictResult.hasHardConflict) {
+                    const conflict = conflictResult.hardConflicts[0];
                     toast({ title: 'Conflicto de horarios', description: `(${d}) Ya tiene confirmado: ${conflict.title}`, variant: 'destructive' });
                     return;
                   }
@@ -1034,8 +1044,11 @@ export const OptimizedAssignmentMatrix = ({
                 return;
               }
               // Full span
-              const conflict = await checkTimeConflict(profileId, jobId);
-              if (conflict) {
+              const conflictResult = await checkTimeConflictEnhanced(profileId, jobId, {
+                includePending: true,
+              });
+              if (conflictResult.hasHardConflict) {
+                const conflict = conflictResult.hardConflicts[0];
                 toast({ title: 'Conflicto de horarios', description: `Ya tiene confirmado: ${conflict.title}`, variant: 'destructive' });
                 return;
               }
