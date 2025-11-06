@@ -72,12 +72,11 @@ serve(async (req) => {
     const datesArrayRaw: unknown = (body as any)?.dates;
     const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp') ? 'whatsapp' : 'email';
     const rawTargetDate = typeof target_date === 'string' && target_date ? target_date : null;
-    const normalizedTargetDate = rawTargetDate ? (() => {
+    let normalizedTargetDate = rawTargetDate ? (() => {
       const parsed = new Date(rawTargetDate);
       if (Number.isNaN(parsed.getTime())) return null;
       return parsed.toISOString().split('T')[0];
     })() : null;
-    const isSingleDayRequest = Boolean(single_day) && Boolean(normalizedTargetDate);
     const normalizedDates: string[] = Array.isArray(datesArrayRaw)
       ? Array.from(new Set((datesArrayRaw as any[])
         .map((d) => {
@@ -88,6 +87,10 @@ serve(async (req) => {
         })
         .filter((d): d is string => typeof d === 'string')))
       : [];
+    if (!normalizedTargetDate && single_day && normalizedDates.length === 1) {
+      normalizedTargetDate = normalizedDates[0];
+    }
+    const isSingleDayRequest = Boolean(single_day) && Boolean(normalizedTargetDate);
     
     // Enhanced validation logging
     console.log('🔍 VALIDATING FIELDS:', {
