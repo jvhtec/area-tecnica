@@ -750,7 +750,7 @@ async function getMorningSummaryDataForDepartment(
   nextDate.setDate(nextDate.getDate() + 1);
   const tomorrowDate = nextDate.toISOString().split('T')[0];
 
-  // Get today's assignments for this department
+  // 1) Get today's assignments for this department (house tech only)
   const { data: assignments = [] } = await client
     .from('job_assignments')
     .select(`
@@ -764,7 +764,7 @@ async function getMorningSummaryDataForDepartment(
     .gte('job.start_time', targetDate)
     .lt('job.start_time', tomorrowDate);
 
-  // Get today's unavailability for this department
+  // 2) Get today's unavailability for this department (primary source)
   const { data: unavailable = [] } = await client
     .from('availability_schedules')
     .select(`
@@ -777,12 +777,53 @@ async function getMorningSummaryDataForDepartment(
     .eq('profile.department', department);
   const unavailableHouseOnly = (unavailable as any[]).filter(u => (u as any)?.profile?.role === 'house_tech');
 
-  // Get all techs in department
+  // 3) Get all house techs in department (population)
   const { data: allTechs = [] } = await client
     .from('profiles')
     .select('id, first_name, last_name, nickname')
     .eq('department', department)
     .eq('role', 'house_tech');
+
+  // 4) Legacy fallback: include legacy table marks (technician_availability)
+  // Some environments still record travel/sick/day_off/vacation here.
+  // We treat these as 'unavailable' for the day if they aren't already present.
+  try {
+    const techIds = (allTechs as any[]).map(t => t.id);
+    if (techIds.length) {
+      const { data: legacyRows, error: legacyErr } = await client
+        .from('technician_availability')
+        .select('technician_id, date, status')
+        .in('technician_id', techIds)
+        .eq('date', targetDate)
+        .in('status', ['vacation', 'travel', 'sick', 'day_off']);
+      if (!legacyErr && legacyRows && legacyRows.length) {
+        const existing = new Set<string>((unavailableHouseOnly as any[]).map(u => (u as any).user_id));
+        for (const row of legacyRows as any[]) {
+          if (!existing.has(row.technician_id)) {
+            const prof = (allTechs as any[]).find(t => t.id === row.technician_id);
+            if (prof) {
+              (unavailableHouseOnly as any[]).push({
+                user_id: row.technician_id,
+                source: row.status,
+                profile: {
+                  first_name: prof.first_name,
+                  last_name: prof.last_name,
+                  nickname: prof.nickname,
+                },
+              });
+              existing.add(row.technician_id);
+            }
+          }
+        }
+      }
+    }
+  } catch (e: any) {
+    // Ignore if legacy table missing
+    if (!(e && e.code === '42P01')) {
+      // Log non-table-missing errors for visibility
+      console.log('morning summary legacy availability lookup warning:', e?.message || e);
+    }
+  }
 
   return {
     assignments: assignments as any,
