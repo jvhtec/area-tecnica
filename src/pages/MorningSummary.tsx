@@ -64,36 +64,38 @@ export default function MorningSummary() {
 
       for (const dept of departments) {
         // Get assignments
-        const { data: assignments } = await supabase
-          .from('job_assignments')
-          .select(`
-            technician_id,
-            job:jobs!inner(title, start_time),
-            profile:profiles!job_assignments_technician_id_fkey!inner(first_name, last_name, nickname, department)
-          `)
-          .eq('status', 'confirmed')
-          .eq('profile.department', dept)
-          .gte('job.start_time', date)
-          .lt('job.start_time', tomorrowDate);
+      const { data: assignments } = await supabase
+        .from('job_assignments')
+        .select(`
+          technician_id,
+          job:jobs!inner(title, start_time),
+          profile:profiles!job_assignments_technician_id_fkey!inner(first_name, last_name, nickname, department, role)
+        `)
+        .eq('status', 'confirmed')
+        .eq('profile.department', dept)
+        .eq('profile.role', 'house_tech')
+        .gte('job.start_time', date)
+        .lt('job.start_time', tomorrowDate);
 
         // Get unavailable
-        const { data: unavailable } = await supabase
-          .from('availability_schedules')
-          .select(`
-            user_id,
-            source,
-            profile:profiles!availability_schedules_user_id_fkey!inner(first_name, last_name, nickname, department)
-          `)
-          .eq('date', date)
-          .eq('status', 'unavailable')
-          .eq('profile.department', dept);
+      const { data: unavailable } = await supabase
+        .from('availability_schedules')
+        .select(`
+          user_id,
+          source,
+          profile:profiles!availability_schedules_user_id_fkey!inner(first_name, last_name, nickname, department, role)
+        `)
+        .eq('date', date)
+        .eq('status', 'unavailable')
+        .eq('profile.department', dept)
+        .eq('profile.role', 'house_tech');
 
         // Get all techs
-        const { data: allTechs } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, nickname')
-          .eq('department', dept)
-          .eq('assignable_as_tech', true);
+      const { data: allTechs } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, nickname')
+        .eq('department', dept)
+        .eq('role', 'house_tech');
 
         // Process data
         const jobGroups: Record<string, string[]> = {};
