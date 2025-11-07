@@ -756,10 +756,11 @@ async function getMorningSummaryDataForDepartment(
     .select(`
       technician_id,
       job:jobs!inner(title, start_time),
-      profile:profiles!job_assignments_technician_id_fkey!inner(first_name, last_name, nickname, department)
+      profile:profiles!job_assignments_technician_id_fkey!inner(first_name, last_name, nickname, department, role)
     `)
     .eq('status', 'confirmed')
     .eq('profile.department', department)
+    .eq('profile.role', 'house_tech')
     .gte('job.start_time', targetDate)
     .lt('job.start_time', tomorrowDate);
 
@@ -769,22 +770,23 @@ async function getMorningSummaryDataForDepartment(
     .select(`
       user_id,
       source,
-      profile:profiles!availability_schedules_user_id_fkey!inner(first_name, last_name, nickname, department)
+      profile:profiles!availability_schedules_user_id_fkey!inner(first_name, last_name, nickname, department, role)
     `)
     .eq('date', targetDate)
     .eq('status', 'unavailable')
     .eq('profile.department', department);
+  const unavailableHouseOnly = (unavailable as any[]).filter(u => (u as any)?.profile?.role === 'house_tech');
 
   // Get all techs in department
   const { data: allTechs = [] } = await client
     .from('profiles')
     .select('id, first_name, last_name, nickname')
     .eq('department', department)
-    .eq('assignable_as_tech', true);
+    .eq('role', 'house_tech');
 
   return {
     assignments: assignments as any,
-    unavailable: unavailable as any,
+    unavailable: unavailableHouseOnly as any,
     allTechs: allTechs as any,
   };
 }
