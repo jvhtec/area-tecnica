@@ -121,23 +121,41 @@ export const useOptimizedJobCard = (
 
   // Compute assigned counts per department and per role code (for comparisons)
   const assignedMetrics = useMemo(() => {
-    const countsByDept: Record<string, number> = { sound: 0, lights: 0, video: 0 } as any;
-    const countsByRole: Record<string, number> = {};
+    // De-duplicate by technician per department/role so multi-day rows count once
+    const soundSet = new Set<string>();
+    const lightsSet = new Set<string>();
+    const videoSet = new Set<string>();
+    const roleSets: Record<string, Set<string>> = {};
+
     const rows = Array.isArray(assignments) ? assignments : [];
     for (const a of rows) {
+      const techId = a.technician_id || `ext:${a.external_technician_name || ''}`;
       if (a.sound_role) {
-        countsByDept.sound = (countsByDept.sound || 0) + 1;
-        countsByRole[a.sound_role] = (countsByRole[a.sound_role] || 0) + 1;
+        soundSet.add(techId);
+        roleSets[a.sound_role] = roleSets[a.sound_role] || new Set<string>();
+        roleSets[a.sound_role].add(techId);
       }
       if (a.lights_role) {
-        countsByDept.lights = (countsByDept.lights || 0) + 1;
-        countsByRole[a.lights_role] = (countsByRole[a.lights_role] || 0) + 1;
+        lightsSet.add(techId);
+        roleSets[a.lights_role] = roleSets[a.lights_role] || new Set<string>();
+        roleSets[a.lights_role].add(techId);
       }
       if (a.video_role) {
-        countsByDept.video = (countsByDept.video || 0) + 1;
-        countsByRole[a.video_role] = (countsByRole[a.video_role] || 0) + 1;
+        videoSet.add(techId);
+        roleSets[a.video_role] = roleSets[a.video_role] || new Set<string>();
+        roleSets[a.video_role].add(techId);
       }
     }
+
+    const countsByDept: Record<string, number> = {
+      sound: soundSet.size,
+      lights: lightsSet.size,
+      video: videoSet.size
+    } as any;
+
+    const countsByRole: Record<string, number> = {};
+    Object.entries(roleSets).forEach(([role, set]) => countsByRole[role] = set.size);
+
     return { countsByDept, countsByRole };
   }, [assignments]);
 
