@@ -912,6 +912,133 @@ function formatMorningSummary(
   };
 }
 
+function formatMultiDepartmentSummary(
+  departments: string[],
+  dataByDept: Map<string, MorningSummaryData>,
+  targetDate: string,
+): { title: string; body: string } {
+  // Format date in Spanish
+  const dateObj = new Date(targetDate + 'T00:00:00Z');
+  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const dayName = dayNames[dateObj.getUTCDay()];
+  const dayNum = dateObj.getUTCDate();
+  const monthName = monthNames[dateObj.getUTCMonth()];
+  const formattedDate = `${dayName} ${dayNum} de ${monthName}`;
+
+  // Department names in Spanish
+  const deptMap: Record<string, string> = {
+    sound: 'Sonido',
+    lights: 'Iluminación',
+    video: 'Vídeo',
+    logistics: 'Logística',
+    production: 'Producción',
+  };
+
+  let fullMessage = `📅 Resumen del día - ${formattedDate}\n\n`;
+
+  // Process each department
+  for (let i = 0; i < departments.length; i++) {
+    const department = departments[i];
+    const data = dataByDept.get(department);
+
+    if (!data) continue;
+
+    const deptName = deptMap[department] || department.toUpperCase();
+    fullMessage += `━━━ ${deptName.toUpperCase()} ━━━\n\n`;
+
+    // Group assignments by job
+    const jobGroups: Record<string, typeof data.assignments> = {};
+    for (const assignment of data.assignments) {
+      const jobTitle = assignment.job.title;
+      if (!jobGroups[jobTitle]) {
+        jobGroups[jobTitle] = [];
+      }
+      jobGroups[jobTitle].push(assignment);
+    }
+
+    // Format jobs section
+    if (Object.keys(jobGroups).length > 0) {
+      fullMessage += `🎤 EN TRABAJOS:\n`;
+      for (const [jobTitle, assignments] of Object.entries(jobGroups)) {
+        const techNames = assignments
+          .map(a => a.profile.nickname || a.profile.first_name)
+          .join(', ');
+        fullMessage += `  • ${jobTitle}: ${techNames}\n`;
+      }
+      fullMessage += '\n';
+    }
+
+    // Calculate warehouse techs
+    const assignedTechIds = new Set(data.assignments.map(a => a.technician_id));
+    const unavailableTechIds = new Set(data.unavailable.map(a => a.user_id));
+    const warehouseTechs = data.allTechs.filter(
+      t => !assignedTechIds.has(t.id) && !unavailableTechIds.has(t.id)
+    );
+
+    if (warehouseTechs.length > 0) {
+      const names = warehouseTechs
+        .map(t => t.nickname || t.first_name)
+        .join(', ');
+      fullMessage += `🏢 EN ALMACÉN: ${names}\n\n`;
+    }
+
+    // Group unavailable by source
+    const bySource: Record<string, typeof data.unavailable> = {};
+    for (const avail of data.unavailable) {
+      const source = avail.source || 'other';
+      if (!bySource[source]) {
+        bySource[source] = [];
+      }
+      bySource[source].push(avail);
+    }
+
+    // Format unavailability
+    let hasUnavailable = false;
+    if (bySource.vacation?.length) {
+      const names = bySource.vacation.map(a => a.profile.nickname || a.profile.first_name).join(', ');
+      fullMessage += `🏖️ DE VACACIONES: ${names}\n`;
+      hasUnavailable = true;
+    }
+    if (bySource.travel?.length) {
+      const names = bySource.travel.map(a => a.profile.nickname || a.profile.first_name).join(', ');
+      fullMessage += `✈️ DE VIAJE: ${names}\n`;
+      hasUnavailable = true;
+    }
+    if (bySource.sick?.length) {
+      const names = bySource.sick.map(a => a.profile.nickname || a.profile.first_name).join(', ');
+      fullMessage += `🤒 ENFERMOS: ${names}\n`;
+      hasUnavailable = true;
+    }
+    if (bySource.day_off?.length) {
+      const names = bySource.day_off.map(a => a.profile.nickname || a.profile.first_name).join(', ');
+      fullMessage += `📅 DÍA LIBRE: ${names}\n`;
+      hasUnavailable = true;
+    }
+    if (bySource.warehouse?.length) {
+      const names = bySource.warehouse.map(a => a.profile.nickname || a.profile.first_name).join(', ');
+      fullMessage += `🏢 MARCADOS EN ALMACÉN: ${names}\n`;
+      hasUnavailable = true;
+    }
+
+    // Summary stats
+    const totalTechs = data.allTechs.length;
+    const availableCount = warehouseTechs.length;
+    fullMessage += `\n📊 ${availableCount}/${totalTechs} técnicos disponibles\n`;
+
+    // Add separator between departments (except last one)
+    if (i < departments.length - 1) {
+      fullMessage += '\n';
+    }
+  }
+
+  const deptNames = departments.map(d => deptMap[d] || d).join(', ');
+  return {
+    title: `Resumen del día - ${deptNames}`,
+    body: fullMessage,
+  };
+}
+
 async function checkAndGetScheduleConfig(
   client: ReturnType<typeof createClient>,
   eventType: string,
@@ -2285,87 +2412,83 @@ async function handleCheckScheduled(
   const day = parts.find(p => p.type === 'day')?.value;
   const targetDate = `${year}-${month}-${day}`;
 
-  // Get routes from push notification matrix
-  const routes = await getPushNotificationRoutes(client, type);
-
-  if (!routes || routes.length === 0) {
-    console.log('⚠️ No routing configured for this event type');
-    return jsonResponse({ status: 'skipped', reason: 'No recipients configured in push notification matrix' });
-  }
-
-  // Determine recipients from routes
-  const recipients = new Set<string>();
-  const management = new Set(await getManagementUserIds(client));
-
-  for (const route of routes) {
-    if (route.recipient_type === 'broadcast') {
-      // Broadcast to all management
-      for (const id of management) {
-        recipients.add(id);
-      }
-    } else if (route.recipient_type === 'management_user' && route.target_id) {
-      // Specific management user
-      recipients.add(route.target_id);
-    } else if (route.recipient_type === 'department' && route.target_id) {
-      // All management in department
-      const deptUsers = await getManagementByDepartmentUserIds(client, route.target_id);
-      for (const id of deptUsers) {
-        recipients.add(id);
-      }
-    }
-    // Note: natural recipients and assigned_technicians don't apply to scheduled notifications
-  }
-
-  if (recipients.size === 0) {
-    return jsonResponse({ status: 'skipped', reason: 'No recipients after applying routes' });
-  }
-
-  console.log(`📨 Sending to ${recipients.size} recipients`);
-
-  // For daily morning summary, send personalized message per department
+  // For daily morning summary, use granular user subscriptions
   if (type === EVENT_TYPES.DAILY_MORNING_SUMMARY) {
-    // Group recipients by department
-    const { data: profiles } = await client
-      .from('profiles')
-      .select('id, department')
-      .in('id', Array.from(recipients));
+    // Query user subscriptions
+    const { data: subscriptions, error: subsError } = await client
+      .from('morning_summary_subscriptions')
+      .select('user_id, subscribed_departments')
+      .eq('enabled', true);
 
-    const recipientsByDept: Record<string, string[]> = {};
-    for (const profile of profiles || []) {
-      const dept = profile.department || 'unknown';
-      if (!recipientsByDept[dept]) {
-        recipientsByDept[dept] = [];
-      }
-      recipientsByDept[dept].push(profile.id);
+    if (subsError) {
+      console.error('❌ Failed to load subscriptions:', subsError);
+      return jsonResponse({ error: 'Failed to load user subscriptions' }, 500);
     }
 
-    console.log(`📊 Recipients by department:`, Object.keys(recipientsByDept).map(d => `${d}: ${recipientsByDept[d].length}`).join(', '));
+    if (!subscriptions || subscriptions.length === 0) {
+      console.log('⚠️ No users subscribed to morning summary');
+      return jsonResponse({ status: 'skipped', reason: 'No users subscribed' });
+    }
 
-    // Send department-specific summary to each department
-    const allResults: Array<{ endpoint: string; ok: boolean; status?: number; skipped?: boolean; department?: string }> = [];
+    console.log(`📨 Found ${subscriptions.length} subscribed users`);
 
-    for (const [department, deptRecipients] of Object.entries(recipientsByDept)) {
-      console.log(`\n🔄 Processing department: ${department} (${deptRecipients.length} recipients)`);
+    // Cache department data to avoid redundant queries
+    const departmentDataCache = new Map<string, MorningSummaryData>();
 
-      // Get morning summary data for this department
-      const data = await getMorningSummaryDataForDepartment(client, department, targetDate);
-      const { title, body: text } = formatMorningSummary(department, data, targetDate);
+    // Process each user
+    const allResults: Array<{ endpoint: string; ok: boolean; status?: number; skipped?: boolean; user_id: string }> = [];
+    let successfulUsers = 0;
 
-      console.log(`📝 Message for ${department}:\n${title}\n${text.substring(0, 200)}...`);
+    for (const subscription of subscriptions) {
+      const userId = subscription.user_id;
+      const departments = subscription.subscribed_departments as string[];
 
-      // Load subscriptions for department recipients
-      const { data: subs, error: subsErr } = await client
-        .from('push_subscriptions')
-        .select('endpoint, p256dh, auth, user_id')
-        .in('user_id', deptRecipients);
-
-      if (subsErr) {
-        console.error(`❌ Failed to load subscriptions for ${department}:`, subsErr);
+      if (!departments || departments.length === 0) {
+        console.log(`⚠️ User ${userId} has no departments subscribed`);
         continue;
       }
 
-      if (!subs || subs.length === 0) {
-        console.log(`⚠️ No subscriptions for ${department} recipients`);
+      console.log(`\n👤 Processing user ${userId}: departments [${departments.join(', ')}]`);
+
+      // Fetch data for each department (use cache if available)
+      const dataByDept = new Map<string, MorningSummaryData>();
+      for (const dept of departments) {
+        if (!departmentDataCache.has(dept)) {
+          console.log(`  📊 Fetching data for ${dept}...`);
+          const data = await getMorningSummaryDataForDepartment(client, dept, targetDate);
+          departmentDataCache.set(dept, data);
+        }
+        dataByDept.set(dept, departmentDataCache.get(dept)!);
+      }
+
+      // Format message (multi-department or single)
+      let title: string;
+      let text: string;
+      if (departments.length === 1) {
+        const formatted = formatMorningSummary(departments[0], dataByDept.get(departments[0])!, targetDate);
+        title = formatted.title;
+        text = formatted.body;
+      } else {
+        const formatted = formatMultiDepartmentSummary(departments, dataByDept, targetDate);
+        title = formatted.title;
+        text = formatted.body;
+      }
+
+      console.log(`  📝 Message: ${title}`);
+
+      // Load push subscriptions for this user
+      const { data: pushSubs, error: pushSubsErr } = await client
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth')
+        .eq('user_id', userId);
+
+      if (pushSubsErr) {
+        console.error(`  ❌ Failed to load push subscriptions for user ${userId}:`, pushSubsErr);
+        continue;
+      }
+
+      if (!pushSubs || pushSubs.length === 0) {
+        console.log(`  ⚠️ User ${userId} has no push subscriptions`);
         continue;
       }
 
@@ -2375,28 +2498,33 @@ async function handleCheckScheduled(
         url: '/personal',
         type,
         meta: {
-          department,
+          departments,
           targetDate,
         },
       };
 
-      // Send to all subscriptions for this department
-      await Promise.all(subs.map(async (sub: any) => {
+      // Send to all devices for this user
+      let userSent = false;
+      for (const pushSub of pushSubs) {
         const result = await sendPushNotification(
           client,
-          { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
+          { endpoint: pushSub.endpoint, p256dh: pushSub.p256dh, auth: pushSub.auth },
           payload
         );
         allResults.push({
-          endpoint: sub.endpoint,
+          endpoint: pushSub.endpoint,
           ok: result.ok,
           status: 'status' in result ? (result as any).status : undefined,
           skipped: 'skipped' in result ? (result as any).skipped : undefined,
-          department,
+          user_id: userId,
         });
-      }));
+        if (result.ok) userSent = true;
+      }
 
-      console.log(`✅ Sent to ${subs.length} subscriptions for ${department}`);
+      if (userSent) {
+        successfulUsers++;
+        console.log(`  ✅ Sent to ${pushSubs.length} device(s) for user ${userId}`);
+      }
     }
 
     // Update last_sent_at timestamp
@@ -2405,11 +2533,13 @@ async function handleCheckScheduled(
       .update({ last_sent_at: new Date().toISOString() })
       .eq('event_type', type);
 
+    console.log(`\n✅ Summary: Sent to ${successfulUsers}/${subscriptions.length} users, ${allResults.length} total notifications`);
+
     return jsonResponse({
       status: 'sent',
       results: allResults,
       count: allResults.length,
-      departments: Object.keys(recipientsByDept),
+      users: successfulUsers,
     });
   }
 
