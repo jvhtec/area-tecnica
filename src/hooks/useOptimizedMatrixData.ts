@@ -80,6 +80,12 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   
   // Memoize job IDs to prevent unnecessary queries
   const jobIds = useMemo(() => jobs.map(job => job.id), [jobs]);
+  // Fast lookup of jobs by id (fallback when PostgREST join returns no job)
+  const jobsById = useMemo(() => {
+    const map = new Map<string, MatrixJob>();
+    for (const j of jobs) map.set(j.id, j);
+    return map;
+  }, [jobs]);
   const technicianIds = useMemo(() => technicians.map(t => t.id), [technicians]);
   const dateRange = useMemo(() => ({
     start: dates[0],
@@ -151,8 +157,11 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           assignment_date: item.assignment_date,
           status: item.status,
           assigned_at: item.assigned_at,
-          job: Array.isArray(item.jobs) ? item.jobs[0] : item.jobs
-        })).filter(item => item.job); // Filter out items without job data
+          // Prefer the jobs array provided to the hook to avoid losing rows when join is blocked by RLS
+          job: jobsById.get(item.job_id) || (Array.isArray(item.jobs) ? item.jobs[0] : item.jobs)
+        }))
+        // Keep rows even if the join returned no job; a fallback from jobsById will usually satisfy it
+        .filter(item => !!item.job);
         
         return transformedData as AssignmentWithJob[];
       } catch (error) {
