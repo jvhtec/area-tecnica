@@ -199,10 +199,10 @@ export function PushNotificationSchedule() {
           <Info className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
           <div className="text-sm text-muted-foreground space-y-1">
             <p>
-              Los destinatarios se configuran en la <strong>Matriz de Notificaciones Push</strong> más arriba.
+              Los usuarios (management, admin, house tech) pueden suscribirse individualmente en la sección <strong>"Mi Suscripción al Resumen Diario"</strong> más abajo.
             </p>
             <p>
-              Cada usuario recibirá un resumen personalizado con datos de su departamento.
+              Cada usuario elige qué departamentos quiere recibir y puede ver múltiples departamentos en un solo resumen.
             </p>
           </div>
         </div>

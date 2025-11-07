@@ -1,27 +1,33 @@
 # Daily Morning Push Notification - Setup Guide
 
-This feature sends automated morning summaries to management users with department-specific personnel status (who's on jobs, in warehouse, on vacation, etc.).
+This feature sends automated morning summaries with personnel status (who's on jobs, in warehouse, on vacation, etc.).
 
 ## Overview
 
 - **Event Type**: `daily.morning.summary`
 - **Default Schedule**: 8:00 AM (Europe/Madrid timezone)
 - **Default Days**: Monday - Friday (weekdays only)
-- **Message Format**: Department-specific, personalized per recipient
+- **Recipient System**: Granular user subscriptions - each user chooses which departments to receive
+- **Message Format**: Single notification with all subscribed departments combined
 
 ## Setup Steps
 
-### 1. Run Database Migration
+### 1. Run Database Migrations
 
-The migration `20250107080000_daily_morning_push_notification.sql` creates:
+**Migration 1**: `20250107080000_daily_morning_push_notification.sql` creates:
 - Event type in `activity_catalog`
 - Schedule configuration table (`push_notification_schedules`)
 - Cron job configuration table (`push_cron_config`)
 - Helper function (`invoke_scheduled_push_notification`)
 - pg_cron job that runs every 15 minutes from 6 AM - 12 PM on weekdays
 
+**Migration 2**: `20250107081000_morning_summary_user_preferences.sql` creates:
+- User subscriptions table (`morning_summary_subscriptions`)
+- RLS policies for user-level access control
+- Allows granular department selection per user
+
 ```bash
-# Migration runs automatically with Supabase
+# Migrations run automatically with Supabase
 npm run db:push
 ```
 
@@ -53,19 +59,33 @@ WHERE id = 1;
 
 ⚠️ **Security Note**: The service role key has full database access. Only store it if you understand the security implications. Otherwise, leave it NULL and ensure the `app.settings.service_role_key` database setting is configured.
 
-### 3. Configure Recipients via Push Notification Matrix
+### 3. Users Subscribe to Departments
 
-1. Go to **Settings** page (admin/management users only)
-2. Scroll to **"Matriz de Notificaciones Push"** (Push Notification Matrix)
-3. Find the row: **"Resumen diario matutino"** (Daily morning summary)
-4. Configure who should receive the notification:
-   - **Broadcast**: All management users
-   - **Management User**: Specific user
-   - **Department**: All management in a specific department
+**Who can subscribe**: Management users, Admin users, and House Tech users
 
-**Important**: Each recipient will receive a personalized summary for their own department only.
+**How to subscribe**:
+1. Go to **Settings** page
+2. Scroll to **"Mi Suscripción al Resumen Diario"** (My Daily Summary Subscription) card
+3. Toggle **"Recibir resumen diario"** to ON
+4. Select which departments you want to receive:
+   - 🎤 Sonido (Sound)
+   - 💡 Iluminación (Lights)
+   - 📹 Vídeo (Video)
+   - 🚚 Logística (Logistics)
+   - 🎬 Producción (Production)
+5. Click **"Guardar preferencias"** (Save preferences)
 
-### 4. Configure Schedule Time (Optional)
+**Key features**:
+- ✅ Subscribe to **multiple departments** - receive all in one notification
+- ✅ Each user controls their own subscriptions independently
+- ✅ Can enable/disable without losing department selections
+- ✅ Instant updates - changes take effect on next scheduled send
+
+**Message format**:
+- **Single department**: "Resumen del día - Sonido"
+- **Multiple departments**: "Resumen del día - Sonido, Iluminación, Vídeo" with sections for each
+
+### 4. Configure Schedule Time (Admin Only)
 
 1. Go to **Settings** page
 2. Scroll to **"Notificación Diaria Matutina"** card
@@ -162,7 +182,7 @@ Look for log messages like:
 
 ## Message Format
 
-Each recipient receives a department-specific message like:
+**Single Department Subscription**:
 
 ```
 📅 Resumen Sonido - Lunes 7 de enero
@@ -177,6 +197,30 @@ Each recipient receives a department-specific message like:
 ✈️ DE VIAJE: Miguel A.
 
 📊 3/8 técnicos disponibles
+```
+
+**Multiple Department Subscription**:
+
+```
+📅 Resumen del día - Lunes 7 de enero
+
+━━━ SONIDO ━━━
+
+🎤 EN TRABAJOS:
+  • Concierto Teatro: Juan P., María L.
+
+🏢 EN ALMACÉN: Pedro M., Ana S.
+
+📊 2/8 técnicos disponibles
+
+━━━ ILUMINACIÓN ━━━
+
+🎤 EN TRABAJOS:
+  • Concierto Teatro: Luis G.
+
+🏖️ DE VACACIONES: Carlos R.
+
+📊 1/5 técnicos disponibles
 ```
 
 ## Troubleshooting
@@ -194,11 +238,19 @@ Each recipient receives a department-specific message like:
    ```
    Ensure `supabase_url` is set correctly (not the placeholder).
 
-3. **Check recipients**:
+3. **Check user subscriptions**:
    ```sql
-   SELECT * FROM push_notification_routes WHERE event_code = 'daily.morning.summary';
+   SELECT
+     p.first_name,
+     p.last_name,
+     p.role,
+     s.subscribed_departments,
+     s.enabled
+   FROM morning_summary_subscriptions s
+   JOIN profiles p ON p.id = s.user_id
+   WHERE s.enabled = true;
    ```
-   Must have at least one route configured.
+   Must have at least one enabled user subscription.
 
 4. **Check cron job exists**:
    ```sql
@@ -233,24 +285,34 @@ Then manually trigger with `force: true`.
 
 ### No Recipients
 
-Ensure users are configured in the Push Notification Matrix and have:
-1. Management or admin role
-2. Push notifications enabled in their browser
-3. Active push subscription in `push_subscriptions` table
+Ensure users have:
+1. Subscribed to morning summary (enabled = true)
+2. Selected at least one department
+3. Management, admin, or house_tech role
+4. Push notifications enabled in their browser
+5. Active push subscription in `push_subscriptions` table
 
-Check subscriptions:
+Check user subscriptions and push subscriptions:
 
 ```sql
 SELECT
   p.first_name,
   p.last_name,
-  p.department,
-  COUNT(ps.endpoint) as subscription_count
-FROM profiles p
+  p.role,
+  s.enabled,
+  s.subscribed_departments,
+  COUNT(ps.endpoint) as device_count
+FROM morning_summary_subscriptions s
+JOIN profiles p ON p.id = s.user_id
 LEFT JOIN push_subscriptions ps ON ps.user_id = p.id
-WHERE p.role IN ('admin', 'management')
-GROUP BY p.id, p.first_name, p.last_name, p.department;
+WHERE s.enabled = true
+GROUP BY p.id, p.first_name, p.last_name, p.role, s.enabled, s.subscribed_departments;
 ```
+
+**Common issues**:
+- User subscribed but hasn't enabled push notifications in browser
+- User has no departments selected (`subscribed_departments` is empty)
+- User's push subscription expired (check `device_count = 0`)
 
 ## Configuration Reference
 
@@ -316,17 +378,25 @@ GROUP BY p.id, p.first_name, p.last_name, p.department;
 ## Files Modified/Created
 
 ### Database
-- `/supabase/migrations/20250107080000_daily_morning_push_notification.sql`
+- `/supabase/migrations/20250107080000_daily_morning_push_notification.sql` (new)
+  - Schedule configuration and cron job setup
+- `/supabase/migrations/20250107081000_morning_summary_user_preferences.sql` (new)
+  - User subscription preferences table
 
 ### Edge Function
 - `/supabase/functions/push/index.ts` (modified)
   - Added `check_scheduled` action
-  - Added morning summary handlers
-  - Added department-specific query functions
+  - Added morning summary handlers (single and multi-department)
+  - Added department-specific query functions with caching
+  - Updated to use `morning_summary_subscriptions` table
 
-### Frontend
+### Frontend - Schedule Management (Admin Only)
 - `/src/hooks/usePushNotificationSchedule.ts` (new)
-- `/src/components/settings/PushNotificationSchedule.tsx` (new)
+- `/src/components/settings/PushNotificationSchedule.tsx` (new, modified)
+
+### Frontend - User Subscriptions (Management/Admin/House Tech)
+- `/src/hooks/useMorningSummarySubscription.ts` (new)
+- `/src/components/settings/MorningSummarySubscription.tsx` (new)
 - `/src/pages/Settings.tsx` (modified)
 
 ### Documentation
