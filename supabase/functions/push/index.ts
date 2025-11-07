@@ -2492,10 +2492,14 @@ async function handleCheckScheduled(
         continue;
       }
 
+      // Build URL with query parameters for in-app viewing
+      const deptParam = departments.join(',');
+      const summaryUrl = `/morning-summary?date=${targetDate}&departments=${deptParam}`;
+
       const payload: PushPayload = {
         title,
         body: text,
-        url: '/personal',
+        url: summaryUrl,
         type,
         meta: {
           departments,
