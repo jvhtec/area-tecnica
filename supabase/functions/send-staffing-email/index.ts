@@ -462,16 +462,26 @@ serve(async (req) => {
         });
         if (insertRes.error && insertRes.error.code === "23505") {
           console.log('🔄 DUPLICATE FOUND, UPDATING...');
-          const upd = await supabase.from("staffing_requests")
+          // Target the exact pending row shape to avoid touching unrelated requests
+          let updater = supabase
+            .from("staffing_requests")
             .update({
               token_hash,
               token_expires_at: exp,
               updated_at: new Date().toISOString(),
-              single_day: isSingleDayRequest,
-              target_date: normalizedTargetDate,
+              // keep existing shape; do not convert full-span to single-day or vice versa
             })
-            .eq("job_id", job_id).eq("profile_id", profile_id).eq("phase", phase).eq("status", "pending")
-            .select("id").maybeSingle();
+            .eq("job_id", job_id)
+            .eq("profile_id", profile_id)
+            .eq("phase", phase)
+            .eq("status", "pending")
+            .eq('single_day', !!isSingleDayRequest);
+
+          if (isSingleDayRequest && normalizedTargetDate) {
+            updater = updater.eq('target_date', normalizedTargetDate);
+          }
+
+          const upd = await updater.select("id").maybeSingle();
           console.log('🔄 UPDATE RESULT:', { data: upd.data, error: upd.error });
           if (upd.data?.id) insertedId = upd.data.id;
         } else if (insertRes.error) {
