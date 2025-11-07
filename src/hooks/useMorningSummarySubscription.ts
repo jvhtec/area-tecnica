@@ -1,0 +1,80 @@
+import { useQuery, useMutation, useQueryClient } from '@tantml:react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+
+export type MorningSummarySubscription = {
+  id: string;
+  user_id: string;
+  subscribed_departments: string[];
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export function useMorningSummarySubscription() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { userId } = useOptimizedAuth();
+
+  const { data: subscription, isLoading, error } = useQuery({
+    queryKey: ['morning-summary-subscription', userId],
+    queryFn: async () => {
+      if (!userId) return null;
+
+      const { data, error } = await supabase
+        .from('morning_summary_subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data as MorningSummarySubscription | null;
+    },
+    enabled: !!userId,
+  });
+
+  const upsertSubscription = useMutation({
+    mutationFn: async (updates: {
+      subscribed_departments: string[];
+      enabled: boolean;
+    }) => {
+      if (!userId) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase
+        .from('morning_summary_subscriptions')
+        .upsert({
+          user_id: userId,
+          subscribed_departments: updates.subscribed_departments,
+          enabled: updates.enabled,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as MorningSummarySubscription;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['morning-summary-subscription', userId] });
+      toast({
+        title: 'Suscripción actualizada',
+        description: 'Tus preferencias de resumen diario se han guardado correctamente.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error al actualizar',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  return {
+    subscription,
+    isLoading,
+    error,
+    upsertSubscription: upsertSubscription.mutate,
+    isUpdating: upsertSubscription.isPending,
+  };
+}

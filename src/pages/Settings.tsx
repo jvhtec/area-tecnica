@@ -24,6 +24,8 @@ import { Bell, Bug } from "lucide-react";
 import { useEffect, useState } from 'react'
 import { usePushDebug } from '@/hooks/usePushDebug'
 import { PushNotificationMatrix } from '@/components/settings/PushNotificationMatrix'
+import { PushNotificationSchedule } from '@/components/settings/PushNotificationSchedule'
+import { MorningSummarySubscription } from '@/components/settings/MorningSummarySubscription'
 
 const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -293,6 +295,13 @@ const Settings = () => {
           {isManagementUser && (
             <PushNotificationMatrix />
           )}
+
+          {isManagementUser && (
+            <PushNotificationSchedule />
+          )}
+
+          {/* Available to management, admin, and house_tech */}
+          <MorningSummarySubscription />
 
           <Card>
             <CardHeader>
