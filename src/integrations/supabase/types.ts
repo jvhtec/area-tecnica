@@ -2695,6 +2695,7 @@ export type Database = {
       }
       job_assignments: {
         Row: {
+          id: string
           assigned_at: string
           assigned_by: string | null
           assignment_date: string | null
@@ -2709,6 +2710,7 @@ export type Database = {
           video_role: string | null
         }
         Insert: {
+          id?: string
           assigned_at?: string
           assigned_by?: string | null
           assignment_date?: string | null
@@ -2723,6 +2725,7 @@ export type Database = {
           video_role?: string | null
         }
         Update: {
+          id?: string
           assigned_at?: string
           assigned_by?: string | null
           assignment_date?: string | null
@@ -4721,6 +4724,9 @@ export type Database = {
           phase: string
           profile_id: string
           status: string
+          single_day: boolean
+          target_date: string | null
+          batch_id: string | null
           token_expires_at: string
           token_hash: string
           updated_at: string
@@ -4732,6 +4738,9 @@ export type Database = {
           phase: string
           profile_id: string
           status: string
+          single_day?: boolean
+          target_date?: string | null
+          batch_id?: string | null
           token_expires_at: string
           token_hash: string
           updated_at?: string
@@ -4743,6 +4752,9 @@ export type Database = {
           phase?: string
           profile_id?: string
           status?: string
+          single_day?: boolean
+          target_date?: string | null
+          batch_id?: string | null
           token_expires_at?: string
           token_hash?: string
           updated_at?: string
