@@ -6,7 +6,7 @@ import { Department } from "@/types/department";
 import { JobDocument } from "@/types/job";
 import { useCallback } from "react";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
-import { resolveJobDocBucket } from "@/utils/jobDocuments";
+import { resolveJobDocLocation } from "@/utils/jobDocuments";
 
 export const useOptimisticJobManagement = (
   selectedDepartment: Department,
@@ -99,10 +99,10 @@ export const useOptimisticJobManagement = (
       console.log("useOptimisticJobManagement: Deleting document:", document);
 
       // Delete from storage
-      const bucket = resolveJobDocBucket(document.file_path);
+      const { bucket, path } = resolveJobDocLocation(document.file_path);
       const { error: storageError } = await supabase.storage
         .from(bucket)
-        .remove([document.file_path]);
+        .remove([path]);
 
       if (storageError) throw storageError;
 

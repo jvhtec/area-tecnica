@@ -21,7 +21,7 @@ import {
   Card 
 } from "@/components/ui/card";
 import { canCreateFolders, canDeleteDocuments, canEditJobs as canEditJobsPerm, canManageFestivalArtists as canManageFestivalArtistsPerm, canUploadDocuments as canUploadDocumentsPerm } from "@/utils/permissions";
-import { createSignedUrl, resolveJobDocBucket } from "@/utils/jobDocuments";
+import { createSignedUrl, resolveJobDocLocation } from "@/utils/jobDocuments";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plane, Wrench, Star, Moon, Mic, Loader2, FileText, Archive } from "lucide-react";
@@ -803,9 +803,10 @@ export function JobCardNew({
     if (!window.confirm("Are you sure you want to delete this document?")) return;
     try {
       console.log("Starting document deletion:", doc);
+      const { bucket, path } = resolveJobDocLocation(doc.file_path);
       const { error: storageError } = await supabase.storage
-        .from(resolveJobDocBucket(doc.file_path))
-        .remove([doc.file_path]);
+        .from(bucket)
+        .remove([path]);
       
       if (storageError) {
         console.error("Storage deletion error:", storageError);
