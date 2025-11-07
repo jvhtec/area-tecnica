@@ -28,7 +28,7 @@ import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { createAllFoldersForJob, openFlexElement } from "@/utils/flex-folders";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { JobPresetManagerDialog } from "@/components/jobs/JobPresetManagerDialog";
-import { resolveJobDocBucket } from "@/utils/jobDocuments";
+import { resolveJobDocLocation } from "@/utils/jobDocuments";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -147,7 +147,7 @@ const FestivalManagement = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const resolveJobDocumentBucket = useCallback((path: string) => resolveJobDocBucket(path), []);
+  const resolveJobDocumentLocation = useCallback((path: string) => resolveJobDocLocation(path), []);
 
   const fetchJobDetails = useCallback(async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
@@ -383,9 +383,10 @@ const FestivalManagement = () => {
 
   const handleJobDocumentView = useCallback(async (docEntry: JobDocumentEntry) => {
     try {
+      const { bucket, path } = resolveJobDocumentLocation(docEntry.file_path);
       const { data, error } = await supabase.storage
-        .from(resolveJobDocumentBucket(docEntry.file_path))
-        .createSignedUrl(docEntry.file_path, 3600);
+        .from(bucket)
+        .createSignedUrl(path, 3600);
 
       if (error) throw error;
 
@@ -400,13 +401,14 @@ const FestivalManagement = () => {
         variant: 'destructive',
       });
     }
-  }, [resolveJobDocumentBucket, toast]);
+  }, [resolveJobDocumentLocation, toast]);
 
   const handleJobDocumentDownload = useCallback(async (docEntry: JobDocumentEntry) => {
     try {
+      const { bucket, path } = resolveJobDocumentLocation(docEntry.file_path);
       const { data, error } = await supabase.storage
-        .from(resolveJobDocumentBucket(docEntry.file_path))
-        .download(docEntry.file_path);
+        .from(bucket)
+        .download(path);
 
       if (error) throw error;
 
@@ -426,7 +428,7 @@ const FestivalManagement = () => {
         variant: 'destructive',
       });
     }
-  }, [resolveJobDocumentBucket, toast]);
+  }, [resolveJobDocumentLocation, toast]);
 
   const handleRiderView = useCallback(async (file: ArtistRiderFile) => {
     try {

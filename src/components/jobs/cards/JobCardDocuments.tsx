@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, Download, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
-import { resolveJobDocBucket } from "@/utils/jobDocuments";
+import { resolveJobDocLocation } from "@/utils/jobDocuments";
 
 export interface JobDocument {
   id: string;
@@ -38,13 +38,13 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
   const handleViewDocument = async (doc: JobDocument) => {
     try {
       console.log("Attempting to view document:", doc);
-      const bucket = resolveJobDocBucket(doc.file_path);
+      const { bucket, path } = resolveJobDocLocation(doc.file_path);
       const { data, error } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(doc.file_path, 60);
+        .createSignedUrl(path, 60);
 
       if (error || !data?.signedUrl) {
-        console.error("Error creating signed URL:", error || 'No signedUrl returned', { bucket, path: doc.file_path });
+        console.error("Error creating signed URL:", error || 'No signedUrl returned', { bucket, path });
         throw error || new Error('Failed to generate signed URL');
       }
 
@@ -60,13 +60,13 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
     try {
       console.log('Starting download for document:', doc.file_name);
 
-      const bucket = resolveJobDocBucket(doc.file_path);
+      const { bucket, path } = resolveJobDocLocation(doc.file_path);
       const { data, error } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(doc.file_path, 60);
-      
+        .createSignedUrl(path, 60);
+
       if (error || !data?.signedUrl) {
-        console.error('Error creating signed URL for download:', error || 'No signedUrl returned', { bucket, path: doc.file_path });
+        console.error('Error creating signed URL for download:', error || 'No signedUrl returned', { bucket, path });
         throw error || new Error('Failed to generate download URL');
       }
       

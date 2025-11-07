@@ -39,7 +39,7 @@ import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { toast } from 'sonner';
 import { syncFlexWorkOrdersForJob } from '@/services/flexWorkOrders';
-import { resolveJobDocBucket } from '@/utils/jobDocuments';
+import { resolveJobDocLocation } from '@/utils/jobDocuments';
 import { mergePDFs } from '@/utils/pdf/pdfMerge';
 import { generateTimesheetPDF } from '@/utils/timesheet-pdf';
 import { generateJobPayoutPDF } from '@/utils/rates-pdf-export';
@@ -359,10 +359,10 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   const handleDownloadDocument = async (doc: any) => {
     try {
-      const bucket = resolveJobDocBucket(doc.file_path);
+      const { bucket, path } = resolveJobDocLocation(doc.file_path);
       const { data } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(doc.file_path, 3600);
+        .createSignedUrl(path, 3600);
 
       if (data?.signedUrl) {
         const link = document.createElement('a');
@@ -379,10 +379,10 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   const handleViewDocument = async (doc: any) => {
     try {
-      const bucket = resolveJobDocBucket(doc.file_path);
+      const { bucket, path } = resolveJobDocLocation(doc.file_path);
       const { data, error } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(doc.file_path, 3600);
+        .createSignedUrl(path, 3600);
 
       if (error) throw error;
 

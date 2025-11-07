@@ -9,7 +9,7 @@ import { Department } from "@/types/department";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
 import { useEffect, useState } from "react";
 import { useTableSubscription } from "@/hooks/useTableSubscription";
-import { resolveJobDocBucket } from "@/utils/jobDocuments";
+import { resolveJobDocLocation } from "@/utils/jobDocuments";
 
 interface JobDocument {
   id: string;
@@ -47,9 +47,10 @@ export const JobDocuments = ({
     try {
       console.log('Starting download for document:', jobDocument.file_name);
 
+      const { bucket, path } = resolveJobDocLocation(jobDocument.file_path);
       const { data, error } = await supabase.storage
-        .from(resolveJobDocBucket(jobDocument.file_path))
-        .download(jobDocument.file_path);
+        .from(bucket)
+        .download(path);
 
       if (error) {
         console.error('Download error:', error);
@@ -80,9 +81,10 @@ export const JobDocuments = ({
     try {
       console.log('Starting view for document:', jobDocument.file_name);
       
+      const { bucket, path } = resolveJobDocLocation(jobDocument.file_path);
       const { data: { signedUrl }, error } = await supabase.storage
-        .from(resolveJobDocBucket(jobDocument.file_path))
-        .createSignedUrl(jobDocument.file_path, 60);
+        .from(bucket)
+        .createSignedUrl(path, 60);
 
       if (error) {
         console.error('View error:', error);
