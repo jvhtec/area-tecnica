@@ -19,6 +19,7 @@ import ProjectManagement from '@/pages/ProjectManagement';
 import TechnicianDashboard from '@/pages/TechnicianDashboard';
 import TechnicianUnavailability from '@/pages/TechnicianUnavailability';
 import Personal from '@/pages/Personal';
+import MorningSummary from '@/pages/MorningSummary';
 import Tours from '@/pages/Tours';
 import PesosTool from '@/pages/PesosTool';
 import LightsPesosTool from '@/pages/LightsPesosTool';
@@ -104,6 +105,7 @@ export default function App() {
                         <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
                         <Route path="/dashboard/unavailability" element={<TechnicianUnavailability />} />
                         <Route path="/personal" element={<Personal />} />
+                        <Route path="/morning-summary" element={<MorningSummary />} />
                         <Route path="/sound" element={<Sound />} />
                         <Route path="/lights" element={<Lights />} />
                         <Route path="/video" element={<Video />} />
