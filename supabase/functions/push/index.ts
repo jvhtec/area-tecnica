@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
-type Action = "subscribe" | "unsubscribe" | "test" | "broadcast";
+type Action = "subscribe" | "unsubscribe" | "test" | "broadcast" | "check_scheduled";
 
 type SubscribeBody = {
   action: "subscribe";
@@ -70,7 +70,13 @@ type BroadcastBody = {
   new_type?: string;
 };
 
-type RequestBody = SubscribeBody | UnsubscribeBody | TestBody | BroadcastBody;
+type CheckScheduledBody = {
+  action: "check_scheduled";
+  type: string; // e.g., 'daily.morning.summary'
+  force?: boolean; // For testing: skip time check
+};
+
+type RequestBody = SubscribeBody | UnsubscribeBody | TestBody | BroadcastBody | CheckScheduledBody;
 
 type PushSubscriptionRow = {
   endpoint: string;
@@ -173,6 +179,9 @@ const EVENT_TYPES = {
 
   // Hoja de ruta
   HOJA_UPDATED: 'hoja.updated',
+
+  // Scheduled notifications
+  DAILY_MORNING_SUMMARY: 'daily.morning.summary',
 } as const;
 
 // Push notification configuration
@@ -696,6 +705,323 @@ function fmtFieldEs(field: string): string {
     case 'license_plate': return 'Matrícula';
     default: return field;
   }
+}
+
+// ============================================================================
+// DAILY MORNING SUMMARY HELPERS
+// ============================================================================
+
+type MorningSummaryData = {
+  assignments: Array<{
+    technician_id: string;
+    job: {
+      title: string;
+      start_time: string;
+    };
+    profile: {
+      first_name: string;
+      last_name: string;
+      nickname: string | null;
+    };
+  }>;
+  unavailable: Array<{
+    user_id: string;
+    source: string;
+    profile: {
+      first_name: string;
+      last_name: string;
+      nickname: string | null;
+    };
+  }>;
+  allTechs: Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    nickname: string | null;
+  }>;
+};
+
+async function getMorningSummaryDataForDepartment(
+  client: ReturnType<typeof createClient>,
+  department: string,
+  targetDate: string, // YYYY-MM-DD
+): Promise<MorningSummaryData> {
+  const nextDate = new Date(targetDate);
+  nextDate.setDate(nextDate.getDate() + 1);
+  const tomorrowDate = nextDate.toISOString().split('T')[0];
+
+  // Get today's assignments for this department
+  const { data: assignments = [] } = await client
+    .from('job_assignments')
+    .select(`
+      technician_id,
+      job:jobs!inner(title, start_time),
+      profile:profiles!job_assignments_technician_id_fkey!inner(first_name, last_name, nickname, department)
+    `)
+    .eq('status', 'confirmed')
+    .eq('profile.department', department)
+    .gte('job.start_time', targetDate)
+    .lt('job.start_time', tomorrowDate);
+
+  // Get today's unavailability for this department
+  const { data: unavailable = [] } = await client
+    .from('availability_schedules')
+    .select(`
+      user_id,
+      source,
+      profile:profiles!availability_schedules_user_id_fkey!inner(first_name, last_name, nickname, department)
+    `)
+    .eq('date', targetDate)
+    .eq('status', 'unavailable')
+    .eq('profile.department', department);
+
+  // Get all techs in department
+  const { data: allTechs = [] } = await client
+    .from('profiles')
+    .select('id, first_name, last_name, nickname')
+    .eq('department', department)
+    .eq('assignable_as_tech', true);
+
+  return {
+    assignments: assignments as any,
+    unavailable: unavailable as any,
+    allTechs: allTechs as any,
+  };
+}
+
+function formatMorningSummary(
+  department: string,
+  data: MorningSummaryData,
+  targetDate: string,
+): { title: string; body: string } {
+  // Format date in Spanish
+  const dateObj = new Date(targetDate + 'T00:00:00Z');
+  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const dayName = dayNames[dateObj.getUTCDay()];
+  const dayNum = dateObj.getUTCDate();
+  const monthName = monthNames[dateObj.getUTCMonth()];
+  const formattedDate = `${dayName} ${dayNum} de ${monthName}`;
+
+  // Department names in Spanish (capitalize)
+  const deptMap: Record<string, string> = {
+    sound: 'Sonido',
+    lights: 'Iluminación',
+    video: 'Vídeo',
+    logistics: 'Logística',
+    production: 'Producción',
+  };
+  const deptName = deptMap[department] || department.toUpperCase();
+
+  let message = `📅 Resumen ${deptName} - ${formattedDate}\n\n`;
+
+  // Group assignments by job
+  const jobGroups: Record<string, typeof data.assignments> = {};
+  for (const assignment of data.assignments) {
+    const jobTitle = assignment.job.title;
+    if (!jobGroups[jobTitle]) {
+      jobGroups[jobTitle] = [];
+    }
+    jobGroups[jobTitle].push(assignment);
+  }
+
+  // Format jobs section
+  if (Object.keys(jobGroups).length > 0) {
+    message += `🎤 EN TRABAJOS:\n`;
+    for (const [jobTitle, assignments] of Object.entries(jobGroups)) {
+      const techNames = assignments
+        .map(a => a.profile.nickname || a.profile.first_name)
+        .join(', ');
+      message += `  • ${jobTitle}: ${techNames}\n`;
+    }
+    message += '\n';
+  }
+
+  // Calculate warehouse techs (available, not on jobs, not unavailable)
+  const assignedTechIds = new Set(data.assignments.map(a => a.technician_id));
+  const unavailableTechIds = new Set(data.unavailable.map(a => a.user_id));
+  const warehouseTechs = data.allTechs.filter(
+    t => !assignedTechIds.has(t.id) && !unavailableTechIds.has(t.id)
+  );
+
+  if (warehouseTechs.length > 0) {
+    const names = warehouseTechs
+      .map(t => t.nickname || t.first_name)
+      .join(', ');
+    message += `🏢 EN ALMACÉN: ${names}\n\n`;
+  }
+
+  // Group unavailable by source
+  const bySource: Record<string, typeof data.unavailable> = {};
+  for (const avail of data.unavailable) {
+    const source = avail.source || 'other';
+    if (!bySource[source]) {
+      bySource[source] = [];
+    }
+    bySource[source].push(avail);
+  }
+
+  // Vacation
+  if (bySource.vacation?.length) {
+    const names = bySource.vacation
+      .map(a => a.profile.nickname || a.profile.first_name)
+      .join(', ');
+    message += `🏖️ DE VACACIONES: ${names}\n`;
+  }
+
+  // Travel
+  if (bySource.travel?.length) {
+    const names = bySource.travel
+      .map(a => a.profile.nickname || a.profile.first_name)
+      .join(', ');
+    message += `✈️ DE VIAJE: ${names}\n`;
+  }
+
+  // Sick
+  if (bySource.sick?.length) {
+    const names = bySource.sick
+      .map(a => a.profile.nickname || a.profile.first_name)
+      .join(', ');
+    message += `🤒 ENFERMOS: ${names}\n`;
+  }
+
+  // Day off
+  if (bySource.day_off?.length) {
+    const names = bySource.day_off
+      .map(a => a.profile.nickname || a.profile.first_name)
+      .join(', ');
+    message += `📅 DÍA LIBRE: ${names}\n`;
+  }
+
+  // Warehouse (manual)
+  if (bySource.warehouse?.length) {
+    const names = bySource.warehouse
+      .map(a => a.profile.nickname || a.profile.first_name)
+      .join(', ');
+    message += `🏢 MARCADOS EN ALMACÉN: ${names}\n`;
+  }
+
+  // Summary stats
+  const totalTechs = data.allTechs.length;
+  const availableCount = warehouseTechs.length;
+  message += `\n📊 ${availableCount}/${totalTechs} técnicos disponibles`;
+
+  return {
+    title: `Resumen del día - ${deptName}`,
+    body: message,
+  };
+}
+
+async function checkAndGetScheduleConfig(
+  client: ReturnType<typeof createClient>,
+  eventType: string,
+  force: boolean = false,
+): Promise<{ shouldSend: boolean; config: any | null }> {
+  // Get schedule configuration
+  const { data: config, error } = await client
+    .from('push_notification_schedules')
+    .select('*')
+    .eq('event_type', eventType)
+    .maybeSingle();
+
+  if (error || !config) {
+    console.log('❌ No schedule config found for:', eventType);
+    return { shouldSend: false, config: null };
+  }
+
+  if (!config.enabled) {
+    console.log('⏸️ Schedule is disabled for:', eventType);
+    return { shouldSend: false, config };
+  }
+
+  // If force flag is set (for testing), skip time check
+  if (force) {
+    console.log('⚡ Force flag set, skipping time check');
+    return { shouldSend: true, config };
+  }
+
+  // Get current time in configured timezone
+  const timezone = config.timezone || 'Europe/Madrid';
+  const now = new Date();
+
+  // Convert to target timezone using Intl API
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    weekday: 'short',
+  });
+
+  const parts = formatter.formatToParts(now);
+  const hourPart = parts.find(p => p.type === 'hour');
+  const minutePart = parts.find(p => p.type === 'minute');
+  const weekdayPart = parts.find(p => p.type === 'weekday');
+
+  const currentHour = parseInt(hourPart?.value || '0');
+  const currentMinute = parseInt(minutePart?.value || '0');
+  const currentWeekday = weekdayPart?.value;
+
+  // Map weekday to number (1=Monday, 7=Sunday)
+  const weekdayMap: Record<string, number> = {
+    'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7
+  };
+  const currentDayNum = weekdayMap[currentWeekday || ''] || 1;
+
+  // Parse schedule time (HH:MM:SS)
+  const [scheduleHour, scheduleMinute] = config.schedule_time.split(':').map((s: string) => parseInt(s));
+
+  // Check if current day is in allowed days
+  const daysOfWeek = config.days_of_week || [1, 2, 3, 4, 5];
+  if (!daysOfWeek.includes(currentDayNum)) {
+    console.log(`📅 Not scheduled for this day: ${currentWeekday} (${currentDayNum}), allowed: ${daysOfWeek}`);
+    return { shouldSend: false, config };
+  }
+
+  // Check if current hour matches schedule hour
+  if (currentHour !== scheduleHour) {
+    console.log(`⏰ Not scheduled time: ${currentHour}:${currentMinute}, scheduled: ${scheduleHour}:${scheduleMinute}`);
+    return { shouldSend: false, config };
+  }
+
+  // Check if already sent this hour (to avoid duplicate sends)
+  if (config.last_sent_at) {
+    const lastSent = new Date(config.last_sent_at);
+    const lastSentFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hour12: false,
+    });
+
+    const lastSentParts = lastSentFormatter.formatToParts(lastSent);
+    const lastSentYear = lastSentParts.find(p => p.type === 'year')?.value;
+    const lastSentMonth = lastSentParts.find(p => p.type === 'month')?.value;
+    const lastSentDay = lastSentParts.find(p => p.type === 'day')?.value;
+    const lastSentHour = parseInt(lastSentParts.find(p => p.type === 'hour')?.value || '0');
+
+    const nowParts = formatter.formatToParts(now);
+    const nowFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const nowDateParts = nowFormatter.formatToParts(now);
+    const nowYear = nowDateParts.find(p => p.type === 'year')?.value;
+    const nowMonth = nowDateParts.find(p => p.type === 'month')?.value;
+    const nowDay = nowDateParts.find(p => p.type === 'day')?.value;
+
+    if (lastSentYear === nowYear && lastSentMonth === nowMonth && lastSentDay === nowDay && lastSentHour === currentHour) {
+      console.log(`✅ Already sent this hour: ${config.last_sent_at}`);
+      return { shouldSend: false, config };
+    }
+  }
+
+  console.log(`✅ Time check passed! Sending at ${currentHour}:${currentMinute} on ${currentWeekday}`);
+  return { shouldSend: true, config };
 }
 
 function channelEs(ch?: string): string {
@@ -1929,6 +2255,168 @@ async function handleTest(
   return jsonResponse({ status: "sent", results });
 }
 
+async function handleCheckScheduled(
+  client: ReturnType<typeof createClient>,
+  body: CheckScheduledBody,
+) {
+  const type = body.type;
+  console.log(`🔍 Checking scheduled notification: ${type}`);
+
+  // Check if it's time to send
+  const { shouldSend, config } = await checkAndGetScheduleConfig(client, type, body.force);
+
+  if (!shouldSend) {
+    return jsonResponse({ status: 'skipped', reason: 'Not scheduled time or already sent' });
+  }
+
+  console.log(`✅ Proceeding to send scheduled notification: ${type}`);
+
+  // Get current date in configured timezone
+  const timezone = config.timezone || 'Europe/Madrid';
+  const dateFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = dateFormatter.formatToParts(new Date());
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  const targetDate = `${year}-${month}-${day}`;
+
+  // Get routes from push notification matrix
+  const routes = await getPushNotificationRoutes(client, type);
+
+  if (!routes || routes.length === 0) {
+    console.log('⚠️ No routing configured for this event type');
+    return jsonResponse({ status: 'skipped', reason: 'No recipients configured in push notification matrix' });
+  }
+
+  // Determine recipients from routes
+  const recipients = new Set<string>();
+  const management = new Set(await getManagementUserIds(client));
+
+  for (const route of routes) {
+    if (route.recipient_type === 'broadcast') {
+      // Broadcast to all management
+      for (const id of management) {
+        recipients.add(id);
+      }
+    } else if (route.recipient_type === 'management_user' && route.target_id) {
+      // Specific management user
+      recipients.add(route.target_id);
+    } else if (route.recipient_type === 'department' && route.target_id) {
+      // All management in department
+      const deptUsers = await getManagementByDepartmentUserIds(client, route.target_id);
+      for (const id of deptUsers) {
+        recipients.add(id);
+      }
+    }
+    // Note: natural recipients and assigned_technicians don't apply to scheduled notifications
+  }
+
+  if (recipients.size === 0) {
+    return jsonResponse({ status: 'skipped', reason: 'No recipients after applying routes' });
+  }
+
+  console.log(`📨 Sending to ${recipients.size} recipients`);
+
+  // For daily morning summary, send personalized message per department
+  if (type === EVENT_TYPES.DAILY_MORNING_SUMMARY) {
+    // Group recipients by department
+    const { data: profiles } = await client
+      .from('profiles')
+      .select('id, department')
+      .in('id', Array.from(recipients));
+
+    const recipientsByDept: Record<string, string[]> = {};
+    for (const profile of profiles || []) {
+      const dept = profile.department || 'unknown';
+      if (!recipientsByDept[dept]) {
+        recipientsByDept[dept] = [];
+      }
+      recipientsByDept[dept].push(profile.id);
+    }
+
+    console.log(`📊 Recipients by department:`, Object.keys(recipientsByDept).map(d => `${d}: ${recipientsByDept[d].length}`).join(', '));
+
+    // Send department-specific summary to each department
+    const allResults: Array<{ endpoint: string; ok: boolean; status?: number; skipped?: boolean; department?: string }> = [];
+
+    for (const [department, deptRecipients] of Object.entries(recipientsByDept)) {
+      console.log(`\n🔄 Processing department: ${department} (${deptRecipients.length} recipients)`);
+
+      // Get morning summary data for this department
+      const data = await getMorningSummaryDataForDepartment(client, department, targetDate);
+      const { title, body: text } = formatMorningSummary(department, data, targetDate);
+
+      console.log(`📝 Message for ${department}:\n${title}\n${text.substring(0, 200)}...`);
+
+      // Load subscriptions for department recipients
+      const { data: subs, error: subsErr } = await client
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth, user_id')
+        .in('user_id', deptRecipients);
+
+      if (subsErr) {
+        console.error(`❌ Failed to load subscriptions for ${department}:`, subsErr);
+        continue;
+      }
+
+      if (!subs || subs.length === 0) {
+        console.log(`⚠️ No subscriptions for ${department} recipients`);
+        continue;
+      }
+
+      const payload: PushPayload = {
+        title,
+        body: text,
+        url: '/personal',
+        type,
+        meta: {
+          department,
+          targetDate,
+        },
+      };
+
+      // Send to all subscriptions for this department
+      await Promise.all(subs.map(async (sub: any) => {
+        const result = await sendPushNotification(
+          client,
+          { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
+          payload
+        );
+        allResults.push({
+          endpoint: sub.endpoint,
+          ok: result.ok,
+          status: 'status' in result ? (result as any).status : undefined,
+          skipped: 'skipped' in result ? (result as any).skipped : undefined,
+          department,
+        });
+      }));
+
+      console.log(`✅ Sent to ${subs.length} subscriptions for ${department}`);
+    }
+
+    // Update last_sent_at timestamp
+    await client
+      .from('push_notification_schedules')
+      .update({ last_sent_at: new Date().toISOString() })
+      .eq('event_type', type);
+
+    return jsonResponse({
+      status: 'sent',
+      results: allResults,
+      count: allResults.length,
+      departments: Object.keys(recipientsByDept),
+    });
+  }
+
+  // For other scheduled notification types (future expansion)
+  return jsonResponse({ status: 'error', reason: 'Unsupported scheduled notification type' }, 400);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -1953,8 +2441,8 @@ serve(async (req) => {
 
   const token = ensureAuthHeader(req);
   const client = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-  // Allow service callers only for broadcast; user token for others
-  const allowService = (body.action as Action) === 'broadcast';
+  // Allow service callers for broadcast and check_scheduled; user token for others
+  const allowService = (body.action as Action) === 'broadcast' || (body.action as Action) === 'check_scheduled';
   const { userId } = await resolveCaller(client, token, allowService);
 
   switch (body.action as Action) {
@@ -1966,6 +2454,8 @@ serve(async (req) => {
       return await handleTest(client, userId, body as TestBody);
     case "broadcast":
       return await handleBroadcast(client, userId, body as BroadcastBody);
+    case "check_scheduled":
+      return await handleCheckScheduled(client, body as CheckScheduledBody);
     default:
       return jsonResponse({ error: "Unsupported action" }, 400);
   }
