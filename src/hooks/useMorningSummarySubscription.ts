@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tantml:react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -15,7 +15,8 @@ export type MorningSummarySubscription = {
 export function useMorningSummarySubscription() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { userId } = useOptimizedAuth();
+  const { user } = useOptimizedAuth();
+  const userId = user?.id;
 
   const { data: subscription, isLoading, error } = useQuery({
     queryKey: ['morning-summary-subscription', userId],

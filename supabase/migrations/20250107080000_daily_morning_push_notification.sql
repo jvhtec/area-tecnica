@@ -5,18 +5,20 @@
 -- 1. Add new event type to activity_catalog
 -- ============================================================================
 
-INSERT INTO activity_catalog (event_code, label_es, severity, description)
+INSERT INTO activity_catalog (code, label, default_visibility, severity, template)
 VALUES (
   'daily.morning.summary',
   'Resumen diario matutino',
+  'management',
   'info',
   'Notificación matutina automática con resumen del personal del día'
 )
-ON CONFLICT (event_code) DO UPDATE
+ON CONFLICT (code) DO UPDATE
 SET
-  label_es = EXCLUDED.label_es,
+  label = EXCLUDED.label,
+  default_visibility = EXCLUDED.default_visibility,
   severity = EXCLUDED.severity,
-  description = EXCLUDED.description;
+  template = EXCLUDED.template;
 
 -- ============================================================================
 -- 2. Create schedule configuration table
