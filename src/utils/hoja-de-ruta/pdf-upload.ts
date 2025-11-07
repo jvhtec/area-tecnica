@@ -76,7 +76,8 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
         file_type: 'application/pdf',
         file_size: pdfBlob.size,
         uploaded_by: (await supabase.auth.getUser()).data.user?.id,
-        original_type: 'pdf'
+        original_type: 'pdf',
+        visible_to_tech: true
       });
 
     if (insertError) {
