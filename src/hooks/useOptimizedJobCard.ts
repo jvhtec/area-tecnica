@@ -49,6 +49,18 @@ export const useOptimizedJobCard = (
     setDocuments(job.job_documents || []);
   }, [job.job_documents]);
 
+  // Helper to fetch and update assignments for this job
+  const refreshAssignments = useCallback(async () => {
+    if (!job?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('job_assignments')
+        .select(`*, profiles(first_name, nickname, last_name)`) 
+        .eq('job_id', job.id);
+      if (!error) setAssignments(data || []);
+    } catch {}
+  }, [job?.id]);
+
   // Realtime: subscribe to assignment changes for this job and refresh local state instantly
   useEffect(() => {
     if (!job?.id) return;
@@ -59,17 +71,7 @@ export const useOptimizedJobCard = (
         schema: 'public',
         table: 'job_assignments',
         filter: `job_id=eq.${job.id}`,
-      }, async () => {
-        try {
-          const { data, error } = await supabase
-            .from('job_assignments')
-            .select(`*, profiles(first_name, nickname, last_name)`) 
-            .eq('job_id', job.id);
-          if (!error) {
-            setAssignments(data || []);
-          }
-        } catch {}
-      })
+      }, async () => { await refreshAssignments(); })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -82,17 +84,20 @@ export const useOptimizedJobCard = (
             .select('*')
             .eq('job_id', job.id)
             .order('uploaded_at', { ascending: false });
-          if (!error) {
-            setDocuments(data || []);
-          }
+          if (!error) setDocuments(data || []);
         } catch {}
       })
       .subscribe();
 
+    // Also listen to global assignment-updated events as a safety net (manual actions)
+    const handler = () => { void refreshAssignments(); };
+    window.addEventListener('assignment-updated', handler);
+
     return () => {
+      window.removeEventListener('assignment-updated', handler);
       supabase.removeChannel(channel);
     };
-  }, [job?.id]);
+  }, [job?.id, refreshAssignments]);
 
   // Memoized permission checks
   const permissions = useMemo(() => {

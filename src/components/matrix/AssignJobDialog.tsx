@@ -269,26 +269,113 @@ export const AssignJobDialog = ({
         response_time: assignAsConfirmed ? new Date().toISOString() : null,
       } as const;
 
-      let insertError: any = null;
-      if (coverageMode === 'multi') {
-        const uniqueKeys = Array.from(new Set((multiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
-        if (uniqueKeys.length === 0) {
-          throw new Error('Select at least one date');
-        }
-        const rows = uniqueKeys.map(dk => ({ ...basePayload, single_day: true, assignment_date: dk }));
-        console.log('Creating multi single-day assignments:', rows);
-        const { error } = await supabase.from('job_assignments').insert(rows);
-        insertError = error;
+      // Before writing, check if an assignment already exists for this job + technician
+      const { data: existingRow } = await supabase
+        .from('job_assignments')
+        .select('job_id, technician_id, single_day, assignment_date, status')
+        .eq('job_id', selectedJobId)
+        .eq('technician_id', technicianId)
+        .maybeSingle();
+
+      if (existingRow) {
+        // Update the existing base row (whole job or single) to align with the requested coverage
+        const updatePayload: any = {
+          sound_role: basePayload.sound_role,
+          lights_role: basePayload.lights_role,
+          video_role: basePayload.video_role,
+          assigned_by: basePayload.assigned_by,
+          assigned_at: basePayload.assigned_at,
+          // Do not downgrade a confirmed assignment to invited
+          status: existingRow.status === 'confirmed' && basePayload.status !== 'confirmed' ? 'confirmed' : basePayload.status,
+          response_time: basePayload.status === 'confirmed' ? basePayload.response_time : existingRow.status === 'confirmed' ? (existingRow as any).response_time ?? null : null,
+          single_day: coverageMode === 'single',
+          assignment_date: coverageMode === 'single' ? assignmentDate : null,
+        };
+
+        console.log('Updating existing assignment with data:', updatePayload);
+        const { error } = await supabase
+          .from('job_assignments')
+          .update(updatePayload)
+          .eq('job_id', selectedJobId)
+          .eq('technician_id', technicianId);
+        if (error) throw error;
       } else {
-        const payload = { ...basePayload, single_day: coverageMode === 'single', assignment_date: coverageMode === 'single' ? assignmentDate : null };
-        console.log('Creating assignment with data:', payload);
-        const { error } = await supabase.from('job_assignments').insert(payload);
-        insertError = error;
+        // No row exists yet. Use insert-first with conflict fallback to update.
+        if (coverageMode === 'multi') {
+          const uniqueKeys = Array.from(new Set((multiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
+          if (uniqueKeys.length === 0) throw new Error('Select at least one date');
+          for (const dk of uniqueKeys) {
+            const row = { ...basePayload, single_day: true, assignment_date: dk };
+            console.log('Inserting single-day assignment row:', row);
+            const { error: insErr } = await supabase.from('job_assignments').insert(row);
+            if (insErr) {
+              if (insErr.code === '23505') {
+                // Duplicate -> update existing per-day row
+                console.warn('Duplicate on insert (per-day). Updating existing row.', { date: dk });
+                const { error: updErr } = await supabase
+                  .from('job_assignments')
+                  .update({
+                    sound_role: row.sound_role,
+                    lights_role: row.lights_role,
+                    video_role: row.video_role,
+                    assigned_by: row.assigned_by,
+                    assigned_at: row.assigned_at,
+                    status: row.status,
+                    response_time: row.response_time,
+                    single_day: true,
+                    assignment_date: dk,
+                  })
+                  .eq('job_id', selectedJobId)
+                  .eq('technician_id', technicianId)
+                  .eq('assignment_date', dk);
+                if (updErr) throw updErr;
+              } else {
+                throw insErr;
+              }
+            }
+          }
+        } else {
+          const row = { ...basePayload, single_day: coverageMode === 'single', assignment_date: coverageMode === 'single' ? assignmentDate : null };
+          console.log('Inserting assignment row:', row);
+          const { error: insErr } = await supabase.from('job_assignments').insert(row);
+          if (insErr) {
+            if (insErr.code === '23505') {
+              // Already exists -> update
+              console.warn('Duplicate on insert. Updating existing base row.');
+              const { error: updErr } = await supabase
+                .from('job_assignments')
+                .update({
+                  sound_role: row.sound_role,
+                  lights_role: row.lights_role,
+                  video_role: row.video_role,
+                  assigned_by: row.assigned_by,
+                  assigned_at: row.assigned_at,
+                  status: row.status,
+                  response_time: row.response_time,
+                  single_day: row.single_day,
+                  assignment_date: row.assignment_date,
+                })
+                .eq('job_id', selectedJobId)
+                .eq('technician_id', technicianId);
+              if (updErr) throw updErr;
+            } else {
+              throw insErr;
+            }
+          }
+        }
       }
 
-      if (insertError) {
-        console.error('Error creating assignment:', insertError);
-        throw insertError;
+      // Verification: ensure at least one assignment row now exists for this job/tech
+      const verifyQuery = supabase
+        .from('job_assignments')
+        .select('job_id')
+        .eq('job_id', selectedJobId)
+        .eq('technician_id', technicianId)
+        .limit(1);
+      const { data: verifyData, error: verifyErr } = await verifyQuery;
+      if (verifyErr) throw verifyErr;
+      if (!verifyData || verifyData.length === 0) {
+        throw new Error('Assignment not persisted');
       }
 
       console.log('Assignment created successfully, now handling Flex crew assignments...');
