@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Save, UserCircle, AlertTriangle } from "lucide-react";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
 
 export const Profile = () => {
   const { toast } = useToast();
@@ -417,6 +418,11 @@ export const Profile = () => {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Morning Summary Subscription - Available to house tech, management, and admin */}
+          {['house_tech', 'management', 'admin'].includes(profile?.role) && (
+            <MorningSummarySubscription />
           )}
 
           <Card>
