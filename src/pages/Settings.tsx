@@ -24,6 +24,7 @@ import { Bell, Bug } from "lucide-react";
 import { useEffect, useState } from 'react'
 import { usePushDebug } from '@/hooks/usePushDebug'
 import { PushNotificationMatrix } from '@/components/settings/PushNotificationMatrix'
+import { PushNotificationSchedule } from '@/components/settings/PushNotificationSchedule'
 
 const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -292,6 +293,10 @@ const Settings = () => {
 
           {isManagementUser && (
             <PushNotificationMatrix />
+          )}
+
+          {isManagementUser && (
+            <PushNotificationSchedule />
           )}
 
           <Card>
