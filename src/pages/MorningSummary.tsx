@@ -90,12 +90,53 @@ export default function MorningSummary() {
         .eq('profile.department', dept)
         .eq('profile.role', 'house_tech');
 
-        // Get all techs
+        // Get all house techs (population)
       const { data: allTechs } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, nickname')
         .eq('department', dept)
         .eq('role', 'house_tech');
+
+        // Legacy fallback: include legacy per-day marks so counts match the Personal calendar
+        let unavailableMerged = unavailable || [];
+        try {
+          const techIds = (allTechs || []).map(t => t.id);
+          if (techIds.length) {
+            const { data: legacyRows } = await supabase
+              .from('technician_availability')
+              .select('technician_id, date, status')
+              .in('technician_id', techIds)
+              .eq('date', date)
+              .in('status', ['vacation','travel','sick','day_off']);
+            if (legacyRows && legacyRows.length) {
+              const existing = new Set((unavailable || []).map((u: any) => u.user_id));
+              for (const row of legacyRows as any[]) {
+                if (!existing.has(row.technician_id)) {
+                  const prof = (allTechs || []).find(t => t.id === row.technician_id);
+                  if (prof) {
+                    unavailableMerged = [
+                      ...unavailableMerged,
+                      {
+                        user_id: row.technician_id,
+                        source: row.status,
+                        profile: {
+                          first_name: prof.first_name,
+                          last_name: prof.last_name,
+                          nickname: prof.nickname,
+                          department: dept,
+                          role: 'house_tech',
+                        }
+                      }
+                    ];
+                    existing.add(row.technician_id);
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {
+          // Legacy table may not exist in some environments
+        }
 
         // Process data
         const jobGroups: Record<string, string[]> = {};
@@ -109,13 +150,13 @@ export default function MorningSummary() {
         }
 
         const assignedIds = new Set((assignments || []).map((a: any) => a.technician_id));
-        const unavailableIds = new Set((unavailable || []).map((u: any) => u.user_id));
+        const unavailableIds = new Set((unavailableMerged || []).map((u: any) => u.user_id));
         const warehouse = (allTechs || [])
           .filter(t => !assignedIds.has(t.id) && !unavailableIds.has(t.id))
           .map(t => t.nickname || t.first_name);
 
         const bySource: Record<string, string[]> = {};
-        for (const u of unavailable || []) {
+        for (const u of (unavailableMerged || [])) {
           const source = (u as any).source || 'other';
           if (!bySource[source]) bySource[source] = [];
           bySource[source].push((u as any).profile.nickname || (u as any).profile.first_name);
