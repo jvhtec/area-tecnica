@@ -82,8 +82,9 @@ serve(async (req: Request) => {
     };
 
     const base = normalizeBase(profile.waha_endpoint);
-    const session = Deno.env.get('WAHA_SESSION') || 'default';
-    const apiKey = Deno.env.get('WAHA_API_KEY') || '';
+    const { data: cfg } = await supabaseAdmin.rpc('get_waha_config', { base_url: base });
+    const session = (cfg?.[0] as any)?.session || Deno.env.get('WAHA_SESSION') || 'default';
+    const apiKey = (cfg?.[0] as any)?.api_key || Deno.env.get('WAHA_API_KEY') || '';
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers['X-API-Key'] = apiKey;
