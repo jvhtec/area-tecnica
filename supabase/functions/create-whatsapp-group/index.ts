@@ -208,7 +208,8 @@ serve(async (req: Request) => {
       return b.replace(/\/+$/, '');
     };
     const base = normalizeBase(actor.waha_endpoint || 'https://waha.sector-pro.work');
-    const apiKey = Deno.env.get('WAHA_API_KEY') || '';
+    const { data: cfg } = await supabaseAdmin.rpc('get_waha_config', { base_url: base });
+    const apiKey = (cfg?.[0] as any)?.api_key || Deno.env.get('WAHA_API_KEY') || '';
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers['X-API-Key'] = apiKey;
 
@@ -216,7 +217,7 @@ serve(async (req: Request) => {
     const subject = `${job.title} - ${deptNameEs}`;
 
     // WAHA expects JIDs like 34900111222@c.us and an object list
-    const session = Deno.env.get('WAHA_SESSION') || 'default';
+    const session = (cfg?.[0] as any)?.session || Deno.env.get('WAHA_SESSION') || 'default';
     const participantObjects = uniqueParticipants.map((p) => {
       const jid = p.replace(/^\+/, '').replace(/\D/g, '') + '@c.us';
       return { id: jid };

@@ -125,8 +125,9 @@ serve(async (req) => {
         return b.replace(/\/+$/, '');
       };
       const base = normalizeBase(actorRes.data.waha_endpoint || '');
-      const apiKey = Deno.env.get('WAHA_API_KEY') || '';
-      const session = Deno.env.get('WAHA_SESSION') || 'default';
+      const { data: cfg } = await supabase.rpc('get_waha_config', { base_url: base });
+      const apiKey = (cfg?.[0] as any)?.api_key || Deno.env.get('WAHA_API_KEY') || '';
+      const session = (cfg?.[0] as any)?.session || Deno.env.get('WAHA_SESSION') || 'default';
       const defaultCC = Deno.env.get('WA_DEFAULT_COUNTRY_CODE') || '+34';
       const headersWA: Record<string,string> = { 'Content-Type': 'application/json' };
       if (apiKey) headersWA['X-API-Key'] = apiKey;
