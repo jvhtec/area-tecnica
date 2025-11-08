@@ -166,9 +166,7 @@ async function fetchLpoMap(
 async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<any[]> {
   const { data, error } = await client
     .from('timesheets')
-    .select(
-      'technician_id, job_id, date, amount_breakdown, amount_breakdown_visible, approved_by_manager'
-    )
+    .select('technician_id, job_id, date, amount_breakdown, approved_by_manager')
     .eq('job_id', jobId)
     .eq('approved_by_manager', true);
   if (error) throw error;
