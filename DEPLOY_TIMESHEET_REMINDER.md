@@ -4,7 +4,7 @@
 
 **You need to redeploy the function to fix the error!**
 
-Two foreign key relationship errors were fixed in the code. Both fixes have been pushed to git. Run this command to deploy the fixes:
+The database schema issue has been fixed. The function now fetches job data separately instead of trying to join (since no FK constraint exists). Run this command to deploy the fix:
 
 ```bash
 npx supabase functions deploy send-timesheet-reminder
@@ -19,14 +19,17 @@ Then ensure you have set the Brevo secrets (see "How to Set Environment Variable
 ### 1. ✅ 404 Error (RESOLVED)
 The function was not deployed initially - now deployed.
 
-### 2. ✅ Foreign Key Constraint Errors (RESOLVED)
-Two relationship errors were fixed:
+### 2. ✅ Database Relationship Errors (RESOLVED)
+Three relationship issues were fixed:
 - **Technician relationship**: Used wrong FK name `timesheets_technician_id_fkey` → Fixed to `fk_timesheets_technician_id` (commit 23b735d)
-- **Jobs relationship**: Used explicit FK hint when none exists → Fixed to use auto-detection via `job_id` column (commit a164d4a)
+- **Jobs relationship (attempt 1)**: Tried to use auto-detection → Failed because no FK constraint exists (commit a164d4a)
+- **Jobs relationship (final fix)**: Changed to fetch job data separately instead of joining (commit e9decd9)
+
+**Root cause**: The `timesheets.job_id` column has no foreign key constraint defined in the database schema. PostgREST requires an actual FK constraint to auto-detect relationships via joins.
 
 ### 3. ⚠️ Next Step: Deploy Updated Function & Set Secrets
 The function code has been fixed and pushed. You need to:
-1. Redeploy the function to pick up both foreign key fixes (commits 23b735d and a164d4a)
+1. Redeploy the function to pick up all fixes (latest commit: e9decd9)
 2. Set the required Brevo secrets (if not already done)
 
 ## Required Environment Variables
