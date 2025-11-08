@@ -45,6 +45,67 @@ import { generateTimesheetPDF } from '@/utils/timesheet-pdf';
 import { generateJobPayoutPDF } from '@/utils/rates-pdf-export';
 import { sendJobPayoutEmails } from '@/lib/job-payout-email';
 
+interface TechnicianProfile {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  department?: string | null;
+}
+
+type SupabaseClientLike = typeof supabase;
+
+export const enrichTimesheetsWithProfiles = async (
+  client: SupabaseClientLike,
+  timesheets: any[]
+): Promise<{ timesheets: any[]; profileMap: Map<string, TechnicianProfile> }> => {
+  const profileMap = new Map<string, TechnicianProfile>();
+  const technicianIds = Array.from(
+    new Set(
+      (timesheets || [])
+        .map((row) => row.technician_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    )
+  );
+
+  if (!technicianIds.length) {
+    return { timesheets, profileMap };
+  }
+
+  const { data: profiles, error } = await client
+    .from('profiles')
+    .select('id, first_name, last_name, department')
+    .in('id', technicianIds);
+
+  if (error) {
+    console.error('[JobDetailsDialog] Failed to load technician profiles for timesheets', error);
+    return { timesheets, profileMap };
+  }
+
+  (profiles || []).forEach((profile: TechnicianProfile) => {
+    if (profile?.id) {
+      profileMap.set(profile.id, profile);
+    }
+  });
+
+  const enrichedTimesheets = timesheets.map((row) => {
+    const fallbackProfile = profileMap.get(row.technician_id);
+    if (!fallbackProfile) {
+      return row;
+    }
+
+    const mergedTechnician = row.technician
+      ? { ...fallbackProfile, ...row.technician }
+      : fallbackProfile;
+
+    return {
+      ...row,
+      technician: mergedTechnician,
+    };
+  });
+
+  return { timesheets: enrichedTimesheets, profileMap };
+};
+
 interface JobDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -694,6 +755,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               timesheets = (visible as any[] | null)?.filter((r) => r.job_id === resolvedJobId) || [];
                             }
 
+                            const { timesheets: enrichedTimesheets, profileMap } = await enrichTimesheetsWithProfiles(
+                              supabase,
+                              timesheets as any[]
+                            );
+
+                            timesheets = enrichedTimesheets;
+
                             // 2) Build job object for timesheet PDF
                             const jobObj = {
                               id: resolvedJobId,
@@ -740,15 +808,33 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                             });
 
                             const techIds = Array.from(new Set((payouts || []).map((p: any) => p.technician_id)));
-                            const { data: profiles } = await supabase
-                              .from('profiles')
-                              .select('id, first_name, last_name')
-                              .in('id', techIds);
+                            const missingProfileIds = techIds.filter(
+                              (id): id is string => typeof id === 'string' && !profileMap.has(id)
+                            );
+
+                            if (missingProfileIds.length) {
+                              const { data: extraProfiles, error: extraProfilesError } = await supabase
+                                .from('profiles')
+                                .select('id, first_name, last_name, department')
+                                .in('id', missingProfileIds);
+
+                              if (extraProfilesError) {
+                                console.error('[JobDetailsDialog] Failed to load technician profiles for payouts', extraProfilesError);
+                              } else {
+                                (extraProfiles || []).forEach((profile: TechnicianProfile) => {
+                                  if (profile?.id) {
+                                    profileMap.set(profile.id, profile);
+                                  }
+                                });
+                              }
+                            }
+
+                            const payoutProfiles = Array.from(profileMap.values());
 
                             const payoutBlob = (await generateJobPayoutPDF(
                               (payouts || []) as any,
                               { id: jobObj.id, title: jobObj.title, start_time: jobObj.start_time, end_time: jobObj.end_time, tour_id: jobDetails?.tour_id ?? null },
-                              (profiles || []) as any,
+                              payoutProfiles as any,
                               lpoMap,
                               tsByTech as any,
                               { download: false }
