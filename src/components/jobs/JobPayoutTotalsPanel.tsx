@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send } from 'lucide-react';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
+import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import { cn, formatCurrency } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,8 +16,11 @@ import {
   type JobPayoutEmailContextResult,
   type TechnicianProfileWithEmail,
 } from '@/lib/job-payout-email';
-import { generateJobPayoutPDF } from '@/utils/rates-pdf-export';
+import { sendTourJobEmails } from '@/lib/tour-payout-email';
+import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-export';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
+import type { JobPayoutTotals } from '@/types/jobExtras';
+import type { TourJobRateQuote } from '@/types/tourRates';
 
 interface JobPayoutTotalsPanelProps {
   jobId: string;
@@ -24,7 +28,95 @@ interface JobPayoutTotalsPanelProps {
 }
 
 export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPanelProps) {
-  const { data: payoutTotals = [], isLoading, error } = useJobPayoutTotals(jobId, technicianId);
+  const {
+    data: jobMeta,
+    isLoading: jobMetaLoading,
+    error: jobMetaError,
+  } = useQuery({
+    queryKey: ['job-payout-metadata', jobId],
+    enabled: !!jobId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('id, title, start_time, tour_id, rates_approved, job_type')
+        .eq('id', jobId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as {
+        id: string;
+        title: string;
+        start_time: string;
+        tour_id: string | null;
+        rates_approved: boolean | null;
+        job_type: string | null;
+      };
+    },
+    staleTime: 60_000,
+  });
+
+  const jobType = jobMeta?.job_type ?? null;
+  const isTourDate = jobType === 'tourdate';
+  const shouldLoadStandardTotals = !!jobId && !isTourDate && !jobMetaLoading;
+  const shouldLoadTourQuotes = !!jobId && isTourDate;
+
+  const {
+    data: standardPayoutTotals = [],
+    isLoading: standardLoading,
+    error: standardError,
+  } = useJobPayoutTotals(jobId, technicianId, { enabled: shouldLoadStandardTotals });
+
+  const {
+    data: rawTourQuotes = [],
+    isLoading: tourQuotesLoading,
+    error: tourQuotesError,
+  } = useManagerJobQuotes(
+    shouldLoadTourQuotes ? jobId : undefined,
+    jobType ?? undefined,
+    jobMeta?.tour_id ?? undefined
+  );
+
+  const visibleTourQuotes = React.useMemo(() => {
+    const quotes = (rawTourQuotes as TourJobRateQuote[]) || [];
+    if (technicianId) {
+      return quotes.filter((quote) => quote.technician_id === technicianId);
+    }
+    return quotes;
+  }, [rawTourQuotes, technicianId]);
+
+  const tourPayoutTotals = React.useMemo<JobPayoutTotals[]>(() => {
+    return visibleTourQuotes.map((quote) => {
+      const baseTotal = Number(quote.total_eur ?? 0);
+      const extrasTotal = Number(
+        quote.extras_total_eur ?? (quote.extras?.total_eur != null ? quote.extras.total_eur : 0)
+      );
+      const totalWithExtras = Number(
+        quote.total_with_extras_eur != null ? quote.total_with_extras_eur : baseTotal + extrasTotal
+      );
+      const extrasBreakdown =
+        quote.extras != null
+          ? (quote.extras as JobPayoutTotals['extras_breakdown'])
+          : ({ items: [], total_eur: extrasTotal } as JobPayoutTotals['extras_breakdown']);
+
+      return {
+        job_id: quote.job_id,
+        technician_id: quote.technician_id,
+        timesheets_total_eur: baseTotal,
+        extras_total_eur: extrasTotal,
+        total_eur: totalWithExtras,
+        extras_breakdown: {
+          items: extrasBreakdown.items ?? [],
+          total_eur: extrasBreakdown.total_eur ?? extrasTotal,
+        },
+        vehicle_disclaimer: Boolean(quote.vehicle_disclaimer),
+        vehicle_disclaimer_text: quote.vehicle_disclaimer_text ?? undefined,
+      } satisfies JobPayoutTotals;
+    });
+  }, [visibleTourQuotes]);
+
+  const payoutTotals = isTourDate ? tourPayoutTotals : standardPayoutTotals;
+  const isLoading = jobMetaLoading || (isTourDate ? tourQuotesLoading : standardLoading);
+  const error = jobMetaError ?? (isTourDate ? tourQuotesError : standardError);
+
   const { data: lpoRows = [] } = useQuery({
     queryKey: ['flex-work-orders-by-job', jobId, technicianId],
     queryFn: async () => {
@@ -37,8 +129,11 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     enabled: !!jobId,
     staleTime: 30_000,
   });
-  const lpoMap = React.useMemo(() => new Map(lpoRows.map(r => [r.technician_id, r.lpo_number || null])), [lpoRows]);
-  const flexElementMap = React.useMemo(() => new Map(lpoRows.map(r => [r.technician_id, r.flex_element_id || null])), [lpoRows]);
+  const lpoMap = React.useMemo(() => new Map(lpoRows.map((r) => [r.technician_id, r.lpo_number || null])), [lpoRows]);
+  const flexElementMap = React.useMemo(
+    () => new Map(lpoRows.map((r) => [r.technician_id, r.flex_element_id || null])),
+    [lpoRows]
+  );
   const FLEX_UI_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
   const FIN_DOC_VIEW_ID = '8238f39c-f42e-11e0-a8de-00e08175e43e'; // fixed view id for fin-doc
   const buildFinDocUrl = React.useCallback((elementId: string | null | undefined) => {
@@ -80,27 +175,6 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     [profileMap]
   );
 
-  const { data: jobMeta } = useQuery({
-    queryKey: ['job-payout-metadata', jobId],
-    enabled: !!jobId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('id, title, start_time, tour_id, rates_approved')
-        .eq('id', jobId)
-        .maybeSingle();
-      if (error) throw error;
-      return data as {
-        id: string;
-        title: string;
-        start_time: string;
-        tour_id: string | null;
-        rates_approved: boolean | null;
-      };
-    },
-    staleTime: 60_000,
-  });
-
   const jobRatesApproved = Boolean(jobMeta?.rates_approved);
   const [isExporting, setIsExporting] = React.useState(false);
   const [isSendingEmails, setIsSendingEmails] = React.useState(false);
@@ -108,11 +182,16 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const [missingEmailTechIds, setMissingEmailTechIds] = React.useState<string[]>([]);
   const lastPreparedContext = React.useRef<JobPayoutEmailContextResult | null>(null);
 
-  const handlePrepareContext = React.useCallback(async () => {
+  React.useEffect(() => {
+    setMissingEmailTechIds([]);
+    lastPreparedContext.current = null;
+  }, [jobId, isTourDate]);
+
+  const prepareStandardContext = React.useCallback(async () => {
     const context = await prepareJobPayoutEmailContext({
       jobId,
       supabase,
-      payouts: payoutTotals,
+      payouts: standardPayoutTotals,
       profiles: profilesWithEmail,
       lpoMap,
       jobDetails: jobMeta || undefined,
@@ -120,13 +199,41 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     lastPreparedContext.current = context;
     setMissingEmailTechIds(context.missingEmails);
     return context;
-  }, [jobId, payoutTotals, profilesWithEmail, lpoMap, jobMeta]);
+  }, [jobId, standardPayoutTotals, profilesWithEmail, lpoMap, jobMeta]);
 
   const handleExport = React.useCallback(async () => {
-    if (!jobId || payoutTotals.length === 0) return;
+    if (!jobId) return;
+
+    if (isTourDate) {
+      if (visibleTourQuotes.length === 0 || !jobMeta) return;
+      setIsExporting(true);
+      try {
+        await generateRateQuotePDF(
+          visibleTourQuotes,
+          {
+            id: jobMeta.id,
+            title: jobMeta.title,
+            start_time: jobMeta.start_time,
+            tour_id: jobMeta.tour_id ?? undefined,
+            job_type: jobMeta.job_type ?? undefined,
+          },
+          profilesWithEmail as any,
+          lpoMap
+        );
+        toast.success('PDF de tarifas generado');
+      } catch (err) {
+        console.error('[JobPayoutTotalsPanel] Error generating tour payout PDF', err);
+        toast.error('No se pudo generar el PDF de pagos de gira');
+      } finally {
+        setIsExporting(false);
+      }
+      return;
+    }
+
+    if (standardPayoutTotals.length === 0) return;
     setIsExporting(true);
     try {
-      const context = await handlePrepareContext();
+      const context = await prepareStandardContext();
       await generateJobPayoutPDF(
         context.payouts,
         context.job,
@@ -141,16 +248,67 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     } finally {
       setIsExporting(false);
     }
-  }, [jobId, payoutTotals.length, handlePrepareContext, lpoMap]);
+  }, [
+    jobId,
+    isTourDate,
+    visibleTourQuotes,
+    jobMeta,
+    profilesWithEmail,
+    lpoMap,
+    standardPayoutTotals.length,
+    prepareStandardContext,
+  ]);
 
   const handleSendEmails = React.useCallback(async () => {
-    if (!jobId || payoutTotals.length === 0) return;
+    if (!jobId) return;
+
+    if (isTourDate) {
+      if (visibleTourQuotes.length === 0) return;
+      setIsSendingEmails(true);
+      try {
+        const result = await sendTourJobEmails({
+          jobId,
+          supabase,
+          quotes: visibleTourQuotes,
+          profiles: profilesWithEmail as any,
+          technicianIds: technicianId ? [technicianId] : undefined,
+        });
+        setMissingEmailTechIds(result.context.missingEmails);
+
+        if (result.error) {
+          console.error('[JobPayoutTotalsPanel] Error sending tour payout emails', result.error);
+          toast.error('No se pudieron enviar los correos de pagos');
+        } else {
+          const partialFailures = Array.isArray(result.response?.results)
+            ? (result.response.results as Array<{ sent: boolean }>).some((r) => !r.sent)
+            : false;
+
+          if (result.success && !partialFailures) {
+            toast.success('Pagos enviados por correo');
+          } else {
+            toast.warning('Algunos correos no se pudieron enviar. Revisa el registro.');
+          }
+
+          if (result.missingEmails.length) {
+            toast.warning('Hay técnicos sin correo configurado.');
+          }
+        }
+      } catch (err) {
+        console.error('[JobPayoutTotalsPanel] Unexpected error sending tour payout emails', err);
+        toast.error('Se produjo un error al enviar los correos de pagos');
+      } finally {
+        setIsSendingEmails(false);
+      }
+      return;
+    }
+
+    if (standardPayoutTotals.length === 0) return;
     setIsSendingEmails(true);
     try {
       const result = await sendJobPayoutEmails({
         jobId,
         supabase,
-        payouts: payoutTotals,
+        payouts: standardPayoutTotals,
         profiles: profilesWithEmail,
         lpoMap,
         jobDetails: jobMeta || undefined,
@@ -184,7 +342,17 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     } finally {
       setIsSendingEmails(false);
     }
-  }, [jobId, payoutTotals, profilesWithEmail, lpoMap, jobMeta]);
+  }, [
+    jobId,
+    isTourDate,
+    visibleTourQuotes,
+    supabase,
+    profilesWithEmail,
+    technicianId,
+    standardPayoutTotals,
+    lpoMap,
+    jobMeta,
+  ]);
 
   const handleSendEmailForTech = React.useCallback(
     async (techId: string) => {
@@ -194,12 +362,54 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         toast.warning('Este técnico no tiene correo configurado.');
         return;
       }
+
       setSendingByTech((s) => ({ ...s, [techId]: true }));
+
+      if (isTourDate) {
+        try {
+          const quotesForTech = visibleTourQuotes.filter((quote) => quote.technician_id === techId);
+          if (quotesForTech.length === 0) {
+            toast.warning('No hay tarifas disponibles para este técnico.');
+            return;
+          }
+          const result = await sendTourJobEmails({
+            jobId,
+            supabase,
+            quotes: quotesForTech,
+            profiles: profilesWithEmail as any,
+            technicianIds: [techId],
+          });
+          setMissingEmailTechIds(result.context.missingEmails);
+
+          if (result.error) {
+            console.error('[JobPayoutTotalsPanel] Error sending tour payout email (single)', result.error);
+            toast.error('No se pudo enviar el correo a este técnico');
+          } else {
+            const sentResult = Array.isArray(result.response?.results)
+              ? (result.response.results as Array<{ technician_id: string; sent: boolean }>).find(
+                  (r) => r.technician_id === techId
+                )
+              : { sent: result.success } as { sent: boolean };
+            if (sentResult?.sent) {
+              toast.success('Correo enviado a este técnico');
+            } else {
+              toast.warning('No se pudo enviar el correo a este técnico');
+            }
+          }
+        } catch (err) {
+          console.error('[JobPayoutTotalsPanel] Unexpected error sending single tour payout email', err);
+          toast.error('Se produjo un error al enviar el correo');
+        } finally {
+          setSendingByTech((s) => ({ ...s, [techId]: false }));
+        }
+        return;
+      }
+
       try {
         const result = await sendJobPayoutEmails({
           jobId,
           supabase,
-          payouts: payoutTotals.filter((p) => p.technician_id === techId),
+          payouts: standardPayoutTotals.filter((p) => p.technician_id === techId),
           profiles: profilesWithEmail.filter((p) => p.id === techId),
           lpoMap,
           jobDetails: jobMeta || undefined,
@@ -210,8 +420,9 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           toast.error('No se pudo enviar el correo a este técnico');
         } else {
           const sent = Array.isArray(result.response?.results)
-            ? (result.response.results as Array<{ technician_id: string; sent: boolean }>).
-                find((r) => r.technician_id === techId)?.sent
+            ? (result.response.results as Array<{ technician_id: string; sent: boolean }>).find(
+                (r) => r.technician_id === techId
+              )?.sent
             : true;
           if (result.success && sent) {
             toast.success('Correo enviado a este técnico');
@@ -226,7 +437,17 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         setSendingByTech((s) => ({ ...s, [techId]: false }));
       }
     },
-    [jobId, payoutTotals, profilesWithEmail, lpoMap, jobMeta, profileMap]
+    [
+      jobId,
+      isTourDate,
+      profileMap,
+      visibleTourQuotes,
+      supabase,
+      profilesWithEmail,
+      standardPayoutTotals,
+      lpoMap,
+      jobMeta,
+    ]
   );
 
   if (isLoading) {
@@ -414,7 +635,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <span>Approved Timesheets:</span>
                 </div>
-                <Badge variant={payout.timesheets_total_eur > 0 ? "default" : "secondary"}>
+                <Badge variant={payout.timesheets_total_eur > 0 ? 'default' : 'secondary'}>
                   {formatCurrency(payout.timesheets_total_eur)}
                 </Badge>
               </div>
@@ -461,7 +682,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             )}
 
             <Separator />
-            
+
             {/* Final total */}
             <div className="flex items-center justify-between font-medium">
               <span>Final Total:</span>
