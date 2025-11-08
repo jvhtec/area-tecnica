@@ -104,7 +104,7 @@ serve(async (req) => {
     // Fetch timesheet using admin client
     const { data: timesheet, error: timesheetError } = await supabaseAdmin
       .from('timesheets')
-      .select('*')
+      .select('id, job_id, technician_id, status, date')
       .eq('id', timesheetId)
       .single()
 
