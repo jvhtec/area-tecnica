@@ -1,7 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Filter, Users, RefreshCw, Refrigerator } from 'lucide-react';
@@ -21,6 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 
 const DEPARTMENT_LABELS: Record<string, string> = {
   sound: 'Sonido',
@@ -73,6 +74,10 @@ type OutstandingJobInfo = {
   departments: OutstandingDepartmentInfo[];
 };
 
+const AVAILABLE_DEPARTMENTS = ['sound', 'lights', 'video'] as const;
+type Department = (typeof AVAILABLE_DEPARTMENTS)[number];
+const FALLBACK_DEPARTMENT: Department = 'sound';
+
 function formatLabel(value: string) {
   return value
     .split(/[_\s]+/)
@@ -100,9 +105,12 @@ function parseSummaryRow(row: any): StaffingSummaryRow | null {
 
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
+  const { userDepartment } = useOptimizedAuth();
+  const [defaultDepartment, setDefaultDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
+  const hasManualDepartmentSelection = React.useRef(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   // Debounce search to reduce filtering churn
@@ -120,6 +128,39 @@ export default function JobAssignmentMatrix() {
   const toggleSpecialty = (name: (typeof specialtyOptions)[number]) => {
     setSelectedSkills(prev => prev.includes(name) ? prev.filter(s => s !== name) : [...prev, name]);
   };
+
+  const normalizedUserDepartment = React.useMemo<Department>(() => {
+    const normalized = typeof userDepartment === 'string' ? userDepartment.toLowerCase() : '';
+    if (AVAILABLE_DEPARTMENTS.includes(normalized as Department)) {
+      return normalized as Department;
+    }
+    return FALLBACK_DEPARTMENT;
+  }, [userDepartment]);
+
+  React.useEffect(() => {
+    setDefaultDepartment((prev) => {
+      if (prev !== normalizedUserDepartment) {
+        hasManualDepartmentSelection.current = false;
+      }
+      return normalizedUserDepartment;
+    });
+  }, [normalizedUserDepartment]);
+
+  React.useEffect(() => {
+    if (!hasManualDepartmentSelection.current) {
+      setSelectedDepartment((prev) => (prev === defaultDepartment ? prev : defaultDepartment));
+    }
+  }, [defaultDepartment]);
+
+  const handleDepartmentChange = React.useCallback((value: Department) => {
+    hasManualDepartmentSelection.current = true;
+    setSelectedDepartment(value);
+  }, []);
+
+  const resetDepartmentToDefault = React.useCallback(() => {
+    hasManualDepartmentSelection.current = false;
+    setSelectedDepartment(defaultDepartment);
+  }, [defaultDepartment]);
 
   // Use virtualized date range with expandable capabilities
   const {
@@ -150,7 +191,8 @@ export default function JobAssignmentMatrix() {
       if (error) throw error;
 
       const filtered = (data || []).filter((tech: any) => {
-        if (selectedDepartment !== 'all' && tech.department !== selectedDepartment) {
+        const techDepartment = typeof tech.department === 'string' ? tech.department.toLowerCase() : '';
+        if (techDepartment !== selectedDepartment) {
           return false;
         }
         if (tech.role === 'technician' || tech.role === 'house_tech') {
@@ -282,9 +324,7 @@ export default function JobAssignmentMatrix() {
         .limit(500); // Limit for performance
 
       // Add department filter if selected
-      if (selectedDepartment !== 'all') {
-        query = query.eq('job_departments.department', selectedDepartment);
-      }
+      query = query.eq('job_departments.department', selectedDepartment);
 
       const { data, error } = await query.order('start_time', { ascending: true });
 
@@ -496,8 +536,6 @@ export default function JobAssignmentMatrix() {
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 
-  const departments = ['all', 'sound', 'lights', 'video'];
-
   // Responsive breakpoint detection
   React.useEffect(() => {
     const update = () => setIsMobile(window.innerWidth <= 768);
@@ -509,13 +547,13 @@ export default function JobAssignmentMatrix() {
   // Active filters count for mobile badge
   const activeFilterCount = React.useMemo(() => {
     let c = 0;
-    if (selectedDepartment !== 'all') c++;
+    if (selectedDepartment !== defaultDepartment) c++;
     if (debouncedSearch) c++;
     if (selectedSkills.length) c += selectedSkills.length;
     if (hideFridge) c++;
     if (allowDirectAssign) c++;
     return c;
-  }, [selectedDepartment, debouncedSearch, selectedSkills, hideFridge, allowDirectAssign]);
+  }, [selectedDepartment, defaultDepartment, debouncedSearch, selectedSkills, hideFridge, allowDirectAssign]);
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -559,18 +597,23 @@ export default function JobAssignmentMatrix() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map(dept => (
-                  <SelectItem key={dept} value={dept}>
-                    {dept === 'all' ? 'All Departments' : dept.charAt(0).toUpperCase() + dept.slice(1)}
-                  </SelectItem>
+            <Tabs
+              value={selectedDepartment}
+              onValueChange={(value) => handleDepartmentChange(value as Department)}
+              className="w-full sm:w-auto"
+            >
+              <TabsList className="flex w-full sm:w-auto overflow-x-auto rounded-md bg-muted p-1 gap-1">
+                {AVAILABLE_DEPARTMENTS.map((dept) => (
+                  <TabsTrigger
+                    key={dept}
+                    value={dept}
+                    className="flex-1 whitespace-nowrap capitalize sm:flex-none"
+                  >
+                    {DEPARTMENT_LABELS[dept] || formatLabel(dept)}
+                  </TabsTrigger>
                 ))}
-              </SelectContent>
-            </Select>
+              </TabsList>
+            </Tabs>
 
             <Input
               placeholder="Search technicians..."
@@ -668,25 +711,37 @@ export default function JobAssignmentMatrix() {
                 <Filter className="h-4 w-4" />
                 <span className="text-sm font-medium">Filters</span>
                 {activeFilterCount > 0 && (
-                  <button className="ml-auto text-xs underline" onClick={() => { setSelectedDepartment('all'); setSearchTerm(''); setSelectedSkills([]); setHideFridge(false); setAllowDirectAssign(false); }}>
+                  <button
+                    className="ml-auto text-xs underline"
+                    onClick={() => {
+                      resetDepartmentToDefault();
+                      setSearchTerm('');
+                      setSelectedSkills([]);
+                      setHideFridge(false);
+                      setAllowDirectAssign(false);
+                    }}
+                  >
                     Clear all
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map(dept => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept === 'all' ? 'All Departments' : dept.charAt(0).toUpperCase() + dept.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Tabs
+                value={selectedDepartment}
+                onValueChange={(value) => handleDepartmentChange(value as Department)}
+                className="w-full"
+              >
+                <TabsList className="flex w-full overflow-x-auto rounded-md bg-muted p-1 gap-1">
+                  {AVAILABLE_DEPARTMENTS.map((dept) => (
+                    <TabsTrigger
+                      key={dept}
+                      value={dept}
+                      className="flex-1 whitespace-nowrap capitalize"
+                    >
+                      {DEPARTMENT_LABELS[dept] || formatLabel(dept)}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
               <Input
                 placeholder="Search technicians..."
                 value={searchTerm}
