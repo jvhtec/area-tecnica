@@ -30,13 +30,22 @@ export function getCategoryFromRole(roleCode: string | null | undefined): 'respo
 
 /**
  * Gets the category from any of the three role fields
- * Prioritizes in order: sound_role, lights_role, video_role
+ * Returns the highest category found (responsable > especialista > tecnico)
  */
 export function getCategoryFromAssignment(assignment: {
   sound_role?: string | null;
   lights_role?: string | null;
   video_role?: string | null;
 }): 'responsable' | 'especialista' | 'tecnico' | null {
-  const role = assignment.sound_role || assignment.lights_role || assignment.video_role;
-  return getCategoryFromRole(role);
+  const roles = [assignment.sound_role, assignment.lights_role, assignment.video_role];
+  const categories = roles.map(role => getCategoryFromRole(role)).filter(cat => cat !== null);
+
+  if (categories.length === 0) return null;
+
+  // Return highest category: responsable > especialista > tecnico
+  if (categories.includes('responsable')) return 'responsable';
+  if (categories.includes('especialista')) return 'especialista';
+  if (categories.includes('tecnico')) return 'tecnico';
+
+  return null;
 }
