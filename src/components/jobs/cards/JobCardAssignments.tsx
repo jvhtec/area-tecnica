@@ -7,13 +7,47 @@ import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
 import { format } from "date-fns";
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { cn } from "@/lib/utils";
 
 interface JobCardAssignmentsProps {
   assignments: any[];
   department: Department;
+  jobTimesheets?: { technician_id: string; status: string }[];
 }
 
-export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignments, department }) => {
+export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignments, department, jobTimesheets = [] }) => {
+  // Determine overall timesheet state for a technician
+  const getTechTimesheetState = (techId: string): 'none' | 'draft' | 'partial' | 'submitted' | 'approved' | 'rejected' => {
+    const list = jobTimesheets.filter(t => t.technician_id === techId);
+    if (list.length === 0) return 'none';
+    const anyRejected = list.some(t => t.status === 'rejected');
+    const anyApproved = list.some(t => t.status === 'approved');
+    const anySubmitted = list.some(t => t.status === 'submitted');
+    const allSubmittedOrApproved = list.every(t => t.status === 'submitted' || t.status === 'approved');
+
+    if (anyRejected) return 'rejected';
+    if (anyApproved && allSubmittedOrApproved) return 'approved';
+    if (allSubmittedOrApproved) return 'submitted';
+    if (anySubmitted || anyApproved) return 'partial';
+    return 'draft';
+  };
+
+  // Apply color classes based on state
+  const getBadgeClassesForTimesheet = (techId: string) => {
+    const state = getTechTimesheetState(techId);
+    switch (state) {
+      case 'approved':
+      case 'submitted':
+        return 'bg-green-500/15 text-green-700 border-green-500/30';
+      case 'partial':
+        return 'bg-yellow-500/15 text-yellow-700 border-yellow-500/30';
+      case 'rejected':
+        return 'bg-red-500/15 text-red-700 border-red-500/30';
+      default:
+        return '';
+    }
+  };
+
   // Group by technician so multi-day assignments produce a single badge per tech
   const grouped = new Map<string, {
     id: string;
@@ -113,12 +147,19 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
             }
           })();
 
+          // Apply timesheet color coding
+          const timesheetClasses = getBadgeClassesForTimesheet(tech.id);
+
           return (
             <Tooltip key={tech.id || index}>
               <TooltipTrigger asChild>
                 <Badge
                   variant={tech.isFromTour ? "outline" : "secondary"}
-                  className={`text-xs ${tech.isFromTour ? 'border-blue-300 text-blue-700' : ''}`}
+                  className={cn(
+                    "text-xs max-w-full border",
+                    tech.isFromTour ? 'border-blue-300 text-blue-700' : '',
+                    timesheetClasses
+                  )}
                 >
                   {tech.name} {tech.role && `(${tech.role})`}
                   {tech.isFromTour && ' 🎪'}

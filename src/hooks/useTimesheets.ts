@@ -342,7 +342,26 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
   };
 
   const submitTimesheet = async (timesheetId: string) => {
-    return updateTimesheet(timesheetId, { status: 'submitted' });
+    const updated = await updateTimesheet(timesheetId, { status: 'submitted' });
+
+    // Send push notification to management (fire-and-forget, non-blocking)
+    if (updated?.job_id && updated?.technician_id) {
+      try {
+        void supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'timesheet.submitted',
+            job_id: updated.job_id,
+            technician_id: updated.technician_id
+          }
+        });
+      } catch (pushErr) {
+        // Non-blocking: log but don't fail the submission
+        console.warn('Failed to send timesheet submission notification:', pushErr);
+      }
+    }
+
+    return updated;
   };
 
   const approveTimesheet = async (timesheetId: string) => {
