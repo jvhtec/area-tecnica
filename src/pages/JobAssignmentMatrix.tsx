@@ -77,6 +77,7 @@ type OutstandingJobInfo = {
 const AVAILABLE_DEPARTMENTS = ['sound', 'lights', 'video'] as const;
 type Department = (typeof AVAILABLE_DEPARTMENTS)[number];
 const FALLBACK_DEPARTMENT: Department = 'sound';
+const OUTSTANDING_STORAGE_KEY = 'job-assignment-matrix:last-outstanding-hash';
 
 function formatLabel(value: string) {
   return value
@@ -124,6 +125,18 @@ export default function JobAssignmentMatrix() {
   const [hideFridge, setHideFridge] = useState<boolean>(true);
   const [showStaffingReminder, setShowStaffingReminder] = useState(false);
   const [lastAcknowledgedHash, setLastAcknowledgedHash] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const storedHash = window.sessionStorage.getItem(OUTSTANDING_STORAGE_KEY);
+      if (storedHash) {
+        setLastAcknowledgedHash(storedHash);
+      }
+    } catch (error) {
+      console.warn('Failed to read outstanding hash from storage', error);
+    }
+  }, []);
   const specialtyOptions = ['foh','monitores','sistemas','rf','escenario','PA'] as const;
   const toggleSpecialty = (name: (typeof specialtyOptions)[number]) => {
     setSelectedSkills(prev => prev.includes(name) ? prev.filter(s => s !== name) : [...prev, name]);
@@ -506,6 +519,13 @@ export default function JobAssignmentMatrix() {
     if (!outstandingJobs.length) {
       if (showStaffingReminder) setShowStaffingReminder(false);
       if (lastAcknowledgedHash !== null) setLastAcknowledgedHash(null);
+      if (typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.removeItem(OUTSTANDING_STORAGE_KEY);
+        } catch (error) {
+          console.warn('Failed to clear outstanding hash from storage', error);
+        }
+      }
       return;
     }
 
@@ -523,6 +543,13 @@ export default function JobAssignmentMatrix() {
   const handleDismissReminder = React.useCallback(() => {
     if (outstandingHash) {
       setLastAcknowledgedHash(outstandingHash);
+      if (typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.setItem(OUTSTANDING_STORAGE_KEY, outstandingHash);
+        } catch (error) {
+          console.warn('Failed to persist outstanding hash to storage', error);
+        }
+      }
     }
     setShowStaffingReminder(false);
   }, [outstandingHash]);
