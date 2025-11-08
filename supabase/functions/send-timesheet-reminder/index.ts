@@ -113,7 +113,7 @@ serve(async (req) => {
           nickname,
           email
         ),
-        job:jobs(
+        jobs(
           id,
           title,
           client_name
@@ -144,7 +144,7 @@ serve(async (req) => {
     }
 
     const technician = timesheet.technician as any
-    const job = timesheet.job as any
+    const job = timesheet.jobs as any
 
     if (!technician?.email) {
       return new Response(JSON.stringify({ error: 'Technician email not found' }), {
