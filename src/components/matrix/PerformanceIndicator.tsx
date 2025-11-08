@@ -1,23 +1,26 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { TrendingUp, Clock, Database, Zap } from 'lucide-react';
+import { TrendingUp, Clock, Database, Zap, RefreshCw } from 'lucide-react';
 
 interface PerformanceIndicatorProps {
   assignmentCount: number;
   availabilityCount: number;
   cellCount: number;
-  isLoading: boolean;
+  isInitialLoading: boolean;
+  isFetching: boolean;
 }
 
 export const PerformanceIndicator = ({
   assignmentCount,
   availabilityCount,
   cellCount,
-  isLoading
+  isInitialLoading,
+  isFetching,
 }: PerformanceIndicatorProps) => {
   const getPerformanceStatus = () => {
-    if (isLoading) return { color: 'secondary', icon: Clock, text: 'Loading...' };
+    if (isInitialLoading) return { color: 'secondary', icon: Clock, text: 'Loading...' };
+    if (isFetching) return { color: 'secondary', icon: RefreshCw, text: 'Refreshing...' };
     if (cellCount > 50000) return { color: 'destructive', icon: TrendingUp, text: 'Heavy Load' };
     if (cellCount > 10000) return { color: 'warning', icon: Zap, text: 'Optimized' };
     return { color: 'success', icon: Zap, text: 'Fast' };
