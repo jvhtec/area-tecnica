@@ -597,6 +597,14 @@ export default function JobAssignmentMatrix() {
     return c;
   }, [selectedDepartment, defaultDepartment, debouncedSearch, selectedSkills, hideFridge, allowDirectAssign]);
 
+  const outstandingJobsCount = staffingReminderQuery.isSuccess ? outstandingJobs.length : null;
+  const outstandingJobsDescription =
+    outstandingJobsCount === null
+      ? 'Loading outstanding staffing data'
+      : outstandingJobsCount === 0
+        ? 'No outstanding jobs'
+        : `${outstandingJobsCount} outstanding ${outstandingJobsCount === 1 ? 'job' : 'jobs'}`;
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
@@ -606,16 +614,37 @@ export default function JobAssignmentMatrix() {
             <Calendar className="h-5 w-5 md:h-6 md:w-6" />
             <h1 className="text-lg md:text-2xl font-bold">Job Assignment Matrix</h1>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="shrink-0"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
+          <div className="flex items-center gap-2 self-stretch sm:self-auto">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setShowStaffingReminder(true);
+                handleReminderOpenChange(true);
+              }}
+              className="shrink-0 flex items-center gap-2"
+              aria-label={`View staffing reminder. ${outstandingJobsDescription}.`}
+            >
+              View staffing reminder
+              {outstandingJobsCount !== null && (
+                <Badge variant="outline" className="text-xs" aria-hidden="true">
+                  {outstandingJobsCount}
+                </Badge>
+              )}
+              <span className="sr-only">{outstandingJobsDescription}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="shrink-0"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+          </div>
         </div>
 
         {/* Date Range Controls - hidden on mobile (use in-header arrows instead) */}
