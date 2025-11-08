@@ -4,7 +4,7 @@
 
 **You need to redeploy the function to fix the error!**
 
-The foreign key constraint name was wrong in the code. It's been fixed and pushed to git. Run this command to deploy the fix:
+Two foreign key relationship errors were fixed in the code. Both fixes have been pushed to git. Run this command to deploy the fixes:
 
 ```bash
 npx supabase functions deploy send-timesheet-reminder
@@ -19,12 +19,14 @@ Then ensure you have set the Brevo secrets (see "How to Set Environment Variable
 ### 1. ✅ 404 Error (RESOLVED)
 The function was not deployed initially - now deployed.
 
-### 2. ✅ Foreign Key Constraint Error (RESOLVED)
-The function was using wrong foreign key name `timesheets_technician_id_fkey` instead of the actual constraint name `fk_timesheets_technician_id`. This has been fixed in commit 23b735d.
+### 2. ✅ Foreign Key Constraint Errors (RESOLVED)
+Two relationship errors were fixed:
+- **Technician relationship**: Used wrong FK name `timesheets_technician_id_fkey` → Fixed to `fk_timesheets_technician_id` (commit 23b735d)
+- **Jobs relationship**: Used explicit FK hint when none exists → Fixed to use auto-detection via `job_id` column (commit a164d4a)
 
 ### 3. ⚠️ Next Step: Deploy Updated Function & Set Secrets
 The function code has been fixed and pushed. You need to:
-1. Redeploy the function to pick up the foreign key fix
+1. Redeploy the function to pick up both foreign key fixes (commits 23b735d and a164d4a)
 2. Set the required Brevo secrets (if not already done)
 
 ## Required Environment Variables
