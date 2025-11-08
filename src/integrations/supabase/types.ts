@@ -5184,6 +5184,9 @@ export type Database = {
           job_id: string
           notes: string | null
           overtime_hours: number | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
           signature_data: string | null
           signed_at: string | null
           start_time: string | null
@@ -5208,6 +5211,9 @@ export type Database = {
           job_id: string
           notes?: string | null
           overtime_hours?: number | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           signature_data?: string | null
           signed_at?: string | null
           start_time?: string | null
@@ -5232,6 +5238,9 @@ export type Database = {
           job_id?: string
           notes?: string | null
           overtime_hours?: number | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           signature_data?: string | null
           signed_at?: string | null
           start_time?: string | null
@@ -5240,6 +5249,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "timesheets_rejected_by_fkey"
+            columns: ["rejected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timesheets_rejected_by_fkey"
+            columns: ["rejected_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fk_timesheets_technician_id"
             columns: ["technician_id"]

@@ -15,8 +15,8 @@ export interface Timesheet {
   created_by?: string;
   approved_by?: string;
   approved_at?: string;
-  rejected_at?: string;
-  rejected_by?: string;
+  rejected_at?: string | null;
+  rejected_by?: string | null;
   rejection_reason?: string | null;
   created_at: string;
   updated_at: string;
