@@ -364,6 +364,30 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
     return updated;
   };
 
+  const revertTimesheet = async (timesheetId: string) => {
+    const updated = await updateTimesheet(
+      timesheetId,
+      {
+        status: 'submitted',
+        approved_by_manager: false,
+        approved_by: null,
+        approved_at: null,
+        rejected_at: null,
+        rejected_by: null,
+        rejection_reason: null
+      },
+      true
+    );
+
+    if (updated) {
+      await fetchTimesheets();
+      toast.success('Timesheet approval reverted');
+      invalidateApprovalContext();
+    }
+
+    return updated;
+  };
+
   const approveTimesheet = async (timesheetId: string) => {
     const currentUser = (await supabase.auth.getUser()).data.user;
     // Mark as approved (manager) and recompute
@@ -511,6 +535,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
     signTimesheet,
     deleteTimesheet,
     deleteTimesheets,
-    recalcTimesheet
+    recalcTimesheet,
+    revertTimesheet
   };
 };
