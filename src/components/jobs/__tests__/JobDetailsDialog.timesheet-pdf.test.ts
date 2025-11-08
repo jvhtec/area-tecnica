@@ -61,7 +61,13 @@ describe('JobDetailsDialog timesheet enrichment', () => {
         select: vi.fn(() => ({
           in: vi.fn(async () => ({
             data: [
-              { id: 'tech-1', first_name: 'Alice', last_name: 'Doe', department: 'Audio' },
+              {
+                id: 'tech-1',
+                first_name: 'Alice',
+                last_name: 'Doe',
+                department: 'Audio',
+                autonomo: false,
+              },
             ],
             error: null,
           })),
@@ -89,6 +95,9 @@ describe('JobDetailsDialog timesheet enrichment', () => {
 
     expect(profileMap.size).toBe(1);
     expect(enrichedTimesheets[0].technician).toMatchObject({ first_name: 'Alice', last_name: 'Doe' });
+    expect(profileMap.get('tech-1')).toMatchObject({ autonomo: false });
+    const payoutProfiles = Array.from(profileMap.values());
+    expect(payoutProfiles[0]).toMatchObject({ autonomo: false });
 
     await generateTimesheetPDF({
       job: {

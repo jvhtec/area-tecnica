@@ -66,6 +66,7 @@ export interface Timesheet {
     last_name: string;
     email: string;
     department: string;
+    autonomo?: boolean | null;
   };
 }
 
