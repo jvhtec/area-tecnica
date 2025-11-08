@@ -39,7 +39,7 @@ interface TimesheetViewProps {
 export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetViewProps) => {
   // Ensure userRole is initialized before passing into hooks that depend on it
   const { user, userRole } = useOptimizedAuth();
-  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, refetch } = useTimesheets(jobId, { userRole });
+  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, revertTimesheet, refetch } = useTimesheets(jobId, { userRole });
   const { assignments } = useJobAssignmentsRealtime(jobId);
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -660,7 +660,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => submitTimesheet(timesheet.id)}
+                          onClick={() => revertTimesheet(timesheet.id)}
                           disabled={isBulkUpdating}
                           className="border-orange-500 text-orange-600 hover:bg-orange-50"
                         >
