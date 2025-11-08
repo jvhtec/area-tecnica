@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarDays, Clock, FileText, Download, Plus, User, Trash2, AlertTriangle } from "lucide-react";
+import { CalendarDays, Clock, FileText, Download, Plus, User, Trash2, AlertTriangle, Mail } from "lucide-react";
 import { useTimesheets } from "@/hooks/useTimesheets";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
@@ -17,6 +17,7 @@ import { JobTotalAmounts } from "./JobTotalAmounts";
 import { MyJobTotal } from "./MyJobTotal";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { sendTimesheetReminder } from "@/lib/timesheet-reminder-email";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,6 +67,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   });
   const [timesheetBeingRejected, setTimesheetBeingRejected] = useState<Timesheet | null>(null);
   const [rejectionNotes, setRejectionNotes] = useState("");
+  const [sendingReminder, setSendingReminder] = useState<string | null>(null);
 
   // Filter timesheets based on user role
   const filteredTimesheets = useMemo(() => {
@@ -158,6 +160,33 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     if (!timesheetBeingRejected) return;
     await rejectTimesheet(timesheetBeingRejected.id, rejectionNotes.trim() || undefined);
     closeRejectDialog();
+  };
+
+  const handleSendReminder = async (timesheetId: string) => {
+    setSendingReminder(timesheetId);
+    try {
+      const result = await sendTimesheetReminder(timesheetId);
+      if (result.success) {
+        toast({
+          title: "Recordatorio enviado",
+          description: `Email enviado a ${result.sentTo}`,
+        });
+      } else {
+        toast({
+          title: "Error al enviar recordatorio",
+          description: result.error || "No se pudo enviar el email",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error al enviar recordatorio",
+        description: "Ocurrió un error inesperado",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingReminder(null);
+    }
   };
 
   const handleBulkAction = async (action: 'submit' | 'approve' | 'delete') => {
@@ -575,6 +604,20 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           disabled={isBulkUpdating}
                         >
                           Editar
+                        </Button>
+                      )}
+
+                      {/* Send Reminder button - Only for management on non-approved timesheets */}
+                      {isManagementUser && timesheet.status !== 'approved' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSendReminder(timesheet.id)}
+                          disabled={sendingReminder === timesheet.id || isBulkUpdating}
+                          className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                        >
+                          <Mail className="h-4 w-4 mr-1" />
+                          {sendingReminder === timesheet.id ? 'Enviando...' : 'Recordatorio'}
                         </Button>
                       )}
 
