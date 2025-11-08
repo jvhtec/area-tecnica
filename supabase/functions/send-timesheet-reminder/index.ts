@@ -104,7 +104,7 @@ serve(async (req) => {
     // Fetch timesheet using admin client
     const { data: timesheet, error: timesheetError } = await supabaseAdmin
       .from('timesheets')
-      .select('*')
+      .select('id, job_id, technician_id, status, date')
       .eq('id', timesheetId)
       .single()
 
@@ -119,7 +119,7 @@ serve(async (req) => {
     // Fetch job details separately since there's no foreign key
     const { data: job, error: jobError } = await supabaseAdmin
       .from('jobs')
-      .select('id, title, client_name')
+      .select('id, title')
       .eq('id', timesheet.job_id)
       .single()
 
@@ -242,13 +242,6 @@ serve(async (req) => {
                       <strong>Trabajo:</strong> ${jobTitle}
                     </td>
                   </tr>
-                  ${job?.client_name ? `
-                  <tr>
-                    <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">
-                      <strong>Cliente:</strong> ${job.client_name}
-                    </td>
-                  </tr>
-                  ` : ''}
                   <tr>
                     <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">
                       <strong>Fecha:</strong> ${new Date(timesheet.date).toLocaleDateString('es-ES', {
@@ -339,6 +332,19 @@ serve(async (req) => {
 
     const brevoResponse = await sendRes.json();
     console.log('Email sent successfully:', brevoResponse.messageId);
+
+    // Mark this timesheet as having received a reminder
+    const { error: updateError } = await supabaseAdmin
+      .from('timesheets')
+      .update({ reminder_sent_at: new Date().toISOString() })
+      .eq('id', timesheetId);
+
+    if (updateError) {
+      console.error('Failed to update reminder_sent_at:', updateError);
+      // Don't fail the request - email was sent successfully
+    } else {
+      console.log('Marked timesheet as reminder sent');
+    }
 
     return new Response(
       JSON.stringify({
