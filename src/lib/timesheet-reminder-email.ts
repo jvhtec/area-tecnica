@@ -18,6 +18,17 @@ export async function sendTimesheetReminder(
   timesheetId: string
 ): Promise<SendTimesheetReminderResult> {
   try {
+    // Ensure user is authenticated before calling the function
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      console.error('No active session:', sessionError);
+      return {
+        success: false,
+        error: 'You must be logged in to send reminder emails',
+      };
+    }
+
     const { data, error } = await supabase.functions.invoke('send-timesheet-reminder', {
       body: { timesheetId },
     });
