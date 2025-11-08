@@ -29,17 +29,9 @@ export async function sendTimesheetReminder(
       };
     }
 
-    // Explicitly pass the Authorization header with the access token
-    console.log('Calling send-timesheet-reminder with session:', {
-      userId: session.user.id,
-      hasToken: !!session.access_token,
-    });
-    
+    // Call the edge function - Supabase client handles authentication automatically
     const { data, error } = await supabase.functions.invoke('send-timesheet-reminder', {
       body: { timesheetId },
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
     });
 
     if (error) {
