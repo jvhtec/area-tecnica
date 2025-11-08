@@ -12,8 +12,91 @@ import { DateRangeExpander } from '@/components/matrix/DateRangeExpander';
 import { useVirtualizedDateRange } from '@/hooks/useVirtualizedDateRange';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { format } from 'date-fns';
 import { SkillsFilter } from '@/components/matrix/SkillsFilter';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
+const DEPARTMENT_LABELS: Record<string, string> = {
+  sound: 'Sonido',
+  lights: 'Luces',
+  video: 'Video',
+  rigging: 'Rigging',
+  staging: 'Escenario',
+  backline: 'Backline',
+  power: 'Energía',
+};
+
+type StaffingSummaryRole = {
+  role_code: string;
+  quantity: number;
+  notes?: string | null;
+};
+
+type StaffingSummaryRow = {
+  job_id: string;
+  department: string;
+  roles: StaffingSummaryRole[];
+};
+
+type StaffingAssignmentRow = {
+  job_id: string;
+  sound_role: string | null;
+  lights_role: string | null;
+  video_role: string | null;
+  status: string | null;
+};
+
+type OutstandingRoleInfo = {
+  roleCode: string;
+  required: number;
+  assigned: number;
+  outstanding: number;
+};
+
+type OutstandingDepartmentInfo = {
+  department: string;
+  displayName: string;
+  outstandingTotal: number;
+  roles: OutstandingRoleInfo[];
+};
+
+type OutstandingJobInfo = {
+  jobId: string;
+  jobTitle: string;
+  outstandingTotal: number;
+  departments: OutstandingDepartmentInfo[];
+};
+
+function formatLabel(value: string) {
+  return value
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function parseSummaryRow(row: any): StaffingSummaryRow | null {
+  if (!row || !row.job_id || !row.department) return null;
+  const rawRoles = Array.isArray(row.roles) ? row.roles : [];
+  const roles = rawRoles
+    .map((r: any) => ({
+      role_code: typeof r?.role_code === 'string' ? r.role_code : String(r?.role_code ?? ''),
+      quantity: Number(r?.quantity ?? 0),
+      notes: (r?.notes ?? null) as string | null,
+    }))
+    .filter((r: StaffingSummaryRole) => r.role_code);
+  return {
+    job_id: row.job_id as string,
+    department: row.department as string,
+    roles,
+  };
+}
 
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
@@ -31,6 +114,8 @@ export default function JobAssignmentMatrix() {
   const [allowDirectAssign, setAllowDirectAssign] = useState(false);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [hideFridge, setHideFridge] = useState<boolean>(true);
+  const [showStaffingReminder, setShowStaffingReminder] = useState(false);
+  const [lastAcknowledgedHash, setLastAcknowledgedHash] = useState<string | null>(null);
   const specialtyOptions = ['foh','monitores','sistemas','rf','escenario','PA'] as const;
   const toggleSpecialty = (name: (typeof specialtyOptions)[number]) => {
     setSelectedSkills(prev => prev.includes(name) ? prev.filter(s => s !== name) : [...prev, name]);
@@ -227,6 +312,180 @@ export default function JobAssignmentMatrix() {
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
   });
+
+  const jobIds = React.useMemo(() => yearJobs.map((j: any) => j.id).filter(Boolean), [yearJobs]);
+  const jobIdsKey = React.useMemo(() => (jobIds.length ? jobIds.slice().sort().join(',') : 'none'), [jobIds]);
+
+  const staffingReminderQuery = useQuery({
+    queryKey: ['matrix-staffing-summary', jobIdsKey],
+    queryFn: async () => {
+      if (!jobIds.length) {
+        return { summaries: [] as StaffingSummaryRow[], assignments: [] as StaffingAssignmentRow[] };
+      }
+
+      const [summaryRes, assignmentsRes] = await Promise.all([
+        supabase
+          .from('job_required_roles_summary')
+          .select('job_id, department, roles')
+          .in('job_id', jobIds),
+        supabase
+          .from('job_assignments')
+          .select('job_id, sound_role, lights_role, video_role, status')
+          .in('job_id', jobIds),
+      ]);
+
+      if (summaryRes.error) throw summaryRes.error;
+      if (assignmentsRes.error) throw assignmentsRes.error;
+
+      const summaries = (summaryRes.data || [])
+        .map(parseSummaryRow)
+        .filter((row): row is StaffingSummaryRow => Boolean(row));
+
+      const assignments = ((assignmentsRes.data || []) as StaffingAssignmentRow[])
+        .filter((row): row is StaffingAssignmentRow => Boolean(row && row.job_id))
+        .map((row) => ({
+          ...row,
+          sound_role: row.sound_role ? String(row.sound_role) : null,
+          lights_role: row.lights_role ? String(row.lights_role) : null,
+          video_role: row.video_role ? String(row.video_role) : null,
+          status: row.status ? String(row.status) : null,
+        }));
+
+      return { summaries, assignments };
+    },
+    enabled: jobIds.length > 0,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+
+  const outstandingJobs = useMemo<OutstandingJobInfo[]>(() => {
+    const payload = staffingReminderQuery.data;
+    if (!payload) return [];
+    const { summaries, assignments } = payload;
+    if (!summaries.length) return [];
+
+    const jobTitleMap = new Map<string, string>(
+      yearJobs.map((job: any) => [job.id, job.title || 'Trabajo sin título'])
+    );
+    const jobOrder = yearJobs.map((job: any) => job.id);
+
+    const assignmentCounts = new Map<string, number>();
+
+    const addAssignment = (jobId: string, department: string, role: string | null) => {
+      if (!jobId || !department || !role) return;
+      const key = `${jobId}:${department}:${role}`;
+      assignmentCounts.set(key, (assignmentCounts.get(key) || 0) + 1);
+    };
+
+    assignments.forEach((row) => {
+      if (!row?.job_id) return;
+      const status = (row.status || '').toLowerCase();
+      if (status === 'declined') return;
+      addAssignment(row.job_id, 'sound', row.sound_role ? row.sound_role.trim() : null);
+      addAssignment(row.job_id, 'lights', row.lights_role ? row.lights_role.trim() : null);
+      addAssignment(row.job_id, 'video', row.video_role ? row.video_role.trim() : null);
+    });
+
+    const jobMap = new Map<string, OutstandingJobInfo>();
+
+    summaries.forEach((summary) => {
+      const jobId = summary.job_id;
+      const department = summary.department;
+      if (!jobId || !department) return;
+
+      const outstandingRoles: OutstandingRoleInfo[] = summary.roles
+        .map((role) => {
+          const roleCode = role.role_code;
+          const required = Number(role.quantity || 0);
+          const assigned = assignmentCounts.get(`${jobId}:${department}:${roleCode}`) || 0;
+          return {
+            roleCode,
+            required,
+            assigned,
+            outstanding: Math.max(required - assigned, 0),
+          };
+        })
+        .filter((role) => role.outstanding > 0)
+        .sort((a, b) => a.roleCode.localeCompare(b.roleCode));
+
+      if (!outstandingRoles.length) return;
+
+      let jobEntry = jobMap.get(jobId);
+      if (!jobEntry) {
+        jobEntry = {
+          jobId,
+          jobTitle: jobTitleMap.get(jobId) || 'Trabajo sin título',
+          outstandingTotal: 0,
+          departments: [],
+        };
+        jobMap.set(jobId, jobEntry);
+      }
+
+      const outstandingTotal = outstandingRoles.reduce((sum, role) => sum + role.outstanding, 0);
+      const displayName = DEPARTMENT_LABELS[department] || formatLabel(department);
+      jobEntry.departments.push({
+        department,
+        displayName,
+        outstandingTotal,
+        roles: outstandingRoles,
+      });
+      jobEntry.outstandingTotal += outstandingTotal;
+    });
+
+    const ordered: OutstandingJobInfo[] = [];
+    jobOrder.forEach((jobId) => {
+      const entry = jobMap.get(jobId);
+      if (entry) {
+        entry.departments.sort((a, b) => a.displayName.localeCompare(b.displayName));
+        ordered.push(entry);
+      }
+    });
+
+    return ordered;
+  }, [staffingReminderQuery.data, yearJobs]);
+
+  const outstandingHash = useMemo(() => (outstandingJobs.length ? JSON.stringify(outstandingJobs) : null), [outstandingJobs]);
+
+  React.useEffect(() => {
+    if (!staffingReminderQuery.isSuccess) return;
+    if (!outstandingJobs.length) {
+      if (showStaffingReminder) setShowStaffingReminder(false);
+      if (lastAcknowledgedHash !== null) setLastAcknowledgedHash(null);
+      return;
+    }
+
+    if (outstandingHash && lastAcknowledgedHash !== outstandingHash) {
+      setShowStaffingReminder(true);
+    }
+  }, [
+    staffingReminderQuery.isSuccess,
+    outstandingJobs,
+    outstandingHash,
+    lastAcknowledgedHash,
+    showStaffingReminder,
+  ]);
+
+  const handleDismissReminder = React.useCallback(() => {
+    if (outstandingHash) {
+      setLastAcknowledgedHash(outstandingHash);
+    }
+    setShowStaffingReminder(false);
+  }, [outstandingHash]);
+
+  const handleReminderOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (!open) {
+        if (outstandingJobs.length) {
+          handleDismissReminder();
+        } else {
+          setShowStaffingReminder(false);
+        }
+      } else {
+        setShowStaffingReminder(true);
+      }
+    },
+    [handleDismissReminder, outstandingJobs.length]
+  );
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -486,6 +745,45 @@ export default function JobAssignmentMatrix() {
           />
         )}
       </div>
+
+      <Dialog open={showStaffingReminder} onOpenChange={handleReminderOpenChange}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Hay {outstandingJobs.length} trabajos con personal por completar
+            </DialogTitle>
+            <DialogDescription>
+              Revisa los roles pendientes para completar la dotación de cada equipo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {outstandingJobs.map((job) => (
+              <div key={job.jobId} className="rounded-md border p-3">
+                <div className="text-sm font-semibold">{job.jobTitle}</div>
+                <div className="mt-2 space-y-2">
+                  {job.departments.map((dept) => (
+                    <div key={`${job.jobId}-${dept.department}`}>
+                      <div className="text-sm font-medium">{dept.displayName}</div>
+                      <ul className="ml-4 mt-1 list-disc space-y-1 text-sm text-muted-foreground">
+                        {dept.roles.map((role) => (
+                          <li key={`${job.jobId}-${dept.department}-${role.roleCode}`}>
+                            {role.outstanding} × {formatLabel(role.roleCode)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={handleDismissReminder} variant="default">
+              Entendido
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
