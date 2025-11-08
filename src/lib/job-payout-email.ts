@@ -8,6 +8,7 @@ export interface TechnicianProfileWithEmail {
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
+  autonomo?: boolean | null;
 }
 
 export interface JobPayoutEmailJobDetails {
@@ -25,6 +26,7 @@ export interface JobPayoutEmailAttachment {
   payout: JobPayoutTotals;
   pdfBase64: string;
   filename: string;
+  autonomo?: boolean | null;
 }
 
 export interface JobPayoutEmailContextResult {
@@ -130,14 +132,15 @@ async function fetchProfiles(
 ): Promise<TechnicianProfileWithEmail[]> {
   if (provided) {
     const hasEmailField = provided.every((p) => Object.prototype.hasOwnProperty.call(p, 'email'));
-    if (hasEmailField) {
+    const hasAutonomoField = provided.every((p) => Object.prototype.hasOwnProperty.call(p, 'autonomo'));
+    if (hasEmailField && hasAutonomoField) {
       return provided;
     }
   }
   if (!techIds.length) return provided || [];
   const { data, error } = await client
     .from('profiles')
-    .select('id, first_name, last_name, email')
+    .select('id, first_name, last_name, email, autonomo')
     .in('id', techIds);
   if (error) throw error;
   return (data || []) as TechnicianProfileWithEmail[];
@@ -219,6 +222,7 @@ export async function prepareJobPayoutEmailContext(
       payout,
       pdfBase64,
       filename,
+      autonomo: profile?.autonomo ?? null,
     });
   }
 
@@ -283,6 +287,7 @@ export async function sendJobPayoutEmails(
       },
       pdf_base64: attachment.pdfBase64,
       filename: attachment.filename,
+      autonomo: attachment.autonomo ?? null,
     })),
     missing_emails: context.missingEmails,
     requested_at: new Date().toISOString(),

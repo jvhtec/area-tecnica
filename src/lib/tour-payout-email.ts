@@ -20,6 +20,7 @@ export interface TourJobEmailAttachment {
   quote: TourJobRateQuote;
   pdfBase64: string;
   filename: string;
+  autonomo?: boolean | null;
 }
 
 export interface TourJobEmailContextResult {
@@ -127,6 +128,7 @@ export async function prepareTourJobEmailContext(
       quote: techQuotes[0],
       pdfBase64,
       filename,
+      autonomo: profile?.autonomo ?? null,
     });
   }
 
@@ -195,6 +197,7 @@ export async function sendTourJobEmails(
         },
         pdf_base64: attachment.pdfBase64,
         filename: attachment.filename,
+        autonomo: attachment.autonomo ?? null,
       };
     }),
     missing_emails: context.missingEmails,

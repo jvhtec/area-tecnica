@@ -13,6 +13,8 @@ import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { sendTourJobEmails } from "@/lib/tour-payout-email";
+import { getAutonomoBadgeLabel } from "@/utils/autonomo";
+import type { TechnicianProfile } from "@/utils/rates-pdf-export";
 
 interface TourRatesPanelProps {
   jobId: string;
@@ -22,22 +24,27 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
   const { data: quotes, isLoading, error } = useTourJobRateQuotes(jobId);
 
   // Fetch technician profiles for display names
+  type ProfileWithEmail = TechnicianProfile & { email?: string | null };
+
   const { data: profiles = [] } = useQuery({
     queryKey: ['profiles-for-tour-rates', quotes?.map(q => q.technician_id)],
     queryFn: async () => {
       if (!quotes?.length) return [];
-      
+
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, role, email')
+        .select('id, first_name, last_name, role, email, autonomo')
         .in('id', techIds);
-      
+
       if (error) throw error;
       return data;
     },
     enabled: !!quotes?.length,
   });
+
+  const typedProfiles = profiles as ProfileWithEmail[];
+  const profileMap = React.useMemo(() => new Map(typedProfiles.map((p) => [p.id, p])), [typedProfiles]);
 
   const { data: jobMeta } = useQuery({
     queryKey: ['tour-rates-job-meta', jobId],
@@ -117,8 +124,8 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
   }, {} as Record<string, TourJobRateQuote[]>);
 
   const getTechnicianName = (techId: string) => {
-    const profile = profiles?.find(p => p.id === techId);
-    return profile ? `${profile.first_name} ${profile.last_name}`.trim() : 'Unknown';
+    const profile = profileMap.get(techId);
+    return profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Unknown' : 'Unknown';
   };
 
   return (
@@ -139,7 +146,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
             onClick={async () => {
               try {
                 setIsSendingEmails(true);
-                const result = await sendTourJobEmails({ jobId, supabase, quotes: quotes as TourJobRateQuote[], profiles: profiles as any });
+                const result = await sendTourJobEmails({ jobId, supabase, quotes: quotes as TourJobRateQuote[], profiles: typedProfiles });
                 if (result.error) {
                   console.error('[TourRatesPanel] Error sending emails', result.error);
                   toast.error('No se pudieron enviar los correos');
@@ -188,6 +195,8 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
           <CardContent>
             <div className="space-y-4">
               {weekQuotes.map((quote) => {
+                const profile = profileMap.get(quote.technician_id);
+                const nonAutonomoLabel = getAutonomoBadgeLabel(profile?.autonomo);
                 const perJobMultiplier = getPerJobMultiplier(quote);
                 const breakdownBase = quote.breakdown?.after_discount ?? quote.breakdown?.base_calculation;
                 const baseDayAmount = quote.base_day_eur ?? 0;
@@ -204,8 +213,14 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                   {/* Main quote card */}
                   <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-medium">{getTechnicianName(quote.technician_id)}</span>
+                        {nonAutonomoLabel && (
+                          <Badge variant="destructive" className="flex items-center gap-1 text-xs">
+                            <AlertCircle className="h-3 w-3" />
+                            {nonAutonomoLabel}
+                          </Badge>
+                        )}
                         {quote.is_house_tech && (
                           <Badge variant="secondary" className="text-xs">House Tech</Badge>
                         )}
@@ -244,7 +259,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                         variant="outline"
                         disabled={
                           !jobRatesApproved || !!sendingByTech[quote.technician_id] ||
-                          !(profiles as any[]).find((p: any) => p.id === quote.technician_id)?.email
+                          !profile?.email
                         }
                         onClick={async () => {
                           setSendingByTech((s) => ({ ...s, [quote.technician_id]: true }));
@@ -253,7 +268,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                               jobId,
                               supabase,
                               quotes: (quotes as TourJobRateQuote[]).filter(q => q.technician_id === quote.technician_id),
-                              profiles: profiles as any,
+                              profiles: typedProfiles,
                               technicianIds: [quote.technician_id],
                             });
                             if (result.error) {
@@ -275,7 +290,11 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                             setSendingByTech((s) => ({ ...s, [quote.technician_id]: false }));
                           }
                         }}
-                        title={jobRatesApproved ? ((profiles as any[]).find((p: any) => p.id === quote.technician_id)?.email ? 'Enviar a este técnico' : 'Sin correo configurado') : 'Aprueba las tarifas para habilitar el envío'}
+                        title={
+                          jobRatesApproved
+                            ? (profile?.email ? 'Enviar a este técnico' : 'Sin correo configurado')
+                            : 'Aprueba las tarifas para habilitar el envío'
+                        }
                       >
                         {sendingByTech[quote.technician_id] ? 'Enviando…' : 'Enviar'}
                       </Button>
