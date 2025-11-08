@@ -41,6 +41,7 @@ const FALLBACK_EVENTS: EventInfo[] = [
   // Job events
   { code: 'job.created', label: 'Job created' },
   { code: 'job.updated', label: 'Job updated' },
+  { code: 'job.requirements.updated', label: 'Job requirements updated' },
   { code: 'job.deleted', label: '🗑️ Job deleted (CRITICAL)' },
   { code: 'job.status.confirmed', label: 'Job confirmed' },
   { code: 'job.status.cancelled', label: 'Job cancelled' },
