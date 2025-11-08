@@ -56,16 +56,27 @@ These should be configured either:
 
 ## Email Logic
 
+**Each timesheet receives only ONE automated reminder** - no spam!
+
 Reminders are sent when:
 - ✅ Job ended 24 hours ago (±30 minutes)
 - ✅ Technician is assigned to the job
 - ✅ Technician has draft timesheets for the job
+- ✅ Reminder has NOT been sent yet (`reminder_sent_at` is NULL)
 - ❌ Technician has NOT submitted or approved timesheets
 
 Reminders are NOT sent when:
 - Job has no technician assignments
 - Technician has already submitted timesheets
 - Technician has no timesheets at all (assumes they're creating them)
+- **A reminder was already sent for this timesheet** (prevents hourly spam)
+
+### Reminder Tracking
+
+The system uses the `reminder_sent_at` column in the `timesheets` table to track whether a reminder has been sent. This ensures:
+- Each timesheet only gets ONE automated reminder
+- Manual reminders from management also update this timestamp
+- No repeated emails to technicians
 
 ## Manual Testing
 

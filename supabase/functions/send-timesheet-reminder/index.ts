@@ -333,6 +333,19 @@ serve(async (req) => {
     const brevoResponse = await sendRes.json();
     console.log('Email sent successfully:', brevoResponse.messageId);
 
+    // Mark this timesheet as having received a reminder
+    const { error: updateError } = await supabaseAdmin
+      .from('timesheets')
+      .update({ reminder_sent_at: new Date().toISOString() })
+      .eq('id', timesheetId);
+
+    if (updateError) {
+      console.error('Failed to update reminder_sent_at:', updateError);
+      // Don't fail the request - email was sent successfully
+    } else {
+      console.log('Marked timesheet as reminder sent');
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

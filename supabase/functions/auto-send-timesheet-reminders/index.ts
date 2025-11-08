@@ -103,10 +103,11 @@ serve(async (req) => {
       for (const assignment of assignments) {
         const technicianId = assignment.technician_id;
 
-        // Check if technician has any timesheets for this job with status 'submitted' or 'approved'
+        // Check if technician has any timesheets for this job
+        // Include reminder_sent_at to check if we already sent a reminder
         const { data: timesheets, error: timesheetsError } = await supabaseAdmin
           .from('timesheets')
-          .select('id, status')
+          .select('id, status, reminder_sent_at')
           .eq('job_id', job.id)
           .eq('technician_id', technicianId);
 
@@ -133,11 +134,13 @@ serve(async (req) => {
           continue;
         }
 
-        // Get the first draft timesheet to send reminder for
-        const draftTimesheet = timesheets.find((ts) => ts.status === 'draft');
+        // Get the first draft timesheet that hasn't had a reminder sent yet
+        const draftTimesheet = timesheets.find(
+          (ts) => ts.status === 'draft' && ts.reminder_sent_at === null
+        );
 
         if (!draftTimesheet) {
-          console.log(`Technician ${technicianId} has no draft timesheets for job ${job.id}`);
+          console.log(`Technician ${technicianId} has no draft timesheets needing reminders for job ${job.id} (already sent or no drafts)`);
           continue;
         }
 
@@ -167,6 +170,18 @@ serve(async (req) => {
             const reminderResult = await reminderRes.json();
             console.log(`Successfully sent reminder for timesheet ${draftTimesheet.id}:`, reminderResult);
             totalReminders++;
+
+            // Mark this timesheet as having received a reminder
+            const { error: updateError } = await supabaseAdmin
+              .from('timesheets')
+              .update({ reminder_sent_at: new Date().toISOString() })
+              .eq('id', draftTimesheet.id);
+
+            if (updateError) {
+              console.error(`Failed to update reminder_sent_at for timesheet ${draftTimesheet.id}:`, updateError);
+            } else {
+              console.log(`Marked timesheet ${draftTimesheet.id} as reminder sent`);
+            }
           }
         } catch (reminderError) {
           console.error(`Error calling send-timesheet-reminder for timesheet ${draftTimesheet.id}:`, reminderError);
