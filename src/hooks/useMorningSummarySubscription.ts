@@ -24,13 +24,13 @@ export function useMorningSummarySubscription() {
       if (!userId) return null;
 
       const { data, error } = await supabase
-        .from('morning_summary_subscriptions')
+        .from('morning_summary_subscriptions' as any)
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
 
       if (error) throw error;
-      return data as MorningSummarySubscription | null;
+      return data as unknown as MorningSummarySubscription | null;
     },
     enabled: !!userId,
   });
@@ -43,7 +43,7 @@ export function useMorningSummarySubscription() {
       if (!userId) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
-        .from('morning_summary_subscriptions')
+        .from('morning_summary_subscriptions' as any)
         .upsert({
           user_id: userId,
           subscribed_departments: updates.subscribed_departments,
@@ -53,7 +53,7 @@ export function useMorningSummarySubscription() {
         .single();
 
       if (error) throw error;
-      return data as MorningSummarySubscription;
+      return data as unknown as MorningSummarySubscription;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['morning-summary-subscription', userId] });

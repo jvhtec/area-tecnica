@@ -1338,7 +1338,7 @@ export const OptimizedAssignmentMatrix = ({
                     override_conflicts: true
                   };
                   setConflictDialog(null);
-                  sendStaffingEmailMut.mutate(payloadWithOverride, {
+                  sendStaffingEmail(payloadWithOverride, {
                     onSuccess: () => {
                       setAvailabilityDialog(null);
                       setAvailabilitySending(false);
