@@ -8,33 +8,49 @@ AS $$
 DECLARE
   cat text;
 BEGIN
-  -- 1) Attempt to resolve from job assignment role suffixes (R > E > T)
-  WITH ranked_assignments AS (
-    SELECT CASE
-             WHEN (UPPER(COALESCE(sound_role, '')) LIKE '%-R')
-               OR (UPPER(COALESCE(lights_role, '')) LIKE '%-R')
-               OR (UPPER(COALESCE(video_role, '')) LIKE '%-R') THEN 'responsable'
-             WHEN (UPPER(COALESCE(sound_role, '')) LIKE '%-E')
-               OR (UPPER(COALESCE(lights_role, '')) LIKE '%-E')
-               OR (UPPER(COALESCE(video_role, '')) LIKE '%-E') THEN 'especialista'
-             WHEN (UPPER(COALESCE(sound_role, '')) LIKE '%-T')
-               OR (UPPER(COALESCE(lights_role, '')) LIKE '%-T')
-               OR (UPPER(COALESCE(video_role, '')) LIKE '%-T') THEN 'tecnico'
-             ELSE NULL
-           END AS tier
-    FROM job_assignments
-    WHERE job_id = _job_id
-      AND technician_id = _tech_id
-  )
-  SELECT tier
+  -- 1) Attempt to resolve from job assignment roles using the same
+  --    normalization as compute_timesheet_amount_2025
+  WITH roles AS (
+         SELECT unnest(ARRAY[ja.sound_role, ja.lights_role, ja.video_role]) AS role_code
+         FROM job_assignments ja
+         WHERE ja.job_id = _job_id
+           AND ja.technician_id = _tech_id
+       ),
+       prepared AS (
+         SELECT role_code,
+                UPPER(NULLIF(split_part(role_code, '-', 3), '')) AS lvl_raw
+         FROM roles
+         WHERE role_code IS NOT NULL
+       ),
+       normalized AS (
+         SELECT CASE
+                  WHEN lvl_raw IS NOT NULL AND lvl_raw <> '' THEN lvl_raw
+                  WHEN role_code ~* 'responsable' THEN 'R'
+                  WHEN role_code ~* 'especialista' THEN 'E'
+                  WHEN role_code ~* 't[eé]cnico' THEN 'T'
+                  ELSE NULL
+                END AS lvl
+         FROM prepared
+       ),
+       ranked AS (
+         SELECT lvl,
+                CASE lvl
+                  WHEN 'R' THEN 3
+                  WHEN 'E' THEN 2
+                  WHEN 'T' THEN 1
+                  ELSE 0
+                END AS weight
+         FROM normalized
+         WHERE lvl IS NOT NULL
+       )
+  SELECT CASE lvl
+           WHEN 'R' THEN 'responsable'
+           WHEN 'E' THEN 'especialista'
+           WHEN 'T' THEN 'tecnico'
+         END
   INTO cat
-  FROM ranked_assignments
-  WHERE tier IS NOT NULL
-  ORDER BY CASE tier
-              WHEN 'responsable' THEN 1
-              WHEN 'especialista' THEN 2
-              WHEN 'tecnico' THEN 3
-            END
+  FROM ranked
+  ORDER BY weight DESC
   LIMIT 1;
 
   IF cat IS NOT NULL THEN
@@ -66,33 +82,7 @@ BEGIN
 END;
 $$;
 
--- Backfill existing timesheets so stored categories and breakdowns match the new resolver
-DO $$
-DECLARE
-  rec record;
-BEGIN
-  FOR rec IN
-    SELECT t.id,
-           t.category,
-           resolve_category_for_timesheet(t.job_id, t.technician_id) AS resolved
-    FROM timesheets t
-  LOOP
-    IF rec.resolved IS NULL THEN
-      CONTINUE;
-    END IF;
-
-    IF rec.resolved IS DISTINCT FROM rec.category THEN
-      UPDATE timesheets
-      SET category = rec.resolved
-      WHERE id = rec.id;
-
-      PERFORM compute_timesheet_amount_2025(rec.id, true);
-    END IF;
-  END LOOP;
-END;
-$$;
-
--- Re-run the backfill so amounts are recomputed with the corrected tier resolution
+-- Re-run the backfill so amounts and stored categories match the improved resolver
 DO $$
 DECLARE
   rec record;
