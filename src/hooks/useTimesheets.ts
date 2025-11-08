@@ -268,7 +268,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         .insert(insertData)
         .select(`
           *,
-          profiles (
+          technician:profiles!fk_timesheets_technician_id (
             first_name,
             last_name,
             email,
@@ -283,7 +283,13 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         return null;
       }
 
-      setTimesheets(prev => [...prev, data as unknown as Timesheet]);
+      setTimesheets(prev => [
+        ...prev,
+        {
+          ...(data as unknown as Timesheet),
+          technician: (data as any)?.technician ?? null
+        }
+      ]);
       toast.success("Timesheet created successfully");
       return data;
     } catch (error) {
@@ -301,7 +307,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         .eq("id", timesheetId)
         .select(`
           *,
-          profiles (
+          technician:profiles!fk_timesheets_technician_id (
             first_name,
             last_name,
             email,
