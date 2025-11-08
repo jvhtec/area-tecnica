@@ -38,8 +38,8 @@ describe('generateRateQuotePDF', () => {
     };
 
     const profiles: TechnicianProfile[] = [
-      { id: 'tech-1', first_name: 'Ana', last_name: 'Lopez' },
-      { id: 'tech-2', first_name: 'Luis', last_name: 'Martin' },
+      { id: 'tech-1', first_name: 'Ana', last_name: 'Lopez', autonomo: false },
+      { id: 'tech-2', first_name: 'Luis', last_name: 'Martin', autonomo: true },
     ];
 
     const quotes: TourJobRateQuote[] = [
@@ -108,6 +108,7 @@ describe('generateRateQuotePDF', () => {
 
     const mainTable = autoTableCalls[0];
     expect(mainTable.head[0][2]).toBe('Base (calc.)');
+    expect(mainTable.body[0][0]).toContain('No autónomo – €30 descuento');
     expect(mainTable.body[0][2]).toBe('180 € ×1,25 = 225 €');
     expect(mainTable.body[1][2]).toBe('150 €');
   });

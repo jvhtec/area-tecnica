@@ -10,6 +10,7 @@ import {
 } from '@/lib/tourRateMath';
 import { formatCurrency } from '@/lib/utils';
 import { fetchJobLogo, fetchTourLogo, getCompanyLogo } from '@/utils/pdf/logoUtils';
+import { appendAutonomoLabel } from '@/utils/autonomo';
 
 export interface TechnicianProfile {
   id: string;
@@ -17,6 +18,7 @@ export interface TechnicianProfile {
   last_name?: string | null;
   default_timesheet_category?: string | null;
   role?: string | null;
+  autonomo?: boolean | null;
 }
 
 export interface JobDetails {
@@ -192,12 +194,22 @@ const resolveHeaderLogo = async ({
   return loadImageSafely(brandingUrl, 'tour or job logo');
 };
 
+interface TechnicianNameInfo {
+  name: string;
+  profile?: TechnicianProfile;
+  autonomo: boolean;
+}
+
 const getTechNameFactory = (profiles: TechnicianProfile[]) => {
-  return (id: string) => {
-    const profile = profiles.find((p) => p.id === id);
-    if (!profile) return 'Unknown';
-    const name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
-    return name || 'Unknown';
+  const profileMap = new Map(profiles.map((p) => [p.id, p]));
+  return (id: string): TechnicianNameInfo => {
+    const profile = profileMap.get(id);
+    if (!profile) {
+      return { name: 'Unknown', profile: undefined, autonomo: true };
+    }
+    const name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Unknown';
+    const autonomo = profile.autonomo !== false;
+    return { name, profile, autonomo };
   };
 };
 
@@ -293,8 +305,9 @@ export async function generateRateQuotePDF(
   }));
 
   const tableData = quotesWithComputed.map(({ quote, computed }) => {
-    const name = getTechName(quote.technician_id);
+    const { name: baseName, autonomo } = getTechName(quote.technician_id);
     const lpo = lpoMap?.get(quote.technician_id) ?? null;
+    const nameWithStatus = appendAutonomoLabel(baseName, autonomo);
     const { effectiveBase, extrasTotal, preMultiplierBase, rawMultiplier, usedFallbackBase } =
       computed;
     const hasError = quote.breakdown?.error;
@@ -319,7 +332,7 @@ export async function generateRateQuotePDF(
     }
 
     return [
-      withLpo(name, lpo),
+      withLpo(nameWithStatus, lpo),
       quote.is_house_tech ? 'Plantilla' : quote.category || '—',
       baseCell,
       hasError ? '—' : formatMultiplier(rawMultiplier),
@@ -444,7 +457,10 @@ export async function generateTourRatesSummaryPDF(
 
   doc.setTextColor(...TEXT_PRIMARY);
 
-  const techTotals = new Map<string, { name: string; dates: number; total: number; lpos: Set<string> }>();
+  const techTotals = new Map<
+    string,
+    { info: TechnicianNameInfo; dates: number; total: number; lpos: Set<string> }
+  >();
 
   sortedJobs.forEach(({ quotes, lpoMap }) => {
     quotes.forEach((quote) => {
@@ -457,13 +473,16 @@ export async function generateTourRatesSummaryPDF(
 
       const { effectiveBase, extrasTotal } = computeEffectiveBase(quote);
       const effectiveTotal = effectiveBase + extrasTotal;
+      const info = getTechName(techId);
       const existing =
         techTotals.get(techId) || {
-          name: getTechName(techId),
+          info,
           dates: 0,
           total: 0,
           lpos: new Set<string>(),
         };
+
+      existing.info = info;
 
       existing.dates += 1;
       existing.total += effectiveTotal;
@@ -476,9 +495,9 @@ export async function generateTourRatesSummaryPDF(
   });
 
   const summaryRows = Array.from(techTotals.values())
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => a.info.name.localeCompare(b.info.name))
     .map((item) => [
-      item.name,
+      appendAutonomoLabel(item.info.name, item.info.autonomo, { multiline: false }),
       item.dates.toString(),
       item.lpos.size ? Array.from(item.lpos).join(', ') : '—',
       formatCurrency(item.total),
@@ -559,8 +578,9 @@ export async function generateTourRatesSummaryPDF(
     breakdownY += 4;
 
     const jobTableRows = item.quotes.map((quote) => {
-      const name = getTechName(quote.technician_id);
+      const { name: baseName, autonomo } = getTechName(quote.technician_id);
       const lpo = item.lpoMap?.get(quote.technician_id) ?? null;
+      const nameWithStatus = appendAutonomoLabel(baseName, autonomo);
       const hasError = quote.breakdown?.error;
       const {
         effectiveBase,
@@ -586,7 +606,7 @@ export async function generateTourRatesSummaryPDF(
           : formatCurrency(effectiveBase);
       }
 
-      let nameCell = withLpo(name, lpo);
+      let nameCell = withLpo(nameWithStatus, lpo);
       if (!hasError) {
         const hrs = Number(
           (quote.breakdown && (quote.breakdown.single_hours_total ?? quote.breakdown.hours_rounded ?? quote.breakdown.worked_hours_rounded)) || 0
@@ -722,10 +742,11 @@ export async function generateJobPayoutPDF(
   const getTechName = getTechNameFactory(profiles);
 
   const tableData = payouts.map((payout) => {
-    const name = getTechName(payout.technician_id);
+    const { name: baseName, autonomo } = getTechName(payout.technician_id);
     const lpo = lpoMap?.get(payout.technician_id) ?? null;
+    const nameWithStatus = appendAutonomoLabel(baseName, autonomo);
     return [
-      withLpo(name, lpo),
+      withLpo(nameWithStatus, lpo),
       formatCurrency(payout.timesheets_total_eur),
       formatCurrency(payout.extras_total_eur),
       formatCurrency(payout.total_eur),
@@ -785,11 +806,12 @@ export async function generateJobPayoutPDF(
         currentY = drawCorporateHeader(doc, headerOptions) + 2;
       }
 
-      const name = getTechName(payout.technician_id);
+      const { name: baseName, autonomo } = getTechName(payout.technician_id);
+      const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false });
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(...CORPORATE_RED);
-      doc.text(name, 14, currentY);
+      doc.text(headingName, 14, currentY);
       currentY += 5;
 
       const tableRows = lines.map((ln) => [
@@ -850,11 +872,12 @@ export async function generateJobPayoutPDF(
         currentY = drawCorporateHeader(doc, headerOptions) + 2;
       }
 
-      const name = getTechName(payout.technician_id);
+      const { name: baseName, autonomo } = getTechName(payout.technician_id);
+      const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false });
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(...CORPORATE_RED);
-      doc.text(name, 14, currentY);
+      doc.text(headingName, 14, currentY);
       currentY += 5;
 
       doc.setFont('helvetica', 'normal');

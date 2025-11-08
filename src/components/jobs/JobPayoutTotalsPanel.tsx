@@ -16,6 +16,7 @@ import {
   type TechnicianProfileWithEmail,
 } from '@/lib/job-payout-email';
 import { generateJobPayoutPDF } from '@/utils/rates-pdf-export';
+import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 
 interface JobPayoutTotalsPanelProps {
   jobId: string;
@@ -56,7 +57,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, autonomo')
         .in('id', techIds);
       if (error) throw error;
       return (data || []) as TechnicianProfileWithEmail[];
@@ -64,6 +65,10 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     staleTime: 60_000,
   });
   const profilesWithEmail = profiles as TechnicianProfileWithEmail[];
+  const autonomoMap = React.useMemo(
+    () => new Map(profilesWithEmail.map((p) => [p.id, p.autonomo ?? null])),
+    [profilesWithEmail]
+  );
   const profileMap = React.useMemo(() => new Map(profilesWithEmail.map((p) => [p.id, p])), [profilesWithEmail]);
   const getTechName = React.useCallback(
     (id: string) => {
@@ -320,7 +325,22 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           >
             <div className="flex items-start justify-between">
               <div>
-                <h4 className="font-medium text-base">{getTechName(payout.technician_id)}</h4>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="font-medium text-base">{getTechName(payout.technician_id)}</h4>
+                  {(() => {
+                    const label = getAutonomoBadgeLabel(autonomoMap.get(payout.technician_id));
+                    if (!label) return null;
+                    return (
+                      <Badge
+                        variant="destructive"
+                        className="flex items-center gap-1 text-xs"
+                      >
+                        <AlertCircle className="h-3 w-3" />
+                        {label}
+                      </Badge>
+                    );
+                  })()}
+                </div>
                 <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                   <span>Job: {payout.job_id}</span>
                   <span>
