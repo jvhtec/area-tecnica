@@ -29,12 +29,25 @@ export async function sendTimesheetReminder(
       };
     }
 
+    // Explicitly pass the Authorization header with the access token
+    console.log('Calling send-timesheet-reminder with session:', {
+      userId: session.user.id,
+      hasToken: !!session.access_token,
+    });
+    
     const { data, error } = await supabase.functions.invoke('send-timesheet-reminder', {
       body: { timesheetId },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
     });
 
     if (error) {
-      console.error('Error invoking send-timesheet-reminder function:', error);
+      console.error('Error invoking send-timesheet-reminder function:', {
+        error,
+        status: error.status,
+        message: error.message,
+      });
       return {
         success: false,
         error: error.message || 'Failed to send reminder email',
