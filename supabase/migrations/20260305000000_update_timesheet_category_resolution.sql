@@ -9,17 +9,32 @@ DECLARE
   cat text;
 BEGIN
   -- 1) Attempt to resolve from job assignment role suffixes (R > E > T)
-  SELECT
-    CASE
-      WHEN (UPPER(COALESCE(sound_role, '')) LIKE '%-R') OR (UPPER(COALESCE(lights_role, '')) LIKE '%-R') OR (UPPER(COALESCE(video_role, '')) LIKE '%-R') THEN 'responsable'
-      WHEN (UPPER(COALESCE(sound_role, '')) LIKE '%-E') OR (UPPER(COALESCE(lights_role, '')) LIKE '%-E') OR (UPPER(COALESCE(video_role, '')) LIKE '%-E') THEN 'especialista'
-      WHEN (UPPER(COALESCE(sound_role, '')) LIKE '%-T') OR (UPPER(COALESCE(lights_role, '')) LIKE '%-T') OR (UPPER(COALESCE(video_role, '')) LIKE '%-T') THEN 'tecnico'
-      ELSE NULL
-    END
+  WITH ranked_assignments AS (
+    SELECT CASE
+             WHEN (UPPER(COALESCE(sound_role, '')) LIKE '%-R')
+               OR (UPPER(COALESCE(lights_role, '')) LIKE '%-R')
+               OR (UPPER(COALESCE(video_role, '')) LIKE '%-R') THEN 'responsable'
+             WHEN (UPPER(COALESCE(sound_role, '')) LIKE '%-E')
+               OR (UPPER(COALESCE(lights_role, '')) LIKE '%-E')
+               OR (UPPER(COALESCE(video_role, '')) LIKE '%-E') THEN 'especialista'
+             WHEN (UPPER(COALESCE(sound_role, '')) LIKE '%-T')
+               OR (UPPER(COALESCE(lights_role, '')) LIKE '%-T')
+               OR (UPPER(COALESCE(video_role, '')) LIKE '%-T') THEN 'tecnico'
+             ELSE NULL
+           END AS tier
+    FROM job_assignments
+    WHERE job_id = _job_id
+      AND technician_id = _tech_id
+  )
+  SELECT tier
   INTO cat
-  FROM job_assignments
-  WHERE job_id = _job_id
-    AND technician_id = _tech_id
+  FROM ranked_assignments
+  WHERE tier IS NOT NULL
+  ORDER BY CASE tier
+              WHEN 'responsable' THEN 1
+              WHEN 'especialista' THEN 2
+              WHEN 'tecnico' THEN 3
+            END
   LIMIT 1;
 
   IF cat IS NOT NULL THEN
@@ -57,19 +72,46 @@ DECLARE
   rec record;
 BEGIN
   FOR rec IN
-    SELECT id, resolved
-    FROM (
-      SELECT t.id,
-             t.category,
-             resolve_category_for_timesheet(t.job_id, t.technician_id) AS resolved
-      FROM timesheets t
-    ) s
-    WHERE resolved IS NOT NULL
-      AND resolved IS DISTINCT FROM category
+    SELECT t.id,
+           t.category,
+           resolve_category_for_timesheet(t.job_id, t.technician_id) AS resolved
+    FROM timesheets t
   LOOP
-    UPDATE timesheets
-    SET category = rec.resolved
-    WHERE id = rec.id;
+    IF rec.resolved IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    IF rec.resolved IS DISTINCT FROM rec.category THEN
+      UPDATE timesheets
+      SET category = rec.resolved
+      WHERE id = rec.id;
+
+      PERFORM compute_timesheet_amount_2025(rec.id, true);
+    END IF;
+  END LOOP;
+END;
+$$;
+
+-- Re-run the backfill so amounts are recomputed with the corrected tier resolution
+DO $$
+DECLARE
+  rec record;
+BEGIN
+  FOR rec IN
+    SELECT t.id,
+           t.category,
+           resolve_category_for_timesheet(t.job_id, t.technician_id) AS resolved
+    FROM timesheets t
+  LOOP
+    IF rec.resolved IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    IF rec.resolved IS DISTINCT FROM rec.category THEN
+      UPDATE timesheets
+      SET category = rec.resolved
+      WHERE id = rec.id;
+    END IF;
 
     PERFORM compute_timesheet_amount_2025(rec.id, true);
   END LOOP;
