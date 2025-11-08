@@ -22,6 +22,9 @@ RETURNS TABLE(
   created_by uuid,
   approved_by uuid,
   approved_at timestamp with time zone,
+  rejected_at timestamp with time zone,
+  rejected_by uuid,
+  rejection_reason text,
   created_at timestamp with time zone,
   updated_at timestamp with time zone,
   category text,
@@ -47,7 +50,7 @@ BEGIN
 
   -- Return timesheets with visibility rules applied
   RETURN QUERY 
-  SELECT 
+  SELECT
     t.id,
     t.job_id,
     t.technician_id,
@@ -63,6 +66,9 @@ BEGIN
     t.created_by,
     t.approved_by,
     t.approved_at,
+    t.rejected_at,
+    t.rejected_by,
+    t.rejection_reason,
     t.created_at,
     t.updated_at,
     t.category,
