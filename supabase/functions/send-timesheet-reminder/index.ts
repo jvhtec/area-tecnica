@@ -106,7 +106,7 @@ serve(async (req) => {
       .from('timesheets')
       .select(`
         *,
-        technician:profiles!timesheets_technician_id_fkey(
+        technician:profiles!fk_timesheets_technician_id(
           id,
           first_name,
           last_name,
