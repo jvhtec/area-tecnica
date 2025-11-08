@@ -12,57 +12,97 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    )
+    // Log incoming request
+    console.log('=== send-timesheet-reminder invoked ===');
+    console.log('Headers received:', {
+      hasAuth: !!req.headers.get('Authorization'),
+      authHeader: req.headers.get('Authorization')?.substring(0, 20) + '...',
+    });
 
-    // Verify user is authenticated and has management permissions
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser()
-
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    // Validate Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error('Missing or invalid Authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Missing or invalid authorization header' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    // Check user role
-    const { data: profile, error: profileError } = await supabaseClient
+    // Extract JWT and decode to get user ID
+    // Since verify_jwt=true, Supabase has already validated the token
+    const jwt = authHeader.replace('Bearer ', '');
+    let userId: string;
+    try {
+      const payload = JSON.parse(atob(jwt.split('.')[1]));
+      userId = payload.sub;
+      console.log('Decoded user ID from JWT:', userId);
+    } catch (decodeError) {
+      console.error('Failed to decode JWT:', decodeError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid token format' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Create admin client for database operations (bypasses RLS)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    console.log('Checking user role for:', userId);
+
+    // Check user role using admin client
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
-      .eq('id', user.id)
-      .single()
+      .eq('id', userId)
+      .single();
 
-    if (profileError || !profile || (profile.role !== 'admin' && profile.role !== 'management')) {
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to verify user permissions' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'management')) {
+      console.log('User does not have required role:', profile?.role);
       return new Response(
         JSON.stringify({ error: 'Forbidden: Only management can send reminder emails' }),
         {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
-      )
+      );
     }
 
-    const { timesheetId } = await req.json()
+    console.log('User authorized, role:', profile.role);
+
+    const { timesheetId } = await req.json();
+    console.log('Processing timesheet ID:', timesheetId);
 
     if (!timesheetId) {
+      console.error('Missing timesheetId in request body');
       return new Response(JSON.stringify({ error: 'Missing timesheetId' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      });
     }
 
-    // Fetch timesheet with technician and job details
-    const { data: timesheet, error: timesheetError } = await supabaseClient
+    // Fetch timesheet with technician and job details using admin client
+    const { data: timesheet, error: timesheetError } = await supabaseAdmin
       .from('timesheets')
       .select(`
         *,
@@ -83,11 +123,14 @@ serve(async (req) => {
       .single()
 
     if (timesheetError || !timesheet) {
+      console.error('Timesheet not found:', timesheetError);
       return new Response(JSON.stringify({ error: 'Timesheet not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      });
     }
+
+    console.log('Timesheet found, status:', timesheet.status);
 
     // Only send reminders for draft or submitted timesheets
     if (timesheet.status === 'approved') {
@@ -280,6 +323,7 @@ serve(async (req) => {
     }
 
     const brevoResponse = await sendRes.json();
+    console.log('Email sent successfully:', brevoResponse.messageId);
 
     return new Response(
       JSON.stringify({
