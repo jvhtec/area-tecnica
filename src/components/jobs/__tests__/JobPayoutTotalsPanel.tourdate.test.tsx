@@ -2,7 +2,8 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { JobPayoutTotalsPanel } from '../JobPayoutTotalsPanel';
-import { NO_AUTONOMO_LABEL } from '@/utils/autonomo';
+import { formatCurrency } from '@/lib/utils';
+import type { TourJobRateQuote } from '@/types/tourRates';
 
 const useJobPayoutTotalsMock = vi.fn();
 const useManagerJobQuotesMock = vi.fn();
@@ -33,24 +34,50 @@ vi.mock('sonner', () => ({
   },
 }));
 
-describe('JobPayoutTotalsPanel autonomo badge', () => {
+describe('JobPayoutTotalsPanel tourdate payouts', () => {
   beforeEach(() => {
     useJobPayoutTotalsMock.mockReturnValue({
-      data: [
-        {
-          technician_id: 'tech-1',
-          job_id: 'job-1',
-          timesheets_total_eur: 100,
-          extras_total_eur: 0,
-          total_eur: 100,
-        },
-      ],
+      data: [],
       isLoading: false,
       error: null,
     });
 
+    const quote: TourJobRateQuote = {
+      job_id: 'job-tour-1',
+      technician_id: 'tech-1',
+      start_time: '2024-01-01T00:00:00Z',
+      end_time: '2024-01-01T06:00:00Z',
+      job_type: 'tourdate',
+      tour_id: 'tour-1',
+      title: 'Tour Date',
+      is_house_tech: false,
+      category: 'tecnico',
+      base_day_eur: 150,
+      week_count: 1,
+      multiplier: 1,
+      iso_year: 2024,
+      iso_week: 1,
+      total_eur: 150,
+      extras: {
+        items: [
+          {
+            extra_type: 'travel_half',
+            quantity: 1,
+            unit_eur: 25,
+            amount_eur: 25,
+          },
+        ],
+        total_eur: 25,
+      },
+      extras_total_eur: 25,
+      total_with_extras_eur: 175,
+      vehicle_disclaimer: true,
+      vehicle_disclaimer_text: 'Vehículo asignado por la gira.',
+      breakdown: {},
+    };
+
     useManagerJobQuotesMock.mockReturnValue({
-      data: [],
+      data: [quote],
       isLoading: false,
       error: null,
     });
@@ -78,12 +105,12 @@ describe('JobPayoutTotalsPanel autonomo badge', () => {
       if (key === 'job-payout-metadata') {
         return {
           data: {
-            id: 'job-1',
-            title: 'Job Uno',
+            id: 'job-tour-1',
+            title: 'Tour Date',
             start_time: '2024-01-01T00:00:00Z',
-            tour_id: null,
+            tour_id: 'tour-1',
             rates_approved: true,
-            job_type: null,
+            job_type: 'tourdate',
           },
           isLoading: false,
           error: null,
@@ -93,9 +120,19 @@ describe('JobPayoutTotalsPanel autonomo badge', () => {
     });
   });
 
-  it('renders the non-autonomo badge when the flag is false', () => {
-    render(<JobPayoutTotalsPanel jobId="job-1" />);
+  it('renders mapped tour payouts with totals and extras', () => {
+    render(<JobPayoutTotalsPanel jobId="job-tour-1" />);
 
-    expect(screen.getByText(NO_AUTONOMO_LABEL)).toBeInTheDocument();
+    const normalize = (value: string) => value.replace(/\s+/g, '');
+    const grandTotals = screen.getAllByText(
+      (content) => normalize(content) === normalize(formatCurrency(175))
+    );
+    const baseTotals = screen.getAllByText(
+      (content) => normalize(content) === normalize(formatCurrency(150))
+    );
+    expect(grandTotals.length).toBeGreaterThan(0);
+    expect(baseTotals.length).toBeGreaterThan(0);
+    expect(screen.getByText('travel half × 1')).toBeInTheDocument();
+    expect(screen.queryByText('No payout information available for this job.')).not.toBeInTheDocument();
   });
 });
