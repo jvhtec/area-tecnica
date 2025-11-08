@@ -97,7 +97,7 @@ export function useUpsertJobRequiredRole() {
           .select('*')
           .single()
         if (error) throw error
-        return data as JobRequiredRoleRow
+        return { row: data as JobRequiredRoleRow, action: 'updated' as const }
       } else {
         const { data, error } = await supabase
           .from('job_required_roles')
@@ -105,13 +105,79 @@ export function useUpsertJobRequiredRole() {
           .select('*')
           .single()
         if (error) throw error
-        return data as JobRequiredRoleRow
+        return { row: data as JobRequiredRoleRow, action: 'created' as const }
       }
     },
-    onSuccess: (row) => {
+    onSuccess: ({ row, action }) => {
       queryClient.invalidateQueries({ queryKey: ['job-required-roles', row.job_id] })
       queryClient.invalidateQueries({ queryKey: ['job-required-summary', row.job_id] })
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      void (async () => {
+        try {
+          const jobId = row.job_id
+          const { data: sessionData } = await supabase.auth.getSession()
+          const actorId = sessionData?.session?.user?.id ?? null
+
+          const { data: summaryData, error: summaryError } = await supabase
+            .from('job_required_roles_summary')
+            .select('department, total_required, roles')
+            .eq('job_id', jobId)
+
+          if (summaryError) throw summaryError
+
+          const summaryItems = (summaryData || [])
+            .map(parseSummaryRow)
+            .filter(Boolean) as RequiredRoleSummaryItem[]
+
+          const departmentRoles = summaryItems.map((item) => ({
+            department: item.department,
+            total_required: item.total_required,
+            roles: item.roles.map((role) => ({
+              role_code: role.role_code,
+              quantity: role.quantity,
+              notes: role.notes ?? null,
+            })),
+          }))
+
+          const activityPayload = {
+            department_roles: departmentRoles,
+            last_change: {
+              type: action,
+              department: row.department,
+              role_code: row.role_code,
+              quantity: row.quantity,
+            },
+          }
+
+          const activityResult = await supabase.rpc('log_activity', {
+            _code: 'job.requirements.updated',
+            _job_id: jobId,
+            _entity_type: 'job_required_roles',
+            _entity_id: row.id,
+            _payload: activityPayload,
+          })
+
+          if (activityResult.error) {
+            console.warn('Failed to record job requirements activity:', activityResult.error)
+          }
+
+          const pushResult = await supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: 'job.requirements.updated',
+              job_id: jobId,
+              actor_id: actorId ?? undefined,
+              department_roles: departmentRoles,
+            },
+          })
+
+          if (pushResult.error) {
+            console.warn('Failed to invoke job requirements push:', pushResult.error)
+          }
+        } catch (err) {
+          console.warn('Failed to broadcast job requirements update:', err)
+        }
+      })()
     },
   })
 }
@@ -124,10 +190,73 @@ export function useDeleteJobRequiredRole() {
       if (error) throw error
       return { id, job_id }
     },
-    onSuccess: ({ job_id }) => {
+    onSuccess: ({ job_id, id }) => {
       queryClient.invalidateQueries({ queryKey: ['job-required-roles', job_id] })
       queryClient.invalidateQueries({ queryKey: ['job-required-summary', job_id] })
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      void (async () => {
+        try {
+          const { data: sessionData } = await supabase.auth.getSession()
+          const actorId = sessionData?.session?.user?.id ?? null
+
+          const { data: summaryData, error: summaryError } = await supabase
+            .from('job_required_roles_summary')
+            .select('department, total_required, roles')
+            .eq('job_id', job_id)
+
+          if (summaryError) throw summaryError
+
+          const summaryItems = (summaryData || [])
+            .map(parseSummaryRow)
+            .filter(Boolean) as RequiredRoleSummaryItem[]
+
+          const departmentRoles = summaryItems.map((item) => ({
+            department: item.department,
+            total_required: item.total_required,
+            roles: item.roles.map((role) => ({
+              role_code: role.role_code,
+              quantity: role.quantity,
+              notes: role.notes ?? null,
+            })),
+          }))
+
+          const activityPayload = {
+            department_roles: departmentRoles,
+            last_change: {
+              type: 'deleted',
+              deleted_role_id: id,
+            },
+          }
+
+          const activityResult = await supabase.rpc('log_activity', {
+            _code: 'job.requirements.updated',
+            _job_id: job_id,
+            _entity_type: 'job_required_roles',
+            _entity_id: id,
+            _payload: activityPayload,
+          })
+
+          if (activityResult.error) {
+            console.warn('Failed to record job requirements activity:', activityResult.error)
+          }
+
+          const pushResult = await supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: 'job.requirements.updated',
+              job_id,
+              actor_id: actorId ?? undefined,
+              department_roles: departmentRoles,
+            },
+          })
+
+          if (pushResult.error) {
+            console.warn('Failed to invoke job requirements push:', pushResult.error)
+          }
+        } catch (err) {
+          console.warn('Failed to broadcast job requirements deletion:', err)
+        }
+      })()
     },
   })
 }

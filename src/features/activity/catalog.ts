@@ -17,6 +17,14 @@ export const activityCatalogDefaults: Record<string, ActivityCatalogEntry> = {
     toast_enabled: true,
     template: '{actor_name} updated job {job_title}',
   },
+  'job.requirements.updated': {
+    code: 'job.requirements.updated',
+    label: 'Job requirements updated',
+    default_visibility: 'job_participants',
+    severity: 'info',
+    toast_enabled: true,
+    template: '{actor_name} adjusted crew requirements for {job_title}',
+  },
   'job.deleted': {
     code: 'job.deleted',
     label: 'Job deleted',
