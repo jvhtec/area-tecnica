@@ -1,12 +1,31 @@
 # Fix send-timesheet-reminder Function
 
+## Quick Fix Summary
+
+**You need to redeploy the function to fix the error!**
+
+The foreign key constraint name was wrong in the code. It's been fixed and pushed to git. Run this command to deploy the fix:
+
+```bash
+npx supabase functions deploy send-timesheet-reminder
+```
+
+Then ensure you have set the Brevo secrets (see "How to Set Environment Variables" section below).
+
+---
+
 ## Issues Fixed
 
 ### 1. ✅ 404 Error (RESOLVED)
 The function was not deployed initially - now deployed.
 
-### 2. ⚠️ Current Issue: "Edge Function returned a non-2xx status code"
-The function is missing required environment variables in Supabase.
+### 2. ✅ Foreign Key Constraint Error (RESOLVED)
+The function was using wrong foreign key name `timesheets_technician_id_fkey` instead of the actual constraint name `fk_timesheets_technician_id`. This has been fixed in commit 23b735d.
+
+### 3. ⚠️ Next Step: Deploy Updated Function & Set Secrets
+The function code has been fixed and pushed. You need to:
+1. Redeploy the function to pick up the foreign key fix
+2. Set the required Brevo secrets (if not already done)
 
 ## Required Environment Variables
 
