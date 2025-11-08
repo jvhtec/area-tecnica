@@ -26,3 +26,6 @@ verify_jwt = true
 
 [functions.send-job-payout-email]
 verify_jwt = true
+
+[functions.send-timesheet-reminder]
+verify_jwt = true

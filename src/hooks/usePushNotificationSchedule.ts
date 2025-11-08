@@ -22,27 +22,27 @@ export function usePushNotificationSchedule(eventType: string) {
     queryKey: ['push-notification-schedule', eventType],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('push_notification_schedules')
+        .from('push_notification_schedules' as any)
         .select('*')
         .eq('event_type', eventType)
         .maybeSingle();
 
       if (error) throw error;
-      return data as PushNotificationSchedule | null;
+      return data as unknown as PushNotificationSchedule | null;
     },
   });
 
   const updateSchedule = useMutation({
     mutationFn: async (updates: Partial<PushNotificationSchedule>) => {
       const { data, error } = await supabase
-        .from('push_notification_schedules')
+        .from('push_notification_schedules' as any)
         .update(updates)
         .eq('event_type', eventType)
         .select()
         .single();
 
       if (error) throw error;
-      return data as PushNotificationSchedule;
+      return data as unknown as PushNotificationSchedule;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['push-notification-schedule', eventType] });
