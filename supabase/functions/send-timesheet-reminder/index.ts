@@ -101,25 +101,44 @@ serve(async (req) => {
       });
     }
 
-    // Fetch timesheet with technician details using admin client
+    // Fetch timesheet using admin client
     const { data: timesheet, error: timesheetError } = await supabaseAdmin
       .from('timesheets')
-      .select(`
-        *,
-        technician:profiles!timesheets_technician_id_fkey(
-          id,
-          first_name,
-          last_name,
-          nickname,
-          email
-        )
-      `)
+      .select('*')
       .eq('id', timesheetId)
       .single()
 
     if (timesheetError || !timesheet) {
       console.error('Timesheet not found:', timesheetError);
       return new Response(JSON.stringify({ error: 'Timesheet not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Timesheet found, status:', timesheet.status);
+
+    // Only send reminders for draft or submitted timesheets
+    if (timesheet.status === 'approved') {
+      return new Response(
+        JSON.stringify({ error: 'Cannot send reminder for approved timesheet' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    // Fetch technician details separately since there's no foreign key
+    const { data: technician, error: technicianError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, first_name, last_name, nickname, email')
+      .eq('id', timesheet.technician_id)
+      .single()
+
+    if (technicianError || !technician) {
+      console.error('Technician not found:', technicianError);
+      return new Response(JSON.stringify({ error: 'Technician not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -140,21 +159,8 @@ serve(async (req) => {
       });
     }
 
-    console.log('Timesheet found, status:', timesheet.status);
     console.log('Job found:', job.title);
-
-    // Only send reminders for draft or submitted timesheets
-    if (timesheet.status === 'approved') {
-      return new Response(
-        JSON.stringify({ error: 'Cannot send reminder for approved timesheet' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
-    }
-
-    const technician = timesheet.technician as any
+    console.log('Technician found:', technician.email);
 
     if (!technician?.email) {
       return new Response(JSON.stringify({ error: 'Technician email not found' }), {
