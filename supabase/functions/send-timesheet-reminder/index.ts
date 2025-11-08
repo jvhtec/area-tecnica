@@ -101,7 +101,7 @@ serve(async (req) => {
       });
     }
 
-    // Fetch timesheet with technician and job details using admin client
+    // Fetch timesheet with technician details using admin client
     const { data: timesheet, error: timesheetError } = await supabaseAdmin
       .from('timesheets')
       .select(`
@@ -112,11 +112,6 @@ serve(async (req) => {
           last_name,
           nickname,
           email
-        ),
-        job:jobs(
-          id,
-          title,
-          client_name
         )
       `)
       .eq('id', timesheetId)
@@ -130,7 +125,23 @@ serve(async (req) => {
       });
     }
 
+    // Fetch job details separately since there's no foreign key
+    const { data: job, error: jobError } = await supabaseAdmin
+      .from('jobs')
+      .select('id, title, client_name')
+      .eq('id', timesheet.job_id)
+      .single()
+
+    if (jobError) {
+      console.error('Job not found:', jobError);
+      return new Response(JSON.stringify({ error: 'Job not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     console.log('Timesheet found, status:', timesheet.status);
+    console.log('Job found:', job.title);
 
     // Only send reminders for draft or submitted timesheets
     if (timesheet.status === 'approved') {
@@ -144,7 +155,6 @@ serve(async (req) => {
     }
 
     const technician = timesheet.technician as any
-    const job = timesheet.job as any
 
     if (!technician?.email) {
       return new Response(JSON.stringify({ error: 'Technician email not found' }), {
