@@ -12,14 +12,14 @@ The function is missing required environment variables in Supabase.
 
 The function requires these environment variables to be set **in your Supabase project**:
 
-### Critical (Function will fail without these):
-- `SUPABASE_SERVICE_ROLE_KEY` - **Required for admin operations** (bypasses RLS)
+### ⚠️ Critical (Must be set as secrets):
 - `BREVO_API_KEY` - Brevo API key for sending emails
-- `BREVO_FROM` - From email address
+- `BREVO_FROM` - From email address (must be verified in Brevo)
 
-### Auto-provided by Supabase:
-- `SUPABASE_URL` - Automatically available
-- `SUPABASE_ANON_KEY` - Automatically available (not used by current version)
+### ✅ Auto-provided by Supabase (DO NOT SET MANUALLY):
+- `SUPABASE_URL` - Automatically injected by Supabase
+- `SUPABASE_SERVICE_ROLE_KEY` - Automatically injected by Supabase (bypasses RLS)
+- `SUPABASE_ANON_KEY` - Automatically injected by Supabase
 
 ### Optional (have defaults):
 - `COMPANY_LOGO_URL_W` - Company logo URL (defaults to Supabase storage)
@@ -32,17 +32,17 @@ The function requires these environment variables to be set **in your Supabase p
 1. Go to https://supabase.com/dashboard/project/syldobdcdsgfgjtbuwxm/settings/functions
 2. Scroll to "Environment variables" or "Secrets"
 3. Add the following secrets:
-   - `SUPABASE_SERVICE_ROLE_KEY`: Your service role key (found in Project Settings > API > service_role key)
    - `BREVO_API_KEY`: Your Brevo/Sendinblue API key
-   - `BREVO_FROM`: Your verified sender email
+   - `BREVO_FROM`: Your verified sender email (e.g., noreply@sectorpro.com)
 
 ### Via Supabase CLI:
 
 ```bash
-npx supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 npx supabase secrets set BREVO_API_KEY=your-brevo-api-key
 npx supabase secrets set BREVO_FROM=noreply@yourdomain.com
 ```
+
+**Note**: DO NOT set `SUPABASE_SERVICE_ROLE_KEY` manually - it's automatically provided by Supabase!
 
 ## Solution
 
@@ -106,39 +106,53 @@ curl -X POST \
 ❌ **Error Responses**:
 - **401 Unauthorized**: Missing or invalid Authorization header
 - **403 Forbidden**: User is not admin or management
-- **404 Not Found**: Timesheet not found (check that SERVICE_ROLE_KEY is set!)
+- **404 Not Found**: Timesheet not found
 - **500 Internal Server Error**: Check Supabase function logs for details
 
 ## Troubleshooting
 
 ### "Edge Function returned a non-2xx status code"
 
-This error means the function is deployed but failing during execution. Common causes:
+This error means the function is deployed but failing during execution.
 
-1. **Missing SUPABASE_SERVICE_ROLE_KEY**
-   - Symptom: Function returns 404 or 500 when querying database
-   - Fix: Set the environment variable in Supabase dashboard
-   - Verify: Check Project Settings > API > service_role key
+**FIRST STEP: Check the function logs!**
 
-2. **Missing BREVO_API_KEY or BREVO_FROM**
-   - Symptom: Function works until trying to send email
-   - Fix: Set both Brevo environment variables
+1. Go to https://supabase.com/dashboard/project/syldobdcdsgfgjtbuwxm/functions/send-timesheet-reminder
+2. Click on "Logs" or "Invocations"
+3. Look at the most recent failed invocation
+4. Check the console.log and console.error messages
+5. Note the actual HTTP status code (401, 403, 404, 500, etc.)
 
-3. **Check Function Logs**
-   - Go to https://supabase.com/dashboard/project/syldobdcdsgfgjtbuwxm/functions/send-timesheet-reminder
-   - View recent invocations and logs
-   - Look for console.log and console.error messages
+### Common Issues:
 
-### How to Get Your Service Role Key
+1. **Missing BREVO_API_KEY or BREVO_FROM**
+   - Symptom: Function logs show "BREVO_API_KEY is not defined" or email sending fails
+   - Fix: Set both Brevo secrets using instructions above
 
-1. Go to https://supabase.com/dashboard/project/syldobdcdsgfgjtbuwxm/settings/api
-2. Scroll to "Project API keys"
-3. Copy the `service_role` key (⚠️ **Keep this secret!**)
-4. Add it to your edge function environment variables
+2. **Invalid Authorization Header (401)**
+   - Symptom: Logs show "Missing or invalid Authorization header"
+   - Fix: Ensure the frontend is passing the JWT token correctly
 
-### After Setting Variables, Redeploy
+3. **User Not Admin/Management (403)**
+   - Symptom: Logs show "User does not have required role"
+   - Fix: Ensure the logged-in user has role 'admin' or 'management' in the profiles table
 
-After adding environment variables, you must redeploy the function:
+4. **Timesheet Not Found (404)**
+   - Symptom: Logs show "Timesheet not found" or "Error fetching profile"
+   - Possible causes:
+     - Invalid timesheet ID
+     - RLS policies blocking access (check function logs for database errors)
+
+5. **Brevo Email Sending Failed (500)**
+   - Symptom: Logs show "Brevo API error" or "Failed to send email"
+   - Possible causes:
+     - Invalid Brevo API key
+     - Unverified sender email address
+     - Brevo account issues
+
+### After Setting Variables
+
+After adding or updating environment variables, Supabase automatically makes them available to the function. You may need to wait a few seconds or trigger a new deployment for changes to take effect:
 
 ```bash
 npx supabase functions deploy send-timesheet-reminder
@@ -151,12 +165,16 @@ npx supabase functions deploy send-timesheet-reminder
 - **Permissions**: Requires admin or management role
 - **Purpose**: Sends reminder emails to technicians for incomplete timesheets
 
-## Environment Variables Required
+## Summary: What You Need to Set
 
-The function requires these environment variables to be set in Supabase:
-- `BREVO_API_KEY` - Brevo API key for sending emails
-- `BREVO_FROM` - From email address
-- `SUPABASE_URL` - Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key for admin operations
-- `COMPANY_LOGO_URL_W` (optional) - Company logo URL
-- `AT_LOGO_URL` (optional) - Area Tecnica logo URL
+**Required Secrets (set these manually):**
+- ✅ `BREVO_API_KEY` - Brevo API key for sending emails
+- ✅ `BREVO_FROM` - From email address (must be verified in Brevo)
+
+**Automatically Provided (don't set these):**
+- ✅ `SUPABASE_URL` - Auto-injected by Supabase
+- ✅ `SUPABASE_SERVICE_ROLE_KEY` - Auto-injected by Supabase
+
+**Optional (have reasonable defaults):**
+- `COMPANY_LOGO_URL_W` - Company logo URL (defaults to Supabase storage)
+- `AT_LOGO_URL` - Area Tecnica logo URL (defaults to Supabase storage)
