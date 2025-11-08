@@ -19,6 +19,7 @@ const COVERED_CODES = new Set<string>([
   'staffing.offer.cancelled',
   'job.status.confirmed',
   'job.status.cancelled',
+  'job.requirements.updated',
   'flex.tourdate_folder.created',
 ])
 

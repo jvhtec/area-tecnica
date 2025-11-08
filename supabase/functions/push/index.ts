@@ -104,6 +104,12 @@ type PushNotificationRoute = {
   include_natural_recipients: boolean;
 };
 
+type DepartmentRoleSummary = {
+  department: string;
+  total_required: number;
+  roles: Array<{ role_code: string; quantity: number; notes?: string | null }>;
+};
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
@@ -120,6 +126,7 @@ const EVENT_TYPES = {
   JOB_STATUS_CANCELLED: 'job.status.cancelled',
   JOB_CALLTIME_UPDATED: 'job.calltime.updated',
   JOB_TYPE_CHANGED: 'job.type.changed',
+  JOB_REQUIREMENTS_UPDATED: 'job.requirements.updated',
 
   // Assignment events
   JOB_ASSIGNMENT_CONFIRMED: 'job.assignment.confirmed',
@@ -589,6 +596,82 @@ async function getJobParticipantUserIds(client: ReturnType<typeof createClient>,
   if (error || !data) return [];
   const ids = data.map((r: any) => r.technician_id).filter(Boolean);
   return Array.from(new Set(ids));
+}
+
+function parseDepartmentRoleSummary(raw: any): DepartmentRoleSummary | null {
+  if (!raw) return null;
+  const department = typeof raw.department === 'string' ? raw.department : '';
+  if (!department) return null;
+  const total = Number(raw.total_required ?? 0);
+  const roles = Array.isArray(raw.roles)
+    ? raw.roles
+        .map((role: any) => ({
+          role_code: typeof role?.role_code === 'string' ? role.role_code : '',
+          quantity: Number(role?.quantity ?? 0),
+          notes: role?.notes ?? null,
+        }))
+        .filter((role) => role.role_code)
+    : [];
+  return {
+    department,
+    total_required: Number.isFinite(total) ? total : 0,
+    roles,
+  };
+}
+
+async function getJobRequiredRolesSummary(
+  client: ReturnType<typeof createClient>,
+  jobId?: string | null,
+): Promise<DepartmentRoleSummary[]> {
+  if (!jobId) return [];
+  try {
+    const { data, error } = await client
+      .from('job_required_roles_summary')
+      .select('department, total_required, roles')
+      .eq('job_id', jobId);
+    if (error || !data) {
+      return [];
+    }
+    return (data || [])
+      .map(parseDepartmentRoleSummary)
+      .filter((item): item is DepartmentRoleSummary => Boolean(item));
+  } catch (_) {
+    return [];
+  }
+}
+
+function normalizeDepartmentRolesPayload(value: unknown): DepartmentRoleSummary[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(parseDepartmentRoleSummary)
+    .filter((item): item is DepartmentRoleSummary => Boolean(item));
+}
+
+function formatDepartmentRolesSummary(summary: DepartmentRoleSummary[]): string {
+  if (!summary || summary.length === 0) {
+    return '';
+  }
+
+  const deptLabels: Record<string, string> = {
+    sound: 'Sonido',
+    lights: 'Iluminación',
+    video: 'Vídeo',
+    logistics: 'Logística',
+    production: 'Producción',
+  };
+
+  const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+  return summary
+    .map((item) => {
+      const deptName = deptLabels[item.department] || capitalize(item.department);
+      const rolesText = item.roles && item.roles.length
+        ? item.roles.map((role) => `${role.role_code} (${role.quantity})`).join(', ')
+        : 'Sin roles asignados';
+      const total = Number(item.total_required ?? 0);
+      return `• ${deptName}${Number.isFinite(total) ? ` (${total})` : ''}: ${rolesText}`;
+    })
+    .join('\n');
 }
 
 async function getJobTitle(client: ReturnType<typeof createClient>, jobId?: string): Promise<string | null> {
@@ -1366,10 +1449,19 @@ async function handleBroadcast(
   let text = '';
   let url = body.url || (jobId ? `/jobs/${jobId}` : tourId ? `/tours/${tourId}` : '/');
 
-  const actor = body.actor_name || (await getProfileDisplayName(client, userId)) || 'Alguien';
+  const actorIdForLookup = (body as any)?.actor_id || userId;
+  const actor = body.actor_name || (await getProfileDisplayName(client, actorIdForLookup)) || 'Alguien';
   const recipName = body.recipient_name || (await getProfileDisplayName(client, body.recipient_id)) || '';
   const ch = channelEs(body.channel);
-  const metaExtras: { view?: string; department?: string; targetUrl?: string; targetDate?: string; singleDay?: boolean } = {};
+  const metaExtras: {
+    view?: string;
+    department?: string;
+    targetUrl?: string;
+    targetDate?: string;
+    singleDay?: boolean;
+    requirementsSummary?: DepartmentRoleSummary[];
+    requirementsSummaryText?: string;
+  } = {};
   let changeSummary: string | undefined;
 
   const rawTargetDate = typeof (body as any)?.target_date === 'string' ? (body as any).target_date as string : undefined;
@@ -1468,6 +1560,27 @@ async function handleBroadcast(
     } else {
       text = `${actor} actualizó "${jobTitle || 'Trabajo'}".`;
     }
+    addNaturalRecipients(Array.from(mgmt));
+    addNaturalRecipients(Array.from(participants));
+
+  } else if (type === EVENT_TYPES.JOB_REQUIREMENTS_UPDATED) {
+    title = 'Requerimientos de equipo actualizados';
+    const providedSummary = normalizeDepartmentRolesPayload((body as any)?.department_roles);
+    let summary = await getJobRequiredRolesSummary(client, jobId);
+    if (!summary.length) {
+      summary = providedSummary;
+    }
+
+    const summaryText = formatDepartmentRolesSummary(summary);
+    if (summaryText) {
+      text = `${actor} actualizó los requerimientos de "${jobTitle || 'Trabajo'}".\n\n${summaryText}`;
+    } else {
+      text = `${actor} actualizó los requerimientos de "${jobTitle || 'Trabajo'}".`;
+    }
+
+    metaExtras.requirementsSummary = summary;
+    metaExtras.requirementsSummaryText = summaryText || undefined;
+
     addNaturalRecipients(Array.from(mgmt));
     addNaturalRecipients(Array.from(participants));
 
@@ -2283,6 +2396,8 @@ async function handleBroadcast(
       ...(metaExtras.view ? { view: metaExtras.view } : {}),
       ...(metaExtras.department ? { department: metaExtras.department } : {}),
       ...(metaExtras.targetUrl ? { targetUrl: metaExtras.targetUrl } : {}),
+      ...(metaExtras.requirementsSummary ? { departmentRoles: metaExtras.requirementsSummary } : {}),
+      ...(metaExtras.requirementsSummaryText ? { departmentRolesText: metaExtras.requirementsSummaryText } : {}),
     },
   };
 
