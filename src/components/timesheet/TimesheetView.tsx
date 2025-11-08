@@ -288,7 +288,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   });
 
   if (isLoading) {
-    return <div className="flex items-center justify-center p-8">Loading timesheets...</div>;
+    return <div className="flex items-center justify-center p-8">Cargando partes de trabajo...</div>;
   }
 
   return (
@@ -303,9 +303,9 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Clock className="h-6 w-6" />
-            {isTechnician ? 'My Timesheets' : 'Timesheets'}
+            {isTechnician ? 'Mis Partes de Trabajo' : 'Partes de Trabajo'}
           </h2>
-          {jobTitle && <p className="text-muted-foreground">Job: {jobTitle}</p>}
+          {jobTitle && <p className="text-muted-foreground">Trabajo: {jobTitle}</p>}
         </div>
         {isManagementUser && filteredTimesheets.length > 0 && (
           <div className="flex items-center gap-2">
@@ -314,13 +314,13 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { 
-                    console.log('Edit Times button clicked, showBulkEditForm:', showBulkEditForm); 
-                    setShowBulkEditForm(!showBulkEditForm); 
+                  onClick={() => {
+                    console.log('Edit Times button clicked, showBulkEditForm:', showBulkEditForm);
+                    setShowBulkEditForm(!showBulkEditForm);
                   }}
                   disabled={isBulkUpdating}
                 >
-                  Edit Times ({selectedTimesheets.size})
+                  Editar Tiempos ({selectedTimesheets.size})
                 </Button>
                 <Button
                   variant="outline"
@@ -328,14 +328,14 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   onClick={() => handleBulkAction('submit')}
                   disabled={selectedTimesheets.size === 0 || isBulkUpdating}
                 >
-                  Submit Selected ({selectedTimesheets.size})
+                  Enviar Seleccionados ({selectedTimesheets.size})
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => handleBulkAction('approve')}
                   disabled={selectedTimesheets.size === 0 || isBulkUpdating}
                 >
-                  Approve Selected ({selectedTimesheets.size})
+                  Aprobar Seleccionados ({selectedTimesheets.size})
                 </Button>
                 <Button
                   variant="destructive"
@@ -344,7 +344,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   disabled={selectedTimesheets.size === 0 || isBulkUpdating}
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
-                  Delete Selected ({selectedTimesheets.size})
+                  Eliminar Seleccionados ({selectedTimesheets.size})
                 </Button>
                 <Button
                   variant="outline"
@@ -352,7 +352,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   onClick={clearSelection}
                   disabled={isBulkUpdating}
                 >
-                  Clear
+                  Limpiar
                 </Button>
               </>
             )}
@@ -362,7 +362,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
               onClick={selectedTimesheets.size > 0 ? clearSelection : selectAllVisibleTimesheets}
               disabled={isBulkUpdating}
             >
-              {selectedTimesheets.size > 0 ? 'Deselect All' : 'Select All'}
+              {selectedTimesheets.size > 0 ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
             </Button>
           </div>
         )}
@@ -373,75 +373,75 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
         <Card className="p-6">
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">
-              Edit Times for {selectedTimesheets.size} Selected Timesheets
-              {isBulkUpdating && <span className="text-sm text-muted-foreground ml-2">(Updating...)</span>}
+              Editar Tiempos para {selectedTimesheets.size} Partes Seleccionados
+              {isBulkUpdating && <span className="text-sm text-muted-foreground ml-2">(Actualizando...)</span>}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div>
-                <Label htmlFor="bulk_start_time">Start Time</Label>
+                <Label htmlFor="bulk_start_time">Hora de Inicio</Label>
                 <Input
                   id="bulk_start_time"
                   type="time"
                   value={bulkFormData.start_time}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, start_time: e.target.value })}
-                  placeholder="Leave empty to skip"
+                  placeholder="Dejar vacío para omitir"
                   disabled={isBulkUpdating}
                 />
               </div>
               <div>
-                <Label htmlFor="bulk_end_time">End Time</Label>
+                <Label htmlFor="bulk_end_time">Hora de Fin</Label>
                 <Input
                   id="bulk_end_time"
                   type="time"
                   value={bulkFormData.end_time}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, end_time: e.target.value })}
-                  placeholder="Leave empty to skip"
+                  placeholder="Dejar vacío para omitir"
                   disabled={isBulkUpdating}
                 />
               </div>
               <div>
-                <Label htmlFor="bulk_break_minutes">Break (minutes)</Label>
+                <Label htmlFor="bulk_break_minutes">Descanso (minutos)</Label>
                 <Input
                   id="bulk_break_minutes"
                   type="number"
                   value={bulkFormData.break_minutes || ''}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, break_minutes: e.target.value ? parseInt(e.target.value) : undefined })}
-                  placeholder="Leave empty to skip"
+                  placeholder="Dejar vacío para omitir"
                   disabled={isBulkUpdating}
                 />
               </div>
               <div>
-                <Label htmlFor="bulk_overtime_hours">Overtime (hours)</Label>
+                <Label htmlFor="bulk_overtime_hours">Horas Extra</Label>
                 <Input
                   id="bulk_overtime_hours"
                   type="number"
                   step="0.5"
                   value={bulkFormData.overtime_hours || ''}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, overtime_hours: e.target.value ? parseFloat(e.target.value) : undefined })}
-                  placeholder="Leave empty to skip"
+                  placeholder="Dejar vacío para omitir"
                   disabled={isBulkUpdating}
                 />
               </div>
               <div className="flex items-end">
-                <Button 
-                  onClick={() => { 
-                    console.log('Apply Changes button clicked!'); 
-                    handleBulkEdit(); 
-                  }} 
+                <Button
+                  onClick={() => {
+                    console.log('Apply Changes button clicked!');
+                    handleBulkEdit();
+                  }}
                   className="w-full"
                   disabled={isBulkUpdating}
                 >
-                  {isBulkUpdating ? 'Updating...' : 'Apply Changes'}
+                  {isBulkUpdating ? 'Actualizando...' : 'Aplicar Cambios'}
                 </Button>
               </div>
             </div>
             <div>
-              <Label htmlFor="bulk_notes">Notes (will append to existing notes)</Label>
+              <Label htmlFor="bulk_notes">Notas (se añadirán a las notas existentes)</Label>
               <Textarea
                 id="bulk_notes"
                 value={bulkFormData.notes}
                 onChange={(e) => setBulkFormData({ ...bulkFormData, notes: e.target.value })}
-                placeholder="Leave empty to skip adding notes"
+                placeholder="Dejar vacío para omitir añadir notas"
                 disabled={isBulkUpdating}
               />
             </div>
@@ -455,8 +455,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           <CardContent className="flex items-center justify-center p-8">
             <div className="text-center">
               <Clock className="h-12 w-12 mx-auto text-muted-foreground animate-spin mb-4" />
-              <p className="text-muted-foreground">Updating timesheets...</p>
-              <p className="text-sm text-muted-foreground mt-2">Please wait while we update all selected timesheets</p>
+              <p className="text-muted-foreground">Actualizando partes de trabajo...</p>
+              <p className="text-sm text-muted-foreground mt-2">Por favor espere mientras actualizamos todos los partes seleccionados</p>
             </div>
           </CardContent>
         </Card>
@@ -467,9 +467,9 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           <CardContent className="flex items-center justify-center p-8">
             <div className="text-center">
               <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No technicians assigned to this job</p>
+              <p className="text-muted-foreground">No hay técnicos asignados a este trabajo</p>
               <p className="text-sm text-muted-foreground mt-2">
-                Assign technicians to this job to generate timesheets automatically
+                Asigne técnicos a este trabajo para generar partes automáticamente
               </p>
             </div>
           </CardContent>
@@ -481,9 +481,9 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           <CardContent className="flex items-center justify-center p-8">
             <div className="text-center">
               <Clock className="h-12 w-12 mx-auto text-muted-foreground animate-spin mb-4" />
-              <p className="text-muted-foreground">Loading timesheets...</p>
+              <p className="text-muted-foreground">Cargando partes de trabajo...</p>
               <p className="text-sm text-muted-foreground mt-2">
-                {isTechnician ? 'Loading your timesheets...' : 'Creating timesheets for assigned technicians...'}
+                {isTechnician ? 'Cargando sus partes de trabajo...' : 'Creando partes para los técnicos asignados...'}
               </p>
             </div>
           </CardContent>
@@ -496,12 +496,12 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
             <div className="text-center">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">
-                {isTechnician ? 'No timesheets found for you on this job' : 'Timesheets are being generated...'}
+                {isTechnician ? 'No se encontraron partes de trabajo para usted en este trabajo' : 'Los partes se están generando...'}
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                {isTechnician 
-                  ? 'Your timesheets will appear here once they are created by management'
-                  : 'Timesheets are automatically created for all assigned technicians'
+                {isTechnician
+                  ? 'Sus partes de trabajo aparecerán aquí una vez que sean creados por la dirección'
+                  : 'Los partes se crean automáticamente para todos los técnicos asignados'
                 }
               </p>
             </div>
@@ -554,7 +554,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       )}
                       <div>
                         <p className="font-medium">
-                          {isTechnician ? 'My Timesheet' : `${timesheet.technician?.first_name} ${timesheet.technician?.last_name}`}
+                          {isTechnician ? 'Mi Parte de Trabajo' : `${timesheet.technician?.first_name} ${timesheet.technician?.last_name}`}
                         </p>
                         {!isTechnician && (
                           <p className="text-sm text-muted-foreground">{timesheet.technician?.department}</p>
@@ -574,23 +574,24 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           onClick={() => startEditing(timesheet)}
                           disabled={isBulkUpdating}
                         >
-                          Edit
+                          Editar
                         </Button>
                       )}
-                      
-                      {/* Submit button */}
+
+                      {/* Submit button - Made more prominent */}
                       {canSubmitTimesheet && (
                         <Button
-                          variant="outline"
-                          size="sm"
+                          variant="default"
+                          size="default"
+                          className="bg-green-600 hover:bg-green-700 font-semibold shadow-md"
                           onClick={() => submitTimesheet(timesheet.id)}
                           disabled={isBulkUpdating}
                         >
-                          Submit
+                          ✓ ENVIAR PARTE
                         </Button>
                       )}
-                      
-                      {/* Only management can approve submitted timesheets */}
+
+                      {/* Only management can approve/unapprove submitted/approved timesheets */}
                       {isManagementUser && timesheet.status === 'submitted' && (
                         <>
                           <Button
@@ -598,7 +599,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                             onClick={() => approveTimesheet(timesheet.id)}
                             disabled={isBulkUpdating}
                           >
-                            Approve
+                            Aprobar
                           </Button>
                           <Button
                             variant="outline"
@@ -606,9 +607,22 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                             onClick={() => openRejectDialog(timesheet)}
                             disabled={isBulkUpdating}
                           >
-                            Reject
+                            Rechazar
                           </Button>
                         </>
+                      )}
+
+                      {/* Reverse approval button */}
+                      {isManagementUser && timesheet.status === 'approved' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => submitTimesheet(timesheet.id)}
+                          disabled={isBulkUpdating}
+                          className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                        >
+                          Revertir Aprobación
+                        </Button>
                       )}
                       
                       {/* Delete button - only for management */}
@@ -629,12 +643,12 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                     <Alert variant="destructive">
                       <AlertTitle className="flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4" />
-                        Timesheet rejected
+                        Parte rechazado
                       </AlertTitle>
                       <AlertDescription>
                         {timesheet.rejection_reason?.length
                           ? timesheet.rejection_reason
-                          : 'Please review the hours and resubmit for approval.'}
+                          : 'Por favor revise las horas y vuelva a enviar para su aprobación.'}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -642,7 +656,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   {editingTimesheet === timesheet.id ? (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <Label htmlFor="start_time">Start Time</Label>
+                        <Label htmlFor="start_time">Hora de Inicio</Label>
                         <Input
                           id="start_time"
                           type="time"
@@ -651,7 +665,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         />
                       </div>
                       <div>
-                        <Label htmlFor="end_time">End Time</Label>
+                        <Label htmlFor="end_time">Hora de Fin</Label>
                         <Input
                           id="end_time"
                           type="time"
@@ -660,7 +674,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         />
                       </div>
                       <div>
-                        <Label htmlFor="break_minutes">Break (minutes)</Label>
+                        <Label htmlFor="break_minutes">Descanso (minutos)</Label>
                         <Input
                           id="break_minutes"
                           type="number"
@@ -675,23 +689,23 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           checked={!!formData.ends_next_day}
                           onChange={(e) => setFormData({ ...formData, ends_next_day: e.target.checked })}
                         />
-                        <Label htmlFor="ends_next_day">Ends next day</Label>
+                        <Label htmlFor="ends_next_day">Termina al día siguiente</Label>
                       </div>
                       <div>
-                        <Label htmlFor="category">Category</Label>
+                        <Label htmlFor="category">Categoría</Label>
                         <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v as any })}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
+                            <SelectValue placeholder="Seleccionar categoría" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="tecnico">tecnico</SelectItem>
+                            <SelectItem value="tecnico">técnico</SelectItem>
                             <SelectItem value="especialista">especialista</SelectItem>
                             <SelectItem value="responsable">responsable</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div>
-                        <Label htmlFor="overtime_hours">Overtime (hours)</Label>
+                        <Label htmlFor="overtime_hours">Horas Extra</Label>
                         <Input
                           id="overtime_hours"
                           type="number"
@@ -701,39 +715,39 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         />
                       </div>
                       <div className="col-span-2 md:col-span-4">
-                        <Label htmlFor="notes">Notes</Label>
+                        <Label htmlFor="notes">Notas</Label>
                         <Textarea
                           id="notes"
                           value={formData.notes}
                           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                          placeholder="Additional notes..."
+                          placeholder="Notas adicionales..."
                         />
                       </div>
                       <div className="col-span-2 md:col-span-4 flex gap-2">
                         <Button onClick={() => handleUpdateTimesheet(timesheet)}>
-                          Save Changes
+                          Guardar Cambios
                         </Button>
                         <Button variant="outline" onClick={() => setEditingTimesheet(null)}>
-                          Cancel
+                          Cancelar
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="text-muted-foreground">Start Time</p>
-                        <p className="font-medium">{timesheet.start_time || 'Not set'}</p>
+                        <p className="text-muted-foreground">Hora de Inicio</p>
+                        <p className="font-medium">{timesheet.start_time || 'No establecido'}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">End Time</p>
-                        <p className="font-medium">{timesheet.end_time || 'Not set'}</p>
+                        <p className="text-muted-foreground">Hora de Fin</p>
+                        <p className="font-medium">{timesheet.end_time || 'No establecido'}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Break</p>
+                        <p className="text-muted-foreground">Descanso</p>
                         <p className="font-medium">{timesheet.break_minutes || 0} min</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Total Hours</p>
+                        <p className="text-muted-foreground">Horas Totales</p>
                         <p className="font-medium">
                           {calculateHours(
                             timesheet.start_time || '09:00',
@@ -745,17 +759,17 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       </div>
                       {timesheet.ends_next_day && (
                         <div>
-                          <p className="text-muted-foreground">Spans midnight</p>
-                          <p className="font-medium">Yes</p>
+                          <p className="text-muted-foreground">Cruza medianoche</p>
+                          <p className="font-medium">Sí</p>
                         </div>
                       )}
                       <div>
-                        <p className="text-muted-foreground">Category</p>
-                        <p className="font-medium">{timesheet.category || 'Not set'}</p>
+                        <p className="text-muted-foreground">Categoría</p>
+                        <p className="font-medium">{timesheet.category || 'No establecido'}</p>
                       </div>
                       {timesheet.notes && (
                         <div className="col-span-2 md:col-span-4">
-                          <p className="text-muted-foreground">Notes</p>
+                          <p className="text-muted-foreground">Notas</p>
                           <p className="font-medium">{timesheet.notes}</p>
                         </div>
                       )}
@@ -776,12 +790,12 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                     return (
                   <div className="mt-4 p-3 rounded-md border">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="font-medium">Rate Calculation</p>
+                      <p className="font-medium">Cálculo de Tarifa</p>
                       {isManagementUser && (
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => recalcTimesheet(timesheet.id)}>Recalculate</Button>
+                          <Button size="sm" variant="outline" onClick={() => recalcTimesheet(timesheet.id)}>Recalcular</Button>
                           {!timesheet.category && (
-                            <Badge variant="destructive">Set category to calculate</Badge>
+                            <Badge variant="destructive">Establecer categoría para calcular</Badge>
                           )}
                         </div>
                        )}
@@ -794,26 +808,26 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       if (!breakdown) {
                         return (
                           <p className="text-sm text-muted-foreground">
-                            {userRole === 'technician' ? 'Pending approval' : 'No calculation available yet'}
+                            {userRole === 'technician' ? 'Pendiente de aprobación' : 'No hay cálculo disponible todavía'}
                           </p>
                         );
                       }
                       return (
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                           <div>
-                            <p className="text-muted-foreground">Rounded Hours</p>
+                            <p className="text-muted-foreground">Horas Redondeadas</p>
                             <p className="font-medium">{breakdown.worked_hours_rounded}h</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Base Amount</p>
+                            <p className="text-muted-foreground">Cantidad Base</p>
                             <p className="font-medium">€{breakdown.base_amount_eur.toFixed(2)}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Overtime</p>
+                            <p className="text-muted-foreground">Horas Extra</p>
                             <p className="font-medium">{breakdown.overtime_hours}h × €{breakdown.overtime_hour_eur}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">OT Amount</p>
+                            <p className="text-muted-foreground">Cantidad HE</p>
                             <p className="font-medium">€{breakdown.overtime_amount_eur.toFixed(2)}</p>
                           </div>
                            <div>
@@ -822,7 +836,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                            </div>
                            {(userRole === 'technician' || userRole === 'house_tech') && (
                              <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
-                               Notes: rounding after 30 minutes; some conditions such as 30€ discounts for autónomos may apply depending on contract.
+                               Notas: redondeo después de 30 minutos; pueden aplicarse algunas condiciones como descuentos de 30€ para autónomos según el contrato.
                              </div>
                            )}
                         </div>
@@ -852,27 +866,27 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reject timesheet</AlertDialogTitle>
+            <AlertDialogTitle>Rechazar parte de trabajo</AlertDialogTitle>
             <AlertDialogDescription>
-              Provide a short note so the technician knows what needs to be corrected before resubmitting.
+              Proporcione una nota breve para que el técnico sepa qué debe corregirse antes de volver a enviar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-2">
             <Label htmlFor="rejection-notes" className="text-sm font-medium">
-              Rejection notes
+              Notas de rechazo
             </Label>
             <Textarea
               id="rejection-notes"
-              placeholder="Missing break, please adjust the end time..."
+              placeholder="Falta descanso, por favor ajuste la hora de finalización..."
               value={rejectionNotes}
               onChange={(event) => setRejectionNotes(event.target.value)}
               minLength={0}
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={closeRejectDialog}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={closeRejectDialog}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmRejectTimesheet} disabled={!timesheetBeingRejected}>
-              Reject timesheet
+              Rechazar parte
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

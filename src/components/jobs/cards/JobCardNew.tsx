@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
@@ -325,6 +325,38 @@ export function JobCardNew({
       return data;
     }
   });
+
+  // Fetch timesheet statuses per technician for this job (for badge color coding)
+  const { data: jobTimesheets } = useQuery({
+    queryKey: ["job-timesheets-status", job.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('technician_id, status')
+        .eq('job_id', job.id);
+      if (error) throw error;
+      return data as { technician_id: string; status: string }[];
+    },
+    enabled: job.job_type !== 'dryhire' && job.job_type !== 'tourdate',
+    staleTime: 60_000
+  });
+
+  // Realtime invalidation when timesheets change
+  useEffect(() => {
+    if (job.job_type === 'dryhire' || job.job_type === 'tourdate') return;
+
+    const channel = supabase
+      .channel(`job-timesheets-${job.id}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'timesheets', filter: `job_id=eq.${job.id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["job-timesheets-status", job.id] });
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [job.id, job.job_type, queryClient]);
 
   const handleCreateWhatsappGroup = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -868,9 +900,10 @@ export function JobCardNew({
             {job.job_type !== "dryhire" && (
               <>
                 {assignments.length > 0 && (
-                  <JobCardAssignments 
-                    assignments={assignments} 
-                    department={department} 
+                  <JobCardAssignments
+                    assignments={assignments}
+                    department={department}
+                    jobTimesheets={jobTimesheets || []}
                   />
                 )}
                 
