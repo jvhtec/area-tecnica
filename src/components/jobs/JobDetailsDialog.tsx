@@ -50,6 +50,7 @@ interface TechnicianProfile {
   first_name?: string | null;
   last_name?: string | null;
   department?: string | null;
+  autonomo?: boolean | null;
 }
 
 type SupabaseClientLike = typeof supabase;
@@ -73,7 +74,7 @@ export const enrichTimesheetsWithProfiles = async (
 
   const { data: profiles, error } = await client
     .from('profiles')
-    .select('id, first_name, last_name, department')
+    .select('id, first_name, last_name, department, autonomo')
     .in('id', technicianIds);
 
   if (error) {
@@ -815,7 +816,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                             if (missingProfileIds.length) {
                               const { data: extraProfiles, error: extraProfilesError } = await supabase
                                 .from('profiles')
-                                .select('id, first_name, last_name, department')
+                                .select('id, first_name, last_name, department, autonomo')
                                 .in('id', missingProfileIds);
 
                               if (extraProfilesError) {
