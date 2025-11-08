@@ -196,7 +196,7 @@ export async function buildTourRatesExportPayload(
       // Attach timesheet-derived hours/OT breakdown when available (informational only)
       const { data: ts } = await supabase
         .from('timesheets')
-        .select('id, technician_id, approved_by_manager, amount_breakdown, amount_breakdown_visible')
+        .select('id, technician_id, approved_by_manager, amount_breakdown')
         .eq('job_id', job.id)
         .in('technician_id', techIds)
         .eq('approved_by_manager', true);
@@ -205,7 +205,7 @@ export async function buildTourRatesExportPayload(
         const toCompute: any[] = [];
         ts.forEach((row: any) => {
           const tech = row.technician_id as string;
-          const persisted = (row.amount_breakdown || row.amount_breakdown_visible) as Record<string, any> | null;
+          const persisted = row.amount_breakdown as Record<string, any> | null;
           if (!persisted) toCompute.push(row);
           const b = persisted || {};
           const h = Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0;
