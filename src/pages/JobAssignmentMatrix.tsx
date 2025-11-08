@@ -183,7 +183,11 @@ export default function JobAssignmentMatrix() {
   });
 
   // Optimized technicians query
-  const { data: technicians = [], isLoading: isLoadingTechnicians } = useQuery({
+  const {
+    data: technicians = [],
+    isInitialLoading: isInitialLoadingTechnicians,
+    isFetching: isFetchingTechnicians,
+  } = useQuery<any[]>({
     queryKey: ['optimized-matrix-technicians', selectedDepartment],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_profiles_with_skills');
@@ -300,7 +304,11 @@ export default function JobAssignmentMatrix() {
   }, [technicians, debouncedSearch, selectedSkills, hideFridge, fridgeSet]);
 
   // Optimized jobs query with smart date filtering
-  const { data: yearJobs = [], isLoading: isLoadingJobs } = useQuery({
+  const {
+    data: yearJobs = [],
+    isInitialLoading: isInitialLoadingJobs,
+    isFetching: isFetchingJobs,
+  } = useQuery<any[]>({
     queryKey: ['optimized-matrix-jobs', rangeInfo.startFormatted, rangeInfo.endFormatted, selectedDepartment],
     queryFn: async () => {
       const startDate = rangeInfo.start;
@@ -351,7 +359,14 @@ export default function JobAssignmentMatrix() {
     enabled: dateRange.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
+    keepPreviousData: true,
+    placeholderData: (previousData) => previousData ?? [],
   });
+
+  const isInitialMatrixLoad = isInitialLoadingTechnicians || isInitialLoadingJobs;
+  const isBackgroundFetchingMatrix =
+    (isFetchingTechnicians && !isInitialLoadingTechnicians) ||
+    (isFetchingJobs && !isInitialLoadingJobs);
 
   const jobIds = React.useMemo(() => yearJobs.map((j: any) => j.id).filter(Boolean), [yearJobs]);
   const jobIdsKey = React.useMemo(() => (jobIds.length ? jobIds.slice().sort().join(',') : 'none'), [jobIds]);
@@ -664,12 +679,19 @@ export default function JobAssignmentMatrix() {
             <Badge variant="outline" className="text-xs">
               {yearJobs.length} jobs
             </Badge>
+            {isBackgroundFetchingMatrix && (
+              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                Fetching...
+              </Badge>
+            )}
             <div className="hidden lg:block">
               <PerformanceIndicator
                 assignmentCount={yearJobs.length * filteredTechnicians.length}
                 availabilityCount={filteredTechnicians.length * dateRange.length}
                 cellCount={filteredTechnicians.length * dateRange.length}
-                isLoading={isLoadingTechnicians || isLoadingJobs}
+                isInitialLoading={isInitialMatrixLoad}
+                isFetching={isBackgroundFetchingMatrix}
               />
             </div>
           </div>
@@ -703,6 +725,12 @@ export default function JobAssignmentMatrix() {
               <Badge variant="outline" className="text-xs">
                 {yearJobs.length} jobs
               </Badge>
+              {isBackgroundFetchingMatrix && (
+                <Badge variant="outline" className="text-[10px] flex items-center gap-1">
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  Fetching...
+                </Badge>
+              )}
             </div>
           </div>
           {filtersOpen && (
@@ -769,7 +797,7 @@ export default function JobAssignmentMatrix() {
 
       {/* Matrix Content */}
       <div className="flex-1 overflow-hidden">
-        {isLoadingTechnicians || isLoadingJobs ? (
+        {isInitialMatrixLoad ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2" />
