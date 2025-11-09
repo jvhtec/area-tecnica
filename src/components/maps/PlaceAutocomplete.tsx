@@ -5,11 +5,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { ApplePlacePicker } from '@/mobile/maps/ApplePlacePicker';
-import { isNativeIOS } from '@/utils/nativePlatform';
-import type { DetailedPlaceSelection } from '@/types/places';
 
-interface PlaceAutocompleteResult extends DetailedPlaceSelection {
+interface PlaceAutocompleteResult {
+  name: string;
+  address: string;
+  coordinates?: { lat: number; lng: number };
   place_id?: string;
 }
 
@@ -46,7 +46,6 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<number | undefined>(undefined);
   const cacheRef = useRef<Record<string, PredictionItem[]>>({});
-  const isIOSNative = isNativeIOS();
 
   // Keep local input in sync with external value
   useEffect(() => {
@@ -55,9 +54,6 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
 
   // Fetch Google Maps API key securely (with retry support)
   const fetchApiKey = async (): Promise<string | null> => {
-    if (isIOSNative) {
-      return null;
-    }
     try {
       const { data, error } = await supabase.functions.invoke('get-google-maps-key');
       if (error) {
@@ -75,16 +71,10 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   };
 
   useEffect(() => {
-    if (isIOSNative) {
-      return;
-    }
     fetchApiKey();
-  }, [isIOSNative]);
+  }, []);
 
   useEffect(() => {
-    if (isIOSNative) {
-      return;
-    }
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setShowSuggestions(false);
@@ -92,12 +82,9 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isIOSNative]);
+  }, []);
 
   const searchPlaces = async (query: string) => {
-    if (isIOSNative) {
-      return;
-    }
     // Ensure API key is available (retry on demand)
     const key = apiKey || (await fetchApiKey());
     if (!key || !query || query.length < 2) {
@@ -203,16 +190,12 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   };
 
   const getPlaceDetails = async (placeId: string, fallbackName: string, fallbackAddress?: string) => {
-    if (isIOSNative) {
-      return;
-    }
-
     console.log('PlacesAutocomplete: Getting place details for:', { placeId, fallbackName, fallbackAddress });
-
+    
     const key = apiKey || (await fetchApiKey());
     if (!key) {
       console.log('PlacesAutocomplete: No API key after retry, using fallback data');
-      onSelect({ name: fallbackName, address: fallbackAddress || '', coordinates: null, place_id: placeId });
+      onSelect({ name: fallbackName, address: fallbackAddress || '', place_id: placeId });
       return;
     }
     
@@ -234,8 +217,8 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
       
       const coordinates = place.location
         ? { lat: place.location.latitude, lng: place.location.longitude }
-        : null;
-
+        : undefined;
+        
       const result: PlaceAutocompleteResult = {
         name: place.displayName?.text || fallbackName,
         address: place.formattedAddress || fallbackAddress || '',
@@ -249,12 +232,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
       setShowSuggestions(false);
     } catch (err) {
       console.error('Error fetching place details:', err);
-      const fallbackResult: PlaceAutocompleteResult = {
-        name: fallbackName,
-        address: fallbackAddress || '',
-        coordinates: null,
-        place_id: placeId,
-      };
+      const fallbackResult = { name: fallbackName, address: fallbackAddress || '', place_id: placeId };
       console.log('PlacesAutocomplete: Using fallback result:', fallbackResult);
       onSelect(fallbackResult);
       setInputValue(fallbackName);
@@ -278,44 +256,6 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     console.log('PlacesAutocomplete: Item selected:', item);
     getPlaceDetails(item.place_id, item.name, item.formatted_address);
   };
-
-  if (isIOSNative) {
-    return (
-      <div className={className}>
-        {label && <Label>{label}</Label>}
-        <ApplePlacePicker
-          initialQuery={inputValue}
-          onBusyChange={onBusyChange}
-          onSelect={(place) => {
-            const normalized: PlaceAutocompleteResult = {
-              name: place.name,
-              address: place.address,
-              coordinates: place.coordinates,
-            };
-            const displayValue = place.name || place.address || '';
-            setInputValue(displayValue);
-            onInputChange?.(displayValue);
-            onSelect(normalized);
-          }}
-          trigger={({ open, loading }) => (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full justify-start"
-              onClick={open}
-              disabled={loading}
-            >
-              <MapPin className="mr-2 h-4 w-4" />
-              <span className="flex-1 text-left truncate">
-                {inputValue || placeholder}
-              </span>
-              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-            </Button>
-          )}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className={className} ref={containerRef}>

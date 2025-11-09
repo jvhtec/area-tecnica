@@ -538,10 +538,10 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
                 value={formData.hotel_name || ""}
                 checkIn={formData.check_in_date}
                 checkOut={formData.check_out_date}
-                onChange={({ name, address, coordinates }) => {
+                onChange={(hotelName, address, coordinates) => {
                   setFormData({
                     ...formData,
-                    hotel_name: name,
+                    hotel_name: hotelName,
                     hotel_address: address || formData.hotel_address,
                     latitude: coordinates?.lat,
                     longitude: coordinates?.lng,
