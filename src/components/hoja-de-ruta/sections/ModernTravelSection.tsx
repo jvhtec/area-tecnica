@@ -150,7 +150,7 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                             </Label>
                             <AddressAutocomplete
                               value={arrangement.pickup_address || ''}
-                              onChange={(address) => onUpdate(index, 'pickup_address', address)}
+                              onChange={({ address }) => onUpdate(index, 'pickup_address', address)}
                               placeholder="Buscar dirección de recogida..."
                             />
                           </div>
