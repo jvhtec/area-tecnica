@@ -3,13 +3,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, MapPin } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
-import { ApplePlacePicker } from '@/mobile/maps/ApplePlacePicker';
-import { isNativeIOS } from '@/utils/nativePlatform';
-import type { PlaceSelection } from '@/types/places';
 
 interface AddressAutocompleteProps {
   value: string;
-  onChange: (place: PlaceSelection) => void;
+  onChange: (address: string, coordinates?: { lat: number; lng: number }) => void;
   placeholder?: string;
   label?: string;
   className?: string;
@@ -26,13 +23,9 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   const autocompleteRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
-  const isIOSNative = isNativeIOS();
 
   // Fetch Google Maps API key
   useEffect(() => {
-    if (isIOSNative) {
-      return;
-    }
     const fetchApiKey = async () => {
       try {
         const { data, error } = await supabase.functions.invoke('get-google-maps-key');
@@ -51,14 +44,10 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
     };
 
     fetchApiKey();
-  }, [isIOSNative]);
+  }, []);
 
   // Initialize autocomplete with new Places API
   useEffect(() => {
-    if (isIOSNative) {
-      return;
-    }
-
     if (!apiKey || !inputRef.current) return;
 
     const loadAutocomplete = () => {
@@ -110,13 +99,9 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
           const coordinates = place.location ? {
             lat: place.location.lat(),
             lng: place.location.lng(),
-          } : null;
+          } : undefined;
 
-          onChange({
-            name: place.displayName || place.formattedAddress || '',
-            address: place.formattedAddress || place.displayName || '',
-            coordinates,
-          });
+          onChange(place.formattedAddress || place.displayName, coordinates);
         });
 
       } catch (error) {
@@ -139,18 +124,14 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
 
       autocompleteRef.current.addListener('place_changed', () => {
         const place = autocompleteRef.current.getPlace();
-
+        
         if (place.formatted_address) {
           const coordinates = place.geometry?.location ? {
             lat: place.geometry.location.lat(),
             lng: place.geometry.location.lng(),
-          } : null;
+          } : undefined;
 
-          onChange({
-            name: place.name || place.formatted_address,
-            address: place.formatted_address,
-            coordinates,
-          });
+          onChange(place.formatted_address, coordinates);
         }
       });
     };
@@ -162,40 +143,11 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
         (window.google?.maps?.event as any)?.clearInstanceListeners?.(autocompleteRef.current);
       }
     };
-  }, [apiKey, isIOSNative, onChange, placeholder]);
+  }, [apiKey, onChange, placeholder]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ name: '', address: e.target.value, coordinates: null });
+    onChange(e.target.value);
   };
-
-  if (isIOSNative) {
-    return (
-      <div className={className}>
-        {label && <Label>{label}</Label>}
-        <ApplePlacePicker
-          initialQuery={value}
-          onBusyChange={setIsLoading}
-          onSelect={(place) => {
-            onChange(place);
-          }}
-          trigger={({ open, loading }) => (
-            <button
-              type="button"
-              onClick={open}
-              className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm"
-              disabled={loading}
-            >
-              <span className="flex items-center gap-2 truncate text-left">
-                <MapPin className="h-4 w-4" />
-                <span className="truncate">{value || placeholder}</span>
-              </span>
-              {(loading || isLoading) && <Loader2 className="h-4 w-4 animate-spin" />}
-            </button>
-          )}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className={className}>

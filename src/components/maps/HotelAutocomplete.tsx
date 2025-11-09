@@ -2,12 +2,9 @@ import React, { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Building, Star, Loader2 } from "lucide-react";
+import { MapPin, Building, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { ApplePlacePicker } from "@/mobile/maps/ApplePlacePicker";
-import { isNativeIOS } from "@/utils/nativePlatform";
-import type { PlaceSelection } from "@/types/places";
 
 // Remove conflicting global type declaration - using typed definitions from src/types/google-maps.d.ts
 
@@ -15,7 +12,7 @@ interface HotelAutocompleteProps {
   value: string;
   checkIn: string;
   checkOut: string;
-  onChange: (place: PlaceSelection) => void;
+  onChange: (hotelName: string, address?: string, coordinates?: { lat: number; lng: number }) => void;
   onCheckInChange: (date: string) => void;
   onCheckOutChange: (date: string) => void;
   placeholder?: string;
@@ -48,22 +45,9 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
   const searchCache = useRef<Record<string, HotelPrediction[]>>({});
-  const isIOSNative = isNativeIOS();
-
-  const emitChange = (name: string, address?: string | null, coordinates?: { lat: number; lng: number } | null) => {
-    onChange({
-      name,
-      address: address || '',
-      coordinates: coordinates ?? null,
-    });
-  };
 
   // Fetch Google Maps API key
   useEffect(() => {
-    if (isIOSNative) {
-      return;
-    }
-
     const fetchApiKey = async () => {
       try {
         const { data, error } = await supabase.functions.invoke('get-google-maps-key');
@@ -87,24 +71,17 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
     };
 
     fetchApiKey();
-  }, [isIOSNative]);
+  }, []);
 
   // Load Google Maps script is not needed for new Places API
   useEffect(() => {
-    if (isIOSNative) {
-      return;
-    }
-
     if (apiKey) {
       setIsApiLoaded(true);
       console.log('Google Places API (New) ready for hotel autocomplete');
     }
-  }, [apiKey, isIOSNative]);
+  }, [apiKey]);
 
   useEffect(() => {
-    if (isIOSNative) {
-      return;
-    }
     const handleClickOutside = (event: MouseEvent) => {
       if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
@@ -113,12 +90,9 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isIOSNative]);
+  }, []);
 
   const searchHotels = async (query: string) => {
-    if (isIOSNative) {
-      return;
-    }
     if (!query || query.length < 2 || !isApiLoaded || !apiKey) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -249,7 +223,7 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
-    emitChange(newValue);
+    onChange(newValue);
 
     // Clear existing timeout
     if (timeoutRef.current) {
@@ -263,13 +237,9 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   };
 
   const getPlaceDetails = async (placeId: string, hotelName: string, fallbackAddress?: string) => {
-    if (isIOSNative) {
-      return;
-    }
-
     if (!isApiLoaded || !apiKey) {
       console.error('Google Places API (New) not ready');
-      emitChange(hotelName, fallbackAddress);
+      onChange(hotelName, fallbackAddress);
       return;
     }
 
@@ -285,16 +255,16 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
       if (!response.ok) throw new Error(`Place Details API error: ${response.status}`);
 
       const place = await response.json();
-      const coordinates = place.location ? { lat: place.location.latitude, lng: place.location.longitude } : null;
-
-      emitChange(
+      const coordinates = place.location ? { lat: place.location.latitude, lng: place.location.longitude } : undefined;
+      
+      onChange(
         place.displayName?.text || hotelName,
         place.formattedAddress || fallbackAddress,
         coordinates
       );
     } catch (error) {
       console.error('Error getting place details, using fallback:', error);
-      emitChange(hotelName, fallbackAddress);
+      onChange(hotelName, fallbackAddress);
     } finally {
       setShowSuggestions(false);
     }
@@ -303,53 +273,6 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   const handleSelectHotel = (hotel: HotelPrediction) => {
     getPlaceDetails(hotel.place_id, hotel.name, hotel.formatted_address);
   };
-
-  if (isIOSNative) {
-    return (
-      <div className="relative">
-        <div className="flex gap-2">
-          <div className="flex-grow">
-            <ApplePlacePicker
-              initialQuery={value}
-              onBusyChange={setIsLoading}
-              onSelect={(place) => {
-                emitChange(place.name, place.address, place.coordinates);
-              }}
-              trigger={({ open, loading }) => (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={cn("w-full justify-start", className)}
-                  onClick={open}
-                  disabled={loading}
-                >
-                  <Building className="mr-2 h-4 w-4" />
-                  <span className="flex-1 truncate text-left">{value || placeholder}</span>
-                  {(loading || isLoading) && (
-                    <span className="ml-2 inline-flex">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    </span>
-                  )}
-                </Button>
-              )}
-            />
-          </div>
-          <Input
-            type="datetime-local"
-            value={checkIn}
-            onChange={(e) => onCheckInChange(e.target.value)}
-            className="w-48"
-          />
-          <Input
-            type="datetime-local"
-            value={checkOut}
-            onChange={(e) => onCheckOutChange(e.target.value)}
-            className="w-48"
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="relative" ref={inputRef}>

@@ -258,7 +258,7 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
                       <Label>Dirección del Venue</Label>
                       <AddressAutocomplete
                         value={eventData.venue.address || ''}
-                        onChange={({ address, coordinates }) => {
+                        onChange={(address, coordinates) => {
                           setEventData(prev => ({
                             ...prev,
                             venue: {

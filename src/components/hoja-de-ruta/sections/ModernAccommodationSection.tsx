@@ -101,8 +101,8 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                         value={accommodation.hotel_name}
                         checkIn={accommodation.check_in}
                         checkOut={accommodation.check_out}
-                        onChange={({ name, address, coordinates }) => {
-                          const updates: Partial<Accommodation> = { hotel_name: name };
+                        onChange={(hotelName, address, coordinates) => {
+                          const updates: Partial<Accommodation> = { hotel_name: hotelName };
                           if (address) updates.address = address;
                           if (coordinates) updates.coordinates = coordinates;
                           onUpdateAccommodation(accommodationIndex, updates);
