@@ -2653,6 +2653,8 @@ export type Database = {
           plus_10_12_eur: number | null
           profile_id: string
           rehearsal_day_eur: number | null
+          tour_base_other_eur: number | null
+          tour_base_responsable_eur: number | null
           updated_at: string
           updated_by: string | null
         }
@@ -2663,6 +2665,8 @@ export type Database = {
           plus_10_12_eur?: number | null
           profile_id: string
           rehearsal_day_eur?: number | null
+          tour_base_other_eur?: number | null
+          tour_base_responsable_eur?: number | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -2673,6 +2677,8 @@ export type Database = {
           plus_10_12_eur?: number | null
           profile_id?: string
           rehearsal_day_eur?: number | null
+          tour_base_other_eur?: number | null
+          tour_base_responsable_eur?: number | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -2695,11 +2701,11 @@ export type Database = {
       }
       job_assignments: {
         Row: {
-          id: string
           assigned_at: string
           assigned_by: string | null
           assignment_date: string | null
           assignment_source: string | null
+          id: string
           job_id: string
           lights_role: string | null
           response_time: string | null
@@ -2707,14 +2713,15 @@ export type Database = {
           sound_role: string | null
           status: Database["public"]["Enums"]["assignment_status"] | null
           technician_id: string
+          use_tour_multipliers: boolean | null
           video_role: string | null
         }
         Insert: {
-          id?: string
           assigned_at?: string
           assigned_by?: string | null
           assignment_date?: string | null
           assignment_source?: string | null
+          id?: string
           job_id: string
           lights_role?: string | null
           response_time?: string | null
@@ -2722,14 +2729,15 @@ export type Database = {
           sound_role?: string | null
           status?: Database["public"]["Enums"]["assignment_status"] | null
           technician_id: string
+          use_tour_multipliers?: boolean | null
           video_role?: string | null
         }
         Update: {
-          id?: string
           assigned_at?: string
           assigned_by?: string | null
           assignment_date?: string | null
           assignment_source?: string | null
+          id?: string
           job_id?: string
           lights_role?: string | null
           response_time?: string | null
@@ -2737,6 +2745,7 @@ export type Database = {
           sound_role?: string | null
           status?: Database["public"]["Enums"]["assignment_status"] | null
           technician_id?: string
+          use_tour_multipliers?: boolean | null
           video_role?: string | null
         }
         Relationships: [
@@ -3823,6 +3832,48 @@ export type Database = {
         }
         Relationships: []
       }
+      morning_summary_subscriptions: {
+        Row: {
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          subscribed_departments: string[]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          subscribed_departments?: string[]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          subscribed_departments?: string[]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "morning_summary_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "morning_summary_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           assignments: boolean | null
@@ -4235,6 +4286,27 @@ export type Database = {
         }
         Relationships: []
       }
+      push_cron_config: {
+        Row: {
+          id: number
+          service_role_key: string | null
+          supabase_url: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          service_role_key?: string | null
+          supabase_url: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          service_role_key?: string | null
+          supabase_url?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       push_notification_routes: {
         Row: {
           created_at: string
@@ -4259,6 +4331,42 @@ export type Database = {
           include_natural_recipients?: boolean
           recipient_type?: Database["public"]["Enums"]["push_notification_recipient_type"]
           target_id?: string | null
+        }
+        Relationships: []
+      }
+      push_notification_schedules: {
+        Row: {
+          created_at: string | null
+          days_of_week: number[] | null
+          enabled: boolean | null
+          event_type: string
+          id: string
+          last_sent_at: string | null
+          schedule_time: string
+          timezone: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          days_of_week?: number[] | null
+          enabled?: boolean | null
+          event_type: string
+          id?: string
+          last_sent_at?: string | null
+          schedule_time?: string
+          timezone?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          days_of_week?: number[] | null
+          enabled?: boolean | null
+          event_type?: string
+          id?: string
+          last_sent_at?: string | null
+          schedule_time?: string
+          timezone?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -4718,43 +4826,43 @@ export type Database = {
       }
       staffing_requests: {
         Row: {
+          batch_id: string | null
           created_at: string
           id: string
           job_id: string
           phase: string
           profile_id: string
-          status: string
           single_day: boolean
+          status: string
           target_date: string | null
-          batch_id: string | null
           token_expires_at: string
           token_hash: string
           updated_at: string
         }
         Insert: {
+          batch_id?: string | null
           created_at?: string
           id?: string
           job_id: string
           phase: string
           profile_id: string
-          status: string
           single_day?: boolean
+          status: string
           target_date?: string | null
-          batch_id?: string | null
           token_expires_at: string
           token_hash: string
           updated_at?: string
         }
         Update: {
+          batch_id?: string | null
           created_at?: string
           id?: string
           job_id?: string
           phase?: string
           profile_id?: string
-          status?: string
           single_day?: boolean
+          status?: string
           target_date?: string | null
-          batch_id?: string | null
           token_expires_at?: string
           token_hash?: string
           updated_at?: string
@@ -5187,6 +5295,7 @@ export type Database = {
           rejected_at: string | null
           rejected_by: string | null
           rejection_reason: string | null
+          reminder_sent_at: string | null
           signature_data: string | null
           signed_at: string | null
           start_time: string | null
@@ -5214,6 +5323,7 @@ export type Database = {
           rejected_at?: string | null
           rejected_by?: string | null
           rejection_reason?: string | null
+          reminder_sent_at?: string | null
           signature_data?: string | null
           signed_at?: string | null
           start_time?: string | null
@@ -5241,6 +5351,7 @@ export type Database = {
           rejected_at?: string | null
           rejected_by?: string | null
           rejection_reason?: string | null
+          reminder_sent_at?: string | null
           signature_data?: string | null
           signed_at?: string | null
           start_time?: string | null
@@ -5250,29 +5361,29 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "timesheets_rejected_by_fkey"
-            columns: ["rejected_by"]
+            foreignKeyName: "fk_timesheets_technician_id"
+            columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "timesheets_rejected_by_fkey"
-            columns: ["rejected_by"]
+            foreignKeyName: "fk_timesheets_technician_id"
+            columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fk_timesheets_technician_id"
-            columns: ["technician_id"]
+            foreignKeyName: "timesheets_rejected_by_fkey"
+            columns: ["rejected_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fk_timesheets_technician_id"
-            columns: ["technician_id"]
+            foreignKeyName: "timesheets_rejected_by_fkey"
+            columns: ["rejected_by"]
             isOneToOne: false
             referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
@@ -6929,6 +7040,7 @@ export type Database = {
           breakdown: Json | null
           category: string | null
           end_time: string | null
+          extras: Json | null
           extras_total_eur: number | null
           is_house_tech: boolean | null
           is_tour_team_member: boolean | null
@@ -6937,12 +7049,15 @@ export type Database = {
           job_id: string | null
           job_type: Database["public"]["Enums"]["job_type"] | null
           multiplier: number | null
+          per_job_multiplier: number | null
           start_time: string | null
           technician_id: string | null
           title: string | null
           total_eur: number | null
           total_with_extras_eur: number | null
           tour_id: string | null
+          vehicle_disclaimer: boolean | null
+          vehicle_disclaimer_text: string | null
           week_count: number | null
         }
         Relationships: [
@@ -7054,6 +7169,16 @@ export type Database = {
     Functions: {
       auto_complete_past_jobs: { Args: never; Returns: number }
       can_manage_users: { Args: never; Returns: boolean }
+      check_technician_conflicts: {
+        Args: {
+          _include_pending?: boolean
+          _single_day?: boolean
+          _target_date?: string
+          _target_job_id: string
+          _technician_id: string
+        }
+        Returns: Json
+      }
       clear_tour_preset_assignments: {
         Args: { _preset_id: string; _tour_id: string }
         Returns: undefined
@@ -7210,6 +7335,18 @@ export type Database = {
         Returns: {
           job_id: string
         }[]
+      }
+      get_waha_config: {
+        Args: { base_url: string }
+        Returns: {
+          api_key: string
+          host: string
+          session: string
+        }[]
+      }
+      invoke_scheduled_push_notification: {
+        Args: { event_type: string }
+        Returns: undefined
       }
       is_admin: { Args: never; Returns: boolean }
       is_house_tech: { Args: { _profile_id: string }; Returns: boolean }
