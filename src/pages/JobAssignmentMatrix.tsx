@@ -513,6 +513,7 @@ export default function JobAssignmentMatrix() {
 
   const outstandingHash = useMemo(() => (outstandingJobs.length ? JSON.stringify(outstandingJobs) : null), [outstandingJobs]);
 
+  // Auto-popup disabled - reminder is now only accessible via button
   React.useEffect(() => {
     if (!staffingReminderQuery.isSuccess) return;
     if (!outstandingJobs.length) {
@@ -527,14 +528,10 @@ export default function JobAssignmentMatrix() {
       }
       return;
     }
-
-    if (outstandingHash && lastAcknowledgedHash !== outstandingHash) {
-      setShowStaffingReminder(true);
-    }
+    // Automatic pop-up removed - user must click button to view staffing reminders
   }, [
     staffingReminderQuery.isSuccess,
     outstandingJobs,
-    outstandingHash,
     lastAcknowledgedHash,
     showStaffingReminder,
   ]);
