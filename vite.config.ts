@@ -19,12 +19,16 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    exclude: ['expo-apple-maps-sheet'],
+  },
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify('1.0RTM'),
   },
   build: {
     sourcemap: true,
     rollupOptions: {
+      external: ['expo-apple-maps-sheet'],
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
