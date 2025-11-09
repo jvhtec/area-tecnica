@@ -48,7 +48,15 @@ export const ApplePlacePicker: React.FC<ApplePlacePickerProps> = ({
     onBusyChange?.(true);
 
     try {
-      const module = await import(/* @vite-ignore */ 'expo-apple-maps-sheet');
+      // Dynamically import native iOS module (only available in Capacitor iOS builds)
+      let module;
+      try {
+        module = await import(/* @vite-ignore */ 'expo-apple-maps-sheet');
+      } catch (importError) {
+        // Module doesn't exist in web environment - this is expected
+        throw new Error('Apple Maps place picker is only available on iOS devices.');
+      }
+      
       const present =
         module.presentAppleMapsPlacePicker ||
         module.presentPlacePicker ||
