@@ -94,10 +94,12 @@ export const FlexElementSelectorDialog: React.FC<
       documentNumber: node.documentNumber,
       domainId: node.domainId,
       definitionId: node.definitionId,
+      schemaId: node.schemaId,
+      viewHint: node.viewHint,
       depth: node.depth,
       node,
     });
-    
+
     onSelect(node.elementId, node);
     onOpenChange(false);
     setSearchQuery("");
