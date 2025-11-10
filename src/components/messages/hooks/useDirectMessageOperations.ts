@@ -18,14 +18,14 @@ export const useDirectMessageOperations = (
     try {
       console.log("Deleting direct message:", messageId);
       const { data: deleted, error } = await supabase
-        .from('direct_messages')
+        .from("direct_messages")
         .delete()
-        .eq('id', messageId)
-        .select('id');
+        .eq("id", messageId)
+        .select("id");
 
       if (error) throw error;
       if (!deleted || deleted.length === 0) {
-        throw new Error('No rows deleted. You may not have permission to delete this direct message.');
+        throw new Error("No rows deleted. You may not have permission to delete this direct message.");
       }
 
       setMessages(prevMessages => prevMessages.filter(message => message.id !== messageId));
