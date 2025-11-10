@@ -1,12 +1,13 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { WiredMicConfig, WiredMic } from "./WiredMicConfig";
+import { MicrophoneListBuilder, WiredMic } from "./MicrophoneListBuilder";
 import { useState } from "react";
 import { Calculator, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useMicrophoneAnalysis } from "@/hooks/useMicrophoneAnalysis";
 import { MicrophoneAnalysisPreview } from "./MicrophoneAnalysisPreview";
+import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 
 interface FestivalMicKitConfigProps {
   jobId: string;
@@ -18,8 +19,14 @@ interface FestivalMicKitConfigProps {
 export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }: FestivalMicKitConfigProps) => {
   const [analysisPreviewOpen, setAnalysisPreviewOpen] = useState(false);
   const [isLoadingRequirements, setIsLoadingRequirements] = useState(false);
-  
+
   const { data: analysisData, isLoading: isAnalyzing, refetch } = useMicrophoneAnalysis(jobId, stageNumber);
+  const { models } = useEquipmentModels();
+
+  // Get available wired microphone models
+  const availableMics = models
+    .filter(model => model.category === 'wired_mics')
+    .map(model => model.name);
 
   console.log('=== FESTIVAL MIC KIT CONFIG DEBUG ===');
   console.log('FestivalMicKitConfig render - wiredMics:', wiredMics);
@@ -136,24 +143,22 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
         </div>
       </CardHeader>
       <CardContent>
-        <WiredMicConfig
-          mics={safeWiredMics}
-          onChange={handleMicsChange}
-          label="Available Wired Microphones"
-          showProvider={false}
-        />
-        
-        {safeWiredMics.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            <div className="mb-4">
-              <Plus className="h-12 w-12 mx-auto opacity-50" />
-            </div>
-            <p className="mb-2">No microphones configured yet</p>
-            <p className="text-sm">
-              Load microphone requirements from Stage {stageNumber} artist analysis or add them manually
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold mb-2">Available Wired Microphones</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Configure the microphones available for Stage {stageNumber}. Use the "Load from Artist Requirements"
+              button to automatically calculate peak needs based on artist submissions.
             </p>
           </div>
-        )}
+          <MicrophoneListBuilder
+            value={safeWiredMics}
+            onChange={handleMicsChange}
+            availableMics={availableMics}
+            showExclusiveUse={true}
+            showNotes={true}
+          />
+        </div>
 
         <MicrophoneAnalysisPreview
           open={analysisPreviewOpen}
