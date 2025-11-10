@@ -38,6 +38,7 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
     folderType: context?.folderType,
     domainId: context?.domainId,
     definitionId: context?.definitionId,
+    schemaId: context?.schemaId,
   });
 
   // Guard: Validate elementId is present and non-empty
@@ -58,19 +59,22 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
 
   // OPTIMIZATION: Use synchronous navigation when sufficient context is available
   // This is the case for tree navigation, where we already have all the metadata
+  const hasSchemaId = typeof context?.schemaId === 'string' && context.schemaId.trim().length > 0;
   const hasSufficientContext = !!(
-    context?.domainId || 
-    context?.definitionId || 
-    (context?.viewHint && context.viewHint !== 'auto')
+    context?.domainId ||
+    context?.definitionId ||
+    (context?.viewHint && context.viewHint !== 'auto') ||
+    hasSchemaId
   );
 
   if (hasSufficientContext) {
-    console.log('[openFlexElement] Using synchronous navigation path (sufficient context)', { 
-      elementId, 
+    console.log('[openFlexElement] Using synchronous navigation path (sufficient context)', {
+      elementId,
       context,
       hasDomainId: !!context?.domainId,
       hasDefinitionId: !!context?.definitionId,
       hasViewHint: !!context?.viewHint,
+      hasSchemaId,
     });
 
     try {
@@ -89,10 +93,11 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
   }
 
   // ASYNC PATH: Used when context is insufficient or sync resolution failed
-  console.log('[openFlexElement] Using async navigation path', { 
-    elementId, 
+  console.log('[openFlexElement] Using async navigation path', {
+    elementId,
     hasSufficientContext,
     reason: hasSufficientContext ? 'sync failed' : 'insufficient context',
+    hasSchemaId,
   });
 
   // Step 1: Try to open a placeholder window synchronously to preserve user gesture

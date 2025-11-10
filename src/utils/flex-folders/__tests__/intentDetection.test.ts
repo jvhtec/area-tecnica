@@ -27,11 +27,11 @@ describe('detectFlexLinkIntent', () => {
     expect(intent).toBe('fin-doc');
   });
 
-  it('should detect fin-doc for hojaGastos definitionId', () => {
+  it('should detect expense-sheet for hojaGastos definitionId', () => {
     const intent = detectFlexLinkIntent({
       definitionId: FLEX_FOLDER_IDS.hojaGastos,
     });
-    expect(intent).toBe('fin-doc');
+    expect(intent).toBe('expense-sheet');
   });
 
   it('should detect contact-list for crewCall definitionId', () => {
@@ -125,6 +125,27 @@ describe('detectFlexLinkIntent', () => {
       viewHint: 'equipment-list',
     });
     expect(intent).toBe('equipment-list');
+  });
+
+  it('should detect fin-doc intent from schemaId', () => {
+    const intent = detectFlexLinkIntent({
+      schemaId: 'FIN_DOC',
+    });
+    expect(intent).toBe('fin-doc');
+  });
+
+  it('should detect expense-sheet intent from schemaId with underscores', () => {
+    const intent = detectFlexLinkIntent({
+      schemaId: 'expense_sheet',
+    });
+    expect(intent).toBe('expense-sheet');
+  });
+
+  it('should fall back to simple-element for unknown schemaId', () => {
+    const intent = detectFlexLinkIntent({
+      schemaId: 'mystery_schema',
+    });
+    expect(intent).toBe('simple-element');
   });
 });
 
