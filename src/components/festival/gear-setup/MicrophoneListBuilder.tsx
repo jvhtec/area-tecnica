@@ -327,9 +327,9 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
                             size="sm"
                             onClick={() => setEditingModel(item.model)}
                             className="h-8 px-2"
-                            aria-label={`Edit settings for ${item.model}`}
+                            aria-label={`Edit notes for ${item.model}`}
                           >
-                            Edit
+                            Notes
                           </Button>
                           <Button
                             type="button"
@@ -346,6 +346,25 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
                     </div>
                   </div>
 
+                  {/* Inline controls for exclusive use */}
+                  {!readOnly && showExclusiveUse && (
+                    <div className="flex items-center space-x-2 pl-1">
+                      <Checkbox
+                        id={`exclusive-inline-${item.model}`}
+                        checked={micData?.exclusive_use || false}
+                        onCheckedChange={(checked) =>
+                          updateMicDetails(item.model, { exclusive_use: !!checked })
+                        }
+                      />
+                      <Label
+                        htmlFor={`exclusive-inline-${item.model}`}
+                        className="text-sm font-normal cursor-pointer"
+                      >
+                        Exclusive use (cannot be shared with other artists)
+                      </Label>
+                    </div>
+                  )}
+
                   {/* Show notes if exists */}
                   {micData?.notes && (
                     <div className="text-sm text-gray-600 pl-4 border-l-2 border-gray-300">
@@ -353,45 +372,27 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
                     </div>
                   )}
 
-                  {/* Edit Dialog */}
-                  {editingModel === item.model && (
+                  {/* Notes Dialog */}
+                  {editingModel === item.model && showNotes && (
                     <Dialog open={true} onOpenChange={() => setEditingModel(null)}>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Edit {item.model}</DialogTitle>
+                          <DialogTitle>Notes for {item.model}</DialogTitle>
                           <DialogDescription>
-                            Configure options for this microphone model
+                            Add any additional notes or special requirements for this microphone
                           </DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          {showExclusiveUse && (
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`exclusive-${item.model}`}
-                                checked={micData?.exclusive_use || false}
-                                onCheckedChange={(checked) =>
-                                  updateMicDetails(item.model, { exclusive_use: !!checked })
-                                }
-                              />
-                              <Label htmlFor={`exclusive-${item.model}`} className="text-sm font-normal">
-                                Exclusive use (cannot be shared with other artists)
-                              </Label>
-                            </div>
-                          )}
-                          {showNotes && (
-                            <div className="space-y-2">
-                              <Label htmlFor={`notes-${item.model}`}>Notes (optional)</Label>
-                              <Textarea
-                                id={`notes-${item.model}`}
-                                placeholder="Add any notes about this microphone..."
-                                value={micData?.notes || ''}
-                                onChange={(e) =>
-                                  updateMicDetails(item.model, { notes: e.target.value })
-                                }
-                                rows={3}
-                              />
-                            </div>
-                          )}
+                        <div className="py-4">
+                          <Textarea
+                            id={`notes-${item.model}`}
+                            placeholder="Add any notes about this microphone..."
+                            value={micData?.notes || ''}
+                            onChange={(e) =>
+                              updateMicDetails(item.model, { notes: e.target.value })
+                            }
+                            rows={5}
+                            autoFocus
+                          />
                         </div>
                         <DialogFooter>
                           <Button onClick={() => setEditingModel(null)}>Done</Button>
