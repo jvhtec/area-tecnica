@@ -1,4 +1,4 @@
-import { resolveFlexUrl } from './resolveFlexUrl';
+import { resolveFlexUrl, resolveFlexUrlSync } from './resolveFlexUrl';
 import { getFlexBaseUrl } from './config';
 import { IntentDetectionContext } from './intentDetection';
 import { buildFlexUrlByIntent } from './urlBuilder';
@@ -21,9 +21,8 @@ export interface OpenFlexElementOptions {
 
 /**
  * Opens a Flex element in a new tab, handling URL resolution while preserving user gesture.
- * This utility opens a placeholder window synchronously, resolves the final URL using the
- * shared resolver, then navigates the placeholder window. If resolution fails, it falls back
- * to a simple-element URL.
+ * Uses synchronous resolution when sufficient context is provided (e.g., from tree navigation).
+ * Falls back to async resolution with API calls when context is insufficient.
  */
 export async function openFlexElement(options: OpenFlexElementOptions): Promise<void> {
   const { elementId, context, onError, onWarning } = options;
@@ -56,6 +55,45 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
     }
     return;
   }
+
+  // OPTIMIZATION: Use synchronous navigation when sufficient context is available
+  // This is the case for tree navigation, where we already have all the metadata
+  const hasSufficientContext = !!(
+    context?.domainId || 
+    context?.definitionId || 
+    (context?.viewHint && context.viewHint !== 'auto')
+  );
+
+  if (hasSufficientContext) {
+    console.log('[openFlexElement] Using synchronous navigation path (sufficient context)', { 
+      elementId, 
+      context,
+      hasDomainId: !!context?.domainId,
+      hasDefinitionId: !!context?.definitionId,
+      hasViewHint: !!context?.viewHint,
+    });
+
+    try {
+      const url = resolveFlexUrlSync({ elementId, context });
+      
+      if (url) {
+        console.log('[openFlexElement] Successfully resolved URL synchronously:', { url, elementId });
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      
+      console.warn('[openFlexElement] Sync resolution returned null, falling back to async path');
+    } catch (syncError) {
+      console.warn('[openFlexElement] Sync resolution failed, falling back to async path:', syncError);
+    }
+  }
+
+  // ASYNC PATH: Used when context is insufficient or sync resolution failed
+  console.log('[openFlexElement] Using async navigation path', { 
+    elementId, 
+    hasSufficientContext,
+    reason: hasSufficientContext ? 'sync failed' : 'insufficient context',
+  });
 
   // Step 1: Try to open a placeholder window synchronously to preserve user gesture
   let placeholderWindow: Window | null = null;
