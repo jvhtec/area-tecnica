@@ -4307,6 +4307,33 @@ export type Database = {
         }
         Relationships: []
       }
+      push_cron_execution_log: {
+        Row: {
+          error_message: string | null
+          event_type: string
+          executed_at: string | null
+          id: number
+          request_id: number | null
+          success: boolean | null
+        }
+        Insert: {
+          error_message?: string | null
+          event_type: string
+          executed_at?: string | null
+          id?: number
+          request_id?: number | null
+          success?: boolean | null
+        }
+        Update: {
+          error_message?: string | null
+          event_type?: string
+          executed_at?: string | null
+          id?: number
+          request_id?: number | null
+          success?: boolean | null
+        }
+        Relationships: []
+      }
       push_notification_routes: {
         Row: {
           created_at: string
