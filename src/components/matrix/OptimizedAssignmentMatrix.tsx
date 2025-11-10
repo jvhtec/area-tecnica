@@ -103,6 +103,7 @@ export const OptimizedAssignmentMatrix = ({
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const [scrollAttempts, setScrollAttempts] = useState(0);
   const syncInProgressRef = useRef(false);
+  const lastKnownScrollRef = useRef({ left: 0, top: 0 });
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
@@ -321,8 +322,10 @@ export const OptimizedAssignmentMatrix = ({
         lastEdgeRef.t = now;
       }
     }
-    
+
     syncScrollPositions(scrollLeft, scrollTop, 'main');
+    lastKnownScrollRef.current.left = scrollLeft;
+    lastKnownScrollRef.current.top = scrollTop;
     // Update visible window for virtualization
     scheduleVisibleWindowUpdate();
   }, [syncScrollPositions, canExpandBefore, canExpandAfter, onNearEdgeScroll, scheduleVisibleWindowUpdate]);
@@ -331,6 +334,7 @@ export const OptimizedAssignmentMatrix = ({
     if (syncInProgressRef.current) return;
     const scrollLeft = e.currentTarget.scrollLeft;
     syncScrollPositions(scrollLeft, mainScrollRef.current?.scrollTop || 0, 'dateHeaders');
+    lastKnownScrollRef.current.left = scrollLeft;
     updateNavAvailability();
   }, [syncScrollPositions]);
 
@@ -338,6 +342,7 @@ export const OptimizedAssignmentMatrix = ({
     if (syncInProgressRef.current) return;
     const scrollTop = e.currentTarget.scrollTop;
     syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, 'technician');
+    lastKnownScrollRef.current.top = scrollTop;
   }, [syncScrollPositions]);
 
   const [availabilityPreferredChannel, setAvailabilityPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
@@ -611,27 +616,57 @@ export const OptimizedAssignmentMatrix = ({
   const prevDatesRef = useRef<Date[] | null>(null);
   useEffect(() => {
     const prev = prevDatesRef.current;
-    if (!prev || prev.length === 0 || dates.length === 0) {
+    const main = mainScrollRef.current;
+    const headers = dateHeadersRef.current;
+    const technicianScroller = technicianScrollRef.current;
+    if (!main || dates.length === 0) {
       prevDatesRef.current = dates.slice();
       return;
     }
-    const prevFirst = prev[0];
-    const prevLast = prev[prev.length - 1];
-    const nextFirst = dates[0];
-    const nextLast = dates[dates.length - 1];
 
-    // If new range extends earlier than before, adjust scrollLeft to compensate added columns on the left
-    if (nextFirst < prevFirst) {
-      const daysAddedLeft = Math.round((prevFirst.getTime() - nextFirst.getTime()) / (1000 * 60 * 60 * 24));
-      const delta = daysAddedLeft * CELL_WIDTH;
-      if (delta > 0) {
-        if (dateHeadersRef.current) dateHeadersRef.current.scrollLeft += delta;
-        if (mainScrollRef.current) mainScrollRef.current.scrollLeft += delta;
+    const lastLeft = lastKnownScrollRef.current.left ?? main.scrollLeft;
+    const lastTop = lastKnownScrollRef.current.top ?? main.scrollTop;
+
+    let targetLeft = lastLeft;
+
+    if (prev && prev.length > 0) {
+      const prevFirstIso = prev[0].toISOString();
+      const nextIndex = dates.findIndex(date => date.toISOString() === prevFirstIso);
+
+      if (nextIndex > 0) {
+        targetLeft = lastLeft + nextIndex * CELL_WIDTH;
+      } else if (nextIndex === -1) {
+        // Range replaced entirely; keep current anchor instead of jumping to start
+        targetLeft = lastLeft;
       }
     }
-    // If only extended to the right, no adjustment needed.
+
+    const applyScroll = (element: HTMLDivElement | null, value: number) => {
+      if (!element) return;
+      if (Math.abs(element.scrollLeft - value) > 1) {
+        element.scrollLeft = value;
+      }
+    };
+
+    applyScroll(main, targetLeft);
+    applyScroll(headers, targetLeft);
+    if (technicianScroller && Math.abs(technicianScroller.scrollTop - lastTop) > 1) {
+      technicianScroller.scrollTop = lastTop;
+    }
+    if (Math.abs(main.scrollTop - lastTop) > 1) {
+      main.scrollTop = lastTop;
+    }
+
+    lastKnownScrollRef.current.left = targetLeft;
+    lastKnownScrollRef.current.top = lastTop;
+
+    const previousScrollLeftRef =
+      (handleMainScroll as any)._previousScrollLeftRef ||
+      ((handleMainScroll as any)._previousScrollLeftRef = { value: null as number | null });
+    previousScrollLeftRef.value = targetLeft;
+
     prevDatesRef.current = dates.slice();
-  }, [dates]);
+  }, [dates, CELL_WIDTH]);
 
   // Mobile date navigation state
   const [canNavLeft, setCanNavLeft] = useState(false);
