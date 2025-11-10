@@ -22,6 +22,216 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { format } from 'date-fns';
+
+type MatrixJob = {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  color?: string | null;
+  status: string;
+  job_type: string;
+  _assigned_count?: number;
+};
+
+async function fetchJobsForWindow(start: Date, end: Date, department: string) {
+  let query = supabase
+    .from('jobs')
+    .select(`
+      id, title, start_time, end_time, color, status, job_type,
+      job_departments!inner(department),
+      job_assignments!job_id(technician_id)
+    `)
+    .lte('start_time', end.toISOString())
+    .gte('end_time', start.toISOString())
+    .in('job_type', ['single', 'festival', 'tourdate'])
+    .limit(500);
+
+  if (department) {
+    query = query.eq('job_departments.department', department);
+  }
+
+  const { data, error } = await query.order('start_time', { ascending: true });
+
+  if (error) throw error;
+
+  return (data || [])
+    .map((j: any) => {
+      const assigns = Array.isArray(j.job_assignments) ? j.job_assignments : [];
+      return {
+        id: j.id,
+        title: j.title,
+        start_time: j.start_time,
+        end_time: j.end_time,
+        color: j.color,
+        status: j.status,
+        job_type: j.job_type,
+        _assigned_count: assigns.length as number,
+      } as MatrixJob;
+    })
+    .filter((j) => j.status !== 'Cancelado' || (j._assigned_count ?? 0) > 0);
+}
+
+async function fetchAssignmentsForWindow(jobIds: string[], technicianIds: string[], jobs: MatrixJob[]) {
+  if (!jobIds.length || !technicianIds.length) return [];
+
+  const jobsById = new Map<string, MatrixJob>();
+  jobs.forEach((job) => {
+    if (job?.id) jobsById.set(job.id, job);
+  });
+
+  const batchSize = 25;
+  const promises: any[] = [];
+
+  for (let i = 0; i < jobIds.length; i += batchSize) {
+    const jobBatch = jobIds.slice(i, i + batchSize);
+    promises.push(
+      supabase
+        .from('job_assignments')
+        .select(`
+          job_id,
+          technician_id,
+          sound_role,
+          lights_role,
+          video_role,
+          single_day,
+          assignment_date,
+          status,
+          assigned_at,
+          jobs!job_id (
+            id,
+            title,
+            start_time,
+            end_time,
+            color
+          )
+        `)
+        .in('job_id', jobBatch)
+        .in('technician_id', technicianIds)
+        .limit(500)
+    );
+  }
+
+  const results = await Promise.all(promises);
+  const allData = results.flatMap((result: any) => {
+    if (result.error) {
+      console.error('Assignment prefetch error:', result.error);
+      return [];
+    }
+    return result.data || [];
+  });
+
+  return allData
+    .map((item: any) => ({
+      job_id: item.job_id,
+      technician_id: item.technician_id,
+      sound_role: item.sound_role,
+      lights_role: item.lights_role,
+      video_role: item.video_role,
+      single_day: item.single_day,
+      assignment_date: item.assignment_date,
+      status: item.status,
+      assigned_at: item.assigned_at,
+      job: jobsById.get(item.job_id) || (Array.isArray(item.jobs) ? item.jobs[0] : item.jobs),
+    }))
+    .filter((item) => !!item.job);
+}
+
+async function fetchAvailabilityForWindow(technicianIds: string[], start: Date, end: Date) {
+  if (!technicianIds.length) return [] as Array<{ user_id: string; date: string; status: string; notes?: string }>;
+
+  const techBatches: string[][] = [];
+  const batchSize = 100;
+  for (let i = 0; i < technicianIds.length; i += batchSize) {
+    techBatches.push(technicianIds.slice(i, i + batchSize));
+  }
+
+  const perDay = new Map<string, { user_id: string; date: string; status: string; notes?: string }>();
+  const startDay = new Date(start);
+  startDay.setHours(0, 0, 0, 0);
+  const endDay = new Date(end);
+  endDay.setHours(0, 0, 0, 0);
+
+  for (const batch of techBatches) {
+    const { data: schedRows, error: schedErr } = await supabase
+      .from('availability_schedules')
+      .select('user_id, date, status, notes, source')
+      .in('user_id', batch)
+      .gte('date', format(start, 'yyyy-MM-dd'))
+      .lte('date', format(end, 'yyyy-MM-dd'))
+      .or('status.eq.unavailable,source.eq.vacation');
+    if (schedErr) throw schedErr;
+    (schedRows || []).forEach((row: any) => {
+      const key = `${row.user_id}-${row.date}`;
+      if (!perDay.has(key)) {
+        perDay.set(key, { user_id: row.user_id, date: row.date, status: 'unavailable', notes: row.notes || undefined });
+      } else if (row.notes) {
+        const current = perDay.get(key)!;
+        if (!current.notes) {
+          perDay.set(key, { ...current, notes: row.notes });
+        }
+      }
+    });
+  }
+
+  try {
+    const { data: legacyRows, error: legacyErr } = await supabase
+      .from('technician_availability')
+      .select('technician_id, date, status')
+      .in('technician_id', technicianIds)
+      .gte('date', format(start, 'yyyy-MM-dd'))
+      .lte('date', format(end, 'yyyy-MM-dd'))
+      .in('status', ['vacation', 'travel', 'sick', 'day_off']);
+    if (legacyErr) {
+      if (legacyErr.code !== '42P01') throw legacyErr;
+    }
+    (legacyRows || []).forEach((row: any) => {
+      const key = `${row.technician_id}-${row.date}`;
+      if (!perDay.has(key)) {
+        perDay.set(key, { user_id: row.technician_id, date: row.date, status: 'unavailable' });
+      }
+    });
+  } catch (error: any) {
+    if (error?.code && error.code !== '42P01') throw error;
+  }
+
+  try {
+    const vacBatchSize = 100;
+    const vacBatches: string[][] = [];
+    for (let i = 0; i < technicianIds.length; i += vacBatchSize) {
+      vacBatches.push(technicianIds.slice(i, i + vacBatchSize));
+    }
+    for (const batch of vacBatches) {
+      const { data: vacs, error: vacErr } = await supabase
+        .from('vacation_requests')
+        .select('technician_id, start_date, end_date, status')
+        .eq('status', 'approved')
+        .in('technician_id', batch)
+        .lte('start_date', format(end, 'yyyy-MM-dd'))
+        .gte('end_date', format(start, 'yyyy-MM-dd'));
+      if (vacErr) {
+        if (vacErr.code !== '42P01') throw vacErr;
+      }
+      (vacs || []).forEach((vac: any) => {
+        const s = new Date(vac.start_date);
+        const e = new Date(vac.end_date);
+        const clampStart = new Date(Math.max(startDay.getTime(), new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime()));
+        const clampEnd = new Date(Math.min(endDay.getTime(), new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime()));
+        for (let d = new Date(clampStart); d.getTime() <= clampEnd.getTime(); d.setDate(d.getDate() + 1)) {
+          const key = `${vac.technician_id}-${format(d, 'yyyy-MM-dd')}`;
+          if (!perDay.has(key)) {
+            perDay.set(key, { user_id: vac.technician_id, date: format(d, 'yyyy-MM-dd'), status: 'unavailable' });
+          }
+        }
+      });
+    }
+  } catch (error: any) {
+    if (error?.code && error.code !== '42P01') throw error;
+  }
+
+  return Array.from(perDay.values());
+}
 
 const DEPARTMENT_LABELS: Record<string, string> = {
   sound: 'Sonido',
@@ -106,6 +316,7 @@ function parseSummaryRow(row: any): StaffingSummaryRow | null {
 
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
+  const prefetchStatusRef = React.useRef<Map<string, 'pending' | 'done'>>(new Map<string, 'pending' | 'done'>());
   const { userDepartment } = useOptimizedAuth();
   const [defaultDepartment, setDefaultDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
@@ -186,7 +397,8 @@ export default function JobAssignmentMatrix() {
     setCenterDate,
     resetRange,
     jumpToMonth,
-    rangeInfo
+    rangeInfo,
+    getProjectedRangeInfo
   } = useVirtualizedDateRange({
     initialWeeksBefore: 1,   // Start with 1 week before today
     initialWeeksAfter: 2,    // Start with 2 weeks after today
@@ -316,6 +528,9 @@ export default function JobAssignmentMatrix() {
     });
   }, [technicians, debouncedSearch, selectedSkills, hideFridge, fridgeSet]);
 
+  const filteredTechnicianIds = useMemo(() => filteredTechnicians.map((tech: { id: string }) => tech.id), [filteredTechnicians]);
+  const filteredTechnicianIdsKey = useMemo(() => filteredTechnicianIds.join(','), [filteredTechnicianIds]);
+
   // Optimized jobs query with smart date filtering
   const {
     data: yearJobs = [],
@@ -379,6 +594,96 @@ export default function JobAssignmentMatrix() {
   const isBackgroundFetchingMatrix =
     (isFetchingTechnicians && !isInitialLoadingTechnicians) ||
     (isFetchingJobs && !isInitialLoadingJobs);
+
+  React.useEffect(() => {
+    if (isInitialMatrixLoad) return;
+    if (!canExpandAfter) return;
+
+    const projection = getProjectedRangeInfo('after');
+    if (!projection) return;
+
+    const { rangeInfo: projectedRange } = projection;
+    const { start, end, startFormatted, endFormatted } = projectedRange;
+    if (!start || !end) return;
+
+    const technicianIds = filteredTechnicianIds;
+    const technicianKey = filteredTechnicianIdsKey;
+    const windowKey = [startFormatted, endFormatted, selectedDepartment, technicianKey].join('|');
+
+    const currentStatus = prefetchStatusRef.current.get(windowKey);
+    if (currentStatus === 'pending' || currentStatus === 'done') return;
+
+    let cancelled = false;
+    prefetchStatusRef.current.set(windowKey, 'pending');
+
+    const runPrefetch = async () => {
+      const jobCacheKey = ['optimized-matrix-jobs', startFormatted, endFormatted, selectedDepartment] as const;
+      const jobsData = await qc.prefetchQuery({
+        queryKey: jobCacheKey,
+        queryFn: () => fetchJobsForWindow(start, end, selectedDepartment),
+        staleTime: 5 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+      });
+
+      if (cancelled) return;
+
+      const jobsForWindow = Array.isArray(jobsData)
+        ? (jobsData as MatrixJob[])
+        : ((qc.getQueryData(jobCacheKey) as MatrixJob[]) ?? []);
+      const jobIds = jobsForWindow.map((job) => job.id).filter(Boolean);
+
+      if (!cancelled && jobIds.length && technicianIds.length) {
+        await qc.prefetchQuery({
+          queryKey: ['optimized-matrix-assignments', jobIds, technicianIds, format(start, 'yyyy-MM-dd')],
+          queryFn: () => fetchAssignmentsForWindow(jobIds, technicianIds, jobsForWindow),
+          staleTime: 30 * 1000,
+          gcTime: 2 * 60 * 1000,
+        });
+      }
+
+      if (!cancelled && technicianIds.length) {
+        await qc.prefetchQuery({
+          queryKey: ['optimized-matrix-availability', technicianIds, format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd')],
+          queryFn: () => fetchAvailabilityForWindow(technicianIds, start, end),
+          staleTime: 60 * 1000,
+          gcTime: 10 * 60 * 1000,
+        });
+      }
+
+      if (!cancelled && canExpandAfter) {
+        expandAfter();
+      }
+    };
+
+    runPrefetch()
+      .then(() => {
+        if (!cancelled) {
+          prefetchStatusRef.current.set(windowKey, 'done');
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          prefetchStatusRef.current.delete(windowKey);
+          console.error('Failed to prefetch next matrix window', error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (prefetchStatusRef.current.get(windowKey) === 'pending') {
+        prefetchStatusRef.current.delete(windowKey);
+      }
+    };
+  }, [
+    qc,
+    canExpandAfter,
+    expandAfter,
+    filteredTechnicianIds,
+    filteredTechnicianIdsKey,
+    getProjectedRangeInfo,
+    isInitialMatrixLoad,
+    selectedDepartment,
+  ]);
 
   const jobIds = React.useMemo(() => yearJobs.map((j: any) => j.id).filter(Boolean), [yearJobs]);
   const jobIdsKey = React.useMemo(() => (jobIds.length ? jobIds.slice().sort().join(',') : 'none'), [jobIds]);
