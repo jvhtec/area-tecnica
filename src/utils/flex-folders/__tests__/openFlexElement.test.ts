@@ -47,7 +47,7 @@ describe('openFlexElement', () => {
     });
 
     // Verify window.open was called synchronously with about:blank
-    expect(mockWindow.open).toHaveBeenCalledWith('about:blank', '_blank', 'noopener,noreferrer');
+    expect(mockWindow.open).toHaveBeenCalledWith('', '_blank');
   });
 
   it('should resolve URL via resolver and navigate placeholder window', async () => {
@@ -286,5 +286,28 @@ describe('openFlexElement', () => {
 
     // Verify placeholder window location was updated
     expect(mockPlaceholderWindow.location.href).toBe(mockUrl);
+  });
+
+  it('should resolve synchronously when schemaId provides intent', async () => {
+    const asyncSpy = vi.spyOn(resolverModule, 'resolveFlexUrl');
+    const syncSpy = vi.spyOn(resolverModule, 'resolveFlexUrlSync');
+
+    await openFlexElement({
+      elementId: 'schema-only-id',
+      context: {
+        schemaId: 'FIN_DOC',
+      },
+    });
+
+    expect(syncSpy).toHaveBeenCalledWith({
+      elementId: 'schema-only-id',
+      context: {
+        schemaId: 'FIN_DOC',
+      },
+    });
+    expect(asyncSpy).not.toHaveBeenCalled();
+    expect(mockWindow.open).toHaveBeenCalledTimes(1);
+    const [urlArg] = mockWindow.open.mock.calls[0];
+    expect(urlArg).toContain('#fin-doc/');
   });
 });

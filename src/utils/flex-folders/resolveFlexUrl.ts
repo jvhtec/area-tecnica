@@ -1,6 +1,10 @@
 import { buildFlexUrl, buildFlexUrlWithTypeDetection, ElementContext } from './buildFlexUrl';
 import { supabase } from '@/lib/supabase';
-import { detectFlexLinkIntent, IntentDetectionContext } from './intentDetection';
+import {
+  detectFlexLinkIntent,
+  intentFromSchemaId,
+  IntentDetectionContext,
+} from './intentDetection';
 import { buildFlexUrlByIntent } from './urlBuilder';
 
 export interface ResolveFlexUrlOptions {
@@ -92,8 +96,15 @@ export async function resolveFlexUrl(options: ResolveFlexUrlOptions): Promise<st
       domain === 'remote-files' ||
       domain === 'file-list'
     );
+    const hasStrongSchema = !!intentFromSchemaId(context?.schemaId);
 
-    if (hasStrongDefinition || isExplicitView || isDryhireOrTourdate || hasStrongDomain) {
+    if (
+      hasStrongDefinition ||
+      isExplicitView ||
+      isDryhireOrTourdate ||
+      hasStrongDomain ||
+      hasStrongSchema
+    ) {
       const intent = detectFlexLinkIntent(context);
       const url = buildFlexUrlByIntent(intent, elementId);
       console.log('[resolveFlexUrl] Resolved URL using context (no API):', {
@@ -101,6 +112,7 @@ export async function resolveFlexUrl(options: ResolveFlexUrlOptions): Promise<st
         elementId,
         intent,
         context,
+        hasStrongSchema,
       });
       return url;
     }

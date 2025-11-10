@@ -12,6 +12,34 @@ export type FlexLinkIntent =
   | 'equipment-list'    // Pull sheet/equipment list
   | 'remote-file-list'; // Remote file list
 
+const SCHEMA_INTENT_MAP: Record<string, FlexLinkIntent> = {
+  'fin-doc': 'fin-doc',
+  'financial-document': 'fin-doc',
+  'financial-doc': 'fin-doc',
+  'presupuesto': 'fin-doc',
+  'dryhire-fin-doc': 'fin-doc',
+  'expense-sheet': 'expense-sheet',
+  'expense': 'expense-sheet',
+  'expense-list': 'expense-sheet',
+  'expense-report': 'expense-sheet',
+  'crew-call': 'contact-list',
+  'contact-list': 'contact-list',
+  'contact-list-element': 'contact-list',
+  'equipment-list': 'equipment-list',
+  'equipment': 'equipment-list',
+  'equipment-schedule': 'equipment-list',
+  'equipment-log': 'equipment-list',
+  'remote-file-list': 'remote-file-list',
+  'remote-files': 'remote-file-list',
+  'file-list': 'remote-file-list',
+  'file-library': 'remote-file-list',
+  'simple-element': 'simple-element',
+  'simple-project-element': 'simple-element',
+  folder: 'simple-element',
+  'dryhire-folder': 'simple-element',
+  'tourdate-folder': 'simple-element',
+};
+
 /**
  * Context information that can help determine the correct intent
  */
@@ -40,6 +68,39 @@ export interface IntentDetectionContext {
    * Explicit view hint to force a specific intent
    */
   viewHint?: FlexLinkIntent | 'auto';
+}
+
+/**
+ * Normalizes a schemaId into a consistent lookup key.
+ */
+export function normalizeSchemaId(schemaId?: string): string | null {
+  if (typeof schemaId !== 'string') {
+    return null;
+  }
+
+  const trimmed = schemaId.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const hyphenated = trimmed
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[\s_]+/g, '-')
+    .toLowerCase();
+
+  return hyphenated || null;
+}
+
+/**
+ * Maps a schemaId to a known intent when possible.
+ */
+export function intentFromSchemaId(schemaId?: string): FlexLinkIntent | null {
+  const normalized = normalizeSchemaId(schemaId);
+  if (!normalized) {
+    return null;
+  }
+
+  return SCHEMA_INTENT_MAP[normalized] ?? null;
 }
 
 // Financial documents that use the #fin-doc URL schema
@@ -89,6 +150,11 @@ export function detectFlexLinkIntent(context?: IntentDetectionContext): FlexLink
   // Explicit view hint takes highest priority
   if (context.viewHint && context.viewHint !== 'auto') {
     return context.viewHint;
+  }
+
+  const schemaIntent = intentFromSchemaId(context.schemaId);
+  if (schemaIntent) {
+    return schemaIntent;
   }
 
   // Check definitionId
