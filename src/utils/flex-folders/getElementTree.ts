@@ -10,6 +10,8 @@ export interface FlexElementNode {
   parentElementId?: string | null;
   domainId?: string;
   definitionId?: string;
+  schemaId?: string;
+  viewHint?: string;
   children?: FlexElementNode[];
 }
 
@@ -20,6 +22,8 @@ export interface FlatElementNode {
   parentElementId?: string | null;
   domainId?: string;
   definitionId?: string;
+  schemaId?: string;
+  viewHint?: string;
   depth: number;
 }
 
@@ -123,6 +127,77 @@ function transformFlexTreeResponse(data: unknown): FlexElementNode[] {
 /**
  * Transform a single element from Flex API format
  */
+function normalizeToString(value: unknown, visited = new Set<object>()): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  if (typeof value === "object" && value !== null) {
+    if (visited.has(value as object)) {
+      return undefined;
+    }
+
+    visited.add(value as object);
+    const record = value as Record<string, unknown>;
+
+    // Common Flex API pattern: { data: "value" }
+    if (typeof record.data === "string") {
+      const trimmed = record.data.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+
+    // Recurse into known nested containers
+    for (const key of ["data", "attributes", "value"]) {
+      if (key in record) {
+        const nested = normalizeToString(record[key], visited);
+        if (nested) return nested;
+      }
+    }
+
+    // As a final fallback, scan all properties once
+    for (const nestedValue of Object.values(record)) {
+      const nested = normalizeToString(nestedValue, visited);
+      if (nested) return nested;
+    }
+  }
+
+  return undefined;
+}
+
+function extractMetadataField(
+  element: Record<string, unknown>,
+  keys: string[],
+  visited = new Set<object>()
+): string | undefined {
+  if (visited.has(element)) {
+    return undefined;
+  }
+  visited.add(element);
+
+  for (const key of keys) {
+    if (key in element) {
+      const value = normalizeToString(element[key]);
+      if (value) {
+        return value;
+      }
+    }
+  }
+
+  if (typeof element.data === "object" && element.data !== null) {
+    const nested = extractMetadataField(
+      element.data as Record<string, unknown>,
+      keys,
+      visited
+    );
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return undefined;
+}
+
 function transformSingleElement(element: unknown): FlexElementNode {
   if (typeof element !== "object" || element === null) {
     console.warn('[getElementTree] Received non-object element, returning default:', element);
@@ -133,9 +208,9 @@ function transformSingleElement(element: unknown): FlexElementNode {
   }
 
   const el = element as Record<string, unknown>;
-  
+
   // Extract elementId with fallbacks
-  const extractedElementId = 
+  const extractedElementId =
     (typeof el.elementId === "string" ? el.elementId : null) ||
     (typeof el.nodeId === "string" ? el.nodeId : null) ||
     (typeof el.id === "string" ? el.id : null) ||
@@ -174,7 +249,25 @@ function transformSingleElement(element: unknown): FlexElementNode {
       (typeof el.definitionId === "string" ? el.definitionId : null) ||
       (typeof el.elementDefinitionId === "string" ? el.elementDefinitionId : null) ||
       undefined,
+    schemaId:
+      (typeof el.schemaId === "string" ? el.schemaId : null) ||
+      (typeof el.schema_id === "string" ? el.schema_id : null) ||
+      extractMetadataField(el, ["schemaId", "schema_id"]) ||
+      undefined,
+    viewHint:
+      (typeof el.viewHint === "string" ? el.viewHint : null) ||
+      (typeof el.view_hint === "string" ? el.view_hint : null) ||
+      extractMetadataField(el, ["viewHint", "view_hint"]) ||
+      undefined,
   };
+
+  if (node.schemaId) {
+    node.schemaId = node.schemaId.trim();
+  }
+
+  if (node.viewHint) {
+    node.viewHint = node.viewHint.trim().toLowerCase();
+  }
 
   // Recursively transform children
   if (Array.isArray(el.children)) {
@@ -206,6 +299,8 @@ export function flattenTree(
       parentElementId: node.parentElementId,
       domainId: node.domainId,
       definitionId: node.definitionId,
+      schemaId: node.schemaId,
+      viewHint: node.viewHint,
       depth,
     });
 
@@ -255,6 +350,8 @@ export function searchTree(
           parentElementId: node.parentElementId,
           domainId: node.domainId,
           definitionId: node.definitionId,
+          schemaId: node.schemaId,
+          viewHint: node.viewHint,
           depth,
         });
       }

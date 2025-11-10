@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { JobCardActions } from '../JobCardActions';
+import type { FlatElementNode } from '@/utils/flex-folders';
 import * as resolveFlexUrl from '@/utils/flex-folders/resolveFlexUrl';
 import * as useFlexUuidModule from '@/hooks/useFlexUuid';
 import * as flexMainFolderId from '@/utils/flexMainFolderId';
@@ -454,6 +455,47 @@ describe('JobCardActions', () => {
       });
 
       expect(result).toBeNull();
+    });
+
+    it('forwards viewHint aliases and schemaId when selecting a node', () => {
+      vi.spyOn(flexMainFolderId, 'getMainFlexElementIdSync').mockReturnValue({
+        elementId: 'main-element-id',
+        department: 'sound',
+      });
+
+      const props = {
+        ...defaultProps,
+        foldersAreCreated: true,
+      };
+
+      render(<JobCardActions {...props} />);
+
+      expect(FlexElementSelectorDialogMock).toHaveBeenCalled();
+
+      const dialogProps = FlexElementSelectorDialogMock.mock.calls[0][0];
+      const node: FlatElementNode = {
+        elementId: 'crew-call-element',
+        displayName: 'Crew Call',
+        depth: 1,
+        domainId: 'contact-list',
+        parentElementId: 'main-element-id',
+        schemaId: 'crew-call-schema',
+        viewHint: 'crew-call',
+      };
+
+      dialogProps.onSelect(node.elementId, node);
+
+      expect(openFlexElementMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          elementId: 'crew-call-element',
+          context: expect.objectContaining({
+            schemaId: 'crew-call-schema',
+            viewHint: 'contact-list',
+            domainId: 'contact-list',
+            jobType: props.job.job_type,
+          }),
+        })
+      );
     });
   });
 
