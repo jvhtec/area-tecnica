@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { addDays, addWeeks, addMonths, format, isSameDay, startOfDay } from 'date-fns';
+import { addDays, addWeeks, format, isSameDay, startOfDay, differenceInCalendarDays } from 'date-fns';
 
 interface DateRangeState {
   centerDate: Date;
@@ -33,6 +33,25 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
     maxWeeksBefore,
     maxWeeksAfter
   });
+
+  const buildRangeInfo = useCallback((state: DateRangeState) => {
+    const start = addWeeks(state.centerDate, -state.weeksBefore);
+    const end = addWeeks(state.centerDate, state.weeksAfter);
+
+    const totalWeeks = state.weeksBefore + state.weeksAfter;
+    const totalDays = Math.max(differenceInCalendarDays(end, start) + 1, 0);
+
+    return {
+      start,
+      end,
+      totalWeeks,
+      totalDays,
+      startFormatted: format(start, 'MMM d, yyyy'),
+      endFormatted: format(end, 'MMM d, yyyy'),
+      isAtMaxBefore: state.weeksBefore >= state.maxWeeksBefore,
+      isAtMaxAfter: state.weeksAfter >= state.maxWeeksAfter,
+    };
+  }, []);
 
   // Generate the current date range
   const dateRange = useMemo(() => {
@@ -110,23 +129,36 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
   }, [setCenterDate]);
 
   // Get range metadata
-  const rangeInfo = useMemo(() => {
-    const start = dateRange[0];
-    const end = dateRange[dateRange.length - 1];
-    const totalWeeks = dateState.weeksBefore + dateState.weeksAfter;
-    const totalDays = dateRange.length;
-    
-    return {
-      start,
-      end,
-      totalWeeks,
-      totalDays,
-      startFormatted: start ? format(start, 'MMM d, yyyy') : '',
-      endFormatted: end ? format(end, 'MMM d, yyyy') : '',
-      isAtMaxBefore: dateState.weeksBefore >= dateState.maxWeeksBefore,
-      isAtMaxAfter: dateState.weeksAfter >= dateState.maxWeeksAfter
+  const rangeInfo = useMemo(() => buildRangeInfo(dateState), [buildRangeInfo, dateState]);
+
+  const getProjectedRangeInfo = useCallback((direction: 'before' | 'after', steps = 1) => {
+    if (steps <= 0) return null;
+
+    const delta = steps * expandByWeeks;
+    let nextWeeksBefore = dateState.weeksBefore;
+    let nextWeeksAfter = dateState.weeksAfter;
+
+    if (direction === 'before') {
+      if (!canExpandBefore) return null;
+      nextWeeksBefore = Math.min(dateState.weeksBefore + delta, dateState.maxWeeksBefore);
+      if (nextWeeksBefore === dateState.weeksBefore) return null;
+    } else {
+      if (!canExpandAfter) return null;
+      nextWeeksAfter = Math.min(dateState.weeksAfter + delta, dateState.maxWeeksAfter);
+      if (nextWeeksAfter === dateState.weeksAfter) return null;
+    }
+
+    const projectedState: DateRangeState = {
+      ...dateState,
+      weeksBefore: nextWeeksBefore,
+      weeksAfter: nextWeeksAfter,
     };
-  }, [dateRange, dateState]);
+
+    return {
+      state: projectedState,
+      rangeInfo: buildRangeInfo(projectedState),
+    };
+  }, [buildRangeInfo, canExpandAfter, canExpandBefore, dateState, expandByWeeks]);
 
   return {
     dateRange,
@@ -139,6 +171,7 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
     resetRange,
     jumpToMonth,
     rangeInfo,
-    currentState: dateState
+    currentState: dateState,
+    getProjectedRangeInfo,
   };
 };
