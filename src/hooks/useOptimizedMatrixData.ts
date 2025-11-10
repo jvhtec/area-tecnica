@@ -93,7 +93,11 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   }), [dates]);
 
   // Much more optimized assignments query - only fetch what's actually needed
-  const { data: allAssignments = [], isLoading: assignmentsLoading } = useQuery({
+  const {
+    data: allAssignments = [],
+    isLoading: assignmentsInitialLoading,
+    isFetching: assignmentsFetching,
+  } = useQuery({
     queryKey: ['optimized-matrix-assignments', jobIds, technicianIds, format(dateRange.start, 'yyyy-MM-dd')],
     queryFn: async (): Promise<AssignmentWithJob[]> => {
       if (jobIds.length === 0 || technicianIds.length === 0) return [];
@@ -173,10 +177,15 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     staleTime: 30 * 1000, // 30 seconds - more frequent updates
     gcTime: 2 * 60 * 1000, // 2 minutes cache
     refetchOnWindowFocus: false, // Disable automatic refetch on focus
+    placeholderData: (previousData) => previousData,
   });
 
   // Availability (unavailability) merged from per-day schedules and legacy table
-  const { data: availabilityData = [], isLoading: availabilityLoading } = useQuery({
+  const {
+    data: availabilityData = [],
+    isLoading: availabilityInitialLoading,
+    isFetching: availabilityFetching,
+  } = useQuery({
     queryKey: ['optimized-matrix-availability', technicianIds, format(dateRange.start, 'yyyy-MM-dd'), format(dateRange.end, 'yyyy-MM-dd')],
     queryFn: async () => {
       if (technicianIds.length === 0 || !dateRange.start || !dateRange.end) return [] as Array<{ user_id: string; date: string; status: string; notes?: string }>;
@@ -280,6 +289,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     enabled: technicianIds.length > 0 && !!dateRange.start && !!dateRange.end,
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
   });
 
   // Realtime invalidation for availability changes
@@ -403,10 +413,14 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     console.log('Assignment queries invalidated');
   };
 
+  const isInitialLoading = assignmentsInitialLoading || availabilityInitialLoading;
+  const isFetching = assignmentsFetching || availabilityFetching;
+
   return {
     allAssignments,
     availabilityData,
-    isLoading: assignmentsLoading || availabilityLoading,
+    isInitialLoading,
+    isFetching,
     getAssignmentForCell,
     getAvailabilityForCell,
     getJobsForDate,
