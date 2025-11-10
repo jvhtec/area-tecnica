@@ -165,7 +165,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
         <Label htmlFor="mic-search" className="sr-only">
           Search microphones
         </Label>
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden="true" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" aria-hidden="true" />
         <Input
           id="mic-search"
           type="text"
@@ -188,7 +188,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
           <Label className="text-sm font-semibold" id="tally-grid-label">
             Available Microphones
           </Label>
-          <span className="text-sm text-gray-500" aria-live="polite" aria-atomic="true">
+          <span className="text-sm text-gray-500 dark:text-gray-400" aria-live="polite" aria-atomic="true">
             Click to add • Total: {totalCount}
           </span>
         </div>
@@ -213,7 +213,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
                 <span className="text-sm truncate flex-1">{mic}</span>
                 {count > 0 && (
                   <span
-                    className="ml-2 bg-white text-primary font-bold px-2 py-0.5 rounded-full text-xs"
+                    className="ml-2 bg-white dark:bg-gray-800 text-primary dark:text-primary-foreground font-bold px-2 py-0.5 rounded-full text-xs"
                     aria-label={`${count} units`}
                   >
                     {count}
@@ -224,7 +224,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
           })}
         </div>
         {filteredMics.length === 0 && (
-          <div className="text-center py-8 text-gray-500" role="status">
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400" role="status">
             No microphones found matching "{searchQuery}"
           </div>
         )}
@@ -243,7 +243,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowClearDialog(true)}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950"
                 aria-label={`Clear all ${expandedEntries.length} microphone entries`}
               >
                 <Trash2 className="h-4 w-4 mr-1" aria-hidden="true" />
@@ -252,19 +252,19 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
             )}
           </div>
           <div
-            className="space-y-2 max-h-96 overflow-y-auto border rounded-lg p-3 bg-gray-50"
+            className="space-y-2 max-h-96 overflow-y-auto border rounded-lg p-3 bg-gray-50 dark:bg-gray-900"
             role="list"
             aria-labelledby="entries-label"
           >
             {expandedEntries.map((entry, idx) => (
               <div
                 key={`${entry.model}-${idx}`}
-                className="flex items-center justify-between bg-white p-3 rounded border"
+                className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded border"
                 role="listitem"
               >
                 <div className="flex items-center gap-2 flex-1">
                   <span className="text-sm font-medium">{entry.model}</span>
-                  <span className="text-xs text-gray-500" aria-label={`Entry ${entry.index + 1} of ${entry.total}`}>
+                  <span className="text-xs text-gray-500 dark:text-gray-400" aria-label={`Entry ${entry.index + 1} of ${entry.total}`}>
                     ({entry.index + 1} of {entry.total})
                   </span>
                 </div>
@@ -292,7 +292,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
           <Label className="text-sm font-semibold mb-3 block" id="summary-label">
             Summary
           </Label>
-          <div className="space-y-2 border rounded-lg p-4 bg-blue-50" role="list" aria-labelledby="summary-label">
+          <div className="space-y-2 border rounded-lg p-4 bg-blue-50 dark:bg-blue-950" role="list" aria-labelledby="summary-label">
             {summary.map(item => {
               const micData = value.find(m => m.model === item.model);
               return (
@@ -303,7 +303,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
                         <span className="font-medium">{item.model}</span>
                         {item.exclusive && (
                           <span
-                            className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded"
+                            className="text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 px-2 py-0.5 rounded"
                             role="status"
                             aria-label="Exclusive use required"
                           >
@@ -314,7 +314,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
                     </div>
                     <div className="flex items-center gap-2">
                       <span
-                        className="text-lg font-bold text-blue-600"
+                        className="text-lg font-bold text-blue-600 dark:text-blue-400"
                         aria-label={`${item.quantity} units of ${item.model}`}
                       >
                         ×{item.quantity}
@@ -336,7 +336,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
                             variant="ghost"
                             size="sm"
                             onClick={() => removeAllOfModel(item.model)}
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="h-8 w-8 p-0 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950"
                             aria-label={`Remove all ${item.quantity} ${item.model} microphones`}
                           >
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -367,7 +367,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
 
                   {/* Show notes if exists */}
                   {micData?.notes && (
-                    <div className="text-sm text-gray-600 pl-4 border-l-2 border-gray-300">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 pl-4 border-l-2 border-gray-300 dark:border-gray-600">
                       {micData.notes}
                     </div>
                   )}
@@ -406,7 +406,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
             <div className="pt-2 border-t mt-3">
               <div className="flex justify-between items-center font-bold">
                 <span>Total Microphones</span>
-                <span className="text-xl text-blue-600" aria-label={`Total: ${totalCount} microphones`}>
+                <span className="text-xl text-blue-600 dark:text-blue-400" aria-label={`Total: ${totalCount} microphones`}>
                   {totalCount}
                 </span>
               </div>
@@ -418,9 +418,9 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
       {/* Empty State */}
       {value.length === 0 && (
         <div className="text-center py-12 border-2 border-dashed rounded-lg" role="status">
-          <Plus className="h-12 w-12 mx-auto text-gray-400 mb-3" aria-hidden="true" />
-          <p className="text-gray-600 font-medium mb-1">No microphones added yet</p>
-          <p className="text-sm text-gray-500">
+          <Plus className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-600 mb-3" aria-hidden="true" />
+          <p className="text-gray-600 dark:text-gray-400 font-medium mb-1">No microphones added yet</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Click on a microphone button above to add it to your list
           </p>
         </div>
@@ -431,7 +431,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
               Clear All Microphones?
             </DialogTitle>
             <DialogDescription>
