@@ -134,7 +134,8 @@ export const OptimizedAssignmentMatrix = ({
     prefetchTechnicianData,
     updateAssignmentOptimistically,
     invalidateAssignmentQueries,
-    isLoading
+    isInitialLoading,
+    isFetching
   } = useOptimizedMatrixData({ technicians, dates, jobs });
 
   // Technician IDs for queries
@@ -588,7 +589,7 @@ export const OptimizedAssignmentMatrix = ({
   // Auto-scroll to today with retry mechanism (only first render)
   useEffect(() => {
     if (autoScrolledRef.current) return;
-    if (isLoading || dates.length === 0) return;
+    if (isInitialLoading || dates.length === 0) return;
 
     const attemptScroll = () => {
       const success = scrollToToday();
@@ -605,7 +606,7 @@ export const OptimizedAssignmentMatrix = ({
 
     const timeoutId = setTimeout(attemptScroll, 50);
     return () => clearTimeout(timeoutId);
-  }, [scrollToToday, isLoading, dates.length, scrollAttempts]);
+  }, [scrollToToday, isInitialLoading, dates.length, scrollAttempts]);
 
   // Initialize visible window after mount and when sizes change
   useEffect(() => {
@@ -808,7 +809,7 @@ export const OptimizedAssignmentMatrix = ({
     }
   }, [availabilityDialog?.open]);
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -820,7 +821,13 @@ export const OptimizedAssignmentMatrix = ({
   }
 
   return (
-    <div className="matrix-layout">
+    <div className="matrix-layout relative">
+      {isFetching && !isInitialLoading && (
+        <div className="pointer-events-none absolute top-2 right-4 flex items-center gap-2 text-xs text-muted-foreground bg-background/80 backdrop-blur rounded-full px-3 py-1 shadow-sm border border-border/60">
+          <span className="h-2 w-2 rounded-full bg-primary animate-pulse" aria-hidden="true" />
+          <span>Refreshing…</span>
+        </div>
+      )}
       {/* Fixed Corner Header */}
       <div 
         className="matrix-corner"
