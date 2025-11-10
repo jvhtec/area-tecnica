@@ -101,6 +101,7 @@ export const OptimizedAssignmentMatrix = ({
   const technicianScrollRef = useRef<HTMLDivElement>(null);
   const dateHeadersRef = useRef<HTMLDivElement>(null);
   const mainScrollRef = useRef<HTMLDivElement>(null);
+  const lastScrollLeftRef = useRef<number | null>(null);
   const [scrollAttempts, setScrollAttempts] = useState(0);
   const syncInProgressRef = useRef(false);
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -279,25 +280,33 @@ export const OptimizedAssignmentMatrix = ({
     if (syncInProgressRef.current) return;
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
-    
+
+    const previousScrollLeft = lastScrollLeftRef.current;
+    lastScrollLeftRef.current = scrollLeft;
+
+    const horizontalDelta = previousScrollLeft === null ? 0 : scrollLeft - previousScrollLeft;
+    const movedHorizontally = previousScrollLeft !== null && horizontalDelta !== 0;
+    const movingTowardLeftEdge = movedHorizontally && horizontalDelta < 0;
+    const movingTowardRightEdge = movedHorizontally && horizontalDelta > 0;
+
     // Check if we're near the edges and can expand
     const scrollElement = e.currentTarget;
     const scrollWidth = scrollElement.scrollWidth;
     const clientWidth = scrollElement.clientWidth;
     const maxScrollLeft = scrollWidth - clientWidth;
-    
+
     const nearLeftEdge = scrollLeft < 200; // Within 200px of left edge
     const nearRightEdge = scrollLeft > maxScrollLeft - 200; // Within 200px of right edge
-    
+
     // Trigger expansion if we're near an edge and can expand
     // Edge expansion throttled to avoid repeated triggers
     const now = performance.now();
     const lastEdgeRef = (handleMainScroll as any)._lastEdgeRef || ((handleMainScroll as any)._lastEdgeRef = { t: 0 });
-    if (now - lastEdgeRef.t > 300) {
-      if (nearLeftEdge && canExpandBefore && onNearEdgeScroll) {
+    if (movedHorizontally && now - lastEdgeRef.t > 300) {
+      if (movingTowardLeftEdge && nearLeftEdge && canExpandBefore && onNearEdgeScroll) {
         onNearEdgeScroll('before');
         lastEdgeRef.t = now;
-      } else if (nearRightEdge && canExpandAfter && onNearEdgeScroll) {
+      } else if (movingTowardRightEdge && nearRightEdge && canExpandAfter && onNearEdgeScroll) {
         onNearEdgeScroll('after');
         lastEdgeRef.t = now;
       }
