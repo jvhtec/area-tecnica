@@ -101,7 +101,6 @@ export const OptimizedAssignmentMatrix = ({
   const technicianScrollRef = useRef<HTMLDivElement>(null);
   const dateHeadersRef = useRef<HTMLDivElement>(null);
   const mainScrollRef = useRef<HTMLDivElement>(null);
-  const lastScrollLeftRef = useRef<number | null>(null);
   const [scrollAttempts, setScrollAttempts] = useState(0);
   const syncInProgressRef = useRef(false);
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -281,11 +280,22 @@ export const OptimizedAssignmentMatrix = ({
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
 
-    const previousScrollLeft = lastScrollLeftRef.current;
-    lastScrollLeftRef.current = scrollLeft;
-
+    const previousScrollLeftRef =
+      (handleMainScroll as any)._previousScrollLeftRef ||
+      ((handleMainScroll as any)._previousScrollLeftRef = { value: null as number | null });
+    const previousScrollLeft = previousScrollLeftRef.value;
     const horizontalDelta = previousScrollLeft === null ? 0 : scrollLeft - previousScrollLeft;
     const movedHorizontally = previousScrollLeft !== null && horizontalDelta !== 0;
+
+    // Ignore pure vertical scrolls while keeping scroll positions in sync
+    if (previousScrollLeft !== null && !movedHorizontally) {
+      syncScrollPositions(scrollLeft, scrollTop, 'main');
+      scheduleVisibleWindowUpdate();
+      return;
+    }
+
+    previousScrollLeftRef.value = scrollLeft;
+
     const movingTowardLeftEdge = movedHorizontally && horizontalDelta < 0;
     const movingTowardRightEdge = movedHorizontally && horizontalDelta > 0;
 
