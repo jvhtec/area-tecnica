@@ -400,8 +400,7 @@ export function CorporateEmailComposer() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[400px] p-0" align="start">
-              {recipientPopoverOpen && (
-                <Command>
+              <Command>
                 <CommandInput
                   placeholder="Buscar por nombre, email o departamento..."
                   value={recipientSearch}
@@ -474,7 +473,6 @@ export function CorporateEmailComposer() {
                   })}
                 </CommandGroup>
               </Command>
-              )}
             </PopoverContent>
           </Popover>
         </div>
