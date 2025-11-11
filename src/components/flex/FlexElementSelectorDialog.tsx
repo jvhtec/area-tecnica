@@ -42,6 +42,19 @@ export const FlexElementSelectorDialog: React.FC<
   FlexElementSelectorDialogProps
 > = ({ open, onOpenChange, mainElementId, defaultElementId, onSelect, filterPredicate }) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCommandReady, setIsCommandReady] = useState(false);
+
+  // Reset command readiness when dialog closes
+  React.useEffect(() => {
+    if (!open) {
+      setIsCommandReady(false);
+      setSearchQuery("");
+    } else {
+      // Delay Command rendering to ensure Dialog DOM is ready
+      const timer = setTimeout(() => setIsCommandReady(true), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
 
   const {
     data: treeData,
@@ -102,12 +115,10 @@ export const FlexElementSelectorDialog: React.FC<
 
     onSelect(node.elementId, node);
     onOpenChange(false);
-    setSearchQuery("");
   };
 
   const handleCancel = () => {
     onOpenChange(false);
-    setSearchQuery("");
   };
 
   const renderNode = (node: FlatElementNode) => {
@@ -185,7 +196,7 @@ export const FlexElementSelectorDialog: React.FC<
                 Retry
               </Button>
             </div>
-          ) : open ? (
+          ) : open && isCommandReady ? (
             <Command className="rounded-lg border">
               <CommandInput
                 placeholder="Search elements..."
@@ -203,6 +214,10 @@ export const FlexElementSelectorDialog: React.FC<
                 </CommandGroup>
               </CommandList>
             </Command>
+          ) : open ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
           ) : null}
         </div>
 
