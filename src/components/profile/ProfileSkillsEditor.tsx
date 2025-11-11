@@ -138,26 +138,24 @@ export const ProfileSkillsEditor: React.FC<ProfileSkillsEditorProps> = ({ profil
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="p-0 w-80" align="start">
-                {addingOpen && (
-                  <Command>
-                    <CommandInput placeholder="Search skills…" value={query} onValueChange={setQuery} />
-                    <CommandList>
-                      <CommandEmpty>No skills.</CommandEmpty>
-                      <CommandGroup heading="Available">
-                        {available
-                          .filter(s => !query || s.name.toLowerCase().includes(query.toLowerCase()))
-                          .map(s => (
-                            <CommandItem key={s.id} onSelect={() => addSkill(s)}>
-                              <span>{s.name}</span>
-                              {s.category && (
-                                <Badge variant="outline" className="ml-auto text-xs">{s.category}</Badge>
-                              )}
-                            </CommandItem>
-                          ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                )}
+                <Command>
+                  <CommandInput placeholder="Search skills…" value={query} onValueChange={setQuery} />
+                  <CommandList>
+                    <CommandEmpty>No skills.</CommandEmpty>
+                    <CommandGroup heading="Available">
+                      {available
+                        .filter(s => !query || s.name.toLowerCase().includes(query.toLowerCase()))
+                        .map(s => (
+                          <CommandItem key={s.id} onSelect={() => addSkill(s)}>
+                            <span>{s.name}</span>
+                            {s.category && (
+                              <Badge variant="outline" className="ml-auto text-xs">{s.category}</Badge>
+                            )}
+                          </CommandItem>
+                        ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
               </PopoverContent>
             </Popover>
           </div>

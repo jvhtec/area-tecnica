@@ -69,31 +69,29 @@ export const SkillsFilter: React.FC<SkillsFilterProps> = ({ selected, onChange }
         </Button>
       </PopoverTrigger>
       <PopoverContent className="p-0 w-80" align="start">
-        {open && (
-          <Command>
-            <CommandInput placeholder="Search skills..." value={query} onValueChange={setQuery} />
-            <CommandList>
-              <CommandEmpty>No skills found.</CommandEmpty>
-              {grouped.map(([category, list]) => (
-                <CommandGroup key={category} heading={category}>
-                  {list
-                    .filter(s => !query || s.name.toLowerCase().includes(query.toLowerCase()))
-                    .map(s => {
-                      const checked = selected.includes(s.name);
-                      return (
-                        <CommandItem key={s.id} onSelect={() => toggle(s.name, !checked)}>
-                          <div className="mr-2">
-                            <Checkbox checked={checked} onCheckedChange={(v) => toggle(s.name, !!v)} />
-                          </div>
-                          <span>{s.name}</span>
-                        </CommandItem>
-                      );
-                    })}
-                </CommandGroup>
-              ))}
-            </CommandList>
-          </Command>
-        )}
+        <Command>
+          <CommandInput placeholder="Search skills..." value={query} onValueChange={setQuery} />
+          <CommandList>
+            <CommandEmpty>No skills found.</CommandEmpty>
+            {grouped.map(([category, list]) => (
+              <CommandGroup key={category} heading={category}>
+                {list
+                  .filter(s => !query || s.name.toLowerCase().includes(query.toLowerCase()))
+                  .map(s => {
+                    const checked = selected.includes(s.name);
+                    return (
+                      <CommandItem key={s.id} onSelect={() => toggle(s.name, !checked)}>
+                        <div className="mr-2">
+                          <Checkbox checked={checked} onCheckedChange={(v) => toggle(s.name, !!v)} />
+                        </div>
+                        <span>{s.name}</span>
+                      </CommandItem>
+                    );
+                  })}
+              </CommandGroup>
+            ))}
+          </CommandList>
+        </Command>
       </PopoverContent>
     </Popover>
   );
