@@ -471,11 +471,8 @@ describe('JobCardActions', () => {
       render(<JobCardActions {...props} />);
 
       expect(FlexElementSelectorDialogMock).toHaveBeenCalled();
-      
-      // Type assertion after verify mock was called - need unknown intermediate due to strict mock typing
-      const calls = FlexElementSelectorDialogMock.mock.calls as unknown as Array<[any]>;
-      const dialogProps = calls[0][0] as { onSelect: (elementId: string, node: FlatElementNode) => void };
-      
+
+      const dialogProps = FlexElementSelectorDialogMock.mock.calls[0][0];
       const node: FlatElementNode = {
         elementId: 'crew-call-element',
         displayName: 'Crew Call',
