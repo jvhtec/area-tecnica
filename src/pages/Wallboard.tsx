@@ -19,7 +19,18 @@ type CalendarFeed = {
 interface CrewAssignmentsFeed { jobs: Array<{ id:string; title:string; crew: Array<{ name:string; role:string; dept:Dept|null; timesheetStatus:'submitted'|'draft'|'missing'|'approved'; }> }>; }
 interface DocProgressFeed { jobs: Array<{ id:string; title:string; departments: Array<{ dept:Dept; have:number; need:number; missing:string[] }> }> }
 interface PendingActionsFeed { items: Array<{ severity:'red'|'yellow'; text:string }> }
-interface LogisticsItem { id:string; date:string; time:string; title:string; transport_type:string|null; plate:string|null; job_title?: string|null }
+interface LogisticsItem {
+  id: string;
+  date: string;
+  time: string;
+  title: string;
+  transport_type: string | null;
+  plate: string | null;
+  job_title?: string | null;
+  procedure: string | null;
+  loadingBay: string | null;
+  departments: string[];
+}
 
 const PanelContainer: React.FC<{ children: React.ReactNode }>=({ children })=> (
   <div className="w-full h-full p-6 flex flex-col gap-4 bg-black text-white">
@@ -889,7 +900,7 @@ export default function Wallboard() {
       const endDate = weekEndISO.slice(0,10);
       const { data: le, error: leErr } = await supabase
         .from('logistics_events')
-        .select('id,event_date,event_time,title,transport_type,license_plate,job_id')
+        .select('id,event_date,event_time,title,transport_type,license_plate,job_id,event_type,loading_bay,logistics_event_departments(department)')
         .gte('event_date', startDate)
         .lte('event_date', endDate)
         .order('event_date', { ascending: true })
@@ -904,15 +915,23 @@ export default function Wallboard() {
         const { data: trows } = await supabase.from('jobs').select('id,title').in('id', evtJobIds);
         (trows||[]).forEach((r:any)=> titlesByJob.set(r.id, r.title));
       }
-      const logisticsItemsBase: LogisticsItem[] = evts.map((e:any)=>({
-        id: e.id,
-        date: e.event_date,
-        time: e.event_time,
-        title: e.title || titlesByJob.get(e.job_id) || 'Logistics',
-        transport_type: e.transport_type ?? null,
-        plate: e.license_plate ?? null,
-        job_title: titlesByJob.get(e.job_id) || null,
-      }));
+      const logisticsItemsBase: LogisticsItem[] = evts.map((e:any)=>{
+        const departments: string[] = Array.isArray(e.logistics_event_departments)
+          ? (e.logistics_event_departments as any[]).map(dep=>dep?.department).filter(Boolean)
+          : [];
+        return {
+          id: e.id,
+          date: e.event_date,
+          time: e.event_time,
+          title: e.title || titlesByJob.get(e.job_id) || 'Logistics',
+          transport_type: e.transport_type ?? null,
+          plate: e.license_plate ?? null,
+          job_title: titlesByJob.get(e.job_id) || null,
+          procedure: e.event_type ?? null,
+          loadingBay: e.loading_bay ?? null,
+          departments,
+        };
+      });
       // Also include confirmed dry-hire jobs as client pickups
       // Helper to format ISO to date/time strings in the job's timezone
       const toTZParts = (iso: string, tz?: string): { date: string; time: string } => {
@@ -950,6 +969,9 @@ export default function Wallboard() {
               transport_type: 'recogida cliente',
               plate: null,
               job_title: j.title || null,
+              procedure: 'load',
+              loadingBay: null,
+              departments: [],
             });
           }
 
@@ -960,12 +982,15 @@ export default function Wallboard() {
                 id: `dryhire-return-${j.id}`,
                 date: returnParts.date,
                 time: returnParts.time,
-                title: j.title || 'Dry Hire',
-                transport_type: 'devolución cliente',
-                plate: null,
-                job_title: j.title || null,
-              });
-            }
+              title: j.title || 'Dry Hire',
+              transport_type: 'devolución cliente',
+              plate: null,
+              job_title: j.title || null,
+              procedure: 'unload',
+              loadingBay: null,
+              departments: [],
+            });
+          }
           }
 
           return items;
@@ -1269,7 +1294,23 @@ const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })=> (
             <div className="text-2xl">🚚</div>
             <div>
               <div className="text-2xl font-medium text-white">{ev.title}</div>
-              <div className="text-zinc-400 text-sm">{ev.transport_type || 'transport'} {ev.plate ? `• ${ev.plate}` : ''}</div>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
+                {ev.procedure ? (
+                  <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 capitalize">{ev.procedure.replace(/_/g, ' ')}</span>
+                ) : null}
+                <span className="text-zinc-300">{ev.transport_type || 'transport'}</span>
+                {ev.loadingBay && <span className="text-zinc-300">Bay {ev.loadingBay}</span>}
+                {ev.plate && <span className="text-zinc-500">Plate {ev.plate}</span>}
+              </div>
+              {ev.departments.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ev.departments.map(dep => (
+                    <span key={dep} className="px-2 py-0.5 rounded bg-zinc-800 text-xs uppercase tracking-wide text-zinc-200">
+                      {dep}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1288,7 +1329,25 @@ const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })
             <div className="font-mono tabular-nums">{ev.date} {ev.time?.slice(0,5)}</div>
             <div className="uppercase text-amber-100">{ev.title}</div>
           </div>
-          <div className="text-amber-300">{ev.transport_type || 'transport'} {ev.plate ? `• ${ev.plate}` : ''}</div>
+          <div className="text-right">
+            <div className="flex flex-wrap justify-end gap-2 text-[10px] text-amber-200">
+              {ev.procedure ? (
+                <span className="border border-[var(--alien-border-dim)] px-1 py-0.5 uppercase">{ev.procedure.replace(/_/g, ' ')}</span>
+              ) : null}
+              <span className="uppercase">{ev.transport_type || 'transport'}</span>
+              {ev.loadingBay && <span className="uppercase">Bay {ev.loadingBay}</span>}
+              {ev.plate && <span className="uppercase text-amber-300">Plate {ev.plate}</span>}
+            </div>
+            {ev.departments.length > 0 && (
+              <div className="mt-1 flex flex-wrap justify-end gap-1 text-[10px] text-amber-300">
+                {ev.departments.map(dep => (
+                  <span key={dep} className="border border-[var(--alien-border-dim)] px-1 py-0.5 uppercase tracking-wide">
+                    {dep}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       ))}
       {(!data || data.length===0) && <div className="text-amber-300">NO LOGISTICS IN WINDOW</div>}
