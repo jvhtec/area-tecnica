@@ -176,7 +176,7 @@ const FestivalGearManagement = () => {
         console.error("Error fetching job details:", error);
         toast({
           title: "Error",
-          description: "Could not load festival details",
+          description: "No se pudieron cargar los detalles del festival",
           variant: "destructive",
         });
       } finally {
@@ -218,7 +218,7 @@ const FestivalGearManagement = () => {
       console.error("Error loading gear setup and stages:", error);
       toast({
         title: "Error",
-        description: "Could not load festival gear setup",
+        description: "No se pudo cargar la configuración de equipo del festival",
         variant: "destructive",
       });
     }
@@ -289,14 +289,14 @@ const FestivalGearManagement = () => {
       await fetchAndSyncStageData(newMaxStages);
       
       toast({
-        title: "Success",
-        description: `Updated to ${newMaxStages} stages`,
+        title: "Éxito",
+        description: `Actualizado a ${newMaxStages} escenarios`,
       });
     } catch (error: any) {
       console.error("Error updating max stages:", error);
       toast({
         title: "Error",
-        description: "Could not update stages configuration",
+        description: "No se pudo actualizar la configuración de escenarios",
         variant: "destructive",
       });
     } finally {
@@ -352,14 +352,14 @@ const FestivalGearManagement = () => {
       setEditingStageName("");
 
       toast({
-        title: "Success",
-        description: "Stage name updated",
+        title: "Éxito",
+        description: "Nombre del escenario actualizado",
       });
     } catch (error) {
       console.error("Error updating stage name:", error);
       toast({
         title: "Error",
-        description: "Could not update stage name",
+        description: "No se pudo actualizar el nombre del escenario",
         variant: "destructive",
       });
       
@@ -381,8 +381,8 @@ const FestivalGearManagement = () => {
 
   const handleSave = () => {
     toast({
-      title: "Success",
-      description: "Festival gear setup has been updated.",
+      title: "Éxito",
+      description: "La configuración de equipo del festival ha sido actualizada.",
     });
   };
 
@@ -412,14 +412,14 @@ const FestivalGearManagement = () => {
       URL.revokeObjectURL(url);
       
       toast({
-        title: "Success",
-        description: 'Gear setup documentation generated successfully'
+        title: "Éxito",
+        description: 'Documentación de configuración de equipo generada exitosamente'
       });
     } catch (error: any) {
       console.error('Error generating gear setup PDF:', error);
       toast({
         title: "Error",
-        description: `Failed to generate documentation: ${error.message}`,
+        description: `Error al generar documentación: ${error.message}`,
         variant: "destructive"
       });
     } finally {
@@ -451,14 +451,14 @@ const FestivalGearManagement = () => {
       URL.revokeObjectURL(url);
       
       toast({
-        title: "Success",
-        description: 'Documentation generated successfully'
+        title: "Éxito",
+        description: 'Documentación generada exitosamente'
       });
     } catch (error: any) {
       console.error('Error generating documentation:', error);
       toast({
         title: "Error",
-        description: `Failed to generate documentation: ${error.message}`,
+        description: `Error al generar documentación: ${error.message}`,
         variant: "destructive"
       });
     } finally {
@@ -475,12 +475,12 @@ const FestivalGearManagement = () => {
           className="self-start"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Festival Management
+          Volver a Gestión de Festival
         </Button>
         <div className="flex flex-col items-start md:items-end md:text-right">
           <h1 className="text-xl md:text-2xl font-bold">{jobTitle}</h1>
           <div className="flex items-center gap-2">
-            <p className="text-sm md:text-base text-muted-foreground">Gear Management</p>
+            <p className="text-sm md:text-base text-muted-foreground">Gestión de Equipo</p>
             <ConnectionIndicator variant="icon" />
           </div>
         </div>
@@ -490,14 +490,14 @@ const FestivalGearManagement = () => {
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div className="space-y-2">
-              <CardTitle>Stages Configuration</CardTitle>
+              <CardTitle>Configuración de Escenarios</CardTitle>
               <CardDescription>
-                Configure the stages for your festival. Click on a stage name to edit it.
+                Configura los escenarios para tu festival. Haz clic en el nombre de un escenario para editarlo.
               </CardDescription>
             </div>
             <Button onClick={handleAddStage} size="sm" className="self-start sm:self-auto">
               <Plus className="h-4 w-4 mr-2" />
-              Add Stage
+              Añadir Escenario
             </Button>
           </div>
         </CardHeader>
@@ -513,7 +513,7 @@ const FestivalGearManagement = () => {
                   <span className="truncate max-w-[120px] md:max-w-none">{stage.name}</span>
                   {stageSetups[stage.number] && (
                     <Badge variant="outline" className="ml-1 md:ml-2 bg-blue-100 text-xs">
-                      Custom
+                      Personalizado
                     </Badge>
                   )}
                 </Button>
@@ -523,7 +523,7 @@ const FestivalGearManagement = () => {
                     <Input
                       value={editingStageName}
                       onChange={(e) => setEditingStageName(e.target.value)}
-                      placeholder="Stage name"
+                      placeholder="Nombre del escenario"
                       className="mb-2"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSaveStageEdit();
@@ -534,11 +534,11 @@ const FestivalGearManagement = () => {
                     <div className="flex gap-2 md:gap-1">
                       <Button size="sm" onClick={handleSaveStageEdit} className="flex-1 md:flex-initial">
                         <Check className="h-3 w-3 mr-2 md:mr-0" />
-                        <span className="md:hidden">Save</span>
+                        <span className="md:hidden">Guardar</span>
                       </Button>
                       <Button size="sm" variant="outline" onClick={handleCancelStageEdit} className="flex-1 md:flex-initial">
                         <X className="h-3 w-3 mr-2 md:mr-0" />
-                        <span className="md:hidden">Cancel</span>
+                        <span className="md:hidden">Cancelar</span>
                       </Button>
                     </div>
                   </div>
@@ -566,8 +566,8 @@ const FestivalGearManagement = () => {
                 <Wrench className="h-4 w-4 md:h-5 md:w-5" />
                 <span className="truncate">{getCurrentStageName(selectedStage)} Gear Setup</span>
               </CardTitle>
-              <Button 
-                onClick={handlePrintGearSetup} 
+              <Button
+                onClick={handlePrintGearSetup}
                 disabled={isPrinting}
                 variant="outline"
                 size="sm"
@@ -578,8 +578,8 @@ const FestivalGearManagement = () => {
                 ) : (
                   <Printer className="h-4 w-4 mr-2" />
                 )}
-                <span className="hidden sm:inline">Print Gear Setup</span>
-                <span className="sm:hidden">Print</span>
+                <span className="hidden sm:inline">Imprimir Configuración de Equipo</span>
+                <span className="sm:hidden">Imprimir</span>
               </Button>
             </div>
           </CardHeader>
@@ -587,7 +587,7 @@ const FestivalGearManagement = () => {
             <div className="mb-4">
               <Alert>
                 <AlertDescription className="text-sm">
-                  Configure the gear setup for {getCurrentStageName(selectedStage)}. This information will be used when artists submit their technical requirements.
+                  Configura el equipo para {getCurrentStageName(selectedStage)}. Esta información se utilizará cuando los artistas envíen sus requerimientos técnicos.
                 </AlertDescription>
               </Alert>
             </div>

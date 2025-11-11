@@ -36,12 +36,12 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
 
   const handleLoadFromAnalysis = async () => {
     if (!analysisData) {
-      toast.error("No analysis data available");
+      toast.error("No hay datos de análisis disponibles");
       return;
     }
 
     if (analysisData.peakRequirements.length === 0) {
-      toast.error(`No microphone requirements found for Stage ${stageNumber}`);
+      toast.error(`No se encontraron requisitos de micrófonos para Stage ${stageNumber}`);
       return;
     }
 
@@ -97,11 +97,11 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
       
       onChange(sanitizedMics);
       
-      toast.success(`Loaded ${newRequirements.length} microphone types for Stage ${stageNumber}`);
+      toast.success(`${newRequirements.length} tipos de micrófonos cargados para Stage ${stageNumber}`);
       setAnalysisPreviewOpen(false);
     } catch (error) {
       console.error("Error loading requirements:", error);
-      toast.error("Failed to load microphone requirements");
+      toast.error("Error al cargar los requisitos de micrófonos");
     } finally {
       setIsLoadingRequirements(false);
     }
@@ -128,16 +128,16 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Stage {stageNumber} Microphone Kit</CardTitle>
+          <CardTitle>Kit de Micrófonos Stage {stageNumber}</CardTitle>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={handleLoadFromAnalysis}
               disabled={isAnalyzing}
             >
               <Calculator className="h-4 w-4 mr-2" />
-              {isAnalyzing ? "Analyzing..." : "Load from Artist Requirements"}
+              {isAnalyzing ? "Analizando..." : "Cargar desde Requisitos de Artistas"}
             </Button>
           </div>
         </div>
@@ -145,10 +145,10 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
       <CardContent>
         <div className="space-y-3">
           <div>
-            <h3 className="text-sm font-semibold mb-2">Available Wired Microphones</h3>
+            <h3 className="text-sm font-semibold mb-2">Micrófonos Cableados Disponibles</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Configure the microphones available for Stage {stageNumber}. Use the "Load from Artist Requirements"
-              button to automatically calculate peak needs based on artist submissions.
+              Configure los micrófonos disponibles para Stage {stageNumber}. Use el botón "Cargar desde Requisitos de Artistas"
+              para calcular automáticamente las necesidades máximas basadas en las solicitudes de los artistas.
             </p>
           </div>
           <MicrophoneListBuilder

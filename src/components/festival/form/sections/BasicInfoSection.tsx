@@ -11,21 +11,21 @@ export const BasicInfoSection = ({ formData, onChange, gearSetup }: ArtistSectio
 
   return (
     <div className="space-y-4 border rounded-lg p-4">
-      <h3 className="text-lg font-semibold">Basic Information</h3>
-      
+      <h3 className="text-lg font-semibold">Información Básica</h3>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label>Artist/Band Name</Label>
-          <Input 
-            value={formData.name || ""} 
+          <Label>Nombre del Artista/Banda</Label>
+          <Input
+            value={formData.name || ""}
             onChange={(e) => onChange({ name: e.target.value })}
-            placeholder="Enter artist name"
+            placeholder="Ingrese el nombre del artista"
           />
         </div>
         <div>
           <Label>Stage</Label>
-          <Select 
-            value={formData.stage?.toString() || "1"} 
+          <Select
+            value={formData.stage?.toString() || "1"}
             onValueChange={(value) => onChange({ stage: parseInt(value) })}
           >
             <SelectTrigger>
@@ -43,28 +43,28 @@ export const BasicInfoSection = ({ formData, onChange, gearSetup }: ArtistSectio
       </div>
 
       <div>
-        <Label>Date</Label>
-        <Input 
+        <Label>Fecha</Label>
+        <Input
           type="date"
-          value={formData.date || ""} 
+          value={formData.date || ""}
           onChange={(e) => onChange({ date: e.target.value })}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label>Show Start</Label>
-          <Input 
+          <Label>Inicio del Show</Label>
+          <Input
             type="time"
-            value={formData.show_start || ""} 
+            value={formData.show_start || ""}
             onChange={(e) => onChange({ show_start: e.target.value })}
           />
         </div>
         <div>
-          <Label>Show End</Label>
-          <Input 
+          <Label>Fin del Show</Label>
+          <Input
             type="time"
-            value={formData.show_end || ""} 
+            value={formData.show_end || ""}
             onChange={(e) => onChange({ show_end: e.target.value })}
           />
         </div>
@@ -72,29 +72,29 @@ export const BasicInfoSection = ({ formData, onChange, gearSetup }: ArtistSectio
 
       <div className="space-y-4">
         <div className="flex items-center space-x-2">
-          <Checkbox 
+          <Checkbox
             id="soundcheck"
             checked={formData.soundcheck}
             onCheckedChange={(checked) => onChange({ soundcheck: checked })}
           />
-          <Label htmlFor="soundcheck">Soundcheck Required</Label>
+          <Label htmlFor="soundcheck">Requiere Soundcheck</Label>
         </div>
 
         {formData.soundcheck && (
           <div className="grid grid-cols-2 gap-4 ml-6">
             <div>
-              <Label>Soundcheck Start</Label>
-              <Input 
+              <Label>Inicio del Soundcheck</Label>
+              <Input
                 type="time"
-                value={formData.soundcheck_start || ""} 
+                value={formData.soundcheck_start || ""}
                 onChange={(e) => onChange({ soundcheck_start: e.target.value })}
               />
             </div>
             <div>
-              <Label>Soundcheck End</Label>
-              <Input 
+              <Label>Fin del Soundcheck</Label>
+              <Input
                 type="time"
-                value={formData.soundcheck_end || ""} 
+                value={formData.soundcheck_end || ""}
                 onChange={(e) => onChange({ soundcheck_end: e.target.value })}
               />
             </div>
@@ -104,21 +104,21 @@ export const BasicInfoSection = ({ formData, onChange, gearSetup }: ArtistSectio
 
       <div className="space-y-4">
         <div className="flex items-center space-x-2">
-          <Checkbox 
+          <Checkbox
             id="after-midnight"
             checked={formData.isaftermidnight}
             onCheckedChange={(checked) => onChange({ isaftermidnight: checked })}
           />
-          <Label htmlFor="after-midnight">Show is after midnight</Label>
+          <Label htmlFor="after-midnight">El show es después de medianoche</Label>
         </div>
 
         <div className="flex items-center space-x-2">
-          <Checkbox 
+          <Checkbox
             id="rider-missing"
             checked={formData.rider_missing}
             onCheckedChange={(checked) => onChange({ rider_missing: checked })}
           />
-          <Label htmlFor="rider-missing">Rider is missing</Label>
+          <Label htmlFor="rider-missing">El rider está faltando</Label>
         </div>
       </div>
     </div>

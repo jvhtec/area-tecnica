@@ -44,8 +44,8 @@ export const ViewFileDialog = ({ open, onOpenChange, file, url }: ViewFileDialog
           {!isImage && !isPDF && (
             <div className="text-center py-8">
               <p className="text-muted-foreground">
-                Preview is not available for this file type.
-                Please download the file to view it.
+                La vista previa no está disponible para este tipo de archivo.
+                Por favor descargue el archivo para verlo.
               </p>
             </div>
           )}

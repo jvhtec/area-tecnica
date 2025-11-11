@@ -125,7 +125,7 @@ export const ShiftsTable = ({
 
   const handleDeleteClick = (e: React.MouseEvent, shiftId: string) => {
     e.stopPropagation();
-    if (confirm("Are you sure you want to delete this shift?")) {
+    if (confirm("¿Estás seguro de que deseas eliminar este turno?")) {
       onDeleteShift(shiftId);
     }
   };
@@ -172,14 +172,14 @@ export const ShiftsTable = ({
       URL.revokeObjectURL(url);
 
       toast({
-        title: "Success",
-        description: "PDF generated successfully",
+        title: "Éxito",
+        description: "PDF generado exitosamente",
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast({
         title: "Error",
-        description: "Could not generate PDF",
+        description: "No se pudo generar el PDF",
         variant: "destructive",
       });
     }
@@ -194,21 +194,21 @@ export const ShiftsTable = ({
         </div>
         <div className="flex gap-2 ml-auto mb-2 print:hidden">
           {!isViewOnly && sortedShifts.length > 0 && jobDates.length > 1 && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => setIsCopyDialogOpen(true)}
             >
               <Copy className="h-4 w-4 mr-2" />
-              Copy Shifts
+              Copiar Turnos
             </Button>
           )}
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={handleExportPDF}
           >
             <FileDown className="h-4 w-4 mr-2" />
-            Export to PDF
+            Exportar a PDF
           </Button>
         </div>
       </div>
@@ -216,12 +216,12 @@ export const ShiftsTable = ({
       <Table className="border-collapse border border-border print:border-black">
         <TableHeader>
           <TableRow className="bg-muted print:bg-gray-200">
-            <TableHead className="border border-border print:border-black print:text-black font-medium">Shift</TableHead>
-            <TableHead className="border border-border print:border-black print:text-black font-medium">Time</TableHead>
+            <TableHead className="border border-border print:border-black print:text-black font-medium">Turno</TableHead>
+            <TableHead className="border border-border print:border-black print:text-black font-medium">Horario</TableHead>
             <TableHead className="border border-border print:border-black print:text-black font-medium">Stage</TableHead>
-            <TableHead className="border border-border print:border-black print:text-black font-medium">Department</TableHead>
-            <TableHead className="border border-border print:border-black print:text-black font-medium">Technicians</TableHead>
-            <TableHead className="border border-border print:border-black print:text-black font-medium print:hidden">Actions</TableHead>
+            <TableHead className="border border-border print:border-black print:text-black font-medium">Departamento</TableHead>
+            <TableHead className="border border-border print:border-black print:text-black font-medium">Técnicos</TableHead>
+            <TableHead className="border border-border print:border-black print:text-black font-medium print:hidden">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -251,7 +251,7 @@ export const ShiftsTable = ({
                     ))}
                   </ul>
                 ) : (
-                  <span className="text-muted-foreground print:text-gray-500">No technicians assigned</span>
+                  <span className="text-muted-foreground print:text-gray-500">Sin técnicos asignados</span>
                 )}
               </TableCell>
               <TableCell className="border border-border print:hidden">

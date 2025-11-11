@@ -15,7 +15,7 @@ export const EquipmentSelect = ({
   value,
   onChange,
   options,
-  placeholder = "Select equipment",
+  placeholder = "Seleccionar equipo",
   fallbackOptions = [],
   category
 }: EquipmentSelectProps) => {
@@ -43,10 +43,10 @@ export const EquipmentSelect = ({
   return (
     <Select value={value} onValueChange={onChange} disabled={isLoading}>
       <SelectTrigger>
-        <SelectValue placeholder={isLoading ? "Loading..." : placeholder} />
+        <SelectValue placeholder={isLoading ? "Cargando..." : placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {Array.isArray(itemsToRender) && itemsToRender.length > 0 && 
+        {Array.isArray(itemsToRender) && itemsToRender.length > 0 &&
           itemsToRender.map((option) => {
             if (typeof option === 'string') {
               return (
@@ -57,7 +57,7 @@ export const EquipmentSelect = ({
             } else if (option && typeof option === 'object') {
               return (
                 <SelectItem key={option.model} value={option.model}>
-                  {option.model}{option.quantity ? ` (${option.quantity} available)` : ''}
+                  {option.model}{option.quantity ? ` (${option.quantity} disponibles)` : ''}
                 </SelectItem>
               );
             }

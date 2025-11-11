@@ -53,7 +53,7 @@ export const ShiftsList = ({
             size="sm"
             onClick={() => setCopyShiftsOpen(true)}
           >
-            Copy Shifts to Another Date
+            Copiar Turnos a Otra Fecha
           </Button>
         )}
       </div>
@@ -71,14 +71,14 @@ export const ShiftsList = ({
                       size="sm"
                       onClick={() => handleEditShift(shift)}
                     >
-                      Edit
+                      Editar
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => onDeleteShift(shift.id)}
                     >
-                      Delete
+                      Eliminar
                     </Button>
                   </>
                 )}
@@ -87,7 +87,7 @@ export const ShiftsList = ({
                   size="sm"
                   onClick={() => handleManageAssignments(shift)}
                 >
-                  {isViewOnly ? "View Staff" : "Manage Staff"}
+                  {isViewOnly ? "Ver Personal" : "Gestionar Personal"}
                 </Button>
               </div>
             </div>
@@ -95,16 +95,16 @@ export const ShiftsList = ({
           <CardContent className="p-4 pt-0">
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <span className="font-medium">Start Time:</span> {shift.start_time}
+                <span className="font-medium">Hora de Inicio:</span> {shift.start_time}
               </div>
               <div>
-                <span className="font-medium">End Time:</span> {shift.end_time}
+                <span className="font-medium">Hora de Fin:</span> {shift.end_time}
               </div>
               <div>
-                <span className="font-medium">Department:</span> {shift.department || "N/A"}
+                <span className="font-medium">Departamento:</span> {shift.department || "N/A"}
               </div>
               <div>
-                <span className="font-medium">Notes:</span> {shift.notes || "N/A"}
+                <span className="font-medium">Notas:</span> {shift.notes || "N/A"}
               </div>
             </div>
           </CardContent>

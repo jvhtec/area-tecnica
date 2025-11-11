@@ -73,7 +73,7 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
               <CloudIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-              Weather Forecast
+              Pronóstico del Tiempo
             </CardTitle>
             {canFetchWeather && (
               <Button
@@ -88,7 +88,7 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
                 ) : (
                   <RefreshCw className="h-4 w-4" />
                 )}
-                {isLoading ? 'Loading...' : 'Refresh'}
+                {isLoading ? 'Cargando...' : 'Actualizar'}
               </Button>
             )}
           </div>
@@ -97,7 +97,7 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
           {!canFetchWeather ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <AlertCircle className="h-4 w-4" />
-              Weather forecast requires venue location and event dates
+              El pronóstico del tiempo requiere ubicación del lugar y fechas del evento
             </div>
           ) : error ? (
             <div className="flex items-center gap-2 text-sm text-destructive">
@@ -107,7 +107,7 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
           ) : isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Fetching weather forecast...
+              Obteniendo pronóstico del tiempo...
             </div>
           ) : weatherData && weatherData.length > 0 ? (
             <div className="space-y-2 sm:space-y-3">
@@ -122,7 +122,7 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
                       <div className="text-xs sm:text-sm text-muted-foreground">
                         {Math.round(weather.maxTemp)}°C / {Math.round(weather.minTemp)}°C
                         {weather.precipitationProbability > 0 && (
-                          <span>, {weather.precipitationProbability}% rain</span>
+                          <span>, {weather.precipitationProbability}% lluvia</span>
                         )}
                       </div>
                     </div>
@@ -132,16 +132,16 @@ export const FestivalWeatherSection: React.FC<FestivalWeatherSectionProps> = ({
               
               <div className="text-xs text-muted-foreground mt-4 space-y-1">
                 <p>
-                  <strong>Tip:</strong> Weather data is fetched from Open-Meteo and updates automatically.
+                  <strong>Consejo:</strong> Los datos del tiempo se obtienen de Open-Meteo y se actualizan automáticamente.
                 </p>
                 {lastFetch && (
-                  <p>Last updated: {lastFetch.toLocaleString()}</p>
+                  <p>Última actualización: {lastFetch.toLocaleString()}</p>
                 )}
               </div>
             </div>
           ) : (
             <div className="text-sm text-muted-foreground">
-              Weather data not available for the selected dates and location.
+              Datos del tiempo no disponibles para las fechas y ubicación seleccionadas.
             </div>
           )}
         </CardContent>

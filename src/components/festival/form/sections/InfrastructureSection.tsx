@@ -11,7 +11,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
 
   return (
     <div className="space-y-4 border rounded-lg p-3 md:p-4">
-      <h3 className="text-base md:text-lg font-semibold">Infrastructure</h3>
+      <h3 className="text-base md:text-lg font-semibold">Infraestructura</h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* CAT6 */}
@@ -141,7 +141,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
         {/* Analog Lines */}
         <div className="space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <Label htmlFor="infra-analog" className="text-sm md:text-base">Analog Lines</Label>
+            <Label htmlFor="infra-analog" className="text-sm md:text-base">Líneas Analógicas</Label>
             <QuantityInput
               id="infra-analog"
               label=""
@@ -157,14 +157,14 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
       </div>
 
       <div>
-        <Label htmlFor="other-infrastructure">Other Infrastructure Requirements</Label>
+        <Label htmlFor="other-infrastructure">Otros Requerimientos de Infraestructura</Label>
         <Input
           id="other-infrastructure"
           value={formData.other_infrastructure || ''}
           onChange={(e) => onChange({
             other_infrastructure: e.target.value
           })}
-          placeholder="Enter any additional infrastructure requirements"
+          placeholder="Ingrese cualquier requerimiento de infraestructura adicional"
         />
       </div>
     </div>

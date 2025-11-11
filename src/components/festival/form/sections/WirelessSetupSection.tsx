@@ -73,37 +73,37 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
 
   return (
     <div className="space-y-4 border rounded-lg p-3 md:p-4">
-      <h3 className="text-base md:text-lg font-semibold">RF & Wireless Setup</h3>
-      
+      <h3 className="text-base md:text-lg font-semibold">Configuración RF & Wireless</h3>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <div className="space-y-4">
           <WirelessConfig
             systems={formData.wireless_systems || []}
             onChange={handleWirelessChange}
-            label="Wireless Systems"
+            label="Sistemas Wireless"
             includeQuantityTypes={true}
           />
           <ProviderSelector
             value={formData.wireless_provided_by || "festival"}
             onChange={handleWirelessProviderChange}
-            label="Wireless Systems Provided By"
+            label="Sistemas Wireless Proporcionados Por"
             id="wireless-provider"
             showMixed={true}
           />
         </div>
-        
+
         <div className="space-y-4">
           <WirelessConfig
             systems={formData.iem_systems || []}
             onChange={handleIEMChange}
-            label="IEM Systems"
+            label="Sistemas IEM"
             includeQuantityTypes={true}
             isIEM={true}
           />
           <ProviderSelector
             value={formData.iem_provided_by || "festival"}
             onChange={handleIEMProviderChange}
-            label="IEM Systems Provided By"
+            label="Sistemas IEM Proporcionados Por"
             id="iem-provider"
             showMixed={true}
           />

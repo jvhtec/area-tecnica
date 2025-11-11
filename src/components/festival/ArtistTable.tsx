@@ -253,13 +253,14 @@ export const ArtistTable = ({
     if (artist.other_infrastructure) {
       infraItems.push(artist.other_infrastructure);
     }
-    
-    return infraItems.length > 0 ? infraItems.join(", ") : "None";
+
+
+    return infraItems.length > 0 ? infraItems.join(", ") : "Ninguno";
   };
 
   // Helper function to truncate notes for display
   const formatNotes = (notes?: string) => {
-    if (!notes || notes.trim() === '') return "No notes";
+    if (!notes || notes.trim() === '') return "Sin notas";
     return notes.length > 50 ? `${notes.substring(0, 50)}...` : notes;
   };
 
@@ -281,7 +282,7 @@ export const ArtistTable = ({
   // Apply chronological sorting to filtered artists using imported utility
   const sortedFilteredArtists = sortArtistsChronologically(filteredArtists as any) as Artist[];
   const handleDeleteClick = async (artist: Artist) => {
-    if (window.confirm(`Are you sure you want to delete ${artist.name}?`)) {
+    if (window.confirm(`¿Estás seguro de que quieres eliminar ${artist.name}?`)) {
       setDeletingArtistId(artist.id);
       await onDeleteArtist(artist);
       setDeletingArtistId(null);
@@ -292,14 +293,14 @@ export const ArtistTable = ({
     quantity: number;
     exclusive_use?: boolean;
   }> = []) => {
-    if (mics.length === 0) return "None";
+    if (mics.length === 0) return "Ninguno";
     return mics.map(mic => {
       const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
       return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
     }).join(", ");
   };
   const formatWirelessSystems = (systems: any[] = [], isIEM = false) => {
-    if (systems.length === 0) return "None";
+    if (systems.length === 0) return "Ninguno";
     return systems.map(system => {
       if (isIEM) {
         // For IEM: show channels and beltpacks
@@ -433,11 +434,12 @@ export const ArtistTable = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
-      toast.success(`PDF generated for ${artist.name}`);
+
+
+      toast.success(`PDF generado para ${artist.name}`);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      toast.error('Failed to generate PDF');
+      toast.error('Error al generar PDF');
     } finally {
       setPrintingArtistId(null);
     }
@@ -457,7 +459,7 @@ export const ArtistTable = ({
     return <div className="w-full">
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Loading artists...</span>
+          <span className="ml-2">Cargando artistas...</span>
         </div>
       </div>;
   }
@@ -468,11 +470,11 @@ export const ArtistTable = ({
           {/* Header */}
           <div className="flex items-center justify-between py-4 px-2">
             <h2 className="text-xl md:text-2xl font-semibold leading-none tracking-tight">
-              Artist Schedule ({sortedFilteredArtists.length} artists)
+              Cronograma de artistas ({sortedFilteredArtists.length} artistas)
             </h2>
             <Button variant="outline" size="sm" onClick={handleViewLinks} className="hidden md:flex">
               <ExternalLink className="h-4 w-4 mr-2" />
-              View All Links
+              Ver todos los enlaces
             </Button>
             <Button variant="outline" size="icon" onClick={handleViewLinks} className="md:hidden">
               <ExternalLink className="h-4 w-4" />
@@ -484,25 +486,25 @@ export const ArtistTable = ({
             <Table className="w-full min-w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[140px]">Artist</TableHead>
+                  <TableHead className="min-w-[140px]">Artista</TableHead>
                   <TableHead className="min-w-[80px]">Stage</TableHead>
-                  <TableHead className="min-w-[100px]">Show Time</TableHead>
+                  <TableHead className="min-w-[100px]">Hora del show</TableHead>
                   <TableHead className="min-w-[100px]">Soundcheck</TableHead>
-                  <TableHead className="min-w-[200px]">Consoles</TableHead>
+                  <TableHead className="min-w-[200px]">Consolas</TableHead>
                   <TableHead className="min-w-[180px]">Wireless/IEM</TableHead>
                   <TableHead className="min-w-[140px]">
                     <div className="flex items-center gap-1">
                       <Mic className="h-4 w-4" />
-                      Microphones
+                      Micrófonos
                     </div>
                   </TableHead>
-                  <TableHead className="min-w-[80px]">Monitors</TableHead>
-                  <TableHead className="min-w-[160px]">Infrastructure</TableHead>
+                  <TableHead className="min-w-[80px]">Monitores</TableHead>
+                  <TableHead className="min-w-[160px]">Infraestructura</TableHead>
                   <TableHead className="min-w-[80px]">Extras</TableHead>
-                  <TableHead className="min-w-[120px]">Notes</TableHead>
-                  <TableHead className="min-w-[80px]">Status</TableHead>
-                  <TableHead className="min-w-[100px]">Gear Status</TableHead>
-                  <TableHead className="min-w-[200px]">Actions</TableHead>
+                  <TableHead className="min-w-[120px]">Notas</TableHead>
+                  <TableHead className="min-w-[80px]">Estado</TableHead>
+                  <TableHead className="min-w-[100px]">Estado del equipo</TableHead>
+                  <TableHead className="min-w-[200px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -514,7 +516,7 @@ export const ArtistTable = ({
                       <TableCell className="min-w-[140px]">
                         <div className="space-y-1">
                           <div className="font-medium">{artist.name}</div>
-                          {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">After Midnight</Badge>}
+                          {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">Después de medianoche</Badge>}
                         </div>
                       </TableCell>
                       <TableCell className="min-w-[80px]">
@@ -528,7 +530,7 @@ export const ArtistTable = ({
                       <TableCell className="min-w-[100px]">
                         {artist.soundcheck ? (
                           <div className="text-sm">
-                            <Badge variant="secondary">Yes</Badge>
+                            <Badge variant="secondary">Sí</Badge>
                             <div className="text-xs text-muted-foreground">
                               {artist.soundcheck_start} - {artist.soundcheck_end}
                             </div>
@@ -541,22 +543,22 @@ export const ArtistTable = ({
                       <TableCell className="min-w-[200px]">
                         <div className="text-sm space-y-1">
                           <div className="flex items-center gap-1 flex-wrap">
-                            <span>FOH: {artist.foh_console || "Not specified"}</span>
+                            <span>FOH: {artist.foh_console || "No especificado"}</span>
                             {artist.foh_console_provided_by && (
                               <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
                                 {artist.foh_console_provided_by}
                               </Badge>
                             )}
-                            {artist.foh_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
+                            {artist.foh_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                           </div>
                           <div className="flex items-center gap-1 flex-wrap">
-                            <span>MON: {artist.mon_console || "Not specified"}</span>
+                            <span>MON: {artist.mon_console || "No especificado"}</span>
                             {artist.mon_console_provided_by && (
                               <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
                                 {artist.mon_console_provided_by}
                               </Badge>
                             )}
-                            {artist.mon_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
+                            {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                           </div>
                         </div>
                       </TableCell>
@@ -617,7 +619,7 @@ export const ArtistTable = ({
                             <Badge variant="secondary">{artist.monitors_quantity}x</Badge>
                           </div>
                         ) : (
-                          <Badge variant="outline">None</Badge>
+                          <Badge variant="outline">Ninguno</Badge>
                         )}
                       </TableCell>
 
@@ -632,10 +634,10 @@ export const ArtistTable = ({
                             </TooltipTrigger>
                             <TooltipContent>
                               <div className="max-w-sm">
-                                <p className="font-medium">Infrastructure Requirements:</p>
+                                <p className="font-medium">Requisitos de infraestructura:</p>
                                 <p>{formatInfrastructure(artist)}</p>
                                 {artist.infrastructure_provided_by && (
-                                  <p className="text-xs mt-1">Provided by: {artist.infrastructure_provided_by}</p>
+                                  <p className="text-xs mt-1">Provisto por: {artist.infrastructure_provided_by}</p>
                                 )}
                               </div>
                             </TooltipContent>
@@ -667,19 +669,19 @@ export const ArtistTable = ({
                             </TooltipTrigger>
                             <TooltipContent>
                               <div className="max-w-sm">
-                                <p className="font-medium">Notes:</p>
+                                <p className="font-medium">Notas:</p>
                                 <p className="whitespace-pre-wrap">{artist.notes}</p>
                               </div>
                             </TooltipContent>
                           </Tooltip>
                         ) : (
-                          <span className="text-xs text-muted-foreground">No notes</span>
+                          <span className="text-xs text-muted-foreground">Sin notas</span>
                         )}
                       </TableCell>
-                      
+
                       <TableCell className="min-w-[80px]">
                         <Badge variant={artist.rider_missing ? "destructive" : "default"}>
-                          {artist.rider_missing ? "Missing" : "Complete"}
+                          {artist.rider_missing ? "Faltante" : "Completo"}
                         </Badge>
                       </TableCell>
 
@@ -689,7 +691,7 @@ export const ArtistTable = ({
                           <GearMismatchIndicator mismatches={gearComparison.mismatches} compact />
                         ) : (
                           <Badge variant="outline" className="text-xs">
-                            No Setup
+                            Sin configuración
                           </Badge>
                         )}
                       </TableCell>
@@ -734,16 +736,16 @@ export const ArtistTable = ({
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <Badge variant="outline" className="text-xs">{getStageDisplayName(artist.stage)}</Badge>
                         <Badge variant={artist.rider_missing ? "destructive" : "default"} className="text-xs">
-                          {artist.rider_missing ? "Missing" : "Complete"}
+                          {artist.rider_missing ? "Faltante" : "Completo"}
                         </Badge>
-                        {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">After Midnight</Badge>}
+                        {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">Después de medianoche</Badge>}
                       </div>
                     </div>
                   </div>
 
                   {/* Show Time */}
                   <div className="space-y-1">
-                    <div className="text-sm font-medium">Show Time</div>
+                    <div className="text-sm font-medium">Hora del show</div>
                     <div className="text-sm">{artist.show_start} - {artist.show_end}</div>
                   </div>
 
@@ -757,27 +759,27 @@ export const ArtistTable = ({
 
                   {/* Consoles */}
                   <div className="space-y-1">
-                    <div className="text-sm font-medium">Consoles</div>
+                    <div className="text-sm font-medium">Consolas</div>
                     <div className="text-sm space-y-1">
                       <div className="flex items-center gap-1 flex-wrap">
                         <span className="text-xs text-muted-foreground">FOH:</span>
-                        <span>{artist.foh_console || "Not specified"}</span>
+                        <span>{artist.foh_console || "No especificado"}</span>
                         {artist.foh_console_provided_by && (
                           <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
                             {artist.foh_console_provided_by}
                           </Badge>
                         )}
-                        {artist.foh_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
+                        {artist.foh_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                       </div>
                       <div className="flex items-center gap-1 flex-wrap">
                         <span className="text-xs text-muted-foreground">MON:</span>
-                        <span>{artist.mon_console || "Not specified"}</span>
+                        <span>{artist.mon_console || "No especificado"}</span>
                         {artist.mon_console_provided_by && (
                           <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
                             {artist.mon_console_provided_by}
                           </Badge>
                         )}
-                        {artist.mon_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
+                        {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                       </div>
                     </div>
                   </div>
@@ -816,7 +818,7 @@ export const ArtistTable = ({
                   <div className="space-y-1">
                     <div className="text-sm font-medium flex items-center gap-1">
                       <Mic className="h-4 w-4" />
-                      Microphones
+                      Micrófonos
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant={
@@ -840,19 +842,19 @@ export const ArtistTable = ({
 
                   {/* Monitors */}
                   <div className="space-y-1">
-                    <div className="text-sm font-medium">Monitors</div>
+                    <div className="text-sm font-medium">Monitores</div>
                     <div>
                       {artist.monitors_enabled ? (
                         <Badge variant="secondary">{artist.monitors_quantity}x</Badge>
                       ) : (
-                        <Badge variant="outline">None</Badge>
+                        <Badge variant="outline">Ninguno</Badge>
                       )}
                     </div>
                   </div>
 
                   {/* Infrastructure */}
                   <div className="space-y-1">
-                    <div className="text-sm font-medium">Infrastructure</div>
+                    <div className="text-sm font-medium">Infraestructura</div>
                     <div className="text-xs text-muted-foreground">
                       {formatInfrastructure(artist)}
                     </div>
@@ -870,7 +872,7 @@ export const ArtistTable = ({
                       <div className="flex flex-wrap gap-1">
                         {artist.extras_sf && <Badge variant="outline" className="text-xs">Side Fill</Badge>}
                         {artist.extras_df && <Badge variant="outline" className="text-xs">Drum Fill</Badge>}
-                        {artist.extras_djbooth && <Badge variant="outline" className="text-xs">DJ Booth</Badge>}
+                        {artist.extras_djbooth && <Badge variant="outline" className="text-xs">Cabina DJ</Badge>}
                       </div>
                     </div>
                   )}
@@ -878,7 +880,7 @@ export const ArtistTable = ({
                   {/* Notes */}
                   {artist.notes && artist.notes.trim() !== '' && (
                     <div className="space-y-1">
-                      <div className="text-sm font-medium">Notes</div>
+                      <div className="text-sm font-medium">Notas</div>
                       <div className="text-xs text-muted-foreground whitespace-pre-wrap">{artist.notes}</div>
                     </div>
                   )}
@@ -886,7 +888,7 @@ export const ArtistTable = ({
                   {/* Gear Status */}
                   {gearComparison && (
                     <div className="space-y-1">
-                      <div className="text-sm font-medium">Gear Status</div>
+                      <div className="text-sm font-medium">Estado del equipo</div>
                       <GearMismatchIndicator mismatches={gearComparison.mismatches} compact />
                     </div>
                   )}
@@ -895,23 +897,23 @@ export const ArtistTable = ({
                   <div className="flex items-center justify-end gap-2 pt-2 border-t">
                     <Button variant="ghost" size="sm" onClick={() => handleGenerateLink(artist)}>
                       <Link className="h-4 w-4 mr-1" />
-                      <span className="text-xs">Link</span>
+                      <span className="text-xs">Enlace</span>
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => handleManageFiles(artist)}>
                       <FileText className="h-4 w-4 mr-1" />
-                      <span className="text-xs">Files</span>
+                      <span className="text-xs">Archivos</span>
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => handlePrintArtist(artist)} disabled={printingArtistId === artist.id}>
                       {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4 mr-1" />}
-                      <span className="text-xs">Print</span>
+                      <span className="text-xs">Imprimir</span>
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => onEditArtist(artist)}>
                       <Pencil className="h-4 w-4 mr-1" />
-                      <span className="text-xs">Edit</span>
+                      <span className="text-xs">Editar</span>
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(artist)} disabled={deletingArtistId === artist.id}>
                       {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
-                      <span className="text-xs">Delete</span>
+                      <span className="text-xs">Eliminar</span>
                     </Button>
                   </div>
                 </div>
@@ -921,7 +923,7 @@ export const ArtistTable = ({
 
           {sortedFilteredArtists.length === 0 && !isLoading && (
             <div className="text-center py-8 text-muted-foreground">
-              No artists found matching the current filters.
+              No se encontraron artistas con los filtros actuales.
             </div>
           )}
         </div>

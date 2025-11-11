@@ -6,11 +6,11 @@ import { InfrastructureConfigProps } from "@/types/festival-gear";
 export const InfrastructureConfig = ({ data, onChange }: InfrastructureConfigProps) => {
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Infrastructure</h3>
-      
+      <h3 className="text-lg font-semibold">Infraestructura</h3>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="cat6-runs">CAT6 Runs</Label>
+          <Label htmlFor="cat6-runs">Líneas CAT6</Label>
           <Input
             id="cat6-runs"
             type="number"
@@ -21,7 +21,7 @@ export const InfrastructureConfig = ({ data, onChange }: InfrastructureConfigPro
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="hma-runs">HMA Runs</Label>
+          <Label htmlFor="hma-runs">Líneas HMA</Label>
           <Input
             id="hma-runs"
             type="number"
@@ -32,7 +32,7 @@ export const InfrastructureConfig = ({ data, onChange }: InfrastructureConfigPro
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="coax-runs">Coax Runs</Label>
+          <Label htmlFor="coax-runs">Líneas Coax</Label>
           <Input
             id="coax-runs"
             type="number"
@@ -43,7 +43,7 @@ export const InfrastructureConfig = ({ data, onChange }: InfrastructureConfigPro
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="analog-runs">Analog Runs</Label>
+          <Label htmlFor="analog-runs">Líneas Analógicas</Label>
           <Input
             id="analog-runs"
             type="number"
@@ -54,7 +54,7 @@ export const InfrastructureConfig = ({ data, onChange }: InfrastructureConfigPro
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="opticalcon-runs">OpticalCon Duo Runs</Label>
+          <Label htmlFor="opticalcon-runs">Líneas OpticalCon Duo</Label>
           <Input
             id="opticalcon-runs"
             type="number"

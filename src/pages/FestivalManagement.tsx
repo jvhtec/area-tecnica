@@ -372,8 +372,8 @@ const FestivalManagement = () => {
     } catch (error: any) {
       console.error('Error fetching documents:', error);
       toast({
-        title: 'Error loading documents',
-        description: error.message || 'We could not load the documents for this job.',
+        title: 'Error al cargar documentos',
+        description: error.message || 'No se pudieron cargar los documentos para este trabajo.',
         variant: 'destructive',
       });
     } finally {
@@ -396,8 +396,8 @@ const FestivalManagement = () => {
     } catch (error: any) {
       console.error('Error viewing document:', error);
       toast({
-        title: 'Unable to open document',
-        description: error.message || 'Please try again in a few moments.',
+        title: 'No se puede abrir el documento',
+        description: error.message || 'Por favor, inténtalo de nuevo en unos momentos.',
         variant: 'destructive',
       });
     }
@@ -423,8 +423,8 @@ const FestivalManagement = () => {
     } catch (error: any) {
       console.error('Error downloading document:', error);
       toast({
-        title: 'Download failed',
-        description: error.message || 'We could not download that file.',
+        title: 'Descarga fallida',
+        description: error.message || 'No se pudo descargar ese archivo.',
         variant: 'destructive',
       });
     }
@@ -444,8 +444,8 @@ const FestivalManagement = () => {
     } catch (error: any) {
       console.error('Error viewing rider:', error);
       toast({
-        title: 'Unable to open rider',
-        description: error.message || 'Please try again later.',
+        title: 'No se puede abrir el rider',
+        description: error.message || 'Por favor, inténtalo de nuevo más tarde.',
         variant: 'destructive',
       });
     }
@@ -470,8 +470,8 @@ const FestivalManagement = () => {
     } catch (error: any) {
       console.error('Error downloading rider:', error);
       toast({
-        title: 'Download failed',
-        description: error.message || 'We could not download that rider file.',
+        title: 'Descarga fallida',
+        description: error.message || 'No se pudo descargar ese archivo de rider.',
         variant: 'destructive',
       });
     }
@@ -580,16 +580,16 @@ const FestivalManagement = () => {
 
           if (existingFolders && existingFolders.length > 0) {
             toast({
-              title: 'Folders already exist',
-              description: 'Flex folders have already been created for this job.',
+              title: 'Las carpetas ya existen',
+              description: 'Ya se han creado carpetas Flex para este trabajo.',
             });
             return;
           }
         } catch (error: any) {
           console.error('Error checking existing folders:', error);
           toast({
-            title: 'Error checking folders',
-            description: error.message || 'Please try again in a moment.',
+            title: 'Error al verificar carpetas',
+            description: error.message || 'Por favor, inténtalo de nuevo en un momento.',
             variant: 'destructive',
           });
           return;
@@ -598,8 +598,8 @@ const FestivalManagement = () => {
 
       if (!job.start_time || !job.end_time) {
         toast({
-          title: 'Missing job dates',
-          description: `Update the job dates before ${flexPickerMode === 'create' ? 'creating' : 'adding'} Flex folders.`,
+          title: 'Fechas del trabajo faltantes',
+          description: `Actualiza las fechas del trabajo antes de ${flexPickerMode === 'create' ? 'crear' : 'añadir'} carpetas Flex.`,
           variant: 'destructive',
         });
         return;
@@ -610,8 +610,8 @@ const FestivalManagement = () => {
 
       if (!isValid(startDate) || !isValid(endDate)) {
         toast({
-          title: 'Invalid job dates',
-          description: 'Please verify the job dates before creating Flex folders.',
+          title: 'Fechas del trabajo inválidas',
+          description: 'Por favor, verifica las fechas del trabajo antes de crear carpetas Flex.',
           variant: 'destructive',
         });
         return;
@@ -625,8 +625,8 @@ const FestivalManagement = () => {
         const formattedEndDate = endDate.toISOString().split('.')[0] + '.000Z';
 
         toast({
-          title: flexPickerMode === 'create' ? 'Creating Flex folders…' : 'Adding Flex folders…',
-          description: flexPickerMode === 'create' ? 'This may take a few seconds.' : 'Selected folders will be created in Flex.',
+          title: flexPickerMode === 'create' ? 'Creando carpetas Flex…' : 'Añadiendo carpetas Flex…',
+          description: flexPickerMode === 'create' ? 'Esto puede tardar unos segundos.' : 'Las carpetas seleccionadas se crearán en Flex.',
         });
 
         await createAllFoldersForJob(
@@ -638,8 +638,8 @@ const FestivalManagement = () => {
         );
 
         toast({
-          title: flexPickerMode === 'create' ? 'Flex folders ready' : 'Flex folders updated',
-          description: flexPickerMode === 'create' ? 'Folders have been created successfully.' : 'Selected folders have been added successfully.',
+          title: flexPickerMode === 'create' ? 'Carpetas Flex listas' : 'Carpetas Flex actualizadas',
+          description: flexPickerMode === 'create' ? 'Las carpetas se han creado exitosamente.' : 'Las carpetas seleccionadas se han añadido exitosamente.',
         });
 
         await Promise.all([
@@ -650,8 +650,8 @@ const FestivalManagement = () => {
       } catch (error: any) {
         console.error('Error adding Flex folders:', error);
         toast({
-          title: 'Flex folder update failed',
-          description: error.message || 'Please try again in a moment.',
+          title: 'Error al actualizar carpetas Flex',
+          description: error.message || 'Por favor, inténtalo de nuevo en un momento.',
           variant: 'destructive',
         });
       } finally {
@@ -663,15 +663,15 @@ const FestivalManagement = () => {
 
   const flexStatus = useMemo(() => {
     if (isFlexLoading) {
-      return { label: 'Checking status…', variant: 'outline' as const };
+      return { label: 'Verificando estado…', variant: 'outline' as const };
     }
     if (flexError) {
-      return { label: 'Flex error', variant: 'destructive' as const };
+      return { label: 'Error de Flex', variant: 'destructive' as const };
     }
     if (folderExists) {
-      return { label: 'Folders ready', variant: 'secondary' as const };
+      return { label: 'Carpetas listas', variant: 'secondary' as const };
     }
-    return { label: 'Folders not created', variant: 'outline' as const };
+    return { label: 'Carpetas no creadas', variant: 'outline' as const };
   }, [isFlexLoading, flexError, folderExists]);
 
   const isSchedulingRoute = location.pathname.includes('/scheduling');
@@ -742,16 +742,16 @@ const FestivalManagement = () => {
       URL.revokeObjectURL(url);
       
       toast({
-        title: "Success",
-        description: options.generateIndividualStagePDFs 
-          ? 'Individual stage PDFs generated successfully'
-          : 'Documentation generated successfully'
+        title: "Éxito",
+        description: options.generateIndividualStagePDFs
+          ? 'PDFs individuales de escenarios generados exitosamente'
+          : 'Documentación generada exitosamente'
       });
     } catch (error: any) {
       console.error('Error generating documentation:', error);
       toast({
         title: "Error",
-        description: `Failed to generate documentation: ${error.message}`,
+        description: `Error al generar documentación: ${error.message}`,
         variant: "destructive"
       });
     } finally {
@@ -765,7 +765,7 @@ const FestivalManagement = () => {
 
   const handleFlexClick = async () => {
     if (isFlexLoading) {
-      toast({ title: "Loading", description: "Please wait while we load the Flex folder..." });
+      toast({ title: "Cargando", description: "Por favor espera mientras cargamos la carpeta Flex..." });
       return;
     }
 
@@ -773,16 +773,16 @@ const FestivalManagement = () => {
       await openFlexElement({
         elementId: flexUuid,
         onError: (error) => {
-          toast({ title: "Error", description: error.message || "Failed to open Flex", variant: "destructive" });
+          toast({ title: "Error", description: error.message || "Error al abrir Flex", variant: "destructive" });
         },
         onWarning: (message) => {
-          toast({ title: "Warning", description: message });
+          toast({ title: "Advertencia", description: message });
         },
       });
     } else if (flexError) {
       toast({ title: "Error", description: flexError, variant: "destructive" });
     } else {
-      toast({ title: "Info", description: "Flex folder not available for this festival" });
+      toast({ title: "Info", description: "Carpeta Flex no disponible para este festival" });
     }
   };
 
@@ -811,16 +811,16 @@ const FestivalManagement = () => {
       if (dbError) throw dbError;
 
       toast({
-        title: "Success",
-        description: "Document uploaded successfully",
+        title: "Éxito",
+        description: "Documento subido exitosamente",
       });
 
       fetchDocuments();
     } catch (error: any) {
       console.error('Error uploading document:', error);
       toast({
-        title: "Upload failed",
-        description: error.message || "Failed to upload document",
+        title: "Error al subir",
+        description: error.message || "Error al subir documento",
         variant: "destructive",
       });
     } finally {
@@ -841,14 +841,14 @@ const FestivalManagement = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: data?.message || "Local folders created successfully",
+        title: "Éxito",
+        description: data?.message || "Carpetas locales creadas exitosamente",
       });
     } catch (error: any) {
       console.error('Error creating local folders:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create local folders",
+        description: error.message || "Error al crear carpetas locales",
         variant: "destructive",
       });
     } finally {
@@ -872,8 +872,8 @@ const FestivalManagement = () => {
       if (error) throw error;
       setArchiveResult(data);
       toast({
-        title: archiveDryRun ? 'Dry run complete' : 'Archive complete',
-        description: `${data?.uploaded ?? 0} uploaded, ${data?.failed ?? 0} failed`,
+        title: archiveDryRun ? 'Prueba completada' : 'Archivo completado',
+        description: `${data?.uploaded ?? 0} subidos, ${data?.failed ?? 0} fallidos`,
       });
       if (!archiveDryRun && (data?.uploaded ?? 0) > 0) {
         fetchDocuments();
@@ -881,7 +881,7 @@ const FestivalManagement = () => {
     } catch (err: any) {
       console.error('Archive error', err);
       setArchiveError(err?.message || 'Failed to archive');
-      toast({ title: 'Archive failed', description: err?.message || 'Failed to archive', variant: 'destructive' });
+      toast({ title: 'Error al archivar', description: err?.message || 'Error al archivar', variant: 'destructive' });
     } finally {
       setIsArchiving(false);
     }
@@ -909,11 +909,11 @@ const FestivalManagement = () => {
       if (error) throw error;
       setBackfillResult(data);
       setBackfillMessage(`Inserted ${data?.inserted ?? 0}, already ${data?.already ?? 0}`);
-      toast({ title: 'Backfill complete', description: `Inserted ${data?.inserted ?? 0}, already ${data?.already ?? 0}` });
+      toast({ title: 'Relleno completado', description: `Insertados ${data?.inserted ?? 0}, ya existían ${data?.already ?? 0}` });
     } catch (err: any) {
       console.error('Backfill error', err);
       setBackfillMessage(err?.message || 'Backfill failed');
-      toast({ title: 'Backfill failed', description: err?.message || 'Backfill failed', variant: 'destructive' });
+      toast({ title: 'Error al rellenar', description: err?.message || 'Error al rellenar', variant: 'destructive' });
     } finally {
       setIsBackfilling(false);
     }
@@ -927,15 +927,15 @@ const FestivalManagement = () => {
       });
       if (error) throw error;
       toast({
-        title: "Success",
-        description: "WhatsApp group created successfully",
+        title: "Éxito",
+        description: "Grupo de WhatsApp creado exitosamente",
       });
       setIsWhatsappDialogOpen(false);
     } catch (error: any) {
       console.error('Error creating WhatsApp group:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create WhatsApp group",
+        description: error.message || "Error al crear grupo de WhatsApp",
         variant: "destructive",
       });
     } finally {
@@ -978,8 +978,8 @@ const FestivalManagement = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Job deleted successfully",
+        title: "Éxito",
+        description: "Trabajo eliminado exitosamente",
       });
 
       navigate('/project-management');
@@ -987,7 +987,7 @@ const FestivalManagement = () => {
       console.error('Error deleting job:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to delete job",
+        description: error.message || "Error al eliminar trabajo",
         variant: "destructive",
       });
     } finally {
@@ -1003,15 +1003,15 @@ const FestivalManagement = () => {
   }, [jobId, navigate]);
 
   if (!jobId) {
-    return <div>Job ID is required</div>;
+    return <div>Se requiere ID del trabajo</div>;
   }
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div>Cargando...</div>;
   }
 
   if (!job) {
-    return <div>Festival not found</div>;
+    return <div>Festival no encontrado</div>;
   }
 
   return (
@@ -1061,7 +1061,7 @@ const FestivalManagement = () => {
                     ) : (
                       <Printer className="h-4 w-4" />
                     )}
-                    <span className="hidden sm:inline">{isPrinting ? 'Generating...' : 'Print'}</span>
+                    <span className="hidden sm:inline">{isPrinting ? 'Generando...' : 'Imprimir'}</span>
                   </Button>
 
                   {(folderExists || isFlexLoading) && (
@@ -1077,7 +1077,7 @@ const FestivalManagement = () => {
                       ) : (
                         <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
                       )}
-                      <span className="hidden sm:inline">{isFlexLoading ? 'Loading...' : 'Flex'}</span>
+                      <span className="hidden sm:inline">{isFlexLoading ? 'Cargando...' : 'Flex'}</span>
                     </Button>
                   )}
 
@@ -1100,7 +1100,7 @@ const FestivalManagement = () => {
                     onClick={() => setIsDeleteDialogOpen(true)}
                   >
                     <Trash2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Delete</span>
+                    <span className="hidden sm:inline">Eliminar</span>
                   </Button>
                 </>
               )}
@@ -1122,19 +1122,19 @@ const FestivalManagement = () => {
                   <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20 transition-colors">
                     <Users className="h-5 w-5 md:h-6 md:w-6" />
                   </div>
-                  <span className="group-hover:text-primary transition-colors">Artists</span>
+                  <span className="group-hover:text-primary transition-colors">Artistas</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-baseline gap-2">
                   <p className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">{artistCount}</p>
-                  <p className="text-xs md:text-sm text-muted-foreground">Total Artists</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Total de Artistas</p>
                 </div>
                 <Button className="w-full group-hover:shadow-md transition-shadow" size="sm" onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/festival-management/${jobId}/artists`);
                 }}>
-                  {isViewOnly ? "View Artists" : "Manage Artists"}
+                  {isViewOnly ? "Ver Artistas" : "Gestionar Artistas"}
                 </Button>
               </CardContent>
             </Card>
@@ -1148,18 +1148,18 @@ const FestivalManagement = () => {
                   <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500 group-hover:bg-purple-500/20 transition-colors">
                     <Layout className="h-5 w-5 md:h-6 md:w-6" />
                   </div>
-                  <span className="group-hover:text-primary transition-colors">Stages & Gear</span>
+                  <span className="group-hover:text-primary transition-colors">Escenarios y Equipo</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs md:text-sm text-muted-foreground min-h-[2.5rem]">
-                  Manage stages and technical equipment
+                  Gestiona escenarios y equipo técnico
                 </p>
                 <Button className="w-full group-hover:shadow-md transition-shadow" size="sm" onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/festival-management/${jobId}/gear`);
                 }}>
-                  {isViewOnly ? "View Gear" : "Manage Gear"}
+                  {isViewOnly ? "Ver Equipo" : "Gestionar Equipo"}
                 </Button>
               </CardContent>
             </Card>
@@ -1173,18 +1173,18 @@ const FestivalManagement = () => {
                   <div className="p-2 rounded-lg bg-green-500/10 text-green-500 group-hover:bg-green-500/20 transition-colors">
                     <Calendar className="h-5 w-5 md:h-6 md:w-6" />
                   </div>
-                  <span className="group-hover:text-primary transition-colors">Scheduling</span>
+                  <span className="group-hover:text-primary transition-colors">Planificación</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs md:text-sm text-muted-foreground min-h-[2.5rem]">
-                  Manage shifts and staff assignments
+                  Gestiona turnos y asignaciones de personal
                 </p>
                 <Button className="w-full group-hover:shadow-md transition-shadow" size="sm" onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/festival-management/${jobId}/scheduling`);
                 }}>
-                  {isViewOnly ? "View Schedule" : "Manage Schedule"}
+                  {isViewOnly ? "Ver Planificación" : "Gestionar Planificación"}
                 </Button>
               </CardContent>
             </Card>
@@ -1195,7 +1195,7 @@ const FestivalManagement = () => {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="flex items-center gap-2 text-base md:text-lg">
                   <RefreshCw className="h-4 w-4 md:h-5 md:w-5" />
-                  Quick Actions
+                  Acciones Rápidas
                 </CardTitle>
                 <Button
                   variant="outline"
@@ -1212,7 +1212,7 @@ const FestivalManagement = () => {
                   ) : (
                     <RefreshCw className="h-4 w-4" />
                   )}
-                  Refresh Data
+                  Actualizar Datos
                 </Button>
               </div>
             </CardHeader>
@@ -1222,12 +1222,12 @@ const FestivalManagement = () => {
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <Users className="h-4 w-4 flex-shrink-0" />
-                      Assignments
+                      Asignaciones
                     </div>
                     <Badge variant="outline" className="text-xs">{humanizeDepartment(assignmentDepartment)}</Badge>
                   </div>
                   <p className="text-xs md:text-sm text-muted-foreground">
-                    Coordinate crew assignments by department.
+                    Coordina asignaciones de crew por departamento.
                   </p>
                   <div className="flex flex-col gap-2">
                     <Select value={assignmentDepartment} onValueChange={(value) => setAssignmentDepartment(value as Department)}>
@@ -1248,7 +1248,7 @@ const FestivalManagement = () => {
                       size="sm"
                       className="w-full"
                     >
-                      Open
+                      Abrir
                     </Button>
                   </div>
                 </div>
@@ -1259,7 +1259,7 @@ const FestivalManagement = () => {
                     Flex Crew Calls
                   </div>
                   <p className="text-xs md:text-sm text-muted-foreground">
-                    Link Sound/Lights crew call element IDs.
+                    Vincula los IDs de elementos de crew call de Sonido/Luces.
                   </p>
                   <div className="flex">
                     {jobId && <CrewCallLinkerDialog jobId={jobId} />}
@@ -1272,10 +1272,10 @@ const FestivalManagement = () => {
                     Timesheets
                   </div>
                   <p className="text-xs md:text-sm text-muted-foreground">
-                    Review and approve crew timesheets for this job.
+                    Revisa y aprueba las hojas de tiempo del crew para este trabajo.
                   </p>
                   <Button onClick={handleNavigateTimesheets} disabled={!jobId} size="sm" className="w-full">
-                    Open Timesheets
+                    Abrir Hojas de Tiempo
                   </Button>
                 </div>
 
@@ -1285,10 +1285,10 @@ const FestivalManagement = () => {
                     Hoja de Ruta
                   </div>
                   <p className="text-xs md:text-sm text-muted-foreground">
-                    Generate and review the roadmap for this job.
+                    Genera y revisa la hoja de ruta para este trabajo.
                   </p>
                   <Button onClick={handleOpenRouteSheet} disabled={!jobId} size="sm" className="w-full">
-                    Open Hoja de Ruta
+                    Abrir Hoja de Ruta
                   </Button>
                 </div>
 
@@ -1301,7 +1301,7 @@ const FestivalManagement = () => {
                     <Badge variant={flexStatus.variant} className="text-xs">{flexStatus.label}</Badge>
                   </div>
                   <p className="text-xs md:text-sm text-muted-foreground">
-                    Keep Flex folders in sync with this job&apos;s data.
+                    Mantén las carpetas de Flex sincronizadas con los datos de este trabajo.
                   </p>
                   <div className="flex flex-col gap-2">
                     <Button
@@ -1313,10 +1313,10 @@ const FestivalManagement = () => {
                       {isCreatingFlexFolders ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Creating…
+                          Creando…
                         </>
                       ) : (
-                        'Create / Verify'
+                        'Crear / Verificar'
                       )}
                     </Button>
                     <div className="grid grid-cols-2 gap-2">
@@ -1335,10 +1335,10 @@ const FestivalManagement = () => {
                         {isCreatingFlexFolders ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Updating…
+                            Actualizando…
                           </>
                         ) : (
-                          'Add'
+                          'Añadir'
                         )}
                       </Button>
                       <Button
@@ -1347,7 +1347,7 @@ const FestivalManagement = () => {
                         disabled={!canEdit}
                         size="sm"
                       >
-                        View Logs
+                        Ver Registros
                       </Button>
                     </div>
                   </div>
@@ -1361,13 +1361,13 @@ const FestivalManagement = () => {
                 <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
                   <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                     <FileText className="h-4 w-4 flex-shrink-0" />
-                    Job Details
+                    Detalles del Trabajo
                   </div>
                   <p className="text-xs md:text-sm text-muted-foreground">
-                    View the complete job configuration and metadata.
+                    Ve la configuración completa del trabajo y sus metadatos.
                   </p>
                   <Button onClick={handleOpenJobDetails} disabled={!job} size="sm" className="w-full">
-                    View Job Details
+                    Ver Detalles del Trabajo
                   </Button>
                 </div>
 
@@ -1376,10 +1376,10 @@ const FestivalManagement = () => {
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-blue-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <Upload className="h-4 w-4 flex-shrink-0 text-blue-500" />
-                      Upload Documents
+                      Subir Documentos
                     </div>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      Upload job documents and technical files.
+                      Sube documentos de trabajo y archivos técnicos.
                     </p>
                     <div className="relative">
                       <input
@@ -1396,10 +1396,10 @@ const FestivalManagement = () => {
                         {isUploadingDocument ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Uploading...
+                            Subiendo...
                           </>
                         ) : (
-                          'Choose File'
+                          'Elegir Archivo'
                         )}
                       </Button>
                     </div>
@@ -1411,10 +1411,10 @@ const FestivalManagement = () => {
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-purple-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <FolderPlus className="h-4 w-4 flex-shrink-0 text-purple-500" />
-                      Local Folders
+                      Carpetas Locales
                     </div>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      Create local folder structure for this job.
+                      Crea estructura de carpetas locales para este trabajo.
                     </p>
                     <Button
                       onClick={handleCreateLocalFolders}
@@ -1425,10 +1425,10 @@ const FestivalManagement = () => {
                       {isCreatingLocalFolders ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Creating...
+                          Creando...
                         </>
                       ) : (
-                        'Create Folders'
+                        'Crear Carpetas'
                       )}
                     </Button>
                   </div>
@@ -1439,10 +1439,10 @@ const FestivalManagement = () => {
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-orange-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <Archive className="h-4 w-4 flex-shrink-0 text-orange-500" />
-                      Archive to Flex
+                      Archivar en Flex
                     </div>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      Archive documents to Flex Documentación Técnica.
+                      Archiva documentos en Flex Documentación Técnica.
                     </p>
                     <Button
                       onClick={() => setIsArchiveDialogOpen(true)}
@@ -1451,7 +1451,7 @@ const FestivalManagement = () => {
                       className="w-full"
                       variant="outline"
                     >
-                      {isArchiving ? 'Archiving...' : 'Open Archive'}
+                      {isArchiving ? 'Archivando...' : 'Abrir Archivo'}
                     </Button>
                   </div>
                 )}
@@ -1461,10 +1461,10 @@ const FestivalManagement = () => {
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-cyan-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <RotateCw className="h-4 w-4 flex-shrink-0 text-cyan-500" />
-                      Backfill Doc Técnica
+                      Rellenar Doc Técnica
                     </div>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      Find and persist missing technical documentation.
+                      Encuentra y persiste documentación técnica faltante.
                     </p>
                     <Button
                       onClick={() => setIsBackfillDialogOpen(true)}
@@ -1473,7 +1473,7 @@ const FestivalManagement = () => {
                       className="w-full"
                       variant="outline"
                     >
-                      {isBackfilling ? 'Backfilling...' : 'Open Backfill'}
+                      {isBackfilling ? 'Rellenando...' : 'Abrir Relleno'}
                     </Button>
                   </div>
                 )}
@@ -1483,10 +1483,10 @@ const FestivalManagement = () => {
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-green-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <MessageCircle className="h-4 w-4 flex-shrink-0 text-green-500" />
-                      WhatsApp Group
+                      Grupo de WhatsApp
                     </div>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      Create WhatsApp group for job coordination.
+                      Crea grupo de WhatsApp para coordinación del trabajo.
                     </p>
                     <Button
                       onClick={() => setIsWhatsappDialogOpen(true)}
@@ -1494,7 +1494,7 @@ const FestivalManagement = () => {
                       className="w-full"
                       variant="outline"
                     >
-                      Create Group
+                      Crear Grupo
                     </Button>
                   </div>
                 )}
@@ -1507,7 +1507,7 @@ const FestivalManagement = () => {
                       Almacén Sonido
                     </div>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      Send message to warehouse team.
+                      Envía mensaje al equipo de almacén.
                     </p>
                     <Button
                       onClick={() => {
@@ -1518,7 +1518,7 @@ const FestivalManagement = () => {
                       className="w-full"
                       variant="outline"
                     >
-                      Send Message
+                      Enviar Mensaje
                     </Button>
                   </div>
                 )}
@@ -1528,10 +1528,10 @@ const FestivalManagement = () => {
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-indigo-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <Scale className="h-4 w-4 flex-shrink-0 text-indigo-500" />
-                      Pesos Calculator
+                      Calculadora de Pesos
                     </div>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      Calculate weights and load distribution.
+                      Calcula pesos y distribución de carga.
                     </p>
                     <Button
                       onClick={() => navigateToCalculator('pesos')}
@@ -1539,7 +1539,7 @@ const FestivalManagement = () => {
                       className="w-full"
                       variant="outline"
                     >
-                      Open Calculator
+                      Abrir Calculadora
                     </Button>
                   </div>
                 )}
@@ -1549,10 +1549,10 @@ const FestivalManagement = () => {
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-yellow-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <Zap className="h-4 w-4 flex-shrink-0 text-yellow-500" />
-                      Consumos Calculator
+                      Calculadora de Consumos
                     </div>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      Calculate power consumption and requirements.
+                      Calcula consumo y requisitos de energía.
                     </p>
                     <Button
                       onClick={() => navigateToCalculator('consumos')}
@@ -1560,7 +1560,7 @@ const FestivalManagement = () => {
                       className="w-full"
                       variant="outline"
                     >
-                      Open Calculator
+                      Abrir Calculadora
                     </Button>
                   </div>
                 )}
@@ -1570,10 +1570,10 @@ const FestivalManagement = () => {
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-red-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
-                      Incident Report
+                      Reporte de Incidencia
                     </div>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      Create an incident report for this job.
+                      Crea un reporte de incidencia para este trabajo.
                     </p>
                     <TechnicianIncidentReportDialog job={job} techName={userRole} />
                   </div>
@@ -1594,7 +1594,7 @@ const FestivalManagement = () => {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="flex items-center gap-2 text-base md:text-lg">
                   <FileText className="h-4 w-4 md:h-5 md:w-5" />
-                  Documents & Riders
+                  Documentos y Riders
                 </CardTitle>
                 <Button
                   variant="outline"
@@ -1609,7 +1609,7 @@ const FestivalManagement = () => {
                   {isLoadingDocuments ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : null}
-                  {isLoadingDocuments ? 'Refreshing…' : 'Refresh'}
+                  {isLoadingDocuments ? 'Actualizando…' : 'Actualizar'}
                 </Button>
               </div>
             </CardHeader>
@@ -1617,14 +1617,14 @@ const FestivalManagement = () => {
               {isLoadingDocuments ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading documents…
+                  Cargando documentos…
                 </div>
               ) : (
                 <>
                   <div>
                     <h4 className="text-xs md:text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
                       <FileText className="h-4 w-4 flex-shrink-0" />
-                      Job Documents
+                      Documentos del Trabajo
                     </h4>
                     {jobDocuments.length > 0 ? (
                       <div className="space-y-2">
@@ -1679,7 +1679,7 @@ const FestivalManagement = () => {
                       </div>
                     ) : (
                       <p className="text-xs md:text-sm text-muted-foreground">
-                        No job documents have been uploaded yet.
+                        Aún no se han subido documentos del trabajo.
                       </p>
                     )}
                   </div>
@@ -1687,7 +1687,7 @@ const FestivalManagement = () => {
                   <div>
                     <h4 className="text-xs md:text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
                       <Users className="h-4 w-4 flex-shrink-0" />
-                      Artist Riders
+                      Riders de Artistas
                     </h4>
                     {groupedRiderFiles.length > 0 ? (
                       <div className="space-y-4">
@@ -1737,7 +1737,7 @@ const FestivalManagement = () => {
                       </div>
                     ) : (
                       <p className="text-xs md:text-sm text-muted-foreground">
-                        No artist riders uploaded yet. Riders added through the artist table will appear here automatically.
+                        Aún no se han subido riders de artistas. Los riders añadidos a través de la tabla de artistas aparecerán aquí automáticamente.
                       </p>
                     )}
                   </div>
@@ -1793,12 +1793,12 @@ const FestivalManagement = () => {
       {isSchedulingRoute && (
         <div>
           <div className="mb-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => navigate(`/festival-management/${jobId}`)}
               className="flex items-center gap-1"
             >
-              Back to Festival
+              Volver al Festival
             </Button>
           </div>
           
@@ -1807,9 +1807,9 @@ const FestivalManagement = () => {
           ) : (
             <Card>
               <CardContent className="p-8 text-center">
-                <p className="text-muted-foreground mb-4">No dates available for scheduling. Please update the festival dates first.</p>
+                <p className="text-muted-foreground mb-4">No hay fechas disponibles para planificación. Por favor, actualiza primero las fechas del festival.</p>
                 <Button onClick={() => navigate(`/festival-management/${jobId}`)}>
-                  Go Back
+                  Volver
                 </Button>
               </CardContent>
             </Card>
@@ -1841,22 +1841,22 @@ const FestivalManagement = () => {
       <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Archive documents to Flex</DialogTitle>
+            <DialogTitle>Archivar documentos en Flex</DialogTitle>
             <DialogDescription>
-              Uploads all job documents to each department's Documentación Técnica in Flex and removes them from Supabase.
+              Sube todos los documentos del trabajo a la Documentación Técnica de cada departamento en Flex y los elimina de Supabase.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Mode</label>
+                <label className="text-sm font-medium">Modo</label>
                 <select
                   className="w-full h-9 rounded-md border bg-background px-3 text-sm"
                   value={archiveMode}
                   onChange={(e) => setArchiveMode(e.target.value as 'by-prefix' | 'all-tech')}
                 >
-                  <option value="by-prefix">By prefix (default)</option>
-                  <option value="all-tech">All technical depts</option>
+                  <option value="by-prefix">Por prefijo (predeterminado)</option>
+                  <option value="all-tech">Todos los depts. técnicos</option>
                 </select>
               </div>
               <div className="flex items-center gap-2 mt-6 sm:mt-[30px]">
@@ -1866,7 +1866,7 @@ const FestivalManagement = () => {
                   checked={archiveIncludeTemplates}
                   onChange={(e) => setArchiveIncludeTemplates(e.target.checked)}
                 />
-                <label htmlFor="includeTemplates" className="text-sm">Include templates</label>
+                <label htmlFor="includeTemplates" className="text-sm">Incluir templates</label>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -1875,13 +1875,13 @@ const FestivalManagement = () => {
                   checked={archiveDryRun}
                   onChange={(e) => setArchiveDryRun(e.target.checked)}
                 />
-                <label htmlFor="dryRun" className="text-sm">Dry run (no delete)</label>
+                <label htmlFor="dryRun" className="text-sm">Prueba (sin eliminar)</label>
               </div>
             </div>
 
             {isArchiving && (
               <div className="flex items-center gap-2 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" /> Archiving...
+                <Loader2 className="h-4 w-4 animate-spin" /> Archivando...
               </div>
             )}
 
@@ -1891,23 +1891,23 @@ const FestivalManagement = () => {
 
             {archiveResult && (
               <div className="space-y-3">
-                <div className="text-sm">Summary</div>
+                <div className="text-sm">Resumen</div>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>Attempted: <span className="font-medium">{archiveResult.attempted ?? 0}</span></div>
-                  <div>Uploaded: <span className="font-medium">{archiveResult.uploaded ?? 0}</span></div>
-                  <div>Skipped: <span className="font-medium">{archiveResult.skipped ?? 0}</span></div>
-                  <div>Failed: <span className="font-medium">{archiveResult.failed ?? 0}</span></div>
+                  <div>Intentados: <span className="font-medium">{archiveResult.attempted ?? 0}</span></div>
+                  <div>Subidos: <span className="font-medium">{archiveResult.uploaded ?? 0}</span></div>
+                  <div>Omitidos: <span className="font-medium">{archiveResult.skipped ?? 0}</span></div>
+                  <div>Fallidos: <span className="font-medium">{archiveResult.failed ?? 0}</span></div>
                 </div>
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)} disabled={isArchiving}>
-              Close
+              Cerrar
             </Button>
             <Button onClick={handleArchiveToFlex} disabled={isArchiving}>
               {isArchiving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {archiveDryRun ? 'Run Dry' : 'Start'}
+              {archiveDryRun ? 'Ejecutar Prueba' : 'Iniciar'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1917,63 +1917,63 @@ const FestivalManagement = () => {
       <Dialog open={isBackfillDialogOpen} onOpenChange={setIsBackfillDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Backfill Documentación Técnica</DialogTitle>
+            <DialogTitle>Rellenar Documentación Técnica</DialogTitle>
             <DialogDescription>
-              Finds and persists missing Documentación Técnica elements for this job so archiving can target them reliably.
+              Encuentra y persiste elementos de Documentación Técnica faltantes para este trabajo, permitiendo que el archivado los localice de forma fiable.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2 text-sm">
             <div className="grid grid-cols-2 gap-3">
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={bfSound} onChange={(e) => setBfSound(e.target.checked)} /> Sound
+                <input type="checkbox" checked={bfSound} onChange={(e) => setBfSound(e.target.checked)} /> Sonido
               </label>
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={bfLights} onChange={(e) => setBfLights(e.target.checked)} /> Lights
+                <input type="checkbox" checked={bfLights} onChange={(e) => setBfLights(e.target.checked)} /> Luces
               </label>
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={bfVideo} onChange={(e) => setBfVideo(e.target.checked)} /> Video
               </label>
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={bfProduction} onChange={(e) => setBfProduction(e.target.checked)} /> Production
+                <input type="checkbox" checked={bfProduction} onChange={(e) => setBfProduction(e.target.checked)} /> Producción
               </label>
             </div>
             <div className="mt-2">
-              <div className="text-xs text-muted-foreground mb-1">Manual UUIDs (optional)</div>
+              <div className="text-xs text-muted-foreground mb-1">UUIDs manuales (opcional)</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs">Sound UUID</label>
+                  <label className="text-xs">UUID Sonido</label>
                   <input
                     className="w-full h-8 rounded border px-2 text-xs"
                     value={uuidSound}
                     onChange={(e) => setUuidSound(e.target.value)}
-                    placeholder="paste elementId"
+                    placeholder="pegar elementId"
                   />
                 </div>
                 <div>
-                  <label className="text-xs">Lights UUID</label>
+                  <label className="text-xs">UUID Luces</label>
                   <input
                     className="w-full h-8 rounded border px-2 text-xs"
                     value={uuidLights}
                     onChange={(e) => setUuidLights(e.target.value)}
-                    placeholder="paste elementId"
+                    placeholder="pegar elementId"
                   />
                 </div>
                 <div>
-                  <label className="text-xs">Video UUID</label>
+                  <label className="text-xs">UUID Video</label>
                   <input
                     className="w-full h-8 rounded border px-2 text-xs"
                     value={uuidVideo}
                     onChange={(e) => setUuidVideo(e.target.value)}
-                    placeholder="paste elementId"
+                    placeholder="pegar elementId"
                   />
                 </div>
                 <div>
-                  <label className="text-xs">Production UUID</label>
+                  <label className="text-xs">UUID Producción</label>
                   <input
                     className="w-full h-8 rounded border px-2 text-xs"
                     value={uuidProduction}
                     onChange={(e) => setUuidProduction(e.target.value)}
-                    placeholder="paste elementId"
+                    placeholder="pegar elementId"
                   />
                 </div>
               </div>
@@ -1981,18 +1981,18 @@ const FestivalManagement = () => {
 
             {isBackfilling && (
               <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" /> Backfilling…
+                <Loader2 className="h-4 w-4 animate-spin" /> Rellenando…
               </div>
             )}
             {backfillMessage && <div className="text-muted-foreground">{backfillMessage}</div>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsBackfillDialogOpen(false)} disabled={isBackfilling}>
-              Close
+              Cerrar
             </Button>
             <Button onClick={handleBackfill} disabled={isBackfilling}>
               {isBackfilling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Start
+              Iniciar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2002,22 +2002,22 @@ const FestivalManagement = () => {
       <Dialog open={isWhatsappDialogOpen} onOpenChange={setIsWhatsappDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create WhatsApp Group</DialogTitle>
+            <DialogTitle>Crear Grupo de WhatsApp</DialogTitle>
             <DialogDescription>
-              Create a WhatsApp group for coordinating this job with your team.
+              Crea un grupo de WhatsApp para coordinar este trabajo con tu equipo.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground">
-              A WhatsApp group will be created with the job title: <span className="font-semibold">{job?.title}</span>
+              Se creará un grupo de WhatsApp con el título del trabajo: <span className="font-semibold">{job?.title}</span>
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsWhatsappDialogOpen(false)} disabled={isSendingWa}>
-              Cancel
+              Cancelar
             </Button>
             <Button onClick={handleCreateWhatsappGroup} disabled={isSendingWa}>
-              {isSendingWa ? 'Creating...' : 'Create Group'}
+              {isSendingWa ? 'Creando...' : 'Crear Grupo'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2056,28 +2056,28 @@ const FestivalManagement = () => {
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Job</DialogTitle>
+            <DialogTitle>Eliminar Trabajo</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this job? This action cannot be undone.
+              ¿Estás seguro de que quieres eliminar este trabajo? Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm">
-              Job: <span className="font-semibold">{job?.title}</span>
+              Trabajo: <span className="font-semibold">{job?.title}</span>
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>
-              Cancel
+              Cancelar
             </Button>
             <Button variant="destructive" onClick={handleDeleteJob} disabled={isDeleting}>
               {isDeleting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
+                  Eliminando...
                 </>
               ) : (
-                'Delete'
+                'Eliminar'
               )}
             </Button>
           </DialogFooter>

@@ -7,11 +7,11 @@ import { StageEquipmentConfigProps } from "@/types/festival-gear";
 export const StageEquipmentConfig = ({ data, onChange }: StageEquipmentConfigProps) => {
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Stage Equipment</h3>
+      <h3 className="text-lg font-semibold">Equipamiento de Stage</h3>
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="available-monitors">Available Monitors</Label>
+          <Label htmlFor="available-monitors">Monitores Disponibles</Label>
           <Input
             id="available-monitors"
             type="number"
@@ -23,7 +23,7 @@ export const StageEquipmentConfig = ({ data, onChange }: StageEquipmentConfigPro
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label htmlFor="side-fills">Side Fills Available</Label>
+            <Label htmlFor="side-fills">Side Fills Disponibles</Label>
             <Switch
               id="side-fills"
               checked={data.extras_sf}
@@ -32,7 +32,7 @@ export const StageEquipmentConfig = ({ data, onChange }: StageEquipmentConfigPro
           </div>
 
           <div className="flex items-center justify-between">
-            <Label htmlFor="drum-fills">Drum Fills Available</Label>
+            <Label htmlFor="drum-fills">Drum Fills Disponibles</Label>
             <Switch
               id="drum-fills"
               checked={data.extras_df}
@@ -41,7 +41,7 @@ export const StageEquipmentConfig = ({ data, onChange }: StageEquipmentConfigPro
           </div>
 
           <div className="flex items-center justify-between">
-            <Label htmlFor="dj-booths">DJ Booths Available</Label>
+            <Label htmlFor="dj-booths">Cabinas de DJ Disponibles</Label>
             <Switch
               id="dj-booths"
               checked={data.extras_djbooth}

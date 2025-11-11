@@ -20,11 +20,11 @@ interface WiredMicConfigProps {
   showProvider?: boolean;
 }
 
-export const WiredMicConfig = ({ 
-  mics, 
-  onChange, 
-  label = "Wired Microphones",
-  showProvider = false 
+export const WiredMicConfig = ({
+  mics,
+  onChange,
+  label = "Micrófonos Cableados",
+  showProvider = false
 }: WiredMicConfigProps) => {
   const addMic = () => {
     onChange([...mics, { 
@@ -57,7 +57,7 @@ export const WiredMicConfig = ({
           onClick={addMic}
         >
           <Plus className="h-4 w-4 mr-2" />
-          Add Microphone
+          Añadir Micrófono
         </Button>
       </div>
 
@@ -70,7 +70,7 @@ export const WiredMicConfig = ({
                 onChange={(value) => updateMic(index, 'model', value)}
                 options={[]}
                 fallbackOptions={[]}
-                placeholder="Select microphone"
+                placeholder="Seleccionar micrófono"
                 category="wired_mics"
               />
             </div>
@@ -89,7 +89,7 @@ export const WiredMicConfig = ({
                 onCheckedChange={(checked) => updateMic(index, 'exclusive_use', !!checked)}
               />
               <Label htmlFor={`exclusive-${index}`} className="text-sm">
-                Exclusive
+                Exclusivo
               </Label>
             </div>
             <Button
@@ -105,7 +105,7 @@ export const WiredMicConfig = ({
       ))}
 
       {mics.length === 0 && (
-        <p className="text-sm text-muted-foreground">No wired microphones added yet.</p>
+        <p className="text-sm text-muted-foreground">Aún no se han añadido micrófonos cableados.</p>
       )}
     </div>
   );

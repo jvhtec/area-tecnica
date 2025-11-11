@@ -17,20 +17,20 @@ export const GearMismatchIndicator = ({ mismatches, compact = false }: GearMisma
       </Badge>
     ) : (
       <Badge variant="secondary" className="bg-green-100 text-green-800">
-        No Issues
+        Sin problemas
       </Badge>
     );
   }
 
   const errors = mismatches.filter(m => m.severity === 'error');
   const warnings = mismatches.filter(m => m.severity === 'warning');
-  
+
   const tooltipContent = (
     <div className="max-w-sm space-y-2">
-      <p className="font-medium">Equipment Issues:</p>
+      <p className="font-medium">Problemas de equipo:</p>
       {errors.length > 0 && (
         <div>
-          <p className="text-red-600 font-medium text-xs">Errors ({errors.length}):</p>
+          <p className="text-red-600 font-medium text-xs">Errores ({errors.length}):</p>
           {errors.map((error, index) => (
             <div key={index} className="text-xs">
               <p className="text-red-600">• {error.message}</p>
@@ -41,7 +41,7 @@ export const GearMismatchIndicator = ({ mismatches, compact = false }: GearMisma
       )}
       {warnings.length > 0 && (
         <div>
-          <p className="text-orange-600 font-medium text-xs">Warnings ({warnings.length}):</p>
+          <p className="text-orange-600 font-medium text-xs">Advertencias ({warnings.length}):</p>
           {warnings.map((warning, index) => (
             <div key={index} className="text-xs">
               <p className="text-orange-600">• {warning.message}</p>
@@ -86,13 +86,13 @@ export const GearMismatchIndicator = ({ mismatches, compact = false }: GearMisma
           {errors.length > 0 && (
             <Badge variant="destructive" className="text-xs">
               <XCircle className="h-3 w-3 mr-1" />
-              {errors.length} Error{errors.length !== 1 ? 's' : ''}
+              {errors.length} Error{errors.length !== 1 ? 'es' : ''}
             </Badge>
           )}
           {warnings.length > 0 && (
             <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
               <AlertTriangle className="h-3 w-3 mr-1" />
-              {warnings.length} Warning{warnings.length !== 1 ? 's' : ''}
+              {warnings.length} Advertencia{warnings.length !== 1 ? 's' : ''}
             </Badge>
           )}
         </div>
