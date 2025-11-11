@@ -86,8 +86,8 @@ export const TourManagementDialog = ({
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
 
       toast({
-        title: "Success",
-        description: `All tour dates ${tourPackOnly ? 'set to' : 'removed from'} Tour Pack Only mode.`,
+        title: "Éxito",
+        description: `Todas las fechas de gira ${tourPackOnly ? 'configuradas en' : 'eliminadas de'} modo Solo Tour Pack.`,
       });
     } catch (error: any) {
       console.error("Error updating tour dates:", error);
@@ -133,14 +133,14 @@ export const TourManagementDialog = ({
       await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
 
       toast({
-        title: "Success",
-        description: `Tour ${actionWord}ed successfully`,
+        title: "Éxito",
+        description: `Gira ${newStatus === 'cancelled' ? 'cancelada' : 'reactivada'} exitosamente`,
       });
     } catch (error: any) {
       console.error(`Error ${actionWord}ing tour:`, error);
       toast({
         title: "Error",
-        description: `Failed to ${actionWord} tour: ${error.message}`,
+        description: `Error al ${newStatus === 'cancelled' ? 'cancelar' : 'reactivar'} la gira: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -154,19 +154,19 @@ export const TourManagementDialog = ({
         <DialogContent className="max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto w-[95vw] md:w-full">
           <DialogHeader>
             <DialogTitle className="text-base md:text-lg">
-              Manage Tour: {tour.name}
-              {tourDateId && <span className="text-sm text-muted-foreground ml-2">(Override Mode)</span>}
+              Gestionar Gira: {tour.name}
+              {tourDateId && <span className="text-sm text-muted-foreground ml-2">(Modo Anulación)</span>}
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 md:space-y-6">
             <div className="border-b pb-4">
-              <h3 className="text-sm font-medium mb-3">Tour Logo</h3>
+              <h3 className="text-sm font-medium mb-3">Logo de Gira</h3>
               <TourLogoManager tourId={tour.id} />
             </div>
-            
+
             <div className="border-b pb-4">
-              <h3 className="text-sm font-medium mb-3">Tour Status</h3>
+              <h3 className="text-sm font-medium mb-3">Estado de Gira</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex items-center gap-3">
@@ -174,16 +174,16 @@ export const TourManagementDialog = ({
                       <>
                         <XCircle className="h-4 w-4 text-red-600" />
                         <div>
-                          <p className="text-sm font-medium">Tour Cancelled</p>
-                          <p className="text-xs text-muted-foreground">This tour is hidden from main views</p>
+                          <p className="text-sm font-medium">Gira Cancelada</p>
+                          <p className="text-xs text-muted-foreground">Esta gira está oculta de las vistas principales</p>
                         </div>
                       </>
                     ) : (
                       <>
                         <CheckCircle className="h-4 w-4 text-green-600" />
                         <div>
-                          <p className="text-sm font-medium">Tour Active</p>
-                          <p className="text-xs text-muted-foreground">This tour is visible in all views</p>
+                          <p className="text-sm font-medium">Gira Activa</p>
+                          <p className="text-xs text-muted-foreground">Esta gira es visible en todas las vistas</p>
                         </div>
                       </>
                     )}
@@ -195,18 +195,18 @@ export const TourManagementDialog = ({
                     disabled={isUpdatingStatus}
                   >
                     {isUpdatingStatus ? (
-                      'Updating...'
+                      'Actualizando...'
                     ) : tour.status === 'cancelled' ? (
-                      'Reactivate Tour'
+                      'Reactivar Gira'
                     ) : (
-                      'Mark as Not Happening'
+                      'Marcar como No Ocurrirá'
                     )}
                   </Button>
                 </div>
                 {tour.status === 'cancelled' && (
                   <Badge variant="destructive" className="text-xs">
                     <XCircle className="h-3 w-3 mr-1" />
-                    This tour and its dates are hidden from main views
+                    Esta gira y sus fechas están ocultas de las vistas principales
                   </Badge>
                 )}
               </div>
@@ -224,14 +224,14 @@ export const TourManagementDialog = ({
             </div>
 
             <div className="border-b pb-4">
-              <h3 className="text-sm font-medium mb-3">Tour Pack Settings</h3>
+              <h3 className="text-sm font-medium mb-3">Configuración de Tour Pack</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
                   <div className="flex items-center gap-3">
                     <Package className="h-4 w-4 text-blue-600" />
                     <div>
-                      <p className="text-sm font-medium">Bulk Tour Pack Mode</p>
-                      <p className="text-xs text-muted-foreground">Set all dates in this tour to Tour Pack Only</p>
+                      <p className="text-sm font-medium">Modo Tour Pack Masivo</p>
+                      <p className="text-xs text-muted-foreground">Establecer todas las fechas de esta gira a Solo Tour Pack</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -241,7 +241,7 @@ export const TourManagementDialog = ({
                       onClick={() => handleBulkTourPackUpdate(true)}
                       disabled={isUpdatingTourPack}
                     >
-                      Enable All
+                      Activar Todo
                     </Button>
                     <Button
                       size="sm"
@@ -249,7 +249,7 @@ export const TourManagementDialog = ({
                       onClick={() => handleBulkTourPackUpdate(false)}
                       disabled={isUpdatingTourPack}
                     >
-                      Disable All
+                      Desactivar Todo
                     </Button>
                   </div>
                 </div>
@@ -258,7 +258,7 @@ export const TourManagementDialog = ({
 
             <div className="border-b pb-4">
               <h3 className="text-sm font-medium mb-3">
-                {tourDateId ? 'Tour Date Overrides' : 'Tour Defaults'}
+                {tourDateId ? 'Anulaciones de Fecha de Gira' : 'Valores por Defecto de Gira'}
               </h3>
               <div className="grid grid-cols-1 gap-3">
                 <Button
@@ -267,7 +267,7 @@ export const TourManagementDialog = ({
                   className="flex items-center gap-2"
                 >
                   <Settings className="h-4 w-4" />
-                  Manage All Defaults & Export PDFs
+                  Gestionar Todos los Valores y Exportar PDFs
                 </Button>
                 <div className="grid grid-cols-2 gap-3">
                   <Button
@@ -276,7 +276,7 @@ export const TourManagementDialog = ({
                     className="flex items-center gap-2"
                   >
                     <Calculator className="h-4 w-4" />
-                    {tourDateId ? 'Override Power' : 'Set Power Defaults'}
+                    {tourDateId ? 'Anular Potencia' : 'Configurar Valores de Potencia'}
                   </Button>
                   <Button
                     variant="outline"
@@ -284,7 +284,7 @@ export const TourManagementDialog = ({
                     className="flex items-center gap-2"
                   >
                     <Weight className="h-4 w-4" />
-                    {tourDateId ? 'Override Weight' : 'Set Weight Defaults'}
+                    {tourDateId ? 'Anular Peso' : 'Configurar Valores de Peso'}
                   </Button>
                 </div>
               </div>
