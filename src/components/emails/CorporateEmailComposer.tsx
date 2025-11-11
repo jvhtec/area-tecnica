@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -366,6 +366,9 @@ export function CorporateEmailComposer() {
           <Send className="h-5 w-5" />
           Redactar Email Corporativo
         </CardTitle>
+        <CardDescription>
+          Los correos se enviarán desde tu departamento (ej: "Sonido - Sector-Pro")
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Recipient selector */}
