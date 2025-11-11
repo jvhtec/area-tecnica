@@ -277,8 +277,8 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       showForTechnician: false
     },
     {
-      title: "Preajustes de Gira",
-      description: "Crear y gestionar preajustes de equipos para esta gira",
+      title: "Presets de Gira",
+      description: "Crear y gestionar presets de equipos para esta gira",
       icon: Box,
       onClick: () => setIsTourPresetsOpen(true),
       badge: "Equipamiento",
@@ -568,7 +568,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
               </Badge>
               {totalAssignments > 0 && (
                 <Badge variant="outline">
-                  {totalAssignments} tripulación asignada
+                  {totalAssignments} crew asignado
                 </Badge>
               )}
             </div>
@@ -661,7 +661,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6 pt-3 md:pt-6">
-            <CardTitle className="text-xs md:text-sm font-medium">Tripulación Asignada</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium">Crew Asignado</CardTitle>
             <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
           </CardHeader>
           <CardContent className="px-3 md:px-6 pb-3 md:pb-6">

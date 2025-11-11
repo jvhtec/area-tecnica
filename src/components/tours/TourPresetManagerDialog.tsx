@@ -64,7 +64,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tour-presets', tourId] });
-      toast({ title: 'Éxito', description: 'Preajuste eliminado' });
+      toast({ title: 'Éxito', description: 'Preset eliminado' });
     },
     onError: (e: any) => {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
@@ -112,7 +112,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
       setEditingPreset(null);
       setCopyingPreset(null);
       setIsCreating(false);
-      toast({ title: 'Éxito', description: 'Preajuste guardado' });
+      toast({ title: 'Éxito', description: 'Preset guardado' });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
@@ -133,7 +133,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
             <option value="video">Vídeo</option>
           </select>
         </div>
-        <Button size="sm" onClick={() => setIsCreating(true)}>Crear Nuevo Preajuste</Button>
+        <Button size="sm" onClick={() => setIsCreating(true)}>Crear Nuevo Preset</Button>
       </div>
 
       <Card>
@@ -161,7 +161,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
               ))}
               {presets.length === 0 && (
                 <div className="text-center text-sm text-muted-foreground py-6">
-                  No hay preajustes para esta gira y departamento.
+                  No hay presets para esta gira y departamento.
                 </div>
               )}
             </div>
@@ -175,7 +175,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base md:text-lg">Preajustes de Gira</DialogTitle>
+          <DialogTitle className="text-base md:text-lg">Presets de Gira</DialogTitle>
         </DialogHeader>
 
         {isCreating || editingPreset || copyingPreset ? (
