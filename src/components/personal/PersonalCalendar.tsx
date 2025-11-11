@@ -13,6 +13,7 @@ import {
   isToday,
   isSameDay,
   isWithinInterval,
+  parse
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { HouseTechBadge } from "./HouseTechBadge";
@@ -102,7 +103,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     return assignments.filter(assignment => {
       // Check if this is a single-day assignment
       if (assignment.single_day && assignment.assignment_date) {
-        const assignmentDate = new Date(assignment.assignment_date);
+        const assignmentDate = parse(assignment.assignment_date, "yyyy-MM-dd", new Date());
         return isSameDay(day, assignmentDate);
       }
       
