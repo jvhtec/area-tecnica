@@ -90,7 +90,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
       setIsSyncing(true);
       toast.info('Syncing crew to Flex…');
       const { data, error } = await supabase.functions.invoke('sync-flex-crew-for-job', {
-        body: { job_id: jobId }
+        body: { job_id: jobId, departments: [department] }
       });
       if (error) {
         console.error('Flex sync error:', error);
