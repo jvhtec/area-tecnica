@@ -218,7 +218,7 @@ export const PrintOptionsDialog = ({
 
   const handleDownloadMissingRiderReport = async () => {
     if (!jobId) {
-      toast.error('Job ID is required to generate missing rider report');
+      toast.error('Se requiere el ID del trabajo para generar el reporte de riders faltantes');
       return;
     }
 
@@ -291,16 +291,16 @@ export const PrintOptionsDialog = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('Missing Rider Report downloaded successfully');
+      toast.success('Reporte de Riders Faltantes descargado exitosamente');
     } catch (error: any) {
       console.error('Error generating Missing Rider Report:', error);
-      toast.error(`Failed to generate Missing Rider Report: ${error.message}`);
+      toast.error(`Error al generar Reporte de Riders Faltantes: ${error.message}`);
     }
   };
 
   const handleDownloadGearSetup = async () => {
     if (!jobId) {
-      toast.error('Job ID is required to generate gear setup report');
+      toast.error('Se requiere el ID del trabajo para generar el reporte de equipamiento');
       return;
     }
 
@@ -341,16 +341,16 @@ export const PrintOptionsDialog = ({
         URL.revokeObjectURL(url);
       }
 
-      toast.success('Gear Setup downloaded successfully');
+      toast.success('Equipamiento descargado exitosamente');
     } catch (error: any) {
       console.error('Error generating Gear Setup:', error);
-      toast.error(`Failed to generate Gear Setup: ${error.message}`);
+      toast.error(`Error al generar Equipamiento: ${error.message}`);
     }
   };
 
   const handleDownloadShiftSchedules = async () => {
     if (!jobId) {
-      toast.error('Job ID is required to generate shift schedules');
+      toast.error('Se requiere el ID del trabajo para generar horarios de turnos');
       return;
     }
 
@@ -396,16 +396,16 @@ export const PrintOptionsDialog = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('Shift Schedules downloaded successfully');
+      toast.success('Horarios de Turnos descargados exitosamente');
     } catch (error: any) {
       console.error('Error generating Shift Schedules:', error);
-      toast.error(`Failed to generate Shift Schedules: ${error.message}`);
+      toast.error(`Error al generar Horarios de Turnos: ${error.message}`);
     }
   };
 
   const handleDownloadArtistTables = async () => {
     if (!jobId) {
-      toast.error('Job ID is required to generate artist tables');
+      toast.error('Se requiere el ID del trabajo para generar tablas de artistas');
       return;
     }
 
@@ -444,16 +444,16 @@ export const PrintOptionsDialog = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('Artist Tables downloaded successfully');
+      toast.success('Tablas de Artistas descargadas exitosamente');
     } catch (error: any) {
       console.error('Error generating Artist Tables:', error);
-      toast.error(`Failed to generate Artist Tables: ${error.message}`);
+      toast.error(`Error al generar Tablas de Artistas: ${error.message}`);
     }
   };
 
   const handleDownloadRfIemTable = async () => {
     if (!jobId) {
-      toast.error('Job ID is required to generate RF/IEM table');
+      toast.error('Se requiere el ID del trabajo para generar tabla de RF/IEM');
       return;
     }
 
@@ -491,16 +491,16 @@ export const PrintOptionsDialog = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('RF/IEM Table downloaded successfully');
+      toast.success('Tabla de RF/IEM descargada exitosamente');
     } catch (error: any) {
       console.error('Error generating RF/IEM Table:', error);
-      toast.error(`Failed to generate RF/IEM Table: ${error.message}`);
+      toast.error(`Error al generar Tabla de RF/IEM: ${error.message}`);
     }
   };
 
   const handleDownloadInfrastructureTable = async () => {
     if (!jobId) {
-      toast.error('Job ID is required to generate infrastructure table');
+      toast.error('Se requiere el ID del trabajo para generar tabla de infraestructura');
       return;
     }
 
@@ -538,16 +538,16 @@ export const PrintOptionsDialog = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('Infrastructure Table downloaded successfully');
+      toast.success('Tabla de Infraestructura descargada exitosamente');
     } catch (error: any) {
       console.error('Error generating Infrastructure Table:', error);
-      toast.error(`Failed to generate Infrastructure Table: ${error.message}`);
+      toast.error(`Error al generar Tabla de Infraestructura: ${error.message}`);
     }
   };
 
   const handleDownloadWiredMicNeeds = async () => {
     if (!jobId) {
-      toast.error('Job ID is required to generate wired microphone needs');
+      toast.error('Se requiere el ID del trabajo para generar necesidades de micrófonos cableados');
       return;
     }
 
@@ -594,10 +594,10 @@ export const PrintOptionsDialog = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('Wired Microphone Needs downloaded successfully');
+      toast.success('Necesidades de Micrófonos Cableados descargadas exitosamente');
     } catch (error: any) {
       console.error('Error generating Wired Microphone Needs:', error);
-      toast.error(`Failed to generate Wired Microphone Needs: ${error.message}`);
+      toast.error(`Error al generar Necesidades de Micrófonos Cableados: ${error.message}`);
     }
   };
 
@@ -605,7 +605,7 @@ export const PrintOptionsDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] sm:max-h-[90vh] w-[95vw] sm:w-auto overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="text-base sm:text-lg">Select Documents to Print</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Seleccionar Documentos para Imprimir</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 sm:space-y-6 py-2 sm:py-4">
           <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800">
@@ -613,51 +613,51 @@ export const PrintOptionsDialog = ({
               <Checkbox
                 id="individual-stage-pdfs"
                 checked={options.generateIndividualStagePDFs}
-                onCheckedChange={(checked) => 
+                onCheckedChange={(checked) =>
                   setOptions(prev => ({ ...prev, generateIndividualStagePDFs: checked as boolean }))
                 }
                 className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
               />
-              <Label 
-                htmlFor="individual-stage-pdfs" 
+              <Label
+                htmlFor="individual-stage-pdfs"
                 className="font-medium text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
               >
-                Generate Individual Stage PDFs
+                Generar PDFs Individuales por Stage
               </Label>
             </div>
             <p className="text-sm text-muted-foreground pl-6 dark:text-gray-300">
-              {options.generateIndividualStagePDFs 
-                ? "Creates separate PDF documents for each stage containing the selected document types. Downloads as a ZIP file containing individual PDFs for each stage."
-                : "Create a single combined PDF with the selected document types and stages. Use the stage selections below to choose which stages to include for each document type."
+              {options.generateIndividualStagePDFs
+                ? "Crea documentos PDF separados para cada stage conteniendo los tipos de documentos seleccionados. Se descarga como un archivo ZIP con PDFs individuales para cada stage."
+                : "Crear un único PDF combinado con los tipos de documentos y stages seleccionados. Usa las selecciones de stage abajo para elegir qué stages incluir para cada tipo de documento."
               }
             </p>
           </div>
 
           {maxStages > 1 && (
             <div className="border-b pb-4">
-              <h3 className="text-sm font-medium mb-3 dark:text-gray-200">Global Stage Controls</h3>
+              <h3 className="text-sm font-medium mb-3 dark:text-gray-200">Controles Globales de Stage</h3>
               <div className="flex flex-col sm:flex-row gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={handleSelectAllStages}
                   className="w-full sm:w-auto"
                 >
-                  Select All Stages
+                  Seleccionar Todos los Stages
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={handleDeselectAllStages}
                   className="w-full sm:w-auto"
                 >
-                  Deselect All Stages
+                  Deseleccionar Todos los Stages
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2 dark:text-gray-400">
-                {options.generateIndividualStagePDFs 
-                  ? "These controls apply to all sections. Individual PDFs will be generated for stages that have content in each selected document type."
-                  : "These controls apply to all sections that have stage selections."
+                {options.generateIndividualStagePDFs
+                  ? "Estos controles aplican a todas las secciones. Se generarán PDFs individuales para stages que tengan contenido en cada tipo de documento seleccionado."
+                  : "Estos controles aplican a todas las secciones que tienen selecciones de stage."
                 }
               </p>
             </div>
@@ -675,11 +675,11 @@ export const PrintOptionsDialog = ({
                     }
                     className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                   />
-                  <Label 
+                  <Label
                     htmlFor="gear-setup"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
                   >
-                    Stage Equipment Setup
+                    Configuración de Equipamiento por Stage
                   </Label>
                 </div>
                 {jobId && (
@@ -708,11 +708,11 @@ export const PrintOptionsDialog = ({
                     }
                     className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                   />
-                  <Label 
+                  <Label
                     htmlFor="shift-schedules"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
                   >
-                    Staff Shift Schedules
+                    Horarios de Turnos de Personal
                   </Label>
                 </div>
                 {jobId && (
@@ -741,11 +741,11 @@ export const PrintOptionsDialog = ({
                     }
                     className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                   />
-                  <Label 
+                  <Label
                     htmlFor="artist-tables"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
                   >
-                    Artist Schedule Tables
+                    Tablas de Programación de Artistas
                   </Label>
                 </div>
                 {jobId && (
@@ -773,11 +773,11 @@ export const PrintOptionsDialog = ({
                   }
                   className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                 />
-                <Label 
+                <Label
                   htmlFor="artist-requirements"
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
                 >
-                  Individual Artist Requirements
+                  Requerimientos Individuales de Artistas
                 </Label>
               </div>
               {options.includeArtistRequirements && maxStages > 1 && renderStageSelections('artistRequirementStages')}
@@ -794,11 +794,11 @@ export const PrintOptionsDialog = ({
                     }
                     className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                   />
-                  <Label 
+                  <Label
                     htmlFor="rf-iem-table"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
                   >
-                    Artist RF & IEM Overview
+                    Resumen de RF e IEM de Artistas
                   </Label>
                 </div>
                 {jobId && (
@@ -827,11 +827,11 @@ export const PrintOptionsDialog = ({
                     }
                     className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                   />
-                  <Label 
+                  <Label
                     htmlFor="infrastructure-table"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
                   >
-                    Infrastructure Needs Overview
+                    Resumen de Necesidades de Infraestructura
                   </Label>
                 </div>
                 {jobId && (
@@ -860,11 +860,11 @@ export const PrintOptionsDialog = ({
                     }
                     className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                   />
-                  <Label 
+                  <Label
                     htmlFor="wired-mic-needs"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
                   >
-                    Wired Microphone Requirements
+                    Requerimientos de Micrófonos Cableados
                   </Label>
                 </div>
                 {jobId && (
@@ -881,7 +881,7 @@ export const PrintOptionsDialog = ({
               </div>
               {options.includeWiredMicNeeds && maxStages > 1 && renderStageSelections('wiredMicNeedsStages')}
               <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
-                Detailed microphone inventory requirements and peak usage analysis
+                Requerimientos detallados de inventario de micrófonos y análisis de uso pico
               </div>
             </div>
 
@@ -895,15 +895,15 @@ export const PrintOptionsDialog = ({
                   }
                   className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                 />
-                <Label 
+                <Label
                   htmlFor="weather-prediction"
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
                 >
-                  Include Weather Prediction
+                  Incluir Pronóstico del Tiempo
                 </Label>
               </div>
               <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
-                Weather forecast for festival dates from Open-Meteo
+                Pronóstico del tiempo para las fechas del festival de Open-Meteo
               </div>
             </div>
 
@@ -918,11 +918,11 @@ export const PrintOptionsDialog = ({
                     }
                     className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                   />
-                  <Label 
+                  <Label
                     htmlFor="missing-rider-report"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
                   >
-                    Missing Rider Report
+                    Reporte de Riders Faltantes
                   </Label>
                 </div>
                 {jobId && (
@@ -938,25 +938,25 @@ export const PrintOptionsDialog = ({
                 )}
               </div>
               <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
-                Summary of all artists with missing technical riders
+                Resumen de todos los artistas con riders técnicos faltantes
               </div>
             </div>
           </div>
 
           <div className="border-t pt-4">
             <div className="bg-muted/50 p-3 rounded-md dark:bg-muted/20">
-              <h4 className="text-xs sm:text-sm font-medium mb-1 dark:text-gray-200">Generated filename:</h4>
+              <h4 className="text-xs sm:text-sm font-medium mb-1 dark:text-gray-200">Nombre de archivo generado:</h4>
               <p className="text-xs sm:text-sm text-muted-foreground font-mono dark:text-gray-300 break-all">{generateFilename()}</p>
             </div>
           </div>
         </div>
         <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
-            Cancel
+            Cancelar
           </Button>
           <Button onClick={handleConfirm} className="w-full sm:w-auto">
-            <span className="hidden sm:inline">Generate {options.generateIndividualStagePDFs ? 'Individual Stage PDFs' : 'PDF'}</span>
-            <span className="sm:hidden">Generate</span>
+            <span className="hidden sm:inline">Generar {options.generateIndividualStagePDFs ? 'PDFs Individuales por Stage' : 'PDF'}</span>
+            <span className="sm:hidden">Generar</span>
           </Button>
         </DialogFooter>
       </DialogContent>

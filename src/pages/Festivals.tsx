@@ -179,10 +179,10 @@ const Festivals = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      toast.success('Documentation generated successfully');
+      toast.success('Documentación generada exitosamente');
     } catch (error: any) {
       console.error('Error generating documentation:', error);
-      toast.error(`Failed to generate documentation: ${error.message}`);
+      toast.error(`Error al generar documentación: ${error.message}`);
     } finally {
       setIsPrinting(prev => ({ ...prev, [selectedJobForPrint.id]: false }));
     }
@@ -191,23 +191,23 @@ const Festivals = () => {
   // Handle refresh button click with enhanced recovery
   const handleRefreshClick = async () => {
     try {
-      toast.info("Refreshing festival data...");
+      toast.info("Actualizando datos de festivales...");
       
       // First try to ensure realtime connection
       const connectionRestored = await ensureRealtimeConnection();
       
       if (connectionRestored) {
         await refetch();
-        toast.success("Festival data refreshed");
+        toast.success("Datos de festival actualizados");
       } else {
         // If connection couldn't be restored, try the full recovery
         await recoverConnection();
         await refetch();
-        toast.success("Connection restored and data refreshed");
+        toast.success("Conexión restaurada y datos actualizados");
       }
     } catch (error) {
       console.error("Error during refresh:", error);
-      toast.error("Could not refresh data. Please try again.");
+      toast.error("No se pudieron actualizar los datos. Por favor, inténtalo de nuevo.");
     }
   };
 
@@ -219,10 +219,10 @@ const Festivals = () => {
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0 pb-2">
           <div className="flex items-center gap-4">
-            <CardTitle className="text-xl md:text-2xl font-bold">Festival Management</CardTitle>
+            <CardTitle className="text-xl md:text-2xl font-bold">Gestión de Festivales</CardTitle>
             <Tent className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground" />
           </div>
-          
+
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <Button
               variant="outline"
@@ -231,11 +231,11 @@ const Festivals = () => {
               className="w-full sm:w-auto"
             >
               {showCompleted ? <EyeOff className="h-4 w-4 sm:mr-2" /> : <Eye className="h-4 w-4 sm:mr-2" />}
-              <span className="ml-2 sm:ml-0">{showCompleted ? 'Hide Completed' : 'Show Completed'}</span>
+              <span className="ml-2 sm:ml-0">{showCompleted ? 'Ocultar Completados' : 'Mostrar Completados'}</span>
             </Button>
-            <SubscriptionIndicator 
-              tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types', 'festival_logos']} 
-              showRefreshButton 
+            <SubscriptionIndicator
+              tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types', 'festival_logos']}
+              showRefreshButton
               onRefresh={handleRefreshClick}
               showLabel
               className="justify-center sm:justify-start"
@@ -244,41 +244,41 @@ const Festivals = () => {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground mb-6">
-            Access and manage all festival-type events in one place.
+            Accede y gestiona todos los eventos tipo festival en un solo lugar.
           </p>
           <Separator className="my-6" />
           
           {isLoading ? (
             <div className="flex flex-col justify-center items-center h-40">
               <Loader2 className="h-8 w-8 animate-spin mb-2 text-primary" />
-              <p className="text-muted-foreground">Loading festivals...</p>
+              <p className="text-muted-foreground">Cargando festivales...</p>
               {connectionStatus !== 'connected' && (
-                <p className="text-amber-500 mt-2">Establishing connection...</p>
+                <p className="text-amber-500 mt-2">Estableciendo conexión...</p>
               )}
             </div>
           ) : isError ? (
             <div className="flex flex-col justify-center items-center h-40 text-center">
               <AlertTriangle className="h-8 w-8 mb-2 text-destructive" />
-              <h3 className="text-lg font-medium text-destructive">Error loading festivals</h3>
+              <h3 className="text-lg font-medium text-destructive">Error al cargar festivales</h3>
               <p className="text-muted-foreground mt-2 max-w-md">
-                {error instanceof Error ? error.message : 'An unknown error occurred'}
+                {error instanceof Error ? error.message : 'Ha ocurrido un error desconocido'}
               </p>
-              <p className="text-sm text-muted-foreground mt-2">Connection status: {connectionStatus}</p>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <p className="text-sm text-muted-foreground mt-2">Estado de conexión: {connectionStatus}</p>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleRefreshClick}
                 className="mt-4"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Reconnect & Try Again
+                Reconectar e Intentar de Nuevo
               </Button>
             </div>
           ) : festivalJobs.length === 0 ? (
             <div className="text-center py-10">
-              <h3 className="text-lg font-medium">No festivals found</h3>
+              <h3 className="text-lg font-medium">No se encontraron festivales</h3>
               <p className="text-muted-foreground mt-2">
-                There are currently no festival-type jobs scheduled.
+                Actualmente no hay trabajos tipo festival programados.
               </p>
             </div>
           ) : (
@@ -327,7 +327,7 @@ const Festivals = () => {
                         ) : (
                           <Printer className="h-4 w-4" />
                         )}
-                        <span className="sr-only">Print Documentation</span>
+                        <span className="sr-only">Imprimir Documentación</span>
                       </Button>
                     )}
                   </div>

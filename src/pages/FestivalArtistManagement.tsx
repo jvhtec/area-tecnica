@@ -445,8 +445,8 @@ const FestivalArtistManagement = () => {
       URL.revokeObjectURL(url);
       
       toast({
-        title: "Success",
-        description: "PDF generated successfully"
+        title: "Éxito",
+        description: "PDF generado exitosamente"
       });
       setIsPrintDialogOpen(false);
     } catch (error) {
@@ -454,7 +454,7 @@ const FestivalArtistManagement = () => {
       console.error('Error stack:', error.stack);
       toast({
         title: "Error",
-        description: "Could not generate PDF",
+        description: "No se pudo generar el PDF",
         variant: "destructive"
       });
     } finally {
@@ -482,7 +482,7 @@ const FestivalArtistManagement = () => {
         console.error("Error fetching all festival artists:", error);
         toast({
           title: "Error",
-          description: "Could not fetch festival artists",
+          description: "No se pudieron obtener los artistas del festival",
           variant: "destructive"
         });
         return;
@@ -490,8 +490,8 @@ const FestivalArtistManagement = () => {
 
       if (!allArtists || allArtists.length === 0) {
         toast({
-          title: "No Data",
-          description: "No artists found for this festival",
+          title: "Sin Datos",
+          description: "No se encontraron artistas para este festival",
           variant: "destructive"
         });
         return;
@@ -530,14 +530,14 @@ const FestivalArtistManagement = () => {
       URL.revokeObjectURL(url);
       
       toast({
-        title: "Success",
-        description: "Full festival schedule PDF generated successfully"
+        title: "Éxito",
+        description: "PDF del horario completo del festival generado exitosamente"
       });
     } catch (error) {
       console.error('Error generating full schedule PDF:', error);
       toast({
         title: "Error",
-        description: "Could not generate full schedule PDF",
+        description: "No se pudo generar el PDF del horario completo",
         variant: "destructive"
       });
     } finally {
@@ -553,8 +553,8 @@ const FestivalArtistManagement = () => {
       <div className="mb-6 px-4 md:px-6">
         <Button variant="ghost" onClick={() => navigate(`/festival-management/${jobId}`)} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          <span className="hidden sm:inline">Back to Festival Management</span>
-          <span className="sm:hidden">Back</span>
+          <span className="hidden sm:inline">Volver a Gestión de Festival</span>
+          <span className="sm:hidden">Volver</span>
         </Button>
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-xl md:text-2xl font-bold truncate">{jobTitle}</h1>
@@ -565,7 +565,7 @@ const FestivalArtistManagement = () => {
       <Card className="mx-4 md:mx-6">
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <CardTitle className="flex items-center gap-2">
-            <span className="text-lg md:text-xl">Artist Management</span>
+            <span className="text-lg md:text-xl">Gestión de Artistas</span>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -574,8 +574,8 @@ const FestivalArtistManagement = () => {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-sm">
-                  <p>Festival days run from {dayStartTime} to {dayStartTime} the next day.</p>
-                  <p>Shows after midnight are included in the previous day's schedule.</p>
+                  <p>Los días del festival van desde las {dayStartTime} hasta las {dayStartTime} del día siguiente.</p>
+                  <p>Los shows después de medianoche se incluyen en el horario del día anterior.</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -584,38 +584,38 @@ const FestivalArtistManagement = () => {
           {/* Desktop buttons */}
           <div className="hidden lg:flex items-center gap-2">
             {showArtistControls && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setIsCopyDialogOpen(true)}
               >
                 <Copy className="h-4 w-4 mr-2" />
-                Copy Artists
+                Copiar Artistas
               </Button>
             )}
-            <Button 
+            <Button
               variant="outline"
               onClick={handlePrintFullSchedule}
               disabled={isFullSchedulePrinting}
             >
               <Printer className="h-4 w-4 mr-2" />
-              {isFullSchedulePrinting ? "Generating..." : "Print Full Schedule"}
+              {isFullSchedulePrinting ? "Generando..." : "Imprimir Horario Completo"}
             </Button>
             <Button onClick={() => {
               setPrintDate(selectedDate);
               setIsPrintDialogOpen(true);
             }}>
               <Printer className="h-4 w-4 mr-2" />
-              Print Day Schedule
+              Imprimir Horario del Día
             </Button>
             {showArtistControls ? (
               <Button onClick={handleAddArtist}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Artist
+                Añadir Artista
               </Button>
             ) : (
-              <Button disabled title="Artists can only be added on show dates">
+              <Button disabled title="Los artistas solo se pueden añadir en fechas de show">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Artist
+                Añadir Artista
               </Button>
             )}
           </div>
@@ -625,15 +625,15 @@ const FestivalArtistManagement = () => {
             {showArtistControls ? (
               <Button onClick={handleAddArtist} className="flex-1 sm:flex-initial">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Artist
+                Añadir Artista
               </Button>
             ) : (
-              <Button disabled title="Artists can only be added on show dates" className="flex-1 sm:flex-initial">
+              <Button disabled title="Los artistas solo se pueden añadir en fechas de show" className="flex-1 sm:flex-initial">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Artist
+                Añadir Artista
               </Button>
             )}
-            
+
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon">
@@ -642,29 +642,29 @@ const FestivalArtistManagement = () => {
               </SheetTrigger>
               <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                 <SheetHeader>
-                  <SheetTitle>Actions</SheetTitle>
+                  <SheetTitle>Acciones</SheetTitle>
                 </SheetHeader>
                 <div className="flex flex-col gap-3 mt-6">
                   {showArtistControls && (
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => setIsCopyDialogOpen(true)}
                       className="justify-start w-full"
                     >
                       <Copy className="h-4 w-4 mr-2" />
-                      Copy Artists
+                      Copiar Artistas
                     </Button>
                   )}
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={handlePrintFullSchedule}
                     disabled={isFullSchedulePrinting}
                     className="justify-start w-full"
                   >
                     <Printer className="h-4 w-4 mr-2" />
-                    {isFullSchedulePrinting ? "Generating..." : "Print Full Schedule"}
+                    {isFullSchedulePrinting ? "Generando..." : "Imprimir Horario Completo"}
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={() => {
                       setPrintDate(selectedDate);
@@ -673,7 +673,7 @@ const FestivalArtistManagement = () => {
                     className="justify-start w-full"
                   >
                     <Printer className="h-4 w-4 mr-2" />
-                    Print Day Schedule
+                    Imprimir Horario del Día
                   </Button>
                 </div>
               </SheetContent>
@@ -730,9 +730,9 @@ const FestivalArtistManagement = () => {
                 </div>
               ) : (
                 <div className="p-8 text-center text-muted-foreground border rounded-md">
-                  <p>This is not configured as a show date.</p>
-                  <p>Artist management is only available on show dates.</p>
-                  <p className="mt-2 text-sm">Right-click on the date tab to change its type.</p>
+                  <p>Esta fecha no está configurada como fecha de show.</p>
+                  <p>La gestión de artistas solo está disponible en fechas de show.</p>
+                  <p className="mt-2 text-sm">Haz clic derecho en la pestaña de fecha para cambiar su tipo.</p>
                 </div>
               )
             )}

@@ -84,7 +84,7 @@ export const CopyArtistsDialog = ({
       setFestivals(data || []);
     } catch (error) {
       console.error("Error loading festivals:", error);
-      toast.error("Failed to load festivals");
+      toast.error("Error al cargar festivales");
     } finally {
       setIsLoading(false);
     }
@@ -99,12 +99,12 @@ export const CopyArtistsDialog = ({
         .not("date", "is", null);
 
       if (error) throw error;
-      
+
       const uniqueDates = [...new Set(data?.map(item => item.date) || [])];
       setAvailableDates(uniqueDates.sort());
     } catch (error) {
       console.error("Error loading dates:", error);
-      toast.error("Failed to load available dates");
+      toast.error("Error al cargar fechas disponibles");
     }
   };
 
@@ -123,7 +123,7 @@ export const CopyArtistsDialog = ({
       setSelectedArtists(data?.map(artist => artist.id) || []);
     } catch (error) {
       console.error("Error loading artists:", error);
-      toast.error("Failed to load artists");
+      toast.error("Error al cargar artistas");
     } finally {
       setIsLoading(false);
     }
@@ -155,7 +155,7 @@ export const CopyArtistsDialog = ({
 
   const copyArtists = async () => {
     if (selectedArtists.length === 0) {
-      toast.error("Please select at least one artist to copy");
+      toast.error("Por favor selecciona al menos un artista para copiar");
       return;
     }
 
@@ -202,12 +202,12 @@ export const CopyArtistsDialog = ({
 
       if (insertError) throw insertError;
 
-      toast.success(`Successfully copied ${selectedArtists.length} artist${selectedArtists.length > 1 ? 's' : ''}`);
+      toast.success(`Se copiaron exitosamente ${selectedArtists.length} artista${selectedArtists.length > 1 ? 's' : ''}`);
       onArtistsCopied();
       onOpenChange(false);
     } catch (error) {
       console.error("Error copying artists:", error);
-      toast.error("Failed to copy artists");
+      toast.error("Error al copiar artistas");
     } finally {
       setIsCopying(false);
     }
@@ -219,17 +219,17 @@ export const CopyArtistsDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Copy Artists from Another Festival
+            Copiar artistas de otro festival
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Festival Selection */}
           <div className="space-y-2">
-            <Label>Select Source Festival</Label>
+            <Label>Seleccionar festival de origen</Label>
             <Select onValueChange={handleFestivalChange} disabled={isLoading}>
               <SelectTrigger className="h-10">
-                <SelectValue placeholder="Choose a festival to copy from..." />
+                <SelectValue placeholder="Elegir festival del que copiar..." />
               </SelectTrigger>
               <SelectContent>
                 {festivals.map(festival => (
@@ -250,10 +250,10 @@ export const CopyArtistsDialog = ({
           {/* Date Selection */}
           {selectedFestival && availableDates.length > 0 && (
             <div className="space-y-2">
-              <Label>Select Source Date</Label>
+              <Label>Seleccionar fecha de origen</Label>
               <Select onValueChange={setSelectedSourceDate}>
                 <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Choose a date..." />
+                  <SelectValue placeholder="Elegir fecha..." />
                 </SelectTrigger>
                 <SelectContent>
                    {availableDates.map(date => (
@@ -269,51 +269,51 @@ export const CopyArtistsDialog = ({
           {/* Copy Options */}
           {artists.length > 0 && (
             <div className="space-y-4">
-              <Label className="text-base font-medium">Copy Options</Label>
+              <Label className="text-base font-medium">Opciones de copia</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-start space-x-2">
                   <Checkbox
                     id="resetTimes"
                     checked={copyOptions.resetTimes}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setCopyOptions(prev => ({ ...prev, resetTimes: !!checked }))
                     }
                     className="mt-1"
                   />
-                  <Label htmlFor="resetTimes" className="text-sm leading-normal cursor-pointer">Reset show times</Label>
+                  <Label htmlFor="resetTimes" className="text-sm leading-normal cursor-pointer">Restablecer horarios del show</Label>
                 </div>
                 <div className="flex items-start space-x-2">
                   <Checkbox
                     id="resetStages"
                     checked={copyOptions.resetStages}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setCopyOptions(prev => ({ ...prev, resetStages: !!checked }))
                     }
                     className="mt-1"
                   />
-                  <Label htmlFor="resetStages" className="text-sm leading-normal cursor-pointer">Reset to Stage 1</Label>
+                  <Label htmlFor="resetStages" className="text-sm leading-normal cursor-pointer">Restablecer a Stage 1</Label>
                 </div>
                 <div className="flex items-start space-x-2">
                   <Checkbox
                     id="copyNotes"
                     checked={copyOptions.copyNotes}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setCopyOptions(prev => ({ ...prev, copyNotes: !!checked }))
                     }
                     className="mt-1"
                   />
-                  <Label htmlFor="copyNotes" className="text-sm leading-normal cursor-pointer">Copy notes</Label>
+                  <Label htmlFor="copyNotes" className="text-sm leading-normal cursor-pointer">Copiar notas</Label>
                 </div>
                 <div className="flex items-start space-x-2">
                   <Checkbox
                     id="copyTechnicalSpecs"
                     checked={copyOptions.copyTechnicalSpecs}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setCopyOptions(prev => ({ ...prev, copyTechnicalSpecs: !!checked }))
                     }
                     className="mt-1"
                   />
-                  <Label htmlFor="copyTechnicalSpecs" className="text-sm leading-normal cursor-pointer">Copy technical specs</Label>
+                  <Label htmlFor="copyTechnicalSpecs" className="text-sm leading-normal cursor-pointer">Copiar especificaciones técnicas</Label>
                 </div>
               </div>
             </div>
@@ -324,10 +324,10 @@ export const CopyArtistsDialog = ({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-medium">
-                  Select Artists ({selectedArtists.length}/{artists.length})
+                  Seleccionar artistas ({selectedArtists.length}/{artists.length})
                 </Label>
                 <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                  {selectedArtists.length === artists.length ? "Deselect All" : "Select All"}
+                  {selectedArtists.length === artists.length ? "Deseleccionar todo" : "Seleccionar todo"}
                 </Button>
               </div>
               
@@ -364,21 +364,21 @@ export const CopyArtistsDialog = ({
           {selectedFestival && availableDates.length === 0 && !isLoading && (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No artists found in the selected festival.</p>
+              <p>No se encontraron artistas en el festival seleccionado.</p>
             </div>
           )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            Cancelar
           </Button>
           <Button
             onClick={copyArtists}
             disabled={selectedArtists.length === 0 || isCopying}
             className="min-w-24"
           >
-            {isCopying ? "Copying..." : `Copy ${selectedArtists.length} Artist${selectedArtists.length !== 1 ? 's' : ''}`}
+            {isCopying ? "Copiando..." : `Copiar ${selectedArtists.length} artista${selectedArtists.length !== 1 ? 's' : ''}`}
           </Button>
         </DialogFooter>
       </DialogContent>

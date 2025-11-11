@@ -115,19 +115,19 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
         className="w-full"
       >
         <Calculator className="h-4 w-4 mr-2" />
-        Wired Microphone Matrix
+        Matriz de Micrófonos Cableados
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
-              <span>Wired Microphone Requirements Matrix</span>
+              <span>Matriz de Requisitos de Micrófonos Cableados</span>
               <div className="flex gap-2">
                 {validArtists.length > 0 && (
                   <Button onClick={exportMatrixPDF} variant="outline" size="sm">
                     <FileText className="h-4 w-4 mr-2" />
-                    Export Matrix PDF
+                    Exportar Matriz PDF
                   </Button>
                 )}
               </div>
@@ -135,42 +135,42 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
           </DialogHeader>
 
           {isLoading ? (
-            <div className="text-center py-8">Loading artist data...</div>
+            <div className="text-center py-8">Cargando datos de artistas...</div>
           ) : validArtists.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No artists found with wired microphone requirements using festival kit.
+              No se encontraron artistas con requisitos de micrófonos cableados usando kit de festival.
               <br />
-              Make sure artists have wired microphones configured with festival kit selected.
+              Asegúrese de que los artistas tengan micrófonos cableados configurados con kit de festival seleccionado.
             </div>
           ) : (
             <div className="space-y-6">
               <div className="text-sm text-muted-foreground">
-                This matrix shows all artists using festival wired microphones. The PDF export will calculate 
-                peak requirements considering show schedules and microphone sharing constraints.
+                Esta matriz muestra todos los artistas que usan micrófonos cableados del festival. La exportación PDF calculará
+                los requisitos máximos considerando los horarios de shows y las restricciones de compartir micrófonos.
               </div>
 
               {/* Summary Statistics */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <div className="text-2xl font-bold text-blue-700">{validArtists.length}</div>
-                  <div className="text-sm text-blue-600">Artists with Wired Mics</div>
+                  <div className="text-sm text-blue-600">Artistas con Micrófonos Cableados</div>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
                   <div className="text-2xl font-bold text-green-700">{microphoneModels.length}</div>
-                  <div className="text-sm text-green-600">Microphone Models</div>
+                  <div className="text-sm text-green-600">Modelos de Micrófonos</div>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <div className="text-2xl font-bold text-purple-700">
                     {new Set(validArtists.map(a => `${a.date}-${a.stage}`)).size}
                   </div>
-                  <div className="text-sm text-purple-600">Date/Stage Combinations</div>
+                  <div className="text-sm text-purple-600">Combinaciones Fecha/Stage</div>
                 </div>
               </div>
 
               {/* Microphone Models Overview */}
               {microphoneModels.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-3">Microphone Models Required</h3>
+                  <h3 className="text-lg font-semibold mb-3">Modelos de Micrófonos Requeridos</h3>
                   <div className="flex flex-wrap gap-2">
                     {microphoneModels.map((model) => (
                       <Badge key={model} variant="outline" className="text-sm">
@@ -183,15 +183,15 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
 
               {/* Artists Preview Table */}
               <div>
-                <h3 className="text-lg font-semibold mb-3">Artists Included in Matrix</h3>
+                <h3 className="text-lg font-semibold mb-3">Artistas Incluidos en la Matriz</h3>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Artist</TableHead>
-                      <TableHead>Date</TableHead>
+                      <TableHead>Artista</TableHead>
+                      <TableHead>Fecha</TableHead>
                       <TableHead>Stage</TableHead>
-                      <TableHead>Show Time</TableHead>
-                      <TableHead>Microphones</TableHead>
+                      <TableHead>Hora del Show</TableHead>
+                      <TableHead>Micrófonos</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -217,7 +217,7 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
                                   </Badge>
                                   {mic.exclusive_use && (
                                     <Badge variant="destructive" className="text-xs">
-                                      Exclusive
+                                      Exclusivo
                                     </Badge>
                                   )}
                                 </div>
@@ -233,8 +233,8 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
 
               <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
                 <div className="text-sm text-yellow-800">
-                  <strong>Note:</strong> The matrix PDF will calculate exact peak requirements by analyzing 
-                  show schedules, exclusive use requirements, and sharing constraints across all dates and stages.
+                  <strong>Nota:</strong> El PDF de la matriz calculará los requisitos máximos exactos analizando
+                  los horarios de shows, requisitos de uso exclusivo y restricciones de compartir en todas las fechas y stages.
                 </div>
               </div>
             </div>

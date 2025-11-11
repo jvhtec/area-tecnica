@@ -23,9 +23,9 @@ export const FestivalsPagination = ({
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
       <div className="text-xs sm:text-sm text-muted-foreground order-2 sm:order-1">
-        Showing {startItem}-{endItem} of {totalItems} festivals
+        Mostrando {startItem}-{endItem} de {totalItems} festivales
       </div>
-      
+
       <div className="flex items-center gap-1 sm:gap-2 order-1 sm:order-2">
         <Button
           variant="outline"
@@ -35,7 +35,7 @@ export const FestivalsPagination = ({
           className="h-9 sm:h-8"
         >
           <ChevronLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Previous</span>
+          <span className="hidden sm:inline">Anterior</span>
         </Button>
         
         <div className="flex items-center gap-1">
@@ -77,7 +77,7 @@ export const FestivalsPagination = ({
           disabled={currentPage >= totalPages}
           className="h-9 sm:h-8"
         >
-          <span className="hidden sm:inline">Next</span>
+          <span className="hidden sm:inline">Siguiente</span>
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>

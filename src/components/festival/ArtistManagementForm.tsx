@@ -152,7 +152,7 @@ export const ArtistManagementForm = ({
             console.error("Error fetching artist:", error);
             toast({
               title: "Error",
-              description: "Could not load artist details",
+              description: "No se pudieron cargar los detalles del artista",
               variant: "destructive",
             });
           } else if (data) {
@@ -162,7 +162,7 @@ export const ArtistManagementForm = ({
           console.error("Error fetching artist:", error);
           toast({
             title: "Error",
-            description: "Could not load artist details",
+            description: "No se pudieron cargar los detalles del artista",
             variant: "destructive",
           });
         } finally {
@@ -185,20 +185,20 @@ export const ArtistManagementForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <BasicInfoSection 
-        formData={formData as any} 
+      <BasicInfoSection
+        formData={formData as any}
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
 
-      <ConsoleSetupSection 
-        formData={formData as any} 
+      <ConsoleSetupSection
+        formData={formData as any}
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
 
-      <WirelessSetupSection 
-        formData={formData as any} 
+      <WirelessSetupSection
+        formData={formData as any}
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
@@ -210,31 +210,31 @@ export const ArtistManagementForm = ({
         onWiredMicsChange={(mics) => updateFormData({ wired_mics: mics })}
       />
 
-      <MonitorSetupSection 
-        formData={formData as any} 
+      <MonitorSetupSection
+        formData={formData as any}
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
 
-      <ExtraRequirementsSection 
-        formData={formData as any} 
+      <ExtraRequirementsSection
+        formData={formData as any}
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
 
-      <InfrastructureSection 
-        formData={formData as any} 
+      <InfrastructureSection
+        formData={formData as any}
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
 
-      <NotesSection 
-        formData={formData as any} 
+      <NotesSection
+        formData={formData as any}
         onChange={updateFormData}
       />
 
       <Button type="submit" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? "Saving..." : artist ? "Update Artist" : "Add Artist"}
+        {isSubmitting ? "Guardando..." : artist ? "Actualizar Artista" : "Agregar Artista"}
       </Button>
     </form>
   );

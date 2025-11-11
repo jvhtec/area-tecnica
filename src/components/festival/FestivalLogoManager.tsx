@@ -81,8 +81,8 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
 
     if (!file.type.startsWith('image/')) {
       toast({
-        title: "Invalid file type",
-        description: "Please upload an image file",
+        title: "Tipo de archivo inválido",
+        description: "Por favor sube un archivo de imagen",
         variant: "destructive",
       });
       return;
@@ -90,8 +90,8 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
 
     if (!user) {
       toast({
-        title: "Authentication required",
-        description: "You must be logged in to upload logos",
+        title: "Autenticación requerida",
+        description: "Debes iniciar sesión para subir logos",
         variant: "destructive",
       });
       return;
@@ -187,12 +187,12 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       }
 
       toast({
-        title: "Success",
-        description: "Festival logo has been updated",
+        title: "Éxito",
+        description: "El logo del festival ha sido actualizado",
       });
     } catch (error: any) {
       console.error('Error uploading logo:', error);
-      const errorMessage = error.message || "Could not upload logo";
+      const errorMessage = error.message || "No se pudo subir el logo";
       setErrorDetails(errorMessage);
       toast({
         title: "Error",
@@ -209,8 +209,8 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
     
     if (!user) {
       toast({
-        title: "Authentication required",
-        description: "You must be logged in to delete logos",
+        title: "Autenticación requerida",
+        description: "Debes iniciar sesión para eliminar logos",
         variant: "destructive",
       });
       return;
@@ -262,15 +262,15 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
         setLogoUrl(null);
 
         toast({
-          title: "Success",
-          description: "Festival logo has been removed",
+          title: "Éxito",
+          description: "El logo del festival ha sido eliminado",
         });
       } else {
         console.log("No logo found to delete");
       }
     } catch (error: any) {
       console.error('Error deleting logo:', error);
-      const errorMessage = error.message || "Could not delete logo";
+      const errorMessage = error.message || "No se pudo eliminar el logo";
       setErrorDetails(errorMessage);
       toast({
         title: "Error",
@@ -338,7 +338,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
         >
           <label htmlFor="logo-upload" className="cursor-pointer">
             <Upload className="h-4 w-4 mr-2" />
-            {isUploading ? "Uploading..." : "Upload Logo"}
+            {isUploading ? "Subiendo..." : "Subir Logo"}
           </label>
         </Button>
       </div>

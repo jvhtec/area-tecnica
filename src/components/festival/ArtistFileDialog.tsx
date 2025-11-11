@@ -36,7 +36,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
         console.error("Error fetching files:", error);
         toast({
           title: "Error",
-          description: "Failed to fetch files",
+          description: "No se pudieron obtener los archivos",
           variant: "destructive",
         });
         return;
@@ -47,7 +47,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       console.error("Error fetching files:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch files",
+        description: "No se pudieron obtener los archivos",
         variant: "destructive",
       });
     }
@@ -95,8 +95,8 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       }
 
       toast({
-        title: "Success",
-        description: "File uploaded successfully",
+        title: "Éxito",
+        description: "Archivo cargado correctamente",
       });
 
       fetchFiles();
@@ -104,7 +104,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       console.error("Error uploading file:", error);
       toast({
         title: "Error",
-        description: "Failed to upload file",
+        description: "No se pudo cargar el archivo",
         variant: "destructive",
       });
     } finally {
@@ -138,8 +138,8 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       }
 
       toast({
-        title: "Success",
-        description: "File deleted successfully",
+        title: "Éxito",
+        description: "Archivo eliminado correctamente",
       });
 
       fetchFiles();
@@ -147,7 +147,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       console.error("Error deleting file:", error);
       toast({
         title: "Error",
-        description: "Failed to delete file",
+        description: "No se pudo eliminar el archivo",
         variant: "destructive",
       });
     } finally {
@@ -177,7 +177,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       console.error("Error downloading file:", error);
       toast({
         title: "Error",
-        description: "Failed to download file",
+        description: "No se pudo descargar el archivo",
         variant: "destructive",
       });
     }
@@ -198,7 +198,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       console.error("Error getting file URL:", error);
       toast({
         title: "Error",
-        description: "Failed to view file",
+        description: "No se pudo ver el archivo",
         variant: "destructive",
       });
     }
@@ -209,12 +209,12 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Manage Files</DialogTitle>
+            <DialogTitle>Gestionar Archivos</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="file-upload">Upload File</Label>
+              <Label htmlFor="file-upload">Cargar Archivo</Label>
               <div className="mt-1 flex items-center gap-4">
                 <Input
                   id="file-upload"
@@ -228,9 +228,9 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
             </div>
 
             <div className="border rounded-lg p-4">
-              <h3 className="font-medium mb-2">Files</h3>
+              <h3 className="font-medium mb-2">Archivos</h3>
               {files.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No files uploaded yet.</p>
+                <p className="text-sm text-muted-foreground">Aún no se han cargado archivos.</p>
               ) : (
                 <div className="space-y-2">
                   {files.map((file) => (
@@ -248,7 +248,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
                             variant="ghost"
                             size="sm"
                             onClick={() => handleViewFile(file)}
-                            title="View file"
+                            title="Ver archivo"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -257,7 +257,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
                           variant="ghost"
                           size="sm"
                           onClick={() => downloadFile(file)}
-                          title="Download file"
+                          title="Descargar archivo"
                         >
                           <Upload className="h-4 w-4" />
                         </Button>
@@ -268,7 +268,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
                             setSelectedFile(file);
                             setDeleteDialogOpen(true);
                           }}
-                          title="Delete file"
+                          title="Eliminar archivo"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -285,14 +285,14 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete File</AlertDialogTitle>
+            <AlertDialogTitle>Eliminar Archivo</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this file? This action cannot be undone.
+              ¿Está seguro que desea eliminar este archivo? Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleFileDelete}>Delete</AlertDialogAction>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleFileDelete}>Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -55,7 +55,7 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
       <CollapsibleTrigger asChild>
         <Button variant="outline" type="button" className="w-full">
           <Calculator className="h-4 w-4 mr-2" />
-          Shift Time Calculator
+          Calculadora de Horarios de Turnos
         </Button>
       </CollapsibleTrigger>
       
@@ -64,7 +64,7 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              Calculate Optimal Shift Times
+              Calcular Horarios Óptimos de Turnos
             </CardTitle>
           </CardHeader>
           
@@ -74,9 +74,9 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" size="sm" type="button" className="w-full justify-start">
                   <Settings className="h-4 w-4 mr-2" />
-                  Configuration
+                  Configuración
                   {(startTimeBuffer !== 30 || teardownTime !== 4) && (
-                    <Badge variant="secondary" className="ml-2 text-xs">Custom</Badge>
+                    <Badge variant="secondary" className="ml-2 text-xs">Personalizado</Badge>
                   )}
                 </Button>
               </CollapsibleTrigger>
@@ -85,7 +85,7 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="start-buffer" className="text-xs">
-                      Start Time Buffer (minutes)
+                      Tiempo de Preparación (minutos)
                     </Label>
                     <Input
                       id="start-buffer"
@@ -99,7 +99,7 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="teardown-time" className="text-xs">
-                      Teardown Time (hours)
+                      Tiempo de Desmontaje (horas)
                     </Label>
                     <Input
                       id="teardown-time"
@@ -113,22 +113,22 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Buffer time is added before first soundcheck. Teardown time is added after last show on festival's final day.
+                  El tiempo de preparación se añade antes del primer soundcheck. El tiempo de desmontaje se añade después del último show en el día final del festival.
                 </div>
               </CollapsibleContent>
             </Collapsible>
 
             {isLoading ? (
-              <div className="text-sm text-muted-foreground">Loading artist schedule...</div>
+              <div className="text-sm text-muted-foreground">Cargando programación de artistas...</div>
             ) : (
               <>
                 <div className="space-y-2">
                   <div className="text-sm font-medium">
-                    {stage ? `Stage ${stage} Schedule` : "Festival Schedule"}
+                    {stage ? `Programación Stage ${stage}` : "Programación del Festival"}
                   </div>
                   <div className="text-sm text-muted-foreground flex items-center gap-2">
                     <Users className="h-3 w-3" />
-                    {artists.length} artists scheduled
+                    {artists.length} artistas programados
                   </div>
                   <Badge variant="outline" className="text-xs">
                     {getScheduleSummary()}
@@ -136,17 +136,17 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Number of Shifts</label>
+                  <label className="text-sm font-medium">Número de Turnos</label>
                   <Select value={numberOfShifts.toString()} onValueChange={(value) => setNumberOfShifts(parseInt(value))}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="2">2 Shifts</SelectItem>
-                      <SelectItem value="3">3 Shifts</SelectItem>
-                      <SelectItem value="4">4 Shifts</SelectItem>
-                      <SelectItem value="5">5 Shifts</SelectItem>
-                      <SelectItem value="6">6 Shifts</SelectItem>
+                      <SelectItem value="2">2 Turnos</SelectItem>
+                      <SelectItem value="3">3 Turnos</SelectItem>
+                      <SelectItem value="4">4 Turnos</SelectItem>
+                      <SelectItem value="5">5 Turnos</SelectItem>
+                      <SelectItem value="6">6 Turnos</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -154,7 +154,7 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
                 {calculatedShifts.length > 0 && (
                   <div className="space-y-3">
                     <div className="text-sm font-medium">
-                      Suggested Shifts (with 1h overlap) - Total: {
+                      Turnos Sugeridos (con solapamiento de 1h) - Total: {
                         Math.round(calculatedShifts.reduce((total, shift) => total + shift.duration, 0) * 10) / 10
                       }h
                     </div>
@@ -182,7 +182,7 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
                             onClick={() => onApplyTimes(shift.start_time, shift.end_time)}
                             className="w-full mt-2"
                           >
-                            Apply to Form
+                            Aplicar al Formulario
                           </Button>
                         </div>
                       ))}
@@ -192,9 +192,9 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
 
                 {artists.length === 0 && (
                   <div className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
-                    {stage 
-                      ? `No artists scheduled for Stage ${stage} on this date.`
-                      : "No artists scheduled for this date. Add artists first to calculate optimal shift times."
+                    {stage
+                      ? `No hay artistas programados para el Stage ${stage} en esta fecha.`
+                      : "No hay artistas programados para esta fecha. Añade artistas primero para calcular horarios óptimos de turnos."
                     }
                   </div>
                 )}

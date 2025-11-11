@@ -138,8 +138,8 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     setTimeout(async () => {
       await refetch();
       toast({
-        title: "Data refreshed",
-        description: "Shifts and assignments have been updated",
+        title: "Datos actualizados",
+        description: "Los turnos y asignaciones han sido actualizados",
       });
     }, 500);
   };
@@ -165,14 +165,14 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
 
       await refetch();
       toast({
-        title: "Success",
-        description: "Shift deleted successfully",
+        title: "Éxito",
+        description: "Turno eliminado exitosamente",
       });
     } catch (error: any) {
       console.error("Error deleting shift:", error);
       toast({
         title: "Error",
-        description: `Failed to delete shift: ${error.message}`,
+        description: `No se pudo eliminar el turno: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -185,14 +185,14 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     try {
       await refetch();
       toast({
-        title: "Success",
-        description: "Shifts refreshed successfully",
+        title: "Éxito",
+        description: "Turnos actualizados exitosamente",
       });
     } catch (error) {
       console.error("Error refreshing shifts:", error);
       toast({
         title: "Error",
-        description: "Failed to refresh shifts",
+        description: "No se pudieron actualizar los turnos",
         variant: "destructive",
       });
     } finally {
@@ -205,7 +205,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     return (
       <Card>
         <CardContent className="p-8 text-center">
-          <p className="text-muted-foreground">No dates available for scheduling.</p>
+          <p className="text-muted-foreground">No hay fechas disponibles para programar.</p>
         </CardContent>
       </Card>
     );
@@ -215,27 +215,27 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     <Card className="mt-4 sm:mt-6">
       <CardHeader className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
-          <CardTitle className="text-base sm:text-lg">Festival Schedule</CardTitle>
+          <CardTitle className="text-base sm:text-lg">Programación del Festival</CardTitle>
           <div className="flex gap-2">
             {!isViewOnly && (
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 onClick={() => setIsCreateShiftOpen(true)}
                 className="flex items-center gap-1"
               >
                 <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Create Shift</span>
+                <span className="hidden sm:inline">Crear Turno</span>
               </Button>
             )}
-            <Button 
-              size="sm" 
-              variant="outline" 
+            <Button
+              size="sm"
+              variant="outline"
               className="flex items-center gap-1"
               onClick={handleRefresh}
               disabled={isRefreshing}
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Refresh</span>
+              <span className="hidden sm:inline">Actualizar</span>
             </Button>
           </div>
         </div>
@@ -246,13 +246,13 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
             showRefreshButton
             onRefresh={handleRefresh}
           />
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
             className="text-xs w-fit"
           >
-            {viewMode === "table" ? "List View" : "Table View"}
+            {viewMode === "table" ? "Vista de Lista" : "Vista de Tabla"}
           </Button>
         </div>
       </CardHeader>
@@ -272,10 +272,10 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
 
           {selectedDate && (
             isLoading ? (
-              <div className="flex justify-center p-8">Loading...</div>
+              <div className="flex justify-center p-8">Cargando...</div>
             ) : shifts.length === 0 ? (
               <div className="text-center p-8 text-muted-foreground">
-                No shifts scheduled for this date. {!isViewOnly && "Click \"Create Shift\" to add one."}
+                No hay turnos programados para esta fecha. {!isViewOnly && "Haz clic en \"Crear Turno\" para añadir uno."}
               </div>
             ) : viewMode === "table" ? (
               <ShiftsTable 

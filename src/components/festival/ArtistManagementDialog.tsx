@@ -50,7 +50,7 @@ export const ArtistManagementDialog = ({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
         <DialogHeader>
           <DialogTitle>
-            {artist ? "Edit Artist" : "Add Artist"}
+            {artist ? "Editar Artista" : "Agregar Artista"}
           </DialogTitle>
         </DialogHeader>
         <ArtistManagementForm

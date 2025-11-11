@@ -11,11 +11,11 @@ export const FormStatusBadge = ({ status, className }: FormStatusBadgeProps) => 
   const getStatusDetails = (status: string) => {
     switch (status) {
       case 'pending':
-        return { label: 'Pending', variant: 'secondary' as const };
+        return { label: 'Pendiente', variant: 'secondary' as const };
       case 'submitted':
-        return { label: 'Submitted', variant: 'default' as const };
+        return { label: 'Enviado', variant: 'default' as const };
       case 'expired':
-        return { label: 'Expired', variant: 'destructive' as const };
+        return { label: 'Expirado', variant: 'destructive' as const };
       default:
         return { label: status, variant: 'secondary' as const };
     }

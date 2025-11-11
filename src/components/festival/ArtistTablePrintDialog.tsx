@@ -150,7 +150,7 @@ export const ArtistTablePrintDialog = ({
       
       if (filteredArtists.length === 0) {
         console.warn('No artists match the filter criteria');
-        toast.error('No artists found for the selected criteria');
+        toast.error('No se encontraron artistas para los criterios seleccionados');
         return;
       }
 
@@ -306,7 +306,7 @@ export const ArtistTablePrintDialog = ({
       });
 
       const pdfData: ArtistTablePdfData = {
-        jobTitle: jobTitle || 'Festival Schedule',
+        jobTitle: jobTitle || 'Cronograma del festival',
         date: selectedDate,
         stage: stageFilter !== 'all' ? stageFilter : undefined,
         stageNames: stageNames,
@@ -340,13 +340,14 @@ export const ArtistTablePrintDialog = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
-      toast.success('Artist schedule PDF generated successfully');
+
+
+      toast.success('PDF del cronograma de artistas generado exitosamente');
       setDialogOpen(false);
     } catch (error) {
       console.error('Error generating artist schedule PDF:', error);
       console.error('Error stack:', error.stack);
-      toast.error('Failed to generate PDF');
+      toast.error('Error al generar PDF');
     } finally {
       setIsGenerating(false);
     }
@@ -356,27 +357,27 @@ export const ArtistTablePrintDialog = ({
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogContent className="sm:max-w-[425px] w-[95vw]">
         <DialogHeader>
-          <DialogTitle>Print Artist Schedule</DialogTitle>
+          <DialogTitle>Imprimir cronograma de artistas</DialogTitle>
           <DialogDescription>
-            Generate a PDF of the current artist schedule.
+            Generar un PDF del cronograma de artistas actual.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
             <Label htmlFor="name" className="sm:text-right">
-              Job Title
+              Título del trabajo
             </Label>
-            <Input id="name" value={jobTitle || 'Festival Schedule'} className="sm:col-span-3" disabled />
+            <Input id="name" value={jobTitle || 'Cronograma del festival'} className="sm:col-span-3" disabled />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
             <Label htmlFor="username" className="sm:text-right">
-              Date
+              Fecha
             </Label>
             <Input id="username" value={selectedDate} className="sm:col-span-3" disabled />
           </div>
           <div className="flex items-start space-x-2 pt-2">
-            <Checkbox 
-              id="gear-conflicts" 
+            <Checkbox
+              id="gear-conflicts"
               checked={includeGearConflicts}
               onCheckedChange={(checked) => {
                 setIncludeGearConflicts(checked === true);
@@ -384,17 +385,17 @@ export const ArtistTablePrintDialog = ({
               className="mt-1"
             />
             <Label htmlFor="gear-conflicts" className="text-sm font-medium leading-normal cursor-pointer">
-              Include gear conflicts summary
+              Incluir resumen de conflictos de equipo
             </Label>
           </div>
         </div>
         <Button onClick={handleTablePrint} disabled={isGenerating || isLoading} className="w-full">
           {(isGenerating || isLoading) ? (
             <>
-              Generating <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+              Generando <Loader2 className="ml-2 h-4 w-4 animate-spin" />
             </>
           ) : (
-            "Generate PDF"
+            "Generar PDF"
           )}
         </Button>
       </DialogContent>
