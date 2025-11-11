@@ -73,6 +73,9 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
         // Fetch job assignments for house techs within date range
         console.log('PersonalCalendar: Fetching job assignments...');
+        const startIso = startDate.toISOString();
+        const endIso = endDate.toISOString();
+
         const { data: assignmentsData, error: assignmentsError } = await supabase
           .from('job_assignments')
           .select(`
@@ -93,8 +96,8 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
             )
           `)
           .in('technician_id', (techsData || []).map(tech => tech.id))
-          .gte('jobs.start_time', startDate.toISOString())
-          .lte('jobs.end_time', endDate.toISOString());
+          .lte('jobs.start_time', endIso)
+          .or(`jobs.end_time.is.null,jobs.end_time.gte.${startIso}`);
 
         if (assignmentsError) {
           console.error('PersonalCalendar: Error fetching assignments:', assignmentsError);
@@ -147,7 +150,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
               title: jobData.title,
               color: jobData.color,
               start_time: jobData.start_time,
-              end_time: jobData.end_time,
+              end_time: jobData.end_time ?? jobData.start_time,
               status: jobData.status,
               location: jobData.locations && Array.isArray(jobData.locations) && jobData.locations.length > 0 
                 ? { name: jobData.locations[0].name } 
