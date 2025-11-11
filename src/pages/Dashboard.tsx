@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useOptimizedMessagesSubscriptions } from "@/hooks/useOptimizedSubscriptions";
+import { CorporateEmailComposer } from "@/components/emails/CorporateEmailComposer";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -192,6 +193,10 @@ const Dashboard = () => {
             </CardContent>
           )}
         </Card>
+      )}
+
+      {(userRole === "management" || userRole === "admin") && (
+        <CorporateEmailComposer />
       )}
 
       <div className="space-y-4 md:space-y-8">
