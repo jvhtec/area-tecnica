@@ -35,7 +35,7 @@ export const MicrophoneAnalysisPreview = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Info className="h-5 w-5" />
-            Stage {analysisDetails.stageNumber} Microphone Requirements
+            Requisitos de Micrófonos Stage {analysisDetails.stageNumber}
           </DialogTitle>
         </DialogHeader>
 
@@ -43,35 +43,35 @@ export const MicrophoneAnalysisPreview = ({
           <Alert>
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
-              Analysis completed for {analysisDetails.totalArtists} artists on Stage {analysisDetails.stageNumber} using festival microphones.
-              Peak requirements calculated considering show schedules and exclusive use constraints.
+              Análisis completado para {analysisDetails.totalArtists} artistas en Stage {analysisDetails.stageNumber} usando micrófonos del festival.
+              Requisitos máximos calculados considerando horarios de shows y restricciones de uso exclusivo.
             </AlertDescription>
           </Alert>
 
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-blue-700">{analysisDetails.stageNumber}</div>
-              <div className="text-sm text-blue-600">Stage Number</div>
+              <div className="text-sm text-blue-600">Número de Stage</div>
             </div>
             <div className="bg-green-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-green-700">{analysisDetails.totalArtists}</div>
-              <div className="text-sm text-green-600">Artists Analyzed</div>
+              <div className="text-sm text-green-600">Artistas Analizados</div>
             </div>
             <div className="bg-purple-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-purple-700">{peakRequirements.length}</div>
-              <div className="text-sm text-purple-600">Mic Models Required</div>
+              <div className="text-sm text-purple-600">Modelos de Mic Requeridos</div>
             </div>
           </div>
 
           {peakRequirements.length > 0 ? (
             <div>
-              <h3 className="text-lg font-semibold mb-3">Peak Microphone Requirements for Stage {analysisDetails.stageNumber}</h3>
+              <h3 className="text-lg font-semibold mb-3">Requisitos Máximos de Micrófonos para Stage {analysisDetails.stageNumber}</h3>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Microphone Model</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Notes</TableHead>
+                    <TableHead>Modelo de Micrófono</TableHead>
+                    <TableHead>Cantidad</TableHead>
+                    <TableHead>Notas</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -91,27 +91,27 @@ export const MicrophoneAnalysisPreview = ({
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              No microphone requirements found for Stage {analysisDetails.stageNumber}. 
-              Make sure artists on this stage have wired microphones configured with festival kit selected.
+              No se encontraron requisitos de micrófonos para Stage {analysisDetails.stageNumber}.
+              Asegúrese de que los artistas en este stage tengan micrófonos cableados configurados con kit de festival seleccionado.
             </div>
           )}
 
           <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
             <div className="text-sm text-yellow-800">
-              <strong>Note:</strong> These requirements are specific to Stage {analysisDetails.stageNumber} and will be merged with your existing microphone kit. 
-              Quantities for existing models will be updated to the higher value.
+              <strong>Nota:</strong> Estos requisitos son específicos para Stage {analysisDetails.stageNumber} y se fusionarán con su kit de micrófonos existente.
+              Las cantidades para modelos existentes se actualizarán al valor más alto.
             </div>
           </div>
 
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              Cancelar
             </Button>
-            <Button 
-              onClick={onConfirm} 
+            <Button
+              onClick={onConfirm}
               disabled={isLoading || peakRequirements.length === 0}
             >
-              {isLoading ? "Loading..." : "Load Requirements"}
+              {isLoading ? "Cargando..." : "Cargar Requisitos"}
             </Button>
           </div>
         </div>

@@ -164,7 +164,7 @@ export const FestivalDateNavigation = ({
     return (
       <div className="flex items-center justify-center p-8 text-center text-muted-foreground border rounded-md">
         <div>
-          <p>No {showOnlyShowDates ? 'show/key' : ''} dates found for this week.</p>
+          <p>No se encontraron fechas {showOnlyShowDates ? 'de show/clave' : ''} para esta semana.</p>
           <div className="flex items-center justify-center gap-2 mt-4">
             <Button
               variant="outline"
@@ -172,7 +172,7 @@ export const FestivalDateNavigation = ({
               onClick={() => setShowOnlyShowDates(false)}
               disabled={!showOnlyShowDates}
             >
-              Show All Dates
+              Mostrar todas las fechas
             </Button>
             <Button
               variant="outline"
@@ -180,7 +180,7 @@ export const FestivalDateNavigation = ({
               onClick={() => setViewMode('all')}
               disabled={viewMode === 'all'}
             >
-              Show All Weeks
+              Mostrar todas las semanas
             </Button>
           </div>
         </div>
@@ -196,15 +196,15 @@ export const FestivalDateNavigation = ({
           {isLongFestival && (
             <>
               <div className="flex items-center gap-2">
-                <Label htmlFor="view-mode" className="text-sm whitespace-nowrap">View:</Label>
+                <Label htmlFor="view-mode" className="text-sm whitespace-nowrap">Vista:</Label>
                 <Switch
                   id="view-mode"
                   checked={viewMode === 'week'}
                   onCheckedChange={(checked) => setViewMode(checked ? 'week' : 'all')}
                 />
-                <span className="text-sm">{viewMode === 'week' ? 'Week' : 'All'}</span>
+                <span className="text-sm">{viewMode === 'week' ? 'Semana' : 'Todo'}</span>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4" />
                 <Switch
@@ -212,7 +212,7 @@ export const FestivalDateNavigation = ({
                   checked={showOnlyShowDates}
                   onCheckedChange={setShowOnlyShowDates}
                 />
-                <Label htmlFor="show-filter" className="text-sm whitespace-nowrap">Key dates only</Label>
+                <Label htmlFor="show-filter" className="text-sm whitespace-nowrap">Solo fechas clave</Label>
               </div>
             </>
           )}
@@ -226,7 +226,7 @@ export const FestivalDateNavigation = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Stages</SelectItem>
+                  <SelectItem value="all">Todos los Stages</SelectItem>
                   {Array.from({ length: maxStages }, (_, i) => i + 1).map((stage) => (
                     <SelectItem key={stage} value={stage.toString()}>
                       Stage {stage}
@@ -271,7 +271,7 @@ export const FestivalDateNavigation = ({
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="h-10 hidden sm:flex">
                 <Calendar className="h-4 w-4 mr-2" />
-                Jump to Date
+                Ir a fecha
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
@@ -279,8 +279,8 @@ export const FestivalDateNavigation = ({
                 mode="single"
                 selected={new Date(selectedDate)}
                 onSelect={handleDateJump}
-                disabled={(date) => 
-                  !jobDates.some(jobDate => 
+                disabled={(date) =>
+                  !jobDates.some(jobDate =>
                     format(jobDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
                   )
                 }
@@ -339,9 +339,9 @@ export const FestivalDateNavigation = ({
                       </TooltipTrigger>
                       <TooltipContent>
                         <div className="text-center">
-                          <p>Festival day runs from {dayStartTime} to {dayStartTime} the next day</p>
-                          <p>Date: {formattedDateValue}</p>
-                          <p>Type: {dateTypes[`${jobId}-${formattedDateValue}`] || 'Not set'}</p>
+                          <p>El día del festival es de {dayStartTime} a {dayStartTime} del día siguiente</p>
+                          <p>Fecha: {formattedDateValue}</p>
+                          <p>Tipo: {dateTypes[`${jobId}-${formattedDateValue}`] || 'No configurado'}</p>
                         </div>
                       </TooltipContent>
                     </Tooltip>

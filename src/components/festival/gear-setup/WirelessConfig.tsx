@@ -79,10 +79,10 @@ export const WirelessConfig = ({
 
   const options = isIEM ? IEM_SYSTEMS : WIRELESS_SYSTEMS;
   const quantityTypeLabels = isIEM ? {
-    hh: "Channels",
+    hh: "Canales",
     bp: "Bodypacks"
   } : {
-    hh: "Handheld",
+    hh: "De Mano",
     bp: "Bodypacks"
   };
 
@@ -104,7 +104,7 @@ export const WirelessConfig = ({
           onClick={addSystem}
         >
           <Plus className="h-4 w-4 mr-2" />
-          Add System
+          Añadir Sistema
         </Button>
       </div>
 
@@ -117,7 +117,7 @@ export const WirelessConfig = ({
                 onChange={(value) => updateSystem(index, 'model', value)}
                 options={[]}
                 fallbackOptions={options}
-                placeholder="Select system"
+                placeholder="Seleccionar sistema"
                 category={getCategory()}
               />
             </div>
@@ -159,17 +159,17 @@ export const WirelessConfig = ({
           </div>
 
           <div>
-            <Label>Frequency Band</Label>
+            <Label>Banda de Frecuencia</Label>
             <Input
               value={system.band || ''}
               onChange={(e) => updateSystem(index, 'band', e.target.value)}
-              placeholder="e.g., G50, H50"
+              placeholder="ej., G50, H50"
             />
           </div>
-          
+
           {!hideProvidedBy && (
             <div>
-              <Label>Provided By</Label>
+              <Label>Proporcionado Por</Label>
               <RadioGroup
                 value={system.provided_by || 'festival'}
                 onValueChange={(value: 'festival' | 'band') => {
@@ -184,7 +184,7 @@ export const WirelessConfig = ({
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="band" id={`${index}-band`} />
-                  <Label htmlFor={`${index}-band`}>Band</Label>
+                  <Label htmlFor={`${index}-band`}>Banda</Label>
                 </div>
               </RadioGroup>
             </div>

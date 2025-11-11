@@ -32,14 +32,14 @@ export const QuantityInput = ({
         />
         {available !== undefined && (
           <Badge variant="secondary">
-            {available} available
+            {available} disponibles
           </Badge>
         )}
       </div>
       {isInvalid && (
         <p className="text-sm text-red-500 flex items-center gap-1 mt-1">
           <AlertCircle className="h-4 w-4" />
-          Exceeds available quantity
+          Excede la cantidad disponible
         </p>
       )}
     </div>

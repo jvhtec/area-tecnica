@@ -74,18 +74,18 @@ export const ArtistFormSubmissionDialog = ({
     try {
       // Create PDF
       const doc = new jsPDF();
-      
+
       // Add title
       doc.setFontSize(20);
-      doc.text("Artist Form Submission", 20, 20);
-      
+      doc.text("Envío de Formulario de Artista", 20, 20);
+
       // Add submission date
       doc.setFontSize(12);
-      doc.text(`Submitted on: ${format(new Date(submission.submitted_at), 'PPpp')}`, 20, 35);
-      
+      doc.text(`Enviado el: ${format(new Date(submission.submitted_at), 'PPpp')}`, 20, 35);
+
       // Add form data
       doc.setFontSize(14);
-      doc.text("Form Data:", 20, 50);
+      doc.text("Datos del Formulario:", 20, 50);
       
       // Convert form data to formatted text
       const formDataText = Object.entries(submission.form_data)
@@ -101,24 +101,24 @@ export const ArtistFormSubmissionDialog = ({
       if (submission.notes) {
         const yPos = 65 + (splitText.length * 7);
         doc.setFontSize(14);
-        doc.text("Notes:", 20, yPos);
+        doc.text("Notas:", 20, yPos);
         doc.setFontSize(12);
         const splitNotes = doc.splitTextToSize(submission.notes, 170);
         doc.text(splitNotes, 20, yPos + 10);
       }
 
       // Save the PDF
-      doc.save("form_submission.pdf");
+      doc.save("envio_formulario.pdf");
 
       toast({
-        title: "Success",
-        description: "Form submission downloaded successfully",
+        title: "Éxito",
+        description: "Envío de formulario descargado correctamente",
       });
     } catch (error) {
       console.error('Error downloading submission:', error);
       toast({
         title: "Error",
-        description: "Could not download the form submission",
+        description: "No se pudo descargar el envío del formulario",
         variant: "destructive",
       });
     }
@@ -128,7 +128,7 @@ export const ArtistFormSubmissionDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle>Form Submission Details</DialogTitle>
+          <DialogTitle>Detalles del Envío del Formulario</DialogTitle>
           {submission && (
             <Button
               variant="outline"
@@ -137,7 +137,7 @@ export const ArtistFormSubmissionDialog = ({
               className="ml-auto"
             >
               <Download className="h-4 w-4 mr-2" />
-              Download PDF
+              Descargar PDF
             </Button>
           )}
         </DialogHeader>
@@ -148,17 +148,17 @@ export const ArtistFormSubmissionDialog = ({
           </div>
         ) : !submission ? (
           <div className="text-center p-4 text-muted-foreground">
-            No submission found for this artist.
+            No se encontró envío para este artista.
           </div>
         ) : (
           <ScrollArea className="flex-1">
             <div className="space-y-4 p-4">
               <div className="text-sm text-muted-foreground">
-                Submitted on: {format(new Date(submission.submitted_at), 'PPpp')}
+                Enviado el: {format(new Date(submission.submitted_at), 'PPpp')}
               </div>
-              
+
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Submitted Data</h3>
+                <h3 className="text-lg font-semibold">Datos Enviados</h3>
                 <pre className="bg-muted p-4 rounded-lg overflow-auto whitespace-pre-wrap">
                   {JSON.stringify(submission.form_data, null, 2)}
                 </pre>
@@ -166,7 +166,7 @@ export const ArtistFormSubmissionDialog = ({
 
               {submission.notes && (
                 <div className="space-y-2">
-                  <h3 className="text-lg font-semibold">Notes</h3>
+                  <h3 className="text-lg font-semibold">Notas</h3>
                   <p className="text-muted-foreground">{submission.notes}</p>
                 </div>
               )}

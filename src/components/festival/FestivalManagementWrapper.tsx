@@ -45,11 +45,11 @@ export function FestivalManagementWrapper() {
           if (fullRecoverySuccess) {
             console.log('Full connection recovery succeeded, retrying fetch');
             refetch();
-            toast.success('Connection restored');
+            toast.success('Conexión restaurada');
           } else {
             console.log('All recovery attempts failed');
-            toast.error('Connection issues persist', {
-              description: 'Please check your network connection and try again'
+            toast.error('Problemas de conexión persisten', {
+              description: 'Por favor, verifica tu conexión de red e intenta de nuevo'
             });
           }
         }
@@ -60,14 +60,14 @@ export function FestivalManagementWrapper() {
   }, [isError, isPaused, refetch, recoverConnection]);
 
   const handleRetry = async () => {
-    toast.info('Reconnecting...');
-    
+    toast.info('Reconectando...');
+
     try {
       await recoverConnection();
       await refetch();
     } catch (error) {
       console.error('Error during retry:', error);
-      toast.error('Retry failed');
+      toast.error('Error al reintentar');
     }
   };
 
@@ -76,7 +76,7 @@ export function FestivalManagementWrapper() {
       <TimeoutLoader
         isLoading={isLoading}
         isError={false}
-        message="Loading festival details..."
+        message="Cargando detalles del festival..."
         timeout={5000}
       />
     );
@@ -86,21 +86,21 @@ export function FestivalManagementWrapper() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] max-w-md mx-auto text-center p-4 md:p-6">
         <AlertTriangle className="h-10 w-10 md:h-12 md:w-12 text-destructive mb-3 md:mb-4" />
-        <h2 className="text-lg md:text-xl font-bold">Error Loading Festival</h2>
+        <h2 className="text-lg md:text-xl font-bold">Error al cargar festival</h2>
         <p className="text-sm md:text-base text-muted-foreground mt-2 mb-3 md:mb-4">
-          {error instanceof Error ? error.message : 'Failed to load festival data'}
+          {error instanceof Error ? error.message : 'No se pudo cargar los datos del festival'}
         </p>
         <p className="text-xs md:text-sm text-muted-foreground mb-4 md:mb-6">
-          Connection status: {connectionStatus}
+          Estado de la conexión: {connectionStatus}
         </p>
-        <Button 
-          onClick={handleRetry} 
+        <Button
+          onClick={handleRetry}
           variant="default"
           size="sm"
           className="flex items-center gap-2"
         >
           <RefreshCw className="h-4 w-4" />
-          Reconnect & Retry
+          Reconectar e Reintentar
         </Button>
       </div>
     );
@@ -109,9 +109,9 @@ export function FestivalManagementWrapper() {
   if (!festival) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-4 text-center">
-        <h2 className="text-lg md:text-xl font-bold">Festival Not Found</h2>
+        <h2 className="text-lg md:text-xl font-bold">Festival no encontrado</h2>
         <p className="text-sm md:text-base text-muted-foreground mt-2">
-          The requested festival could not be found or may have been deleted.
+          No se pudo encontrar el festival solicitado o puede haber sido eliminado.
         </p>
       </div>
     );

@@ -11,23 +11,23 @@ export const MonitorSetupSection = ({ formData, onChange, gearSetup }: SectionPr
   return (
     <div className="space-y-4 border rounded-lg p-3 md:p-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h3 className="text-base md:text-lg font-semibold">Monitor Setup</h3>
+        <h3 className="text-base md:text-lg font-semibold">Configuración de Monitores</h3>
         <div className="flex items-center space-x-2">
           <Switch
             id="monitors-enabled"
             checked={formData.monitors_enabled}
-            onCheckedChange={(checked) => 
+            onCheckedChange={(checked) =>
               onChange({ monitors_enabled: checked, monitors_quantity: checked ? 1 : 0 })
             }
           />
-          <Label htmlFor="monitors-enabled" className="text-sm md:text-base">Enable Stage Monitors</Label>
+          <Label htmlFor="monitors-enabled" className="text-sm md:text-base">Habilitar Monitores de Stage</Label>
         </div>
       </div>
 
       {formData.monitors_enabled && (
         <QuantityInput
           id="monitors-quantity"
-          label="Number of Monitors"
+          label="Número de Monitores"
           value={formData.monitors_quantity || 0}
           onChange={(value) => onChange({ monitors_quantity: value })}
           available={gearSetup?.available_monitors}

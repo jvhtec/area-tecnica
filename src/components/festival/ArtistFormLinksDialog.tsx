@@ -70,7 +70,7 @@ export const ArtistFormLinksDialog = ({
       console.error('Error fetching artist links:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch artist links",
+        description: "No se pudieron obtener los enlaces de artistas",
         variant: "destructive",
       });
     } finally {
@@ -112,14 +112,14 @@ export const ArtistFormLinksDialog = ({
 
       await fetchArtistLinks();
       toast({
-        title: "Success",
-        description: "Generated missing links successfully",
+        title: "Éxito",
+        description: "Enlaces faltantes generados correctamente",
       });
     } catch (error) {
       console.error('Error generating links:', error);
       toast({
         title: "Error",
-        description: "Failed to generate links",
+        description: "No se pudieron generar los enlaces",
         variant: "destructive",
       });
     } finally {
@@ -135,14 +135,14 @@ export const ArtistFormLinksDialog = ({
       return acc;
     }, {} as Record<string, ArtistLinkData[]>);
 
-    let text = `Artist Form Links - ${format(new Date(selectedDate), 'dd/MM/yyyy')}\n\n`;
+    let text = `Enlaces de Formularios de Artistas - ${format(new Date(selectedDate), 'dd/MM/yyyy')}\n\n`;
 
     Object.entries(groupedByStage).forEach(([stage, artists]) => {
       text += `${stage}:\n`;
       artists.forEach(artist => {
-        const link = artist.token 
+        const link = artist.token
           ? `${window.location.origin}/festival/artist-form/${artist.token}`
-          : 'No link generated yet';
+          : 'Enlace aún no generado';
         text += `${artist.name} - ${link}\n`;
       });
       text += '\n';
@@ -150,26 +150,26 @@ export const ArtistFormLinksDialog = ({
 
     navigator.clipboard.writeText(text);
     toast({
-      title: "Copied",
-      description: "All links copied to clipboard",
+      title: "Copiado",
+      description: "Todos los enlaces copiados al portapapeles",
     });
   };
 
   const copyStageLinks = (stage: number) => {
     const stageArtists = artistLinks.filter(a => a.stage === stage);
     let text = `Stage ${stage} - ${format(new Date(selectedDate), 'dd/MM/yyyy')}\n\n`;
-    
+
     stageArtists.forEach(artist => {
-      const link = artist.token 
+      const link = artist.token
         ? `${window.location.origin}/festival/artist-form/${artist.token}`
-        : 'No link generated yet';
+        : 'Enlace aún no generado';
       text += `${artist.name} - ${link}\n`;
     });
 
     navigator.clipboard.writeText(text);
     toast({
-      title: "Copied",
-      description: `Stage ${stage} links copied to clipboard`,
+      title: "Copiado",
+      description: `Enlaces del Stage ${stage} copiados al portapapeles`,
     });
   };
 
@@ -191,18 +191,18 @@ export const ArtistFormLinksDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Artist Form Links - {format(new Date(selectedDate), 'dd/MM/yyyy')}</DialogTitle>
+          <DialogTitle>Enlaces de Formularios de Artistas - {format(new Date(selectedDate), 'dd/MM/yyyy')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <Button onClick={generateLinks} disabled={isGenerating}>
               <RefreshCcw className={`h-4 w-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-              Generate Missing Links
+              Generar Enlaces Faltantes
             </Button>
             <Button onClick={copyAllLinks}>
               <Copy className="h-4 w-4 mr-2" />
-              Copy All Links
+              Copiar Todos los Enlaces
             </Button>
           </div>
 
@@ -212,7 +212,7 @@ export const ArtistFormLinksDialog = ({
                 <h3 className="text-lg font-semibold">Stage {stage}</h3>
                 <Button variant="outline" size="sm" onClick={() => copyStageLinks(stage)}>
                   <Copy className="h-4 w-4 mr-2" />
-                  Copy Stage Links
+                  Copiar Enlaces del Stage
                 </Button>
               </div>
               <div className="border rounded-lg divide-y">
@@ -225,11 +225,11 @@ export const ArtistFormLinksDialog = ({
                         {artist.token ? (
                           <>
                             {artist.status === 'expired' && (
-                              <Badge variant="destructive">Expired</Badge>
+                              <Badge variant="destructive">Expirado</Badge>
                             )}
                             {artist.expires_at && isAfter(new Date(artist.expires_at), new Date()) && (
                               <Badge variant="secondary">
-                                Expires {format(new Date(artist.expires_at), 'dd/MM/yyyy')}
+                                Expira {format(new Date(artist.expires_at), 'dd/MM/yyyy')}
                               </Badge>
                             )}
                             <Button
@@ -239,8 +239,8 @@ export const ArtistFormLinksDialog = ({
                                 const link = `${window.location.origin}/festival/artist-form/${artist.token}`;
                                 navigator.clipboard.writeText(link);
                                 toast({
-                                  title: "Copied",
-                                  description: "Link copied to clipboard",
+                                  title: "Copiado",
+                                  description: "Enlace copiado al portapapeles",
                                 });
                               }}
                             >
@@ -248,7 +248,7 @@ export const ArtistFormLinksDialog = ({
                             </Button>
                           </>
                         ) : (
-                          <Badge variant="outline">No link generated</Badge>
+                          <Badge variant="outline">Sin enlace generado</Badge>
                         )}
                       </div>
                     </div>

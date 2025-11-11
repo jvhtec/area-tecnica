@@ -154,15 +154,15 @@ export const ManageAssignmentsDialog = ({
       queryClient.invalidateQueries({ queryKey: ["festivalShifts"] });
       onAssignmentsUpdated();
       toast({
-        title: "Success",
-        description: "Technician assigned successfully",
+        title: "Éxito",
+        description: "Técnico asignado exitosamente",
       });
     },
     onError: (error: any) => {
       console.error("Error adding assignment:", error);
       toast({
         title: "Error",
-        description: "Could not assign technician",
+        description: "No se pudo asignar el técnico",
         variant: "destructive",
       });
     },
@@ -185,15 +185,15 @@ export const ManageAssignmentsDialog = ({
       queryClient.invalidateQueries({ queryKey: ["festivalShifts"] });
       onAssignmentsUpdated();
       toast({
-        title: "Success",
-        description: "Technician unassigned successfully",
+        title: "Éxito",
+        description: "Técnico desasignado exitosamente",
       });
     },
     onError: (error: any) => {
       console.error("Error removing assignment:", error);
       toast({
         title: "Error",
-        description: "Could not unassign technician",
+        description: "No se pudo desasignar el técnico",
         variant: "destructive",
       });
     },
@@ -203,7 +203,7 @@ export const ManageAssignmentsDialog = ({
     if ((!technicianId && !externalTechnicianName) || !role) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Por favor completa todos los campos requeridos",
         variant: "destructive",
       });
       return;
@@ -229,7 +229,7 @@ export const ManageAssignmentsDialog = ({
       console.error("Error adding assignment:", error);
       toast({
         title: "Error",
-        description: "Could not assign technician",
+        description: "No se pudo asignar el técnico",
         variant: "destructive",
       });
     }
@@ -242,7 +242,7 @@ export const ManageAssignmentsDialog = ({
       console.error("Error removing assignment:", error);
       toast({
         title: "Error",
-        description: "Could not unassign technician",
+        description: "No se pudo desasignar el técnico",
         variant: "destructive",
       });
     }
@@ -253,12 +253,12 @@ export const ManageAssignmentsDialog = ({
       <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base sm:text-lg">
-            {isViewOnly ? "View Staff for" : "Manage Staff for"} {shift.name}
+            {isViewOnly ? "Ver Personal para" : "Gestionar Personal para"} {shift.name}
           </DialogTitle>
           <DialogDescription className="text-sm">
-            {isViewOnly 
-              ? "View staff assigned to this shift" 
-              : "Add or remove staff from this shift"}
+            {isViewOnly
+              ? "Ver personal asignado a este turno"
+              : "Añadir o eliminar personal de este turno"}
           </DialogDescription>
         </DialogHeader>
 
@@ -271,25 +271,25 @@ export const ManageAssignmentsDialog = ({
                     checked={isExternalTechnician}
                     onCheckedChange={setIsExternalTechnician}
                   />
-                  <Label>External Technician</Label>
+                  <Label>Técnico Externo</Label>
                 </div>
 
                 {isExternalTechnician ? (
                   <div className="grid gap-2">
-                    <Label htmlFor="externalTechnician">External Technician Name</Label>
+                    <Label htmlFor="externalTechnician">Nombre del Técnico Externo</Label>
                     <Input
                       id="externalTechnician"
                       value={externalTechnicianName}
                       onChange={(e) => setExternalTechnicianName(e.target.value)}
-                      placeholder="Enter technician name"
+                      placeholder="Ingresar nombre del técnico"
                     />
                   </div>
                 ) : (
                   <div className="grid gap-2">
-                    <Label htmlFor="technician">Technician</Label>
+                    <Label htmlFor="technician">Técnico</Label>
                     <Select onValueChange={setTechnicianId}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a technician" />
+                        <SelectValue placeholder="Seleccionar un técnico" />
                       </SelectTrigger>
                       <SelectContent>
                         {getSortedTechnicians().map((technician) => (
@@ -303,13 +303,13 @@ export const ManageAssignmentsDialog = ({
                 )}
 
                 <div className="grid gap-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select 
-                    value={role} 
+                  <Label htmlFor="role">Rol</Label>
+                  <Select
+                    value={role}
                     onValueChange={setRole}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a role" />
+                      <SelectValue placeholder="Seleccionar un rol" />
                     </SelectTrigger>
                     <SelectContent>
                       {getRoleOptions(shift.department as Department || "sound").map((code) => (
@@ -321,13 +321,13 @@ export const ManageAssignmentsDialog = ({
                   </Select>
                 </div>
                 <Button onClick={handleAddAssignment} disabled={addAssignmentMutation.isPending}>
-                  {addAssignmentMutation.isPending ? "Assigning..." : "Assign Technician"}
+                  {addAssignmentMutation.isPending ? "Asignando..." : "Asignar Técnico"}
                 </Button>
               </div>
             )}
-            
+
             <div className="space-y-4">
-              <h3 className="text-sm font-medium">Assigned Staff</h3>
+              <h3 className="text-sm font-medium">Personal Asignado</h3>
               {shift.assignments.length > 0 ? (
                 <div className="space-y-2">
                   {shift.assignments.map(assignment => (
@@ -338,27 +338,27 @@ export const ManageAssignmentsDialog = ({
                         - {labelForCode(assignment.role) || assignment.role}
                       </div>
                       {!isViewOnly && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleRemoveAssignment(assignment.id)}
                         >
-                          Remove
+                          Eliminar
                         </Button>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-sm text-muted-foreground">No staff assigned to this shift yet.</div>
+                <div className="text-sm text-muted-foreground">Aún no hay personal asignado a este turno.</div>
               )}
             </div>
           </div>
         </ScrollArea>
-        
+
         <DialogFooter className="mt-6">
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-            Close
+            Cerrar
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -30,20 +30,20 @@ export const ConsoleSetupSection = ({ formData, onChange }: ArtistSectionProps) 
 
   return (
     <div className="space-y-4 border rounded-lg p-4">
-      <h3 className="text-lg font-semibold">Console Setup</h3>
-      
+      <h3 className="text-lg font-semibold">Configuración de Consoles</h3>
+
       {/* FOH Console */}
       <div className="space-y-4">
-        <h4 className="font-medium">FOH Console</h4>
+        <h4 className="font-medium">Console FOH</h4>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label>Console Model</Label>
+            <Label>Modelo de Console</Label>
             <Select
               value={formData.foh_console || ""}
               onValueChange={(value) => onChange({ foh_console: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select console" />
+                <SelectValue placeholder="Seleccionar console" />
               </SelectTrigger>
               <SelectContent>
                 {fohOptions.map((option) => (
@@ -55,7 +55,7 @@ export const ConsoleSetupSection = ({ formData, onChange }: ArtistSectionProps) 
             </Select>
           </div>
           <div>
-            <Label>Provided By</Label>
+            <Label>Proporcionado Por</Label>
             <Select
               value={formData.foh_console_provided_by || "festival"}
               onValueChange={(value) => onChange({ foh_console_provided_by: value })}
@@ -65,33 +65,33 @@ export const ConsoleSetupSection = ({ formData, onChange }: ArtistSectionProps) 
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="festival">Festival</SelectItem>
-                <SelectItem value="band">Band</SelectItem>
+                <SelectItem value="band">Banda</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Checkbox 
+          <Checkbox
             id="foh-tech"
             checked={formData.foh_tech}
             onCheckedChange={(checked) => onChange({ foh_tech: checked })}
           />
-          <Label htmlFor="foh-tech">FOH Technician Required</Label>
+          <Label htmlFor="foh-tech">Requiere Técnico FOH</Label>
         </div>
       </div>
 
       {/* Monitor Console */}
       <div className="space-y-4">
-        <h4 className="font-medium">Monitor Console</h4>
+        <h4 className="font-medium">Console de Monitor</h4>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label>Console Model</Label>
+            <Label>Modelo de Console</Label>
             <Select
               value={formData.mon_console || ""}
               onValueChange={(value) => onChange({ mon_console: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select console" />
+                <SelectValue placeholder="Seleccionar console" />
               </SelectTrigger>
               <SelectContent>
                 {monOptions.map((option) => (
@@ -103,7 +103,7 @@ export const ConsoleSetupSection = ({ formData, onChange }: ArtistSectionProps) 
             </Select>
           </div>
           <div>
-            <Label>Provided By</Label>
+            <Label>Proporcionado Por</Label>
             <Select
               value={formData.mon_console_provided_by || "festival"}
               onValueChange={(value) => onChange({ mon_console_provided_by: value })}
@@ -113,18 +113,18 @@ export const ConsoleSetupSection = ({ formData, onChange }: ArtistSectionProps) 
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="festival">Festival</SelectItem>
-                <SelectItem value="band">Band</SelectItem>
+                <SelectItem value="band">Banda</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Checkbox 
+          <Checkbox
             id="mon-tech"
             checked={formData.mon_tech}
             onCheckedChange={(checked) => onChange({ mon_tech: checked })}
           />
-          <Label htmlFor="mon-tech">Monitor Technician Required</Label>
+          <Label htmlFor="mon-tech">Requiere Técnico de Monitor</Label>
         </div>
       </div>
     </div>

@@ -29,7 +29,7 @@ export const ArtistFormLinkDialog = ({
     if (!artistId) {
       toast({
         title: "Error",
-        description: "Artist ID is required to generate a form link.",
+        description: "Se requiere el ID del artista para generar un enlace de formulario.",
         variant: "destructive",
       });
       return;
@@ -76,16 +76,16 @@ export const ArtistFormLinkDialog = ({
 
       const formUrl = `${window.location.origin}/festival/artist-form/${data.token}`;
       setFormLink(formUrl);
-      
+
       toast({
-        title: "Link generated",
-        description: "New form link has been generated successfully.",
+        title: "Enlace generado",
+        description: "El nuevo enlace de formulario ha sido generado correctamente.",
       });
     } catch (error: any) {
       console.error('Error generating form link:', error);
       toast({
         title: "Error",
-        description: "Failed to generate form link.",
+        description: "No se pudo generar el enlace del formulario.",
         variant: "destructive",
       });
     } finally {
@@ -97,13 +97,13 @@ export const ArtistFormLinkDialog = ({
     try {
       await navigator.clipboard.writeText(formLink);
       toast({
-        title: "Copied",
-        description: "Link copied to clipboard",
+        title: "Copiado",
+        description: "Enlace copiado al portapapeles",
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to copy link",
+        description: "No se pudo copiar el enlace",
         variant: "destructive",
       });
     }
@@ -139,7 +139,7 @@ export const ArtistFormLinkDialog = ({
           setFormLink("");
           toast({
             title: "Error",
-            description: "Failed to check existing form link.",
+            description: "No se pudo verificar el enlace de formulario existente.",
             variant: "destructive",
           });
         }
@@ -153,9 +153,9 @@ export const ArtistFormLinkDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Form Link for {artistName}</DialogTitle>
+          <DialogTitle>Enlace de Formulario para {artistName}</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4 mt-4">
           {formLink ? (
             <>
@@ -169,7 +169,7 @@ export const ArtistFormLinkDialog = ({
                   variant="outline"
                   size="icon"
                   onClick={copyToClipboard}
-                  title="Copy link"
+                  title="Copiar enlace"
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
@@ -180,7 +180,7 @@ export const ArtistFormLinkDialog = ({
                 disabled={isLoading}
               >
                 <RefreshCcw className="h-4 w-4 mr-2" />
-                Generate New Link
+                Generar Nuevo Enlace
               </Button>
             </>
           ) : (
@@ -189,7 +189,7 @@ export const ArtistFormLinkDialog = ({
               className="w-full"
               disabled={isLoading}
             >
-              Generate Link
+              Generar Enlace
             </Button>
           )}
         </div>

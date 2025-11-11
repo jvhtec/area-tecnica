@@ -208,7 +208,7 @@ export const FestivalGearSetupForm = ({
         console.error('Error fetching festival gear setup:', error);
         toast({
           title: "Error",
-          description: "Failed to load gear setup.",
+          description: "Error al cargar la configuración de equipamiento.",
           variant: "destructive"
         });
       } finally {
@@ -413,16 +413,16 @@ export const FestivalGearSetupForm = ({
 
       onSave?.();
       toast({
-        title: "Success",
-        description: isPrimaryStage 
-          ? "Global gear setup has been saved." 
-          : `Stage ${stageNumber} setup has been saved.`,
+        title: "Éxito",
+        description: isPrimaryStage
+          ? "La configuración de equipamiento global ha sido guardada."
+          : `La configuración de Stage ${stageNumber} ha sido guardada.`,
       });
     } catch (error) {
       console.error('Error saving festival gear setup:', error);
       toast({
         title: "Error",
-        description: "Failed to save festival gear setup.",
+        description: "Error al guardar la configuración de equipamiento del festival.",
         variant: "destructive",
       });
     } finally {
@@ -430,11 +430,11 @@ export const FestivalGearSetupForm = ({
     }
   };
 
-  const alertText = isPrimaryStage 
-    ? "You are editing the default stage setup. These settings will be used as defaults for all stages."
-    : hasStageSpecificSetup 
-      ? `This stage has a custom gear setup that differs from the global configuration.`
-      : `This stage is currently using the global setup. Any changes will create a custom setup for Stage ${stageNumber}.`;
+  const alertText = isPrimaryStage
+    ? "Está editando la configuración de stage predeterminada. Esta configuración se utilizará como predeterminada para todos los stages."
+    : hasStageSpecificSetup
+      ? `Este stage tiene una configuración de equipamiento personalizada que difiere de la configuración global.`
+      : `Este stage está usando actualmente la configuración global. Cualquier cambio creará una configuración personalizada para Stage ${stageNumber}.`;
 
   const alertVariant = isPrimaryStage ? "default" : hasStageSpecificSetup ? "info" : "default";
 
@@ -511,9 +511,9 @@ export const FestivalGearSetupForm = ({
         />
 
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Microphone Requirements Analysis</h3>
+          <h3 className="text-lg font-semibold">Análisis de Requisitos de Micrófonos</h3>
           <p className="text-sm text-muted-foreground">
-            Calculate wired microphone needs based on artist requirements and show schedules.
+            Calcule las necesidades de micrófonos cableados basándose en los requisitos de los artistas y los horarios de shows.
           </p>
           <MicrophoneNeedsCalculator jobId={jobId} />
         </div>
@@ -529,7 +529,7 @@ export const FestivalGearSetupForm = ({
         <Accordion type="multiple" defaultValue={["consoles", "wireless"]} className="space-y-4">
           <AccordionItem value="consoles" className="border rounded-lg px-4">
             <AccordionTrigger className="text-base font-semibold hover:no-underline">
-              Console Configuration
+              Configuración de Console
             </AccordionTrigger>
             <AccordionContent>
               <FestivalConsoleSetupSection
@@ -541,7 +541,7 @@ export const FestivalGearSetupForm = ({
 
           <AccordionItem value="wireless" className="border rounded-lg px-4">
             <AccordionTrigger className="text-base font-semibold hover:no-underline">
-              Wireless Setup
+              Configuración de Wireless
             </AccordionTrigger>
             <AccordionContent>
               <WirelessSetupSection
@@ -553,7 +553,7 @@ export const FestivalGearSetupForm = ({
 
           <AccordionItem value="mics" className="border rounded-lg px-4">
             <AccordionTrigger className="text-base font-semibold hover:no-underline">
-              Microphone Kit
+              Kit de Micrófonos
             </AccordionTrigger>
             <AccordionContent>
               <FestivalMicKitConfig
@@ -570,7 +570,7 @@ export const FestivalGearSetupForm = ({
 
           <AccordionItem value="monitors" className="border rounded-lg px-4">
             <AccordionTrigger className="text-base font-semibold hover:no-underline">
-              Monitor Setup
+              Configuración de Monitor
             </AccordionTrigger>
             <AccordionContent>
               <MonitorSetupSection
@@ -583,7 +583,7 @@ export const FestivalGearSetupForm = ({
 
           <AccordionItem value="extras" className="border rounded-lg px-4">
             <AccordionTrigger className="text-base font-semibold hover:no-underline">
-              Extra Requirements
+              Requisitos Adicionales
             </AccordionTrigger>
             <AccordionContent>
               <ExtraRequirementsSection
@@ -596,7 +596,7 @@ export const FestivalGearSetupForm = ({
 
           <AccordionItem value="infrastructure" className="border rounded-lg px-4">
             <AccordionTrigger className="text-base font-semibold hover:no-underline">
-              Infrastructure
+              Infraestructura
             </AccordionTrigger>
             <AccordionContent>
               <InfrastructureSection
@@ -609,12 +609,12 @@ export const FestivalGearSetupForm = ({
 
           <AccordionItem value="analysis" className="border rounded-lg px-4">
             <AccordionTrigger className="text-base font-semibold hover:no-underline">
-              Microphone Analysis
+              Análisis de Micrófonos
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Calculate wired microphone needs based on artist requirements and show schedules.
+                  Calcule las necesidades de micrófonos cableados basándose en los requisitos de los artistas y los horarios de shows.
                 </p>
                 <MicrophoneNeedsCalculator jobId={jobId} />
               </div>
@@ -623,7 +623,7 @@ export const FestivalGearSetupForm = ({
 
           <AccordionItem value="notes" className="border rounded-lg px-4">
             <AccordionTrigger className="text-base font-semibold hover:no-underline">
-              Notes
+              Notas
             </AccordionTrigger>
             <AccordionContent>
               <NotesSection
@@ -637,12 +637,12 @@ export const FestivalGearSetupForm = ({
 
       <Button type="submit" disabled={isLoading} className="w-full">
         <Save className="h-4 w-4 mr-2" />
-        {isLoading ? "Saving..." : (
-          isPrimaryStage 
-            ? "Save Global Setup" 
-            : hasStageSpecificSetup 
-              ? `Update Stage ${stageNumber} Setup` 
-              : `Create Custom Setup for Stage ${stageNumber}`
+        {isLoading ? "Guardando..." : (
+          isPrimaryStage
+            ? "Guardar Configuración Global"
+            : hasStageSpecificSetup
+              ? `Actualizar Configuración de Stage ${stageNumber}`
+              : `Crear Configuración Personalizada para Stage ${stageNumber}`
         )}
       </Button>
     </form>

@@ -49,7 +49,7 @@ export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps)
           onClick={addConsole}
         >
           <Plus className="h-4 w-4 mr-2" />
-          Add Console
+          Añadir Console
         </Button>
       </div>
 
@@ -61,7 +61,7 @@ export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps)
               onChange={(value) => updateConsole(index, 'model', value)}
               options={[]}
               fallbackOptions={consoleOptions}
-              placeholder="Select console"
+              placeholder="Seleccionar console"
               category={getCategory()}
             />
           </div>

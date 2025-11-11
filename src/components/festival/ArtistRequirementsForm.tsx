@@ -59,7 +59,7 @@ export const ArtistRequirementsForm = () => {
       if (!token) {
         toast({
           title: "Error",
-          description: "Invalid form token",
+          description: "Token de formulario inválido",
           variant: "destructive"
         });
         return;
@@ -76,16 +76,16 @@ export const ArtistRequirementsForm = () => {
         if (!formInfo) {
           toast({
             title: "Error",
-            description: "Invalid form token",
+            description: "Token de formulario inválido",
             variant: "destructive"
           });
           return;
         }
-        
+
         if (formInfo.status === 'completed') {
           toast({
-            title: "Form Already Submitted",
-            description: "This form has already been completed.",
+            title: "Formulario Ya Enviado",
+            description: "Este formulario ya ha sido completado.",
             variant: "destructive"
           });
           return;
@@ -104,7 +104,7 @@ export const ArtistRequirementsForm = () => {
         if (!artistData) {
           toast({
             title: "Error",
-            description: "Artist not found",
+            description: "Artista no encontrado",
             variant: "destructive"
           });
           return;
@@ -155,7 +155,7 @@ export const ArtistRequirementsForm = () => {
         console.error('Error fetching form data:', error);
         toast({
           title: "Error",
-          description: "Could not load form data. Please try again later.",
+          description: "No se pudieron cargar los datos del formulario. Por favor intente más tarde.",
           variant: "destructive"
         });
       } finally {
@@ -184,8 +184,8 @@ export const ArtistRequirementsForm = () => {
           const newData = payload.new as FormData;
           if (newData && newData.status === 'completed') {
             toast({
-              title: "Form Status Updated",
-              description: "Your form has been submitted successfully",
+              title: "Estado del Formulario Actualizado",
+              description: "Su formulario ha sido enviado correctamente",
             });
             navigate('/festival/form-submitted');
           }
@@ -212,11 +212,11 @@ export const ArtistRequirementsForm = () => {
 
       if (formError) throw formError;
       if (!formInfo) {
-        throw new Error('Form not found');
+        throw new Error('Formulario no encontrado');
       }
 
       if (formInfo.status === 'completed') {
-        throw new Error('This form has already been submitted');
+        throw new Error('Este formulario ya ha sido enviado');
       }
 
       const { error: submissionError } = await supabase
@@ -239,8 +239,8 @@ export const ArtistRequirementsForm = () => {
       if (updateError) throw updateError;
 
       toast({
-        title: "Success",
-        description: "Your technical requirements have been submitted successfully.",
+        title: "Éxito",
+        description: "Sus requerimientos técnicos han sido enviados correctamente.",
       });
 
       navigate('/festival/form-submitted');
@@ -248,7 +248,7 @@ export const ArtistRequirementsForm = () => {
       console.error('Error submitting form:', error);
       toast({
         title: "Error",
-        description: error.message || "Could not submit form. Please try again later.",
+        description: error.message || "No se pudo enviar el formulario. Por favor intente más tarde.",
         variant: "destructive"
       });
     } finally {
@@ -286,51 +286,51 @@ export const ArtistRequirementsForm = () => {
           
           <Card>
             <CardHeader>
-              <CardTitle>Artist Technical Requirements Form</CardTitle>
+              <CardTitle>Formulario de Requerimientos Técnicos del Artista</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-8">
-                <BasicInfoSection 
-                  formData={formData} 
+                <BasicInfoSection
+                  formData={formData}
                   onChange={handleFormChange}
                 />
 
-                <ConsoleSetupSection 
-                  formData={formData} 
-                  onChange={handleFormChange} 
+                <ConsoleSetupSection
+                  formData={formData}
+                  onChange={handleFormChange}
                   gearSetup={gearSetup}
                 />
 
-                <ArtistWirelessSetupSection 
-                  formData={formData} 
+                <ArtistWirelessSetupSection
+                  formData={formData}
                   onChange={handleFormChange}
                 />
 
-                <MonitorSetupSection 
-                  formData={formData} 
-                  onChange={handleFormChange} 
+                <MonitorSetupSection
+                  formData={formData}
+                  onChange={handleFormChange}
                   gearSetup={gearSetup}
                 />
 
-                <ExtraRequirementsSection 
-                  formData={formData} 
-                  onChange={handleFormChange} 
+                <ExtraRequirementsSection
+                  formData={formData}
+                  onChange={handleFormChange}
                   gearSetup={gearSetup}
                 />
 
-                <InfrastructureSection 
-                  formData={formData} 
-                  onChange={handleFormChange} 
+                <InfrastructureSection
+                  formData={formData}
+                  onChange={handleFormChange}
                   gearSetup={gearSetup}
                 />
 
-                <NotesSection 
-                  formData={formData} 
+                <NotesSection
+                  formData={formData}
                   onChange={handleFormChange}
                 />
 
                 <Button type="submit" disabled={isLoading} className="w-full">
-                  {isLoading ? "Submitting..." : "Submit Requirements"}
+                  {isLoading ? "Enviando..." : "Enviar Requerimientos"}
                 </Button>
               </form>
             </CardContent>

@@ -27,13 +27,13 @@ export const MicKitSection = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Microphone Kit</CardTitle>
+        <CardTitle>Kit de Micrófonos</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <ProviderSelector
           value={micKit}
           onChange={onMicKitChange}
-          label="Microphone Kit Provider"
+          label="Proveedor del Kit de Micrófonos"
           id="mic-kit"
           showMixed={true}
         />
@@ -42,12 +42,12 @@ export const MicKitSection = ({
           <div className="space-y-3">
             <div>
               <h3 className="text-sm font-semibold mb-2">
-                {micKit === 'mixed' ? "Festival-Provided Wired Microphones" : "Required Wired Microphones"}
+                {micKit === 'mixed' ? "Micrófonos Cableados Proporcionados por el Festival" : "Micrófonos Cableados Requeridos"}
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
                 {micKit === 'mixed'
-                  ? "Select only the microphones that the festival will provide. The band will provide any additional microphones."
-                  : "Select the wired microphones you need for your performance."
+                  ? "Seleccione solo los micrófonos que el festival proporcionará. La banda proporcionará cualquier micrófono adicional."
+                  : "Seleccione los micrófonos cableados que necesita para su presentación."
                 }
               </p>
             </div>
@@ -64,7 +64,7 @@ export const MicKitSection = ({
         {micKit === 'band' && (
           <div className="p-4 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground">
-              The band will provide their own microphone kit.
+              La banda proporcionará su propio kit de micrófonos.
             </p>
           </div>
         )}
@@ -72,8 +72,8 @@ export const MicKitSection = ({
         {micKit === 'mixed' && (
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-sm text-blue-700">
-              Mixed microphone setup: Enter only the microphones that the festival will provide.
-              The band will provide any additional microphones they need.
+              Configuración mixta de micrófonos: Ingrese solo los micrófonos que el festival proporcionará.
+              La banda proporcionará cualquier micrófono adicional que necesite.
             </p>
           </div>
         )}

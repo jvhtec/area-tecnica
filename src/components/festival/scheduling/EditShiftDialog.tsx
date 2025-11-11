@@ -22,9 +22,9 @@ interface EditShiftDialogProps {
 }
 
 const formSchema = z.object({
-  name: z.string().min(1, "Shift name is required"),
-  start_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Valid time format is required (HH:MM)"),
-  end_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Valid time format is required (HH:MM)"),
+  name: z.string().min(1, "El nombre del turno es requerido"),
+  start_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Se requiere formato de hora válido (HH:MM)"),
+  end_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Se requiere formato de hora válido (HH:MM)"),
   stage: z.string().optional(),
   department: z.string().optional(),
   notes: z.string().optional(),
@@ -78,14 +78,14 @@ export const EditShiftDialog = ({
       onShiftUpdated();
       onOpenChange(false);
       toast({
-        title: "Success",
-        description: "Shift updated successfully",
+        title: "Éxito",
+        description: "Turno actualizado exitosamente",
       });
     } catch (error: any) {
       console.error("Error updating shift:", error);
       toast({
         title: "Error",
-        description: "Could not update shift",
+        description: "No se pudo actualizar el turno",
         variant: "destructive",
       });
     } finally {
@@ -97,14 +97,14 @@ export const EditShiftDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base sm:text-lg">Edit Shift</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Editar Turno</DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 pt-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Shift Name</Label>
+            <Label htmlFor="name">Nombre del Turno</Label>
             <Input
               id="name"
-              placeholder="Morning Shift, Sound Check, etc."
+              placeholder="Turno Mañana, Soundcheck, etc."
               {...form.register("name")}
             />
             {form.formState.errors.name && (
@@ -123,7 +123,7 @@ export const EditShiftDialog = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="start_time">Start Time</Label>
+              <Label htmlFor="start_time">Hora de Inicio</Label>
               <Input
                 id="start_time"
                 type="time"
@@ -137,7 +137,7 @@ export const EditShiftDialog = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="end_time">End Time</Label>
+              <Label htmlFor="end_time">Hora de Fin</Label>
               <Input
                 id="end_time"
                 type="time"
@@ -153,16 +153,16 @@ export const EditShiftDialog = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="stage">Stage (optional)</Label>
-              <Select 
+              <Label htmlFor="stage">Stage (opcional)</Label>
+              <Select
                 defaultValue={form.getValues("stage") || "none"}
                 onValueChange={(value) => form.setValue("stage", value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select stage" />
+                  <SelectValue placeholder="Seleccionar stage" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No stage</SelectItem>
+                  <SelectItem value="none">Sin stage</SelectItem>
                   <SelectItem value="1">Stage 1</SelectItem>
                   <SelectItem value="2">Stage 2</SelectItem>
                   <SelectItem value="3">Stage 3</SelectItem>
@@ -172,30 +172,30 @@ export const EditShiftDialog = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="department">Department (optional)</Label>
-              <Select 
+              <Label htmlFor="department">Departamento (opcional)</Label>
+              <Select
                 defaultValue={form.getValues("department") || "none"}
                 onValueChange={(value) => form.setValue("department", value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
+                  <SelectValue placeholder="Seleccionar departamento" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No department</SelectItem>
-                  <SelectItem value="sound">Sound</SelectItem>
-                  <SelectItem value="lights">Lights</SelectItem>
+                  <SelectItem value="none">Sin departamento</SelectItem>
+                  <SelectItem value="sound">Sonido</SelectItem>
+                  <SelectItem value="lights">Luces</SelectItem>
                   <SelectItem value="video">Video</SelectItem>
-                  <SelectItem value="logistics">Logistics</SelectItem>
+                  <SelectItem value="logistics">Logística</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes (optional)</Label>
+            <Label htmlFor="notes">Notas (opcional)</Label>
             <Textarea
               id="notes"
-              placeholder="Any additional information about this shift"
+              placeholder="Cualquier información adicional sobre este turno"
               {...form.register("notes")}
             />
           </div>
@@ -206,10 +206,10 @@ export const EditShiftDialog = ({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Updating..." : "Update Shift"}
+              {isSubmitting ? "Actualizando..." : "Actualizar Turno"}
             </Button>
           </div>
         </form>

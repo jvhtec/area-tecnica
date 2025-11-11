@@ -94,7 +94,7 @@ export const ArtistForm = () => {
     if (!token) {
       toast({
         title: "Error",
-        description: "Invalid form URL",
+        description: "URL de formulario inválida",
         variant: "destructive",
       });
       return;
@@ -110,21 +110,21 @@ export const ArtistForm = () => {
         .single();
 
       if (formError) {
-        throw new Error('Invalid form link');
+        throw new Error('Enlace de formulario inválido');
       }
 
       if (!formInfo) {
-        throw new Error('Form not found');
+        throw new Error('Formulario no encontrado');
       }
 
       // Check if form is expired
       if (new Date(formInfo.expires_at) < new Date()) {
-        throw new Error('This form link has expired');
+        throw new Error('Este enlace de formulario ha expirado');
       }
 
       // Check if form is already completed
       if (formInfo.status !== 'pending') {
-        throw new Error('This form has already been submitted');
+        throw new Error('Este formulario ya ha sido enviado');
       }
 
       // Ensure wired_mics is properly serialized
@@ -211,8 +211,8 @@ export const ArtistForm = () => {
       if (updateFormError) throw updateFormError;
 
       toast({
-        title: "Success",
-        description: "Form submitted successfully",
+        title: "Éxito",
+        description: "Formulario enviado correctamente",
       });
 
       // Redirect to a thank you page
@@ -232,15 +232,15 @@ export const ArtistForm = () => {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto space-y-8">
-        <h1 className="text-2xl font-bold">Artist Technical Requirements Form</h1>
-        
+        <h1 className="text-2xl font-bold">Formulario de Requerimientos Técnicos del Artista</h1>
+
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="grid gap-6">
             {/* Basic Info */}
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Basic Information</h2>
+              <h2 className="text-xl font-semibold">Información Básica</h2>
               <div className="space-y-2">
-                <Label>Artist/Band Name</Label>
+                <Label>Nombre del Artista/Banda</Label>
                 <Input
                   type="text"
                   value={formData.name || ""}
@@ -251,7 +251,7 @@ export const ArtistForm = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Show Start Time</Label>
+                  <Label>Hora de Inicio del Show</Label>
                   <Input
                     type="time"
                     value={formData.show_start || ""}
@@ -259,7 +259,7 @@ export const ArtistForm = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Show End Time</Label>
+                  <Label>Hora de Fin del Show</Label>
                   <Input
                     type="time"
                     value={formData.show_end || ""}
@@ -270,18 +270,18 @@ export const ArtistForm = () => {
 
               <div className="space-y-4">
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="soundcheck"
                     checked={formData.soundcheck}
                     onCheckedChange={(checked) => setFormData(prev => ({ ...prev, soundcheck: !!checked }))}
                   />
-                  <Label htmlFor="soundcheck">Soundcheck Required</Label>
+                  <Label htmlFor="soundcheck">Requiere Soundcheck</Label>
                 </div>
 
                 {formData.soundcheck && (
                   <div className="grid grid-cols-2 gap-4 ml-6">
                     <div className="space-y-2">
-                      <Label>Soundcheck Start</Label>
+                      <Label>Inicio del Soundcheck</Label>
                       <Input
                         type="time"
                         value={formData.soundcheck_start || ""}
@@ -289,7 +289,7 @@ export const ArtistForm = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Soundcheck End</Label>
+                      <Label>Fin del Soundcheck</Label>
                       <Input
                         type="time"
                         value={formData.soundcheck_end || ""}
@@ -300,37 +300,37 @@ export const ArtistForm = () => {
                 )}
 
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="after-midnight"
                     checked={formData.isaftermidnight}
                     onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isaftermidnight: !!checked }))}
                   />
-                  <Label htmlFor="after-midnight">Show is after midnight</Label>
+                  <Label htmlFor="after-midnight">El show es después de medianoche</Label>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="rider-missing"
                     checked={formData.rider_missing}
                     onCheckedChange={(checked) => setFormData(prev => ({ ...prev, rider_missing: !!checked }))}
                   />
-                  <Label htmlFor="rider-missing">Rider is missing</Label>
+                  <Label htmlFor="rider-missing">El rider está faltando</Label>
                 </div>
               </div>
             </div>
 
             {/* FOH Console Section */}
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold">FOH Console</h2>
+              <h2 className="text-xl font-semibold">Console FOH</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Console Model</Label>
+                  <Label>Modelo de Console</Label>
                   <Select
                     value={formData.foh_console || ""}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, foh_console: value }))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select console" />
+                      <SelectValue placeholder="Seleccionar console" />
                     </SelectTrigger>
                     <SelectContent>
                       {fohOptions.map((option) => (
@@ -342,7 +342,7 @@ export const ArtistForm = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Provided By</Label>
+                  <Label>Proporcionado Por</Label>
                   <Select
                     value={formData.foh_console_provided_by || "festival"}
                     onValueChange={(value: "festival" | "band") => setFormData(prev => ({ ...prev, foh_console_provided_by: value }))}
@@ -352,33 +352,33 @@ export const ArtistForm = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="festival">Festival</SelectItem>
-                      <SelectItem value="band">Band</SelectItem>
+                      <SelectItem value="band">Banda</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <Checkbox 
+                <Checkbox
                   id="foh-tech"
                   checked={formData.foh_tech}
                   onCheckedChange={(checked) => setFormData(prev => ({ ...prev, foh_tech: !!checked }))}
                 />
-                <Label htmlFor="foh-tech">FOH Technician Required</Label>
+                <Label htmlFor="foh-tech">Requiere Técnico FOH</Label>
               </div>
             </div>
 
             {/* Monitor Console Section */}
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Monitor Console</h2>
+              <h2 className="text-xl font-semibold">Console de Monitor</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Console Model</Label>
+                  <Label>Modelo de Console</Label>
                   <Select
                     value={formData.mon_console || ""}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console: value }))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select console" />
+                      <SelectValue placeholder="Seleccionar console" />
                     </SelectTrigger>
                     <SelectContent>
                       {monOptions.map((option) => (
@@ -390,7 +390,7 @@ export const ArtistForm = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Provided By</Label>
+                  <Label>Proporcionado Por</Label>
                   <Select
                     value={formData.mon_console_provided_by || "festival"}
                     onValueChange={(value: "festival" | "band") => setFormData(prev => ({ ...prev, mon_console_provided_by: value }))}
@@ -400,18 +400,18 @@ export const ArtistForm = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="festival">Festival</SelectItem>
-                      <SelectItem value="band">Band</SelectItem>
+                      <SelectItem value="band">Banda</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <Checkbox 
+                <Checkbox
                   id="mon-tech"
                   checked={formData.mon_tech}
                   onCheckedChange={(checked) => setFormData(prev => ({ ...prev, mon_tech: !!checked }))}
                 />
-                <Label htmlFor="mon-tech">Monitor Technician Required</Label>
+                <Label htmlFor="mon-tech">Requiere Técnico de Monitor</Label>
               </div>
             </div>
 
@@ -431,18 +431,18 @@ export const ArtistForm = () => {
 
             {/* Notes Section */}
             <div className="space-y-2">
-              <Label>Additional Notes</Label>
+              <Label>Notas Adicionales</Label>
               <Input
                 type="text"
                 value={formData.notes || ""}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Any additional requirements or comments"
+                placeholder="Cualquier requerimiento o comentario adicional"
               />
             </div>
           </div>
 
           <Button type="submit" disabled={isLoading} className="w-full">
-            {isLoading ? "Submitting..." : "Submit Form"}
+            {isLoading ? "Enviando..." : "Enviar Formulario"}
           </Button>
         </form>
       </div>

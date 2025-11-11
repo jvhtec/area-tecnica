@@ -29,7 +29,7 @@ export const CopyShiftsDialog = ({
 
   const handleCopy = async () => {
     if (!targetDate) {
-      toast.error("Please select a target date");
+      toast.error("Por favor selecciona una fecha destino");
       return;
     }
 
@@ -58,7 +58,7 @@ export const CopyShiftsDialog = ({
       }
 
       if (!shifts || shifts.length === 0) {
-        toast.error("No shifts found for the selected source date");
+        toast.error("No se encontraron turnos para la fecha de origen seleccionada");
         return;
       }
 
@@ -128,15 +128,15 @@ export const CopyShiftsDialog = ({
       }
 
       console.log("Copy operation completed successfully");
-      toast.success(`Successfully copied ${shifts.length} shifts with all assignments to ${format(new Date(targetDate), 'MMM d, yyyy')}`);
-      
+      toast.success(`Se copiaron exitosamente ${shifts.length} turnos con todas las asignaciones a ${format(new Date(targetDate), 'MMM d, yyyy')}`);
+
       // Call the callback to refresh data
       onShiftsCopied();
       onOpenChange(false);
-      
+
     } catch (error: any) {
       console.error("Error copying shifts:", error);
-      toast.error(`Failed to copy shifts: ${error.message || 'Unknown error'}`);
+      toast.error(`Error al copiar turnos: ${error.message || 'Error desconocido'}`);
     } finally {
       setIsLoading(false);
     }
@@ -146,22 +146,22 @@ export const CopyShiftsDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base sm:text-lg">Copy Shifts to Another Date</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Copiar Turnos a Otra Fecha</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-4">
           <div>
             <p className="text-sm text-muted-foreground mb-2">
-              Source date: {format(new Date(sourceDate), 'MMM d, yyyy')}
+              Fecha de origen: {format(new Date(sourceDate), 'MMM d, yyyy')}
             </p>
             <p className="text-xs text-muted-foreground mb-4">
-              This will copy all shifts and their assigned technicians to the target date.
+              Esto copiará todos los turnos y sus técnicos asignados a la fecha destino.
             </p>
             <Select
               value={targetDate}
               onValueChange={setTargetDate}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select target date" />
+                <SelectValue placeholder="Seleccionar fecha destino" />
               </SelectTrigger>
               <SelectContent>
                 {jobDates.map((date) => {
@@ -182,13 +182,13 @@ export const CopyShiftsDialog = ({
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               onClick={handleCopy}
               disabled={!targetDate || isLoading}
             >
-              {isLoading ? "Copying..." : "Copy Shifts & Assignments"}
+              {isLoading ? "Copiando..." : "Copiar Turnos y Asignaciones"}
             </Button>
           </div>
         </div>

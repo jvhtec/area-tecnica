@@ -18,12 +18,12 @@ export const ProviderSelector = ({ value, onChange, label, id, showMixed = false
         </div>
         <div className="flex items-center space-x-2">
           <RadioGroupItem value="band" id={`${id}-band`} />
-          <Label htmlFor={`${id}-band`}>Band</Label>
+          <Label htmlFor={`${id}-band`}>Banda</Label>
         </div>
         {showMixed && (
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="mixed" id={`${id}-mixed`} />
-            <Label htmlFor={`${id}-mixed`}>Mixed</Label>
+            <Label htmlFor={`${id}-mixed`}>Mixto</Label>
           </div>
         )}
       </RadioGroup>
