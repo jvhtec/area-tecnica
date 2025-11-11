@@ -12,6 +12,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const DEFAULT_INLINE_IMAGE_RETENTION_HOURS = 24 * 7; // 7 days
+
+function resolveInlineImageRetentionHours(): number {
+  const raw = Deno.env.get("CORPORATE_EMAIL_IMAGE_RETENTION_HOURS");
+  if (!raw) {
+    return DEFAULT_INLINE_IMAGE_RETENTION_HOURS;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    console.warn(
+      `[send-corporate-email] Invalid CORPORATE_EMAIL_IMAGE_RETENTION_HOURS value "${raw}" – falling back to default (${DEFAULT_INLINE_IMAGE_RETENTION_HOURS}h)`
+    );
+    return DEFAULT_INLINE_IMAGE_RETENTION_HOURS;
+  }
+
+  return parsed;
+}
+
+const INLINE_IMAGE_RETENTION_HOURS = resolveInlineImageRetentionHours();
+const INLINE_IMAGE_RETENTION_MS = INLINE_IMAGE_RETENTION_HOURS * 60 * 60 * 1000;
+
 // Maximum file sizes
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB
@@ -42,6 +64,12 @@ interface SendCorporateEmailRequest {
   recipients: RecipientCriteria;
   pdfAttachments?: PdfAttachment[];
   inlineImages?: InlineImage[];
+}
+
+interface EmailLogMetadata {
+  inlineImagePaths?: string[] | null;
+  inlineImageRetentionUntil?: string | null;
+  inlineImageCleanupCompletedAt?: string | null;
 }
 
 /**
@@ -257,7 +285,8 @@ async function logEmailSend(
   recipients: string[],
   sentCount: number,
   totalRecipients: number,
-  error?: string
+  error?: string,
+  metadata?: EmailLogMetadata
 ) {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
@@ -270,7 +299,7 @@ async function logEmailSend(
     status = 'success';
   }
 
-  await supabase.from("corporate_email_logs").insert({
+  const logPayload: Record<string, unknown> = {
     actor_id: actorId,
     subject,
     body_html: bodyHtml,
@@ -279,14 +308,28 @@ async function logEmailSend(
     sent_count: sentCount,
     total_recipients: totalRecipients,
     error_message: error,
-  });
+  };
+
+  if (metadata) {
+    if (metadata.inlineImagePaths !== undefined) {
+      logPayload.inline_image_paths = metadata.inlineImagePaths;
+    }
+    if (metadata.inlineImageRetentionUntil !== undefined) {
+      logPayload.inline_image_retention_until = metadata.inlineImageRetentionUntil;
+    }
+    if (metadata.inlineImageCleanupCompletedAt !== undefined) {
+      logPayload.inline_image_cleanup_completed_at = metadata.inlineImageCleanupCompletedAt;
+    }
+  }
+
+  await supabase.from("corporate_email_logs").insert(logPayload);
 }
 
 /**
  * Clean up temporary images from storage
  */
-async function cleanupImages(filePaths: string[]) {
-  if (filePaths.length === 0) return;
+async function cleanupImages(filePaths: string[]): Promise<boolean> {
+  if (filePaths.length === 0) return true;
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
@@ -297,11 +340,16 @@ async function cleanupImages(filePaths: string[]) {
 
     if (error) {
       console.error("[send-corporate-email] Error cleaning up images:", error);
-    } else {
-      console.log(`[send-corporate-email] Successfully deleted ${filePaths.length} images`);
+      return false;
     }
+
+    if (data && data.length > 0) {
+      console.log(`[send-corporate-email] Successfully deleted ${data.length} images`);
+    }
+    return true;
   } catch (error) {
     console.error("[send-corporate-email] Exception during cleanup:", error);
+    return false;
   }
 }
 
@@ -522,6 +570,8 @@ serve(async (req) => {
     const success = sendRes.ok;
     let messageId: string | undefined;
     let errorMessage: string | undefined;
+    let retentionUntil: string | null = null;
+    let logMetadata: EmailLogMetadata | undefined;
 
     if (success) {
       try {
@@ -530,14 +580,39 @@ serve(async (req) => {
       } catch (e) {
         console.warn("[send-corporate-email] Could not parse Brevo response", e);
       }
+
+      if (uploadedImagePaths.length > 0) {
+        retentionUntil = new Date(Date.now() + INLINE_IMAGE_RETENTION_MS).toISOString();
+        console.log(
+          `[send-corporate-email] Retaining ${uploadedImagePaths.length} inline images until ${retentionUntil} (${INLINE_IMAGE_RETENTION_HOURS}h)`
+        );
+        logMetadata = {
+          inlineImagePaths: uploadedImagePaths,
+          inlineImageRetentionUntil: retentionUntil,
+        };
+      }
     } else {
       errorMessage = await sendRes.text();
       console.error("[send-corporate-email] Brevo error:", sendRes.status, errorMessage);
-    }
 
-    // Step 11: Clean up temporary images (always, success or failure)
-    console.log(`[send-corporate-email] Cleaning up ${uploadedImagePaths.length} temporary images...`);
-    await cleanupImages(uploadedImagePaths);
+      if (uploadedImagePaths.length > 0) {
+        console.log(
+          `[send-corporate-email] Cleaning up ${uploadedImagePaths.length} temporary images due to send failure...`
+        );
+        const cleanupSucceeded = await cleanupImages(uploadedImagePaths);
+        if (cleanupSucceeded) {
+          logMetadata = {
+            inlineImageCleanupCompletedAt: new Date().toISOString(),
+          };
+        } else {
+          retentionUntil = new Date(Date.now() + INLINE_IMAGE_RETENTION_MS).toISOString();
+          logMetadata = {
+            inlineImagePaths: uploadedImagePaths,
+            inlineImageRetentionUntil: retentionUntil,
+          };
+        }
+      }
+    }
 
     // Step 12: Log to database
     await logEmailSend(
@@ -547,7 +622,8 @@ serve(async (req) => {
       recipientEmails,
       success ? recipientEmails.length : 0,
       recipientEmails.length,
-      errorMessage
+      errorMessage,
+      logMetadata
     );
 
     // Step 13: Return response
@@ -562,6 +638,8 @@ serve(async (req) => {
             success: true,
           })),
           messageId,
+          inlineImageRetentionExpiresAt: retentionUntil,
+          inlineImageRetentionHours: INLINE_IMAGE_RETENTION_HOURS,
         }),
         {
           status: 200,

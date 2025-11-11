@@ -72,3 +72,7 @@ The web client already registers a production service worker, caches the app she
 6. **Store the generated VAPID keys** (see `docs/pwa-push-credentials.md`) in your secret manager and expose the public key to the client via `VITE_VAPID_PUBLIC_KEY`.
 
 Offline support currently covers the core app shell. Expand the cache list in `public/sw.js` or add runtime caching if additional assets or API responses should be available while offline.
+
+## Corporate email inline images
+
+Inline images uploaded through the corporate email composer are stored temporarily in the `corporate-emails-temp` storage bucket. The send flow retains these files for the configured retention window (default 7 days) so recipients can continue viewing the content. A scheduled Supabase Edge Function (`cleanup-corporate-email-images`) purges expired files and retries any paths that could not be deleted automatically. For setup instructions and operational guidance, see [`docs/corporate-email-inline-image-retention.md`](docs/corporate-email-inline-image-retention.md).
