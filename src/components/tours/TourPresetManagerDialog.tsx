@@ -64,7 +64,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tour-presets', tourId] });
-      toast({ title: 'Success', description: 'Preset deleted' });
+      toast({ title: 'Éxito', description: 'Preajuste eliminado' });
     },
     onError: (e: any) => {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
@@ -112,7 +112,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
       setEditingPreset(null);
       setCopyingPreset(null);
       setIsCreating(false);
-      toast({ title: 'Success', description: 'Preset saved' });
+      toast({ title: 'Éxito', description: 'Preajuste guardado' });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
@@ -122,18 +122,18 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">Department</span>
+          <span className="text-sm text-muted-foreground">Departamento</span>
           <select
             className="border rounded px-2 py-1 text-sm"
             value={department}
             onChange={(e) => setDepartment(e.target.value as Department)}
           >
-            <option value="sound">Sound</option>
-            <option value="lights">Lights</option>
-            <option value="video">Video</option>
+            <option value="sound">Sonido</option>
+            <option value="lights">Luces</option>
+            <option value="video">Vídeo</option>
           </select>
         </div>
-        <Button size="sm" onClick={() => setIsCreating(true)}>Create New Preset</Button>
+        <Button size="sm" onClick={() => setIsCreating(true)}>Crear Nuevo Preajuste</Button>
       </div>
 
       <Card>
@@ -144,10 +144,10 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
                 <div key={p.id} className="flex items-center justify-between border rounded p-3">
                   <div>
                     <div className="font-medium">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">{p.items.length} items · {department}</div>
+                    <div className="text-xs text-muted-foreground">{p.items.length} elementos · {department}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => setCopyingPreset({ ...p, name: `Copy of ${p.name}` })}>
+                    <Button variant="ghost" size="icon" onClick={() => setCopyingPreset({ ...p, name: `Copia de ${p.name}` })}>
                       <Copy className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => setEditingPreset(p)}>
@@ -161,7 +161,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
               ))}
               {presets.length === 0 && (
                 <div className="text-center text-sm text-muted-foreground py-6">
-                  No presets for this tour and department.
+                  No hay preajustes para esta gira y departamento.
                 </div>
               )}
             </div>
@@ -175,7 +175,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base md:text-lg">Tour Presets</DialogTitle>
+          <DialogTitle className="text-base md:text-lg">Preajustes de Gira</DialogTitle>
         </DialogHeader>
 
         {isCreating || editingPreset || copyingPreset ? (

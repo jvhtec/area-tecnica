@@ -155,7 +155,7 @@ export const TourDefaultsManager = ({
       console.error('Error deleting table:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete table',
+        description: 'Error al eliminar la tabla',
         variant: 'destructive',
       });
     }
@@ -169,7 +169,7 @@ export const TourDefaultsManager = ({
       console.error('Error deleting set:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete set',
+        description: 'Error al eliminar el conjunto',
         variant: 'destructive',
       });
     }
@@ -228,8 +228,8 @@ export const TourDefaultsManager = ({
 
       if (relevantDefaults.length === 0) {
         toast({
-          title: 'No defaults found',
-          description: `No ${type} defaults found for ${department} department`,
+          title: 'No se encontraron valores por defecto',
+          description: `No se encontraron valores por defecto de ${type === 'power' ? 'potencia' : 'peso'} para el departamento de ${department}`,
           variant: 'destructive',
         });
         return;
@@ -342,14 +342,14 @@ export const TourDefaultsManager = ({
       document.body.removeChild(a);
 
       toast({
-        title: 'Success',
-        description: 'PDF exported successfully',
+        title: 'Éxito',
+        description: 'PDF exportado exitosamente',
       });
     } catch (error) {
       console.error('Error exporting PDF:', error);
       toast({
         title: 'Error',
-        description: 'Failed to export PDF',
+        description: 'Error al exportar PDF',
         variant: 'destructive',
       });
     }
@@ -359,8 +359,8 @@ export const TourDefaultsManager = ({
     try {
       if (tourDates.length === 0) {
         toast({
-          title: 'No tour dates found',
-          description: 'No tour dates available for export',
+          title: 'No se encontraron fechas de gira',
+          description: 'No hay fechas de gira disponibles para exportar',
           variant: 'destructive',
         });
         return;
@@ -380,14 +380,14 @@ export const TourDefaultsManager = ({
       }
 
       toast({
-        title: 'Success',
-        description: `Exported ${tourDates.length} PDFs for all tour dates`,
+        title: 'Éxito',
+        description: `Se exportaron ${tourDates.length} PDFs para todas las fechas de gira`,
       });
     } catch (error) {
       console.error('Error exporting bulk tour date PDFs:', error);
       toast({
         title: 'Error',
-        description: 'Failed to export tour date PDFs',
+        description: 'Error al exportar los PDFs de las fechas de gira',
         variant: 'destructive',
       });
     }
@@ -536,7 +536,7 @@ export const TourDefaultsManager = ({
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-lg font-semibold flex items-center gap-2">
               <Calculator className="h-5 w-5" />
-              Power Defaults ({powerTables.length})
+              Valores por Defecto de Potencia ({powerTables.length})
             </h4>
             <div className="flex gap-2">
               <Button
@@ -546,7 +546,7 @@ export const TourDefaultsManager = ({
                 disabled={powerTables.length === 0}
               >
                 <FileText className="h-4 w-4 mr-1" />
-                Export Defaults PDF
+                Exportar PDF de Valores
               </Button>
               <Button
                 variant="outline"
@@ -555,7 +555,7 @@ export const TourDefaultsManager = ({
                 disabled={powerTables.length === 0 || tourDates.length === 0}
               >
                 <Download className="h-4 w-4 mr-1" />
-                Bulk Tour Date PDFs
+                PDFs Masivos de Fechas
               </Button>
             </div>
           </div>
@@ -646,7 +646,7 @@ export const TourDefaultsManager = ({
           )}
 
           {powerTables.length === 0 && (
-            <p className="text-muted-foreground">No power defaults configured</p>
+            <p className="text-muted-foreground">No hay valores por defecto de potencia configurados</p>
           )}
         </div>
 
@@ -655,7 +655,7 @@ export const TourDefaultsManager = ({
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-lg font-semibold flex items-center gap-2">
               <Weight className="h-5 w-5" />
-              Weight Defaults ({weightTables.length})
+              Valores por Defecto de Peso ({weightTables.length})
             </h4>
             <div className="flex gap-2">
               <Button
@@ -665,7 +665,7 @@ export const TourDefaultsManager = ({
                 disabled={weightTables.length === 0}
               >
                 <FileText className="h-4 w-4 mr-1" />
-                Export Defaults PDF
+                Exportar PDF de Valores
               </Button>
               <Button
                 variant="outline"
@@ -674,7 +674,7 @@ export const TourDefaultsManager = ({
                 disabled={weightTables.length === 0 || tourDates.length === 0}
               >
                 <Download className="h-4 w-4 mr-1" />
-                Bulk Tour Date PDFs
+                PDFs Masivos de Fechas
               </Button>
             </div>
           </div>
@@ -760,7 +760,7 @@ export const TourDefaultsManager = ({
           )}
 
           {weightTables.length === 0 && (
-            <p className="text-muted-foreground">No weight defaults configured</p>
+            <p className="text-muted-foreground">No hay valores por defecto de peso configurados</p>
           )}
         </div>
       </div>
@@ -773,10 +773,10 @@ export const TourDefaultsManager = ({
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
             <Calendar className="h-5 w-5" />
-            Tour Dates ({tourDates.length})
+            Fechas de Gira ({tourDates.length})
           </h3>
           <p className="text-sm text-green-700 mb-4">
-            Export individual PDFs for each tour date, including both defaults and overrides.
+            Exporta PDFs individuales para cada fecha de gira, incluyendo valores por defecto y anulaciones.
           </p>
         </div>
 
@@ -806,7 +806,7 @@ export const TourDefaultsManager = ({
                           onClick={() => exportTourDatePDF(tourDate, dept, 'power')}
                           className="text-xs"
                         >
-                          Power PDF
+                          PDF de Potencia
                         </Button>
                         <Button
                           variant="outline"
@@ -814,7 +814,7 @@ export const TourDefaultsManager = ({
                           onClick={() => exportTourDatePDF(tourDate, dept, 'weight')}
                           className="text-xs"
                         >
-                          Weight PDF
+                          PDF de Peso
                         </Button>
                       </div>
                     </div>
@@ -824,7 +824,7 @@ export const TourDefaultsManager = ({
             ))}
           </div>
         ) : (
-          <p className="text-muted-foreground">No tour dates configured</p>
+          <p className="text-muted-foreground">No hay fechas de gira configuradas</p>
         )}
       </div>
     );
@@ -834,36 +834,36 @@ export const TourDefaultsManager = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base md:text-lg truncate">Tour Defaults: {tour?.name}</DialogTitle>
+          <DialogTitle className="text-base md:text-lg truncate">Valores por Defecto de Gira: {tour?.name}</DialogTitle>
         </DialogHeader>
-        
+
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="sound">Sound</TabsTrigger>
-            <TabsTrigger value="lights">Lights</TabsTrigger>
-            <TabsTrigger value="video">Video</TabsTrigger>
-            <TabsTrigger value="tour-dates">Tour Dates</TabsTrigger>
+            <TabsTrigger value="sound">Sonido</TabsTrigger>
+            <TabsTrigger value="lights">Luces</TabsTrigger>
+            <TabsTrigger value="video">Vídeo</TabsTrigger>
+            <TabsTrigger value="tour-dates">Fechas de Gira</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="sound" className="mt-6">
             {defaultSetsLoading || soundPowerLoading || soundWeightLoading ? (
-              <p>Loading sound defaults...</p>
+              <p>Cargando valores por defecto de sonido...</p>
             ) : (
               renderDepartmentDefaults('sound')
             )}
           </TabsContent>
-          
+
           <TabsContent value="lights" className="mt-6">
             {defaultSetsLoading || soundPowerLoading || soundWeightLoading ? (
-              <p>Loading lights defaults...</p>
+              <p>Cargando valores por defecto de luces...</p>
             ) : (
               renderDepartmentDefaults('lights')
             )}
           </TabsContent>
-          
+
           <TabsContent value="video" className="mt-6">
             {defaultSetsLoading || soundPowerLoading || soundWeightLoading ? (
-              <p>Loading video defaults...</p>
+              <p>Cargando valores por defecto de vídeo...</p>
             ) : (
               renderDepartmentDefaults('video')
             )}

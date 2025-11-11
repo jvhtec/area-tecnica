@@ -111,8 +111,8 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
     return (
       <div className="container mx-auto p-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Tour Not Found</h1>
-          <p className="text-muted-foreground">The requested tour could not be found.</p>
+          <h1 className="text-2xl font-bold mb-4">Gira No Encontrada</h1>
+          <p className="text-muted-foreground">No se pudo encontrar la gira solicitada.</p>
         </div>
       </div>
     );
@@ -147,7 +147,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   const handleCreateWaGroup = async () => {
     try {
       if (!waSelectedDateId) {
-        toast({ title: 'Select a date', description: 'Please choose a tour date to target.' , variant: 'destructive'});
+        toast({ title: 'Selecciona una fecha', description: 'Por favor elige una fecha de gira como destino.' , variant: 'destructive'});
         return;
       }
       setIsCreatingWaGroup(true);
@@ -158,7 +158,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         .eq('tour_date_id', waSelectedDateId)
         .maybeSingle();
       if (jobErr || !jobRow) {
-        toast({ title: 'No job found', description: 'No job linked to the selected tour date.' , variant: 'destructive'});
+        toast({ title: 'No se encontró trabajo', description: 'No hay trabajo vinculado a la fecha de gira seleccionada.' , variant: 'destructive'});
         setIsCreatingWaGroup(false);
         return;
       }
@@ -179,12 +179,12 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         if (!ph) missing.push(full); else validPhones += 1;
       }
       if (validPhones === 0) {
-        toast({ title: 'No phones', description: 'No valid phone numbers found for the selected department on this date.', variant: 'destructive' });
+        toast({ title: 'Sin teléfonos', description: 'No se encontraron números de teléfono válidos para el departamento seleccionado en esta fecha.', variant: 'destructive' });
         setIsCreatingWaGroup(false);
         return;
       }
       if (missing.length > 0) {
-        toast({ title: 'Some missing phones', description: `Members without phone: ${missing.slice(0,3).join(', ')}${missing.length>3?'…':''}` });
+        toast({ title: 'Faltan algunos teléfonos', description: `Miembros sin teléfono: ${missing.slice(0,3).join(', ')}${missing.length>3?'…':''}` });
       }
 
       // Invoke the existing edge function
@@ -192,9 +192,9 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         body: { job_id: jobRow.id, department: waDepartment }
       });
       if (fnErr) {
-        toast({ title: 'Failed to create group', description: fnErr.message, variant: 'destructive' });
+        toast({ title: 'Error al crear grupo', description: fnErr.message, variant: 'destructive' });
       } else {
-        toast({ title: 'Requested', description: 'WhatsApp group creation requested. It will finalize shortly.' });
+        toast({ title: 'Solicitado', description: 'Se solicitó la creación del grupo de WhatsApp. Se finalizará en breve.' });
         setIsWaDialogOpen(false);
       }
     } catch (e: any) {
@@ -217,14 +217,14 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
     try {
       await exportTourPDF(tour);
       toast({
-        title: "Success",
-        description: "Tour schedule exported successfully",
+        title: "Éxito",
+        description: "Calendario de gira exportado exitosamente",
       });
     } catch (error: any) {
       console.error("Error exporting tour schedule:", error);
       toast({
         title: "Error",
-        description: "Failed to export tour schedule",
+        description: "Error al exportar el calendario de gira",
         variant: "destructive",
       });
     } finally {
@@ -242,95 +242,95 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
 
   const quickActions: QuickAction[] = [
     {
-      title: "Tour Dates & Locations",
-      description: "View tour dates, venues, and locations",
+      title: "Fechas y Ubicaciones de la Gira",
+      description: "Ver fechas, recintos y ubicaciones de la gira",
       icon: Calendar,
       onClick: () => setIsDatesOpen(true),
-      badge: `${totalDates} dates`,
+      badge: `${totalDates} fechas`,
       viewOnly: true
     },
     {
-      title: "Team Assignments",
-      description: isTechnicianView 
-        ? "View tour team members (automatically applied to all jobs)" 
-        : "Assign crew members to the entire tour (auto-syncs to all jobs)",
+      title: "Asignaciones del Equipo",
+      description: isTechnicianView
+        ? "Ver miembros del equipo de gira (aplicados automáticamente a todos los trabajos)"
+        : "Asignar miembros del equipo a toda la gira (sincroniza automáticamente con todos los trabajos)",
       icon: UserCheck,
       onClick: () => setIsAssignmentsOpen(true),
-      badge: `${totalAssignments} assigned`,
+      badge: `${totalAssignments} asignados`,
       viewOnly: isTechnicianView,
       hasAutoSync: true
     },
     {
-      title: "Document Management",
-      description: "Upload, organize, and share tour documents",
+      title: "Gestión de Documentos",
+      description: "Subir, organizar y compartir documentos de la gira",
       icon: FileText,
       onClick: () => setIsDocumentsOpen(true),
-      badge: "Available",
+      badge: "Disponible",
       viewOnly: false
     },
     {
-      title: "Rates & Extras Manager",
-      description: "Set extras and resolve rate issues",
+      title: "Gestor de Tarifas y Extras",
+      description: "Configurar extras y resolver problemas de tarifas",
       icon: Euro,
       onClick: () => setIsRatesManagerOpen(true),
-      badge: tourRatesApproved ? "Rates Approved" : "Needs Approval",
+      badge: tourRatesApproved ? "Tarifas Aprobadas" : "Requiere Aprobación",
       showForTechnician: false
     },
     {
-      title: "Tour Presets",
-      description: "Create and manage equipment presets for this tour",
+      title: "Preajustes de Gira",
+      description: "Crear y gestionar preajustes de equipos para esta gira",
       icon: Box,
       onClick: () => setIsTourPresetsOpen(true),
-      badge: "Equipment",
+      badge: "Equipamiento",
       showForTechnician: false
     },
     {
-      title: "Tour Configuration",
-      description: "Power & weight defaults, technical settings",
+      title: "Configuración de Gira",
+      description: "Valores por defecto de potencia y peso, configuraciones técnicas",
       icon: Settings,
       onClick: () => setIsDefaultsManagerOpen(true),
-      badge: "Settings",
+      badge: "Configuración",
       showForTechnician: false
     },
     {
-      title: "Power Requirements",
-      description: "Set default power calculations for all dates",
+      title: "Requisitos de Potencia",
+      description: "Establecer cálculos de potencia por defecto para todas las fechas",
       icon: Calculator,
       onClick: handlePowerDefaults,
-      badge: "Defaults",
+      badge: "Por Defecto",
       showForTechnician: false
     },
     {
-      title: "Weight Calculations",
-      description: "Configure weight defaults and calculations",
+      title: "Cálculos de Peso",
+      description: "Configurar valores por defecto y cálculos de peso",
       icon: Weight,
       onClick: handleWeightDefaults,
-      badge: "Defaults",
+      badge: "Por Defecto",
       showForTechnician: false
     },
     {
-      title: "Scheduling & Timeline",
-      description: "Tour timeline and scheduling management",
+      title: "Programación y Línea de Tiempo",
+      description: "Línea de tiempo y gestión de programación de la gira",
       icon: Clock,
       onClick: () => setIsSchedulingOpen(true),
-      badge: "Available",
+      badge: "Disponible",
       viewOnly: false,
       showForTechnician: false
     },
     {
-      title: "Logistics",
-      description: "Tour‑wide transport with per‑date overrides",
+      title: "Logística",
+      description: "Transporte para toda la gira con anulaciones por fecha",
       icon: Truck,
       onClick: () => setIsLogisticsOpen(true),
-      badge: "Available",
+      badge: "Disponible",
       showForTechnician: false
     },
     {
-      title: "Tour Tasks",
-      description: "Manage tour-wide tasks and updates",
+      title: "Tareas de Gira",
+      description: "Gestionar tareas y actualizaciones de toda la gira",
       icon: ListChecks,
       onClick: handleOpenTourTasks,
-      badge: "Available",
+      badge: "Disponible",
       showForTechnician: false,
     }
   ].filter(action => {
@@ -346,7 +346,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
 
   const handleFlexClick = async () => {
     if (isFlexLoading) {
-      toast({ title: "Loading", description: "Please wait while we load the Flex folder..." });
+      toast({ title: "Cargando", description: "Por favor espera mientras cargamos la carpeta Flex..." });
       return;
     }
 
@@ -354,16 +354,16 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       await openFlexElement({
         elementId: flexUuid,
         onError: (error) => {
-          toast({ title: "Error", description: error.message || "Failed to open Flex", variant: "destructive" });
+          toast({ title: "Error", description: error.message || "Error al abrir Flex", variant: "destructive" });
         },
         onWarning: (message) => {
-          toast({ title: "Warning", description: message });
+          toast({ title: "Advertencia", description: message });
         },
       });
     } else if (flexError) {
       toast({ title: "Error", description: flexError, variant: "destructive" });
     } else {
-      toast({ title: "Info", description: "Flex folder not available for this tour" });
+      toast({ title: "Info", description: "Carpeta Flex no disponible para esta gira" });
     }
   };
 
@@ -394,11 +394,11 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
                 <Button variant="ghost" onClick={handleBackToTechnicianDashboard} className="p-0 h-auto">
                   <ArrowLeft className="h-4 w-4 mr-1" />
-                  Back to Dashboard
+                  Volver al Panel
                 </Button>
                 <Badge variant="outline">
                   <Eye className="h-3 w-3 mr-1" />
-                  Technician View
+                  Vista de Técnico
                 </Badge>
               </div>
               <h1 className="text-2xl md:text-3xl font-bold">{tour.name}</h1>
@@ -415,7 +415,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                   </div>
                 )}
                 <Badge variant="outline" style={{ borderColor: tour.color, color: tour.color }}>
-                  {totalDates} dates
+                  {totalDates} fechas
                 </Badge>
               </div>
             </div>
@@ -424,20 +424,20 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
           <div className="flex flex-col sm:flex-row gap-2 w-full">
             <Button variant="outline" onClick={() => setIsAssignmentsOpen(true)} className="w-full sm:w-auto">
               <Users className="h-4 w-4 mr-2" />
-              View Assignments
+              Ver Asignaciones
             </Button>
             <Button onClick={() => setIsDocumentsOpen(true)} className="w-full sm:w-auto">
               <FileText className="h-4 w-4 mr-2" />
-              Open Documents
+              Abrir Documentos
             </Button>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg md:text-xl">Scheduled Tour Dates</CardTitle>
+            <CardTitle className="text-lg md:text-xl">Fechas de Gira Programadas</CardTitle>
             <p className="text-xs md:text-sm text-muted-foreground">
-              Review confirmed dates and locations for this tour.
+              Revisa las fechas y ubicaciones confirmadas para esta gira.
             </p>
           </CardHeader>
           <CardContent className="px-3 md:px-6">
@@ -466,7 +466,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                       ) : (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar className="h-4 w-4" />
-                          <span>Date not available</span>
+                          <span>Fecha no disponible</span>
                         </div>
                       )}
                       {date.location?.name && (
@@ -486,7 +486,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
               </div>
             ) : (
               <div className="text-center py-10 text-muted-foreground text-sm">
-                No scheduled dates available for this tour yet.
+                Aún no hay fechas programadas disponibles para esta gira.
               </div>
             )}
           </CardContent>
@@ -542,11 +542,11 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
                 <Button variant="ghost" onClick={handleBackToTechnicianDashboard} className="p-0 h-auto">
                   <ArrowLeft className="h-4 w-4 mr-1" />
-                  Back to Dashboard
+                  Volver al Panel
                 </Button>
                 <Badge variant="outline">
                   <Eye className="h-3 w-3 mr-1" />
-                  Technician View
+                  Vista de Técnico
                 </Badge>
               </div>
             )}
@@ -564,11 +564,11 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                 </div>
               )}
               <Badge variant="outline" style={{ borderColor: tour.color, color: tour.color }}>
-                {totalDates} dates
+                {totalDates} fechas
               </Badge>
               {totalAssignments > 0 && (
                 <Badge variant="outline">
-                  {totalAssignments} crew assigned
+                  {totalAssignments} tripulación asignada
                 </Badge>
               )}
             </div>
@@ -577,14 +577,14 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         
         {!isTechnicianView && (
           <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-            <Button 
+            <Button
               onClick={handlePrintSchedule}
               variant="outline"
               disabled={isPrintingSchedule}
               className="w-full sm:w-auto"
             >
               <Printer className="h-4 w-4 mr-2" />
-              {isPrintingSchedule ? 'Printing...' : 'Print Schedule'}
+              {isPrintingSchedule ? 'Imprimiendo...' : 'Imprimir Calendario'}
             </Button>
             {/* Only show Flex button if folder exists or is loading */}
             {(folderExists || isFlexLoading) && (
@@ -600,18 +600,18 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                 ) : (
                   <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
                 )}
-                {isFlexLoading ? 'Loading...' : 'Flex'}
+                {isFlexLoading ? 'Cargando...' : 'Flex'}
               </Button>
             )}
             {(userRole === 'management' || userRole === 'admin') && (
               <Button variant="outline" size="sm" className="flex items-center gap-2 w-full sm:w-auto" onClick={openWaDialog}>
                 <MessageCircle className="h-4 w-4" />
-                WhatsApp Group
+                Grupo WhatsApp
               </Button>
             )}
             <Button onClick={() => setIsSettingsOpen(true)} className="w-full sm:w-auto">
               <Settings className="h-4 w-4 mr-2" />
-              Tour Settings
+              Configuración de Gira
             </Button>
           </div>
         )}
@@ -623,8 +623,8 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
           <div className="flex items-start gap-2">
             <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="text-xs md:text-sm text-blue-800 dark:text-blue-200">
-              <p className="font-medium mb-1">Automatic Job Synchronization</p>
-              <p className="text-xs md:text-sm">Tour assignments are automatically applied to all jobs in this tour. Team members assigned to the tour will instantly appear on all individual job assignments, and removing them from the tour removes them from all jobs.</p>
+              <p className="font-medium mb-1">Sincronización Automática de Trabajos</p>
+              <p className="text-xs md:text-sm">Las asignaciones de gira se aplican automáticamente a todos los trabajos de esta gira. Los miembros del equipo asignados a la gira aparecerán instantáneamente en todas las asignaciones de trabajos individuales, y eliminarlos de la gira los elimina de todos los trabajos.</p>
             </div>
           </div>
         </div>
@@ -634,7 +634,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6 pt-3 md:pt-6">
-            <CardTitle className="text-xs md:text-sm font-medium">Total Dates</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium">Fechas Totales</CardTitle>
             <Calendar className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
           </CardHeader>
           <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
@@ -643,7 +643,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6 pt-3 md:pt-6">
-            <CardTitle className="text-xs md:text-sm font-medium">Completed</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium">Completadas</CardTitle>
             <BarChart3 className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
           </CardHeader>
           <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
@@ -652,7 +652,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6 pt-3 md:pt-6">
-            <CardTitle className="text-xs md:text-sm font-medium">Upcoming</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium">Próximas</CardTitle>
             <Clock className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
           </CardHeader>
           <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
@@ -661,13 +661,13 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 md:px-6 pt-3 md:pt-6">
-            <CardTitle className="text-xs md:text-sm font-medium">Assigned Crew</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium">Tripulación Asignada</CardTitle>
             <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
           </CardHeader>
           <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
             <div className="text-xl md:text-2xl font-bold">{totalAssignments}</div>
             <p className="text-xs text-muted-foreground">
-              {assignedDepartments} departments
+              {assignedDepartments} departamentos
             </p>
           </CardContent>
         </Card>
@@ -676,7 +676,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       {/* Quick Actions Grid */}
       <div>
         <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 px-1">
-          {isTechnicianView ? 'Tour Information' : 'Management Areas'}
+          {isTechnicianView ? 'Información de Gira' : 'Áreas de Gestión'}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {quickActions.map((action, index) => (
@@ -692,7 +692,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                       <action.icon className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" style={{ color: tour.color }} />
                       {action.hasAutoSync && !isTechnicianView && (
                         <Badge variant="outline" className="text-xs border-blue-300 text-blue-700 hidden sm:inline-flex">
-                          Auto-sync
+                          Auto-sincronización
                         </Badge>
                       )}
                     </div>
@@ -716,7 +716,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                             refetchApproval();
                           }}
                         >
-                          Revoke
+                          Revocar
                         </Button>
                       ) : (
                         <Button
@@ -733,7 +733,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                             refetchApproval();
                           }}
                         >
-                          Approve
+                          Aprobar
                         </Button>
                       )}
                     </div>
@@ -745,7 +745,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                 <p className="text-xs text-muted-foreground line-clamp-2">{action.description}</p>
                 {action.viewOnly && isTechnicianView && (
                   <Badge variant="secondary" className="mt-2 text-xs">
-                    View Only
+                    Solo Lectura
                   </Badge>
                 )}
               </CardContent>
@@ -757,7 +757,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       {/* Upcoming Dates Section */}
       {upcomingDates.length > 0 && (
         <div>
-          <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 px-1">Upcoming Tour Dates</h2>
+          <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 px-1">Próximas Fechas de Gira</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {upcomingDates.map((date: any) => (
               <Card key={date.id}>
@@ -877,14 +877,14 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       <Dialog open={isWaDialogOpen} onOpenChange={setIsWaDialogOpen}>
         <DialogContent className="w-[95vw] md:w-full max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base md:text-lg">Create WhatsApp Group</DialogTitle>
+            <DialogTitle className="text-base md:text-lg">Crear Grupo de WhatsApp</DialogTitle>
             <DialogDescription className="text-xs md:text-sm">
-              Choose a tour date and department. The group will include the assigned crew for that date.
+              Elige una fecha de gira y departamento. El grupo incluirá la tripulación asignada para esa fecha.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <label className="block text-xs md:text-sm font-medium mb-1">Tour Date</label>
+              <label className="block text-xs md:text-sm font-medium mb-1">Fecha de Gira</label>
               <select
                 className="w-full border rounded px-2 py-1 text-sm"
                 value={waSelectedDateId || ''}
@@ -898,27 +898,27 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
               </select>
             </div>
             <div>
-              <label className="block text-xs md:text-sm font-medium mb-1">Department</label>
+              <label className="block text-xs md:text-sm font-medium mb-1">Departamento</label>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                 <label className="flex items-center gap-2 cursor-pointer text-xs md:text-sm">
                   <input type="radio" name="wa-dept" checked={waDepartment==='sound'} onChange={() => setWaDepartment('sound')} />
-                  <span>Sound</span>
+                  <span>Sonido</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer text-xs md:text-sm">
                   <input type="radio" name="wa-dept" checked={waDepartment==='lights'} onChange={() => setWaDepartment('lights')} />
-                  <span>Lights</span>
+                  <span>Luces</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer text-xs md:text-sm">
                   <input type="radio" name="wa-dept" checked={waDepartment==='video'} onChange={() => setWaDepartment('video')} />
-                  <span>Video</span>
+                  <span>Vídeo</span>
                 </label>
               </div>
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setIsWaDialogOpen(false)} disabled={isCreatingWaGroup} className="w-full sm:w-auto">Cancel</Button>
+            <Button variant="outline" onClick={() => setIsWaDialogOpen(false)} disabled={isCreatingWaGroup} className="w-full sm:w-auto">Cancelar</Button>
             <Button onClick={handleCreateWaGroup} disabled={isCreatingWaGroup} className="w-full sm:w-auto">
-              {isCreatingWaGroup ? 'Creating…' : 'Create Group'}
+              {isCreatingWaGroup ? 'Creando…' : 'Crear Grupo'}
             </Button>
           </DialogFooter>
         </DialogContent>
