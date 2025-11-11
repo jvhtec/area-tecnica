@@ -16,6 +16,8 @@ interface Assignment {
   sound_role: string | null;
   lights_role: string | null;
   video_role: string | null;
+  single_day: boolean;
+  assignment_date: string | null;
   job: {
     id: string;
     title: string;
@@ -80,6 +82,8 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
             sound_role,
             lights_role,
             video_role,
+            single_day,
+            assignment_date,
             jobs!inner (
               id,
               title,
@@ -142,6 +146,8 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
             sound_role: assignment.sound_role,
             lights_role: assignment.lights_role,
             video_role: assignment.video_role,
+            single_day: assignment.single_day,
+            assignment_date: assignment.assignment_date,
             job: {
               id: jobData.id,
               title: jobData.title,

@@ -57,6 +57,13 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
   const getAssignmentsForDate = useCallback((targetDate: Date) => {
     return assignments.filter(assignment => {
+      // Check if this is a single-day assignment
+      if (assignment.single_day && assignment.assignment_date) {
+        const assignmentDate = new Date(assignment.assignment_date);
+        return isSameDay(targetDate, assignmentDate);
+      }
+      
+      // Otherwise, use the job's full date range
       const startDate = new Date(assignment.job.start_time);
       const endDate = new Date(assignment.job.end_time);
       return isSameDay(targetDate, startDate) || isWithinInterval(targetDate, { start: startDate, end: endDate });
