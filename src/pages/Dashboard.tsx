@@ -235,7 +235,7 @@ const Dashboard = () => {
             </CardHeader>
             <CollapsibleContent>
               <CardContent>
-                <CorporateEmailComposer />
+                {emailComposerOpen && <CorporateEmailComposer />}
               </CardContent>
             </CollapsibleContent>
           </Card>
