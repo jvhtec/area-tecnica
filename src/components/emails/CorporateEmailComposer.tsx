@@ -400,79 +400,81 @@ export function CorporateEmailComposer() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[400px] p-0" align="start">
-              <Command>
-                <CommandInput
-                  placeholder="Buscar por nombre, email o departamento..."
-                  value={recipientSearch}
-                  onValueChange={setRecipientSearch}
-                />
-                <CommandEmpty>No se encontraron resultados</CommandEmpty>
+              {recipientPopoverOpen && (
+                <Command>
+                  <CommandInput
+                    placeholder="Buscar por nombre, email o departamento..."
+                    value={recipientSearch}
+                    onValueChange={setRecipientSearch}
+                  />
+                  <CommandEmpty>No se encontraron resultados</CommandEmpty>
 
-                {/* Quick role selection */}
-                <CommandGroup heading="Por rol">
-                  {roleOptions.map((role) => (
-                    <CommandItem
-                      key={role.value}
-                      onSelect={() => {
-                        addRecipient({
-                          id: `role_${role.value}`,
-                          label: role.label,
-                          type: "role",
-                          role: role.value,
-                        });
-                      }}
-                    >
-                      {role.label}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-
-                {/* Department selection */}
-                {uniqueDepartments.length > 0 && (
-                  <CommandGroup heading="Por departamento">
-                    {uniqueDepartments.slice(0, 5).map((dept) => (
+                  {/* Quick role selection */}
+                  <CommandGroup heading="Por rol">
+                    {roleOptions.map((role) => (
                       <CommandItem
-                        key={dept}
+                        key={role.value}
                         onSelect={() => {
                           addRecipient({
-                            id: `dept_${dept}`,
-                            label: `Departamento: ${dept}`,
-                            type: "department",
-                            department: dept,
+                            id: `role_${role.value}`,
+                            label: role.label,
+                            type: "role",
+                            role: role.value,
                           });
                         }}
                       >
-                        {dept}
+                        {role.label}
                       </CommandItem>
                     ))}
                   </CommandGroup>
-                )}
 
-                {/* Individual profiles */}
-                <CommandGroup heading="Individuales">
-                  {profiles.slice(0, 10).map((profile) => {
-                    const name = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
-                    return (
-                      <CommandItem
-                        key={profile.id}
-                        onSelect={() => {
-                          addRecipient({
-                            id: `profile_${profile.id}`,
-                            label: name || profile.email || "Sin nombre",
-                            type: "individual",
-                            profileId: profile.id,
-                          });
-                        }}
-                      >
-                        <div className="flex flex-col">
-                          <span>{name || "Sin nombre"}</span>
-                          <span className="text-xs text-muted-foreground">{profile.email}</span>
-                        </div>
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              </Command>
+                  {/* Department selection */}
+                  {uniqueDepartments.length > 0 && (
+                    <CommandGroup heading="Por departamento">
+                      {uniqueDepartments.slice(0, 5).map((dept) => (
+                        <CommandItem
+                          key={dept}
+                          onSelect={() => {
+                            addRecipient({
+                              id: `dept_${dept}`,
+                              label: `Departamento: ${dept}`,
+                              type: "department",
+                              department: dept,
+                            });
+                          }}
+                        >
+                          {dept}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  )}
+
+                  {/* Individual profiles */}
+                  <CommandGroup heading="Individuales">
+                    {profiles.slice(0, 10).map((profile) => {
+                      const name = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
+                      return (
+                        <CommandItem
+                          key={profile.id}
+                          onSelect={() => {
+                            addRecipient({
+                              id: `profile_${profile.id}`,
+                              label: name || profile.email || "Sin nombre",
+                              type: "individual",
+                              profileId: profile.id,
+                            });
+                          }}
+                        >
+                          <div className="flex flex-col">
+                            <span>{name || "Sin nombre"}</span>
+                            <span className="text-xs text-muted-foreground">{profile.email}</span>
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </Command>
+              )}
             </PopoverContent>
           </Popover>
         </div>

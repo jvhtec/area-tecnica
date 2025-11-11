@@ -10,14 +10,16 @@ const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive>
 >(({ className, ...props }, ref) => {
-  const [mounted, setMounted] = React.useState(false);
+  const [isReady, setIsReady] = React.useState(false);
 
-  React.useEffect(() => {
-    setMounted(true);
+  React.useLayoutEffect(() => {
+    // Use setTimeout to defer initialization until after DOM is fully ready
+    const timer = setTimeout(() => setIsReady(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
-  if (!mounted) {
-    return null;
+  if (!isReady) {
+    return <div className={cn("flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground", className)} />;
   }
 
   return (
