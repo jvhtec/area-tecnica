@@ -9,7 +9,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Send } from "lucide-react";
+import { MessageSquare, Send, ChevronDown } from "lucide-react";
 import { MessagesList } from "@/components/messages/MessagesList";
 import { DirectMessagesList } from "@/components/messages/DirectMessagesList";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,7 @@ const Dashboard = () => {
   const [newMessageDialogOpen, setNewMessageDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [emailComposerOpen, setEmailComposerOpen] = useState(false);
 
   // Data fetching with optimized hook
   const { data: jobs, isLoading } = useOptimizedJobs();
@@ -195,10 +196,6 @@ const Dashboard = () => {
         </Card>
       )}
 
-      {(userRole === "management" || userRole === "admin") && (
-        <CorporateEmailComposer />
-      )}
-
       <div className="space-y-4 md:space-y-8">
         {/* Calendar section - full width */}
         <div className="w-full">
@@ -223,6 +220,26 @@ const Dashboard = () => {
           />
         </div>
       </div>
+
+      {userRole === "management" && (
+        <Card className="w-full">
+          <CardHeader>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-between p-0 h-auto hover:bg-transparent"
+              onClick={() => setEmailComposerOpen(!emailComposerOpen)}
+            >
+              <CardTitle>Redactar Email Corporativo</CardTitle>
+              <ChevronDown className={`h-5 w-5 transition-transform ${emailComposerOpen ? "rotate-180" : ""}`} />
+            </Button>
+          </CardHeader>
+          {emailComposerOpen && (
+            <CardContent>
+              <CorporateEmailComposer />
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* Assignment dialog intentionally disabled for dashboard parity */}
 
