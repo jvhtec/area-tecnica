@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { isJobOnDate } from "@/utils/timezoneUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -223,23 +222,23 @@ const Dashboard = () => {
       </div>
 
       {userRole === "management" && (
-        <Collapsible open={emailComposerOpen} onOpenChange={setEmailComposerOpen}>
-          <Card className="w-full">
-            <CardHeader>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
-                  <CardTitle>Redactar Email Corporativo</CardTitle>
-                  <ChevronDown className={`h-5 w-5 transition-transform ${emailComposerOpen ? "rotate-180" : ""}`} />
-                </Button>
-              </CollapsibleTrigger>
-            </CardHeader>
-            <CollapsibleContent>
-              <CardContent>
-                {emailComposerOpen && <CorporateEmailComposer />}
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
+        <Card className="w-full">
+          <CardHeader>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-between p-0 h-auto hover:bg-transparent"
+              onClick={() => setEmailComposerOpen(!emailComposerOpen)}
+            >
+              <CardTitle>Redactar Email Corporativo</CardTitle>
+              <ChevronDown className={`h-5 w-5 transition-transform ${emailComposerOpen ? "rotate-180" : ""}`} />
+            </Button>
+          </CardHeader>
+          {emailComposerOpen && (
+            <CardContent>
+              <CorporateEmailComposer />
+            </CardContent>
+          )}
+        </Card>
       )}
 
       {/* Assignment dialog intentionally disabled for dashboard parity */}
