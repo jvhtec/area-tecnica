@@ -57,6 +57,7 @@ interface TourManagementProps {
 }
 
 type QuickAction = {
+  id?: string;
   title: string;
   description: string;
   icon: typeof Calendar;
@@ -269,6 +270,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       viewOnly: false
     },
     {
+      id: "rates-manager",
       title: "Gestor de Tarifas y Extras",
       description: "Configurar extras y resolver problemas de tarifas",
       icon: Euro,
@@ -696,11 +698,11 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                         </Badge>
                       )}
                     </div>
-                    <Badge variant={action.badge === "Coming Soon" ? "secondary" : tourRatesApproved && action.title === 'Rates & Extras Manager' ? 'default' : 'outline'} className="text-xs">
+                    <Badge variant={action.badge === "Coming Soon" ? "secondary" : tourRatesApproved && action.id === 'rates-manager' ? 'default' : 'outline'} className="text-xs">
                       {action.badge}
                     </Badge>
                   </div>
-                  {!isTechnicianView && action.title === 'Rates & Extras Manager' && (
+                  {!isTechnicianView && action.id === 'rates-manager' && (
                     <div className="flex gap-2">
                       {tourRatesApproved ? (
                         <Button
