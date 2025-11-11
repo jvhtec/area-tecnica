@@ -157,11 +157,11 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
         }
       }
 
-      toast({ title: 'Logistics updated for tour dates' })
+      toast({ title: 'Logística actualizada para las fechas de gira' })
       await refetchRequests()
       onOpenChange(false)
     } catch (e: any) {
-      toast({ title: 'Error', description: e.message || 'Failed to save logistics', variant: 'destructive' })
+      toast({ title: 'Error', description: e.message || 'Error al guardar la logística', variant: 'destructive' })
     }
   }
 
@@ -169,34 +169,34 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base md:text-lg">Tour Logistics – Transport</DialogTitle>
+          <DialogTitle className="text-base md:text-lg">Logística de Gira – Transporte</DialogTitle>
         </DialogHeader>
 
         {/* Department + Note */}
         <div className="flex flex-wrap gap-4 items-end">
           <div>
-            <Label>Department</Label>
+            <Label>Departamento</Label>
             <Select value={department} onValueChange={(v) => setDepartment(v as Department)}>
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="sound">Sound</SelectItem>
-                <SelectItem value="lights">Lights</SelectItem>
-                <SelectItem value="video">Video</SelectItem>
+                <SelectItem value="sound">Sonido</SelectItem>
+                <SelectItem value="lights">Luces</SelectItem>
+                <SelectItem value="video">Vídeo</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="flex-1 min-w-[240px]">
-            <Label>Note (applies to all unless overridden in items)</Label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional note" />
+            <Label>Nota (se aplica a todas a menos que se anule en los elementos)</Label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Nota opcional" />
           </div>
           <div className="ml-auto">
-            <Button onClick={saveAll}>Save to all dates</Button>
+            <Button onClick={saveAll}>Guardar en todas las fechas</Button>
           </div>
         </div>
 
         {/* Default vehicles */}
         <div className="mt-4 space-y-2">
-          <Label>Default vehicles for tour</Label>
+          <Label>Vehículos por defecto para la gira</Label>
           <div className="space-y-2">
             {defaultItems.map((it, idx) => (
               <div key={idx} className="flex items-center gap-2">
@@ -220,7 +220,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                   min={0}
                   step={0.1}
                   className="w-52"
-                  placeholder="Leftover space (m) - optional"
+                  placeholder="Espacio sobrante (m) - opcional"
                   value={it.leftover_space_meters === '' ? '' : it.leftover_space_meters}
                   onChange={(e) => {
                     const val = e.target.value
@@ -239,19 +239,19 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                     setDefaultItems(next.length ? next : [{ transport_type: 'trailer', leftover_space_meters: '' }])
                   }}
                 >
-                  Remove
+                  Eliminar
                 </Button>
               </div>
             ))}
             <div>
-              <Button type="button" variant="secondary" onClick={() => setDefaultItems([...defaultItems, { transport_type: 'trailer', leftover_space_meters: '' }])}>Add Vehicle</Button>
+              <Button type="button" variant="secondary" onClick={() => setDefaultItems([...defaultItems, { transport_type: 'trailer', leftover_space_meters: '' }])}>Añadir Vehículo</Button>
             </div>
           </div>
         </div>
 
         {/* Per-date overrides */}
         <div className="mt-6">
-          <Label>Per-date overrides (optional)</Label>
+          <Label>Anulaciones por fecha (opcional)</Label>
           <div className="mt-2 space-y-3 max-h-[40vh] overflow-y-auto pr-2">
             {tourJobs.map((job: any) => {
               const items = overrides[job.id]
@@ -264,12 +264,12 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                     </div>
                     <div className="flex items-center gap-2">
                       {job.status === 'Cancelado' && (
-                        <Badge variant="destructive" className="text-[10px]">Cancelled</Badge>
+                        <Badge variant="destructive" className="text-[10px]">Cancelado</Badge>
                       )}
                       {items ? (
-                        <Button variant="outline" size="sm" onClick={() => removeOverrideFor(job.id)}>Use default</Button>
+                        <Button variant="outline" size="sm" onClick={() => removeOverrideFor(job.id)}>Usar por defecto</Button>
                       ) : (
-                        <Button variant="secondary" size="sm" onClick={() => setOverrideFor(job.id, defaultItems)}>Override</Button>
+                        <Button variant="secondary" size="sm" onClick={() => setOverrideFor(job.id, defaultItems)}>Anular</Button>
                       )}
                     </div>
                   </div>
@@ -297,7 +297,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                             min={0}
                             step={0.1}
                             className="w-52"
-                            placeholder="Leftover space (m) - optional"
+                            placeholder="Espacio sobrante (m) - opcional"
                             value={it.leftover_space_meters === '' ? '' : it.leftover_space_meters}
                             onChange={(e) => {
                               const val = e.target.value
@@ -316,12 +316,12 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                               setOverrideFor(job.id, next.length ? next : [{ transport_type: 'trailer', leftover_space_meters: '' }])
                             }}
                           >
-                            Remove
+                            Eliminar
                           </Button>
                         </div>
                       ))}
                       <div>
-                        <Button type="button" variant="secondary" onClick={() => setOverrideFor(job.id, [...(overrides[job.id] || []), { transport_type: 'trailer', leftover_space_meters: '' }])}>Add Vehicle</Button>
+                        <Button type="button" variant="secondary" onClick={() => setOverrideFor(job.id, [...(overrides[job.id] || []), { transport_type: 'trailer', leftover_space_meters: '' }])}>Añadir Vehículo</Button>
                       </div>
                     </div>
                   )}
