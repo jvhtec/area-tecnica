@@ -124,12 +124,20 @@ function getSenderName(department: string | null): string {
 
 /**
  * Fetch recipient emails based on criteria
+ *
+ * Logic:
+ * - Explicit profile IDs are always included
+ * - Department and role filters use AND logic (users must match both)
+ * - Within each filter type (departments/roles), it's OR logic
+ *
+ * Example: departments=[sound, lights] AND roles=[staff]
+ * Returns: Users in (Sound OR Lights) AND with Staff role
  */
 async function fetchRecipientEmails(criteria: RecipientCriteria): Promise<string[]> {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const emails = new Set<string>();
 
-  // Fetch by explicit profile IDs
+  // 1. Always include explicit profile IDs (if any)
   if (criteria.profileIds && criteria.profileIds.length > 0) {
     const { data, error } = await supabase
       .from("profiles")
@@ -144,37 +152,48 @@ async function fetchRecipientEmails(criteria: RecipientCriteria): Promise<string
     }
   }
 
-  // Fetch by departments
-  if (criteria.departments && criteria.departments.length > 0) {
-    const { data, error } = await supabase
+  // 2. Fetch by department AND role filters (intersection logic)
+  const hasDepartmentFilter = criteria.departments && criteria.departments.length > 0;
+  const hasRoleFilter = criteria.roles && criteria.roles.length > 0;
+
+  if (hasDepartmentFilter || hasRoleFilter) {
+    console.log("[fetchRecipientEmails] Applying filters:", {
+      departments: criteria.departments || [],
+      roles: criteria.roles || [],
+      logic: hasDepartmentFilter && hasRoleFilter ? "AND" : "single filter",
+    });
+
+    // Build query with AND logic between department and role
+    let query = supabase
       .from("profiles")
       .select("email")
-      .in("department", criteria.departments)
       .not("email", "is", null);
 
-    if (!error && data) {
+    // Add department filter (OR within departments)
+    if (hasDepartmentFilter) {
+      query = query.in("department", criteria.departments!);
+    }
+
+    // Add role filter (OR within roles)
+    if (hasRoleFilter) {
+      query = query.in("role", criteria.roles!);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("[fetchRecipientEmails] Query error:", error);
+    } else if (data) {
+      console.log(`[fetchRecipientEmails] Found ${data.length} profiles matching filters`);
       data.forEach((profile) => {
         if (profile.email) emails.add(profile.email);
       });
     }
   }
 
-  // Fetch by roles
-  if (criteria.roles && criteria.roles.length > 0) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("email")
-      .in("role", criteria.roles)
-      .not("email", "is", null);
-
-    if (!error && data) {
-      data.forEach((profile) => {
-        if (profile.email) emails.add(profile.email);
-      });
-    }
-  }
-
-  return Array.from(emails);
+  const finalEmails = Array.from(emails);
+  console.log(`[fetchRecipientEmails] Returning ${finalEmails.length} unique email addresses`);
+  return finalEmails;
 }
 
 /**
@@ -378,7 +397,11 @@ serve(async (req) => {
     }
 
     // Step 6: Fetch recipient emails
-    console.log("[send-corporate-email] Fetching recipients...");
+    console.log("[send-corporate-email] Fetching recipients with criteria:", {
+      profileIds: body.recipients.profileIds?.length || 0,
+      departments: body.recipients.departments || [],
+      roles: body.recipients.roles || [],
+    });
     const recipientEmails = await fetchRecipientEmails(body.recipients);
 
     if (recipientEmails.length === 0) {
@@ -394,7 +417,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[send-corporate-email] Sending to ${recipientEmails.length} recipients...`);
+    console.log(`[send-corporate-email] Found ${recipientEmails.length} unique recipients`);
 
     // Step 7: Upload inline images to temporary storage and get URLs
     const uploadedImagePaths: string[] = [];

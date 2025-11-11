@@ -374,6 +374,9 @@ export function CorporateEmailComposer() {
         {/* Recipient selector */}
         <div className="space-y-2">
           <Label htmlFor="recipients">Destinatarios</Label>
+          <p className="text-xs text-muted-foreground">
+            Múltiples filtros se combinan con lógica AND (ej: "Sonido" + "Personal" = solo personal de sonido)
+          </p>
           <div className="flex flex-wrap gap-2 mb-2">
             {selectedRecipients.map((recipient) => (
               <Badge key={recipient.id} variant="secondary" className="gap-1">
