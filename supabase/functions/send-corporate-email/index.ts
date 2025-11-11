@@ -71,22 +71,55 @@ async function resolveUser(req: Request) {
 }
 
 /**
- * Check if user has admin or management role
+ * Department display name mapping
  */
-async function checkUserRole(userId: string): Promise<boolean> {
+const DEPARTMENT_LABELS: Record<string, string> = {
+  sound: "Sonido",
+  lights: "Iluminación",
+  video: "Video",
+  production: "Producción",
+  logistics: "Logística",
+  administrative: "Administración",
+  personnel: "Personal",
+  comercial: "Comercial",
+};
+
+/**
+ * Check if user has admin or management role and get their department
+ */
+async function checkUserRoleAndGetDepartment(
+  userId: string
+): Promise<{ hasPermission: boolean; department: string | null }> {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const { data, error } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, department")
     .eq("id", userId)
     .maybeSingle();
 
   if (error || !data) {
-    console.warn("[send-corporate-email] Unable to fetch user role:", error);
-    return false;
+    console.warn("[send-corporate-email] Unable to fetch user profile:", error);
+    return { hasPermission: false, department: null };
   }
 
-  return data.role === "admin" || data.role === "management";
+  const hasPermission = data.role === "admin" || data.role === "management";
+  return { hasPermission, department: data.department };
+}
+
+/**
+ * Get sender name based on department
+ */
+function getSenderName(department: string | null): string {
+  if (!department) {
+    return "Sector-Pro";
+  }
+
+  const departmentLabel = DEPARTMENT_LABELS[department];
+  if (!departmentLabel) {
+    return "Sector-Pro";
+  }
+
+  return `${departmentLabel} - Sector-Pro`;
 }
 
 /**
@@ -280,9 +313,9 @@ serve(async (req) => {
       );
     }
 
-    // Step 2: Check user role
-    console.log("[send-corporate-email] Checking user role...");
-    const hasPermission = await checkUserRole(user.id);
+    // Step 2: Check user role and get department
+    console.log("[send-corporate-email] Checking user role and department...");
+    const { hasPermission, department } = await checkUserRoleAndGetDepartment(user.id);
     if (!hasPermission) {
       return new Response(
         JSON.stringify({
@@ -295,6 +328,10 @@ serve(async (req) => {
         }
       );
     }
+
+    // Get sender name based on department
+    const senderName = getSenderName(department);
+    console.log(`[send-corporate-email] Sender name: ${senderName}`);
 
     // Step 3: Validate environment variables
     if (!BREVO_KEY || !BREVO_FROM) {
@@ -427,7 +464,7 @@ serve(async (req) => {
 
     // Step 9: Build Brevo payload
     const emailPayload: Record<string, unknown> = {
-      sender: { email: BREVO_FROM, name: "Área Técnica" },
+      sender: { email: BREVO_FROM, name: senderName },
       to: recipientEmails.map((email) => ({ email })),
       subject: body.subject,
       htmlContent,
