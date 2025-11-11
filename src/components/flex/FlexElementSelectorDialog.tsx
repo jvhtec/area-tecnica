@@ -185,7 +185,7 @@ export const FlexElementSelectorDialog: React.FC<
                 Retry
               </Button>
             </div>
-          ) : (
+          ) : open ? (
             <Command className="rounded-lg border">
               <CommandInput
                 placeholder="Search elements..."
@@ -203,7 +203,7 @@ export const FlexElementSelectorDialog: React.FC<
                 </CommandGroup>
               </CommandList>
             </Command>
-          )}
+          ) : null}
         </div>
 
         <DialogFooter>
