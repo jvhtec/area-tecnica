@@ -156,6 +156,8 @@ export function CorporateEmailComposer() {
           const base64 = await fileToBase64(file);
 
           // Generate stable CID
+          // Note: Backend will upload to Supabase Storage, replace cid: with public URL,
+          // send the email, then delete the temporary file
           const cid = `img_${Date.now()}_${i}`;
 
           newImages.push({
@@ -514,7 +516,9 @@ export function CorporateEmailComposer() {
             <p className="text-sm text-muted-foreground">
               Arrastra imágenes aquí o haz clic para seleccionar
             </p>
-            <p className="text-xs text-muted-foreground mt-1">PNG, JPEG, GIF (máx. 5MB cada una)</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              PNG, JPEG, GIF (máx. 5MB cada una) · Las imágenes se eliminan automáticamente después del envío
+            </p>
           </div>
           <input
             ref={imageInputRef}

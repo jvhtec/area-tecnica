@@ -230,6 +230,29 @@ async function logEmailSend(
   });
 }
 
+/**
+ * Clean up temporary images from storage
+ */
+async function cleanupImages(filePaths: string[]) {
+  if (filePaths.length === 0) return;
+
+  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  try {
+    const { data, error } = await supabase.storage
+      .from("corporate-emails-temp")
+      .remove(filePaths);
+
+    if (error) {
+      console.error("[send-corporate-email] Error cleaning up images:", error);
+    } else {
+      console.log(`[send-corporate-email] Successfully deleted ${filePaths.length} images`);
+    }
+  } catch (error) {
+    console.error("[send-corporate-email] Exception during cleanup:", error);
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -336,13 +359,73 @@ serve(async (req) => {
 
     console.log(`[send-corporate-email] Sending to ${recipientEmails.length} recipients...`);
 
-    // Step 7: Wrap body in corporate template
+    // Step 7: Upload inline images to temporary storage and get URLs
+    const uploadedImagePaths: string[] = [];
+    let processedBodyHtml = body.bodyHtml;
+
+    if (body.inlineImages && body.inlineImages.length > 0) {
+      console.log(`[send-corporate-email] Uploading ${body.inlineImages.length} inline images...`);
+      const supabaseClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+      for (const img of body.inlineImages) {
+        try {
+          // Generate unique filename
+          const timestamp = Date.now();
+          const random = Math.random().toString(36).substring(7);
+          const extension = img.mimeType.split("/")[1] || "png";
+          const filename = `${timestamp}_${random}.${extension}`;
+          const filePath = `temp/${filename}`;
+
+          // Convert base64 to binary
+          const binaryString = atob(img.content);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          // Upload to storage
+          const { data: uploadData, error: uploadError } = await supabaseClient.storage
+            .from("corporate-emails-temp")
+            .upload(filePath, bytes, {
+              contentType: img.mimeType,
+              cacheControl: "3600",
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error("[send-corporate-email] Failed to upload image:", uploadError);
+            throw new Error(`Failed to upload image ${img.filename}: ${uploadError.message}`);
+          }
+
+          // Track uploaded path for cleanup
+          uploadedImagePaths.push(filePath);
+
+          // Get public URL
+          const { data: urlData } = supabaseClient.storage
+            .from("corporate-emails-temp")
+            .getPublicUrl(filePath);
+
+          // Replace CID reference with actual URL in HTML
+          const cidPattern = new RegExp(`cid:${img.cid}`, "g");
+          processedBodyHtml = processedBodyHtml.replace(cidPattern, urlData.publicUrl);
+
+          console.log(`[send-corporate-email] Uploaded image: ${filePath} -> ${urlData.publicUrl}`);
+        } catch (error) {
+          console.error("[send-corporate-email] Error processing image:", error);
+          // Clean up any uploaded images before throwing
+          await cleanupImages(uploadedImagePaths);
+          throw error;
+        }
+      }
+    }
+
+    // Step 8: Wrap body in corporate template
     const htmlContent = wrapInCorporateTemplate({
-      bodyHtml: body.bodyHtml,
+      bodyHtml: processedBodyHtml,
       subject: body.subject,
     });
 
-    // Step 8: Build Brevo payload
+    // Step 9: Build Brevo payload
     const emailPayload: Record<string, unknown> = {
       sender: { email: BREVO_FROM, name: "Área Técnica" },
       to: recipientEmails.map((email) => ({ email })),
@@ -358,26 +441,23 @@ serve(async (req) => {
       }));
     }
 
-    // Add inline images
-    if (body.inlineImages && body.inlineImages.length > 0) {
-      emailPayload.inlineImageActivation = true;
-      emailPayload.inlineImage = body.inlineImages.map((img) => ({
-        contentId: img.cid,
-        content: img.content,
-        name: img.filename,
-      }));
-    }
-
-    // Step 9: Send via Brevo
+    // Step 10: Send via Brevo
     console.log("[send-corporate-email] Sending via Brevo...");
-    const sendRes = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: {
-        "api-key": BREVO_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(emailPayload),
-    });
+    let sendRes: Response;
+    try {
+      sendRes = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": BREVO_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(emailPayload),
+      });
+    } catch (error) {
+      // Clean up uploaded images on send failure
+      await cleanupImages(uploadedImagePaths);
+      throw error;
+    }
 
     const success = sendRes.ok;
     let messageId: string | undefined;
@@ -395,7 +475,11 @@ serve(async (req) => {
       console.error("[send-corporate-email] Brevo error:", sendRes.status, errorMessage);
     }
 
-    // Step 10: Log to database
+    // Step 11: Clean up temporary images (always, success or failure)
+    console.log(`[send-corporate-email] Cleaning up ${uploadedImagePaths.length} temporary images...`);
+    await cleanupImages(uploadedImagePaths);
+
+    // Step 12: Log to database
     await logEmailSend(
       user.id,
       body.subject,
@@ -406,7 +490,7 @@ serve(async (req) => {
       errorMessage
     );
 
-    // Step 11: Return response
+    // Step 13: Return response
     if (success) {
       return new Response(
         JSON.stringify({

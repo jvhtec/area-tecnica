@@ -4,11 +4,15 @@
 
 /**
  * Inline image attachment with content ID for embedding in HTML
+ *
+ * Note: The backend will upload images to temporary Supabase Storage,
+ * replace cid: references with public URLs, send the email, then delete
+ * the temporary files to avoid storage bloat.
  */
 export interface InlineImage {
-  /** Content ID referenced in HTML as cid:xxxxx */
+  /** Content ID referenced in HTML as cid:xxxxx (will be replaced with storage URL) */
   cid: string;
-  /** Base64-encoded image data */
+  /** Base64-encoded image data (will be uploaded to temporary storage) */
   content: string;
   /** MIME type (e.g., image/png, image/jpeg) */
   mimeType: string;
