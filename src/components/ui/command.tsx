@@ -9,16 +9,28 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive>
->(({ className, ...props }, ref) => (
-  <CommandPrimitive
-    ref={ref}
-    className={cn(
-      "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
-      className
-    )}
-    {...props}
-  />
-))
+>(({ className, ...props }, ref) => {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return (
+    <CommandPrimitive
+      ref={ref}
+      className={cn(
+        "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
+        className
+      )}
+      {...props}
+    />
+  );
+})
 Command.displayName = CommandPrimitive.displayName
 
 interface CommandDialogProps extends DialogProps {}
