@@ -6,8 +6,8 @@ This Edge Function exposes a read‑only, per‑technician iCalendar (ICS) feed 
 Function
 --------
 - Path: `supabase/functions/tech-calendar-ics/index.ts`
-- URL: `${SUPABASE_URL}/functions/v1/tech-calendar-ics?tid=<profile_id>&token=<calendar_ics_token>`
- - Public access: `supabase/functions/tech-calendar-ics/config.toml` sets `verify_jwt = false` so Google/Apple can fetch without auth headers.
+- URL: `${SUPABASE_URL}/functions/v1/tech-calendar-ics?tid=<profile_id>&token=<calendar_ics_token>&apikey=<anon_key>`
+ - Public access: `supabase/functions/tech-calendar-ics/config.toml` sets `verify_jwt = false` so Google/Apple can fetch without auth headers. The anon key is included as a query parameter to bypass Supabase's infrastructure authentication.
 
 Security
 --------
@@ -24,6 +24,7 @@ Parameters
 ----------
 - `tid` (required): Profile UUID of the technician.
 - `token` (required): Secret token from `profiles.calendar_ics_token`.
+- `apikey` (required): Supabase anon key for authentication bypass.
 - `back` (optional): Days back to include (default 90, max 365).
 - `fwd` (optional): Days forward to include (default 365, max 730).
 
