@@ -104,6 +104,7 @@ export function useStaffingRealtime() {
       console.log('🔄 Invalidating matrix queries')
       qc.invalidateQueries({ queryKey: ['assignment-matrix'] })
       qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
+      qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
     }
       
     return () => { 
