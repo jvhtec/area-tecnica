@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Department } from "@/types/department";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, Copy, RefreshCcw } from "lucide-react";
-import { SUPABASE_URL } from "@/lib/api-config";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
@@ -169,7 +169,7 @@ export const Profile = () => {
   };
 
   const icsUrl = profile?.calendar_ics_token
-    ? `${SUPABASE_URL}/functions/v1/tech-calendar-ics?tid=${profile.id}&token=${profile.calendar_ics_token}&back=90&fwd=365`
+    ? `${SUPABASE_URL}/functions/v1/tech-calendar-ics?tid=${profile.id}&token=${profile.calendar_ics_token}&apikey=${SUPABASE_ANON_KEY}&back=90&fwd=365`
     : '';
 
   const handlePasswordChange = async () => {
