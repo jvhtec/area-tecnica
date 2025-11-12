@@ -97,8 +97,8 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
             )
           `)
           .in('technician_id', (techsData || []).map(tech => tech.id))
-          .gte('jobs.start_time', startDate.toISOString())
-          .lte('jobs.end_time', endDate.toISOString());
+          .lte('jobs.start_time', endDate.toISOString())
+          .gte('jobs.end_time', startDate.toISOString());
 
         if (assignmentsError) {
           console.error('PersonalCalendar: Error fetching assignments:', assignmentsError);
