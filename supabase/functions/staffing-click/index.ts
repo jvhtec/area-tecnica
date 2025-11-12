@@ -300,41 +300,145 @@ serve(async (req) => {
           // 3) Conflict check: ensure no other confirmed assignment overlaps
           const { data: confirmedAssigns, error: assignErr } = await supabase
             .from('job_assignments')
-            .select('job_id,status')
+            .select('job_id,status,single_day,assignment_date')
             .eq('technician_id', row.profile_id)
             .eq('status', 'confirmed');
+          const confirmedAssignments = !assignErr && Array.isArray(confirmedAssigns) ? confirmedAssigns : [];
+          const otherJobIds = Array.from(new Set(confirmedAssignments.map(a => a.job_id).filter(id => id !== row.job_id)));
+          let otherJobs: { id: number; start_time: string | null; end_time: string | null; title: string | null }[] = [];
+          if (otherJobIds.length > 0) {
+            const { data: otherJobsData } = await supabase
+              .from('jobs')
+              .select('id,start_time,end_time,title')
+              .in('id', otherJobIds);
+            otherJobs = otherJobsData ?? [];
+          }
 
-          let hasConflict = false;
-          if (!assignErr && (confirmedAssigns?.length ?? 0) > 0) {
-            const otherJobIds = confirmedAssigns!.map(a => a.job_id).filter(id => id !== row.job_id);
-            if (otherJobIds.length > 0) {
-              const { data: otherJobs } = await supabase
-                .from('jobs')
-                .select('id,start_time,end_time,title')
-                .in('id', otherJobIds);
-              const targetStart = job.start_time ? new Date(job.start_time) : null;
-              const targetEnd = job.end_time ? new Date(job.end_time) : null;
-              const overlap = targetStart && targetEnd ? (otherJobs ?? []).find(j => j.start_time && j.end_time && (new Date(j.start_time) < targetEnd) && (new Date(j.end_time) > targetStart)) : null;
-              if (overlap) {
-                hasConflict = true;
+          const jobTimeMap = new Map<number, { title: string | null; start: Date | null; end: Date | null; rawStart: string | null; rawEnd: string | null }>();
+          if (job) {
+            jobTimeMap.set(job.id, {
+              title: job.title ?? null,
+              start: job.start_time ? new Date(job.start_time) : null,
+              end: job.end_time ? new Date(job.end_time) : null,
+              rawStart: job.start_time ?? null,
+              rawEnd: job.end_time ?? null,
+            });
+          }
+          for (const j of otherJobs) {
+            jobTimeMap.set(j.id, {
+              title: j.title ?? null,
+              start: j.start_time ? new Date(j.start_time) : null,
+              end: j.end_time ? new Date(j.end_time) : null,
+              rawStart: j.start_time ?? null,
+              rawEnd: j.end_time ?? null,
+            });
+          }
+
+          const DAY_MS = 24 * 60 * 60 * 1000;
+          const toDateOrNull = (value: string | null | undefined) => {
+            if (!value) return null;
+            const d = new Date(value);
+            return Number.isNaN(d.getTime()) ? null : d;
+          };
+          const addDays = (date: Date, days: number) => new Date(date.getTime() + days * DAY_MS);
+
+          type TimeWindow = { kind: 'day'; start: Date; end: Date } | { kind: 'range'; start: Date; end: Date };
+          type AssignmentCoverage = {
+            window: TimeWindow;
+            meta: {
+              job_id: number;
+              job_title: string | null;
+              assignment_date?: string;
+              start_time?: string | null;
+              end_time?: string | null;
+            };
+          };
+
+          const existingAssignmentWindows: AssignmentCoverage[] = [];
+          for (const assign of confirmedAssignments) {
+            if (assign.job_id === row.job_id) continue;
+            if (assign.single_day && assign.assignment_date) {
+              const dayStart = toDateOrNull(assign.assignment_date);
+              if (!dayStart) continue;
+              existingAssignmentWindows.push({
+                window: { kind: 'day', start: dayStart, end: addDays(dayStart, 1) },
+                meta: {
+                  job_id: assign.job_id,
+                  job_title: jobTimeMap.get(assign.job_id)?.title ?? null,
+                  assignment_date: assign.assignment_date,
+                },
+              });
+              continue;
+            }
+            const jobInfo = jobTimeMap.get(assign.job_id);
+            if (!jobInfo || !jobInfo.start || !jobInfo.end) continue;
+            if (jobInfo.start.getTime() >= jobInfo.end.getTime()) continue;
+            existingAssignmentWindows.push({
+              window: { kind: 'range', start: jobInfo.start, end: jobInfo.end },
+              meta: {
+                job_id: assign.job_id,
+                job_title: jobInfo.title ?? null,
+                start_time: jobInfo.rawStart,
+                end_time: jobInfo.rawEnd,
+              },
+            });
+          }
+
+          const windowsIntersect = (a: TimeWindow, b: TimeWindow) => a.start.getTime() < b.end.getTime() && b.start.getTime() < a.end.getTime();
+
+          // 4) Upsert assignment(s): handles single or batch dates
+          async function upsertAssignmentFor(targetDate: string | null) {
+            const requestWindow: TimeWindow | null = (() => {
+              if (targetDate) {
+                const dayStart = toDateOrNull(targetDate);
+                if (!dayStart) return null;
+                return { kind: 'day', start: dayStart, end: addDays(dayStart, 1) };
+              }
+              const jobInfo = jobTimeMap.get(row.job_id);
+              if (!jobInfo || !jobInfo.start || !jobInfo.end) return null;
+              if (jobInfo.start.getTime() >= jobInfo.end.getTime()) return null;
+              return { kind: 'range', start: jobInfo.start, end: jobInfo.end };
+            })();
+
+            if (requestWindow && existingAssignmentWindows.length > 0) {
+              const conflicting = existingAssignmentWindows.find(existing => windowsIntersect(requestWindow, existing.window));
+              if (conflicting) {
+                const conflictMeta: Record<string, unknown> = {
+                  request_job_id: row.job_id,
+                  request_single_day: !!targetDate,
+                  request_window_type: requestWindow.kind,
+                  conflicting_job_id: conflicting.meta.job_id,
+                  conflicting_job_title: conflicting.meta.job_title,
+                  conflicting_window_type: conflicting.window.kind,
+                };
+                if (targetDate) {
+                  conflictMeta.request_assignment_date = targetDate;
+                } else {
+                  conflictMeta.request_job_start = job?.start_time ?? null;
+                  conflictMeta.request_job_end = job?.end_time ?? null;
+                }
+                if (conflicting.meta.assignment_date) {
+                  conflictMeta.conflicting_assignment_date = conflicting.meta.assignment_date;
+                }
+                if (conflicting.meta.start_time || conflicting.meta.end_time) {
+                  conflictMeta.conflicting_job_start = conflicting.meta.start_time ?? null;
+                  conflictMeta.conflicting_job_end = conflicting.meta.end_time ?? null;
+                }
                 await supabase.from('staffing_events').insert({
                   staffing_request_id: rid,
                   event: 'auto_assign_skipped_conflict',
-                  meta: { conflicting_job_id: overlap.id, conflicting_title: overlap.title }
+                  meta: conflictMeta,
                 });
+                return;
               }
             }
-          }
 
-          if (!hasConflict) {
-            // 4) Upsert assignment(s): handles single or batch dates
-            async function upsertAssignmentFor(targetDate: string | null) {
-              console.log('🧾 upsertAssignmentFor invoked', {
-                job_id: row.job_id,
-                technician_id: row.profile_id,
-                targetDate,
-                batch_id: (row as any)?.batch_id || null,
-              });
+            console.log('🧾 upsertAssignmentFor invoked', {
+              job_id: row.job_id,
+              technician_id: row.profile_id,
+              targetDate,
+              batch_id: (row as any)?.batch_id || null,
+            });
               const rolePatch: Record<string, string | null> = {};
               if (prof.department === 'sound') rolePatch['sound_role'] = chosenRole;
               else if (prof.department === 'lights') rolePatch['lights_role'] = chosenRole;
