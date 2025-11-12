@@ -53,7 +53,7 @@ begin
   new.updated_at = now();
   return new;
 end;
-$$ language plpgsql;
+$$ language plpgsql set search_path = '';
 
 drop trigger if exists job_tasks_set_updated_at on public.job_tasks;
 create trigger job_tasks_set_updated_at

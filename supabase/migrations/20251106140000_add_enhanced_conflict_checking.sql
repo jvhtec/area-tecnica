@@ -13,6 +13,7 @@ CREATE OR REPLACE FUNCTION check_technician_conflicts(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
   result jsonb;

@@ -34,6 +34,7 @@ CREATE OR REPLACE FUNCTION public.is_management_or_admin(p_user_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
+SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1
@@ -81,6 +82,7 @@ CREATE POLICY soundvision_file_reviews_delete_self_or_management
 CREATE OR REPLACE FUNCTION public.touch_soundvision_file_reviews_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 BEGIN
   NEW.updated_at = now();
@@ -98,6 +100,7 @@ CREATE TRIGGER trg_soundvision_file_reviews_updated_at
 CREATE OR REPLACE FUNCTION public.refresh_soundvision_file_review_stats()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 DECLARE
   v_file_id UUID;

@@ -417,7 +417,7 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = '';
 
 -- Apply to all new tables
 DROP TRIGGER IF EXISTS update_tour_timeline_events_updated_at ON public.tour_timeline_events;
@@ -489,7 +489,7 @@ BEGIN
 
   ORDER BY event_date ASC;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION public.get_tour_complete_timeline(UUID) TO authenticated, service_role;
@@ -518,7 +518,7 @@ BEGIN
 
   RETURN result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION public.get_tour_date_complete_info(UUID) TO authenticated, service_role;

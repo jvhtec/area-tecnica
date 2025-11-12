@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS public.activity_prefs (
 CREATE OR REPLACE FUNCTION public.touch_activity_prefs_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 BEGIN
   NEW.updated_at := NOW();
@@ -329,6 +330,7 @@ CREATE OR REPLACE FUNCTION public.json_diff_public(_old JSONB, _new JSONB, allow
 RETURNS JSONB
 LANGUAGE sql
 IMMUTABLE
+SET search_path = ''
 AS $$
   SELECT COALESCE(
     jsonb_object_agg(key, jsonb_build_object('from', _old->key, 'to', _new->key)),

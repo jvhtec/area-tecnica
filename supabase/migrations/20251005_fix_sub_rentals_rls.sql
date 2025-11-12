@@ -66,6 +66,7 @@ CREATE POLICY "Department can delete sub_rentals"
 CREATE OR REPLACE FUNCTION public.sub_rentals_set_department_from_equipment()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 BEGIN
   -- Always set department based on the selected equipment

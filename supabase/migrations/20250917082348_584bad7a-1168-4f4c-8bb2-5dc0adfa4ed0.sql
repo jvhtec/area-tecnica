@@ -2,11 +2,11 @@
 
 -- 1) Fix function search path for security
 CREATE OR REPLACE FUNCTION minutes_to_hours_round_30(mins integer)
-RETURNS integer 
-LANGUAGE sql 
-IMMUTABLE 
+RETURNS integer
+LANGUAGE sql
+IMMUTABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
   SELECT CASE
     WHEN mins IS NULL OR mins <= 0 THEN 0

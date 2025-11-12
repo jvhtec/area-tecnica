@@ -12,6 +12,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS job_documents_unique_template
 CREATE OR REPLACE FUNCTION public.normalize_text_for_match(input text)
 RETURNS text
 LANGUAGE sql
+SET search_path = ''
 AS $$
   SELECT CASE
     WHEN input IS NULL THEN NULL
