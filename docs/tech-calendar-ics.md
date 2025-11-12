@@ -7,7 +7,7 @@ Function
 --------
 - Path: `supabase/functions/tech-calendar-ics/index.ts`
 - URL: `${SUPABASE_URL}/functions/v1/tech-calendar-ics?tid=<profile_id>&token=<calendar_ics_token>`
- - Public access: `supabase/functions/tech-calendar-ics/config.toml` sets `verify_jwt = false` so Google/Apple can fetch without auth headers.
+ - Public access: Both `supabase/config.toml` and `supabase/functions/tech-calendar-ics/config.toml` set `verify_jwt = false` so calendar apps (Google, Apple, Outlook) can fetch without authentication.
 
 Security
 --------
