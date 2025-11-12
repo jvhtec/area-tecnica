@@ -44,7 +44,7 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
       setName(equipment.name);
       setCategory((equipment.category as string) || categories[0]);
     }
-  }, [equipment, categories]);
+  }, [equipment?.id]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
