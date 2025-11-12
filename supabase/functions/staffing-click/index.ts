@@ -596,7 +596,6 @@ serve(async (req) => {
               meta: { role: chosenRole, department: prof.department }
             });
           }
-        }
       } catch (autoAssignErr) {
         console.error('Auto-assign error on confirm:', autoAssignErr);
         await supabase.from('staffing_events').insert({

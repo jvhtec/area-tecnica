@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useCallback } from 'react';
 import { format, isWithinInterval, isSameDay } from 'date-fns';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
@@ -402,7 +402,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   };
 
   // Invalidate specific queries for real-time updates
-  const invalidateAssignmentQueries = async () => {
+  const invalidateAssignmentQueries = useCallback(async () => {
     console.log('Invalidating assignment queries...');
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] }),
@@ -411,7 +411,36 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       queryClient.invalidateQueries({ queryKey: ['jobs'] }) // Also invalidate jobs to refresh the matrix
     ]);
     console.log('Assignment queries invalidated');
-  };
+  }, [queryClient]);
+
+  // Realtime subscription for job_assignments table
+  useEffect(() => {
+    console.log('🔔 Setting up job_assignments realtime subscription for matrix');
+
+    const channel = supabase
+      .channel('matrix-job-assignments')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_assignments'
+        },
+        (payload) => {
+          console.log('🔔 job_assignments change detected in matrix:', payload.eventType, payload);
+          // Immediately invalidate and refetch
+          invalidateAssignmentQueries();
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔔 job_assignments subscription status:', status);
+      });
+
+    return () => {
+      console.log('🔔 Cleaning up job_assignments realtime subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [invalidateAssignmentQueries]);
 
   const isInitialLoading = assignmentsInitialLoading || availabilityInitialLoading;
   const isFetching = assignmentsFetching || availabilityFetching;
