@@ -401,7 +401,7 @@ export function CorporateEmailComposer() {
             </PopoverTrigger>
             <PopoverContent className="w-[400px] p-0" align="start">
               {recipientPopoverOpen && (
-                <Command>
+                <Command shouldFilter={false}>
                   <CommandInput
                     placeholder="Buscar por nombre, email o departamento..."
                     value={recipientSearch}
@@ -451,7 +451,7 @@ export function CorporateEmailComposer() {
 
                   {/* Individual profiles */}
                   <CommandGroup heading="Individuales">
-                    {profiles.slice(0, 10).map((profile) => {
+                    {profiles.map((profile) => {
                       const name = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
                       return (
                         <CommandItem
