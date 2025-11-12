@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { detectConflictForAssignment, type AssignmentCoverage, type JobTimeInfo } from "./conflictUtils.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -314,7 +315,7 @@ serve(async (req) => {
             otherJobs = otherJobsData ?? [];
           }
 
-          const jobTimeMap = new Map<number, { title: string | null; start: Date | null; end: Date | null; rawStart: string | null; rawEnd: string | null }>();
+          const jobTimeMap = new Map<number, JobTimeInfo>();
           if (job) {
             jobTimeMap.set(job.id, {
               title: job.title ?? null,
@@ -341,18 +342,6 @@ serve(async (req) => {
             return Number.isNaN(d.getTime()) ? null : d;
           };
           const addDays = (date: Date, days: number) => new Date(date.getTime() + days * DAY_MS);
-
-          type TimeWindow = { kind: 'day'; start: Date; end: Date } | { kind: 'range'; start: Date; end: Date };
-          type AssignmentCoverage = {
-            window: TimeWindow;
-            meta: {
-              job_id: number;
-              job_title: string | null;
-              assignment_date?: string;
-              start_time?: string | null;
-              end_time?: string | null;
-            };
-          };
 
           const existingAssignmentWindows: AssignmentCoverage[] = [];
           for (const assign of confirmedAssignments) {
@@ -384,55 +373,8 @@ serve(async (req) => {
             });
           }
 
-          const windowsIntersect = (a: TimeWindow, b: TimeWindow) => a.start.getTime() < b.end.getTime() && b.start.getTime() < a.end.getTime();
-
           // 4) Upsert assignment(s): handles single or batch dates
           async function upsertAssignmentFor(targetDate: string | null) {
-            const requestWindow: TimeWindow | null = (() => {
-              if (targetDate) {
-                const dayStart = toDateOrNull(targetDate);
-                if (!dayStart) return null;
-                return { kind: 'day', start: dayStart, end: addDays(dayStart, 1) };
-              }
-              const jobInfo = jobTimeMap.get(row.job_id);
-              if (!jobInfo || !jobInfo.start || !jobInfo.end) return null;
-              if (jobInfo.start.getTime() >= jobInfo.end.getTime()) return null;
-              return { kind: 'range', start: jobInfo.start, end: jobInfo.end };
-            })();
-
-            if (requestWindow && existingAssignmentWindows.length > 0) {
-              const conflicting = existingAssignmentWindows.find(existing => windowsIntersect(requestWindow, existing.window));
-              if (conflicting) {
-                const conflictMeta: Record<string, unknown> = {
-                  request_job_id: row.job_id,
-                  request_single_day: !!targetDate,
-                  request_window_type: requestWindow.kind,
-                  conflicting_job_id: conflicting.meta.job_id,
-                  conflicting_job_title: conflicting.meta.job_title,
-                  conflicting_window_type: conflicting.window.kind,
-                };
-                if (targetDate) {
-                  conflictMeta.request_assignment_date = targetDate;
-                } else {
-                  conflictMeta.request_job_start = job?.start_time ?? null;
-                  conflictMeta.request_job_end = job?.end_time ?? null;
-                }
-                if (conflicting.meta.assignment_date) {
-                  conflictMeta.conflicting_assignment_date = conflicting.meta.assignment_date;
-                }
-                if (conflicting.meta.start_time || conflicting.meta.end_time) {
-                  conflictMeta.conflicting_job_start = conflicting.meta.start_time ?? null;
-                  conflictMeta.conflicting_job_end = conflicting.meta.end_time ?? null;
-                }
-                await supabase.from('staffing_events').insert({
-                  staffing_request_id: rid,
-                  event: 'auto_assign_skipped_conflict',
-                  meta: conflictMeta,
-                });
-                return;
-              }
-            }
-
             console.log('🧾 upsertAssignmentFor invoked', {
               job_id: row.job_id,
               technician_id: row.profile_id,
@@ -577,6 +519,22 @@ serve(async (req) => {
                   batch_id: (row as any).batch_id,
                   assignmentDate,
                 });
+                const conflictResult = detectConflictForAssignment({
+                  targetDate: assignmentDate,
+                  existingAssignmentWindows,
+                  jobInfo: jobTimeMap.get(row.job_id),
+                  jobId: row.job_id,
+                  jobStartTime: job?.start_time ?? null,
+                  jobEndTime: job?.end_time ?? null,
+                });
+                if (conflictResult.conflict) {
+                  await supabase.from('staffing_events').insert({
+                    staffing_request_id: rid,
+                    event: 'auto_assign_skipped_conflict',
+                    meta: conflictResult.meta,
+                  });
+                  continue;
+                }
                 await upsertAssignmentFor(assignmentDate);
               }
             } else {
@@ -585,7 +543,24 @@ serve(async (req) => {
                 technician_id: row.profile_id,
                 targetDate: (row as any).single_day && (row as any).target_date ? (row as any).target_date : null,
               });
-              await upsertAssignmentFor((row as any).single_day && (row as any).target_date ? (row as any).target_date : null);
+              const singleTarget = (row as any).single_day && (row as any).target_date ? (row as any).target_date : null;
+              const conflictResult = detectConflictForAssignment({
+                targetDate: singleTarget,
+                existingAssignmentWindows,
+                jobInfo: jobTimeMap.get(row.job_id),
+                jobId: row.job_id,
+                jobStartTime: job?.start_time ?? null,
+                jobEndTime: job?.end_time ?? null,
+              });
+              if (conflictResult.conflict) {
+                await supabase.from('staffing_events').insert({
+                  staffing_request_id: rid,
+                  event: 'auto_assign_skipped_conflict',
+                  meta: conflictResult.meta,
+                });
+              } else {
+                await upsertAssignmentFor(singleTarget);
+              }
             }
 
             try {
