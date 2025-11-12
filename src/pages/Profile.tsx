@@ -373,6 +373,14 @@ export const Profile = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>⚠️ Recordatorio importante</AlertTitle>
+                  <AlertDescription>
+                    Después de actualizar la aplicación, recuerda volver a activar las notificaciones en esta página para seguir recibiendo alertas de cambios y actualizaciones.
+                  </AlertDescription>
+                </Alert>
+
                 {!isSupported ? (
                   <Alert variant="info">
                     <AlertTitle>Navegador no compatible</AlertTitle>

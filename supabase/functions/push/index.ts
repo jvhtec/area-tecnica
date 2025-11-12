@@ -187,6 +187,9 @@ const EVENT_TYPES = {
   // Hoja de ruta
   HOJA_UPDATED: 'hoja.updated',
 
+  // Changelog
+  CHANGELOG_UPDATED: 'changelog.updated',
+
   // Scheduled notifications
   DAILY_MORNING_SUMMARY: 'daily.morning.summary',
 } as const;
@@ -2321,6 +2324,35 @@ async function handleBroadcast(
     // Notify only users who are both management and in the sound department
     const soundManagement = Array.from(management).filter((id) => soundDept.has(id));
     addNaturalRecipients(soundManagement);
+
+  // ========================================================================
+  // CHANGELOG EVENTS (1 event)
+  // ========================================================================
+
+  } else if (type === EVENT_TYPES.CHANGELOG_UPDATED) {
+    // Notify all users when changelog is updated
+    const version = (body as any)?.version as string | undefined;
+    const content = (body as any)?.content as string | undefined;
+
+    title = '⚠️ ¡Actualiza ahora!';
+    if (content) {
+      // Show the full changelog content in the notification
+      text = content;
+    } else if (version) {
+      text = `Nueva versión v${version} disponible. Actualiza la aplicación para ver las novedades.`;
+    } else {
+      text = 'Se han publicado cambios importantes. Actualiza la aplicación.';
+    }
+
+    url = body.url || '/';
+    // Broadcast to all authenticated users
+    clearAllRecipients();
+    const { data: allUsers } = await client
+      .from('profiles')
+      .select('id');
+    if (allUsers && allUsers.length > 0) {
+      addNaturalRecipients(allUsers.map(u => u.id));
+    }
 
   // ========================================================================
   // FALLBACK (Unknown event types)

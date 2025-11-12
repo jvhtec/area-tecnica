@@ -122,6 +122,9 @@ const FALLBACK_EVENTS: EventInfo[] = [
   // SoundVision
   { code: 'soundvision.file.uploaded', label: 'SoundVision file uploaded' },
   { code: 'soundvision.file.downloaded', label: 'SoundVision file downloaded' },
+
+  // App updates
+  { code: 'changelog.updated', label: '📝 Changelog updated' },
 ];
 
 function routeKey(event: string, type: RecipientType, target: string | null) {

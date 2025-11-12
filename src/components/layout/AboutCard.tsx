@@ -51,11 +51,17 @@ interface AboutCardProps {
 }
 
 const filterRecentEntries = (entries: ChangelogEntry[]) => {
-  const cutoff = new Date()
-  cutoff.setMonth(cutoff.getMonth() - 1)
+  const now = new Date()
+  const cutoff = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+
   return entries.filter(entry => {
-    const entryDate = new Date(entry.date)
-    if (Number.isNaN(entryDate.getTime())) return true
+    // Parse YYYY-MM-DD format to avoid timezone issues
+    const match = entry.date.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!match) return true // Keep entries with invalid dates
+
+    const [, year, month, day] = match
+    const entryDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+
     return entryDate >= cutoff
   })
 }
@@ -169,6 +175,16 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
             ? { id: data.id, version: data.version, date: data.entry_date, content: data.content, lastUpdated: data.last_updated }
             : entry
         )))
+
+        // Send push notification about changelog update
+        void supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'changelog.updated',
+            version: data.version,
+            content: data.content
+          }
+        })
       }
       setEditingEntry(null)
       setEditContent("")
