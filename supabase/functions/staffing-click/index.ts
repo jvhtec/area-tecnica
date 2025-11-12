@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createConflictEvaluator, type ConflictEvaluationResult } from "./conflict-utils.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -297,37 +298,38 @@ serve(async (req) => {
             event: 'auto_assign_attempt',
             meta: { role: chosenRole, department: prof.department, job_id: job.id, profile_id: row.profile_id }
           });
-          // 3) Conflict check: ensure no other confirmed assignment overlaps
+          // 3) Conflict check preparation: ensure no other confirmed assignment overlaps
           const { data: confirmedAssigns, error: assignErr } = await supabase
             .from('job_assignments')
-            .select('job_id,status')
+            .select('job_id,status,assignment_date,single_day')
             .eq('technician_id', row.profile_id)
             .eq('status', 'confirmed');
 
-          let hasConflict = false;
-          if (!assignErr && (confirmedAssigns?.length ?? 0) > 0) {
-            const otherJobIds = confirmedAssigns!.map(a => a.job_id).filter(id => id !== row.job_id);
+          let evaluateConflict: (targetDate: string | null) => ConflictEvaluationResult | null = () => null;
+          if (!assignErr) {
+            const otherJobIds = Array.from(
+              new Set(
+                (confirmedAssigns ?? [])
+                  .map(a => a.job_id)
+                  .filter(id => `${id}` !== `${row.job_id}`),
+              ),
+            );
+            let otherJobs: any[] = [];
             if (otherJobIds.length > 0) {
-              const { data: otherJobs } = await supabase
+              const { data: otherJobsData } = await supabase
                 .from('jobs')
                 .select('id,start_time,end_time,title')
                 .in('id', otherJobIds);
-              const targetStart = job.start_time ? new Date(job.start_time) : null;
-              const targetEnd = job.end_time ? new Date(job.end_time) : null;
-              const overlap = targetStart && targetEnd ? (otherJobs ?? []).find(j => j.start_time && j.end_time && (new Date(j.start_time) < targetEnd) && (new Date(j.end_time) > targetStart)) : null;
-              if (overlap) {
-                hasConflict = true;
-                await supabase.from('staffing_events').insert({
-                  staffing_request_id: rid,
-                  event: 'auto_assign_skipped_conflict',
-                  meta: { conflicting_job_id: overlap.id, conflicting_title: overlap.title }
-                });
-              }
+              otherJobs = otherJobsData ?? [];
             }
+            evaluateConflict = createConflictEvaluator({
+              currentJob: { id: job.id, start_time: job.start_time ?? null, end_time: job.end_time ?? null },
+              confirmedAssignments: confirmedAssigns ?? [],
+              otherJobs,
+            });
           }
 
-          if (!hasConflict) {
-            // 4) Upsert assignment(s): handles single or batch dates
+          // 4) Upsert assignment(s): handles single or batch dates
             async function upsertAssignmentFor(targetDate: string | null) {
               console.log('🧾 upsertAssignmentFor invoked', {
                 job_id: row.job_id,
@@ -473,15 +475,44 @@ serve(async (req) => {
                   batch_id: (row as any).batch_id,
                   assignmentDate,
                 });
+                const conflict = evaluateConflict(assignmentDate);
+                if (conflict) {
+                  await supabase.from('staffing_events').insert({
+                    staffing_request_id: rid,
+                    event: 'auto_assign_skipped_conflict',
+                    meta: {
+                      conflicting_job_id: conflict.jobId,
+                      conflicting_title: conflict.title,
+                      target_date: assignmentDate ?? conflict.targetDate ?? null,
+                      reason: conflict.reason,
+                    },
+                  });
+                  continue;
+                }
                 await upsertAssignmentFor(assignmentDate);
               }
             } else {
+              const singleTargetDate = (row as any).single_day && (row as any).target_date ? (row as any).target_date : null;
               console.log('📅 Processing single assignment row', {
                 job_id: row.job_id,
                 technician_id: row.profile_id,
-                targetDate: (row as any).single_day && (row as any).target_date ? (row as any).target_date : null,
+                targetDate: singleTargetDate,
               });
-              await upsertAssignmentFor((row as any).single_day && (row as any).target_date ? (row as any).target_date : null);
+              const conflict = evaluateConflict(singleTargetDate);
+              if (conflict) {
+                await supabase.from('staffing_events').insert({
+                  staffing_request_id: rid,
+                  event: 'auto_assign_skipped_conflict',
+                  meta: {
+                    conflicting_job_id: conflict.jobId,
+                    conflicting_title: conflict.title,
+                    target_date: singleTargetDate ?? conflict.targetDate ?? null,
+                    reason: conflict.reason,
+                  },
+                });
+              } else {
+                await upsertAssignmentFor(singleTargetDate);
+              }
             }
 
             try {
