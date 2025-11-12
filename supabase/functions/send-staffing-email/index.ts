@@ -685,6 +685,18 @@ serve(async (req) => {
         const headersWA: Record<string, string> = { 'Content-Type': 'application/json' };
         if (apiKey) headersWA['X-API-Key'] = apiKey;
 
+        const requestId = crypto.randomUUID();
+        try {
+          console.log('[send-staffing-email] WA context', {
+            requestId,
+            actorId,
+            base,
+            session,
+            hasApiKey: Boolean(apiKey),
+            chatIdSuffix: (tech.phone || '').slice(-4),
+          });
+        } catch {}
+
         // Normalize phone → JID
         function normalizePhone(raw: string, defaultCountry: string): { ok: true; value: string } | { ok: false; reason: string } {
           if (!raw) return { ok: false, reason: 'empty' } as const;
@@ -709,22 +721,94 @@ serve(async (req) => {
           return new Response(JSON.stringify({ error: 'Invalid phone format for WhatsApp' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
         const chatId = norm.value.replace(/^\+/, '').replace(/\D/g, '') + '@c.us';
-        const sendUrl = `${base}/api/sendText`;
-        const msgBody = { chatId, text, session, linkPreview: false } as const;
-        console.log('📤 SENDING WHATSAPP VIA WAHA...', { chatId: '***@c.us', sendUrl });
-        // Add timeout + clearer logging for Cloudflare 524
+        const basePayload = { chatId, text, linkPreview: false } as const;
+        const attempts = [
+          { url: `${base}/api/${encodeURIComponent(session)}/sendText`, body: { ...basePayload } },
+          { url: `${base}/api/sendText`, body: { ...basePayload, session } },
+        ] as const;
+
+        // Timeouts and helpers
         const timeoutMs = Number(Deno.env.get('WAHA_FETCH_TIMEOUT_MS') || 15000);
-        const controller = new AbortController();
-        const to = setTimeout(() => controller.abort(new DOMException('timeout','AbortError')), timeoutMs);
-        const waRes = await fetch(sendUrl, { method: 'POST', headers: headersWA, body: JSON.stringify(msgBody), signal: controller.signal });
-        clearTimeout(to);
-        console.log('📤 WAHA RESPONSE:', { status: waRes.status, ok: waRes.ok });
+        const overallMs = Number(Deno.env.get('STAFFING_WA_OVERALL_TIMEOUT_MS') || 14000);
+        const started = Date.now();
+        const fetchWithTimeout = async (url: string, init: RequestInit, ms: number) => {
+          const controller = new AbortController();
+          const t = setTimeout(() => controller.abort(new DOMException('timeout','AbortError')), ms);
+          try { return await fetch(url, { ...init, signal: controller.signal }); } finally { clearTimeout(t); }
+        };
+        const parseCF524 = (body: string) => {
+          const is524 = /Error code\s*524/i.test(body) || /cloudflare/i.test(body);
+          if (!is524) return null;
+          const ray = (body.match(/Cloudflare Ray ID:\s*<strong[^>]*>([^<]+)/i)?.[1]) || (body.match(/Ray ID:\s*([a-z0-9]+)/i)?.[1]) || null;
+          return { rayId: ray };
+        };
+        const truncate = (v?: string | null, max = 2000) => !v ? '' : (v.length > max ? v.slice(0, max) + '…' : v);
+        const interpretResponse = (payload: unknown): { ok: boolean; reason?: string } => {
+          if (!payload || typeof payload !== 'object') return { ok: true };
+          const obj = payload as Record<string, unknown>;
+          if (obj.success === false) return { ok: false, reason: typeof obj.message === 'string' ? obj.message : 'WAHA reported success=false' };
+          if (obj.error && typeof obj.error === 'string') return { ok: false, reason: obj.error };
+          if (Array.isArray((obj as any).errors) && (obj as any).errors.length) return { ok: false, reason: String((obj as any).errors) };
+          if (typeof (obj as any).status === 'string') {
+            const lowered = String((obj as any).status).toLowerCase();
+            if (['error','fail','failed'].includes(lowered)) return { ok: false, reason: String((obj as any).message || lowered) };
+            if (['success','ok'].includes(lowered)) return { ok: true };
+          }
+          if ((obj as any).success === true) return { ok: true };
+          if ('result' in obj && (obj as any).result !== undefined) return { ok: true };
+          if ('data' in obj && (obj as any).data !== undefined) return { ok: true };
+          if ('id' in obj || 'messageId' in obj) return { ok: true };
+          return { ok: true };
+        };
+
+        type AttemptErr = { url: string; step: 'http'|'fetch'|'api'; status?: number; body?: string; json?: Record<string, unknown>|null; message?: string; cloudflareRayId?: string|null };
+        const attemptErrors: AttemptErr[] = [];
+        let waOk = false;
+        let lastStatus: number | undefined;
+
+        for (const attempt of attempts) {
+          const elapsed = Date.now() - started;
+          const remaining = overallMs - elapsed - 200;
+          if (remaining <= 200) {
+            attemptErrors.push({ url: attempt.url, step: 'fetch', message: 'skipped_due_to_time_budget' });
+            continue;
+          }
+          try {
+            const ms = Math.min(timeoutMs, Math.max(500, remaining));
+            const res = await fetchWithTimeout(attempt.url, { method: 'POST', headers: headersWA, body: JSON.stringify(attempt.body) }, ms);
+            lastStatus = res.status;
+            const ct = res.headers.get('content-type') || '';
+            let parsed: Record<string, unknown> | null = null;
+            let textBody: string | null = null;
+            if (/application\/json/i.test(ct)) parsed = await res.json().catch(() => null) as any;
+            else textBody = await res.text().catch(() => null);
+            if (!res.ok) {
+              const bodyStr = parsed ? JSON.stringify(parsed) : textBody || '';
+              const cf = res.status === 524 && bodyStr ? parseCF524(bodyStr) : null;
+              console.warn('[send-staffing-email] WAHA non-OK', { url: attempt.url, status: res.status, rayId: cf?.rayId || null });
+              attemptErrors.push({ url: attempt.url, step: 'http', status: res.status, body: truncate(bodyStr), cloudflareRayId: cf?.rayId || null });
+              continue;
+            }
+            const interpretation = interpretResponse(parsed);
+            if (interpretation.ok) { waOk = true; break; }
+            const serialized = parsed ? JSON.stringify(parsed) : textBody || '';
+            console.warn('[send-staffing-email] WAHA reported failure', { url: attempt.url, reason: interpretation.reason || null });
+            attemptErrors.push({ url: attempt.url, step: 'api', status: res.status, json: parsed, body: truncate(serialized), message: interpretation.reason });
+          } catch (e) {
+            const message = e instanceof Error ? e.message : String(e);
+            console.warn('[send-staffing-email] WAHA fetch error', { url: attempt.url, message });
+            attemptErrors.push({ url: attempt.url, step: 'fetch', message });
+          }
+        }
+
+        // Log event with final observed status (even if failure) to keep existing analytics behavior
         await supabase.from('staffing_events').insert({
           staffing_request_id: insertedId,
           event: 'whatsapp_sent',
-          meta: { phase, status: waRes.status, role: role ?? null, single_day: isSingleDayRequest || isBatch, target_date: normalizedTargetDate, dates: normalizedDates }
+          meta: { phase, status: waOk ? 200 : (lastStatus ?? 0), role: role ?? null, single_day: isSingleDayRequest || isBatch, target_date: normalizedTargetDate, dates: normalizedDates }
         });
-        if (waRes.ok) {
+
+        if (waOk) {
           try {
             const activityCode = phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent';
             await supabase.rpc('log_activity_as', {
@@ -733,26 +817,18 @@ serve(async (req) => {
               _job_id: job_id,
               _entity_type: 'staffing',
               _entity_id: insertedId,
-              _payload: {
-                staffing_request_id: insertedId,
-                phase,
-                profile_id,
-                tech_name: fullName || tech.email || tech.phone,
-              },
+              _payload: { staffing_request_id: insertedId, phase, profile_id, tech_name: fullName || tech.email || tech.phone },
               _visibility: null,
             });
           } catch (activityError) {
             console.warn('[send-staffing-email] Failed to log activity (whatsapp)', activityError);
           }
           return new Response(JSON.stringify({ success: true, channel: 'whatsapp' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-        } else {
-          const errTxt = await waRes.text().catch(() => '');
-          if (waRes.status === 524) {
-            const ray = (errTxt.match(/Cloudflare Ray ID:\s*<strong[^>]*>([^<]+)/i)?.[1]) || null;
-            console.warn('[send-staffing-email] WAHA sendText timeout via Cloudflare (524)', { status: waRes.status, rayId: ray });
-          }
-          return new Response(JSON.stringify({ error: 'WhatsApp delivery failed', details: { status: waRes.status, body: errTxt } }), { status: waRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
+
+        const errorPayload = { error: 'WhatsApp delivery failed', request_id: requestId, context: { base, session, chatIdSuffix: (tech.phone || '').slice(-4) }, attempts: attemptErrors };
+        const statusToReturn = typeof lastStatus === 'number' && lastStatus >= 400 ? lastStatus : 502;
+        return new Response(JSON.stringify(errorPayload), { status: statusToReturn, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       } else {
         // Email channel via Brevo
         console.log('📤 SENDING EMAIL VIA BREVO...');

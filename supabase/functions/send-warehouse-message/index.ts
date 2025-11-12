@@ -89,6 +89,18 @@ serve(async (req: Request) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers['X-API-Key'] = apiKey;
 
+    const requestId = crypto.randomUUID();
+    try {
+      console.log('send-warehouse-message context', {
+        requestId,
+        actorId,
+        base,
+        session,
+        hasApiKey: Boolean(apiKey),
+        groupIdSuffix: WAREHOUSE_SOUND_GROUP?.slice(-8) || null,
+      });
+    } catch {}
+
     const basePayload = { chatId: WAREHOUSE_SOUND_GROUP, text: msg, linkPreview: false } as const;
     const attempts = [
       {
@@ -102,7 +114,10 @@ serve(async (req: Request) => {
     ] as const;
 
     // Fetch with timeout + Cloudflare 524 awareness
+    // Keep a global time budget to avoid crossing edge 15s limits
     const timeoutMs = Number(Deno.env.get('WAHA_FETCH_TIMEOUT_MS') || 15000);
+    const overallBudgetMs = Number(Deno.env.get('WAREHOUSE_SEND_OVERALL_TIMEOUT_MS') || 14000);
+    const startedAt = Date.now();
     const fetchWithTimeout = async (url: string, init: RequestInit, ms: number) => {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(new DOMException('timeout','AbortError')), ms);
@@ -159,8 +174,20 @@ serve(async (req: Request) => {
     };
 
     for (const attempt of attempts) {
+      // Ensure we don't exceed the global time budget
+      const elapsed = Date.now() - startedAt;
+      const remaining = overallBudgetMs - elapsed - 200; // leave a small margin to finalize response
+      if (remaining <= 200) {
+        attemptErrors.push({ url: attempt.url, step: 'fetch', message: 'skipped_due_to_time_budget' });
+        continue;
+      }
       try {
-        const res = await fetchWithTimeout(attempt.url, { method: 'POST', headers, body: JSON.stringify(attempt.body) }, timeoutMs);
+        const perAttemptTimeout = Math.min(timeoutMs, Math.max(500, remaining));
+        const res = await fetchWithTimeout(
+          attempt.url,
+          { method: 'POST', headers, body: JSON.stringify(attempt.body) },
+          perAttemptTimeout,
+        );
         const contentType = res.headers.get('content-type') || '';
         let parsedJson: Record<string, unknown> | null = null;
         let bodyText: string | null = null;
@@ -220,6 +247,8 @@ serve(async (req: Request) => {
     if (!waSendOk) {
       const errorPayload: Record<string, unknown> = {
         error: 'Failed to send WhatsApp message',
+        request_id: requestId,
+        context: { base, session },
         attempts: attemptErrors.map((err) => ({
           url: err.url,
           step: err.step,
