@@ -1603,3 +1603,114 @@ using (
     where p.id = (select auth.uid()) and p.role in ('admin', 'management')
   )
 );
+
+drop policy if exists "Users can view accommodations from their hojas de ruta" on public.hoja_de_ruta_accommodations;
+create policy "Users can view accommodations from their hojas de ruta"
+on public.hoja_de_ruta_accommodations
+for select
+using (
+  hoja_de_ruta_id in (
+    select h.id from public.hoja_de_ruta h
+    where h.created_by = (select auth.uid()) or h.approved_by = (select auth.uid())
+  )
+);
+
+-- =====================================================================
+-- HOJA_DE_RUTA_ROOM_ASSIGNMENTS TABLE
+-- =====================================================================
+
+drop policy if exists "Users can view room assignments from their accommodations" on public.hoja_de_ruta_room_assignments;
+create policy "Users can view room assignments from their accommodations"
+on public.hoja_de_ruta_room_assignments
+for select
+using (
+  accommodation_id in (
+    select a.id from public.hoja_de_ruta_accommodations a
+    join public.hoja_de_ruta h on a.hoja_de_ruta_id = h.id
+    where h.created_by = (select auth.uid()) or h.approved_by = (select auth.uid())
+  )
+);
+
+drop policy if exists "Users can create room assignments for their accommodations" on public.hoja_de_ruta_room_assignments;
+create policy "Users can create room assignments for their accommodations"
+on public.hoja_de_ruta_room_assignments
+for insert
+with check (
+  accommodation_id in (
+    select a.id from public.hoja_de_ruta_accommodations a
+    join public.hoja_de_ruta h on a.hoja_de_ruta_id = h.id
+    where h.created_by = (select auth.uid())
+  )
+);
+
+drop policy if exists "Users can update room assignments for their accommodations" on public.hoja_de_ruta_room_assignments;
+create policy "Users can update room assignments for their accommodations"
+on public.hoja_de_ruta_room_assignments
+for update
+using (
+  accommodation_id in (
+    select a.id from public.hoja_de_ruta_accommodations a
+    join public.hoja_de_ruta h on a.hoja_de_ruta_id = h.id
+    where h.created_by = (select auth.uid())
+  )
+);
+
+drop policy if exists "Users can delete room assignments for their accommodations" on public.hoja_de_ruta_room_assignments;
+create policy "Users can delete room assignments for their accommodations"
+on public.hoja_de_ruta_room_assignments
+for delete
+using (
+  accommodation_id in (
+    select a.id from public.hoja_de_ruta_accommodations a
+    join public.hoja_de_ruta h on a.hoja_de_ruta_id = h.id
+    where h.created_by = (select auth.uid())
+  )
+);
+
+-- =====================================================================
+-- HOJA_DE_RUTA_TRAVEL_ARRANGEMENTS TABLE
+-- =====================================================================
+
+drop policy if exists "Users can view travel arrangements from their hojas de ruta" on public.hoja_de_ruta_travel_arrangements;
+create policy "Users can view travel arrangements from their hojas de ruta"
+on public.hoja_de_ruta_travel_arrangements
+for select
+using (
+  hoja_de_ruta_id in (
+    select h.id from public.hoja_de_ruta h
+    where h.created_by = (select auth.uid()) or h.approved_by = (select auth.uid())
+  )
+);
+
+drop policy if exists "Users can create travel arrangements for their hojas de ruta" on public.hoja_de_ruta_travel_arrangements;
+create policy "Users can create travel arrangements for their hojas de ruta"
+on public.hoja_de_ruta_travel_arrangements
+for insert
+with check (
+  hoja_de_ruta_id in (
+    select h.id from public.hoja_de_ruta h
+    where h.created_by = (select auth.uid())
+  )
+);
+
+drop policy if exists "Users can update travel arrangements for their hojas de ruta" on public.hoja_de_ruta_travel_arrangements;
+create policy "Users can update travel arrangements for their hojas de ruta"
+on public.hoja_de_ruta_travel_arrangements
+for update
+using (
+  hoja_de_ruta_id in (
+    select h.id from public.hoja_de_ruta h
+    where h.created_by = (select auth.uid())
+  )
+);
+
+drop policy if exists "Users can delete travel arrangements for their hojas de ruta" on public.hoja_de_ruta_travel_arrangements;
+create policy "Users can delete travel arrangements for their hojas de ruta"
+on public.hoja_de_ruta_travel_arrangements
+for delete
+using (
+  hoja_de_ruta_id in (
+    select h.id from public.hoja_de_ruta h
+    where h.created_by = (select auth.uid())
+  )
+);
