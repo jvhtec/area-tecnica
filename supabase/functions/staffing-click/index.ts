@@ -44,7 +44,7 @@ serve(async (req) => {
 
     if (!rid || !action || !exp || !t) {
       console.log('❌ STEP 2 FAILED: Missing parameters');
-      return redirectResponse({
+      return await redirectResponse({
         title: 'Enlace inválido',
         status: 'error',
         heading: 'Enlace inválido',
@@ -57,7 +57,7 @@ serve(async (req) => {
     const nowTime = Date.now();
     if (expTime < nowTime) {
       console.log('❌ STEP 3 FAILED: Link expired', { expTime, nowTime, diff: nowTime - expTime });
-      return redirectResponse({
+      return await redirectResponse({
         title: 'Enlace caducado',
         status: 'warning',
         heading: 'Enlace caducado',
@@ -72,7 +72,7 @@ serve(async (req) => {
     
     if (dbError) {
       console.error('❌ STEP 4 FAILED: Database error', dbError);
-      return redirectResponse({
+      return await redirectResponse({
         title: 'Error de base de datos',
         status: 'error',
         heading: 'Error de base de datos',
@@ -82,7 +82,7 @@ serve(async (req) => {
     
     if (!row) {
       console.log('❌ STEP 4 FAILED: Request not found in database', { rid });
-      return redirectResponse({
+      return await redirectResponse({
         title: 'No encontrado',
         status: 'error',
         heading: 'Solicitud no encontrada',
@@ -113,17 +113,17 @@ serve(async (req) => {
 
       if (token_hash_expected !== row.token_hash && providedHash !== row.token_hash) {
         console.log('❌ STEP 5 FAILED: Token validation failed');
-        return redirectResponse({
-          title: 'Token inválido',
-          status: 'error',
-          heading: 'Token inválido',
-          message: 'Este enlace no es válido. Utiliza el enlace original de tu correo.'
-        });
+      return await redirectResponse({
+        title: 'Token inválido',
+        status: 'error',
+        heading: 'Token inválido',
+        message: 'Este enlace no es válido. Utiliza el enlace original de tu correo.'
+      });
       }
       console.log('✅ STEP 5: Token validated successfully');
     } catch (cryptoError) {
       console.error('❌ STEP 5 FAILED: Crypto error', cryptoError);
-      return redirectResponse({
+      return await redirectResponse({
         title: 'Error de validación',
         status: 'error',
         heading: 'Error de validación',
@@ -137,7 +137,7 @@ serve(async (req) => {
       const statusText = row.status === 'confirmed' ? 'confirmado' : 'rechazado';
       const phase = row.phase === 'offer' ? 'la oferta' : 'la disponibilidad';
       console.log('⚠️ STEP 6: Already responded', { status: row.status, phase: row.phase });
-      return redirectResponse({
+      return await redirectResponse({
         title: 'Respuesta registrada',
         status: 'warning',
         heading: 'Respuesta ya registrada',
@@ -530,7 +530,7 @@ serve(async (req) => {
 
     const phaseText = row.phase === 'offer' ? 'la oferta' : 'la disponibilidad';
     const isOk = newStatus === 'confirmed';
-    return redirectResponse({
+    return await redirectResponse({
       title: isOk ? '¡Confirmado!' : 'Respuesta registrada',
       status: isOk ? 'success' : 'neutral',
       heading: isOk ? '¡Gracias! Confirmado' : 'Respuesta registrada',
@@ -551,23 +551,99 @@ serve(async (req) => {
 });
 
 /**
- * Redirects to GitHub Pages parametric error page
+ * Redirects to public result page (defaults to sector-pro.work)
  */
-function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
-  console.log('📄 REDIRECTING TO RESULT PAGE:', { status: opts.status, heading: opts.heading });
-  
-  const baseUrl = 'https://jvhtec.github.io/area-tecnica/public/temp_error.html';
+async function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
+  // Prefer redirect if an explicit result page URL is configured and reachable.
+  const configuredBase = Deno.env.get('PUBLIC_CONFIRM_RESULT_URL') || Deno.env.get('PUBLIC_RESULT_PAGE_URL') || '';
+  const defaultBase = 'https://sector-pro.work/temp_error.html';
+  const baseUrl = configuredBase || defaultBase;
+
   const params = new URLSearchParams({
     status: opts.status,
     heading: opts.heading,
     message: opts.message,
     ...(opts.submessage ? { submessage: opts.submessage } : {})
   });
-  
-  return new Response(null, {
-    status: 302,
-    headers: {
-      'Location': `${baseUrl}?${params.toString()}`
+
+  // Try redirecting to either configuredBase or the default sector-pro URL
+  const shouldTryRedirect = true;
+
+  if (shouldTryRedirect) {
+    try {
+      // Probe the page quickly to avoid redirecting to a 404
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 700);
+      const head = await fetch(`${baseUrl}`, { method: 'HEAD', signal: controller.signal }).catch(() => undefined);
+      clearTimeout(t);
+      if (head && head.ok) {
+        console.log('📄 REDIRECTING TO RESULT PAGE:', { status: opts.status, heading: opts.heading, target: baseUrl });
+        return new Response(null, { status: 302, headers: { 'Location': `${baseUrl}?${params.toString()}` } });
+      } else {
+        console.warn('⚠️ Result page not reachable, rendering inline page instead', { baseUrl, status: head?.status });
+      }
+    } catch (e) {
+      console.warn('⚠️ Result page probe error, rendering inline page', { error: (e as Error)?.message });
     }
-  });
+  }
+
+  // Fallback: render inline HTML so the user never sees a 404
+  return new Response(renderPage(opts), { headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
+}
+
+function renderPage(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
+  const palette: Record<typeof opts.status, { bg: string; fg: string; icon: string; }> = {
+    success: { bg: '#ECFDF5', fg: '#065F46', icon: '✅' },
+    warning: { bg: '#FFFBEB', fg: '#92400E', icon: '⚠️' },
+    error:   { bg: '#FEF2F2', fg: '#991B1B', icon: '❌' },
+    neutral: { bg: '#F3F4F6', fg: '#111827', icon: 'ℹ️' },
+  } as const;
+  const theme = palette[opts.status];
+  const companyLogo = COMPANY_LOGO_URL;
+  const atLogo = AT_LOGO_URL;
+  return `<!doctype html>
+  <html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(opts.title)}</title>
+    <style>
+      body{margin:0;font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, sans-serif;background:#0b0f14;color:#111}
+      .wrap{max-width:640px;margin:32px auto;padding:24px}
+      .card{background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);overflow:hidden}
+      .header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:#0b0f14}
+      .brand img{height:28px}
+      .content{padding:28px 24px;background:${theme.bg};color:${theme.fg}}
+      h1{margin:0 0 8px 0;font-size:22px}
+      p{margin:6px 0;font-size:16px;line-height:1.4}
+      .icon{font-size:22px;margin-right:8px}
+      .footer{padding:12px 20px;color:#6b7280;font-size:12px;background:#f9fafb;text-align:center}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="header">
+          <div class="brand"><img src="${companyLogo}" alt="Logo" /></div>
+          <div class="brand"><img src="${atLogo}" alt="Área Técnica"/></div>
+        </div>
+        <div class="content">
+          <h1><span class="icon">${theme.icon}</span>${escapeHtml(opts.heading)}</h1>
+          <p>${escapeHtml(opts.message)}</p>
+          ${opts.submessage ? `<p>${escapeHtml(opts.submessage)}</p>` : ''}
+        </div>
+        <div class="footer">Puedes cerrar esta pestaña.</div>
+      </div>
+    </div>
+  </body>
+  </html>`;
+}
+
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
