@@ -609,13 +609,15 @@ serve(async (req) => {
 
     const phaseText = row.phase === 'offer' ? 'la oferta' : 'la disponibilidad';
     const isOk = newStatus === 'confirmed';
-    return await redirectResponse({
+    const redirect = await redirectResponse({
       title: isOk ? '¡Confirmado!' : 'Respuesta registrada',
       status: isOk ? 'success' : 'neutral',
       heading: isOk ? '¡Gracias! Confirmado' : 'Respuesta registrada',
       message: `Tu respuesta sobre ${phaseText} ha sido registrada.`,
       submessage: 'Puedes cerrar esta pestaña.'
     });
+
+    return redirect;
   } catch (error) {
     console.error("❌ UNEXPECTED SERVER ERROR:", error);
     console.error("Error stack:", (error as Error)?.stack);
