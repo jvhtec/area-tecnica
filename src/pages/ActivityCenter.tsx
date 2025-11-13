@@ -1,13 +1,43 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listActivity } from '@/features/activity/api';
 import { getActivityMeta } from '@/features/activity/catalog';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { getDashboardPath } from '@/utils/roleBasedRouting';
 
 export default function ActivityCenter() {
+  const navigate = useNavigate();
+  const { userRole, isLoading: authLoading } = useOptimizedAuth();
+
+  // Early security check: Only allow admin, management
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (userRole && !['admin', 'management'].includes(userRole)) {
+      const redirectPath = getDashboardPath(userRole as any);
+      navigate(redirectPath, { replace: true });
+    }
+  }, [userRole, authLoading, navigate]);
+
   const { data = [], isLoading, error, refetch } = useQuery({
     queryKey: ['activity', 'all'],
     queryFn: () => listActivity({ limit: 50 }),
   });
+
+  // Show loading state while checking authorization
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900 dark:border-white" />
+      </div>
+    );
+  }
+
+  // Don't render anything if user is unauthorized
+  if (!userRole || !['admin', 'management'].includes(userRole)) {
+    return null;
+  }
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
