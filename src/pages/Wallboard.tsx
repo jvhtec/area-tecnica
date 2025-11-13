@@ -32,8 +32,8 @@ interface LogisticsItem {
   departments: string[];
 }
 
-const PanelContainer: React.FC<{ children: React.ReactNode }>=({ children })=> (
-  <div className="w-full h-full p-6 flex flex-col gap-4 bg-black text-white">
+const PanelContainer: React.FC<{ children: React.ReactNode; theme?: 'light' | 'dark' }>=({ children, theme = 'light' })=> (
+  <div className={`w-full h-full p-6 flex flex-col gap-4 ${theme === 'light' ? 'bg-white text-zinc-900' : 'bg-black text-white'}`}>
     {children}
   </div>
 );
@@ -112,31 +112,35 @@ function buildCalendarModel(data: CalendarFeed | null, highlightIds?: Set<string
   return { dayNames: DAY_LABELS, monthLabel, cells };
 }
 
-const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string>; page?: number; pageSize?: number }>=({ data, highlightIds, page = 0, pageSize = 6 })=> {
+const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string>; page?: number; pageSize?: number; theme?: 'light' | 'dark' }>=({ data, highlightIds, page = 0, pageSize = 6, theme = 'light' })=> {
   const jobs = data?.jobs ?? [];
   const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(jobs.length / pageSize);
 
   return (
-    <PanelContainer>
+    <PanelContainer theme={theme}>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-5xl font-semibold">Jobs – Next 7 Days</h1>
         {totalPages > 1 && (
-          <div className="text-38 text-zinc-400">Page {page + 1} of {totalPages}</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Page {page + 1} of {totalPages}</div>
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {paginatedJobs.map(j => (
           <div
             key={j.id}
-            className={`rounded-lg bg-zinc-900 p-4 border ${highlightIds?.has(j.id) ? 'border-amber-400 ring-4 ring-amber-400/40 animate-pulse' : 'border-zinc-800'}`}
+            className={`rounded-lg p-4 border ${
+              theme === 'light'
+                ? `bg-zinc-50 ${highlightIds?.has(j.id) ? 'border-amber-500 ring-4 ring-amber-400/40 animate-pulse' : 'border-zinc-200'}`
+                : `bg-zinc-900 ${highlightIds?.has(j.id) ? 'border-amber-400 ring-4 ring-amber-400/40 animate-pulse' : 'border-zinc-800'}`
+            }`}
           >
             <div className="flex items-center justify-between">
               <div className="text-38 font-medium truncate pr-2">{j.title}</div>
               <div className="flex items-center"><StatusDot color={j.status} /></div>
             </div>
-            <div className="text-zinc-300 text-30 mt-1">{j.location?.name ?? '—'}</div>
-            <div className="text-zinc-400 mt-2 text-32">{new Date(j.start_time).toLocaleString()} → {new Date(j.end_time).toLocaleTimeString()}</div>
+            <div className={`text-30 mt-1 ${theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}`}>{j.location?.name ?? '—'}</div>
+            <div className={`mt-2 text-32 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>{new Date(j.start_time).toLocaleString()} → {new Date(j.end_time).toLocaleTimeString()}</div>
             <div className="mt-3 flex gap-6 text-30">
               {j.departments.map(d => (
                 <div key={d} className="flex items-center gap-2">
@@ -145,93 +149,93 @@ const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?
                 </div>
               ))}
             </div>
-            <div className="mt-2 text-2xl text-zinc-500">Docs: {j.departments.map(d=>`${d[0].toUpperCase()}${d.slice(1)} ${j.docs[d]?.have ?? 0}/${j.docs[d]?.need ?? 0}`).join(' • ')}</div>
+            <div className={`mt-2 text-2xl ${theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}`}>Docs: {j.departments.map(d=>`${d[0].toUpperCase()}${d.slice(1)} ${j.docs[d]?.have ?? 0}/${j.docs[d]?.need ?? 0}`).join(' • ')}</div>
           </div>
         ))}
         {jobs.length===0 && (
-          <div className="text-zinc-400 text-38">No jobs in the next 7 days</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No jobs in the next 7 days</div>
         )}
       </div>
     </PanelContainer>
   );
 };
 
-const CrewAssignmentsPanel: React.FC<{ data: CrewAssignmentsFeed | null; page?: number; pageSize?: number }>=({ data, page = 0, pageSize = 4 })=> {
+const CrewAssignmentsPanel: React.FC<{ data: CrewAssignmentsFeed | null; page?: number; pageSize?: number; theme?: 'light' | 'dark' }>=({ data, page = 0, pageSize = 4, theme = 'light' })=> {
   const jobs = data?.jobs ?? [];
   const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(jobs.length / pageSize);
 
   return (
-    <PanelContainer>
+    <PanelContainer theme={theme}>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-5xl font-semibold">Crew Assignments</h1>
         {totalPages > 1 && (
-          <div className="text-38 text-zinc-400">Page {page + 1} of {totalPages}</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Page {page + 1} of {totalPages}</div>
         )}
       </div>
       <div className="flex flex-col gap-4">
         {paginatedJobs.map(job => (
-          <div key={job.id} className="rounded-lg bg-zinc-900 p-4 border border-zinc-800">
+          <div key={job.id} className={`rounded-lg p-4 border ${theme === 'light' ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
             <div className="text-38 font-medium mb-3">{job.title}</div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {job.crew.map((c, i) => (
-                <div key={i} className="flex items-center justify-between bg-zinc-800/50 rounded-md px-3 py-2">
+                <div key={i} className={`flex items-center justify-between rounded-md px-3 py-2 ${theme === 'light' ? 'bg-zinc-100' : 'bg-zinc-800/50'}`}>
                   <div className="flex items-center gap-3 truncate">
                     <span className="text-38">{c.dept==='sound'?'🎧':c.dept==='lights'?'💡':c.dept==='video'?'📹':'👤'}</span>
                     <div className="truncate">
                       <div className="text-32 truncate">{c.name || '—'}</div>
-                      <div className="text-xl text-zinc-400 truncate">{c.role}</div>
+                      <div className={`text-xl truncate ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>{c.role}</div>
                     </div>
                   </div>
-                  <div className={`px-2 py-1 rounded text-xl ${c.timesheetStatus==='approved'?'bg-green-600':c.timesheetStatus==='submitted'?'bg-blue-600':c.timesheetStatus==='draft'?'bg-amber-600':'bg-red-600'}`}>{c.timesheetStatus}</div>
+                  <div className={`px-2 py-1 rounded text-xl ${c.timesheetStatus==='approved'?'bg-green-600':c.timesheetStatus==='submitted'?'bg-blue-600':c.timesheetStatus==='draft'?'bg-amber-600':'bg-red-600'} text-white`}>{c.timesheetStatus}</div>
                 </div>
               ))}
-              {job.crew.length===0 && <div className="text-zinc-400 text-30">No crew assigned yet</div>}
+              {job.crew.length===0 && <div className={`text-30 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No crew assigned yet</div>}
             </div>
           </div>
         ))}
         {jobs.length===0 && (
-          <div className="text-zinc-400 text-38">No jobs to show</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No jobs to show</div>
         )}
       </div>
     </PanelContainer>
   );
 };
 
-const DocProgressPanel: React.FC<{ data: DocProgressFeed | null; page?: number; pageSize?: number }>=({ data, page = 0, pageSize = 4 })=> {
+const DocProgressPanel: React.FC<{ data: DocProgressFeed | null; page?: number; pageSize?: number; theme?: 'light' | 'dark' }>=({ data, page = 0, pageSize = 4, theme = 'light' })=> {
   const jobs = data?.jobs ?? [];
   const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(jobs.length / pageSize);
 
   return (
-    <PanelContainer>
+    <PanelContainer theme={theme}>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-5xl font-semibold">Document Progress</h1>
         {totalPages > 1 && (
-          <div className="text-38 text-zinc-400">Page {page + 1} of {totalPages}</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Page {page + 1} of {totalPages}</div>
         )}
       </div>
       <div className="flex flex-col gap-4">
         {paginatedJobs.map(job => (
-          <div key={job.id} className="rounded-lg bg-zinc-900 p-4 border border-zinc-800">
+          <div key={job.id} className={`rounded-lg p-4 border ${theme === 'light' ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
             <div className="text-38 font-medium mb-3">{job.title}</div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {job.departments.map(dep => {
                 const pct = dep.need>0 ? Math.round((dep.have/dep.need)*100) : 0;
                 return (
-                  <div key={dep.dept} className="bg-zinc-800/50 rounded-md p-3">
+                  <div key={dep.dept} className={`rounded-md p-3 ${theme === 'light' ? 'bg-zinc-100' : 'bg-zinc-800/50'}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-32 flex items-center gap-2">
                         <span className="text-38">{dep.dept==='sound'?'🎧':dep.dept==='lights'?'💡':'📹'}</span>
                         <span className="capitalize">{dep.dept}</span>
                       </div>
-                      <div className="text-2xl text-zinc-300">{dep.have}/{dep.need}</div>
+                      <div className={`text-2xl ${theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}`}>{dep.have}/{dep.need}</div>
                     </div>
-                    <div className="h-3 bg-zinc-700 rounded">
+                    <div className={`h-3 rounded ${theme === 'light' ? 'bg-zinc-300' : 'bg-zinc-700'}`}>
                       <div className="h-3 bg-blue-500 rounded" style={{ width: `${pct}%` }} />
                     </div>
                     {dep.missing.length>0 && (
-                      <div className="text-xl text-zinc-400 mt-2">Missing: {dep.missing.join(', ')}</div>
+                      <div className={`text-xl mt-2 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Missing: {dep.missing.join(', ')}</div>
                     )}
                   </div>
                 );
@@ -240,39 +244,39 @@ const DocProgressPanel: React.FC<{ data: DocProgressFeed | null; page?: number; 
           </div>
         ))}
         {jobs.length===0 && (
-          <div className="text-zinc-400 text-38">Nothing pending</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Nothing pending</div>
         )}
       </div>
     </PanelContainer>
   );
 };
 
-const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data })=> (
-  <PanelContainer>
+const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null; theme?: 'light' | 'dark' }>=({ data, theme = 'light' })=> (
+  <PanelContainer theme={theme}>
     <h1 className="text-5xl font-semibold">Pending Actions</h1>
     <div className="flex flex-col gap-3 text-38">
       {(data?.items ?? []).map((it, i) => (
         <div key={i} className={`rounded-md px-4 py-3 ${it.severity==='red'?'bg-red-700/30 border border-red-700/50':'bg-amber-700/30 border border-amber-700/50'}`}>{it.text}</div>
       ))}
-      {(data?.items.length ?? 0)===0 && <div className="text-zinc-400">All good ✅</div>}
+      {(data?.items.length ?? 0)===0 && <div className={theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}>All good ✅</div>}
     </div>
   </PanelContainer>
 );
 
-const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds }) => {
+const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<string>; theme?: 'light' | 'dark' }>=({ data, highlightIds, theme = 'light' }) => {
   const { dayNames, monthLabel, cells } = buildCalendarModel(data, highlightIds, true);
   return (
-    <PanelContainer>
+    <PanelContainer theme={theme}>
       <div className="flex items-end justify-between gap-6">
         <div>
           <h1 className="text-5xl font-semibold leading-tight">Job Calendar</h1>
-          <div className="text-38 uppercase tracking-[0.35em] text-zinc-400 mt-2">{monthLabel}</div>
+          <div className={`text-38 uppercase tracking-[0.35em] mt-2 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>{monthLabel}</div>
         </div>
-        <div className="text-right text-2xl text-zinc-500 max-w-[28rem] leading-snug">
+        <div className={`text-right text-2xl max-w-[28rem] leading-snug ${theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}`}>
           Current month view with compact job display
         </div>
       </div>
-      <div className="grid grid-cols-7 gap-2 text-zinc-500 uppercase tracking-[0.35em] text-xl font-semibold pt-2">
+      <div className={`grid grid-cols-7 gap-2 uppercase tracking-[0.35em] text-xl font-semibold pt-2 ${theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}`}>
         {dayNames.map(name => (
           <div key={name} className="text-center">{name}</div>
         ))}
@@ -283,16 +287,18 @@ const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<st
           const highlightSet = cell.highlightJobIds;
           const classes = [
             'rounded-lg border p-3 flex flex-col gap-2 min-h-[12rem] shadow-inner transition-all duration-300',
-            cell.inMonth ? 'bg-zinc-950/90 border-zinc-800 text-white' : 'bg-zinc-900/40 border-zinc-800/40 text-zinc-500',
+            theme === 'light'
+              ? (cell.inMonth ? 'bg-white border-zinc-200 text-zinc-900' : 'bg-zinc-50 border-zinc-100 text-zinc-400')
+              : (cell.inMonth ? 'bg-zinc-950/90 border-zinc-800 text-white' : 'bg-zinc-900/40 border-zinc-800/40 text-zinc-500'),
             cell.isToday ? 'border-blue-400/80 ring-2 ring-blue-400/30 shadow-[0_0_45px_rgba(96,165,250,0.35)]' : '',
             cell.hasHighlight ? 'border-amber-400/80 ring-4 ring-amber-400/30 shadow-[0_0_55px_rgba(251,191,36,0.35)]' : '',
           ].filter(Boolean).join(' ');
           return (
             <div key={cell.isoKey + idx} className={classes}>
               <div className="flex items-start justify-between">
-                <div className={`text-38 font-bold leading-none ${cell.inMonth ? '' : 'text-zinc-600'}`}>{cell.date.getDate()}</div>
+                <div className={`text-38 font-bold leading-none ${cell.inMonth ? '' : (theme === 'light' ? 'text-zinc-300' : 'text-zinc-600')}`}>{cell.date.getDate()}</div>
                 {jobs.length > 0 && (
-                  <div className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-lg font-semibold tabular-nums">
+                  <div className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 text-lg font-semibold tabular-nums">
                     {jobs.length}
                   </div>
                 )}
@@ -304,15 +310,15 @@ const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<st
                   const itemClasses = [
                     'flex items-center gap-1.5 rounded px-2 py-1 text-xs',
                     highlight
-                      ? 'bg-amber-500/20 text-amber-100 border border-amber-300'
-                      : 'bg-zinc-900/70 text-zinc-200 border border-zinc-700',
+                      ? 'bg-amber-500/20 text-amber-900 border border-amber-400'
+                      : (theme === 'light' ? 'bg-zinc-100 text-zinc-700 border border-zinc-200' : 'bg-zinc-900/70 text-zinc-200 border border-zinc-700'),
                   ].join(' ');
                   return (
                     <div key={job.id} className={itemClasses}>
                       <StatusDot color={job.status} />
                       <div className="flex-1 truncate">
                         <div className="font-semibold truncate text-sm">{job.title}</div>
-                        <div className="text-xs text-zinc-400 flex gap-2">
+                        <div className={`text-xs flex gap-2 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>
                           <span className="tabular-nums">{time}</span>
                           {job.departments.length > 0 && (
                             <span className="uppercase">{job.departments.join('/')}</span>
@@ -323,7 +329,7 @@ const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<st
                   );
                 })}
                 {jobs.length > 8 && (
-                  <div className="text-xs text-zinc-400 text-center">+{jobs.length - 8} more</div>
+                  <div className={`text-xs text-center ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>+{jobs.length - 8} more</div>
                 )}
               </div>
             </div>
@@ -336,7 +342,7 @@ const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<st
 
 type TickerMessage = { message: string; level: AnnouncementLevel };
 
-const Ticker: React.FC<{ messages: TickerMessage[]; bottomOffset?: number }>=({ messages, bottomOffset = 0 })=> {
+const Ticker: React.FC<{ messages: TickerMessage[]; bottomOffset?: number; theme?: 'light' | 'dark' }>=({ messages, bottomOffset = 0, theme = 'light' })=> {
   const [posX, setPosX] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const textRef = useRef<HTMLSpanElement | null>(null);
@@ -357,7 +363,7 @@ const Ticker: React.FC<{ messages: TickerMessage[]; bottomOffset?: number }>=({ 
             {msg.message}
           </span>
           {idx < messages.length - 1 && (
-            <span className="px-6 text-zinc-500">•</span>
+            <span className={`px-6 ${theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}`}>•</span>
           )}
         </React.Fragment>
       ))}
@@ -400,7 +406,7 @@ const Ticker: React.FC<{ messages: TickerMessage[]; bottomOffset?: number }>=({ 
   }, [contentKey, hasMessages]);
 
   return (
-    <div ref={containerRef} className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 border-t border-zinc-800 py-2 text-xl overflow-hidden" style={{ bottom: bottomOffset }}>
+    <div ref={containerRef} className={`fixed bottom-0 left-0 right-0 border-t py-2 text-xl overflow-hidden ${theme === 'light' ? 'bg-zinc-100/95 border-zinc-200' : 'bg-zinc-900/95 border-zinc-800'}`} style={{ bottom: bottomOffset }}>
       {hasMessages ? (
         <div className="whitespace-nowrap will-change-transform" style={{ transform: `translateX(${posX}px)` }}>
           {renderCopy({ ref: node => { textRef.current = node; } })}
@@ -413,7 +419,7 @@ const Ticker: React.FC<{ messages: TickerMessage[]; bottomOffset?: number }>=({ 
   );
 };
 
-const FooterLogo: React.FC<{ onToggle?: () => void; onMeasure?: (h: number) => void }> = ({ onToggle, onMeasure }) => {
+const FooterLogo: React.FC<{ onToggle?: () => void; onMeasure?: (h: number) => void; theme?: 'light' | 'dark' }> = ({ onToggle, onMeasure, theme = 'light' }) => {
   // Use Supabase public bucket: "public logos"/sectorlogow.png, with local fallbacks
   const { data } = supabase.storage.from('public logos').getPublicUrl('sectorlogow.png');
   const primary = data?.publicUrl;
@@ -436,7 +442,7 @@ const FooterLogo: React.FC<{ onToggle?: () => void; onMeasure?: (h: number) => v
     return () => { ro.disconnect(); window.removeEventListener('resize', report); };
   }, [onMeasure]);
   return (
-    <div ref={containerRef} className="fixed bottom-0 left-0 right-0 py-3 bg-black/70 border-t border-zinc-800 flex items-center justify-center z-50">
+    <div ref={containerRef} className={`fixed bottom-0 left-0 right-0 py-3 border-t flex items-center justify-center z-50 ${theme === 'light' ? 'bg-white/70 border-zinc-200' : 'bg-black/70 border-zinc-800'}`}>
       <img
         src={src}
         alt="Company Logo"
@@ -498,6 +504,7 @@ export default function Wallboard() {
   const effectiveSlug = (presetSlug?.trim() || 'default').toLowerCase();
 
   const [isAlien, setIsAlien] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light'); // Default to light mode
   const [panelOrder, setPanelOrder] = useState<PanelKey[]>([...DEFAULT_PANEL_ORDER]);
   const [panelDurations, setPanelDurations] = useState<Record<PanelKey, number>>({ ...DEFAULT_PANEL_DURATIONS });
   const [rotationFallbackSeconds, setRotationFallbackSeconds] = useState<number>(DEFAULT_ROTATION_FALLBACK_SECONDS);
@@ -656,7 +663,7 @@ export default function Wallboard() {
         .from('jobs')
         .select('id,title,start_time,end_time,status,location_id,job_type,tour_id,timezone')
         .in('job_type', ['single','festival','tourdate','dryhire'])
-        .in('status', ['Confirmado','Tentativa'])
+        .in('status', ['Confirmado','Tentativa','Completado'])
         .lte('start_time', calendarEndISO)
         .gte('end_time', calendarStartISO)
         .order('start_time', { ascending: true });
@@ -1131,22 +1138,22 @@ export default function Wallboard() {
   const safeIdx = activePanels.length ? idx % activePanels.length : 0;
   const current = activePanels[safeIdx] ?? 'overview';
   return (
-    <div className={`min-h-screen ${isAlien ? 'bg-black text-[var(--alien-amber)] alien-scanlines alien-vignette' : 'bg-black text-white'}`}>
+    <div className={`min-h-screen ${isAlien ? 'bg-black text-[var(--alien-amber)] alien-scanlines alien-vignette' : (theme === 'light' ? 'bg-zinc-100 text-zinc-900' : 'bg-black text-white')}`}>
       {presetMessage && (
         <div className="bg-amber-500/20 text-amber-200 text-sm text-center py-2">
           {presetMessage}
         </div>
       )}
       <div className="pb-28">{/* space for ticker + footer */}
-        {current==='overview' && (isAlien ? <AlienJobsPanel data={overview} highlightIds={new Set(highlightJobs.keys())} /> : <JobsOverviewPanel data={overview} highlightIds={new Set(highlightJobs.keys())} page={panelPages.overview} />)}
-        {current==='crew' && (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} page={panelPages.crew} />)}
-        {current==='docs' && (isAlien ? <AlienDocsPanel data={docs} /> : <DocProgressPanel data={docs} page={panelPages.docs} />)}
-        {current==='logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} page={panelPages.logistics} />)}
-        {current==='pending' && (isAlien ? <AlienPendingPanel data={pending} /> : <PendingActionsPanel data={pending} />)}
-        {current==='calendar' && (isAlien ? <AlienCalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} /> : <CalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} />)}
+        {current==='overview' && (isAlien ? <AlienJobsPanel data={overview} highlightIds={new Set(highlightJobs.keys())} /> : <JobsOverviewPanel data={overview} highlightIds={new Set(highlightJobs.keys())} page={panelPages.overview} theme={theme} />)}
+        {current==='crew' && (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} page={panelPages.crew} theme={theme} />)}
+        {current==='docs' && (isAlien ? <AlienDocsPanel data={docs} /> : <DocProgressPanel data={docs} page={panelPages.docs} theme={theme} />)}
+        {current==='logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} page={panelPages.logistics} theme={theme} />)}
+        {current==='pending' && (isAlien ? <AlienPendingPanel data={pending} /> : <PendingActionsPanel data={pending} theme={theme} />)}
+        {current==='calendar' && (isAlien ? <AlienCalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} /> : <CalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} theme={theme} />)}
       </div>
-      <Ticker messages={tickerMsgs} bottomOffset={footerH} />
-      <FooterLogo onToggle={() => setIsAlien(v => !v)} onMeasure={setFooterH} />
+      <Ticker messages={tickerMsgs} bottomOffset={footerH} theme={theme} />
+      <FooterLogo onToggle={() => setIsAlien(v => !v)} onMeasure={setFooterH} theme={theme} />
     </div>
   );
 }
@@ -1329,39 +1336,39 @@ const AlienPendingPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data }
 );
 
 // Logistics Panels
-const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null; page?: number; pageSize?: number }>=({ data, page = 0, pageSize = 6 })=> {
+const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null; page?: number; pageSize?: number; theme?: 'light' | 'dark' }>=({ data, page = 0, pageSize = 6, theme = 'light' })=> {
   const items = data ?? [];
   const paginatedItems = items.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(items.length / pageSize);
 
   return (
-    <PanelContainer>
+    <PanelContainer theme={theme}>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-5xl font-semibold">Logistics – Next 7 Days</h1>
         {totalPages > 1 && (
-          <div className="text-38 text-zinc-400">Page {page + 1} of {totalPages}</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Page {page + 1} of {totalPages}</div>
         )}
       </div>
       <div className="flex flex-col gap-3">
         {paginatedItems.map(ev => (
-          <div key={ev.id} className="bg-zinc-900 border border-zinc-800 rounded p-3 flex items-center justify-between">
+          <div key={ev.id} className={`border rounded p-3 flex items-center justify-between ${theme === 'light' ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
             <div className="flex items-center gap-4">
-              <div className="text-32 tabular-nums text-zinc-200">{ev.date} {ev.time?.slice(0,5)}</div>
+              <div className={`text-32 tabular-nums ${theme === 'light' ? 'text-zinc-700' : 'text-zinc-200'}`}>{ev.date} {ev.time?.slice(0,5)}</div>
               <div className="text-38">🚚</div>
               <div>
-                <div className="text-38 font-medium text-white">{ev.title}</div>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-2xl text-zinc-400">
+                <div className="text-38 font-medium">{ev.title}</div>
+                <div className={`mt-1 flex flex-wrap items-center gap-2 text-2xl ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>
                   {ev.procedure ? (
-                    <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 capitalize">{ev.procedure.replace(/_/g, ' ')}</span>
+                    <span className={`px-2 py-0.5 rounded capitalize ${theme === 'light' ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-200'}`}>{ev.procedure.replace(/_/g, ' ')}</span>
                   ) : null}
-                  <span className="text-zinc-300">{ev.transport_type || 'transport'}</span>
-                  {ev.loadingBay && <span className="text-zinc-300">Bay {ev.loadingBay}</span>}
-                  {ev.plate && <span className="text-zinc-500">Plate {ev.plate}</span>}
+                  <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>{ev.transport_type || 'transport'}</span>
+                  {ev.loadingBay && <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>Bay {ev.loadingBay}</span>}
+                  {ev.plate && <span className={theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}>Plate {ev.plate}</span>}
                 </div>
                 {ev.departments.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {ev.departments.map(dep => (
-                      <span key={dep} className="px-2 py-0.5 rounded bg-zinc-800 text-lg uppercase tracking-wide text-zinc-200">
+                      <span key={dep} className={`px-2 py-0.5 rounded text-lg uppercase tracking-wide ${theme === 'light' ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-200'}`}>
                         {dep}
                       </span>
                     ))}
@@ -1371,7 +1378,7 @@ const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null; page?: number; pa
             </div>
           </div>
         ))}
-        {items.length===0 && <div className="text-zinc-400 text-38">No logistics in the next 7 days</div>}
+        {items.length===0 && <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No logistics in the next 7 days</div>}
       </div>
     </PanelContainer>
   );
