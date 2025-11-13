@@ -286,6 +286,20 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     }
   }, [showTourRatesTab, showExtrasTab, selectedTab]);
 
+  // Reset selectedTab if user is on a dryhire-excluded tab when isDryhire is true
+  useEffect(() => {
+    if (isDryhire && ['location', 'personnel', 'documents', 'restaurants', 'extras'].includes(selectedTab)) {
+      setSelectedTab('info');
+    }
+  }, [isDryhire, selectedTab]);
+
+  // Reset selectedTab to 'info' when dialog opens to ensure clean state
+  useEffect(() => {
+    if (open) {
+      setSelectedTab('info');
+    }
+  }, [open]);
+
   // Rider files for the artists of this job (2-step to be RLS-friendly)
   const { data: riderFiles = [], isLoading: isRidersLoading } = useQuery({
     queryKey: ['job-rider-files', job.id, artistIdList],
