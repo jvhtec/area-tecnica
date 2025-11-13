@@ -44,6 +44,19 @@ export const ThemeToggle = ({
     updatePreferences({ dark_mode: newDarkMode })
   }
 
+  // Global keyboard shortcut: Ctrl+Shift+D (Cmd+Shift+D on Mac)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'D') {
+        event.preventDefault()
+        toggleDarkMode()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [toggleDarkMode])
+
   const isIconDisplay = display === "icon"
   const iconSizeClass = isIconDisplay ? "h-5 w-5" : "h-4 w-4"
   const computedAriaLabel = isIconDisplay

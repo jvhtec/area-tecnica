@@ -62,19 +62,17 @@ function formatDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function buildCalendarModel(data: CalendarFeed | null, highlightIds?: Set<string>): { dayNames: readonly string[]; monthLabel: string; cells: CalendarCell[] } {
+function buildCalendarModel(data: CalendarFeed | null, highlightIds?: Set<string>, currentMonthOnly: boolean = true): { dayNames: readonly string[]; monthLabel: string; cells: CalendarCell[] } {
   const today = new Date();
   const highlightSet = highlightIds ? new Set(highlightIds) : new Set<string>();
-  const fallbackGrid = (() => {
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const offset = (startOfMonth.getDay() + 6) % 7;
-    const start = new Date(startOfMonth.getTime() - offset * MS_PER_DAY);
-    const end = new Date(start.getTime() + (42 - 1) * MS_PER_DAY);
-    return { start, end };
-  })();
-  const gridStart = data ? new Date(data.range.start) : fallbackGrid.start;
-  const gridEnd = data ? new Date(data.range.end) : fallbackGrid.end;
-  const dayCount = Math.max(1, Math.round((gridEnd.getTime() - gridStart.getTime()) / MS_PER_DAY) + 1);
+
+  // Always show current month grid
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const offset = (startOfMonth.getDay() + 6) % 7;
+  const gridStart = new Date(startOfMonth.getTime() - offset * MS_PER_DAY);
+  const gridEnd = new Date(gridStart.getTime() + (42 - 1) * MS_PER_DAY);
+
+  const dayCount = 42; // Always show 6 weeks
   const todayKey = formatDateKey(today);
 
   const jobsByKey = data?.jobsByDate ?? {};
@@ -90,14 +88,10 @@ function buildCalendarModel(data: CalendarFeed | null, highlightIds?: Set<string
   }
 
   const monthFormatter = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
-  const rangeStart = data ? new Date(data.range.start) : gridStart;
-  const rangeEnd = data ? new Date(data.range.end) : gridEnd;
-  const startLabel = monthFormatter.format(new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1));
-  const endLabel = monthFormatter.format(new Date(rangeEnd.getFullYear(), rangeEnd.getMonth(), 1));
-  const monthLabel = startLabel === endLabel ? startLabel : `${startLabel} → ${endLabel}`;
+  const monthLabel = monthFormatter.format(startOfMonth);
 
-  const focusMonth = data ? data.focusMonth : today.getMonth();
-  const focusYear = data ? data.focusYear : today.getFullYear();
+  const focusMonth = today.getMonth();
+  const focusYear = today.getFullYear();
 
   const cells: CalendarCell[] = Array.from({ length: dayCount }, (_, idx) => {
     const date = new Date(gridStart.getTime() + idx * MS_PER_DAY);
@@ -118,112 +112,145 @@ function buildCalendarModel(data: CalendarFeed | null, highlightIds?: Set<string
   return { dayNames: DAY_LABELS, monthLabel, cells };
 }
 
-const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds })=> (
-  <PanelContainer>
-    <h1 className="text-5xl font-semibold">Jobs – Next 7 Days</h1>
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {(data?.jobs ?? []).map(j => (
-        <div
-          key={j.id}
-          className={`rounded-lg bg-zinc-900 p-4 border ${highlightIds?.has(j.id) ? 'border-amber-400 ring-4 ring-amber-400/40 animate-pulse' : 'border-zinc-800'}`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="text-2xl font-medium truncate pr-2">{j.title}</div>
-            <div className="flex items-center"><StatusDot color={j.status} /></div>
-          </div>
-          <div className="text-zinc-300 text-lg mt-1">{j.location?.name ?? '—'}</div>
-          <div className="text-zinc-400 mt-2 text-xl">{new Date(j.start_time).toLocaleString()} → {new Date(j.end_time).toLocaleTimeString()}</div>
-          <div className="mt-3 flex gap-6 text-lg">
-            {j.departments.map(d => (
-              <div key={d} className="flex items-center gap-2">
-                <span className="text-2xl">{d==='sound'?'🎧':d==='lights'?'💡':'📹'}</span>
-                <span className="tabular-nums">{(j.crewAssigned as any)[d] || 0}/{(j.crewNeeded as any)[d] ?? 0}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 text-sm text-zinc-500">Docs: {j.departments.map(d=>`${d[0].toUpperCase()}${d.slice(1)} ${j.docs[d]?.have ?? 0}/${j.docs[d]?.need ?? 0}`).join(' • ')}</div>
-        </div>
-      ))}
-      {(!data || data.jobs.length===0) && (
-        <div className="text-zinc-400 text-2xl">No jobs in the next 7 days</div>
-      )}
-  </div>
-  </PanelContainer>
-);
+const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string>; page?: number; pageSize?: number }>=({ data, highlightIds, page = 0, pageSize = 6 })=> {
+  const jobs = data?.jobs ?? [];
+  const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
+  const totalPages = Math.ceil(jobs.length / pageSize);
 
-const CrewAssignmentsPanel: React.FC<{ data: CrewAssignmentsFeed | null }>=({ data })=> (
-  <PanelContainer>
-    <h1 className="text-5xl font-semibold">Crew Assignments</h1>
-    <div className="flex flex-col gap-4">
-      {(data?.jobs ?? []).map(job => (
-        <div key={job.id} className="rounded-lg bg-zinc-900 p-4 border border-zinc-800">
-          <div className="text-2xl font-medium mb-3">{job.title}</div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {job.crew.map((c, i) => (
-              <div key={i} className="flex items-center justify-between bg-zinc-800/50 rounded-md px-3 py-2">
-                <div className="flex items-center gap-3 truncate">
-                  <span className="text-2xl">{c.dept==='sound'?'🎧':c.dept==='lights'?'💡':c.dept==='video'?'📹':'👤'}</span>
-                  <div className="truncate">
-                    <div className="text-xl truncate">{c.name || '—'}</div>
-                    <div className="text-sm text-zinc-400 truncate">{c.role}</div>
-                  </div>
+  return (
+    <PanelContainer>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-5xl font-semibold">Jobs – Next 7 Days</h1>
+        {totalPages > 1 && (
+          <div className="text-38 text-zinc-400">Page {page + 1} of {totalPages}</div>
+        )}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {paginatedJobs.map(j => (
+          <div
+            key={j.id}
+            className={`rounded-lg bg-zinc-900 p-4 border ${highlightIds?.has(j.id) ? 'border-amber-400 ring-4 ring-amber-400/40 animate-pulse' : 'border-zinc-800'}`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-38 font-medium truncate pr-2">{j.title}</div>
+              <div className="flex items-center"><StatusDot color={j.status} /></div>
+            </div>
+            <div className="text-zinc-300 text-30 mt-1">{j.location?.name ?? '—'}</div>
+            <div className="text-zinc-400 mt-2 text-32">{new Date(j.start_time).toLocaleString()} → {new Date(j.end_time).toLocaleTimeString()}</div>
+            <div className="mt-3 flex gap-6 text-30">
+              {j.departments.map(d => (
+                <div key={d} className="flex items-center gap-2">
+                  <span className="text-38">{d==='sound'?'🎧':d==='lights'?'💡':'📹'}</span>
+                  <span className="tabular-nums">{(j.crewAssigned as any)[d] || 0}/{(j.crewNeeded as any)[d] ?? 0}</span>
                 </div>
-                <div className={`px-2 py-1 rounded text-sm ${c.timesheetStatus==='approved'?'bg-green-600':c.timesheetStatus==='submitted'?'bg-blue-600':c.timesheetStatus==='draft'?'bg-amber-600':'bg-red-600'}`}>{c.timesheetStatus}</div>
-              </div>
-            ))}
-            {job.crew.length===0 && <div className="text-zinc-400 text-lg">No crew assigned yet</div>}
+              ))}
+            </div>
+            <div className="mt-2 text-2xl text-zinc-500">Docs: {j.departments.map(d=>`${d[0].toUpperCase()}${d.slice(1)} ${j.docs[d]?.have ?? 0}/${j.docs[d]?.need ?? 0}`).join(' • ')}</div>
           </div>
-        </div>
-      ))}
-      {(!data || data.jobs.length===0) && (
-        <div className="text-zinc-400 text-2xl">No jobs to show</div>
-      )}
-    </div>
-  </PanelContainer>
-);
+        ))}
+        {jobs.length===0 && (
+          <div className="text-zinc-400 text-38">No jobs in the next 7 days</div>
+        )}
+      </div>
+    </PanelContainer>
+  );
+};
 
-const DocProgressPanel: React.FC<{ data: DocProgressFeed | null }>=({ data })=> (
-  <PanelContainer>
-    <h1 className="text-5xl font-semibold">Document Progress</h1>
-    <div className="flex flex-col gap-4">
-      {(data?.jobs ?? []).map(job => (
-        <div key={job.id} className="rounded-lg bg-zinc-900 p-4 border border-zinc-800">
-          <div className="text-2xl font-medium mb-3">{job.title}</div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {job.departments.map(dep => {
-              const pct = dep.need>0 ? Math.round((dep.have/dep.need)*100) : 0;
-              return (
-                <div key={dep.dept} className="bg-zinc-800/50 rounded-md p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-xl flex items-center gap-2">
-                      <span className="text-2xl">{dep.dept==='sound'?'🎧':dep.dept==='lights'?'💡':'📹'}</span>
-                      <span className="capitalize">{dep.dept}</span>
+const CrewAssignmentsPanel: React.FC<{ data: CrewAssignmentsFeed | null; page?: number; pageSize?: number }>=({ data, page = 0, pageSize = 4 })=> {
+  const jobs = data?.jobs ?? [];
+  const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
+  const totalPages = Math.ceil(jobs.length / pageSize);
+
+  return (
+    <PanelContainer>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-5xl font-semibold">Crew Assignments</h1>
+        {totalPages > 1 && (
+          <div className="text-38 text-zinc-400">Page {page + 1} of {totalPages}</div>
+        )}
+      </div>
+      <div className="flex flex-col gap-4">
+        {paginatedJobs.map(job => (
+          <div key={job.id} className="rounded-lg bg-zinc-900 p-4 border border-zinc-800">
+            <div className="text-38 font-medium mb-3">{job.title}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {job.crew.map((c, i) => (
+                <div key={i} className="flex items-center justify-between bg-zinc-800/50 rounded-md px-3 py-2">
+                  <div className="flex items-center gap-3 truncate">
+                    <span className="text-38">{c.dept==='sound'?'🎧':c.dept==='lights'?'💡':c.dept==='video'?'📹':'👤'}</span>
+                    <div className="truncate">
+                      <div className="text-32 truncate">{c.name || '—'}</div>
+                      <div className="text-xl text-zinc-400 truncate">{c.role}</div>
                     </div>
-                    <div className="text-sm text-zinc-300">{dep.have}/{dep.need}</div>
                   </div>
-                  <div className="h-2 bg-zinc-700 rounded">
-                    <div className="h-2 bg-blue-500 rounded" style={{ width: `${pct}%` }} />
-                  </div>
-                  {dep.missing.length>0 && (
-                    <div className="text-sm text-zinc-400 mt-2">Missing: {dep.missing.join(', ')}</div>
-                  )}
+                  <div className={`px-2 py-1 rounded text-xl ${c.timesheetStatus==='approved'?'bg-green-600':c.timesheetStatus==='submitted'?'bg-blue-600':c.timesheetStatus==='draft'?'bg-amber-600':'bg-red-600'}`}>{c.timesheetStatus}</div>
                 </div>
-              );
-            })}
+              ))}
+              {job.crew.length===0 && <div className="text-zinc-400 text-30">No crew assigned yet</div>}
+            </div>
           </div>
-        </div>
-      ))}
-      {(!data || data.jobs.length===0) && (
-        <div className="text-zinc-400 text-2xl">Nothing pending</div>
-      )}
-    </div>
-  </PanelContainer>
-);
+        ))}
+        {jobs.length===0 && (
+          <div className="text-zinc-400 text-38">No jobs to show</div>
+        )}
+      </div>
+    </PanelContainer>
+  );
+};
+
+const DocProgressPanel: React.FC<{ data: DocProgressFeed | null; page?: number; pageSize?: number }>=({ data, page = 0, pageSize = 4 })=> {
+  const jobs = data?.jobs ?? [];
+  const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
+  const totalPages = Math.ceil(jobs.length / pageSize);
+
+  return (
+    <PanelContainer>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-5xl font-semibold">Document Progress</h1>
+        {totalPages > 1 && (
+          <div className="text-38 text-zinc-400">Page {page + 1} of {totalPages}</div>
+        )}
+      </div>
+      <div className="flex flex-col gap-4">
+        {paginatedJobs.map(job => (
+          <div key={job.id} className="rounded-lg bg-zinc-900 p-4 border border-zinc-800">
+            <div className="text-38 font-medium mb-3">{job.title}</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {job.departments.map(dep => {
+                const pct = dep.need>0 ? Math.round((dep.have/dep.need)*100) : 0;
+                return (
+                  <div key={dep.dept} className="bg-zinc-800/50 rounded-md p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-32 flex items-center gap-2">
+                        <span className="text-38">{dep.dept==='sound'?'🎧':dep.dept==='lights'?'💡':'📹'}</span>
+                        <span className="capitalize">{dep.dept}</span>
+                      </div>
+                      <div className="text-2xl text-zinc-300">{dep.have}/{dep.need}</div>
+                    </div>
+                    <div className="h-3 bg-zinc-700 rounded">
+                      <div className="h-3 bg-blue-500 rounded" style={{ width: `${pct}%` }} />
+                    </div>
+                    {dep.missing.length>0 && (
+                      <div className="text-xl text-zinc-400 mt-2">Missing: {dep.missing.join(', ')}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        {jobs.length===0 && (
+          <div className="text-zinc-400 text-38">Nothing pending</div>
+        )}
+      </div>
+    </PanelContainer>
+  );
+};
 
 const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data })=> (
   <PanelContainer>
     <h1 className="text-5xl font-semibold">Pending Actions</h1>
-    <div className="flex flex-col gap-3 text-2xl">
+    <div className="flex flex-col gap-3 text-38">
       {(data?.items ?? []).map((it, i) => (
         <div key={i} className={`rounded-md px-4 py-3 ${it.severity==='red'?'bg-red-700/30 border border-red-700/50':'bg-amber-700/30 border border-amber-700/50'}`}>{it.text}</div>
       ))}
@@ -233,29 +260,29 @@ const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data
 );
 
 const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds }) => {
-  const { dayNames, monthLabel, cells } = buildCalendarModel(data, highlightIds);
+  const { dayNames, monthLabel, cells } = buildCalendarModel(data, highlightIds, true);
   return (
     <PanelContainer>
       <div className="flex items-end justify-between gap-6">
         <div>
           <h1 className="text-5xl font-semibold leading-tight">Job Calendar</h1>
-          <div className="text-2xl uppercase tracking-[0.35em] text-zinc-400 mt-2">{monthLabel}</div>
+          <div className="text-38 uppercase tracking-[0.35em] text-zinc-400 mt-2">{monthLabel}</div>
         </div>
-        <div className="text-right text-xl text-zinc-500 max-w-[28rem] leading-snug">
-          Six-week horizon of confirmed & tentative jobs with highlight callouts.
+        <div className="text-right text-2xl text-zinc-500 max-w-[28rem] leading-snug">
+          Current month view with compact job display
         </div>
       </div>
-      <div className="grid grid-cols-7 gap-4 text-zinc-500 uppercase tracking-[0.35em] text-lg font-semibold pt-2">
+      <div className="grid grid-cols-7 gap-2 text-zinc-500 uppercase tracking-[0.35em] text-xl font-semibold pt-2">
         {dayNames.map(name => (
           <div key={name} className="text-center">{name}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-4 auto-rows-fr flex-1">
+      <div className="grid grid-cols-7 gap-2 auto-rows-fr flex-1">
         {cells.map((cell, idx) => {
           const jobs = cell.jobs;
           const highlightSet = cell.highlightJobIds;
           const classes = [
-            'rounded-2xl border p-6 flex flex-col gap-4 min-h-[18rem] shadow-inner transition-all duration-300 backdrop-blur-sm',
+            'rounded-lg border p-3 flex flex-col gap-2 min-h-[12rem] shadow-inner transition-all duration-300',
             cell.inMonth ? 'bg-zinc-950/90 border-zinc-800 text-white' : 'bg-zinc-900/40 border-zinc-800/40 text-zinc-500',
             cell.isToday ? 'border-blue-400/80 ring-2 ring-blue-400/30 shadow-[0_0_45px_rgba(96,165,250,0.35)]' : '',
             cell.hasHighlight ? 'border-amber-400/80 ring-4 ring-amber-400/30 shadow-[0_0_55px_rgba(251,191,36,0.35)]' : '',
@@ -263,51 +290,40 @@ const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<st
           return (
             <div key={cell.isoKey + idx} className={classes}>
               <div className="flex items-start justify-between">
-                <div className={`text-5xl font-bold leading-none ${cell.inMonth ? '' : 'text-zinc-600'}`}>{cell.date.getDate()}</div>
+                <div className={`text-38 font-bold leading-none ${cell.inMonth ? '' : 'text-zinc-600'}`}>{cell.date.getDate()}</div>
                 {jobs.length > 0 && (
-                  <div className="flex items-center gap-3 text-zinc-400">
-                    <span className="px-4 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-2xl font-semibold tabular-nums">
-                      {jobs.length}
-                    </span>
-                    <span className="tracking-[0.4em] uppercase text-sm">jobs</span>
+                  <div className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-lg font-semibold tabular-nums">
+                    {jobs.length}
                   </div>
                 )}
               </div>
-              <div className="flex-1 space-y-3">
-                {jobs.slice(0, 3).map(job => {
+              <div className="flex-1 space-y-1 overflow-auto">
+                {jobs.slice(0, 8).map(job => {
                   const highlight = highlightSet.has(job.id);
                   const time = new Date(job.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                   const itemClasses = [
-                    'flex items-start gap-3 rounded-xl border px-4 py-3 backdrop-blur-sm',
+                    'flex items-center gap-1.5 rounded px-2 py-1 text-xs',
                     highlight
-                      ? 'border-amber-300 bg-amber-500/20 text-amber-100 shadow-[0_0_35px_rgba(251,191,36,0.4)]'
-                      : 'border-zinc-700 bg-zinc-900/70 text-zinc-100',
+                      ? 'bg-amber-500/20 text-amber-100 border border-amber-300'
+                      : 'bg-zinc-900/70 text-zinc-200 border border-zinc-700',
                   ].join(' ');
                   return (
                     <div key={job.id} className={itemClasses}>
-                      <div className="pt-1"><StatusDot color={job.status} /></div>
-                      <div className="flex-1 overflow-hidden">
-                        <div className="text-2xl font-semibold truncate leading-tight">{job.title}</div>
-                        <div className="text-lg text-zinc-400 flex flex-wrap gap-x-3 gap-y-1 leading-tight">
+                      <StatusDot color={job.status} />
+                      <div className="flex-1 truncate">
+                        <div className="font-semibold truncate text-sm">{job.title}</div>
+                        <div className="text-xs text-zinc-400 flex gap-2">
                           <span className="tabular-nums">{time}</span>
-                          {job.location?.name && (
-                            <span className="truncate max-w-[16rem]">{job.location.name}</span>
-                          )}
                           {job.departments.length > 0 && (
-                            <span className="uppercase tracking-[0.3em] text-sm text-zinc-500">
-                              {job.departments.join(' / ')}
-                            </span>
+                            <span className="uppercase">{job.departments.join('/')}</span>
                           )}
                         </div>
                       </div>
                     </div>
                   );
                 })}
-                {jobs.length > 3 && (
-                  <div className="text-xl text-zinc-400">+{jobs.length - 3} more scheduled</div>
-                )}
-                {jobs.length === 0 && (
-                  <div className="text-3xl text-zinc-700 tracking-[0.4em] uppercase">—</div>
+                {jobs.length > 8 && (
+                  <div className="text-xs text-zinc-400 text-center">+{jobs.length - 8} more</div>
                 )}
               </div>
             </div>
@@ -332,7 +348,7 @@ const Ticker: React.FC<{ messages: TickerMessage[]; bottomOffset?: number }>=({ 
   const renderCopy = (options?: { ref?: (node: HTMLSpanElement | null) => void; paddingLeft?: number }) => (
     <span
       ref={options?.ref}
-      className="inline-flex items-center text-xl"
+      className="inline-flex items-center text-30"
       style={options?.paddingLeft ? { paddingLeft: options.paddingLeft } : undefined}
     >
       {messages.map((msg, idx) => (
@@ -501,14 +517,33 @@ export default function Wallboard() {
     const seconds = panelDurations[currentPanel] ?? rotationFallbackSeconds;
     const durationMs = Math.max(1, seconds) * 1000;
     const timer = window.setTimeout(() => {
-      setIdx(current => {
-        const total = activePanels.length;
-        if (total <= 0) return 0;
-        return (current + 1) % total;
-      });
+      // Check if current panel has multiple pages
+      const getCurrentPageCount = () => {
+        if (currentPanel === 'overview') return Math.ceil((overview?.jobs.length ?? 0) / 6);
+        if (currentPanel === 'crew') return Math.ceil((crew?.jobs.length ?? 0) / 4);
+        if (currentPanel === 'docs') return Math.ceil((docs?.jobs.length ?? 0) / 4);
+        if (currentPanel === 'logistics') return Math.ceil((logistics?.length ?? 0) / 6);
+        return 1;
+      };
+
+      const pageCount = getCurrentPageCount();
+      const currentPage = panelPages[currentPanel] ?? 0;
+
+      // If there are more pages, go to next page
+      if (currentPage + 1 < pageCount) {
+        setPanelPages(prev => ({ ...prev, [currentPanel]: currentPage + 1 }));
+      } else {
+        // Reset page and move to next panel
+        setPanelPages(prev => ({ ...prev, [currentPanel]: 0 }));
+        setIdx(current => {
+          const total = activePanels.length;
+          if (total <= 0) return 0;
+          return (current + 1) % total;
+        });
+      }
     }, durationMs);
     return () => clearTimeout(timer);
-  }, [idx, panelOrder, panelDurations, rotationFallbackSeconds]);
+  }, [idx, panelOrder, panelDurations, rotationFallbackSeconds, panelPages, overview, crew, docs, logistics]);
 
   useEffect(() => {
     let cancelled = false;
@@ -574,6 +609,14 @@ export default function Wallboard() {
   const [tickerMsgs, setTickerMsgs] = useState<TickerMessage[]>([]);
   const [highlightJobs, setHighlightJobs] = useState<Map<string, number>>(new Map());
   const [footerH, setFooterH] = useState<number>(72);
+  const [panelPages, setPanelPages] = useState<Record<PanelKey, number>>({
+    overview: 0,
+    crew: 0,
+    docs: 0,
+    logistics: 0,
+    pending: 0,
+    calendar: 0,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -1092,10 +1135,10 @@ export default function Wallboard() {
         </div>
       )}
       <div className="pb-28">{/* space for ticker + footer */}
-        {current==='overview' && (isAlien ? <AlienJobsPanel data={overview} highlightIds={new Set(highlightJobs.keys())} /> : <JobsOverviewPanel data={overview} highlightIds={new Set(highlightJobs.keys())} />)}
-        {current==='crew' && (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} />)}
-        {current==='docs' && (isAlien ? <AlienDocsPanel data={docs} /> : <DocProgressPanel data={docs} />)}
-        {current==='logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} />)}
+        {current==='overview' && (isAlien ? <AlienJobsPanel data={overview} highlightIds={new Set(highlightJobs.keys())} /> : <JobsOverviewPanel data={overview} highlightIds={new Set(highlightJobs.keys())} page={panelPages.overview} />)}
+        {current==='crew' && (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} page={panelPages.crew} />)}
+        {current==='docs' && (isAlien ? <AlienDocsPanel data={docs} /> : <DocProgressPanel data={docs} page={panelPages.docs} />)}
+        {current==='logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} page={panelPages.logistics} />)}
         {current==='pending' && (isAlien ? <AlienPendingPanel data={pending} /> : <PendingActionsPanel data={pending} />)}
         {current==='calendar' && (isAlien ? <AlienCalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} /> : <CalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} />)}
       </div>
@@ -1283,42 +1326,53 @@ const AlienPendingPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data }
 );
 
 // Logistics Panels
-const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })=> (
-  <PanelContainer>
-    <h1 className="text-5xl font-semibold">Logistics – Next 7 Days</h1>
-    <div className="flex flex-col gap-3">
-      {(data ?? []).map(ev => (
-        <div key={ev.id} className="bg-zinc-900 border border-zinc-800 rounded p-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="text-xl tabular-nums text-zinc-200">{ev.date} {ev.time?.slice(0,5)}</div>
-            <div className="text-2xl">🚚</div>
-            <div>
-              <div className="text-2xl font-medium text-white">{ev.title}</div>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
-                {ev.procedure ? (
-                  <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 capitalize">{ev.procedure.replace(/_/g, ' ')}</span>
-                ) : null}
-                <span className="text-zinc-300">{ev.transport_type || 'transport'}</span>
-                {ev.loadingBay && <span className="text-zinc-300">Bay {ev.loadingBay}</span>}
-                {ev.plate && <span className="text-zinc-500">Plate {ev.plate}</span>}
-              </div>
-              {ev.departments.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {ev.departments.map(dep => (
-                    <span key={dep} className="px-2 py-0.5 rounded bg-zinc-800 text-xs uppercase tracking-wide text-zinc-200">
-                      {dep}
-                    </span>
-                  ))}
+const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null; page?: number; pageSize?: number }>=({ data, page = 0, pageSize = 6 })=> {
+  const items = data ?? [];
+  const paginatedItems = items.slice(page * pageSize, (page + 1) * pageSize);
+  const totalPages = Math.ceil(items.length / pageSize);
+
+  return (
+    <PanelContainer>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-5xl font-semibold">Logistics – Next 7 Days</h1>
+        {totalPages > 1 && (
+          <div className="text-38 text-zinc-400">Page {page + 1} of {totalPages}</div>
+        )}
+      </div>
+      <div className="flex flex-col gap-3">
+        {paginatedItems.map(ev => (
+          <div key={ev.id} className="bg-zinc-900 border border-zinc-800 rounded p-3 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-32 tabular-nums text-zinc-200">{ev.date} {ev.time?.slice(0,5)}</div>
+              <div className="text-38">🚚</div>
+              <div>
+                <div className="text-38 font-medium text-white">{ev.title}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-2xl text-zinc-400">
+                  {ev.procedure ? (
+                    <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 capitalize">{ev.procedure.replace(/_/g, ' ')}</span>
+                  ) : null}
+                  <span className="text-zinc-300">{ev.transport_type || 'transport'}</span>
+                  {ev.loadingBay && <span className="text-zinc-300">Bay {ev.loadingBay}</span>}
+                  {ev.plate && <span className="text-zinc-500">Plate {ev.plate}</span>}
                 </div>
-              )}
+                {ev.departments.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {ev.departments.map(dep => (
+                      <span key={dep} className="px-2 py-0.5 rounded bg-zinc-800 text-lg uppercase tracking-wide text-zinc-200">
+                        {dep}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
-      {(!data || data.length===0) && <div className="text-zinc-400 text-2xl">No logistics in the next 7 days</div>}
-    </div>
-  </PanelContainer>
-);
+        ))}
+        {items.length===0 && <div className="text-zinc-400 text-38">No logistics in the next 7 days</div>}
+      </div>
+    </PanelContainer>
+  );
+};
 
 const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })=> (
   <AlienShell title="LOGISTICS - PROXIMITY SCAN" kind="tracker">
