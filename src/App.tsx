@@ -42,6 +42,7 @@ import { EquipmentManagement } from '@/pages/EquipmentManagement';
 import { ArtistRequirementsForm } from '@/components/festival/ArtistRequirementsForm';
 import { FormSubmitted } from '@/components/festival/FormSubmitted';
 import { RequireAuth } from '@/components/RequireAuth';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import FestivalGearManagement from '@/pages/FestivalGearManagement';
 import Festivals from '@/pages/Festivals';
 import { OptimizedAuthProvider } from "@/hooks/useOptimizedAuth";
@@ -101,75 +102,75 @@ export default function App() {
 
                       {/* Protected Routes */}
                       <Route element={<RequireAuth><Layout /></RequireAuth>}>
-                        <Route path="/dashboard" element={<Dashboard />} />
-                        <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
-                        <Route path="/dashboard/unavailability" element={<TechnicianUnavailability />} />
-                        <Route path="/personal" element={<Personal />} />
+                        <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><Dashboard /></ProtectedRoute>} />
+                        <Route path="/technician-dashboard" element={<ProtectedRoute allowedRoles={['technician', 'house_tech']}><TechnicianDashboard /></ProtectedRoute>} />
+                        <Route path="/dashboard/unavailability" element={<ProtectedRoute allowedRoles={['technician', 'house_tech']}><TechnicianUnavailability /></ProtectedRoute>} />
+                        <Route path="/personal" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><Personal /></ProtectedRoute>} />
                         <Route path="/morning-summary" element={<MorningSummary />} />
-                        <Route path="/sound" element={<Sound />} />
-                        <Route path="/lights" element={<Lights />} />
-                        <Route path="/video" element={<Video />} />
-                        <Route path="/logistics" element={<Logistics />} />
+                        <Route path="/sound" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Sound /></ProtectedRoute>} />
+                        <Route path="/lights" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Lights /></ProtectedRoute>} />
+                        <Route path="/video" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Video /></ProtectedRoute>} />
+                        <Route path="/logistics" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><Logistics /></ProtectedRoute>} />
                         <Route path="/profile" element={<Profile />} />
-                        <Route path="/settings" element={<Settings />} />
-                        <Route path="/project-management" element={<ProjectManagement />} />
+                        <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin', 'management']}><Settings /></ProtectedRoute>} />
+                        <Route path="/project-management" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><ProjectManagement /></ProtectedRoute>} />
                         <Route path="/equipment-management" element={<EquipmentManagement />} />
-                        <Route path="/job-assignment-matrix" element={<JobAssignmentMatrix />} />
-                        <Route path="/activity" element={<ActivityCenter />} />
+                        <Route path="/job-assignment-matrix" element={<ProtectedRoute allowedRoles={['admin', 'management']}><JobAssignmentMatrix /></ProtectedRoute>} />
+                        <Route path="/activity" element={<ProtectedRoute allowedRoles={['admin', 'management']}><ActivityCenter /></ProtectedRoute>} />
                         <Route path="/timesheets" element={<Timesheets />} />
-                        <Route path="/tours" element={<Tours />} />
-                        <Route path="/festivals" element={<Festivals />} />
-                        <Route path="/incident-reports" element={<IncidentReports />} />
-                        <Route path="/announcements" element={<Announcements />} />
-                        <Route path="/management/wallboard-presets" element={<WallboardPresets />} />
-                        <Route path="/management/rates" element={<RatesCenterPage />} />
+                        <Route path="/tours" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Tours /></ProtectedRoute>} />
+                        <Route path="/festivals" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Festivals /></ProtectedRoute>} />
+                        <Route path="/incident-reports" element={<ProtectedRoute allowedRoles={['admin', 'management']}><IncidentReports /></ProtectedRoute>} />
+                        <Route path="/announcements" element={<ProtectedRoute allowedRoles={['admin', 'management']}><Announcements /></ProtectedRoute>} />
+                        <Route path="/management/wallboard-presets" element={<ProtectedRoute allowedRoles={['admin', 'management']}><WallboardPresets /></ProtectedRoute>} />
+                        <Route path="/management/rates" element={<ProtectedRoute allowedRoles={['admin', 'management']}><RatesCenterPage /></ProtectedRoute>} />
                         <Route path="/manual" element={<UserManual />} />
 
                         {/* Tour Management Route */}
-                        <Route path="/tour-management/:tourId" element={<TourManagementWrapper />} />
+                        <Route path="/tour-management/:tourId" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><TourManagementWrapper /></ProtectedRoute>} />
 
                         {/* Tools Routes - Both nested and original paths for compatibility */}
-                        <Route path="/sound/pesos" element={<PesosTool />} />
-                        <Route path="/sound/consumos" element={<ConsumosTool />} />
-                        <Route path="/pesos-tool" element={<PesosTool />} />
-                        <Route path="/lights-pesos-tool" element={<LightsPesosTool />} />
-                        <Route path="/video-pesos-tool" element={<VideoPesosTool />} />
-                        <Route path="/consumos-tool" element={<ConsumosTool />} />
-                        <Route path="/lights-consumos-tool" element={<LightsConsumosTool />} />
-                        <Route path="/video-consumos-tool" element={<VideoConsumosTool />} />
-                        <Route path="/lights-memoria-tecnica" element={<LightsMemoriaTecnica />} />
-                        <Route path="/video-memoria-tecnica" element={<VideoMemoriaTecnica />} />
-                        <Route path="/excel-tool" element={<ExcelTool />} />
-                        <Route path="/hoja-de-ruta" element={<ModernHojaDeRuta />} />
-                        <Route path="/labor-po-form" element={<LaborPOForm />} />
+                        <Route path="/sound/pesos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><PesosTool /></ProtectedRoute>} />
+                        <Route path="/sound/consumos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ConsumosTool /></ProtectedRoute>} />
+                        <Route path="/pesos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><PesosTool /></ProtectedRoute>} />
+                        <Route path="/lights-pesos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsPesosTool /></ProtectedRoute>} />
+                        <Route path="/video-pesos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoPesosTool /></ProtectedRoute>} />
+                        <Route path="/consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ConsumosTool /></ProtectedRoute>} />
+                        <Route path="/lights-consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsConsumosTool /></ProtectedRoute>} />
+                        <Route path="/video-consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoConsumosTool /></ProtectedRoute>} />
+                        <Route path="/lights-memoria-tecnica" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsMemoriaTecnica /></ProtectedRoute>} />
+                        <Route path="/video-memoria-tecnica" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoMemoriaTecnica /></ProtectedRoute>} />
+                        <Route path="/excel-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ExcelTool /></ProtectedRoute>} />
+                        <Route path="/hoja-de-ruta" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ModernHojaDeRuta /></ProtectedRoute>} />
+                        <Route path="/labor-po-form" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LaborPOForm /></ProtectedRoute>} />
 
                         {/* Tour-specific tool routes */}
-                        <Route path="/tours/:tourId/sound/pesos" element={<PesosTool />} />
-                        <Route path="/tours/:tourId/sound/consumos" element={<ConsumosTool />} />
-                        <Route path="/tours/:tourId/lights/pesos" element={<LightsPesosTool />} />
-                        <Route path="/tours/:tourId/lights/consumos" element={<LightsConsumosTool />} />
-                        <Route path="/tours/:tourId/video/pesos" element={<VideoPesosTool />} />
-                        <Route path="/tours/:tourId/video/consumos" element={<VideoConsumosTool />} />
+                        <Route path="/tours/:tourId/sound/pesos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><PesosTool /></ProtectedRoute>} />
+                        <Route path="/tours/:tourId/sound/consumos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ConsumosTool /></ProtectedRoute>} />
+                        <Route path="/tours/:tourId/lights/pesos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsPesosTool /></ProtectedRoute>} />
+                        <Route path="/tours/:tourId/lights/consumos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsConsumosTool /></ProtectedRoute>} />
+                        <Route path="/tours/:tourId/video/pesos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoPesosTool /></ProtectedRoute>} />
+                        <Route path="/tours/:tourId/video/consumos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoConsumosTool /></ProtectedRoute>} />
 
                         {/* Tour date-specific tool routes */}
-                        <Route path="/tour-dates/:tourDateId/sound/pesos" element={<PesosTool />} />
-                        <Route path="/tour-dates/:tourDateId/sound/consumos" element={<ConsumosTool />} />
-                        <Route path="/tour-dates/:tourDateId/lights/pesos" element={<LightsPesosTool />} />
-                        <Route path="/tour-dates/:tourDateId/lights/consumos" element={<LightsConsumosTool />} />
-                        <Route path="/tour-dates/:tourDateId/video/pesos" element={<VideoPesosTool />} />
-                        <Route path="/tour-dates/:tourDateId/video/consumos" element={<VideoConsumosTool />} />
+                        <Route path="/tour-dates/:tourDateId/sound/pesos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><PesosTool /></ProtectedRoute>} />
+                        <Route path="/tour-dates/:tourDateId/sound/consumos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ConsumosTool /></ProtectedRoute>} />
+                        <Route path="/tour-dates/:tourDateId/lights/pesos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsPesosTool /></ProtectedRoute>} />
+                        <Route path="/tour-dates/:tourDateId/lights/consumos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsConsumosTool /></ProtectedRoute>} />
+                        <Route path="/tour-dates/:tourDateId/video/pesos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoPesosTool /></ProtectedRoute>} />
+                        <Route path="/tour-dates/:tourDateId/video/consumos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoConsumosTool /></ProtectedRoute>} />
 
                         {/* Disponibilidad Route */}
-                        <Route path="/disponibilidad" element={<Disponibilidad />} />
+                        <Route path="/disponibilidad" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Disponibilidad /></ProtectedRoute>} />
 
                         {/* SoundVision Files Route */}
                         <Route path="/soundvision-files" element={<SoundVisionFiles />} />
 
                         {/* Festival Management Routes */}
-                        <Route path="/festival-management/:jobId" element={<FestivalManagement />} />
-                        <Route path="/festival-management/:jobId/artists" element={<FestivalArtistManagement />} />
-                        <Route path="/festival-management/:jobId/gear" element={<FestivalGearManagement />} />
-                        <Route path="/festival-management/:jobId/scheduling" element={<FestivalManagement />} />
+                        <Route path="/festival-management/:jobId" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><FestivalManagement /></ProtectedRoute>} />
+                        <Route path="/festival-management/:jobId/artists" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><FestivalArtistManagement /></ProtectedRoute>} />
+                        <Route path="/festival-management/:jobId/gear" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><FestivalGearManagement /></ProtectedRoute>} />
+                        <Route path="/festival-management/:jobId/scheduling" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><FestivalManagement /></ProtectedRoute>} />
                       </Route>
                     </Routes>
                     {/* Radix-based toaster (legacy) and Sonner toaster for activity + app toasts */}

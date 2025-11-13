@@ -1,10 +1,13 @@
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Department } from "@/types/department";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { format } from "date-fns";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { supabase } from "@/lib/supabase";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
@@ -36,16 +39,29 @@ const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
 };
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  const { userRole: authUserRole, isLoading: authLoading } = useOptimizedAuth();
+
+  // Early security check: Only allow admin, management, logistics
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (authUserRole && !['admin', 'management', 'logistics'].includes(authUserRole)) {
+      const redirectPath = getDashboardPath(authUserRole as any);
+      navigate(redirectPath, { replace: true });
+    }
+  }, [authUserRole, authLoading, navigate]);
+
   // User data & preferences
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [showMessages, setShowMessages] = useState(false);
-  
+
   // Dashboard state
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [timeSpan, setTimeSpan] = useState<string>("1week");
   const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
-  
+
   // Modal state
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -60,7 +76,7 @@ const Dashboard = () => {
   const queryClient = useQueryClient();
   // Ensure realtime updates for messages are wired
   useOptimizedMessagesSubscriptions(userId || '');
-  
+
   // No manual subscriptions needed - useOptimizedJobs handles job-related subscriptions
 
   // Fetch user data
@@ -93,6 +109,20 @@ const Dashboard = () => {
 
     fetchUserRoleAndPrefs();
   }, []);
+
+  // Show loading state while checking authorization
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900 dark:border-white" />
+      </div>
+    );
+  }
+
+  // Don't render anything if user is unauthorized (they'll be redirected)
+  if (!authUserRole || !['admin', 'management', 'logistics'].includes(authUserRole)) {
+    return null;
+  }
 
   // Event handlers
   const handleJobClick = (_jobId: string) => {
