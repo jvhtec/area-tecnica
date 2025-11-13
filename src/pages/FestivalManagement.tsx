@@ -99,6 +99,8 @@ const FestivalManagement = () => {
     address?: string;
     coordinates?: { lat: number; lng: number };
   }>({});
+  const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
+  const [isMapLoading, setIsMapLoading] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const { userRole } = useOptimizedAuth();
@@ -710,6 +712,54 @@ const FestivalManagement = () => {
     fetchDocuments();
   }, [fetchDocuments]);
 
+  // Load static map preview when venue data is available
+  useEffect(() => {
+    const loadStaticMap = async () => {
+      try {
+        if (!venueData.address && !venueData.coordinates) {
+          setMapPreviewUrl(null);
+          return;
+        }
+
+        setIsMapLoading(true);
+
+        // Fetch Google Maps API key
+        const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+        if (error || !data?.apiKey) {
+          console.warn('Failed to load Google Maps API key');
+          setMapPreviewUrl(null);
+          setIsMapLoading(false);
+          return;
+        }
+
+        const apiKey = data.apiKey as string;
+        const zoom = 13;
+        const width = 400;
+        const height = 200;
+        const scale = 2;
+
+        const center = venueData.coordinates
+          ? `${venueData.coordinates.lat},${venueData.coordinates.lng}`
+          : encodeURIComponent(venueData.address || '');
+
+        const markers = venueData.coordinates
+          ? `&markers=color:red|label:V|${venueData.coordinates.lat},${venueData.coordinates.lng}`
+          : (venueData.address ? `&markers=color:red|label:V|${encodeURIComponent(venueData.address)}` : '');
+
+        const url = `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=${zoom}&size=${width}x${height}&scale=${scale}${markers}&key=${encodeURIComponent(apiKey)}`;
+
+        setMapPreviewUrl(url);
+      } catch (e: any) {
+        console.warn('Failed to load static map preview:', e?.message || e);
+        setMapPreviewUrl(null);
+      } finally {
+        setIsMapLoading(false);
+      }
+    };
+
+    loadStaticMap();
+  }, [venueData]);
+
   const handlePrintAllDocumentation = async (options: PrintOptions, filename: string) => {
     if (!jobId) return;
     
@@ -1042,7 +1092,45 @@ const FestivalManagement = () => {
                   <Calendar className="h-3 w-3" />
                   {new Date(job?.start_time || '').toLocaleDateString()} - {new Date(job?.end_time || '').toLocaleDateString()}
                 </span>
+                {venueData.address && (
+                  <>
+                    <span className="hidden sm:inline">•</span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      <span className="truncate max-w-xs">{venueData.address}</span>
+                    </span>
+                  </>
+                )}
               </div>
+
+              {/* Venue Map Preview */}
+              {(venueData.address || venueData.coordinates) && (
+                <div className="mt-3">
+                  {isMapLoading ? (
+                    <div className="w-full h-32 bg-muted rounded-lg flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : mapPreviewUrl ? (
+                    <button
+                      onClick={() => {
+                        const url = venueData.coordinates
+                          ? `https://www.google.com/maps/search/?api=1&query=${venueData.coordinates.lat},${venueData.coordinates.lng}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venueData.address || '')}`;
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="w-full rounded-lg overflow-hidden border hover:border-primary transition-all hover:shadow-md group relative"
+                    >
+                      <img src={mapPreviewUrl} alt="Venue location" className="w-full h-auto" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-background/90 px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          Abrir en Google Maps
+                        </div>
+                      </div>
+                    </button>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}

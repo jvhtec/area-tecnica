@@ -7,12 +7,12 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  MapPin, 
-  Users, 
-  FileText, 
-  UtensilsCrossed, 
-  Truck, 
+import {
+  MapPin,
+  Users,
+  FileText,
+  UtensilsCrossed,
+  Truck,
   Clock,
   Phone,
   Globe,
@@ -20,15 +20,20 @@ import {
   Eye,
   ExternalLink,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  CloudIcon,
+  RefreshCw,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PlacesRestaurantService } from "@/utils/hoja-de-ruta/services/places-restaurant-service";
-import type { Restaurant } from "@/types/hoja-de-ruta";
+import type { Restaurant, WeatherData } from "@/types/hoja-de-ruta";
 import { labelForCode } from '@/utils/roles';
+import { useWeatherData } from '@/hooks/useWeatherData';
 import { TourRatesPanel } from '@/components/tours/TourRatesPanel';
 import { JobExtrasManagement } from '@/components/jobs/JobExtrasManagement';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
@@ -310,7 +315,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   // Reset selectedTab if user is on a dryhire-excluded tab when isDryhire is true
   // This runs AFTER the dialog has opened and should handle job type changes
   useEffect(() => {
-    if (open && isDryhire && ['location', 'personnel', 'documents', 'restaurants', 'extras'].includes(selectedTab)) {
+    if (open && isDryhire && ['location', 'personnel', 'documents', 'restaurants', 'weather', 'extras'].includes(selectedTab)) {
       console.log('JobDetailsDialog: Dryhire job detected, resetting from', selectedTab, 'to info');
       setSelectedTab('info');
     }
@@ -394,6 +399,37 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
       );
     },
     enabled: open && !!jobDetails?.locations && (!!jobDetails?.locations?.formatted_address || !!jobDetails?.locations?.name || (!!jobDetails?.locations?.latitude && !!jobDetails?.locations?.longitude))
+  });
+
+  // Weather data for job dates
+  const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);
+
+  // Format event dates for weather API
+  const eventDatesString = jobDetails?.start_time && jobDetails?.end_time
+    ? new Date(jobDetails.start_time).toLocaleDateString('en-GB').split('/').join('/') +
+      (new Date(jobDetails.start_time).toDateString() !== new Date(jobDetails.end_time).toDateString()
+        ? ' - ' + new Date(jobDetails.end_time).toLocaleDateString('en-GB').split('/').join('/')
+        : '')
+    : '';
+
+  const weatherVenue = {
+    address: jobDetails?.locations?.formatted_address || jobDetails?.locations?.name,
+    coordinates: jobDetails?.locations?.latitude && jobDetails?.locations?.longitude
+      ? {
+          lat: typeof jobDetails.locations.latitude === 'number'
+            ? jobDetails.locations.latitude
+            : parseFloat(jobDetails.locations.latitude),
+          lng: typeof jobDetails.locations.longitude === 'number'
+            ? jobDetails.locations.longitude
+            : parseFloat(jobDetails.locations.longitude)
+        }
+      : undefined
+  };
+
+  const { isLoading: isWeatherLoading, error: weatherError, fetchWeather } = useWeatherData({
+    venue: weatherVenue,
+    eventDates: eventDatesString,
+    onWeatherUpdate: setWeatherData
   });
 
   // Set up tour rates subscriptions for real-time updates
@@ -521,11 +557,15 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     );
   }
 
+  // Calculate grid columns based on visible tabs
+  // Base tabs: Info (1)
+  // Conditional tabs: Location, Personnel, Documents, Restaurants, Weather (5) - hidden if dryhire
+  // Optional tabs: Tour Rates, Extras
   const gridColsClass = isDryhire
-    ? 'grid-cols-1'
+    ? 'grid-cols-1' // Only Info tab for dryhire
     : showExtrasTab
-      ? (showTourRatesTab ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-7' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6')
-      : (showTourRatesTab ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5');
+      ? (showTourRatesTab ? 'grid-cols-2 sm:grid-cols-4 md:grid-cols-8' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-7')
+      : (showTourRatesTab ? 'grid-cols-2 sm:grid-cols-4 md:grid-cols-7' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6');
 
   const showPendingRatesNotice = !isDryhire
     && jobDetails?.job_type === 'tourdate'
@@ -552,6 +592,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
             {!isDryhire && <TabsTrigger value="personnel" className="py-2">Personal</TabsTrigger>}
             {!isDryhire && <TabsTrigger value="documents" className="py-2">Docs</TabsTrigger>}
             {!isDryhire && <TabsTrigger value="restaurants" className="py-2">Restau.</TabsTrigger>}
+            {!isDryhire && <TabsTrigger value="weather" className="py-2">Clima</TabsTrigger>}
             {showTourRatesTab && (
               <TabsTrigger value="tour-rates" className="py-2">Tarifas</TabsTrigger>
             )}
@@ -1252,6 +1293,110 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                         ? "No se encontraron restaurantes cercanos"
                         : "No hay dirección del recinto para buscar restaurantes"
                       }
+                    </p>
+                  </div>
+                )}
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="weather" className="space-y-4">
+              <Card className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <CloudIcon className="h-4 w-4" />
+                    Pronóstico del Tiempo
+                  </h3>
+                  {weatherVenue.address && eventDatesString && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchWeather}
+                      disabled={isWeatherLoading}
+                      className="flex items-center gap-1"
+                    >
+                      {isWeatherLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                      {isWeatherLoading ? 'Cargando...' : 'Actualizar'}
+                    </Button>
+                  )}
+                </div>
+
+                {!weatherVenue.address && !weatherVenue.coordinates ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                    <AlertCircle className="h-4 w-4" />
+                    El pronóstico del tiempo requiere ubicación del lugar
+                  </div>
+                ) : !eventDatesString ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                    <AlertCircle className="h-4 w-4" />
+                    El pronóstico del tiempo requiere fechas del evento
+                  </div>
+                ) : weatherError ? (
+                  <div className="flex items-center gap-2 text-sm text-destructive py-4">
+                    <AlertCircle className="h-4 w-4" />
+                    {weatherError}
+                  </div>
+                ) : isWeatherLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Obteniendo pronóstico del tiempo...
+                  </div>
+                ) : weatherData && weatherData.length > 0 ? (
+                  <div className="space-y-2">
+                    {weatherData.map((weather, index) => {
+                      const getWeatherIcon = (condition: string) => {
+                        if (condition.toLowerCase().includes('sun')) return '☀️';
+                        if (condition.toLowerCase().includes('cloud')) return '☁️';
+                        if (condition.toLowerCase().includes('rain')) return '🌧️';
+                        if (condition.toLowerCase().includes('snow')) return '❄️';
+                        if (condition.toLowerCase().includes('storm')) return '⛈️';
+                        return '🌤️';
+                      };
+
+                      const formatDate = (dateStr: string) => {
+                        try {
+                          const date = new Date(dateStr);
+                          return date.toLocaleDateString('es-ES', {
+                            month: 'long',
+                            day: 'numeric'
+                          });
+                        } catch {
+                          return dateStr;
+                        }
+                      };
+
+                      return (
+                        <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">{getWeatherIcon(weather.condition)}</span>
+                            <div>
+                              <div className="font-medium text-sm">
+                                {formatDate(weather.date)} – {weather.condition}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {Math.round(weather.maxTemp)}°C / {Math.round(weather.minTemp)}°C
+                                {weather.precipitationProbability > 0 && (
+                                  <span>, {weather.precipitationProbability}% lluvia</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="text-xs text-muted-foreground mt-4">
+                      <strong>Fuente:</strong> Los datos del tiempo se obtienen de Open-Meteo y se actualizan automáticamente.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <CloudIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-muted-foreground text-sm">
+                      Datos del tiempo no disponibles para las fechas y ubicación seleccionadas.
                     </p>
                   </div>
                 )}
