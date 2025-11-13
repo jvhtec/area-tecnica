@@ -81,6 +81,9 @@ const Auth = () => {
           <img 
             src="/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png" 
             alt="Sector Pro Logo" 
+            width="174"
+            height="48"
+            fetchPriority="high"
             className="h-12 w-auto opacity-80"
           />
         </div>

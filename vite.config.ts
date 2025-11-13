@@ -28,6 +28,12 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
+          forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
+          supabase: ['@supabase/supabase-js', '@supabase/auth-ui-react'],
+          charts: ['recharts'],
+          utils: ['date-fns', 'date-fns-tz', 'clsx', 'tailwind-merge'],
         },
       },
     },
