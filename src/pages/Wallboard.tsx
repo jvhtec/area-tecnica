@@ -454,14 +454,13 @@ const FooterLogo: React.FC<{ onToggle?: () => void; onMeasure?: (h: number) => v
   );
 };
 
-type PanelKey = 'overview'|'crew'|'docs'|'logistics'|'pending'|'calendar';
+type PanelKey = 'overview'|'crew'|'logistics'|'pending'|'calendar';
 
-const PANEL_KEYS: PanelKey[] = ['overview','crew','docs','logistics','pending','calendar'];
+const PANEL_KEYS: PanelKey[] = ['overview','crew','logistics','pending','calendar'];
 const DEFAULT_PANEL_ORDER: PanelKey[] = [...PANEL_KEYS];
 const DEFAULT_PANEL_DURATIONS: Record<PanelKey, number> = {
   overview: 12,
   crew: 12,
-  docs: 12,
   logistics: 12,
   pending: 12,
   calendar: 12,
@@ -526,7 +525,6 @@ export default function Wallboard() {
   const [panelPages, setPanelPages] = useState<Record<PanelKey, number>>({
     overview: 0,
     crew: 0,
-    docs: 0,
     logistics: 0,
     pending: 0,
     calendar: 0,
@@ -547,7 +545,6 @@ export default function Wallboard() {
       const getCurrentPageCount = () => {
         if (currentPanel === 'overview') return Math.ceil((overview?.jobs.length ?? 0) / 6);
         if (currentPanel === 'crew') return Math.ceil((crew?.jobs.length ?? 0) / 4);
-        if (currentPanel === 'docs') return Math.ceil((docs?.jobs.length ?? 0) / 4);
         if (currentPanel === 'logistics') return Math.ceil((logistics?.length ?? 0) / 6);
         return 1;
       };
@@ -569,7 +566,7 @@ export default function Wallboard() {
       }
     }, durationMs);
     return () => clearTimeout(timer);
-  }, [idx, panelOrder, panelDurations, rotationFallbackSeconds, panelPages, overview, crew, docs, logistics]);
+  }, [idx, panelOrder, panelDurations, rotationFallbackSeconds, panelPages, overview, crew, logistics]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1147,7 +1144,6 @@ export default function Wallboard() {
       <div className="pb-28">{/* space for ticker + footer */}
         {current==='overview' && (isAlien ? <AlienJobsPanel data={overview} highlightIds={new Set(highlightJobs.keys())} /> : <JobsOverviewPanel data={overview} highlightIds={new Set(highlightJobs.keys())} page={panelPages.overview} theme={theme} />)}
         {current==='crew' && (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} page={panelPages.crew} theme={theme} />)}
-        {current==='docs' && (isAlien ? <AlienDocsPanel data={docs} /> : <DocProgressPanel data={docs} page={panelPages.docs} theme={theme} />)}
         {current==='logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} page={panelPages.logistics} theme={theme} />)}
         {current==='pending' && (isAlien ? <AlienPendingPanel data={pending} /> : <PendingActionsPanel data={pending} theme={theme} />)}
         {current==='calendar' && (isAlien ? <AlienCalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} /> : <CalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} theme={theme} />)}
