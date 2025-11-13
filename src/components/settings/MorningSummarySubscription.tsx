@@ -4,9 +4,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMorningSummarySubscription } from '@/hooks/useMorningSummarySubscription';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { Bell, Info } from 'lucide-react';
+import { Bell, Info, Clock } from 'lucide-react';
 
 type Department = {
   value: string;
@@ -22,12 +23,20 @@ const DEPARTMENTS: Department[] = [
   { value: 'production', label: 'Producción', emoji: '🎬' },
 ];
 
+const TIME_SLOTS = [
+  { value: '06:00:00', label: '06:00' },
+  { value: '07:00:00', label: '07:00' },
+  { value: '08:00:00', label: '08:00 (predeterminado)' },
+  { value: '09:00:00', label: '09:00' },
+];
+
 export function MorningSummarySubscription() {
   const { userRole } = useOptimizedAuth();
   const { subscription, isLoading, upsertSubscription, isUpdating } = useMorningSummarySubscription();
 
   const [enabled, setEnabled] = useState(false);
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+  const [scheduleTime, setScheduleTime] = useState<string>('08:00:00');
 
   // Check if user has access (management, admin, or house_tech)
   const hasAccess = userRole && ['admin', 'management', 'house_tech'].includes(userRole);
@@ -37,6 +46,7 @@ export function MorningSummarySubscription() {
     if (subscription) {
       setEnabled(subscription.enabled);
       setSelectedDepartments(subscription.subscribed_departments || []);
+      setScheduleTime(subscription.schedule_time || '08:00:00');
     }
   }, [subscription]);
 
@@ -44,6 +54,7 @@ export function MorningSummarySubscription() {
     upsertSubscription({
       enabled,
       subscribed_departments: selectedDepartments,
+      schedule_time: scheduleTime,
     });
   };
 
@@ -106,6 +117,33 @@ export function MorningSummarySubscription() {
             checked={enabled}
             onCheckedChange={setEnabled}
           />
+        </div>
+
+        {/* Time Selection */}
+        <div className="space-y-2">
+          <Label htmlFor="schedule-time" className="text-sm font-medium flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Hora de envío
+          </Label>
+          <Select
+            value={scheduleTime}
+            onValueChange={setScheduleTime}
+            disabled={!enabled}
+          >
+            <SelectTrigger id="schedule-time" className="w-full">
+              <SelectValue placeholder="Selecciona una hora" />
+            </SelectTrigger>
+            <SelectContent>
+              {TIME_SLOTS.map(slot => (
+                <SelectItem key={slot.value} value={slot.value}>
+                  {slot.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Hora de Madrid (horario de España peninsular)
+          </p>
         </div>
 
         {/* Department Selection */}

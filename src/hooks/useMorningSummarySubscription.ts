@@ -8,6 +8,8 @@ export type MorningSummarySubscription = {
   user_id: string;
   subscribed_departments: string[];
   enabled: boolean;
+  schedule_time: string;
+  last_sent_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -39,6 +41,7 @@ export function useMorningSummarySubscription() {
     mutationFn: async (updates: {
       subscribed_departments: string[];
       enabled: boolean;
+      schedule_time: string;
     }) => {
       if (!userId) throw new Error('User not authenticated');
 
@@ -48,6 +51,7 @@ export function useMorningSummarySubscription() {
           user_id: userId,
           subscribed_departments: updates.subscribed_departments,
           enabled: updates.enabled,
+          schedule_time: updates.schedule_time,
         })
         .select()
         .single();

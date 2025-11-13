@@ -1280,6 +1280,63 @@ async function checkAndGetScheduleConfig(
   return { shouldSend: true, config };
 }
 
+// Helper function to check if it's time to send to a specific user
+function shouldSendToUser(
+  userScheduleTime: string,
+  userLastSentAt: string | null,
+  currentHour: number,
+  timezone: string = 'Europe/Madrid',
+): boolean {
+  // Parse user's preferred hour from schedule_time (format: HH:MM:SS)
+  const [userHour] = userScheduleTime.split(':').map((s: string) => parseInt(s));
+
+  // Check if current hour matches user's preferred hour
+  if (currentHour !== userHour) {
+    return false;
+  }
+
+  // Check if already sent to this user this hour
+  if (userLastSentAt) {
+    const lastSent = new Date(userLastSentAt);
+    const now = new Date();
+
+    const lastSentFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hour12: false,
+    });
+
+    const lastSentParts = lastSentFormatter.formatToParts(lastSent);
+    const lastSentYear = lastSentParts.find(p => p.type === 'year')?.value;
+    const lastSentMonth = lastSentParts.find(p => p.type === 'month')?.value;
+    const lastSentDay = lastSentParts.find(p => p.type === 'day')?.value;
+    const lastSentHour = parseInt(lastSentParts.find(p => p.type === 'hour')?.value || '0');
+
+    const nowFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hour12: false,
+    });
+    const nowParts = nowFormatter.formatToParts(now);
+    const nowYear = nowParts.find(p => p.type === 'year')?.value;
+    const nowMonth = nowParts.find(p => p.type === 'month')?.value;
+    const nowDay = nowParts.find(p => p.type === 'day')?.value;
+    const nowHour = parseInt(nowParts.find(p => p.type === 'hour')?.value || '0');
+
+    if (lastSentYear === nowYear && lastSentMonth === nowMonth && lastSentDay === nowDay && lastSentHour === nowHour) {
+      return false; // Already sent this hour
+    }
+  }
+
+  return true;
+}
+
 function channelEs(ch?: string): string {
   if (!ch) return '';
   return ch === 'whatsapp' ? 'WhatsApp' : 'correo';
@@ -2579,35 +2636,77 @@ async function handleCheckScheduled(
   const type = body.type;
   console.log(`🔍 Checking scheduled notification: ${type}`);
 
-  // Check if it's time to send
-  const { shouldSend, config } = await checkAndGetScheduleConfig(client, type, body.force);
-
-  if (!shouldSend) {
-    return jsonResponse({ status: 'skipped', reason: 'Not scheduled time or already sent' });
-  }
-
-  console.log(`✅ Proceeding to send scheduled notification: ${type}`);
-
-  // Get current date in configured timezone
-  const timezone = config.timezone || 'Europe/Madrid';
-  const dateFormatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const parts = dateFormatter.formatToParts(new Date());
-  const year = parts.find(p => p.type === 'year')?.value;
-  const month = parts.find(p => p.type === 'month')?.value;
-  const day = parts.find(p => p.type === 'day')?.value;
-  const targetDate = `${year}-${month}-${day}`;
-
-  // For daily morning summary, use granular user subscriptions
+  // For daily morning summary, use per-user schedule times
   if (type === EVENT_TYPES.DAILY_MORNING_SUMMARY) {
-    // Query user subscriptions
+    // Get global config for enabled status and days of week
+    const { data: config, error: configError } = await client
+      .from('push_notification_schedules')
+      .select('*')
+      .eq('event_type', type)
+      .maybeSingle();
+
+    if (configError || !config) {
+      console.log('❌ No schedule config found for:', type);
+      return jsonResponse({ status: 'skipped', reason: 'No schedule config found' });
+    }
+
+    if (!config.enabled) {
+      console.log('⏸️ Schedule is disabled for:', type);
+      return jsonResponse({ status: 'skipped', reason: 'Schedule disabled' });
+    }
+
+    // Get current time in Madrid timezone (hardcoded)
+    const timezone = 'Europe/Madrid';
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      weekday: 'short',
+    });
+
+    const parts = formatter.formatToParts(now);
+    const hourPart = parts.find(p => p.type === 'hour');
+    const minutePart = parts.find(p => p.type === 'minute');
+    const weekdayPart = parts.find(p => p.type === 'weekday');
+
+    const currentHour = parseInt(hourPart?.value || '0');
+    const currentMinute = parseInt(minutePart?.value || '0');
+    const currentWeekday = weekdayPart?.value;
+
+    // Map weekday to number (1=Monday, 7=Sunday)
+    const weekdayMap: Record<string, number> = {
+      'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7
+    };
+    const currentDayNum = weekdayMap[currentWeekday || ''] || 1;
+
+    // Check if current day is in allowed days (unless force flag)
+    const daysOfWeek = config.days_of_week || [1, 2, 3, 4, 5];
+    if (!body.force && !daysOfWeek.includes(currentDayNum)) {
+      console.log(`📅 Not scheduled for this day: ${currentWeekday} (${currentDayNum}), allowed: ${daysOfWeek}`);
+      return jsonResponse({ status: 'skipped', reason: 'Not a scheduled day' });
+    }
+
+    console.log(`⏰ Current time: ${currentHour}:${currentMinute} on ${currentWeekday}`);
+
+    // Get current date for summary
+    const dateFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const dateParts = dateFormatter.formatToParts(now);
+    const year = dateParts.find(p => p.type === 'year')?.value;
+    const month = dateParts.find(p => p.type === 'month')?.value;
+    const day = dateParts.find(p => p.type === 'day')?.value;
+    const targetDate = `${year}-${month}-${day}`;
+
+    // Query user subscriptions with schedule_time and last_sent_at
     const { data: subscriptions, error: subsError } = await client
       .from('morning_summary_subscriptions')
-      .select('user_id, subscribed_departments')
+      .select('user_id, subscribed_departments, schedule_time, last_sent_at')
       .eq('enabled', true);
 
     if (subsError) {
@@ -2620,7 +2719,28 @@ async function handleCheckScheduled(
       return jsonResponse({ status: 'skipped', reason: 'No users subscribed' });
     }
 
-    console.log(`📨 Found ${subscriptions.length} subscribed users`);
+    console.log(`📨 Found ${subscriptions.length} total subscribed users`);
+
+    // Filter users whose schedule_time matches current hour and haven't been sent yet
+    const usersToNotify = subscriptions.filter(sub => {
+      const shouldSend = body.force || shouldSendToUser(
+        sub.schedule_time || '08:00:00',
+        sub.last_sent_at,
+        currentHour,
+        timezone
+      );
+      if (shouldSend) {
+        console.log(`  ✓ User ${sub.user_id}: scheduled for ${sub.schedule_time}`);
+      }
+      return shouldSend;
+    });
+
+    if (usersToNotify.length === 0) {
+      console.log('⏰ No users to notify at this hour');
+      return jsonResponse({ status: 'skipped', reason: 'No users scheduled for this hour' });
+    }
+
+    console.log(`📨 Notifying ${usersToNotify.length} users at ${currentHour}:00`);
 
     // Cache department data to avoid redundant queries
     const departmentDataCache = new Map<string, MorningSummaryData>();
@@ -2629,7 +2749,7 @@ async function handleCheckScheduled(
     const allResults: Array<{ endpoint: string; ok: boolean; status?: number; skipped?: boolean; user_id: string }> = [];
     let successfulUsers = 0;
 
-    for (const subscription of subscriptions) {
+    for (const subscription of usersToNotify) {
       const userId = subscription.user_id;
       const departments = subscription.subscribed_departments as string[];
 
@@ -2718,16 +2838,16 @@ async function handleCheckScheduled(
       if (userSent) {
         successfulUsers++;
         console.log(`  ✅ Sent to ${pushSubs.length} device(s) for user ${userId}`);
+
+        // Update per-user last_sent_at timestamp
+        await client
+          .from('morning_summary_subscriptions')
+          .update({ last_sent_at: new Date().toISOString() })
+          .eq('user_id', userId);
       }
     }
 
-    // Update last_sent_at timestamp
-    await client
-      .from('push_notification_schedules')
-      .update({ last_sent_at: new Date().toISOString() })
-      .eq('event_type', type);
-
-    console.log(`\n✅ Summary: Sent to ${successfulUsers}/${subscriptions.length} users, ${allResults.length} total notifications`);
+    console.log(`\n✅ Summary: Sent to ${successfulUsers}/${usersToNotify.length} users, ${allResults.length} total notifications`);
 
     return jsonResponse({
       status: 'sent',
