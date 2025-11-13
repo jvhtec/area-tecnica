@@ -22,12 +22,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Bell, Bug } from "lucide-react";
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { getDashboardPath } from '@/utils/roleBasedRouting'
 import { usePushDebug } from '@/hooks/usePushDebug'
 import { PushNotificationMatrix } from '@/components/settings/PushNotificationMatrix'
 import { PushNotificationSchedule } from '@/components/settings/PushNotificationSchedule'
 import { MorningSummarySubscription } from '@/components/settings/MorningSummarySubscription'
 
 const Settings = () => {
+  const navigate = useNavigate();
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [importUsersOpen, setImportUsersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -35,9 +38,19 @@ const Settings = () => {
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   // Department selector for Equipment Models card
   const [modelsDepartment, setModelsDepartment] = useState<Department>('sound');
-  
-  const { userRole } = useOptimizedAuth();
+
+  const { userRole, isLoading: authLoading } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
+
+  // Early security check: Only allow admin, management
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (userRole && !['admin', 'management'].includes(userRole)) {
+      const redirectPath = getDashboardPath(userRole as any);
+      navigate(redirectPath, { replace: true });
+    }
+  }, [userRole, authLoading, navigate]);
   const {
     isSupported,
     permission,
