@@ -914,7 +914,6 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               )}
             </TabsContent>
 
-            {!isDryhire && (
             <TabsContent value="location" className="space-y-4">
               <Card className="p-4">
                 {jobDetails?.locations ? (
@@ -995,9 +994,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 )}
               </Card>
             </TabsContent>
-            )}
 
-            {!isDryhire && (
             <TabsContent value="personnel" className="space-y-4">
               <Card className="p-4">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -1058,9 +1055,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 )}
               </Card>
             </TabsContent>
-            )}
 
-            {!isDryhire && (
             <TabsContent value="documents" className="space-y-4">
               <Card className="p-4">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -1153,9 +1148,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 )}
               </Card>
             </TabsContent>
-            )}
 
-            {!isDryhire && (
             <TabsContent value="restaurants" className="space-y-4">
               <Card className="p-4">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -1229,7 +1222,6 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 )}
               </Card>
             </TabsContent>
-            )}
 
             {showTourRatesTab && resolvedJobId && (
               <TabsContent value="tour-rates" className="space-y-4">
