@@ -505,6 +505,25 @@ export default function Wallboard() {
   const [tickerIntervalMs, setTickerIntervalMs] = useState<number>(DEFAULT_TICKER_SECONDS * 1000);
   const [presetMessage, setPresetMessage] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
+  
+  // Data polling state - declared here to avoid temporal dead zone in useEffect below
+  const [overview, setOverview] = useState<JobsOverviewFeed|null>(null);
+  const [calendarData, setCalendarData] = useState<CalendarFeed|null>(null);
+  const [crew, setCrew] = useState<CrewAssignmentsFeed|null>(null);
+  const [docs, setDocs] = useState<DocProgressFeed|null>(null);
+  const [pending, setPending] = useState<PendingActionsFeed|null>(null);
+  const [logistics, setLogistics] = useState<LogisticsItem[]|null>(null);
+  const [tickerMsgs, setTickerMsgs] = useState<TickerMessage[]>([]);
+  const [highlightJobs, setHighlightJobs] = useState<Map<string, number>>(new Map());
+  const [footerH, setFooterH] = useState<number>(72);
+  const [panelPages, setPanelPages] = useState<Record<PanelKey, number>>({
+    overview: 0,
+    crew: 0,
+    docs: 0,
+    logistics: 0,
+    pending: 0,
+    calendar: 0,
+  });
 
   useEffect(() => {
     setIdx(0);
@@ -600,24 +619,8 @@ export default function Wallboard() {
   }, [effectiveSlug]);
 
   // Data polling (client-side via RLS-safe views)
-  const [overview, setOverview] = useState<JobsOverviewFeed|null>(null);
-  const [calendarData, setCalendarData] = useState<CalendarFeed|null>(null);
-  const [crew, setCrew] = useState<CrewAssignmentsFeed|null>(null);
-  const [docs, setDocs] = useState<DocProgressFeed|null>(null);
-  const [pending, setPending] = useState<PendingActionsFeed|null>(null);
-  const [logistics, setLogistics] = useState<LogisticsItem[]|null>(null);
-  const [tickerMsgs, setTickerMsgs] = useState<TickerMessage[]>([]);
-  const [highlightJobs, setHighlightJobs] = useState<Map<string, number>>(new Map());
-  const [footerH, setFooterH] = useState<number>(72);
-  const [panelPages, setPanelPages] = useState<Record<PanelKey, number>>({
-    overview: 0,
-    crew: 0,
-    docs: 0,
-    logistics: 0,
-    pending: 0,
-    calendar: 0,
-  });
-
+  // Note: State declarations moved earlier to avoid temporal dead zone issues
+  
   useEffect(() => {
     let cancelled = false;
     const fetchAll = async () => {
