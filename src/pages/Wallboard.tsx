@@ -42,7 +42,7 @@ const StatusDot: React.FC<{ color: 'green'|'yellow'|'red' }>=({ color }) => (
   <span className={`inline-block w-3 h-3 rounded-full mr-2 ${color==='green'?'bg-green-500':color==='yellow'?'bg-yellow-400':'bg-red-500'}`} />
 );
 
-const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] as const;
+const DAY_LABELS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'] as const;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 type CalendarCell = {
@@ -120,9 +120,9 @@ const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?
   return (
     <PanelContainer theme={theme}>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-5xl font-semibold">Jobs – Next 7 Days</h1>
+        <h1 className="text-5xl font-semibold">Trabajos – Próximos 7 Días</h1>
         {totalPages > 1 && (
-          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Page {page + 1} of {totalPages}</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -153,7 +153,7 @@ const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?
           </div>
         ))}
         {jobs.length===0 && (
-          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No jobs in the next 7 days</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No hay trabajos en los próximos 7 días</div>
         )}
       </div>
     </PanelContainer>
@@ -168,9 +168,9 @@ const CrewAssignmentsPanel: React.FC<{ data: CrewAssignmentsFeed | null; page?: 
   return (
     <PanelContainer theme={theme}>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-5xl font-semibold">Crew Assignments</h1>
+        <h1 className="text-5xl font-semibold">Asignaciones de Equipo</h1>
         {totalPages > 1 && (
-          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Page {page + 1} of {totalPages}</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
         )}
       </div>
       <div className="flex flex-col gap-4">
@@ -190,12 +190,12 @@ const CrewAssignmentsPanel: React.FC<{ data: CrewAssignmentsFeed | null; page?: 
                   <div className={`px-2 py-1 rounded text-xl ${c.timesheetStatus==='approved'?'bg-green-600':c.timesheetStatus==='submitted'?'bg-blue-600':c.timesheetStatus==='draft'?'bg-amber-600':'bg-red-600'} text-white`}>{c.timesheetStatus}</div>
                 </div>
               ))}
-              {job.crew.length===0 && <div className={`text-30 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No crew assigned yet</div>}
+              {job.crew.length===0 && <div className={`text-30 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Aún no hay equipo asignado</div>}
             </div>
           </div>
         ))}
         {jobs.length===0 && (
-          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No jobs to show</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No hay trabajos para mostrar</div>
         )}
       </div>
     </PanelContainer>
@@ -210,9 +210,9 @@ const DocProgressPanel: React.FC<{ data: DocProgressFeed | null; page?: number; 
   return (
     <PanelContainer theme={theme}>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-5xl font-semibold">Document Progress</h1>
+        <h1 className="text-5xl font-semibold">Progreso de Documentos</h1>
         {totalPages > 1 && (
-          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Page {page + 1} of {totalPages}</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
         )}
       </div>
       <div className="flex flex-col gap-4">
@@ -235,7 +235,7 @@ const DocProgressPanel: React.FC<{ data: DocProgressFeed | null; page?: number; 
                       <div className="h-3 bg-blue-500 rounded" style={{ width: `${pct}%` }} />
                     </div>
                     {dep.missing.length>0 && (
-                      <div className={`text-xl mt-2 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Missing: {dep.missing.join(', ')}</div>
+                      <div className={`text-xl mt-2 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Faltante: {dep.missing.join(', ')}</div>
                     )}
                   </div>
                 );
@@ -244,7 +244,7 @@ const DocProgressPanel: React.FC<{ data: DocProgressFeed | null; page?: number; 
           </div>
         ))}
         {jobs.length===0 && (
-          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Nothing pending</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Nada pendiente</div>
         )}
       </div>
     </PanelContainer>
@@ -253,12 +253,12 @@ const DocProgressPanel: React.FC<{ data: DocProgressFeed | null; page?: number; 
 
 const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null; theme?: 'light' | 'dark' }>=({ data, theme = 'light' })=> (
   <PanelContainer theme={theme}>
-    <h1 className="text-5xl font-semibold">Pending Actions</h1>
+    <h1 className="text-5xl font-semibold">Acciones Pendientes</h1>
     <div className="flex flex-col gap-3 text-38">
       {(data?.items ?? []).map((it, i) => (
         <div key={i} className={`rounded-md px-4 py-3 ${it.severity==='red'?'bg-red-700/30 border border-red-700/50':'bg-amber-700/30 border border-amber-700/50'}`}>{it.text}</div>
       ))}
-      {(data?.items.length ?? 0)===0 && <div className={theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}>All good ✅</div>}
+      {(data?.items.length ?? 0)===0 && <div className={theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}>Todo bien ✅</div>}
     </div>
   </PanelContainer>
 );
@@ -269,11 +269,11 @@ const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<st
     <PanelContainer theme={theme}>
       <div className="flex items-end justify-between gap-6">
         <div>
-          <h1 className="text-5xl font-semibold leading-tight">Job Calendar</h1>
+          <h1 className="text-5xl font-semibold leading-tight">Calendario de Trabajos</h1>
           <div className={`text-38 uppercase tracking-[0.35em] mt-2 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>{monthLabel}</div>
         </div>
         <div className={`text-right text-2xl max-w-[28rem] leading-snug ${theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}`}>
-          Current month view with compact job display
+          Vista del mes actual con visualización compacta de trabajos
         </div>
       </div>
       <div className={`grid grid-cols-7 gap-2 uppercase tracking-[0.35em] text-xl font-semibold pt-2 ${theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}`}>
@@ -329,7 +329,7 @@ const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<st
                   );
                 })}
                 {jobs.length > 8 && (
-                  <div className={`text-xs text-center ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>+{jobs.length - 8} more</div>
+                  <div className={`text-xs text-center ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>+{jobs.length - 8} más</div>
                 )}
               </div>
             </div>
@@ -445,7 +445,7 @@ const FooterLogo: React.FC<{ onToggle?: () => void; onMeasure?: (h: number) => v
     <div ref={containerRef} className={`fixed bottom-0 left-0 right-0 py-3 border-t flex items-center justify-center z-50 ${theme === 'light' ? 'bg-white/70 border-zinc-200' : 'bg-black/70 border-zinc-800'}`}>
       <img
         src={src}
-        alt="Company Logo"
+        alt="Logo de la Empresa"
         className="h-12 w-auto opacity-90 cursor-pointer select-none"
         onError={() => setIdx(i => i + 1)}
         onClick={() => onToggle && onToggle()}
@@ -1174,7 +1174,7 @@ const AlienShell: React.FC<{ title: string; kind?: 'standard'|'critical'|'env'|'
 const AlienCalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds })=> {
   const { dayNames, monthLabel, cells } = buildCalendarModel(data, highlightIds);
   return (
-    <AlienShell title={`CALENDAR WINDOW – ${monthLabel.toUpperCase()}`} kind="tracker">
+    <AlienShell title={`VENTANA DE CALENDARIO – ${monthLabel.toUpperCase()}`} kind="tracker">
       <div className="space-y-2">
         <div className="grid grid-cols-7 gap-2 text-[10px] uppercase tracking-[0.35em] text-amber-300">
           {dayNames.map(name => (
@@ -1222,7 +1222,7 @@ const AlienCalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: S
                     );
                   })}
                   {jobs.length > 4 && (
-                    <div className="text-[10px] uppercase tracking-[0.4em] text-amber-300">+{jobs.length - 4} MORE</div>
+                    <div className="text-[10px] uppercase tracking-[0.4em] text-amber-300">+{jobs.length - 4} MÁS</div>
                   )}
                   {jobs.length === 0 && (
                     <div className="text-[11px] text-amber-500/40 uppercase tracking-[0.4em]">—</div>
@@ -1240,7 +1240,7 @@ const AlienCalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: S
 const AlienJobsPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds })=> (
   <div className="p-2 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 min-h-[calc(100vh-120px)]">
     {(data?.jobs ?? []).map(j => (
-      <AlienShell key={j.id} title="JOBS OVERVIEW - OPERATIONS">
+      <AlienShell key={j.id} title="RESUMEN DE TRABAJOS - OPERACIONES">
         <div className="space-y-2">
           <div className={`flex justify-between items-center ${highlightIds?.has(j.id) ? 'animate-pulse' : ''}`}>
             <div className={`text-amber-100 text-sm font-bold uppercase tracking-wider ${highlightIds?.has(j.id) ? 'bg-amber-400 text-black px-1' : ''}`}>{j.title}</div>
@@ -1252,7 +1252,7 @@ const AlienJobsPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: S
             {j.departments.map(d => (
               <div key={d} className="border border-[var(--alien-border-dim)] p-2">
                 <div className="uppercase text-amber-300 text-[10px]">{d}</div>
-                <div className="text-amber-100 text-xs tabular-nums">{j.crewAssigned[d] || 0} crew</div>
+                <div className="text-amber-100 text-xs tabular-nums">{j.crewAssigned[d] || 0} equipo</div>
                 <div className="text-amber-200 text-[10px]">docs {j.docs[d]?.have ?? 0}/{j.docs[d]?.need ?? 0}</div>
               </div>
             ))}
@@ -1261,13 +1261,13 @@ const AlienJobsPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: S
       </AlienShell>
     ))}
     {(!data || data.jobs.length===0) && (
-      <AlienShell title="JOBS OVERVIEW - OPERATIONS"><div className="text-amber-300">NO JOBS IN WINDOW</div></AlienShell>
+      <AlienShell title="RESUMEN DE TRABAJOS - OPERACIONES"><div className="text-amber-300">NO HAY TRABAJOS EN VENTANA</div></AlienShell>
     )}
   </div>
 );
 
 const AlienCrewPanel: React.FC<{ data: CrewAssignmentsFeed | null }>=({ data })=> (
-  <AlienShell title="CREW STATUS - BIOSIGN MONITOR" kind="tracker">
+  <AlienShell title="ESTADO DEL EQUIPO - MONITOR BIOSIGN" kind="tracker">
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
       {(data?.jobs ?? []).map(job => (
         <div key={job.id} className="border border-[var(--alien-border-dim)] p-2">
@@ -1282,19 +1282,19 @@ const AlienCrewPanel: React.FC<{ data: CrewAssignmentsFeed | null }>=({ data })=
                 <div className="uppercase text-amber-300 text-[10px]">{c.role}</div>
               </div>
             ))}
-            {job.crew.length===0 && <div className="text-amber-300 text-xs">NO CREW ASSIGNED</div>}
+            {job.crew.length===0 && <div className="text-amber-300 text-xs">NO HAY EQUIPO ASIGNADO</div>}
           </div>
         </div>
       ))}
       {(!data || data.jobs.length===0) && (
-        <div className="text-amber-300">NO JOBS</div>
+        <div className="text-amber-300">NO HAY TRABAJOS</div>
       )}
     </div>
   </AlienShell>
 );
 
 const AlienDocsPanel: React.FC<{ data: DocProgressFeed | null }>=({ data })=> (
-  <AlienShell title="DOCUMENTATION - ENV CONTROL" kind="env">
+  <AlienShell title="DOCUMENTACIÓN - CONTROL AMBIENTAL" kind="env">
     <div className="space-y-2">
       {(data?.jobs ?? []).map(job => (
         <div key={job.id} className="border border-[var(--alien-border-dim)] p-2">
@@ -1318,19 +1318,19 @@ const AlienDocsPanel: React.FC<{ data: DocProgressFeed | null }>=({ data })=> (
         </div>
       ))}
       {(!data || data.jobs.length===0) && (
-        <div className="text-amber-300">NO DOCUMENT PROGRESS AVAILABLE</div>
+        <div className="text-amber-300">NO HAY PROGRESO DE DOCUMENTOS DISPONIBLE</div>
       )}
     </div>
   </AlienShell>
 );
 
 const AlienPendingPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data })=> (
-  <AlienShell title="SYSTEM ALERTS - EMERGENCY PROTOCOL" kind="critical">
+  <AlienShell title="ALERTAS DEL SISTEMA - PROTOCOLO DE EMERGENCIA" kind="critical">
     <div className="space-y-2">
       {(data?.items ?? []).map((it, i) => (
         <div key={i} className={`px-2 py-1 text-xs font-mono ${it.severity==='red'?'bg-red-600 text-white':'bg-yellow-600 text-black'}`}>{it.text}</div>
       ))}
-      {(data?.items.length ?? 0)===0 && <div className="text-amber-300">ALL SYSTEMS NOMINAL</div>}
+      {(data?.items.length ?? 0)===0 && <div className="text-amber-300">TODOS LOS SISTEMAS NOMINALES</div>}
     </div>
   </AlienShell>
 );
@@ -1344,9 +1344,9 @@ const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null; page?: number; pa
   return (
     <PanelContainer theme={theme}>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-5xl font-semibold">Logistics – Next 7 Days</h1>
+        <h1 className="text-5xl font-semibold">Logística – Próximos 7 Días</h1>
         {totalPages > 1 && (
-          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Page {page + 1} of {totalPages}</div>
+          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
         )}
       </div>
       <div className="flex flex-col gap-3">
@@ -1378,14 +1378,14 @@ const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null; page?: number; pa
             </div>
           </div>
         ))}
-        {items.length===0 && <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No logistics in the next 7 days</div>}
+        {items.length===0 && <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No hay logística en los próximos 7 días</div>}
       </div>
     </PanelContainer>
   );
 };
 
 const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })=> (
-  <AlienShell title="LOGISTICS - PROXIMITY SCAN" kind="tracker">
+  <AlienShell title="LOGÍSTICA - ESCANEO DE PROXIMIDAD" kind="tracker">
     <div className="space-y-2">
       {(data ?? []).map(ev => (
         <div key={ev.id} className="border border-[var(--alien-border-dim)] p-2 flex items-center justify-between text-amber-200 text-xs">
@@ -1414,7 +1414,7 @@ const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })
           </div>
         </div>
       ))}
-      {(!data || data.length===0) && <div className="text-amber-300">NO LOGISTICS IN WINDOW</div>}
+      {(!data || data.length===0) && <div className="text-amber-300">NO HAY LOGÍSTICA EN VENTANA</div>}
     </div>
   </AlienShell>
 );

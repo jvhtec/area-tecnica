@@ -12,12 +12,12 @@ import { ArrowDown, ArrowUp, Copy, Plus, RotateCcw, Trash2 } from 'lucide-react'
 type PanelKey = 'overview' | 'crew' | 'docs' | 'logistics' | 'calendar' | 'pending';
 
 const PANEL_LABELS: Record<PanelKey, string> = {
-  overview: 'Jobs Overview',
-  crew: 'Crew Assignments',
-  docs: 'Document Progress',
-  logistics: 'Logistics',
-  calendar: 'Calendar',
-  pending: 'Pending Actions',
+  overview: 'Resumen de Trabajos',
+  crew: 'Asignaciones de Equipo',
+  docs: 'Progreso de Documentos',
+  logistics: 'Logística',
+  calendar: 'Calendario',
+  pending: 'Acciones Pendientes',
 };
 
 const DEFAULT_ORDER: PanelKey[] = ['overview', 'crew', 'docs', 'logistics', 'calendar', 'pending'];
@@ -111,7 +111,7 @@ export default function WallboardPresets() {
       if (error) {
         console.error('Failed to load wallboard presets', error);
         toast({
-          title: 'Failed to load presets',
+          title: 'Error al cargar configuraciones',
           description: error.message,
           variant: 'destructive',
         });
@@ -177,8 +177,8 @@ export default function WallboardPresets() {
 
     if (!trimmedSlug) {
       toast({
-        title: 'Slug required',
-        description: 'Provide a unique slug for this wallboard preset.',
+        title: 'Se requiere slug',
+        description: 'Proporcione un slug único para esta configuración de wallboard.',
         variant: 'destructive',
       });
       return;
@@ -186,8 +186,8 @@ export default function WallboardPresets() {
 
     if (!trimmedUrl) {
       toast({
-        title: 'URL required',
-        description: 'Add a display URL so the wallboard can be shared.',
+        title: 'Se requiere URL',
+        description: 'Agregue una URL de visualización para que el wallboard pueda compartirse.',
         variant: 'destructive',
       });
       return;
@@ -218,12 +218,12 @@ export default function WallboardPresets() {
 
       if (error) {
         toast({
-          title: 'Failed to save preset',
+          title: 'Error al guardar configuración',
           description: error.message,
           variant: 'destructive',
         });
       } else {
-        toast({ title: 'Preset saved' });
+        toast({ title: 'Configuración guardada' });
         const updatedAt = new Date().toISOString();
         setSlugInput(trimmedSlug);
         setDisplayUrlInput(trimmedUrl);
@@ -245,8 +245,8 @@ export default function WallboardPresets() {
     } catch (error) {
       console.error('Unexpected error saving wallboard preset', error);
       toast({
-        title: 'Failed to save preset',
-        description: 'Unexpected error while saving the preset.',
+        title: 'Error al guardar configuración',
+        description: 'Error inesperado al guardar la configuración.',
         variant: 'destructive',
       });
     } finally {
@@ -282,12 +282,12 @@ export default function WallboardPresets() {
         throw new Error('Clipboard API unavailable');
       }
       await navigator.clipboard.writeText(value);
-      toast({ title: 'Copied', description: 'URL copied to clipboard.' });
+      toast({ title: 'Copiado', description: 'URL copiada al portapapeles.' });
     } catch (error) {
       console.error('Failed to copy wallboard URL', error);
       toast({
-        title: 'Copy failed',
-        description: 'Unable to copy this URL automatically.',
+        title: 'Error al copiar',
+        description: 'No se pudo copiar esta URL automáticamente.',
         variant: 'destructive',
       });
     }
@@ -300,8 +300,8 @@ export default function WallboardPresets() {
 
     if (!name || !slug || !url) {
       toast({
-        title: 'Missing details',
-        description: 'Name, slug, and URL are required to create a wallboard.',
+        title: 'Faltan detalles',
+        description: 'Se requieren nombre, slug y URL para crear un wallboard.',
         variant: 'destructive',
       });
       return;
@@ -335,13 +335,13 @@ export default function WallboardPresets() {
       if (error) {
         console.error('Failed to create wallboard preset', error);
         toast({
-          title: 'Creation failed',
+          title: 'Error al crear',
           description: error.message,
           variant: 'destructive',
         });
       } else if (data) {
         const row = data as WallboardPresetRow;
-        toast({ title: 'Wallboard created', description: `${row.name} is ready to configure.` });
+        toast({ title: 'Wallboard creado', description: `${row.name} está listo para configurar.` });
         setPresets((rows) => sortBySlug([...rows, row]));
         setActiveSlug(row.slug);
         setNewPresetName('');
@@ -351,8 +351,8 @@ export default function WallboardPresets() {
     } catch (error) {
       console.error('Unexpected error creating wallboard preset', error);
       toast({
-        title: 'Creation failed',
-        description: 'Unexpected error while creating the wallboard.',
+        title: 'Error al crear',
+        description: 'Error inesperado al crear el wallboard.',
         variant: 'destructive',
       });
     } finally {
@@ -363,7 +363,7 @@ export default function WallboardPresets() {
   const deletePreset = async (preset: WallboardPresetRow) => {
     if (typeof window !== 'undefined') {
       const confirmed = window.confirm(
-        `Delete wallboard "${preset.name}"? This action cannot be undone and any displays using it will stop updating.`
+        `¿Eliminar wallboard "${preset.name}"? Esta acción no se puede deshacer y cualquier pantalla que lo use dejará de actualizarse.`
       );
       if (!confirmed) return;
     }
@@ -375,7 +375,7 @@ export default function WallboardPresets() {
       if (error) {
         console.error('Failed to delete wallboard preset', error);
         toast({
-          title: 'Delete failed',
+          title: 'Error al eliminar',
           description: error.message,
           variant: 'destructive',
         });
@@ -388,13 +388,13 @@ export default function WallboardPresets() {
           }
           return current;
         });
-        toast({ title: 'Wallboard deleted', description: `${preset.name} has been removed.` });
+        toast({ title: 'Wallboard eliminado', description: `${preset.name} ha sido eliminado.` });
       }
     } catch (error) {
       console.error('Unexpected error deleting wallboard preset', error);
       toast({
-        title: 'Delete failed',
-        description: 'Unexpected error while deleting the wallboard.',
+        title: 'Error al eliminar',
+        description: 'Error inesperado al eliminar el wallboard.',
         variant: 'destructive',
       });
     } finally {
@@ -405,10 +405,10 @@ export default function WallboardPresets() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Wallboard Presets</h1>
+        <h1 className="text-2xl font-semibold">Configuraciones de Wallboard</h1>
         <p className="text-muted-foreground">
-          Configure rotation order and timing for the wallboard panels. Changes apply immediately for users referencing the
-          selected preset.
+          Configure el orden de rotación y el tiempo para los paneles del wallboard. Los cambios se aplican inmediatamente para los usuarios que referencian la
+          configuración seleccionada.
         </p>
       </div>
 
@@ -417,14 +417,14 @@ export default function WallboardPresets() {
           <div>
             <CardTitle className="text-xl">Wallboards</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Manage preset slugs and display URLs for every wallboard screen.
+              Administre los slugs de configuración y las URLs de visualización para cada pantalla de wallboard.
             </p>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-3">
             {presets.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No wallboards configured yet.</p>
+              <p className="text-sm text-muted-foreground">No hay wallboards configurados aún.</p>
             ) : (
               presets.map((preset) => (
                 <div
@@ -445,7 +445,7 @@ export default function WallboardPresets() {
                         onClick={() => copyDisplayUrl(preset.display_url)}
                         disabled={!preset.display_url}
                       >
-                        <Copy className="mr-2 h-4 w-4" /> Copy URL
+                        <Copy className="mr-2 h-4 w-4" /> Copiar URL
                       </Button>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 justify-end">
@@ -456,7 +456,7 @@ export default function WallboardPresets() {
                         onClick={() => setActiveSlug(preset.slug)}
                         disabled={activeSlug === preset.slug || saving}
                       >
-                        Edit preset
+                        Editar configuración
                       </Button>
                       <Button
                         type="button"
@@ -466,10 +466,10 @@ export default function WallboardPresets() {
                         disabled={deletingId === preset.id || saving || creating}
                       >
                         {deletingId === preset.id ? (
-                          'Deleting…'
+                          'Eliminando…'
                         ) : (
                           <span className="flex items-center gap-2">
-                            <Trash2 className="h-4 w-4" /> Delete
+                            <Trash2 className="h-4 w-4" /> Eliminar
                           </span>
                         )}
                       </Button>
@@ -482,16 +482,16 @@ export default function WallboardPresets() {
 
           <div className="space-y-4 rounded-md border border-dashed p-4">
             <div className="flex items-center gap-2 text-base font-semibold">
-              <Plus className="h-4 w-4" /> Add new wallboard
+              <Plus className="h-4 w-4" /> Agregar nuevo wallboard
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="new-wallboard-name">Name</Label>
+                <Label htmlFor="new-wallboard-name">Nombre</Label>
                 <Input
                   id="new-wallboard-name"
                   value={newPresetName}
                   onChange={(event) => setNewPresetName(event.target.value)}
-                  placeholder="Production Floor"
+                  placeholder="Piso de Producción"
                   disabled={creating}
                 />
               </div>
@@ -501,26 +501,26 @@ export default function WallboardPresets() {
                   id="new-wallboard-slug"
                   value={newPresetSlug}
                   onChange={(event) => setNewPresetSlug(event.target.value)}
-                  placeholder="production-floor"
+                  placeholder="piso-produccion"
                   disabled={creating}
                 />
-                <p className="text-xs text-muted-foreground">Used to reference the preset in URLs.</p>
+                <p className="text-xs text-muted-foreground">Se usa para referenciar la configuración en las URLs.</p>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="new-wallboard-url">Display URL</Label>
+                <Label htmlFor="new-wallboard-url">URL de Visualización</Label>
                 <Input
                   id="new-wallboard-url"
                   value={newPresetUrl}
                   onChange={(event) => setNewPresetUrl(event.target.value)}
-                  placeholder="https://example.com/wallboard/production-floor"
+                  placeholder="https://ejemplo.com/wallboard/piso-produccion"
                   disabled={creating}
                 />
-                <p className="text-xs text-muted-foreground">Send this link to the device showing the wallboard.</p>
+                <p className="text-xs text-muted-foreground">Envíe este enlace al dispositivo que muestra el wallboard.</p>
               </div>
             </div>
             <div className="flex justify-end">
               <Button type="button" onClick={createPreset} disabled={creating}>
-                {creating ? 'Creating…' : 'Create wallboard'}
+                {creating ? 'Creando…' : 'Crear wallboard'}
               </Button>
             </div>
           </div>
@@ -530,13 +530,13 @@ export default function WallboardPresets() {
       <Card>
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <CardTitle className="text-xl">Preset</CardTitle>
-            <p className="text-sm text-muted-foreground">Select an existing preset to review or update.</p>
+            <CardTitle className="text-xl">Configuración</CardTitle>
+            <p className="text-sm text-muted-foreground">Seleccione una configuración existente para revisar o actualizar.</p>
           </div>
           <div className="w-full md:w-64">
             <Select value={activeSlug ?? undefined} onValueChange={setActiveSlug} disabled={loading}>
               <SelectTrigger>
-                <SelectValue placeholder={loading ? 'Loading…' : 'Choose preset'} />
+                <SelectValue placeholder={loading ? 'Cargando…' : 'Elegir configuración'} />
               </SelectTrigger>
               <SelectContent>
                 {presets.map((preset) => (
@@ -552,24 +552,24 @@ export default function WallboardPresets() {
           <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="preset-slug">Preset slug</Label>
+                <Label htmlFor="preset-slug">Slug de configuración</Label>
                 <Input
                   id="preset-slug"
                   value={slugInput}
                   onChange={(event) => setSlugInput(event.target.value)}
-                  placeholder="production-floor"
+                  placeholder="piso-produccion"
                   disabled={saving}
                 />
-                <p className="text-xs text-muted-foreground">Must be unique and will update the wallboard route.</p>
+                <p className="text-xs text-muted-foreground">Debe ser único y actualizará la ruta del wallboard.</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="preset-display-url">Display URL</Label>
+                <Label htmlFor="preset-display-url">URL de Visualización</Label>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Input
                     id="preset-display-url"
                     value={displayUrlInput}
                     onChange={(event) => setDisplayUrlInput(event.target.value)}
-                    placeholder="https://example.com/wallboard/production-floor"
+                    placeholder="https://ejemplo.com/wallboard/piso-produccion"
                     disabled={saving}
                   />
                   <Button
@@ -579,23 +579,23 @@ export default function WallboardPresets() {
                     onClick={() => copyDisplayUrl(displayUrlInput)}
                     disabled={!displayUrlInput}
                   >
-                    <Copy className="mr-2 h-4 w-4" /> Copy
+                    <Copy className="mr-2 h-4 w-4" /> Copiar
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Share this link with any device that should display the wallboard.
+                  Comparta este enlace con cualquier dispositivo que deba mostrar el wallboard.
                 </p>
               </div>
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Panel Order</h2>
+                <h2 className="text-lg font-semibold">Orden de Paneles</h2>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={resetChanges} disabled={saving}>
-                    <RotateCcw className="mr-2 h-4 w-4" /> Reset
+                    <RotateCcw className="mr-2 h-4 w-4" /> Restablecer
                   </Button>
                   <Button onClick={saveChanges} disabled={saving}>
-                    {saving ? 'Saving…' : 'Save Changes'}
+                    {saving ? 'Guardando…' : 'Guardar Cambios'}
                   </Button>
                 </div>
               </div>
@@ -636,13 +636,13 @@ export default function WallboardPresets() {
                           onClick={() => removePanel(panel)}
                           disabled={panelOrder.length <= 1 || saving}
                         >
-                          Remove
+                          Eliminar
                         </Button>
                       </div>
                     </div>
                     <div className="flex flex-col items-start gap-1 md:flex-row md:items-center">
                       <Label htmlFor={`${panel}-duration`} className="text-sm text-muted-foreground">
-                        Duration (seconds)
+                        Duración (segundos)
                       </Label>
                       <Input
                         id={`${panel}-duration`}
@@ -659,14 +659,14 @@ export default function WallboardPresets() {
                 ))}
                 {panelOrder.length === 0 && (
                   <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-                    No panels selected. Add a panel from the dropdown below.
+                    No hay paneles seleccionados. Agregue un panel desde el menú desplegable a continuación.
                   </div>
                 )}
               </div>
 
               {availablePanels.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Add panel:</span>
+                  <span className="text-sm text-muted-foreground">Agregar panel:</span>
                   {availablePanels.map((panel) => (
                     <Button
                       key={panel}
@@ -685,7 +685,7 @@ export default function WallboardPresets() {
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="fallback-seconds">Fallback rotation (seconds)</Label>
+                <Label htmlFor="fallback-seconds">Rotación de respaldo (segundos)</Label>
                 <Input
                   id="fallback-seconds"
                   type="number"
@@ -696,11 +696,11 @@ export default function WallboardPresets() {
                   disabled={saving}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Used when a panel is missing a duration or fallback timing is required.
+                  Se usa cuando un panel no tiene una duración o se requiere tiempo de respaldo.
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="highlight-seconds">Highlight TTL (seconds)</Label>
+                <Label htmlFor="highlight-seconds">TTL de resaltado (segundos)</Label>
                 <Input
                   id="highlight-seconds"
                   type="number"
@@ -711,11 +711,11 @@ export default function WallboardPresets() {
                   disabled={saving}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Controls how long highlighted jobs remain emphasised.
+                  Controla cuánto tiempo permanecen resaltados los trabajos.
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ticker-seconds">Ticker refresh (seconds)</Label>
+                <Label htmlFor="ticker-seconds">Actualización del ticker (segundos)</Label>
                 <Input
                   id="ticker-seconds"
                   type="number"
@@ -726,7 +726,7 @@ export default function WallboardPresets() {
                   disabled={saving}
                 />
                 <p className="text-xs text-muted-foreground">
-                  How frequently the announcements ticker reloads messages.
+                  Con qué frecuencia el ticker de anuncios recarga los mensajes.
                 </p>
               </div>
             </div>
@@ -734,7 +734,7 @@ export default function WallboardPresets() {
         )}
         {!activePreset && !loading && presets.length === 0 && (
           <CardContent>
-            <p className="text-sm text-muted-foreground">No presets available yet.</p>
+            <p className="text-sm text-muted-foreground">No hay configuraciones disponibles aún.</p>
           </CardContent>
         )}
       </Card>
