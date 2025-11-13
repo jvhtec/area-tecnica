@@ -184,6 +184,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
       if (error) throw error;
       console.log('JobDetailsDialog: Full job data loaded:', JSON.stringify(data, null, 2));
+      console.log('JobDetailsDialog: Location data:', data?.locations);
+      console.log('JobDetailsDialog: Job assignments:', data?.job_assignments?.length || 0);
+      console.log('JobDetailsDialog: Job documents:', data?.job_documents?.length || 0);
       return data;
     },
     enabled: open
@@ -213,6 +216,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const jobRatesApproved = jobRatesApproval?.rates_approved ?? !!jobDetails?.rates_approved;
   const { data: approvalStatus, isLoading: approvalStatusLoading } = useJobApprovalStatus(resolvedJobId);
   const isDryhire = (jobDetails?.job_type || job?.job_type) === 'dryhire';
+  console.log('JobDetailsDialog: isDryhire =', isDryhire, 'job_type =', jobDetails?.job_type || job?.job_type);
   const showExtrasTab = !isDryhire && (isManager || (jobRatesApproved && jobExtras.length > 0));
   const showTourRatesTab = !isDryhire
     && jobDetails?.job_type === 'tourdate'
@@ -286,19 +290,31 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     }
   }, [showTourRatesTab, showExtrasTab, selectedTab]);
 
-  // Reset selectedTab if user is on a dryhire-excluded tab when isDryhire is true
-  useEffect(() => {
-    if (isDryhire && ['location', 'personnel', 'documents', 'restaurants', 'extras'].includes(selectedTab)) {
-      setSelectedTab('info');
-    }
-  }, [isDryhire, selectedTab]);
-
   // Reset selectedTab to 'info' when dialog opens to ensure clean state
+  // Only reset once when dialog opens, not on every render
+  const [lastOpenState, setLastOpenState] = useState(false);
   useEffect(() => {
-    if (open) {
+    if (open && !lastOpenState) {
+      // Dialog is opening - reset to info tab
+      console.log('JobDetailsDialog: Dialog opening, resetting to info tab');
       setSelectedTab('info');
     }
-  }, [open]);
+    setLastOpenState(open);
+  }, [open, lastOpenState]);
+
+  // Log tab changes for debugging
+  useEffect(() => {
+    console.log('JobDetailsDialog: selectedTab changed to:', selectedTab);
+  }, [selectedTab]);
+
+  // Reset selectedTab if user is on a dryhire-excluded tab when isDryhire is true
+  // This runs AFTER the dialog has opened and should handle job type changes
+  useEffect(() => {
+    if (open && isDryhire && ['location', 'personnel', 'documents', 'restaurants', 'extras'].includes(selectedTab)) {
+      console.log('JobDetailsDialog: Dryhire job detected, resetting from', selectedTab, 'to info');
+      setSelectedTab('info');
+    }
+  }, [open, isDryhire, selectedTab]);
 
   // Rider files for the artists of this job (2-step to be RLS-friendly)
   const { data: riderFiles = [], isLoading: isRidersLoading } = useQuery({
@@ -345,34 +361,39 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   };
 
   // Fetch nearby restaurants
-  const { data: restaurants, isLoading: isRestaurantsLoading } = useQuery({
+  const { data: restaurants = [], isLoading: isRestaurantsLoading } = useQuery({
     queryKey: ['job-restaurants', job.id, jobDetails?.locations?.formatted_address],
     queryFn: async () => {
       const locationData = jobDetails?.locations;
-      const address = locationData?.formatted_address;
-      
+      const address = locationData?.formatted_address || locationData?.name;
+
       console.log('Restaurant query - location data:', locationData);
       console.log('Restaurant query - using address:', address);
-      
-      if (!address) {
-        console.log('Restaurant query - no address found, returning empty array');
+
+      if (!address && !locationData?.latitude) {
+        console.log('Restaurant query - no address or coordinates found, returning empty array');
         return [];
       }
-      
-      const coordinates = locationData?.latitude && locationData?.longitude 
+
+      const coordinates = locationData?.latitude && locationData?.longitude
         ? { lat: Number(locationData.latitude), lng: Number(locationData.longitude) }
         : undefined;
 
       console.log('Restaurant query - coordinates:', coordinates);
-      
+
+      // If we have coordinates but no address, we can still search
+      if (!address && coordinates) {
+        console.log('Restaurant query - using coordinates only');
+      }
+
       return await PlacesRestaurantService.searchRestaurantsNearVenue(
-        address,
+        address || `${coordinates?.lat},${coordinates?.lng}`,
         2000,
         10,
         coordinates
       );
     },
-    enabled: open && !!jobDetails?.locations?.formatted_address
+    enabled: open && !!jobDetails?.locations && (!!jobDetails?.locations?.formatted_address || !!jobDetails?.locations?.name || (!!jobDetails?.locations?.latitude && !!jobDetails?.locations?.longitude))
   });
 
   // Set up tour rates subscriptions for real-time updates
