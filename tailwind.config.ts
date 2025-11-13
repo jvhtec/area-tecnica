@@ -41,6 +41,12 @@ export default {
       },
     },
     extend: {
+      // Extended font sizes for wallboard
+      fontSize: {
+        '38': ['38px', { lineHeight: '1.2' }],
+        '32': ['32px', { lineHeight: '1.2' }],
+        '30': ['30px', { lineHeight: '1.2' }],
+      },
       // Extended spacing scale including common gaps and iOS safe area tokens
       spacing: {
         18: "4.5rem",
