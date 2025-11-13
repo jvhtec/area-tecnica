@@ -9,18 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { ArrowDown, ArrowUp, Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
 
-type PanelKey = 'overview' | 'crew' | 'docs' | 'logistics' | 'calendar' | 'pending';
+type PanelKey = 'overview' | 'crew' | 'logistics' | 'calendar' | 'pending';
 
 const PANEL_LABELS: Record<PanelKey, string> = {
   overview: 'Resumen de Trabajos',
   crew: 'Asignaciones de Equipo',
-  docs: 'Progreso de Documentos',
   logistics: 'Logística',
   calendar: 'Calendario',
   pending: 'Acciones Pendientes',
 };
 
-const DEFAULT_ORDER: PanelKey[] = ['overview', 'crew', 'docs', 'logistics', 'calendar', 'pending'];
+const DEFAULT_ORDER: PanelKey[] = ['overview', 'crew', 'logistics', 'calendar', 'pending'];
 
 interface WallboardPresetRow {
   id: string;
