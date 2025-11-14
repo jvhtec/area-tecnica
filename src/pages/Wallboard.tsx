@@ -943,13 +943,13 @@ function coerceSeconds(value: unknown, fallback: number, min = 1, max = 600): nu
 }
 
 // Main wallboard component - can be used with or without auth
-function WallboardDisplay({ presetSlug: propPresetSlug }: { presetSlug?: string } = {}) {
+function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { presetSlug?: string; skipSplash?: boolean } = {}) {
   const { presetSlug: urlPresetSlug } = useParams<{ presetSlug?: string }>();
   const presetSlug = propPresetSlug !== undefined ? propPresetSlug : urlPresetSlug;
   const effectiveSlug = (presetSlug?.trim() || 'default').toLowerCase();
   const isProduccionPreset = effectiveSlug === 'produccion';
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!skipSplash); // Skip loading splash if already shown
   const [isAlien, setIsAlien] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light'); // Default to light mode
   const [panelOrder, setPanelOrder] = useState<PanelKey[]>([...DEFAULT_PANEL_ORDER]);
