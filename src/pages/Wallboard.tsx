@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
 import { ANNOUNCEMENT_LEVEL_STYLES, type AnnouncementLevel } from '@/constants/announcementLevels';
 import { Plane, Wrench, Star, Moon, Mic } from 'lucide-react';
+import SplashScreen from '@/components/SplashScreen';
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -941,12 +942,14 @@ function coerceSeconds(value: unknown, fallback: number, min = 1, max = 600): nu
   return Math.round(clamped);
 }
 
-export default function Wallboard() {
-  useRoleGuard(['admin','management','wallboard']);
-  const { presetSlug } = useParams<{ presetSlug?: string }>();
+// Main wallboard component - can be used with or without auth
+function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { presetSlug?: string; skipSplash?: boolean } = {}) {
+  const { presetSlug: urlPresetSlug } = useParams<{ presetSlug?: string }>();
+  const presetSlug = propPresetSlug !== undefined ? propPresetSlug : urlPresetSlug;
   const effectiveSlug = (presetSlug?.trim() || 'default').toLowerCase();
   const isProduccionPreset = effectiveSlug === 'produccion';
 
+  const [isLoading, setIsLoading] = useState(!skipSplash); // Skip loading splash if already shown
   const [isAlien, setIsAlien] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light'); // Default to light mode
   const [panelOrder, setPanelOrder] = useState<PanelKey[]>([...DEFAULT_PANEL_ORDER]);
@@ -1097,6 +1100,7 @@ export default function Wallboard() {
   
   useEffect(() => {
     let cancelled = false;
+    let isFirstLoad = true;
     const fetchAll = async () => {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1541,7 +1545,13 @@ export default function Wallboard() {
         });
       const logisticsItems: LogisticsItem[] = [...logisticsItemsBase, ...dryHireItems]
         .sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
-      if (!cancelled) setLogistics(logisticsItems);
+      if (!cancelled) {
+        setLogistics(logisticsItems);
+        if (isFirstLoad) {
+          setIsLoading(false);
+          isFirstLoad = false;
+        }
+      }
     };
     fetchAll();
     const id = setInterval(fetchAll, 60000); // 60s polling
@@ -1628,6 +1638,11 @@ export default function Wallboard() {
   const activePanels = panelOrder.length ? panelOrder : DEFAULT_PANEL_ORDER;
   const safeIdx = activePanels.length ? idx % activePanels.length : 0;
   const current = activePanels[safeIdx] ?? 'overview';
+
+  if (isLoading) {
+    return <SplashScreen onComplete={() => setIsLoading(false)} />;
+  }
+
   return (
     <div className={`min-h-screen ${isAlien ? 'bg-black text-[var(--alien-amber)] alien-scanlines alien-vignette' : (theme === 'light' ? 'bg-zinc-100 text-zinc-900' : 'bg-black text-white')}`}>
       {presetMessage && (
@@ -1930,3 +1945,12 @@ const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })
     </div>
   </AlienShell>
 );
+
+// Export WallboardDisplay for use by public route
+export { WallboardDisplay };
+
+// Default export with auth guard for authenticated route
+export default function Wallboard() {
+  useRoleGuard(['admin','management','wallboard']);
+  return <WallboardDisplay />;
+}
