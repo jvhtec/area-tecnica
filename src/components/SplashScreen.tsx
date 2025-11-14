@@ -5,7 +5,7 @@ interface SplashScreenProps {
   duration?: number;
 }
 
-const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, duration = 10000 }) => {
+const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, duration = 8000 }) => {
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
@@ -277,7 +277,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, duration = 1000
           />
         </div>
 
-        <div className="splash-loading-text">Initializing System</div>
+        <div className="splash-loading-text">Inicializando Sistema</div>
 
         <div className="splash-loading-bar-container">
           <div className="splash-loading-bar" />
