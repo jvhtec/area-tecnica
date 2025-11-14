@@ -12,7 +12,7 @@ This document describes the tokenized access feature for the wallboard, allowing
   - Animated grid background
   - Loading bar indicator
   - "Initializing System" text
-  - Auto-dismisses after 3 seconds or on click
+  - Auto-dismisses after 10 seconds or on click
 - Located in: `src/components/SplashScreen.tsx`
 
 ### 2. Tokenized Wallboard Access
@@ -124,7 +124,7 @@ http://localhost:5173/wallboard/public/your-token-here/default
 ```
 
 **4.2 Check for success:**
-- ✅ Splash screen appears for 3-5 seconds
+- ✅ Splash screen appears for 10 seconds
 - ✅ Wallboard loads with data
 - ✅ No console errors
 - ✅ All panels display correctly
@@ -403,7 +403,7 @@ All data access is governed by existing RLS policies configured for the `wallboa
 **Symptoms:** No loading animation
 
 **Solutions:**
-- ✅ Splash screen shows for up to 5 seconds during validation
+- ✅ Splash screen shows for 10 seconds during validation
 - ✅ Click anywhere to skip the splash screen
 - ✅ If wallboard loads instantly, splash may be skipped
 - ✅ Check that SplashScreen component is imported correctly
