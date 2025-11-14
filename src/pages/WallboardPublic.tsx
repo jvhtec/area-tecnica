@@ -88,7 +88,7 @@ export default function WallboardPublic() {
 
   // Show splash screen while validating
   if (isValidating) {
-    return <SplashScreen duration={5000} />;
+    return <SplashScreen />;
   }
 
   // Show error if token is invalid
