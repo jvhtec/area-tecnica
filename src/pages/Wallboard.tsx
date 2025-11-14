@@ -5,6 +5,7 @@ import { useRoleGuard } from '@/hooks/useRoleGuard';
 import { ANNOUNCEMENT_LEVEL_STYLES, type AnnouncementLevel } from '@/constants/announcementLevels';
 import { Plane, Wrench, Star, Moon, Mic } from 'lucide-react';
 import SplashScreen from '@/components/SplashScreen';
+import { RadioPlayer } from '@/components/wallboard/RadioPlayer';
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -959,6 +960,17 @@ function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { 
   const [tickerIntervalMs, setTickerIntervalMs] = useState<number>(DEFAULT_TICKER_SECONDS * 1000);
   const [presetMessage, setPresetMessage] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
+
+  // BGM state
+  const [bgmConfig, setBgmConfig] = useState<{
+    bgmStationName: string | null;
+    bgmStreamUrl: string | null;
+    bgmFallbacks: string[];
+  }>({
+    bgmStationName: null,
+    bgmStreamUrl: null,
+    bgmFallbacks: [],
+  });
   
   // Data polling state - declared here to avoid temporal dead zone in useEffect below
   const [overview, setOverview] = useState<JobsOverviewFeed|null>(null);
@@ -1029,7 +1041,7 @@ function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { 
     const loadPreset = async () => {
       const { data, error } = await supabase
         .from('wallboard_presets')
-        .select('panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds')
+        .select('panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds, bgm_station_name, bgm_stream_url, bgm_fallbacks')
         .eq('slug', effectiveSlug)
         .maybeSingle();
 
@@ -1084,6 +1096,11 @@ function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { 
       setRotationFallbackSeconds(fallbackSeconds);
       setHighlightTtlMs(highlightSeconds * 1000);
       setTickerIntervalMs(tickerSeconds * 1000);
+      setBgmConfig({
+        bgmStationName: data.bgm_station_name ?? null,
+        bgmStreamUrl: data.bgm_stream_url ?? null,
+        bgmFallbacks: Array.isArray(data.bgm_fallbacks) ? data.bgm_fallbacks : [],
+      });
       setPresetMessage(null);
       setHighlightJobs(new Map());
       setIdx(0);
@@ -1645,6 +1662,7 @@ function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { 
 
   return (
     <div className={`min-h-screen ${isAlien ? 'bg-black text-[var(--alien-amber)] alien-scanlines alien-vignette' : (theme === 'light' ? 'bg-zinc-100 text-zinc-900' : 'bg-black text-white')}`}>
+      <RadioPlayer config={bgmConfig} />
       {presetMessage && (
         <div className="bg-amber-500/20 text-amber-200 text-sm text-center py-2">
           {presetMessage}
