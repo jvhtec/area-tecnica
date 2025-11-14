@@ -784,6 +784,297 @@ describe('RBAC Tests', () => {
 
 ---
 
+## Component-Level Permissions Reference
+
+This section provides a comprehensive breakdown of component-level permissions throughout the application.
+
+### Department Pages
+
+| Page | Create Job | Edit Job | Delete Job | Assign Personnel | Upload Docs | View Details |
+|------|------------|----------|------------|------------------|-------------|--------------|
+| **Sound** | Admin+Mgmt 🔒 | Admin+Mgmt 🔒 | Admin+Mgmt 🔒 | Admin+Mgmt+Log 🔒 | Admin+Mgmt+Log 🔒 | All ✅ |
+| **Lights** | Admin+Mgmt 🔒 | Admin+Mgmt 🔒 | Admin+Mgmt 🔒 | Admin+Mgmt+Log 🔒 | Admin+Mgmt+Log 🔒 | All ✅ |
+| **Video** | Admin+Mgmt 🔒 | Admin+Mgmt 🔒 | ⚠️ All (BUG) | Admin+Mgmt+Log 🔒 | Admin+Mgmt+Log 🔒 | All ✅ |
+
+**⚠️ Security Issue**: Video page delete has no permission check (`src/pages/Video.tsx:128-151`)
+
+### Personal/House Tech Calendar Permissions
+
+**File**: `src/pages/Personal.tsx`
+
+| Feature | Admin | Management | House Tech | Technician | Logistics |
+|---------|-------|------------|------------|------------|-----------|
+| **Access Page** | ✅ | ✅ | ✅ | ❌ (redirected) | ❌ |
+| **View Calendar** | ✅ | ✅ | ✅ Read-only | ❌ | ❌ |
+| **Edit Calendar Dates** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **View Vacation Requests** | ✅ | ✅ | ✅ Own only | ❌ | ❌ |
+| **Submit Vacation Request** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Approve/Reject Vacation** | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+**Permission Check** (line 79):
+```typescript
+canEditDates = userRole === 'admin' || userRole === 'management'
+```
+
+### Project Management Page Permissions
+
+**File**: `src/pages/ProjectManagement.tsx`
+
+| Feature | Admin | Management | Logistics | House Tech | Technician |
+|---------|-------|------------|-----------|------------|------------|
+| **Access Page** | ✅ | ✅ | ✅ | ❌ | ✅ View festivals |
+| **Create Items** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Auto-complete Jobs** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Tasks Button** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **WhatsApp Group** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Almacén Message** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Manage Festival** | ✅ | ✅ | ✅ | 👁️ View | 👁️ View |
+| **Assign Personnel** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Calculators (Pesos/Consumos)** | ❌ | ✅ | ❌ | ❌ | ❌ |
+| **Incident Report** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Flex Folders** | ✅ | ✅ | ✅ | ❌ | ❌ |
+
+**Permission Check** (line 76):
+```typescript
+canCreateItems = ['admin', 'management', 'logistics'].includes(userRole)
+```
+
+### Festival Management Permissions
+
+**File**: `src/pages/FestivalManagement.tsx`
+
+| Feature | Admin | Management | Logistics | House Tech (Sound) | Technician (Sound) |
+|---------|-------|------------|-----------|-------------------|-------------------|
+| **Access Page** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Add Artist** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Edit Artist** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Delete Artist** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Upload Documents** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Delete Documents** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Sync to Flex** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **View Festival Data** | ✅ | ✅ | ✅ | ✅ Read-only | ✅ Read-only |
+| **Calculators** | ❌ | ✅ | ❌ | ❌ | ❌ |
+
+**Access Rule**: Sound department house_tech and technician get view-only access
+
+### User Management Permissions
+
+**File**: `src/components/users/EditUserDialog.tsx`
+
+#### Field-Level Permissions
+
+| Field | All Management Users | Management Only (Special) |
+|-------|---------------------|---------------------------|
+| Basic Info (Name, Phone, DNI) | ✅ | |
+| Department, Role | ✅ | |
+| Assignable as Tech | ✅ | |
+| Autónomo (if technician) | ✅ | |
+| **SoundVision Access** | | ✅ (lines 158-175) |
+| **Flex Resource ID** | | ✅ (lines 194-247) |
+| **Flex URL Extract Helper** | | ✅ (lines 194-247) |
+| **House Tech Rate Editor** | | ✅ (lines 334-343) |
+| **Send Onboarding Email** | | ✅ (lines 316-326) |
+
+**Permission Check** (lines 30-31):
+```typescript
+const isManagementUser = ['admin', 'management'].includes(userRole || '')
+```
+
+**Special Behavior**:
+- **Sound House Tech**: SoundVision access force-enabled (cannot disable)
+- **Sound Technician**: SoundVision access is editable toggle
+
+**File**: `src/components/users/UsersListContent.tsx`
+
+| Action | Admin | Management | Others |
+|--------|-------|------------|--------|
+| **View Users** | ✅ | ✅ | ❌ |
+| **Edit User** | ✅ | ✅ | ❌ |
+| **Manage Skills** | ✅ | ✅ (if isManagementUser) | ❌ |
+| **Delete User** | ✅ | ❌ | ❌ |
+
+**Manage Skills Button** (lines 55, 112):
+- Only shown when `isManagementUser === true`
+
+### SoundVision Files Permissions
+
+**File**: `src/components/soundvision/SoundVisionFilesList.tsx`
+
+| Action | Admin | Management | Logistics | House Tech | Technician |
+|--------|-------|------------|-----------|------------|------------|
+| **Access Page** | ✅ | ✅ | ✅ (if has SV access) | ✅ (if has SV access) | ✅ (if has SV access) |
+| **Upload Files** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Download Files** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Delete Files** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Review (Always)** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Review (After Download)** | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+**Permission Checks** (lines 40-74):
+```typescript
+const canDelete = canDeleteSoundVisionFiles(profile?.role)  // [Admin+Mgmt]
+const isManagement = profile?.role === 'admin' || profile?.role === 'management'
+const canOpenReviews = (file: SoundVisionFile) =>
+  isManagement || file.hasDownloaded || file.hasReviewed
+```
+
+**Review Access Rules**:
+- **Management**: Always enabled
+- **Others**: Must download file first (tooltip shown when disabled)
+
+### Job Card Actions Component Permissions
+
+**File**: `src/components/jobs/cards/JobCardActions.tsx`
+
+This is a critical shared component with extensive conditional rendering:
+
+| Button/Action | Permission Check | Line Numbers |
+|---------------|------------------|--------------|
+| **Tasks** | `isProjectManagementPage && job_type !== 'dryhire'` | 731-742 |
+| **WhatsApp Group** | `isProjectManagementPage && (admin\|\|mgmt) && job_type not in ['tourdate','dryhire']` | 754-766 |
+| **Almacén Message** | `isProjectManagementPage && (admin\|\|mgmt)` | 767-782 |
+| **View Details** | `onJobDetailsClick provided` (All) | 784-794 |
+| **Manage Festival** | `job_type==='festival' && isProjectManagementPage && canManageArtists` | 796-807 |
+| **Manage Job** | `job_type not in ['festival','dryhire'] && isProjectManagementPage && canManageArtists` | 808-819 |
+| **Assign** | `!isHouseTech && job_type !== 'dryhire' && isProjectManagementPage` | 820-831 |
+| **Refresh** | Always shown (All) | 832-839 |
+| **Timesheet** | `job_type not in ['dryhire','tourdate']` (All) | 852-862 |
+| **Calculators** | `isProjectManagementPage && userRole === 'management'` | 864-889 |
+| **Technician Incident** | `userRole === 'technician' && job_type !== 'dryhire'` | 890-895 |
+| **Edit/Delete** | `canEditJobs` (Admin+Mgmt) | 896-916 |
+| **Flex Folder** | `canCreateFlexFolders` (Admin+Mgmt+Log) | 917-971 |
+| **Create Local Folders** | Always shown (All) | 972-989 |
+| **Archive** | `job_type !== 'dryhire'` (All) | 991-1002 |
+| **Backfill** | Always shown (All) | 1004-1013 |
+| **Upload Documents** | `canUploadDocuments && showUpload && job_type !== 'dryhire'` | 1014-1026 |
+
+**Props Interface** (lines 83-122):
+```typescript
+interface JobCardActionsProps {
+  userRole: string | null
+  canEditJobs: boolean           // [Admin+Mgmt]
+  canCreateFlexFolders: boolean  // [Admin+Mgmt+Log]
+  canUploadDocuments: boolean    // [Admin+Mgmt+Log]
+  canManageArtists: boolean      // [All except wallboard]
+  isHouseTech: boolean           // Hides assign button
+  isProjectManagementPage: boolean
+}
+```
+
+### Dialog/Modal Permissions Summary
+
+| Dialog Name | Access Roles | Special Conditions |
+|-------------|--------------|-------------------|
+| **CreateJobDialog** | Admin, Management | Used in Sound/Lights/Video pages |
+| **EditJobDialog** | Admin, Management | Via canEditJobs prop |
+| **DeleteConfirmDialog** | Admin, Management | Via canEditJobs prop |
+| **AssignPersonnelDialog** | Admin, Management, Logistics | Hidden for house_tech |
+| **TaskManagerDialog** | Admin, Management, Logistics | job_type !== 'dryhire' |
+| **TechnicianIncidentDialog** | Technician only | job_type !== 'dryhire' |
+| **VacationRequestDialog** | Admin, Management, House Tech | |
+| **EditUserDialog** | Admin, Management | Field-level permissions vary |
+| **ManageSkillsDialog** | Admin, Management | When isManagementUser=true |
+| **SendEmailConfirmDialog** | Admin, Management | Management users only |
+| **UploadDocumentsDialog** | Admin, Management, Logistics | job_type !== 'dryhire' |
+| **PesosCalculatorDialog** | Management only | Project Management context |
+| **ConsumosCalculatorDialog** | Management only | Project Management context |
+| **SVReviewDialog** | Conditional | Management always; others after download |
+| **ArchiveToFlexDialog** | All | job_type !== 'dryhire' |
+
+### Permission Utility Functions
+
+**File**: `src/utils/permissions.ts`
+
+Complete list of permission check functions:
+
+```typescript
+// User/Role Checks
+- isTechnicianRole(role): boolean
+- canViewDetails(role): boolean  // Always true
+
+// Job Management
+- canEditJobs(role): boolean  // admin, management, logistics
+- canAssignPersonnel(role): boolean  // admin, management, logistics
+
+// Document Management
+- canUploadDocuments(role): boolean  // admin, management, logistics
+- canDeleteDocuments(role): boolean  // admin, management
+- canCreateFolders(role): boolean  // admin, management, logistics
+
+// Festival Management
+- canManageFestivalArtists(role): boolean  // all except wallboard
+
+// SoundVision
+- canUploadSoundVisionFiles(role): boolean  // admin, mgmt, log, ht, tech
+- canDeleteSoundVisionFiles(role): boolean  // admin, management
+```
+
+### Special Permission Flags
+
+#### soundvision_access_enabled
+
+**Behavior**:
+- **Automatic**: Sound House Techs always have access (force-enabled)
+- **Manual**: Sound Technicians can be granted access
+- **Request**: Other users can request access
+
+**Grants Access To**:
+- SoundVision files page
+- Upload SoundVision files
+- Download and review files
+
+#### matrixAccess
+
+**Values**: `'edit'` | `'view'` | `'none'`
+
+**Behavior**:
+- **Admin**: Always has full access regardless of flag
+- **Others**: Determined by flag value
+  - `'edit'`: Can modify job matrix
+  - `'view'`: Read-only access to job matrix
+  - `'none'`: No access to job matrix
+
+#### video_user
+
+**Values**: `boolean`
+
+**Behavior**:
+- **Admin**: Always has access regardless of flag
+- **Others**: Must have flag set to `true` to access video features
+
+### Complete CRUD Permissions Matrix
+
+| Entity | Create | Read | Update | Delete |
+|--------|--------|------|--------|--------|
+| **Jobs** | Admin, Mgmt | All (dept-filtered) | Admin, Mgmt | Admin, Mgmt (⚠️ except Video page) |
+| **Job Assignments** | Admin, Mgmt, Log | All | Admin, Mgmt, Log | Admin, Mgmt, Log |
+| **Festival Artists** | Admin, Mgmt, Log | All with fest access | Admin, Mgmt, Log | Admin, Mgmt |
+| **Documents** | Admin, Mgmt, Log | All | Admin, Mgmt, Log | Admin, Mgmt |
+| **SoundVision Files** | All with SV access | All with SV access | All with SV access | Admin, Mgmt |
+| **Users** | Admin | Admin, Mgmt | Admin, Mgmt | Admin |
+| **Vacation Requests** | Admin, Mgmt, HT | Admin, Mgmt, HT | Admin, Mgmt | Admin, Mgmt |
+| **User Skills** | Admin, Mgmt | Admin, Mgmt | Admin, Mgmt | Admin, Mgmt |
+| **House Tech Rates** | Admin, Mgmt | Admin, Mgmt | Admin, Mgmt | Admin, Mgmt |
+
+### Known Limitations & Security Issues
+
+1. **Video Page Delete (Critical)** ⚠️
+   - File: `src/pages/Video.tsx:128-151`
+   - Issue: No permission check
+   - Impact: Any authenticated user can delete video jobs
+   - Fix: Add same permission check as Sound/Lights pages
+
+2. **Client-Side Only Checks**
+   - All permission checks are client-side
+   - Must be enforced server-side with RLS policies
+   - Client checks are for UX, not security
+
+3. **Job Type Conditional Logic**
+   - Many features check `job_type !== 'dryhire'`
+   - This is a business rule, not a permission
+   - Still affects UI rendering
+
+---
+
 ## Key Files Reference
 
 - **User Types**: `src/types/user.ts:1`
@@ -794,3 +1085,16 @@ describe('RBAC Tests', () => {
 - **Protected Route**: `src/components/ProtectedRoute.tsx:1`
 - **Role Guard Hook**: `src/hooks/useRoleGuard.tsx:1`
 - **User Role Context**: `src/contexts/UserRoleContext.tsx:1`
+
+### Component Files with Permissions
+
+- **Job Card Actions**: `src/components/jobs/cards/JobCardActions.tsx` (100+ conditional renders)
+- **Edit User Dialog**: `src/components/users/EditUserDialog.tsx` (field-level permissions)
+- **Users List**: `src/components/users/UsersListContent.tsx` (action permissions)
+- **SoundVision Files**: `src/components/soundvision/SoundVisionFilesList.tsx` (download-gated reviews)
+- **Sound Page**: `src/pages/Sound.tsx` (job management)
+- **Lights Page**: `src/pages/Lights.tsx` (job management)
+- **Video Page**: `src/pages/Video.tsx` (⚠️ has security issue)
+- **Personal Calendar**: `src/pages/Personal.tsx` (calendar edit permissions)
+- **Project Management**: `src/pages/ProjectManagement.tsx` (extensive permissions)
+- **Festival Management**: `src/pages/FestivalManagement.tsx` (dept override)
