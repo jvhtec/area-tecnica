@@ -33,6 +33,14 @@ export default function WallboardPublic() {
       // Step 1: Validate the token against environment variable
       const expectedToken = import.meta.env.VITE_WALLBOARD_TOKEN || 'demo-wallboard-token';
 
+      // Debug logging (remove in production)
+      console.log('🔐 Token validation:', {
+        urlToken: token,
+        expectedToken: expectedToken,
+        envVarSet: !!import.meta.env.VITE_WALLBOARD_TOKEN,
+        match: token === expectedToken
+      });
+
       if (token !== expectedToken) {
         setError('Invalid access token');
         setIsValidating(false);
