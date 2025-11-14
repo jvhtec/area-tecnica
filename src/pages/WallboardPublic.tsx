@@ -21,12 +21,24 @@ export default function WallboardPublic() {
   const [isValidating, setIsValidating] = useState(true);
   const [isValid, setIsValid] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSplash, setShowSplash] = useState(true);
+  const [authComplete, setAuthComplete] = useState(false);
+
+  // Ensure splash shows for minimum duration
+  useEffect(() => {
+    const splashTimer = setTimeout(() => {
+      setShowSplash(false);
+    }, 10000); // 10 seconds
+
+    return () => clearTimeout(splashTimer);
+  }, []);
 
   useEffect(() => {
     const validateTokenAndAuthenticate = async () => {
       if (!token) {
         setError('No token provided');
         setIsValidating(false);
+        setAuthComplete(true);
         return;
       }
 
@@ -44,6 +56,7 @@ export default function WallboardPublic() {
       if (token !== expectedToken) {
         setError('Invalid access token');
         setIsValidating(false);
+        setAuthComplete(true);
         return;
       }
 
@@ -64,12 +77,14 @@ export default function WallboardPublic() {
             console.error('Wallboard auth error:', signInError);
             setError('Failed to authenticate wallboard session. Please check configuration.');
             setIsValidating(false);
+            setAuthComplete(true);
             return;
           }
 
           // Successfully authenticated
           setIsValid(true);
           setIsValidating(false);
+          setAuthComplete(true);
         } else {
           // No credentials configured - check if there's already a valid session
           const { data: { session } } = await supabase.auth.getSession();
@@ -78,24 +93,27 @@ export default function WallboardPublic() {
             // User is already logged in, use their session
             setIsValid(true);
             setIsValidating(false);
+            setAuthComplete(true);
           } else {
             // No credentials and no session - provide setup instructions
             setError('Wallboard service account not configured. See documentation for setup instructions.');
             setIsValidating(false);
+            setAuthComplete(true);
           }
         }
       } catch (err) {
         console.error('Authentication exception:', err);
         setError('Failed to authenticate. Please try again.');
         setIsValidating(false);
+        setAuthComplete(true);
       }
     };
 
     validateTokenAndAuthenticate();
   }, [token]);
 
-  // Show splash screen while validating
-  if (isValidating) {
+  // Show splash screen until both auth is complete AND splash duration has elapsed
+  if (showSplash || !authComplete) {
     return <SplashScreen />;
   }
 
