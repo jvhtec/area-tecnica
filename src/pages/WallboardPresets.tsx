@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowDown, ArrowUp, Copy, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, Plus, RotateCcw, Trash2, Music, Play, X } from 'lucide-react';
+import { RadioStation, WallboardApi } from '@/lib/wallboard-api';
 
 type PanelKey = 'overview' | 'crew' | 'logistics' | 'calendar' | 'pending';
 
@@ -32,6 +33,9 @@ interface WallboardPresetRow {
   rotation_fallback_seconds: number;
   highlight_ttl_seconds: number;
   ticker_poll_interval_seconds: number;
+  bgm_station_name: string | null;
+  bgm_stream_url: string | null;
+  bgm_fallbacks: string[];
   created_at: string;
   updated_at: string;
 }
@@ -98,13 +102,43 @@ export default function WallboardPresets() {
   const [highlightSeconds, setHighlightSeconds] = useState(300);
   const [tickerSeconds, setTickerSeconds] = useState(20);
 
+  // BGM configuration state
+  const [bgmStationName, setBgmStationName] = useState<string>('');
+  const [bgmStreamUrl, setBgmStreamUrl] = useState<string>('');
+  const [bgmFallbacks, setBgmFallbacks] = useState<string[]>([]);
+  const [radioStations, setRadioStations] = useState<RadioStation[]>([]);
+  const [loadingStations, setLoadingStations] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [previewAudio, setPreviewAudio] = useState<HTMLAudioElement | null>(null);
+
+  // Fetch radio stations on mount
+  useEffect(() => {
+    const fetchStations = async () => {
+      setLoadingStations(true);
+      try {
+        const stations = await WallboardApi.fetchRadioStations();
+        setRadioStations(stations);
+      } catch (error) {
+        console.error('Failed to load radio stations', error);
+        toast({
+          title: 'Error al cargar estaciones',
+          description: 'No se pudieron cargar las estaciones de radio.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoadingStations(false);
+      }
+    };
+    fetchStations();
+  }, [toast]);
+
   useEffect(() => {
     const fetchPresets = async () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('wallboard_presets')
         .select(
-          'id, slug, name, description, display_url, panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds, created_at, updated_at'
+          'id, slug, name, description, display_url, panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds, bgm_station_name, bgm_stream_url, bgm_fallbacks, created_at, updated_at'
         )
         .order('slug', { ascending: true });
       if (error) {
@@ -143,6 +177,9 @@ export default function WallboardPresets() {
     setFallbackSeconds(clampNumber(activePreset.rotation_fallback_seconds ?? 12, 1, 600, 12));
     setHighlightSeconds(clampNumber(activePreset.highlight_ttl_seconds ?? 300, 30, 3600, 300));
     setTickerSeconds(clampNumber(activePreset.ticker_poll_interval_seconds ?? 20, 10, 600, 20));
+    setBgmStationName(activePreset.bgm_station_name ?? '');
+    setBgmStreamUrl(activePreset.bgm_stream_url ?? '');
+    setBgmFallbacks(activePreset.bgm_fallbacks ?? []);
   }, [activePreset]);
 
   const movePanel = (index: number, direction: -1 | 1) => {
@@ -204,6 +241,9 @@ export default function WallboardPresets() {
       rotation_fallback_seconds: clampNumber(fallbackSeconds, 1, 600, 12),
       highlight_ttl_seconds: clampNumber(highlightSeconds, 30, 3600, 300),
       ticker_poll_interval_seconds: clampNumber(tickerSeconds, 10, 600, 20),
+      bgm_station_name: bgmStationName || null,
+      bgm_stream_url: bgmStreamUrl || null,
+      bgm_fallbacks: bgmFallbacks.filter(Boolean),
       slug: trimmedSlug,
       display_url: trimmedUrl,
       updated_at: new Date().toISOString(),
@@ -270,9 +310,93 @@ export default function WallboardPresets() {
     setFallbackSeconds(clampNumber(activePreset.rotation_fallback_seconds ?? 12, 1, 600, 12));
     setHighlightSeconds(clampNumber(activePreset.highlight_ttl_seconds ?? 300, 30, 3600, 300));
     setTickerSeconds(clampNumber(activePreset.ticker_poll_interval_seconds ?? 20, 10, 600, 20));
+    setBgmStationName(activePreset.bgm_station_name ?? '');
+    setBgmStreamUrl(activePreset.bgm_stream_url ?? '');
+    setBgmFallbacks(activePreset.bgm_fallbacks ?? []);
   };
 
   const availablePanels = (Object.keys(PANEL_LABELS) as PanelKey[]).filter((key) => !panelOrder.includes(key));
+
+  // BGM helper functions
+  const selectStation = (station: RadioStation) => {
+    setBgmStationName(station.name);
+    setBgmStreamUrl(station.stream);
+    // Stop preview if playing
+    if (previewAudio) {
+      previewAudio.pause();
+      setPreviewAudio(null);
+    }
+    toast({
+      title: 'Estación seleccionada',
+      description: `${station.name} ha sido seleccionada para reproducción.`,
+    });
+  };
+
+  const previewStation = (station: RadioStation) => {
+    // Stop current preview if any
+    if (previewAudio) {
+      previewAudio.pause();
+      setPreviewAudio(null);
+    }
+
+    // Start new preview
+    const audio = new Audio(station.stream);
+    audio.volume = 0.3;
+    audio.play().catch((error) => {
+      console.error('Failed to preview station', error);
+      toast({
+        title: 'Error de reproducción',
+        description: 'No se pudo reproducir la estación.',
+        variant: 'destructive',
+      });
+    });
+    setPreviewAudio(audio);
+
+    // Auto-stop after 10 seconds
+    setTimeout(() => {
+      audio.pause();
+      setPreviewAudio(null);
+    }, 10000);
+  };
+
+  const stopPreview = () => {
+    if (previewAudio) {
+      previewAudio.pause();
+      setPreviewAudio(null);
+    }
+  };
+
+  const clearBgmSelection = () => {
+    setBgmStationName('');
+    setBgmStreamUrl('');
+    setBgmFallbacks([]);
+    stopPreview();
+  };
+
+  const addFallbackStream = () => {
+    setBgmFallbacks([...bgmFallbacks, '']);
+  };
+
+  const updateFallbackStream = (index: number, value: string) => {
+    const updated = [...bgmFallbacks];
+    updated[index] = value;
+    setBgmFallbacks(updated);
+  };
+
+  const removeFallbackStream = (index: number) => {
+    setBgmFallbacks(bgmFallbacks.filter((_, i) => i !== index));
+  };
+
+  // Filter stations based on search
+  const filteredStations = useMemo(() => {
+    if (!searchQuery.trim()) return radioStations;
+    const query = searchQuery.toLowerCase();
+    return radioStations.filter(
+      (station) =>
+        station.name.toLowerCase().includes(query) ||
+        station.tags.some((tag) => tag.toLowerCase().includes(query))
+    );
+  }, [radioStations, searchQuery]);
 
   const copyDisplayUrl = async (value: string) => {
     if (!value) return;
@@ -320,6 +444,9 @@ export default function WallboardPresets() {
       rotation_fallback_seconds: 12,
       highlight_ttl_seconds: 300,
       ticker_poll_interval_seconds: 20,
+      bgm_station_name: null,
+      bgm_stream_url: null,
+      bgm_fallbacks: [],
     };
 
     try {
@@ -327,7 +454,7 @@ export default function WallboardPresets() {
         .from('wallboard_presets')
         .insert(payload)
         .select(
-          'id, slug, name, description, display_url, panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds, created_at, updated_at'
+          'id, slug, name, description, display_url, panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds, bgm_station_name, bgm_stream_url, bgm_fallbacks, created_at, updated_at'
         )
         .single();
 
@@ -678,6 +805,137 @@ export default function WallboardPresets() {
                       {PANEL_LABELS[panel]}
                     </Button>
                   ))}
+                </div>
+              )}
+            </div>
+
+            {/* BGM Configuration Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Music className="h-5 w-5" />
+                  <h2 className="text-lg font-semibold">Música de Fondo (BGM)</h2>
+                </div>
+                {bgmStreamUrl && (
+                  <Button variant="outline" size="sm" onClick={clearBgmSelection} disabled={saving}>
+                    <X className="mr-2 h-4 w-4" /> Limpiar Selección
+                  </Button>
+                )}
+              </div>
+
+              {bgmStreamUrl ? (
+                <div className="space-y-4 rounded-md border p-4">
+                  <div className="space-y-2">
+                    <Label>Estación Seleccionada</Label>
+                    <div className="rounded-md bg-muted p-3">
+                      <p className="font-medium">{bgmStationName}</p>
+                      <p className="text-sm text-muted-foreground break-all">{bgmStreamUrl}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Streams de Respaldo (opcional)</Label>
+                      <Button variant="outline" size="sm" onClick={addFallbackStream} disabled={saving}>
+                        <Plus className="mr-2 h-4 w-4" /> Agregar Respaldo
+                      </Button>
+                    </div>
+                    {bgmFallbacks.map((fallback, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          value={fallback}
+                          onChange={(e) => updateFallbackStream(index, e.target.value)}
+                          placeholder="https://ejemplo.com/stream-respaldo"
+                          disabled={saving}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeFallbackStream(index)}
+                          disabled={saving}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {bgmFallbacks.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Sin streams de respaldo configurados.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 rounded-md border p-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="station-search">Buscar Estaciones de Radio</Label>
+                    <Input
+                      id="station-search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Buscar por nombre o etiqueta..."
+                      disabled={loadingStations}
+                    />
+                  </div>
+
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {loadingStations ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">Cargando estaciones...</p>
+                    ) : filteredStations.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No se encontraron estaciones.
+                      </p>
+                    ) : (
+                      filteredStations.slice(0, 50).map((station) => (
+                        <div
+                          key={station.stream}
+                          className="flex flex-col gap-2 rounded-md border p-3 md:flex-row md:items-center md:justify-between"
+                        >
+                          <div className="flex items-center gap-3">
+                            {station.favicon && (
+                              <img
+                                src={station.favicon}
+                                alt={station.name}
+                                className="h-8 w-8 rounded"
+                                onError={(e) => (e.currentTarget.style.display = 'none')}
+                              />
+                            )}
+                            <div>
+                              <p className="font-medium">{station.name}</p>
+                              {station.tags.length > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                  {station.tags.slice(0, 3).join(', ')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => previewStation(station)}
+                              disabled={saving}
+                            >
+                              <Play className="mr-2 h-3 w-3" /> Probar
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => selectStation(station)}
+                              disabled={saving}
+                            >
+                              Seleccionar
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {filteredStations.length > 50 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Mostrando las primeras 50 estaciones. Usa la búsqueda para refinar los resultados.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

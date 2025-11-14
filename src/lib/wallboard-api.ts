@@ -49,6 +49,19 @@ export interface AnnouncementsFeed {
   announcements: Array<{ id: string; message: string; level: string; created_at: string; active: boolean }>;
 }
 
+export interface RadioStation {
+  name: string;
+  stream: string;
+  favicon: string;
+  tags: string[];
+}
+
+export interface WallboardBgmConfig {
+  bgmStationName: string | null;
+  bgmStreamUrl: string | null;
+  bgmFallbacks: string[];
+}
+
 export class WallboardApi {
   private token?: string;
   private base = "/functions/v1/wallboard-feed";
@@ -81,6 +94,16 @@ export class WallboardApi {
   async announcements(): Promise<AnnouncementsFeed> {
     const res = await fetch(`${this.base}/announcements`, { headers: this.headers() });
     if (!res.ok) throw new Error(`announcements failed: ${res.status}`);
+    return res.json();
+  }
+
+  static async fetchRadioStations(search?: string, tag?: string): Promise<RadioStation[]> {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (tag) params.set('tag', tag);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`/functions/v1/wallboard-radio-stations${query}`);
+    if (!res.ok) throw new Error(`radio-stations failed: ${res.status}`);
     return res.json();
   }
 }
