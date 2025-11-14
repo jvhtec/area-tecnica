@@ -24,14 +24,20 @@ export default function WallboardPublic() {
   const [showSplash, setShowSplash] = useState(true);
   const [authComplete, setAuthComplete] = useState(false);
 
-  // Ensure splash shows for minimum duration (8s + 800ms for fade-out animation)
-  useEffect(() => {
-    const splashTimer = setTimeout(() => {
+  // Handle splash screen completion
+  const handleSplashComplete = () => {
+    // Only hide splash if auth is also complete
+    if (authComplete) {
       setShowSplash(false);
-    }, 8800); // 8 seconds + 800ms fade-out
+    }
+  };
 
-    return () => clearTimeout(splashTimer);
-  }, []);
+  // When auth completes, check if splash timer has also finished
+  useEffect(() => {
+    if (authComplete && !showSplash) {
+      // Both complete, do nothing (already hidden)
+    }
+  }, [authComplete, showSplash]);
 
   useEffect(() => {
     const validateTokenAndAuthenticate = async () => {
@@ -112,9 +118,9 @@ export default function WallboardPublic() {
     validateTokenAndAuthenticate();
   }, [token]);
 
-  // Show splash screen until both auth is complete AND splash duration has elapsed
-  if (showSplash || !authComplete) {
-    return <SplashScreen />;
+  // Show splash screen until both auth is complete AND splash animation has finished
+  if (showSplash) {
+    return <SplashScreen onComplete={handleSplashComplete} />;
   }
 
   // Show error if token is invalid
