@@ -54,6 +54,7 @@ import Timesheets from '@/pages/Timesheets';
 import { UserManual } from '@/components/UserManual';
 import IncidentReports from '@/pages/IncidentReports';
 import Wallboard from '@/pages/Wallboard';
+import WallboardPublic from '@/pages/WallboardPublic';
 import Announcements from '@/pages/Announcements';
 import WallboardPresets from '@/pages/WallboardPresets';
 import RatesCenterPage from '@/pages/RatesCenterPage';
@@ -92,6 +93,8 @@ export default function App() {
                     <Routes>
                       <Route path="/" element={<Auth />} />
                       <Route path="/auth" element={<Auth />} />
+                      {/* Wallboard: public tokenized access (no auth required) */}
+                      <Route path="/wallboard/public/:token/:presetSlug?" element={<WallboardPublic />} />
                       {/* Wallboard: protected, full-screen (no Layout) */}
                       <Route path="/wallboard/:presetSlug?" element={<RequireAuth><Wallboard /></RequireAuth>} />
                       {/* Public Routes */}
