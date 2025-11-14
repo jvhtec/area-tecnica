@@ -24,11 +24,11 @@ export default function WallboardPublic() {
   const [showSplash, setShowSplash] = useState(true);
   const [authComplete, setAuthComplete] = useState(false);
 
-  // Ensure splash shows for minimum duration
+  // Ensure splash shows for minimum duration (8s + 800ms for fade-out animation)
   useEffect(() => {
     const splashTimer = setTimeout(() => {
       setShowSplash(false);
-    }, 10000); // 10 seconds
+    }, 8800); // 8 seconds + 800ms fade-out
 
     return () => clearTimeout(splashTimer);
   }, []);
