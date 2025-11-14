@@ -1640,7 +1640,7 @@ function WallboardDisplay({ presetSlug: propPresetSlug }: { presetSlug?: string 
   const current = activePanels[safeIdx] ?? 'overview';
 
   if (isLoading) {
-    return <SplashScreen onComplete={() => setIsLoading(false)} duration={3000} />;
+    return <SplashScreen onComplete={() => setIsLoading(false)} />;
   }
 
   return (

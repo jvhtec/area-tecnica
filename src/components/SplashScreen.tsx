@@ -5,7 +5,7 @@ interface SplashScreenProps {
   duration?: number;
 }
 
-const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, duration = 3000 }) => {
+const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, duration = 5000 }) => {
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
