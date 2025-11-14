@@ -155,5 +155,5 @@ export default function WallboardPublic() {
   }
 
   // Token is valid - display the wallboard without authentication
-  return <WallboardDisplay presetSlug={presetSlug} />;
+  return <WallboardDisplay presetSlug={presetSlug} skipSplash={true} />;
 }
