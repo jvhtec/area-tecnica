@@ -191,6 +191,16 @@
   background: transparent;
 }
 
+/* Hide scrollbar completely */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Assignment Matrix Layout */
 .matrix-layout {
   position: relative;
