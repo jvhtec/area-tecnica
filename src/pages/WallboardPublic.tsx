@@ -118,13 +118,8 @@ export default function WallboardPublic() {
     validateTokenAndAuthenticate();
   }, [token]);
 
-  // Show splash screen until both auth is complete AND splash animation has finished
-  if (showSplash) {
-    return <SplashScreen onComplete={handleSplashComplete} />;
-  }
-
-  // Show error if token is invalid
-  if (!isValid || error) {
+  // Show error if token is invalid (before splash completes)
+  if (!isValid && error && authComplete) {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8">
         <div className="max-w-md w-full space-y-6">
@@ -154,6 +149,18 @@ export default function WallboardPublic() {
     );
   }
 
-  // Token is valid - display the wallboard without authentication
-  return <WallboardDisplay presetSlug={presetSlug} skipSplash={true} />;
+  // Render wallboard in background while splash is showing (so data loads during splash)
+  // Once auth completes and is valid, start loading the wallboard
+  const shouldLoadWallboard = authComplete && isValid;
+
+  return (
+    <>
+      {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
+      {shouldLoadWallboard && (
+        <div style={{ visibility: showSplash ? 'hidden' : 'visible' }}>
+          <WallboardDisplay presetSlug={presetSlug} skipSplash={true} />
+        </div>
+      )}
+    </>
+  );
 }
