@@ -1,8 +1,16 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? "";
+const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? "";
+
+type AuthResult = {
+  method: "jwt" | "shared";
+  presetSlug?: string | null;
+};
 
 type Dept = "sound" | "lights" | "video";
 
@@ -10,7 +18,73 @@ function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
   } as Record<string, string>;
+}
+
+class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+let jwtKeyPromise: Promise<CryptoKey> | null = null;
+async function getJwtKey() {
+  if (!WALLBOARD_JWT_SECRET) {
+    throw new HttpError(500, "WALLBOARD_JWT_SECRET is not configured");
+  }
+  if (!jwtKeyPromise) {
+    jwtKeyPromise = crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(WALLBOARD_JWT_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"],
+    );
+  }
+  return await jwtKeyPromise;
+}
+
+async function authenticate(req: Request, url: URL): Promise<AuthResult> {
+  const headerToken = req.headers.get("authorization") ?? req.headers.get("Authorization") ?? "";
+  if (headerToken.startsWith("Bearer ")) {
+    const token = headerToken.slice(7).trim();
+    if (!token) {
+      throw new HttpError(401, "Missing bearer token");
+    }
+    try {
+      const key = await getJwtKey();
+      const payload: Record<string, unknown> = await verify(token, key);
+      if (payload.scope !== "wallboard") {
+        throw new HttpError(403, "Invalid wallboard scope");
+      }
+      const presetSlug = typeof payload.preset === "string" ? payload.preset : undefined;
+      return { method: "jwt", presetSlug };
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      throw new HttpError(401, "Invalid token");
+    }
+  }
+
+  const sharedHeader =
+    req.headers.get("x-wallboard-token") ??
+    req.headers.get("x-wallboard-shared-token") ??
+    req.headers.get("x-wallboard-shared") ??
+    url.searchParams.get("wallboardToken");
+  if (sharedHeader) {
+    if (!WALLBOARD_SHARED_TOKEN) {
+      throw new HttpError(500, "WALLBOARD_SHARED_TOKEN is not configured");
+    }
+    if (sharedHeader !== WALLBOARD_SHARED_TOKEN) {
+      throw new HttpError(403, "Forbidden");
+    }
+    const presetSlug = url.searchParams.get("preset")?.trim().toLowerCase() ?? undefined;
+    return { method: "shared", presetSlug };
+  }
+
+  throw new HttpError(401, "Unauthorized");
 }
 
 function startOfDay(d: Date) {
@@ -32,10 +106,10 @@ serve(async (req) => {
   const url = new URL(req.url);
   const path = url.pathname.replace(/\/+$/, "");
 
-  const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
-
   try {
-    // Security disabled for preview: feeds are public for now
+    const auth = await authenticate(req, url);
+    const presetSlug = auth.presetSlug?.trim().toLowerCase() ?? undefined;
+    const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     if (path.endsWith("/jobs-overview")) {
       // Today + tomorrow window
@@ -104,7 +178,7 @@ serve(async (req) => {
         }),
       } as any;
 
-      return new Response(JSON.stringify(result), {
+      return new Response(JSON.stringify({ ...result, presetSlug }), {
         headers: { "Content-Type": "application/json", ...corsHeaders() },
       });
     }
@@ -179,7 +253,7 @@ serve(async (req) => {
         })),
       } as any;
 
-      return new Response(JSON.stringify(result), {
+      return new Response(JSON.stringify({ ...result, presetSlug }), {
         headers: { "Content-Type": "application/json", ...corsHeaders() },
       });
     }
@@ -217,7 +291,7 @@ serve(async (req) => {
         })),
       };
 
-      return new Response(JSON.stringify(payload), {
+      return new Response(JSON.stringify({ ...payload, presetSlug }), {
         headers: { "Content-Type": "application/json", ...corsHeaders() },
       });
     }
@@ -290,7 +364,7 @@ serve(async (req) => {
         });
       }
 
-      return new Response(JSON.stringify({ items }), {
+      return new Response(JSON.stringify({ items, presetSlug }), {
         headers: { "Content-Type": "application/json", ...corsHeaders() },
       });
     }
@@ -303,7 +377,7 @@ serve(async (req) => {
         .order("created_at", { ascending: false })
         .limit(20);
       if (error) throw error;
-      return new Response(JSON.stringify({ announcements: data ?? [] }), {
+      return new Response(JSON.stringify({ announcements: data ?? [], presetSlug }), {
         headers: { "Content-Type": "application/json", ...corsHeaders() },
       });
     }
@@ -313,8 +387,9 @@ serve(async (req) => {
       headers: { "Content-Type": "application/json", ...corsHeaders() },
     });
   } catch (e: any) {
+    const status = e instanceof HttpError ? e.status : 500;
     return new Response(JSON.stringify({ error: e?.message ?? String(e) }), {
-      status: 500,
+      status,
       headers: { "Content-Type": "application/json", ...corsHeaders() },
     });
   }
