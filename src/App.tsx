@@ -70,6 +70,7 @@ function ActivityPushFallbackInit() {
 }
 
 const SOUND_DEPARTMENT = "sound";
+const LIGHTS_DEPARTMENT = "lights";
 
 const FestivalsAccessGuard = () => {
   const { userRole, userDepartment, isLoading } = useOptimizedAuth();
@@ -86,6 +87,27 @@ const FestivalsAccessGuard = () => {
   }
 
   return <Festivals />;
+};
+
+const DisponibilidadAccessGuard = () => {
+  const { userRole, userDepartment, isLoading } = useOptimizedAuth();
+
+  if (isLoading) {
+    return null;
+  }
+
+  const normalizedDepartment = userDepartment?.toLowerCase();
+  const isAdmin = userRole === "admin";
+  const hasManagementDepartmentAccess =
+    userRole === "management" &&
+    (normalizedDepartment === SOUND_DEPARTMENT ||
+      normalizedDepartment === LIGHTS_DEPARTMENT);
+
+  if (!isAdmin && !hasManagementDepartmentAccess) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Disponibilidad />;
 };
 
 export default function App() {
@@ -183,7 +205,7 @@ export default function App() {
                         <Route path="/tour-dates/:tourDateId/video/consumos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoConsumosTool /></ProtectedRoute>} />
 
                         {/* Disponibilidad Route */}
-                        <Route path="/disponibilidad" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Disponibilidad /></ProtectedRoute>} />
+                        <Route path="/disponibilidad" element={<ProtectedRoute allowedRoles={['admin', 'management']}><DisponibilidadAccessGuard /></ProtectedRoute>} />
 
                         {/* SoundVision Files Route */}
                         <Route path="/soundvision-files" element={<SoundVisionFiles />} />

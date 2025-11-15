@@ -18,15 +18,58 @@ import { useOptimizedJobs } from '@/hooks/useOptimizedJobs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
+type DisponibilidadDepartment = 'sound' | 'lights';
+
+const DEPARTMENT_LABELS: Record<DisponibilidadDepartment, string> = {
+  sound: 'Sonido',
+  lights: 'Luces'
+};
+
 export default function Disponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);
   const navigate = useNavigate();
-  const { session, userDepartment } = useOptimizedAuth();
+  const { session, userDepartment, userRole } = useOptimizedAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  const department = (userDepartment || 'sound') as 'sound' | 'lights' | 'video';
+  const normalizedDepartment = userDepartment?.toLowerCase();
+  const isAdmin = userRole === 'admin';
+  const isManagement = userRole === 'management';
+  const hasManagementDepartmentAccess =
+    normalizedDepartment === 'sound' || normalizedDepartment === 'lights';
+
+  const [adminDepartment, setAdminDepartment] = useState<DisponibilidadDepartment>('sound');
+
+  useEffect(() => {
+    if (isAdmin && hasManagementDepartmentAccess && normalizedDepartment) {
+      setAdminDepartment(normalizedDepartment as DisponibilidadDepartment);
+    }
+  }, [isAdmin, hasManagementDepartmentAccess, normalizedDepartment]);
+
+  const department: DisponibilidadDepartment | null = isAdmin
+    ? adminDepartment
+    : hasManagementDepartmentAccess
+      ? (normalizedDepartment as DisponibilidadDepartment)
+      : null;
+
+  if (isManagement && !hasManagementDepartmentAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+        <h1 className="text-2xl font-semibold mb-4">Acceso restringido</h1>
+        <p className="text-muted-foreground max-w-xl">
+          Esta sección solo está disponible para los departamentos de Sonido y Luces.
+          Solicita acceso a uno de estos departamentos para continuar.
+        </p>
+      </div>
+    );
+  }
+
+  if (!department) {
+    return null;
+  }
+
+  const departmentLabel = DEPARTMENT_LABELS[department];
 
   // Jobs happening on the selected date for this department
   const dayStart = startOfDay(selectedDate);
@@ -103,7 +146,21 @@ export default function Disponibilidad() {
           "flex items-center",
           isMobile ? "flex-col gap-3 w-full" : "justify-between"
         )}>
-          <h1 className="text-xl md:text-2xl font-bold">Disponibilidad · {department}</h1>
+          <h1 className="text-xl md:text-2xl font-bold">Disponibilidad · {departmentLabel}</h1>
+          {isAdmin && (
+            <div className="flex gap-2">
+              {Object.entries(DEPARTMENT_LABELS).map(([value, label]) => (
+                <Button
+                  key={value}
+                  variant={department === value ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setAdminDepartment(value as DisponibilidadDepartment)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
             <Button 
               variant="outline"
