@@ -54,7 +54,7 @@ export interface NavigationItem {
 type LabelSource = string | ((context: NavigationContext) => string | null)
 type IconSource = LucideIcon | ((context: NavigationContext) => LucideIcon | null)
 
-interface NavigationItemConfig {
+export interface NavigationItemConfig {
   id: string
   label: LabelSource
   mobileLabel?: LabelSource
@@ -344,14 +344,17 @@ const resolveIcon = (
 
 export const buildNavigationItems = (
   context: NavigationContext,
+  navigationConfig: NavigationItemConfig[] = baseNavigationConfig,
 ): NavigationItem[] => {
   if (!context.userRole) {
     return []
   }
 
-  return baseNavigationConfig
+  const isAdmin = context.userRole === "admin"
+
+  return navigationConfig
     .map((config) => {
-      if (!config.isVisible(context)) {
+      if (!isAdmin && !config.isVisible(context)) {
         return null
       }
 
