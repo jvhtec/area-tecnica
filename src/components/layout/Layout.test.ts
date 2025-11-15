@@ -52,7 +52,7 @@ describe("selectPrimaryNavigationItems", () => {
     })
 
     expect(primary.map((item) => item.id)).toEqual([
-      "department-sound",
+      "management-department",
       "project-management",
       "tours",
       "festivals",
@@ -71,7 +71,7 @@ describe("selectPrimaryNavigationItems", () => {
 
     expect(primary.map((item) => item.id)).toEqual([
       "project-management",
-      "department-lights",
+      "management-department",
       "disponibilidad",
       "logistics",
     ])
@@ -93,6 +93,26 @@ describe("selectPrimaryNavigationItems", () => {
       "logistics",
       "job-assignment-matrix",
     ])
+  })
+})
+
+describe("buildNavigationItems - management department navigation", () => {
+  it("omits the department link when userDepartment is missing", () => {
+    const context = buildContext({ userRole: "management", userDepartment: null })
+    const items = buildNavigationItems(context)
+
+    const managementDept = items.find((item) => item.id === "management-department")
+    expect(managementDept).toBeUndefined()
+  })
+
+  it("creates a department link that matches the assigned department", () => {
+    const context = buildContext({ userRole: "management", userDepartment: "lights" })
+    const items = buildNavigationItems(context)
+
+    const managementDept = items.find((item) => item.id === "management-department")
+    expect(managementDept).toBeDefined()
+    expect(managementDept?.label).toBe("Luces")
+    expect(managementDept?.to).toBe("/lights")
   })
 })
 
