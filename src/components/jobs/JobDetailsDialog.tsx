@@ -414,7 +414,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         coordinates
       );
     },
-    enabled: open && !!jobDetails?.locations && (!!jobDetails?.locations?.formatted_address || !!jobDetails?.locations?.name || (!!jobDetails?.locations?.latitude && !!jobDetails?.locations?.longitude))
+    // Wait for jobDetails to load before running this query
+    enabled: open && !isJobLoading && !!jobDetails?.locations && (!!jobDetails?.locations?.formatted_address || !!jobDetails?.locations?.name || (!!jobDetails?.locations?.latitude && !!jobDetails?.locations?.longitude))
   });
 
   // Weather data for job dates
