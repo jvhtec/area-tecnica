@@ -276,7 +276,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 12,
     mobileSlot: "secondary",
     getPath: () => "/management/wallboard-presets",
-    isVisible: ({ userRole }) => userRole === "admin" || userRole === "management",
+    isVisible: ({ userRole }) => userRole === "admin",
   },
   {
     id: "announcements",
@@ -286,8 +286,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 12,
     mobileSlot: "secondary",
     getPath: () => "/announcements",
-    isVisible: ({ userRole }) =>
-      userRole === "admin" || userRole === "management",
+    isVisible: ({ userRole }) => userRole === "admin",
   },
   {
     id: "incident-reports",
@@ -308,8 +307,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 14,
     mobileSlot: "secondary",
     getPath: () => "/activity",
-    isVisible: ({ userRole }) =>
-      userRole === "admin" || userRole === "management",
+    isVisible: ({ userRole }) => userRole === "admin",
   },
   {
     id: "settings",
