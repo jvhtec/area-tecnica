@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
@@ -45,7 +45,7 @@ import { RequireAuth } from '@/components/RequireAuth';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import FestivalGearManagement from '@/pages/FestivalGearManagement';
 import Festivals from '@/pages/Festivals';
-import { OptimizedAuthProvider } from "@/hooks/useOptimizedAuth";
+import { OptimizedAuthProvider, useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AppInit } from "@/components/AppInit";
@@ -68,6 +68,25 @@ function ActivityPushFallbackInit() {
   useActivityPushFallback();
   return null;
 }
+
+const SOUND_DEPARTMENT = "sound";
+
+const FestivalsAccessGuard = () => {
+  const { userRole, userDepartment, isLoading } = useOptimizedAuth();
+
+  if (isLoading) {
+    return null;
+  }
+
+  const isAdmin = userRole === "admin";
+  const isSoundMember = userDepartment?.toLowerCase() === SOUND_DEPARTMENT;
+
+  if (!isAdmin && !isSoundMember) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Festivals />;
+};
 
 export default function App() {
   // Initialize multi-tab coordinator
@@ -122,7 +141,7 @@ export default function App() {
                         <Route path="/activity" element={<ProtectedRoute allowedRoles={['admin']}><ActivityCenter /></ProtectedRoute>} />
                         <Route path="/timesheets" element={<Timesheets />} />
                         <Route path="/tours" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Tours /></ProtectedRoute>} />
-                        <Route path="/festivals" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Festivals /></ProtectedRoute>} />
+                        <Route path="/festivals" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><FestivalsAccessGuard /></ProtectedRoute>} />
                         <Route path="/incident-reports" element={<ProtectedRoute allowedRoles={['admin', 'management']}><IncidentReports /></ProtectedRoute>} />
                         <Route path="/announcements" element={<ProtectedRoute allowedRoles={['admin']}><Announcements /></ProtectedRoute>} />
                         <Route path="/management/wallboard-presets" element={<ProtectedRoute allowedRoles={['admin']}><WallboardPresets /></ProtectedRoute>} />

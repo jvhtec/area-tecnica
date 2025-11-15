@@ -221,8 +221,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 6,
     mobileSlot: "secondary",
     getPath: () => "/festivals",
-    isVisible: ({ userRole }) =>
-      userRole === "management" || userRole === "house_tech",
+    isVisible: ({ userDepartment }) =>
+      userDepartment?.toLowerCase() === "sound",
   },
   {
     id: "disponibilidad",
