@@ -21,7 +21,9 @@ const SoundVisionFiles = () => {
     }
   }, [hasSoundVisionAccess, isLoading]);
 
-  const { data: files = [], isLoading: isFilesLoading } = useSoundVisionFiles();
+  const { data: files = [], isLoading: isFilesLoading } = useSoundVisionFiles(undefined, {
+    enabled: !isLoading && hasSoundVisionAccess,
+  });
 
   if (isLoading) {
     return (

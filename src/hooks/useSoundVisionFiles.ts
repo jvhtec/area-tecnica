@@ -52,10 +52,21 @@ export interface SoundVisionFileFilters {
   fileType?: string;
 }
 
-export const useSoundVisionFiles = (filters?: SoundVisionFileFilters) => {
+export interface UseSoundVisionFilesOptions {
+  enabled?: boolean;
+}
+
+export const useSoundVisionFiles = (
+  filters?: SoundVisionFileFilters,
+  options?: UseSoundVisionFilesOptions
+) => {
   return useQuery({
     queryKey: ['soundvision-files', filters],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
+      const { error: accessError } = await supabase.rpc('assert_soundvision_access');
+      if (accessError) throw accessError;
+
       // First get the files with venue data
       const query = supabase
         .from('soundvision_files')
