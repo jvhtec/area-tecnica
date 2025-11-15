@@ -232,8 +232,16 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 7,
     mobileSlot: "secondary",
     getPath: () => "/disponibilidad",
-    isVisible: ({ userRole }) =>
-      userRole === "management" || userRole === "house_tech",
+    isVisible: ({ userRole, userDepartment }) => {
+      if (userRole === "admin") {
+        return true
+      }
+      if (userRole !== "management") {
+        return false
+      }
+      const normalized = userDepartment?.toLowerCase()
+      return normalized === "sound" || normalized === "lights"
+    },
   },
   {
     id: "project-management",
