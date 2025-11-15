@@ -119,13 +119,13 @@ export default function App() {
                         <Route path="/project-management" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><ProjectManagement /></ProtectedRoute>} />
                         <Route path="/equipment-management" element={<EquipmentManagement />} />
                         <Route path="/job-assignment-matrix" element={<ProtectedRoute allowedRoles={['admin', 'management']}><JobAssignmentMatrix /></ProtectedRoute>} />
-                        <Route path="/activity" element={<ProtectedRoute allowedRoles={['admin', 'management']}><ActivityCenter /></ProtectedRoute>} />
+                        <Route path="/activity" element={<ProtectedRoute allowedRoles={['admin']}><ActivityCenter /></ProtectedRoute>} />
                         <Route path="/timesheets" element={<Timesheets />} />
                         <Route path="/tours" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Tours /></ProtectedRoute>} />
                         <Route path="/festivals" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Festivals /></ProtectedRoute>} />
                         <Route path="/incident-reports" element={<ProtectedRoute allowedRoles={['admin', 'management']}><IncidentReports /></ProtectedRoute>} />
-                        <Route path="/announcements" element={<ProtectedRoute allowedRoles={['admin', 'management']}><Announcements /></ProtectedRoute>} />
-                        <Route path="/management/wallboard-presets" element={<ProtectedRoute allowedRoles={['admin', 'management']}><WallboardPresets /></ProtectedRoute>} />
+                        <Route path="/announcements" element={<ProtectedRoute allowedRoles={['admin']}><Announcements /></ProtectedRoute>} />
+                        <Route path="/management/wallboard-presets" element={<ProtectedRoute allowedRoles={['admin']}><WallboardPresets /></ProtectedRoute>} />
                         <Route path="/management/rates" element={<ProtectedRoute allowedRoles={['admin', 'management']}><RatesCenterPage /></ProtectedRoute>} />
                         <Route path="/manual" element={<UserManual />} />
 
