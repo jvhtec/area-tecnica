@@ -1,5 +1,9 @@
+import { Activity } from "lucide-react"
 import { describe, expect, it } from "vitest"
-import type { SidebarNavigationProps } from "./SidebarNavigation"
+import type {
+  NavigationItemConfig,
+  SidebarNavigationProps,
+} from "./SidebarNavigation"
 
 const storage = new Map<string, string>()
 const localStorageMock = {
@@ -131,5 +135,34 @@ describe("buildNavigationItems - SoundVision visibility", () => {
 
     const soundVisionItem = items.find((item) => item.id === "soundvision-files")
     expect(soundVisionItem).toBeUndefined()
+  })
+})
+
+describe("buildNavigationItems - admin visibility", () => {
+  it("includes routes from every role for admins", () => {
+    const context = buildContext({ userRole: "admin" })
+    const items = buildNavigationItems(context)
+
+    expect(items.find((item) => item.id === "management-dashboard")).toBeDefined()
+    expect(items.find((item) => item.id === "technician-dashboard")).toBeDefined()
+    expect(items.find((item) => item.id === "logistics")).toBeDefined()
+    expect(items.find((item) => item.id === "soundvision-files")).toBeDefined()
+  })
+
+  it("automatically renders future routes for admins", () => {
+    const context = buildContext({ userRole: "admin" })
+    const futureRoute: NavigationItemConfig = {
+      id: "future-route",
+      label: "Future route",
+      icon: Activity,
+      getPath: () => "/future",
+      isVisible: () => false,
+    }
+
+    const adminItems = buildNavigationItems(context, [futureRoute])
+    const managerItems = buildNavigationItems(buildContext(), [futureRoute])
+
+    expect(adminItems.map((item) => item.id)).toContain("future-route")
+    expect(managerItems.map((item) => item.id)).not.toContain("future-route")
   })
 })
