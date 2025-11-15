@@ -295,22 +295,38 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     }
   }, [showTourRatesTab, showExtrasTab, selectedTab]);
 
-  // Reset selectedTab to 'info' when dialog opens to ensure clean state
-  // Only reset once when dialog opens, not on every render
+  // Reset selectedTab to 'info' when dialog opens OR when job changes
+  // This prevents showing stale/empty tabs when switching between jobs
   const [lastOpenState, setLastOpenState] = useState(false);
+  const [lastJobId, setLastJobId] = useState<string | null>(null);
   useEffect(() => {
-    if (open && !lastOpenState) {
-      // Dialog is opening - reset to info tab
-      console.log('JobDetailsDialog: Dialog opening, resetting to info tab');
+    const jobIdChanged = job.id !== lastJobId;
+    const dialogOpening = open && !lastOpenState;
+
+    if (dialogOpening || (open && jobIdChanged)) {
+      // Dialog is opening OR job changed while dialog is open - reset to info tab
+      console.log('JobDetailsDialog: Resetting to info tab', { dialogOpening, jobIdChanged, jobId: job.id });
       setSelectedTab('info');
+      setLastJobId(job.id);
     }
     setLastOpenState(open);
-  }, [open, lastOpenState]);
+  }, [open, lastOpenState, job.id, lastJobId]);
 
   // Log tab changes for debugging
   useEffect(() => {
     console.log('JobDetailsDialog: selectedTab changed to:', selectedTab);
   }, [selectedTab]);
+
+  // Invalidate all job-related queries when job changes to ensure fresh data
+  useEffect(() => {
+    if (open && job.id) {
+      console.log('JobDetailsDialog: Job changed, invalidating queries for job', job.id);
+      queryClient.invalidateQueries({ queryKey: ['job-details', job.id] });
+      queryClient.invalidateQueries({ queryKey: ['job-artists', job.id] });
+      queryClient.invalidateQueries({ queryKey: ['job-restaurants', job.id] });
+      queryClient.invalidateQueries({ queryKey: ['job-rider-files', job.id] });
+    }
+  }, [job.id, open, queryClient]);
 
   // Reset selectedTab if user is on a dryhire-excluded tab when isDryhire is true
   // This runs AFTER the dialog has opened and should handle job type changes
@@ -1071,7 +1087,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
             <TabsContent value="location" className="space-y-4">
               <Card className="p-4">
-                {jobDetails?.locations ? (
+                {isJobLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : jobDetails?.locations ? (
                   <div className="space-y-4">
                       <div className="flex items-start justify-between">
                         <div>
@@ -1157,7 +1177,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   Personal asignado
                 </h3>
 
-                {jobDetails?.job_assignments && jobDetails.job_assignments.length > 0 ? (
+                {isJobLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : jobDetails?.job_assignments && jobDetails.job_assignments.length > 0 ? (
                   <div className="space-y-3">
                     {jobDetails.job_assignments.map((assignment: any) => (
                       <div key={assignment.technician_id} className="flex items-center justify-between p-3 bg-muted rounded">
@@ -1218,7 +1242,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   Documentos del trabajo
                 </h3>
 
-                {jobDetails?.job_documents && jobDetails.job_documents.length > 0 ? (
+                {isJobLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : jobDetails?.job_documents && jobDetails.job_documents.length > 0 ? (
                   <div className="space-y-2">
                     {jobDetails.job_documents.map((doc: any) => {
                       const isTemplate = doc.template_type === 'soundvision';
@@ -1311,7 +1339,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   Restaurantes cercanos
                 </h3>
 
-                {isRestaurantsLoading ? (
+                {(isJobLoading || isRestaurantsLoading) ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
                     <p className="text-muted-foreground">Buscando restaurantes cercanos...</p>
@@ -1385,7 +1413,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     <CloudIcon className="h-4 w-4" />
                     Pronóstico del Tiempo
                   </h3>
-                  {weatherVenue.address && eventDatesString && (
+                  {!isJobLoading && weatherVenue.address && eventDatesString && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -1403,7 +1431,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   )}
                 </div>
 
-                {!weatherVenue.address && !weatherVenue.coordinates ? (
+                {isJobLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : !weatherVenue.address && !weatherVenue.coordinates ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
                     <AlertCircle className="h-4 w-4" />
                     El pronóstico del tiempo requiere ubicación del lugar
