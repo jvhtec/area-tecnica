@@ -6,7 +6,33 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const ALLOWED_ROLES = ['admin', 'management']
+const DEFAULT_ALLOWED_ROLES = [
+  'admin',
+  'management',
+  'house_tech',
+  'technician',
+  'logistics',
+]
+
+const getAllowedRoles = () => {
+  const configuredRoles = Deno.env.get('GOOGLE_MAPS_ALLOWED_ROLES')
+
+  if (!configuredRoles) {
+    return DEFAULT_ALLOWED_ROLES
+  }
+
+  if (configuredRoles.trim() === '*') {
+    // Wildcard allows every authenticated user to request the key.
+    return null
+  }
+
+  return configuredRoles
+    .split(',')
+    .map((role) => role.trim())
+    .filter((role) => role.length > 0)
+}
+
+const ALLOWED_ROLES = getAllowedRoles()
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -65,7 +91,7 @@ serve(async (req) => {
       )
     }
 
-    if (!ALLOWED_ROLES.includes(profile.role)) {
+    if (ALLOWED_ROLES && !ALLOWED_ROLES.includes(profile.role)) {
       console.warn(`Unauthorized role attempted to fetch Google Maps key: ${profile.role}`)
       return new Response(
         JSON.stringify({ error: 'Insufficient permissions' }),
