@@ -45,14 +45,14 @@ import { UserInfo } from "./UserInfo"
 
 const PRIMARY_NAVIGATION_PROFILE_MAP: Record<string, readonly string[]> = {
   sound: [
-    "department-sound",
+    "management-department",
     "project-management",
     "tours",
     "festivals",
   ],
   lights: [
     "project-management",
-    "department-lights",
+    "management-department",
     "disponibilidad",
     "logistics",
   ],

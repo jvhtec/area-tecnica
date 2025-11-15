@@ -72,6 +72,12 @@ const departmentLabelMap: Record<string, string> = {
   video: "Vídeo",
 }
 
+const departmentIconMap: Record<string, LucideIcon> = {
+  sound: Music2,
+  lights: Lightbulb,
+  video: Video,
+}
+
 const baseNavigationConfig: NavigationItemConfig[] = [
   {
     id: "management-dashboard",
@@ -146,34 +152,32 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     isVisible: ({ userRole }) => userRole === "management",
   },
   {
-    id: "department-sound",
-    label: "Sonido",
-    mobileLabel: "Sonido",
-    icon: Music2,
+    id: "management-department",
+    label: ({ userDepartment }) => {
+      const normalized = userDepartment?.toLowerCase() ?? ""
+      return departmentLabelMap[normalized] || userDepartment || null
+    },
+    mobileLabel: ({ userDepartment }) => {
+      const normalized = userDepartment?.toLowerCase() ?? ""
+      return departmentLabelMap[normalized] || "Departamento"
+    },
+    icon: (({ userDepartment }) => {
+      const normalized = userDepartment?.toLowerCase() ?? ""
+      return departmentIconMap[normalized] ?? null
+    }) as (context: NavigationContext) => LucideIcon | null,
     mobilePriority: 6,
     mobileSlot: "secondary",
-    getPath: () => "/sound",
-    isVisible: ({ userRole }) => userRole === "management",
-  },
-  {
-    id: "department-lights",
-    label: "Luces",
-    mobileLabel: "Luces",
-    icon: Lightbulb,
-    mobilePriority: 7,
-    mobileSlot: "secondary",
-    getPath: () => "/lights",
-    isVisible: ({ userRole }) => userRole === "management",
-  },
-  {
-    id: "department-video",
-    label: "Vídeo",
-    mobileLabel: "Vídeo",
-    icon: Video,
-    mobilePriority: 8,
-    mobileSlot: "secondary",
-    getPath: () => "/video",
-    isVisible: ({ userRole }) => userRole === "management",
+    getPath: ({ userDepartment }) => {
+      const normalized = userDepartment?.toLowerCase() ?? ""
+      return departmentIconMap[normalized] ? `/${normalized}` : null
+    },
+    isVisible: ({ userRole, userDepartment }) => {
+      if (userRole !== "management" || !userDepartment) {
+        return false
+      }
+      const normalized = userDepartment.toLowerCase()
+      return Boolean(departmentIconMap[normalized])
+    },
   },
   {
     id: "house-department",
