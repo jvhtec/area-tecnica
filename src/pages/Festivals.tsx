@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
@@ -24,12 +24,13 @@ const ITEMS_PER_PAGE = 9; // 3x3 grid
  */
 const Festivals = () => {
   const navigate = useNavigate();
-  const { 
-    jobs, 
-    isLoading, 
-    isError, 
-    error, 
-    isRefreshing, 
+  const { userRole, userDepartment, isLoading: authLoading } = useOptimizedAuth();
+  const {
+    jobs,
+    isLoading,
+    isError,
+    error,
+    isRefreshing,
     refetch,
     realtimeStatus
   } = useJobsRealtime();
@@ -42,7 +43,6 @@ const Festivals = () => {
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [selectedJobForPrint, setSelectedJobForPrint] = useState<{ id: string; title: string } | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
-  const { userRole } = useOptimizedAuth();
   const { status: connectionStatus, recoverConnection } = useConnectionStatus();
   const festivalRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -210,6 +210,13 @@ const Festivals = () => {
       toast.error("No se pudieron actualizar los datos. Por favor, inténtalo de nuevo.");
     }
   };
+
+  const isAdmin = userRole === 'admin';
+  const isSoundMember = userDepartment?.toLowerCase() === 'sound';
+
+  if (!authLoading && !isAdmin && !isSoundMember) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
   const emptyFunction = () => {};
