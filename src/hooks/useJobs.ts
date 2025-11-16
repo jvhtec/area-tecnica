@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase-client"; // Updated import path
 import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
+import { trackError } from "@/lib/errorTracking";
 
 export const useJobs = () => {
   const queryClient = useQueryClient();
@@ -86,6 +87,11 @@ export const useJobs = () => {
             await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
             return fetchWithRetry(retries - 1);
           }
+          void trackError(error, {
+            system: 'assignments',
+            operation: 'useJobs.fetch',
+            retriesAttempted: 3
+          });
           throw error;
         }
       };
