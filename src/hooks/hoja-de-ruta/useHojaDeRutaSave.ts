@@ -2,7 +2,24 @@ import { useCallback, useRef } from 'react';
 import { EventData, TravelArrangement, Accommodation } from '@/types/hoja-de-ruta';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { debounce } from 'lodash';
+
+const debounce = <T extends (...args: any[]) => void>(
+  callback: T,
+  delay: number,
+) => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  return (...args: Parameters<T>) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+
+    timeoutId = setTimeout(() => {
+      timeoutId = null;
+      callback(...args);
+    }, delay);
+  };
+};
 
 export const useHojaDeRutaSave = (
   selectedJobId: string,
