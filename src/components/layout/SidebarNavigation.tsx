@@ -364,42 +364,53 @@ export const buildNavigationItems = (
 
   const isAdmin = context.userRole === "admin"
 
+  const createNavigationItem = (
+    config: NavigationItemConfig,
+  ): NavigationItem | null => {
+    const to = config.getPath(context)
+    if (!to) {
+      return null
+    }
+
+    const label = resolveLabel(config.label, context)
+    const icon = resolveIcon(config.icon, context)
+
+    if (!label || !icon) {
+      return null
+    }
+
+    const mobileLabel =
+      resolveLabel(config.mobileLabel ?? config.label, context) ?? label
+    const mobileSlot = config.mobileSlot ?? "secondary"
+
+    const isActive = config.match
+      ? (pathname: string) => config.match?.(pathname, context, to) ?? false
+      : (pathname: string) => pathname === to
+
+    return {
+      id: config.id,
+      label,
+      mobileLabel,
+      to,
+      icon,
+      mobilePriority: config.mobilePriority,
+      mobileSlot,
+      isActive,
+    }
+  }
+
+  if (isAdmin) {
+    return navigationConfig
+      .map((config) => createNavigationItem(config))
+      .filter(Boolean) as NavigationItem[]
+  }
+
   return navigationConfig
     .map((config) => {
-      if (!isAdmin && !config.isVisible(context)) {
+      if (!config.isVisible(context)) {
         return null
       }
-
-      const to = config.getPath(context)
-      if (!to) {
-        return null
-      }
-
-      const label = resolveLabel(config.label, context)
-      const icon = resolveIcon(config.icon, context)
-
-      if (!label || !icon) {
-        return null
-      }
-
-      const mobileLabel =
-        resolveLabel(config.mobileLabel ?? config.label, context) ?? label
-      const mobileSlot = config.mobileSlot ?? "secondary"
-
-      const isActive = config.match
-        ? (pathname: string) => config.match?.(pathname, context, to) ?? false
-        : (pathname: string) => pathname === to
-
-      return {
-        id: config.id,
-        label,
-        mobileLabel,
-        to,
-        icon,
-        mobilePriority: config.mobilePriority,
-        mobileSlot,
-        isActive,
-      } satisfies NavigationItem
+      return createNavigationItem(config)
     })
     .filter(Boolean) as NavigationItem[]
 }
