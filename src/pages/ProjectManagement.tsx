@@ -20,13 +20,15 @@ import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 const ProjectManagement = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { userDepartment, isLoading: authLoading } = useOptimizedAuth();
   const [loading, setLoading] = useState(true);
-  const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
+  const [selectedDepartment, setSelectedDepartment] = useState<Department>((userDepartment as Department) ?? "sound");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
@@ -42,6 +44,12 @@ const ProjectManagement = () => {
 
   const startDate = startOfMonth(currentDate);
   const endDate = endOfMonth(currentDate);
+
+  useEffect(() => {
+    if (!authLoading) {
+      setSelectedDepartment((userDepartment as Department) ?? "sound");
+    }
+  }, [authLoading, userDepartment]);
 
   // Use custom hook to keep the "jobs" tab active/visible.
   useTabVisibility(["jobs"]);
