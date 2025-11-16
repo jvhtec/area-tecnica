@@ -1,3 +1,4 @@
+-- postgres:transaction off
 -- Phase 1.1 – Zero-risk index improvements
 -- All indexes use CONCURRENTLY + IF NOT EXISTS for safe deployments.
 
