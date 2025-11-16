@@ -1,5 +1,37 @@
 import { expect, afterEach, vi } from 'vitest';
 
+function createStorageMock() {
+  let store: Record<string, string> = {};
+  return {
+    getItem(key: string) {
+      return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null;
+    },
+    setItem(key: string, value: string) {
+      store[key] = String(value);
+    },
+    removeItem(key: string) {
+      delete store[key];
+    },
+    clear() {
+      store = {};
+    },
+    key(index: number) {
+      return Object.keys(store)[index] ?? null;
+    },
+    get length() {
+      return Object.keys(store).length;
+    },
+  } satisfies Storage;
+}
+
+if (typeof globalThis.localStorage === 'undefined') {
+  vi.stubGlobal('localStorage', createStorageMock());
+}
+
+if (typeof globalThis.sessionStorage === 'undefined') {
+  vi.stubGlobal('sessionStorage', createStorageMock());
+}
+
 // Only import testing-library/react and jest-dom if we're in a DOM environment
 if (typeof window !== 'undefined') {
   // @ts-ignore
@@ -59,5 +91,22 @@ if (typeof window !== 'undefined') {
       }
       return originalGetElementsByTagName(tagName);
     } as any;
+  }
+
+  const elementProto = globalThis.HTMLElement?.prototype ?? globalThis.Element?.prototype;
+
+  if (elementProto) {
+    if (!elementProto.hasPointerCapture) {
+      elementProto.hasPointerCapture = () => false;
+    }
+    if (!elementProto.setPointerCapture) {
+      elementProto.setPointerCapture = () => {};
+    }
+    if (!elementProto.releasePointerCapture) {
+      elementProto.releasePointerCapture = () => {};
+    }
+    if (!elementProto.scrollIntoView) {
+      elementProto.scrollIntoView = () => {};
+    }
   }
 }

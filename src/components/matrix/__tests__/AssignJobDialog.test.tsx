@@ -4,17 +4,28 @@ import userEvent from '@testing-library/user-event';
 
 import { AssignJobDialog } from '../AssignJobDialog';
 
-const useQueryMock = vi.fn();
-const checkTimeConflictEnhancedMock = vi.fn();
-const insertMock = vi.fn();
-const deleteMock = vi.fn();
-const fromMock = vi.fn();
-const authGetUserMock = vi.fn();
-const functionsInvokeMock = vi.fn();
-const toastFn = Object.assign(vi.fn(), {
-  error: vi.fn(),
-  success: vi.fn(),
-});
+const {
+  useQueryMock,
+  checkTimeConflictEnhancedMock,
+  insertMock,
+  deleteMock,
+  fromMock,
+  authGetUserMock,
+  functionsInvokeMock,
+  toastFn,
+} = vi.hoisted(() => ({
+  useQueryMock: vi.fn(),
+  checkTimeConflictEnhancedMock: vi.fn(),
+  insertMock: vi.fn(),
+  deleteMock: vi.fn(),
+  fromMock: vi.fn(),
+  authGetUserMock: vi.fn(),
+  functionsInvokeMock: vi.fn(),
+  toastFn: Object.assign(vi.fn(), {
+    error: vi.fn(),
+    success: vi.fn(),
+  }),
+}));
 
 type ConflictCheckResult = {
   hasHardConflict: boolean;
@@ -22,6 +33,30 @@ type ConflictCheckResult = {
   hardConflicts: Array<{ id: string; title: string; start_time: string; end_time: string; status: string }>;
   softConflicts: Array<{ id: string; title: string; start_time: string; end_time: string; status: string }>;
   unavailabilityConflicts: Array<{ date: string; reason: string; source: string; notes?: string }>;
+};
+
+const createQueryBuilder = (responseData?: unknown, maybeSingleData?: unknown) => {
+  const response = { data: responseData ?? null, error: null };
+  const promise = Promise.resolve(response);
+  const builder: any = {
+    insert: (...args: unknown[]) => insertMock(...args),
+    delete: (...args: unknown[]) => {
+      deleteMock(...args);
+      return builder;
+    },
+    update: vi.fn(() => builder),
+    select: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    neq: vi.fn(() => builder),
+    limit: vi.fn(() => builder),
+    order: vi.fn(() => builder),
+    maybeSingle: vi.fn(async () => ({ data: maybeSingleData ?? null, error: null })),
+    single: vi.fn(async () => ({ data: maybeSingleData ?? null, error: null })),
+    then: promise.then.bind(promise),
+    catch: promise.catch.bind(promise),
+    finally: promise.finally.bind(promise),
+  };
+  return builder;
 };
 
 vi.mock('@tanstack/react-query', async () => {
@@ -77,16 +112,9 @@ beforeEach(() => {
   deleteMock.mockResolvedValue({ error: null });
   fromMock.mockImplementation((table: string) => {
     if (table === 'job_assignments') {
-      return {
-        insert: insertMock,
-        delete: deleteMock,
-      };
+      return createQueryBuilder([{ job_id: 'job-1' }]);
     }
-    return {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    };
+    return createQueryBuilder();
   });
   authGetUserMock.mockResolvedValue({ data: { user: { id: 'manager-1' } } });
   functionsInvokeMock.mockResolvedValue({ data: null, error: null });
@@ -113,7 +141,7 @@ describe('AssignJobDialog conflict handling', () => {
     };
     checkTimeConflictEnhancedMock.mockResolvedValue(conflictResult);
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
     const onClose = vi.fn();
 
     render(
@@ -127,8 +155,8 @@ describe('AssignJobDialog conflict handling', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /choose a role/i }));
-    await user.click(screen.getByText(/foh/i));
+    await user.click(screen.getByRole('combobox'));
+    await user.click(screen.getByText('FOH — Responsable'));
 
     await user.click(screen.getByRole('button', { name: /assign job/i }));
 
@@ -167,7 +195,7 @@ describe('AssignJobDialog conflict handling', () => {
     };
     checkTimeConflictEnhancedMock.mockResolvedValue(noConflictResult);
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
     const onClose = vi.fn();
 
     render(
@@ -181,8 +209,8 @@ describe('AssignJobDialog conflict handling', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /choose a role/i }));
-    await user.click(screen.getByText(/foh/i));
+    await user.click(screen.getByRole('combobox'));
+    await user.click(screen.getByText('FOH — Responsable'));
 
     await user.click(screen.getByRole('button', { name: /assign job/i }));
 
