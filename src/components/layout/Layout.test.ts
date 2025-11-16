@@ -159,12 +159,17 @@ describe("buildNavigationItems - SoundVision visibility", () => {
 })
 
 describe("buildNavigationItems - admin visibility", () => {
-  it("includes routes from every role for admins", () => {
+  it("includes routes from every role except technician-only links", () => {
     const context = buildContext({ userRole: "admin" })
     const items = buildNavigationItems(context)
 
     expect(items.find((item) => item.id === "management-dashboard")).toBeDefined()
-    expect(items.find((item) => item.id === "technician-dashboard")).toBeDefined()
+    expect(items.find((item) => item.id === "technician-dashboard")).toBeUndefined()
+    expect(
+      items.find((item) => item.id === "technician-unavailability"),
+    ).toBeUndefined()
+    expect(items.find((item) => item.id === "admin-lights")).toBeDefined()
+    expect(items.find((item) => item.id === "admin-video")).toBeDefined()
     expect(items.find((item) => item.id === "logistics")).toBeDefined()
     expect(items.find((item) => item.id === "soundvision-files")).toBeDefined()
   })
