@@ -3,7 +3,7 @@
 
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 
-CREATE VIEW IF NOT EXISTS slow_queries_timesheets AS
+CREATE OR REPLACE VIEW slow_queries_timesheets AS
 SELECT
   query,
   calls,
@@ -14,7 +14,7 @@ WHERE query ~* '\\b(from|join)\\s+timesheets\\b'
   AND mean_exec_time > 100
 ORDER BY mean_exec_time DESC;
 
-CREATE VIEW IF NOT EXISTS data_anomalies AS
+CREATE OR REPLACE VIEW data_anomalies AS
 SELECT
   'timesheets' AS table_name,
   'missing_times' AS anomaly,
@@ -29,7 +29,7 @@ SELECT
 FROM job_assignments
 WHERE sound_role IS NULL AND lights_role IS NULL AND video_role IS NULL;
 
-CREATE VIEW IF NOT EXISTS recent_activity AS
+CREATE OR REPLACE VIEW recent_activity AS
 SELECT
   'timesheet' AS type,
   status AS action,

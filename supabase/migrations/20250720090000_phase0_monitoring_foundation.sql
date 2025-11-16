@@ -1,7 +1,7 @@
 -- Phase 0.1 – Monitoring & Observability foundation
 -- Adds read-only health views plus error logging table/indexes.
 
-CREATE VIEW IF NOT EXISTS system_health_timesheets AS
+CREATE OR REPLACE VIEW system_health_timesheets AS
 SELECT
   COUNT(*) FILTER (WHERE status = 'draft') AS drafts,
   COUNT(*) FILTER (WHERE status = 'submitted') AS submitted,
@@ -11,14 +11,16 @@ SELECT
   AVG(EXTRACT(epoch FROM (approved_at - created_at))) AS avg_approval_time_seconds
 FROM timesheets;
 
-CREATE VIEW IF NOT EXISTS system_health_assignments AS
+CREATE OR REPLACE VIEW system_health_assignments AS
 SELECT
   COUNT(*) AS total_assignments,
   COUNT(DISTINCT job_id) AS active_jobs,
   COUNT(DISTINCT technician_id) AS assigned_technicians,
-  COUNT(*) FILTER (WHERE created_at > now() - interval '24 hours') AS created_24h,
+  COUNT(*) FILTER (WHERE assigned_at > now() - interval '24 hours') AS assigned_24h,
+  COUNT(*) FILTER (WHERE assignment_date IS NULL) AS missing_assignment_date,
   COUNT(*) FILTER (WHERE status = 'confirmed') AS confirmed,
-  COUNT(*) FILTER (WHERE status = 'invited') AS invited
+  COUNT(*) FILTER (WHERE status = 'invited') AS invited,
+  COUNT(*) FILTER (WHERE status = 'declined') AS declined
 FROM job_assignments;
 
 CREATE TABLE IF NOT EXISTS system_errors (
