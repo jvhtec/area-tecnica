@@ -656,6 +656,8 @@ export type Database = {
           category: Database["public"]["Enums"]["equipment_category"]
           created_at: string | null
           department: string
+          barcode_number: string | null
+          stencil_number: string | null
           id: string
           name: string
           updated_at: string | null
@@ -664,6 +666,8 @@ export type Database = {
           category?: Database["public"]["Enums"]["equipment_category"]
           created_at?: string | null
           department?: string
+          barcode_number?: string | null
+          stencil_number?: string | null
           id?: string
           name: string
           updated_at?: string | null
@@ -672,6 +676,8 @@ export type Database = {
           category?: Database["public"]["Enums"]["equipment_category"]
           created_at?: string | null
           department?: string
+          barcode_number?: string | null
+          stencil_number?: string | null
           id?: string
           name?: string
           updated_at?: string | null
@@ -4189,6 +4195,122 @@ export type Database = {
             columns: ["skill_id"]
             isOneToOne: false
             referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_incident_reports: {
+        Row: {
+          id: string
+          equipment_id: string | null
+          equipment_name: string
+          department: string
+          issue_description: string
+          actions_taken: string | null
+          reporter_name: string | null
+          contact: string | null
+          barcode_number: string | null
+          stencil_number: string | null
+          signature_data: string
+          honeypot_value: string | null
+          photo_path: string | null
+          job_id: string | null
+          job_title_snapshot: string | null
+          job_status_snapshot: string | null
+          created_at: string
+          status: string
+          triaged_by: string | null
+          triaged_at: string | null
+          triage_notes: string | null
+          pdf_storage_path: string | null
+          pdf_generated_at: string | null
+          metadata: Json
+          triage_log: Json
+          source: string
+        }
+        Insert: {
+          id?: string
+          equipment_id?: string | null
+          equipment_name: string
+          department: string
+          issue_description: string
+          actions_taken?: string | null
+          reporter_name?: string | null
+          contact?: string | null
+          barcode_number?: string | null
+          stencil_number?: string | null
+          signature_data: string
+          honeypot_value?: string | null
+          photo_path?: string | null
+          job_id?: string | null
+          job_title_snapshot?: string | null
+          job_status_snapshot?: string | null
+          created_at?: string
+          status?: string
+          triaged_by?: string | null
+          triaged_at?: string | null
+          triage_notes?: string | null
+          pdf_storage_path?: string | null
+          pdf_generated_at?: string | null
+          metadata?: Json
+          triage_log?: Json
+          source?: string
+        }
+        Update: {
+          id?: string
+          equipment_id?: string | null
+          equipment_name?: string
+          department?: string
+          issue_description?: string
+          actions_taken?: string | null
+          reporter_name?: string | null
+          contact?: string | null
+          barcode_number?: string | null
+          stencil_number?: string | null
+          signature_data?: string
+          honeypot_value?: string | null
+          photo_path?: string | null
+          job_id?: string | null
+          job_title_snapshot?: string | null
+          job_status_snapshot?: string | null
+          created_at?: string
+          status?: string
+          triaged_by?: string | null
+          triaged_at?: string | null
+          triage_notes?: string | null
+          pdf_storage_path?: string | null
+          pdf_generated_at?: string | null
+          metadata?: Json
+          triage_log?: Json
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_incident_reports_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "public_incident_reports_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "public_incident_reports_triaged_by_fkey"
+            columns: ["triaged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "public_incident_reports_triaged_by_fkey"
+            columns: ["triaged_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
           },
         ]

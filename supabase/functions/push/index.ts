@@ -28,6 +28,7 @@ type BroadcastBody = {
   type: string; // e.g., 'job.created', 'job.updated', 'document.uploaded', 'document.tech_visible.enabled', 'staffing.availability.sent', etc.
   job_id?: string;
   url?: string;
+  subtype?: string;
   // Optional targeting hints
   recipient_id?: string; // direct user to notify (e.g., technician)
   user_ids?: string[]; // explicit recipients
@@ -42,6 +43,7 @@ type BroadcastBody = {
   loading_bay?: string | null;
   title?: string | null;
   departments?: string[];
+  department?: string;
   auto_created_unload?: boolean;
   paired_event_type?: string;
   paired_event_date?: string;
@@ -68,6 +70,10 @@ type BroadcastBody = {
   location_name?: string;
   old_type?: string;
   new_type?: string;
+  equipment_id?: string;
+  equipment_name?: string;
+  barcode_number?: string;
+  stencil_number?: string;
 };
 
 type CheckScheduledBody = {
@@ -1464,6 +1470,10 @@ async function handleBroadcast(
     singleDay?: boolean;
     requirementsSummary?: DepartmentRoleSummary[];
     requirementsSummaryText?: string;
+    equipmentId?: string;
+    barcodeNumber?: string;
+    stencilNumber?: string;
+    source?: string;
   } = {};
   let changeSummary: string | undefined;
 
@@ -1619,26 +1629,47 @@ async function handleBroadcast(
   // ========================================================================
 
   } else if (type === EVENT_TYPES.INCIDENT_REPORT_UPLOADED) {
-    // CRITICAL: Incident reports are safety-critical and need immediate visibility
-    title = '⚠️ Reporte de incidencia';
-    const fname = body.file_name || 'reporte de incidencia';
-    text = `${actor} ha reportado una incidencia en "${jobTitle || 'Trabajo'}": ${fname}`;
+    const isPublicIncident = (body as any)?.subtype === 'incident.report.public';
+    title = isPublicIncident ? '⚠️ Reporte público de incidencia' : '⚠️ Reporte de incidencia';
+    const fname = body.file_name || body.equipment_name || 'reporte de incidencia';
+    const deptText = body.department ? ` (${body.department})` : '';
+    text = isPublicIncident
+      ? `${actor} envió un reporte público${deptText}: ${fname}`
+      : `${actor} ha reportado una incidencia en "${jobTitle || 'Trabajo'}": ${fname}`;
 
-    // Target: Sound department management + all admins + job participants
     clearAllRecipients();
-    addRecipients([userId]); // keep actor self-notification
+    addRecipients([userId]);
 
-    // Get sound department management users
-    const soundMgmt = Array.from(management).filter((id) => soundDept.has(id));
-    const adminIds = await getAdminUserIds(client);
+    const normalizedDept = typeof body.department === 'string'
+      ? body.department.toLowerCase()
+      : Array.isArray(body.departments) && body.departments.length
+        ? body.departments[0]?.toLowerCase()
+        : null;
 
-    // Add all critical recipients
-    addNaturalRecipients([...soundMgmt, ...adminIds]);
-    addNaturalRecipients(Array.from(participants));
+    if (normalizedDept) {
+      const scoped = await getManagementByDepartmentUserIds(client, normalizedDept);
+      if (scoped.length) {
+        addNaturalRecipients(scoped);
+      } else {
+        addNaturalRecipients(Array.from(mgmt));
+      }
+      metaExtras.department = normalizedDept;
+    } else {
+      const soundMgmt = Array.from(management).filter((id) => soundDept.has(id));
+      const adminIds = await getAdminUserIds(client);
+      addNaturalRecipients([...soundMgmt, ...adminIds]);
+    }
 
-    // Mark as high priority in metadata
+    if (jobId) {
+      addNaturalRecipients(Array.from(participants));
+    }
+
     metaExtras.view = 'incident-reports';
-    metaExtras.targetUrl = `/incident-reports`;
+    metaExtras.targetUrl = isPublicIncident ? `/incident-reports?tab=public` : `/incident-reports`;
+    if (body.equipment_id) metaExtras.equipmentId = body.equipment_id;
+    if (body.barcode_number) metaExtras.barcodeNumber = body.barcode_number;
+    if (body.stencil_number) metaExtras.stencilNumber = body.stencil_number;
+    if ((body as any)?.subtype) metaExtras.source = (body as any).subtype as string;
 
     console.log('🚨 Incident report notification - recipients:', recipients.size);
 
@@ -2430,6 +2461,10 @@ async function handleBroadcast(
       ...(metaExtras.targetUrl ? { targetUrl: metaExtras.targetUrl } : {}),
       ...(metaExtras.requirementsSummary ? { departmentRoles: metaExtras.requirementsSummary } : {}),
       ...(metaExtras.requirementsSummaryText ? { departmentRolesText: metaExtras.requirementsSummaryText } : {}),
+      ...(metaExtras.equipmentId ? { equipmentId: metaExtras.equipmentId } : {}),
+      ...(metaExtras.barcodeNumber ? { barcodeNumber: metaExtras.barcodeNumber } : {}),
+      ...(metaExtras.stencilNumber ? { stencilNumber: metaExtras.stencilNumber } : {}),
+      ...(metaExtras.source ? { source: metaExtras.source } : {}),
     },
   };
 

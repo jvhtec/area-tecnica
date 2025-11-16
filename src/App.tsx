@@ -62,6 +62,7 @@ import { useActivityPushFallback } from '@/hooks/useActivityPushFallback';
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
 import SoundVisionFiles from '@/pages/SoundVisionFiles';
 import { ViewportProvider } from '@/hooks/use-mobile';
+import PublicIncidentReport from '@/pages/PublicIncidentReport';
 
 // Initialize activity push fallback within auth context
 function ActivityPushFallbackInit() {
@@ -143,6 +144,7 @@ export default function App() {
                         <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
                         <Route path="form-submitted" element={<FormSubmitted />} />
                       </Route>
+                      <Route path="/public/incident/:equipmentId" element={<PublicIncidentReport />} />
 
                       {/* Protected Routes */}
                       <Route element={<RequireAuth><Layout /></RequireAuth>}>

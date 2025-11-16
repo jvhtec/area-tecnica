@@ -11,7 +11,7 @@ export const uploadJobPdfWithCleanup = async (
   pdfBlob: Blob,
   fileName: string,
   category: string
-): Promise<void> => {
+): Promise<string> => {
   // Sanitize filename for storage
   const sanitizedFileName = fileName
     .replace(/[^a-zA-Z0-9._-]/g, "_")
@@ -94,6 +94,7 @@ export const uploadJobPdfWithCleanup = async (
         }
       });
     } catch {}
+    return objectPath;
   } catch (err) {
     console.error("uploadJobPdfWithCleanup error:", err);
     throw err;
