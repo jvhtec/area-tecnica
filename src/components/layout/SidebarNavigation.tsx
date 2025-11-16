@@ -180,6 +180,26 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     },
   },
   {
+    id: "admin-lights",
+    label: "Luces",
+    mobileLabel: "Luces",
+    icon: Lightbulb,
+    mobilePriority: 6,
+    mobileSlot: "secondary",
+    getPath: () => "/lights",
+    isVisible: ({ userRole }) => userRole === "admin",
+  },
+  {
+    id: "admin-video",
+    label: "Vídeo",
+    mobileLabel: "Vídeo",
+    icon: Video,
+    mobilePriority: 6,
+    mobileSlot: "secondary",
+    getPath: () => "/video",
+    isVisible: ({ userRole }) => userRole === "admin",
+  },
+  {
     id: "house-department",
     label: ({ userDepartment }) =>
       departmentLabelMap[userDepartment?.toLowerCase() ?? ""] ||
@@ -354,6 +374,11 @@ const resolveIcon = (
   return source as LucideIcon
 }
 
+const adminExcludedIds = new Set([
+  "technician-dashboard",
+  "technician-unavailability",
+])
+
 export const buildNavigationItems = (
   context: NavigationContext,
   navigationConfig: NavigationItemConfig[] = baseNavigationConfig,
@@ -401,7 +426,12 @@ export const buildNavigationItems = (
 
   if (isAdmin) {
     return navigationConfig
-      .map((config) => createNavigationItem(config))
+      .map((config) => {
+        if (adminExcludedIds.has(config.id)) {
+          return null
+        }
+        return createNavigationItem(config)
+      })
       .filter(Boolean) as NavigationItem[]
   }
 
