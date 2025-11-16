@@ -1,5 +1,5 @@
 import { Activity } from "lucide-react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import type {
   NavigationItemConfig,
   SidebarNavigationProps,
@@ -184,5 +184,24 @@ describe("buildNavigationItems - admin visibility", () => {
 
     expect(adminItems.map((item) => item.id)).toContain("future-route")
     expect(managerItems.map((item) => item.id)).not.toContain("future-route")
+  })
+
+  it("bypasses per-route visibility logic for admins", () => {
+    const context = buildContext({ userRole: "admin" })
+    const isVisible = vi.fn(() => false)
+    const guardedRoute: NavigationItemConfig = {
+      id: "guarded-route",
+      label: "Guarded route",
+      icon: Activity,
+      getPath: () => "/guarded",
+      isVisible,
+    }
+
+    const adminItems = buildNavigationItems(context, [guardedRoute])
+    const managerItems = buildNavigationItems(buildContext(), [guardedRoute])
+
+    expect(isVisible).toHaveBeenCalledTimes(1)
+    expect(adminItems.map((item) => item.id)).toContain("guarded-route")
+    expect(managerItems.map((item) => item.id)).not.toContain("guarded-route")
   })
 })
