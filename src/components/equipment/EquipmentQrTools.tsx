@@ -12,6 +12,7 @@ import { Download, Link2, Printer, Save } from "lucide-react";
 import { Database } from "@/integrations/supabase/types";
 
 import { buildZplLabel } from "@/constants/zebra-label";
+import { getCategoriesForDepartment, type Department } from "@/types/equipment";
 
 const getPublicBaseUrl = () => {
   if (import.meta.env.VITE_PUBLIC_APP_URL) {
@@ -34,11 +35,19 @@ export const EquipmentQrTools = ({ department }: { department: string }) => {
   const { data: equipment = [], isLoading } = useQuery({
     queryKey: ['equipment-qr', department],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const categories = department ? getCategoriesForDepartment(department as Department) : [];
+      let query = supabase
         .from('equipment')
-        .select('id, name, department, barcode_number, stencil_number')
-        .eq('department', department)
+        .select('id, name, department, barcode_number, stencil_number, category')
         .order('name');
+
+      if (categories.length > 0) {
+        query = query.in('category', categories as string[]);
+      } else if (department) {
+        query = query.eq('department', department);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data ?? [];
     }
@@ -130,7 +139,9 @@ export const EquipmentQrTools = ({ department }: { department: string }) => {
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Cargando equipos...</div>
         ) : equipmentList.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No hay equipos registrados para {department}.</div>
+          <div className="text-sm text-muted-foreground">
+            No hay equipos registrados para este departamento o sus categorías.
+          </div>
         ) : (
           equipmentList.map(item => (
             <div key={item.id} className="border rounded-lg p-4 space-y-4">
