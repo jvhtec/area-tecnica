@@ -1,6 +1,8 @@
 -- Phase 1.2 – Monitoring views & alerts
 -- Adds observability helpers built on pg_stat_statements + production tables.
 
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
 CREATE VIEW IF NOT EXISTS slow_queries_timesheets AS
 SELECT
   query,
@@ -8,7 +10,7 @@ SELECT
   mean_exec_time,
   max_exec_time
 FROM pg_stat_statements
-WHERE query ILIKE '%timesheets%'
+WHERE query ~* '\\b(from|join)\\s+timesheets\\b'
   AND mean_exec_time > 100
 ORDER BY mean_exec_time DESC;
 

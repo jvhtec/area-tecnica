@@ -31,6 +31,7 @@ GROUP BY status, phase;
 -- \copy (above query) TO 'docs/data_audit_phase0/data_audit_orphaned_staffing_requests.csv' CSV HEADER
 
 \echo '4) Invalid role codes (compare manually against known_valid_role_codes.txt)'
+-- \copy (above query) TO 'docs/data_audit_phase0/data_audit_invalid_role_codes.csv' CSV HEADER
 SELECT DISTINCT sound_role AS role_code FROM job_assignments WHERE sound_role IS NOT NULL
 UNION
 SELECT DISTINCT lights_role FROM job_assignments WHERE lights_role IS NOT NULL
