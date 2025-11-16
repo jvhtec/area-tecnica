@@ -167,13 +167,21 @@ export const PublicIncidentReportsTriage = () => {
           filteredReports.map(report => (
             <div key={report.id} className="rounded-lg border p-4 space-y-4">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
+                <div className="space-y-1">
                   <p className="text-lg font-semibold">{report.equipment_name}</p>
                   <p className="text-sm text-muted-foreground">
                     {departmentLabels[report.department?.toLowerCase() ?? ""] ?? report.department}
-                    {report.barcode_number ? ` · Código: ${report.barcode_number}` : ""}
-                    {report.stencil_number ? ` · Stencil: ${report.stencil_number}` : ""}
                   </p>
+                  {(report.barcode_number || report.stencil_number) && (
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      {report.barcode_number && (
+                        <p>Artículo descrito: {report.barcode_number}</p>
+                      )}
+                      {report.stencil_number && (
+                        <p>Identificador adicional: {report.stencil_number}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <Badge>{statusLabels[report.status] ?? report.status}</Badge>
               </div>

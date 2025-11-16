@@ -65,8 +65,8 @@ export const PublicIncidentReport = () => {
         setForm(prev => ({
           ...prev,
           department: data.equipment.department || '',
-          barcode_number: data.equipment.barcode_number || '',
-          stencil_number: data.equipment.stencil_number || ''
+          barcode_number: '',
+          stencil_number: ''
         }));
       } catch (err) {
         console.error('Prefill error', err);
@@ -149,6 +149,8 @@ export const PublicIncidentReport = () => {
         reporter_name: '',
         contact: '',
         job_id: '',
+        barcode_number: '',
+        stencil_number: '',
         signature_data: ''
       }));
       signatureRef.current?.clear();
@@ -188,7 +190,7 @@ export const PublicIncidentReport = () => {
         <CardHeader>
           <CardTitle>Reporte público de incidencias</CardTitle>
           <CardDescription>
-            Completa todos los campos en español. Este formulario requiere firma y se envía al equipo de {equipment.department}.
+            Completa todos los campos en español. Describe manualmente el artículo usando los cuadros de texto y firma antes de enviar al equipo de {equipment.department}.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -205,13 +207,23 @@ export const PublicIncidentReport = () => {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label>Código de barras</Label>
-                <Input value={form.barcode_number} onChange={(e) => handleChange('barcode_number', e.target.value)} />
+              <div className="space-y-1">
+                <Label>Descripción del artículo (texto libre)</Label>
+                <Input
+                  placeholder="Ej. Caja Line Array #4"
+                  value={form.barcode_number}
+                  onChange={(e) => handleChange('barcode_number', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Escribe cualquier referencia o nombre que ayude a identificar el equipo.</p>
               </div>
-              <div>
-                <Label>Stencil</Label>
-                <Input value={form.stencil_number} onChange={(e) => handleChange('stencil_number', e.target.value)} />
+              <div className="space-y-1">
+                <Label>Identificador adicional o ubicación</Label>
+                <Input
+                  placeholder="Rack A, Estuche rojo, etc."
+                  value={form.stencil_number}
+                  onChange={(e) => handleChange('stencil_number', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Estos campos reemplazan el seguimiento individual, así que escribe lo necesario.</p>
               </div>
             </div>
 

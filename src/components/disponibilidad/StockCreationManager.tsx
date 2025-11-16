@@ -1,16 +1,17 @@
 
 import { useState, useEffect } from 'react';
-import { StockEntry, Equipment, getCategoriesForDepartment } from '@/types/equipment';
+import { StockEntry, Equipment, getCategoriesForDepartment, allCategoryLabels } from '@/types/equipment';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Minus } from 'lucide-react';
+import { Minus, Plus, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { EquipmentCreationManager } from '@/components/equipment/EquipmentCreationManager';
 import { StockMovementDialog } from '@/components/equipment/StockMovementDialog';
+import { buildZplLabel } from '@/constants/zebra-label';
 
 interface StockManagerProps {
   stock: StockEntry[];
@@ -20,13 +21,23 @@ interface StockManagerProps {
 
 type GroupedEquipment = {
   [key: string]: Array<{
-    id: string;
-    name: string;
-    category: string;
+    equipment: Equipment;
     quantity: number;
     currentQuantity: number;
   }>;
 };
+
+const getPublicBaseUrl = () => {
+  if (import.meta.env.VITE_PUBLIC_APP_URL) {
+    return import.meta.env.VITE_PUBLIC_APP_URL as string;
+  }
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  return '';
+};
+
+const sanitizeFileName = (value: string) => value.replace(/[^a-zA-Z0-9-_]/g, '_');
 
 export const StockCreationManager = ({ stock, onStockUpdate, department }: StockManagerProps) => {
   const { toast } = useToast();
@@ -125,9 +136,7 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
     const currentLevel = currentStockLevels.find(s => s.equipment_id === equipment.id);
     
     acc[category].push({
-      id: equipment.id,
-      name: equipment.name,
-      category: equipment.category,
+      equipment,
       quantity: stockEntry?.base_quantity || 0,
       currentQuantity: currentLevel?.current_quantity || 0
     });
@@ -154,6 +163,32 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
     setShowMovementDialog(true);
   };
 
+  const handlePrintLabel = (equipment: Equipment) => {
+    if (typeof document === 'undefined') {
+      toast({ title: 'No disponible', description: 'La descarga de etiquetas solo funciona en el navegador.' });
+      return;
+    }
+    const publicUrl = `${getPublicBaseUrl()}/public/incident/${equipment.id}`;
+    const categoryLabel = equipment.category && allCategoryLabels[equipment.category as keyof typeof allCategoryLabels];
+    const zpl = buildZplLabel({
+      equipmentName: equipment.name,
+      url: publicUrl,
+      detailLine: categoryLabel ? `Categoría: ${categoryLabel}` : undefined,
+    });
+    const blob = new Blob([zpl], { type: 'text/plain' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${sanitizeFileName(equipment.name)}.zpl`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(link.href), 0);
+    toast({
+      title: 'Etiqueta QR lista',
+      description: 'Descarga el archivo .zpl (105x55mm) y envíalo a tu impresora Zebra.',
+    });
+  };
+
   return (
     <div className="space-y-8">
       <div className="space-y-4">
@@ -176,19 +211,19 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
               <div key={category} className="space-y-4">
                 <h3 className="text-lg font-semibold capitalize">{category}</h3>
                 <div className="space-y-4">
-                  {items.map(equipment => (
-                    <div key={equipment.id} className="flex items-center space-x-4">
+                  {items.map(item => (
+                    <div key={item.equipment.id} className="flex flex-col gap-2 md:flex-row md:items-center md:space-x-4">
                       <div className="flex-1">
-                        <Label>{equipment.name}</Label>
+                        <Label>{item.equipment.name}</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Button
                           variant="outline"
                           size="icon"
                           onClick={() => handleMovementClick(
-                            equipmentList.find(e => e.id === equipment.id)!,
+                            item.equipment,
                             false,
-                            equipment.currentQuantity
+                            item.currentQuantity
                           )}
                         >
                           <Minus className="h-4 w-4" />
@@ -196,7 +231,7 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
                         <Input
                           type="number"
                           min="0"
-                          value={equipment.currentQuantity}
+                          value={item.currentQuantity}
                           readOnly
                           className="w-24 bg-muted"
                         />
@@ -204,14 +239,23 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
                           variant="outline"
                           size="icon"
                           onClick={() => handleMovementClick(
-                            equipmentList.find(e => e.id === equipment.id)!,
+                            item.equipment,
                             true,
-                            equipment.currentQuantity
+                            item.currentQuantity
                           )}
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="md:ml-auto"
+                        onClick={() => handlePrintLabel(item.equipment)}
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Imprimir QR
+                      </Button>
                     </div>
                   ))}
                 </div>

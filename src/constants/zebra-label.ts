@@ -1,32 +1,38 @@
 export const ZEBRA_LABEL_TEMPLATE = {
-  widthDots: 600,
-  heightDots: 400,
+  widthMm: 105,
+  heightMm: 55,
+  dpi: 203,
   qrModel: 'BQN,2,6',
   font: '0',
   brand: 'Sector Pro',
-  footer: 'Reporte QR público',
+  footer: 'Describe el equipo en el formulario',
 };
+
+const mmToDots = (mm: number) => Math.round((mm / 25.4) * ZEBRA_LABEL_TEMPLATE.dpi);
 
 interface BuildParams {
   equipmentName: string;
   url: string;
-  barcode: string;
-  stencil: string;
+  detailLine?: string;
+  instructionsLine?: string;
 }
 
-export const buildZplLabel = ({ equipmentName, url, barcode, stencil }: BuildParams) => {
-  const safeName = equipmentName.replace(/[^A-Za-z0-9\s-]/g, '').slice(0, 28);
-  const barcodeText = barcode || 'Sin código';
-  const stencilText = stencil || 'Sin stencil';
+export const buildZplLabel = ({ equipmentName, url, detailLine, instructionsLine }: BuildParams) => {
+  const widthDots = mmToDots(ZEBRA_LABEL_TEMPLATE.widthMm);
+  const heightDots = mmToDots(ZEBRA_LABEL_TEMPLATE.heightMm);
+  const safeName = equipmentName.replace(/[^A-Za-z0-9\s-]/g, '').slice(0, 36) || 'Equipo';
+  const detail = (detailLine || 'Texto libre en el reporte').slice(0, 40);
+  const instructions = (instructionsLine || 'Etiqueta 105x55mm').slice(0, 40);
 
   return `^XA
-^PW${ZEBRA_LABEL_TEMPLATE.widthDots}
-^LL${ZEBRA_LABEL_TEMPLATE.heightDots}
+^PW${widthDots}
+^LL${heightDots}
 ^CI28
-^FO20,20^${ZEBRA_LABEL_TEMPLATE.qrModel}^FDLA,${url}^FS
-^FO250,20^A0N,30,30^FD${safeName}^FS
-^FO250,70^A0N,24,24^FDBarra: ${barcodeText}^FS
-^FO250,110^A0N,24,24^FDStencil: ${stencilText}^FS
-^FO250,150^A0N,20,20^FD${ZEBRA_LABEL_TEMPLATE.footer}^FS
+^FO30,30^${ZEBRA_LABEL_TEMPLATE.qrModel}^FDLA,${url}^FS
+^FO320,10^A0N,20,20^FD${ZEBRA_LABEL_TEMPLATE.brand}^FS
+^FO320,40^A0N,34,34^FD${safeName}^FS
+^FO320,100^A0N,24,24^FD${detail}^FS
+^FO320,150^A0N,22,22^FD${ZEBRA_LABEL_TEMPLATE.footer}^FS
+^FO320,190^A0N,20,20^FD${instructions}^FS
 ^XZ`;
 };

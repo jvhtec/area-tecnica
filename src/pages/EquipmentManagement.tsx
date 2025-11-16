@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToast } from '@/hooks/use-toast';
 import { StockCreationManager } from '@/components/disponibilidad/StockCreationManager';
-import { EquipmentQrTools } from '@/components/equipment/EquipmentQrTools';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -136,7 +135,6 @@ export function EquipmentManagement() {
             onStockUpdate={handleStockUpdate}
             department={userDepartment}
           />
-          <EquipmentQrTools department={userDepartment} />
         </div>
       )}
     </div>
