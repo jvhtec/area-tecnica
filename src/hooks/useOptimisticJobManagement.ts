@@ -7,6 +7,7 @@ import { JobDocument } from "@/types/job";
 import { useCallback } from "react";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
+import { trackError } from "@/lib/errorTracking";
 
 export const useOptimisticJobManagement = (
   selectedDepartment: Department,
@@ -54,6 +55,13 @@ export const useOptimisticJobManagement = (
 
     if (error) {
       console.error("useOptimisticJobManagement: Error fetching jobs:", error);
+      void trackError(error, {
+        system: 'assignments',
+        operation: 'fetch_jobs',
+        department: selectedDepartment,
+        startDate,
+        endDate
+      });
       throw error;
     }
 
@@ -127,6 +135,12 @@ export const useOptimisticJobManagement = (
       });
     } catch (error: any) {
       console.error("useOptimisticJobManagement: Error deleting document:", error);
+      void trackError(error, {
+        system: 'assignments',
+        operation: 'delete_job_document',
+        jobId,
+        documentId: document.id
+      });
       toast({
         title: "Error",
         description: "Failed to delete document: " + error.message,
@@ -163,6 +177,11 @@ export const useOptimisticJobManagement = (
       }
     } catch (error: any) {
       console.error("useOptimisticJobManagement: Error in optimistic job deletion:", error);
+      void trackError(error, {
+        system: 'assignments',
+        operation: 'delete_job',
+        jobId
+      });
       toast({
         title: "Error deleting job",
         description: error.message,
