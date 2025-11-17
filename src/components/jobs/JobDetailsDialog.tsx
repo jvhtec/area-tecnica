@@ -129,6 +129,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const { userRole, user } = useOptimizedAuth();
   const isManager = ['admin','management'].includes(userRole || '');
   const isTechnicianRole = ['technician', 'house_tech'].includes(userRole || '');
+  const isHouseTech = userRole === 'house_tech';
   const queryClient = useQueryClient();
   const [isSendingPayoutEmails, setIsSendingPayoutEmails] = useState(false);
   const triggerPayoutEmails = React.useCallback(
@@ -222,10 +223,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const { data: approvalStatus, isLoading: approvalStatusLoading } = useJobApprovalStatus(resolvedJobId);
   const isDryhire = (jobDetails?.job_type || job?.job_type) === 'dryhire';
   console.log('JobDetailsDialog: isDryhire =', isDryhire, 'job_type =', jobDetails?.job_type || job?.job_type);
-  const showExtrasTab = !isDryhire && (isManager || (jobRatesApproved && jobExtras.length > 0));
+  const showExtrasTab = !isDryhire && (isManager || isHouseTech || (jobRatesApproved && jobExtras.length > 0));
+  const canSeeRateTabs = (isManager || jobRatesApproved) && !isHouseTech;
   const showTourRatesTab = !isDryhire
     && jobDetails?.job_type === 'tourdate'
-    && (isManager || jobRatesApproved);
+    && canSeeRateTabs;
 
   // Flex Work Orders progress (manager-only)
   const [isSyncingWorkOrders, setIsSyncingWorkOrders] = useState(false);

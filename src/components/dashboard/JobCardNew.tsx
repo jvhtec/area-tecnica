@@ -86,6 +86,7 @@ export interface JobCardNewProps {
   showManageArtists?: boolean;
   isProjectManagementPage?: boolean;
   hideTasks?: boolean;
+  detailsOnlyMode?: boolean;
 }
 
 export function JobCardNew({
@@ -100,7 +101,8 @@ export function JobCardNew({
   showUpload = false,
   showManageArtists = false,
   isProjectManagementPage = false,
-  hideTasks = false
+  hideTasks = false,
+  detailsOnlyMode = false
 }: JobCardNewProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -880,7 +882,7 @@ export function JobCardNew({
   };
 
   const handleJobCardClick = () => {
-    if (isHouseTech || isJobBeingDeleted) {
+    if (isHouseTech || isJobBeingDeleted || isDetailsOnlyMode) {
       return; // Block job card clicks for house techs or jobs being deleted
     }
     // On project management pages, do not open tasks on card click
@@ -905,6 +907,7 @@ export function JobCardNew({
   };
 
   const isHouseTech = userRole === 'house_tech';
+  const isDetailsOnlyMode = Boolean(detailsOnlyMode);
   const canEditJobs = canEditJobsPerm(userRole);
   const canManageArtists = canManageFestivalArtistsPerm(userRole);
   const canUploadDocuments = canUploadDocumentsPerm(userRole);
@@ -972,24 +975,26 @@ export function JobCardNew({
           {/* Buttons section */}
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             <div className="flex-1" /> {/* Spacer */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleCollapse}
-              title="Toggle Details"
-              className="hover:bg-accent/50 shrink-0 h-8 w-8 sm:h-10 sm:w-10"
-              disabled={isJobBeingDeleted}
-            >
-                {collapsed ? (
-                  <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
-                ) : (
-                  <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4" />
-                )}
-              </Button>
+            <div className="flex items-center gap-2">
+              {!isDetailsOnlyMode && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleCollapse}
+                  title="Toggle Details"
+                  className="hover:bg-accent/50 shrink-0 h-8 w-8 sm:h-10 sm:w-10"
+                  disabled={isJobBeingDeleted}
+                >
+                  {collapsed ? (
+                    <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                  ) : (
+                    <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                  )}
+                </Button>
+              )}
             </div>
-          <div className="flex flex-wrap gap-1 sm:gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-              {(userRole === 'technician' || userRole === 'house_tech') && (
+            <div className="flex flex-wrap gap-1 sm:gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+              {(isDetailsOnlyMode || userRole === 'technician' || userRole === 'house_tech') && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1001,170 +1006,174 @@ export function JobCardNew({
                   <span className="hidden sm:inline">View Details</span>
                 </Button>
               )}
-              {/* Timesheet button - hide for dryhire and tourdate */}
-              {job.job_type !== 'dryhire' && job.job_type !== 'tourdate' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTimesheetClick}
-                  className="hover:bg-accent/50 text-xs sm:text-sm px-1 sm:px-2 h-7 sm:h-8"
-                  disabled={isJobBeingDeleted}
-                >
-                  <ClipboardList className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Times</span>
-                  <span className="sm:hidden">Times</span>
-                </Button>
-              )}
-              
-              {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleFestivalArtistsClick}
-                  className="hover:bg-accent/50 text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
-                  disabled={isJobBeingDeleted}
-                >
-                  <span className="hidden sm:inline">
-                    {userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
-                  </span>
-                  <span className="sm:hidden">Festival</span>
-                </Button>
-              )}
-              {isProjectManagementPage && job.job_type !== 'dryhire' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => { e.stopPropagation(); setTaskManagerOpen(true); }}
-                  className="hover:bg-accent/50 text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
-                  disabled={isJobBeingDeleted}
-                >
-                  <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Tasks</span>
-                  <span className="sm:hidden">Tasks</span>
-                </Button>
-              )}
-              {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isJobBeingDeleted) {
-                      setAssignmentDialogOpen(true);
-                    }
-                  }}
-                  className="hover:bg-accent/50 text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
-                  disabled={isJobBeingDeleted}
-                >
-                  <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Assign</span>
-                  <span className="sm:hidden">Assign</span>
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={refreshData}
-                title="Refresh"
-                className="hover:bg-accent/50 h-7 w-7 sm:h-8 sm:w-8"
-                disabled={isJobBeingDeleted}
-              >
-                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
-              {canEditJobs && (
+              {!isDetailsOnlyMode && (
                 <>
+                  {/* Timesheet button - hide for dryhire and tourdate */}
+                  {job.job_type !== 'dryhire' && job.job_type !== 'tourdate' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTimesheetClick}
+                      className="hover:bg-accent/50 text-xs sm:text-sm px-1 sm:px-2 h-7 sm:h-8"
+                      disabled={isJobBeingDeleted}
+                    >
+                      <ClipboardList className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Times</span>
+                      <span className="sm:hidden">Times</span>
+                    </Button>
+                  )}
+
+                  {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleFestivalArtistsClick}
+                      className="hover:bg-accent/50 text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
+                      disabled={isJobBeingDeleted}
+                    >
+                      <span className="hidden sm:inline">
+                        {userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
+                      </span>
+                      <span className="sm:hidden">Festival</span>
+                    </Button>
+                  )}
+                  {isProjectManagementPage && job.job_type !== 'dryhire' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); setTaskManagerOpen(true); }}
+                      className="hover:bg-accent/50 text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
+                      disabled={isJobBeingDeleted}
+                    >
+                      <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Tasks</span>
+                      <span className="sm:hidden">Tasks</span>
+                    </Button>
+                  )}
+                  {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isJobBeingDeleted) {
+                          setAssignmentDialogOpen(true);
+                        }
+                      }}
+                      className="hover:bg-accent/50 text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
+                      disabled={isJobBeingDeleted}
+                    >
+                      <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Assign</span>
+                      <span className="sm:hidden">Assign</span>
+                    </Button>
+                  }
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={handleEditButtonClick}
-                    title="Edit job details"
+                    onClick={refreshData}
+                    title="Refresh"
                     className="hover:bg-accent/50 h-7 w-7 sm:h-8 sm:w-8"
                     disabled={isJobBeingDeleted}
                   >
-                    <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleDeleteClick}
-                    className="hover:bg-accent/50 h-7 w-7 sm:h-8 sm:w-8"
-                    disabled={isJobBeingDeleted}
-                  >
-                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </Button>
+                  {canEditJobs && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleEditButtonClick}
+                        title="Edit job details"
+                        className="hover:bg-accent/50 h-7 w-7 sm:h-8 sm:w-8"
+                        disabled={isJobBeingDeleted}
+                      >
+                        <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleDeleteClick}
+                        className="hover:bg-accent/50 h-7 w-7 sm:h-8 sm:w-8"
+                        disabled={isJobBeingDeleted}
+                      >
+                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </Button>
+                    </>
+                  )}
+                  {canCreateFlexFolders && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={createFlexFoldersHandler}
+                      disabled={foldersAreCreated || isJobBeingDeleted || isFoldersLoading || isCreatingFolders}
+                      title={getFlexButtonTitle()}
+                      className={
+                        foldersAreCreated || isJobBeingDeleted || isFoldersLoading || isCreatingFolders
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:bg-accent/50"
+                      }
+                    >
+                      {isCreatingFolders ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
+                  {canCreateLocalFolders && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={createLocalFoldersHandler}
+                      disabled={isCreatingLocalFolders || isJobBeingDeleted}
+                      title={isCreatingLocalFolders ? "Creating local folders..." : "Create local folder structure"}
+                      className={
+                        isCreatingLocalFolders || isJobBeingDeleted
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:bg-accent/50"
+                      }
+                    >
+                      {isCreatingLocalFolders ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FolderPlus className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
+                  {/* Archive to Flex */}
+                  {job.job_type !== 'dryhire' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => { e.stopPropagation(); setArchiveOpen(true); }}
+                      disabled={isJobBeingDeleted}
+                      title="Archive documents to Flex"
+                      className="hover:bg-accent/50"
+                    >
+                      <Archive className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (
+                    <div className="relative">
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        onClick={(ev) => ev.stopPropagation()}
+                        disabled={isJobBeingDeleted}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hover:bg-accent/50"
+                        disabled={isJobBeingDeleted}
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </>
-              )}
-              {canCreateFlexFolders && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={createFlexFoldersHandler}
-                  disabled={foldersAreCreated || isJobBeingDeleted || isFoldersLoading || isCreatingFolders}
-                  title={getFlexButtonTitle()}
-                  className={
-                    foldersAreCreated || isJobBeingDeleted || isFoldersLoading || isCreatingFolders
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:bg-accent/50"
-                  }
-                >
-                  {isCreatingFolders ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
-                  )}
-                </Button>
-              )}
-              {canCreateLocalFolders && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={createLocalFoldersHandler}
-                  disabled={isCreatingLocalFolders || isJobBeingDeleted}
-                  title={isCreatingLocalFolders ? "Creating local folders..." : "Create local folder structure"}
-                  className={
-                    isCreatingLocalFolders || isJobBeingDeleted
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:bg-accent/50"
-                  }
-                >
-                  {isCreatingLocalFolders ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <FolderPlus className="h-4 w-4" />
-                  )}
-                </Button>
-              )}
-              {/* Archive to Flex */}
-              {job.job_type !== 'dryhire' && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => { e.stopPropagation(); setArchiveOpen(true); }}
-                  disabled={isJobBeingDeleted}
-                  title="Archive documents to Flex"
-                  className="hover:bg-accent/50"
-                >
-                  <Archive className="h-4 w-4" />
-                </Button>
-              )}
-              {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (
-                <div className="relative">
-                  <input
-                    type="file"
-                    onChange={handleFileUpload}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    onClick={(ev) => ev.stopPropagation()}
-                    disabled={isJobBeingDeleted}
-                  />
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="hover:bg-accent/50"
-                    disabled={isJobBeingDeleted}
-                  >
-                    <Upload className="h-4 w-4" />
-                  </Button>
-                </div>
               )}
             </div>
           </div>
@@ -1334,45 +1343,129 @@ export function JobCardNew({
         </div>
       </Card>
 
-      {!isHouseTech && !isJobBeingDeleted && (
+      {!isJobBeingDeleted && (
         <>
-          {taskManagerOpen && (
-            <TaskManagerDialog
-              open={taskManagerOpen}
-              onOpenChange={setTaskManagerOpen}
-              userRole={userRole}
-              jobId={job.id}
-            />
+          {!isHouseTech && !isDetailsOnlyMode && (
+            <>
+              {taskManagerOpen && (
+                <TaskManagerDialog
+                  open={taskManagerOpen}
+                  onOpenChange={setTaskManagerOpen}
+                  userRole={userRole}
+                  jobId={job.id}
+                />
+              )}
+              {soundTaskDialogOpen && (
+                <SoundTaskDialog
+                  open={soundTaskDialogOpen}
+                  onOpenChange={setSoundTaskDialogOpen}
+                  jobId={job.id}
+                />
+              )}
+              {lightsTaskDialogOpen && (
+                <LightsTaskDialog
+                  open={lightsTaskDialogOpen}
+                  onOpenChange={setLightsTaskDialogOpen}
+                  jobId={job.id}
+                />
+              )}
+              {videoTaskDialogOpen && (
+                <VideoTaskDialog
+                  open={videoTaskDialogOpen}
+                  onOpenChange={setVideoTaskDialogOpen}
+                  jobId={job.id}
+                />
+              )}
+              {editJobDialogOpen && (
+                <EditJobDialog
+                  open={editJobDialogOpen}
+                  onOpenChange={setEditJobDialogOpen}
+                  job={job}
+                />
+              )}
+              {assignmentDialogOpen && job.job_type !== "dryhire" && (
+                <JobAssignmentDialog
+                  isOpen={assignmentDialogOpen}
+                  onClose={() => setAssignmentDialogOpen(false)}
+                  onAssignmentChange={() => {}}
+                  jobId={job.id}
+                  department={department as Department}
+                />
+              )}
+              {/* Archive to Flex Dialog */}
+              <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+                <DialogContent className="sm:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Archive documents to Flex</DialogTitle>
+                    <DialogDescription>
+                      Uploads all job documents to each department's Documentación Técnica in Flex and removes them from Supabase.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Mode</Label>
+                        <Select value={archiveMode} onValueChange={(v) => setArchiveMode(v as 'by-prefix' | 'all-tech')}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="by-prefix">By prefix (default)</SelectItem>
+                            <SelectItem value="all-tech">All technical depts</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center gap-2 mt-6 sm:mt-[30px]">
+                        <Checkbox id="includeTemplates" checked={archiveIncludeTemplates} onCheckedChange={(v) => setArchiveIncludeTemplates(Boolean(v))} />
+                        <Label htmlFor="includeTemplates">Include templates</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox id="dryRun" checked={archiveDryRun} onCheckedChange={(v) => setArchiveDryRun(Boolean(v))} />
+                        <Label htmlFor="dryRun">Dry run (no delete)</Label>
+                      </div>
+                    </div>
+
+                    {archiving && (
+                      <div className="flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Archiving...</div>
+                    )}
+
+                    {archiveError && (
+                      <div className="text-sm text-red-600">{archiveError}</div>
+                    )}
+
+                    {archiveResult && (
+                      <div className="space-y-3">
+                        <div className="text-sm">Summary</div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>Attempted: <span className="font-medium">{archiveResult.attempted ?? 0}</span></div>
+                          <div>Uploaded: <span className="font-medium">{archiveResult.uploaded ?? 0}</span></div>
+                          <div>Skipped: <span className="font-medium">{archiveResult.skipped ?? 0}</span></div>
+                          <div>Failed: <span className="font-medium">{archiveResult.failed ?? 0}</span></div>
+                        </div>
+                        {archiveResult.details && Array.isArray(archiveResult.details) && (
+                          <div className="max-h-48 overflow-auto border rounded p-2 text-xs">
+                            {archiveResult.details.map((d: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between py-0.5">
+                                <div className="truncate mr-2" title={d.file}>{d.file}</div>
+                                <div className="text-muted-foreground">{d.status}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter className="gap-2">
+                    <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={archiving}>Close</Button>
+                    <Button onClick={handleArchiveToFlex} disabled={archiving}>
+                      {archiving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      {archiveDryRun ? 'Run Dry' : 'Start'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
-          {soundTaskDialogOpen && (
-            <SoundTaskDialog
-              open={soundTaskDialogOpen}
-              onOpenChange={setSoundTaskDialogOpen}
-              jobId={job.id}
-            />
-          )}
-          {lightsTaskDialogOpen && (
-            <LightsTaskDialog
-              open={lightsTaskDialogOpen}
-              onOpenChange={setLightsTaskDialogOpen}
-              jobId={job.id}
-            />
-          )}
-          {videoTaskDialogOpen && (
-            <VideoTaskDialog
-              open={videoTaskDialogOpen}
-              onOpenChange={setVideoTaskDialogOpen}
-              jobId={job.id}
-            />
-          )}
-          {editJobDialogOpen && (
-            <EditJobDialog
-              open={editJobDialogOpen}
-              onOpenChange={setEditJobDialogOpen}
-              job={job}
-            />
-          )}
-          {/* Job Details Dialog for technicians/house techs */}
           {jobDetailsDialogOpen && (
             <JobDetailsDialog
               open={jobDetailsDialogOpen}
@@ -1381,87 +1474,6 @@ export function JobCardNew({
               department={department}
             />
           )}
-          {assignmentDialogOpen && job.job_type !== "dryhire" && (
-            <JobAssignmentDialog
-              isOpen={assignmentDialogOpen}
-              onClose={() => setAssignmentDialogOpen(false)}
-              onAssignmentChange={() => {}}
-              jobId={job.id}
-              department={department as Department}
-            />
-          )}
-          {/* Archive to Flex Dialog */}
-          <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Archive documents to Flex</DialogTitle>
-                <DialogDescription>
-                  Uploads all job documents to each department's Documentación Técnica in Flex and removes them from Supabase.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Mode</Label>
-                    <Select value={archiveMode} onValueChange={(v) => setArchiveMode(v as 'by-prefix' | 'all-tech')}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select mode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="by-prefix">By prefix (default)</SelectItem>
-                        <SelectItem value="all-tech">All technical depts</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2 mt-6 sm:mt-[30px]">
-                    <Checkbox id="includeTemplates" checked={archiveIncludeTemplates} onCheckedChange={(v) => setArchiveIncludeTemplates(Boolean(v))} />
-                    <Label htmlFor="includeTemplates">Include templates</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox id="dryRun" checked={archiveDryRun} onCheckedChange={(v) => setArchiveDryRun(Boolean(v))} />
-                    <Label htmlFor="dryRun">Dry run (no delete)</Label>
-                  </div>
-                </div>
-
-                {archiving && (
-                  <div className="flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Archiving...</div>
-                )}
-
-                {archiveError && (
-                  <div className="text-sm text-red-600">{archiveError}</div>
-                )}
-
-                {archiveResult && (
-                  <div className="space-y-3">
-                    <div className="text-sm">Summary</div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>Attempted: <span className="font-medium">{archiveResult.attempted ?? 0}</span></div>
-                      <div>Uploaded: <span className="font-medium">{archiveResult.uploaded ?? 0}</span></div>
-                      <div>Skipped: <span className="font-medium">{archiveResult.skipped ?? 0}</span></div>
-                      <div>Failed: <span className="font-medium">{archiveResult.failed ?? 0}</span></div>
-                    </div>
-                    {archiveResult.details && Array.isArray(archiveResult.details) && (
-                      <div className="max-h-48 overflow-auto border rounded p-2 text-xs">
-                        {archiveResult.details.map((d: any, idx: number) => (
-                          <div key={idx} className="flex items-center justify-between py-0.5">
-                            <div className="truncate mr-2" title={d.file}>{d.file}</div>
-                            <div className="text-muted-foreground">{d.status}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={archiving}>Close</Button>
-                <Button onClick={handleArchiveToFlex} disabled={archiving}>
-                  {archiving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  {archiveDryRun ? 'Run Dry' : 'Start'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </>
       )}
     </div>
