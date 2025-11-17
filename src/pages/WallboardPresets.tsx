@@ -64,41 +64,11 @@ function clampNumber(value: number, min: number, max: number, fallback: number) 
   return Math.round(value);
 }
 
-function getPublicDisplayUrl(value: string, slug?: string): string {
+function getPublicDisplayUrl(_value: string, slug?: string): string {
   const origin = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : '';
-  const trimmed = value.trim();
-  const envToken = (import.meta as any).env?.VITE_WALLBOARD_TOKEN as string | undefined;
-
-  const pathParts = trimmed.split('/').filter(Boolean);
-  const wallboardIdx = pathParts.findIndex((p) => p === 'wallboard');
-  const tokenFromPath =
-    wallboardIdx >= 0 && pathParts[wallboardIdx + 1] === 'public'
-      ? pathParts[wallboardIdx + 2]
-      : undefined;
-
-  const token = (envToken || tokenFromPath || DEFAULT_WALLBOARD_TOKEN).trim();
-  if (!token) return '';
-
-  // Prefer existing slug in the path if present, otherwise use provided slug or default
-  const slugFromPath =
-    wallboardIdx >= 0 && pathParts[wallboardIdx + 1] === 'public'
-      ? pathParts[wallboardIdx + 3]
-      : undefined;
-  const cleanSlug = (slugFromPath || slug || 'default').toLowerCase();
-
-  const baseOrigin = (() => {
-    try {
-      if (trimmed && /https?:\/\//i.test(trimmed)) {
-        return new URL(trimmed).origin;
-      }
-    } catch {
-      // ignore malformed URLs
-    }
-    return origin;
-  })();
-
-  const prefix = `${baseOrigin || ''}/wallboard/public/${encodeURIComponent(token)}/${encodeURIComponent(cleanSlug)}`;
-  return prefix;
+  const token = (import.meta as any).env?.VITE_WALLBOARD_TOKEN as string | undefined || DEFAULT_WALLBOARD_TOKEN;
+  const cleanSlug = (slug?.trim() || 'default').toLowerCase();
+  return `${origin || ''}/wallboard/public/${encodeURIComponent(token)}/${encodeURIComponent(cleanSlug)}`;
 }
 
 export default function WallboardPresets() {
@@ -169,7 +139,7 @@ export default function WallboardPresets() {
   useEffect(() => {
     if (!activePreset || isSavingRef.current) return;
     setSlugInput(activePreset.slug);
-    setDisplayUrlInput(getPublicDisplayUrl(activePreset.display_url ?? '', activePreset.slug));
+    setDisplayUrlInput(getPublicDisplayUrl('', activePreset.slug));
     setPanelOrder(normaliseOrder(activePreset.panel_order));
     setPanelDurations((prev) => {
       const next: Record<PanelKey, number> = { ...prev };
@@ -211,7 +181,7 @@ export default function WallboardPresets() {
   const saveChanges = async () => {
     if (!activePreset) return;
     const trimmedSlug = slugInput.trim();
-    const trimmedUrl = getPublicDisplayUrl(displayUrlInput.trim(), trimmedSlug);
+    const trimmedUrl = getPublicDisplayUrl('', trimmedSlug);
 
     if (!trimmedSlug) {
       toast({
@@ -296,7 +266,7 @@ export default function WallboardPresets() {
   const resetChanges = () => {
     if (!activePreset) return;
     setSlugInput(activePreset.slug);
-    setDisplayUrlInput(getPublicDisplayUrl(activePreset.display_url ?? '', activePreset.slug));
+    setDisplayUrlInput(getPublicDisplayUrl('', activePreset.slug));
     setPanelOrder(normaliseOrder(activePreset.panel_order));
     setPanelDurations((durations) => {
       const next = { ...durations };
@@ -315,7 +285,7 @@ export default function WallboardPresets() {
 
   const copyDisplayUrl = async (value: string) => {
     if (!value) return;
-    const publicUrl = getPublicDisplayUrl(value, slugInput);
+    const publicUrl = getPublicDisplayUrl('', slugInput || activeSlug || 'default');
     try {
       if (typeof navigator === 'undefined' || !navigator.clipboard) {
         throw new Error('Clipboard API unavailable');
@@ -335,7 +305,7 @@ export default function WallboardPresets() {
   const createPreset = async () => {
     const name = newPresetName.trim();
     const slug = newPresetSlug.trim();
-    const url = getPublicDisplayUrl(newPresetUrl.trim(), slug);
+    const url = getPublicDisplayUrl('', slug);
 
     if (!name || !slug || !url) {
       toast({
@@ -606,17 +576,15 @@ export default function WallboardPresets() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Input
                     id="preset-display-url"
-                    value={displayUrlInput}
-                    onChange={(event) => setDisplayUrlInput(event.target.value)}
+                    value={getPublicDisplayUrl('', activeSlug || slugInput)}
+                    readOnly
                     placeholder="https://ejemplo.com/wallboard/public/TOKEN/slug"
-                    disabled={saving}
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => copyDisplayUrl(displayUrlInput)}
-                    disabled={!displayUrlInput}
+                    onClick={() => copyDisplayUrl(getPublicDisplayUrl('', slugInput || activeSlug || 'default'))}
                   >
                     <Copy className="mr-2 h-4 w-4" /> Copiar
                   </Button>
@@ -624,7 +592,7 @@ export default function WallboardPresets() {
                 <p className="text-xs text-muted-foreground">
                   URL pública resultante:{' '}
                   <span className="font-mono break-all">
-                    {displayUrlInput ? getPublicDisplayUrl(displayUrlInput, slugInput) : '—'}
+                    {getPublicDisplayUrl('', slugInput)}
                   </span>
                   . Comparta este enlace con cualquier dispositivo que deba mostrar el wallboard.
                 </p>

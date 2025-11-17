@@ -61,19 +61,34 @@ export class WallboardApiError extends Error {
 
 export class WallboardApi {
   private token?: string;
-  private base = "/functions/v1/wallboard-feed";
   constructor(token?: string) { this.token = token; }
 
-  private headers() {
-    return this.token ? { Authorization: `Bearer ${this.token}` } : {};
-  }
-
+  // Prefer Supabase invoke to avoid dev-server rewrites returning HTML
   private async request<T>(path: string): Promise<T> {
-    const res = await fetch(`${this.base}${path}`, { headers: this.headers() });
-    if (!res.ok) {
-      throw new WallboardApiError(`${path} failed`, res.status);
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const headers = this.token ? { "x-wallboard-jwt": this.token } : {};
+      const { data, error } = await supabase.functions.invoke('wallboard-feed', {
+        body: { path },
+        headers,
+        responseType: 'json'
+      } as any);
+      if (error) throw error;
+      return data as T;
+    } catch (err) {
+      const res = await fetch(`/functions/v1/wallboard-feed${path}`, {
+        headers: this.token ? { "x-wallboard-jwt": this.token } : {},
+        cache: 'no-store'
+      });
+      if (!res.ok) {
+        throw new WallboardApiError(`${path} failed`, res.status);
+      }
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        throw new WallboardApiError(`${path} returned non-JSON`, res.status);
+      }
+      return res.json();
     }
-    return res.json();
   }
 
   jobsOverview(): Promise<JobsOverviewFeed> {
@@ -94,8 +109,20 @@ export class WallboardApi {
 }
 
 export async function exchangeWallboardToken(shared: string): Promise<{ token: string; expiresIn: number }> {
+  // Prefer Supabase Edge Function invoke to avoid CORS/base-path issues
+  try {
+    const mod = await import('@/integrations/supabase/client');
+    const supabase = mod.supabase;
+    const { data, error } = await supabase.functions.invoke('wallboard-auth', {
+      body: { wallboardToken: shared },
+    });
+    if (error) throw error;
+    if (data?.token) return data as { token: string; expiresIn: number };
+  } catch (err) {
+    console.warn('wallboard-auth invoke fallback to fetch:', err);
+  }
+
   const res = await fetch(`/functions/v1/wallboard-auth?wallboardToken=${encodeURIComponent(shared)}`);
   if (!res.ok) throw new Error(`wallboard-auth failed: ${res.status}`);
   return res.json();
 }
-

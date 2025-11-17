@@ -4,8 +4,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? "";
-const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? "";
+const FALLBACK_SHARED_TOKEN = Deno.env.get("VITE_WALLBOARD_TOKEN") ?? "demo-wallboard-token";
+const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? FALLBACK_SHARED_TOKEN;
+const FALLBACK_WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? "wallboard-dev-secret";
+const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? FALLBACK_WALLBOARD_JWT_SECRET;
 
 type AuthResult = {
   method: "jwt" | "shared";
@@ -17,8 +19,8 @@ type Dept = "sound" | "lights" | "video";
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-wallboard-jwt",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   } as Record<string, string>;
 }
 
@@ -48,6 +50,23 @@ async function getJwtKey() {
 }
 
 async function authenticate(req: Request, url: URL): Promise<AuthResult> {
+  // 1) Explicit wallboard JWT header (to avoid Supabase client overriding Authorization)
+  const xJwt = req.headers.get("x-wallboard-jwt");
+  if (xJwt) {
+    try {
+      const key = await getJwtKey();
+      const payload: Record<string, unknown> = await verify(xJwt, key);
+      if (payload.scope !== "wallboard") {
+        throw new HttpError(403, "Invalid wallboard scope");
+      }
+      const presetSlug = typeof payload.preset === "string" ? payload.preset : undefined;
+      return { method: "jwt", presetSlug };
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      throw new HttpError(401, "Invalid token");
+    }
+  }
+
   const headerToken = req.headers.get("authorization") ?? req.headers.get("Authorization") ?? "";
   if (headerToken.startsWith("Bearer ")) {
     const token = headerToken.slice(7).trim();
@@ -104,7 +123,31 @@ serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/\/+$/, "");
+
+  // Allow supabase.functions.invoke POST body to specify the feed path
+  let pathFromBody = "";
+  if (req.method === "POST") {
+    const contentType = req.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      try {
+        const body = await req.json();
+        if (body?.path && typeof body.path === "string") {
+          pathFromBody = body.path;
+        }
+      } catch {
+        // ignore body parse errors; fall back to URL
+      }
+    }
+  }
+
+  // Normalize requested path, removing the functions prefix if present
+  const rawPath = pathFromBody || url.pathname;
+  let path = rawPath.replace(/\/+$/, "");
+  const idx = path.indexOf("wallboard-feed");
+  if (idx >= 0) {
+    path = path.slice(idx + "wallboard-feed".length);
+  }
+  if (!path || path === "") path = "/";
 
   try {
     const auth = await authenticate(req, url);
