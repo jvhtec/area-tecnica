@@ -3,7 +3,9 @@ import { create, getNumericDate, Header, Payload } from "https://deno.land/x/djw
 
 const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? "";
 const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? "";
-const DEFAULT_TTL_SECONDS = parseInt(Deno.env.get("WALLBOARD_JWT_TTL") ?? "900", 10); // 15 minutes
+const MIN_TTL_SECONDS = 8 * 60 * 60; // 8 hours minimum
+const envTtl = parseInt(Deno.env.get("WALLBOARD_JWT_TTL") ?? '', 10);
+const DEFAULT_TTL_SECONDS = Number.isFinite(envTtl) ? envTtl : MIN_TTL_SECONDS;
 
 function cors() {
   return {
@@ -33,7 +35,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: cors() });
     }
     const now = Math.floor(Date.now() / 1000);
-    const ttl = Math.max(60, DEFAULT_TTL_SECONDS);
+    const ttl = Math.max(MIN_TTL_SECONDS, DEFAULT_TTL_SECONDS);
     const jwt = await sign({
       iss: "wallboard-auth",
       iat: now,
