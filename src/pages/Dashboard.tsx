@@ -246,6 +246,7 @@ const Dashboard = () => {
             onJobClick={handleJobClick}
             userRole={userRole}
             selectedDate={date}
+            detailsOnlyMode
             hideTasks
           />
         </div>

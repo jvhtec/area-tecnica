@@ -45,6 +45,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [vacationPeriods, setVacationPeriods] = useState<VacationPeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`; // Stable key per month to avoid refetch on day clicks
 
   useEffect(() => {
     let isMounted = true;
@@ -219,7 +220,8 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
       supabase.removeChannel(assignmentChannel);
       supabase.removeChannel(availabilityChannel);
     };
-  }, [currentMonth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthKey]); // Only refetch when the month changes, not every day selection
 
   return { houseTechs, assignments, vacationPeriods, isLoading };
 };

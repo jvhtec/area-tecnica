@@ -416,7 +416,6 @@ export function JobCardNew({
       
       // Cancel any ongoing queries for this job to prevent race conditions
       await queryClient.cancelQueries({ queryKey: ["sound-tasks", job.id] });
-      await queryClient.cancelQueries({ queryKey: ["sound-personnel", job.id] });
       
       const result = await deleteJobOptimistically(job.id);
       
@@ -706,19 +705,19 @@ export function JobCardNew({
     return Math.round(totalProgress / soundTasks.length);
   };
 
-  const getCompletedTasks = () => {
-    if (!soundTasks?.length) return 0;
-    return soundTasks.filter((task: any) => task.status === "completed").length;
-  };
-
   const getTotalPersonnel = () => {
     if (!personnel) return 0;
     return (
       (personnel.foh_engineers || 0) +
-      (personnel.mon_engineers || 0)
-      + (personnel.pa_techs || 0)
-      + (personnel.rf_techs || 0)
+      (personnel.mon_engineers || 0) +
+      (personnel.pa_techs || 0) +
+      (personnel.rf_techs || 0)
     );
+  };
+
+  const getCompletedTasks = () => {
+    if (!soundTasks?.length) return 0;
+    return soundTasks.filter((task: any) => task.status === "completed").length;
   };
 
   const handleEditClick = (e: React.MouseEvent) => {
@@ -856,7 +855,6 @@ export function JobCardNew({
     
     await queryClient.invalidateQueries({ queryKey: ["jobs"] });
     await queryClient.invalidateQueries({ queryKey: ["sound-tasks", job.id] });
-    await queryClient.invalidateQueries({ queryKey: ["sound-personnel", job.id] });
 
     toast({
       title: "Data refreshed",

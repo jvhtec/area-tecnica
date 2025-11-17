@@ -23,17 +23,16 @@ const ROLE_REGISTRY: Record<Discipline, RoleOption[]> = {
     { code: 'SND-RF-E',  label: 'RF — Especialista', discipline: 'sound', position: 'RF', level: 'E' },
     { code: 'SND-SYS-E', label: 'Sistemas — Especialista', discipline: 'sound', position: 'SYS', level: 'E' },
 
-    { code: 'SND-PA-T',  label: 'PA — Técnico', discipline: 'sound', position: 'PA', level: 'T' },
+    { code: 'SND-PA-T',  label: 'Tecnico de Escenario — Técnico', discipline: 'sound', position: 'PA', level: 'T' },
+    { code: 'SND-MNT-T', label: 'Montador — Técnico', discipline: 'sound', position: 'MNT', level: 'T' },
   ],
   lights: [
-    { code: 'LGT-BRD-R', label: 'Mesa — Responsable', discipline: 'lights', position: 'BRD', level: 'R' },
-    { code: 'LGT-SYS-R', label: 'Sistema/Rig — Responsable', discipline: 'lights', position: 'SYS', level: 'R' },
-
-    { code: 'LGT-BRD-E', label: 'Mesa — Especialista', discipline: 'lights', position: 'BRD', level: 'E' },
-    { code: 'LGT-SYS-E', label: 'Sistema/Rig — Especialista', discipline: 'lights', position: 'SYS', level: 'E' },
-    { code: 'LGT-FOLO-E', label: 'Follow Spot — Especialista', discipline: 'lights', position: 'FOLO', level: 'E' },
-
-    { code: 'LGT-PA-T', label: 'PA — Técnico', discipline: 'lights', position: 'PA', level: 'T' },
+    { code: 'LGT-ASST-R', label: 'Asistente — Responsable', discipline: 'lights', position: 'ASST', level: 'R' },
+    { code: 'LGT-ASST-E', label: 'Asistente — Especialista', discipline: 'lights', position: 'ASST', level: 'E' },
+    { code: 'LGT-DIM-R', label: 'Dimmer — Responsable', discipline: 'lights', position: 'DIM', level: 'R' },
+    { code: 'LGT-DIM-E', label: 'Dimmer — Especialista', discipline: 'lights', position: 'DIM', level: 'E' },
+    { code: 'LGT-CAN-T', label: 'Cañón — Técnico', discipline: 'lights', position: 'CAN', level: 'T' },
+    { code: 'LGT-MON-T', label: 'Montador — Técnico', discipline: 'lights', position: 'MON', level: 'T' },
   ],
   video: [
     { code: 'VID-SW-R', label: 'Switcher/TD — Responsable', discipline: 'video', position: 'SW', level: 'R' },
@@ -85,11 +84,15 @@ export function codeForLabel(label: string, discipline?: string): string | null 
     [/^monitor(\s+engineer)?$/i, 'SND-MON-E'],
     [/^rf(\s+tech(nician)?)?$/i, 'SND-RF-E'],
     [/^pa(\s+tech(nician)?)?$/i, 'SND-PA-T'],
+    [/^montador$/i, 'SND-MNT-T'],
 
-    [/^lighting\s+designer$/i, 'LGT-BRD-R'],
-    [/^lighting\s+technician$/i, 'LGT-PA-T'],
-    [/^follow\s*spot/i, 'LGT-FOLO-E'],
-    [/^rigger$/i, 'LGT-SYS-E'],
+    [/^asistente.*responsable$/i, 'LGT-ASST-R'],
+    [/^asistente.*especialista$/i, 'LGT-ASST-E'],
+    [/^dimm?er.*responsable$/i, 'LGT-DIM-R'],
+    [/^dimm?er.*especialista$/i, 'LGT-DIM-E'],
+    [/^cañ[oó]n$/i, 'LGT-CAN-T'],
+    [/^montador$/i, 'LGT-MON-T'],
+    [/^lighting\s+technician$/i, 'LGT-MON-T'],
 
     [/^video\s+director$/i, 'VID-DIR-E'],
     [/^video\s+technician$/i, 'VID-PA-T'],
@@ -108,4 +111,3 @@ export function codeForLabel(label: string, discipline?: string): string | null 
 export function getDepartmentRoles(department: string): string[] {
   return roleOptionsForDiscipline(department).map(r => r.label)
 }
-

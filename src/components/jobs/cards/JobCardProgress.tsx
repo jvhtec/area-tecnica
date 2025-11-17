@@ -2,15 +2,17 @@
 import React from 'react';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { RequiredRoleSummaryItem } from "@/hooks/useJobRequiredRoles";
+import { labelForCode } from "@/utils/roles";
 
 interface JobCardProgressProps {
   soundTasks: any[] | null;
-  personnel: any;
+  roleSummary?: RequiredRoleSummaryItem[];
 }
 
 export const JobCardProgress: React.FC<JobCardProgressProps> = ({
   soundTasks,
-  personnel
+  roleSummary = []
 }) => {
   const calculateTotalProgress = () => {
     if (!soundTasks?.length) return 0;
@@ -23,32 +25,34 @@ export const JobCardProgress: React.FC<JobCardProgressProps> = ({
     return soundTasks.filter((task: any) => task.status === "completed").length;
   };
 
-  const getTotalPersonnel = () => {
-    if (!personnel) return 0;
-    return (
-      (personnel.foh_engineers || 0) +
-      (personnel.mon_engineers || 0) +
-      (personnel.pa_techs || 0) +
-      (personnel.rf_techs || 0)
-    );
-  };
+  const hasRequirements = roleSummary.length > 0;
 
-  if (!soundTasks?.length && !personnel) {
+  if (!soundTasks?.length && !hasRequirements) {
     return null;
   }
 
   return (
     <div className="space-y-4 mt-4">
-      {personnel && (
+      {hasRequirements && (
         <div className="mt-2 p-2 bg-accent/20 rounded-md">
           <div className="text-xs font-medium mb-1">
-            Required Personnel: {getTotalPersonnel()}
+            Required Personnel
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>FOH Engineers: {personnel.foh_engineers || 0}</div>
-            <div>MON Engineers: {personnel.mon_engineers || 0}</div>
-            <div>PA Techs: {personnel.pa_techs || 0}</div>
-            <div>RF Techs: {personnel.rf_techs || 0}</div>
+          <div className="space-y-2 text-xs">
+            {roleSummary.map((item) => (
+              <div key={item.department} className="space-y-1">
+                <div className="font-medium">
+                  {item.department} — {item.total_required || 0}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {item.roles.map((role, idx) => (
+                    <Badge key={`${role.role_code}-${idx}`} variant="outline" className="text-[11px]">
+                      {labelForCode(role.role_code)} × {role.quantity}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

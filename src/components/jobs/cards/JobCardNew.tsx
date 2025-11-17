@@ -969,7 +969,7 @@ export function JobCardNew({
           {!collapsed && job.job_type !== "dryhire" && !hideTasks && (
             <JobCardProgress 
               soundTasks={soundTasks} 
-              personnel={personnel}
+              roleSummary={reqSummary}
             />
           )}
         </div>

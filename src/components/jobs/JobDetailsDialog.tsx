@@ -168,7 +168,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   );
 
   // Fetch comprehensive job data
-  const { data: jobDetails, isLoading: isJobLoading } = useQuery({
+  const { data: jobDetails, isLoading: isJobLoading, error: jobDocumentsError } = useQuery({
     queryKey: ['job-details', job.id],
     queryFn: async () => {
       const { data, error } = await supabase
