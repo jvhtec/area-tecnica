@@ -3,6 +3,17 @@ import { create, getNumericDate, Header, Payload } from "https://deno.land/x/djw
 
 const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? "";
 const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? "";
+const missingSecrets = [
+  !WALLBOARD_SHARED_TOKEN && "WALLBOARD_SHARED_TOKEN",
+  !WALLBOARD_JWT_SECRET && "WALLBOARD_JWT_SECRET",
+].filter(Boolean) as string[];
+
+if (missingSecrets.length > 0) {
+  console.error(
+    `Missing required wallboard auth secrets: ${missingSecrets.join(", ")}. Cannot start.`
+  );
+  throw new Error("Missing wallboard auth secrets");
+}
 const MIN_TTL_SECONDS = 8 * 60 * 60; // 8 hours minimum
 const envTtl = parseInt(Deno.env.get("WALLBOARD_JWT_TTL") ?? '', 10);
 const DEFAULT_TTL_SECONDS = Number.isFinite(envTtl) ? envTtl : MIN_TTL_SECONDS;
