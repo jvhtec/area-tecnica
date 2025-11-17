@@ -143,11 +143,50 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
           .insert(items.map(i => ({ ...i, preset_id: created.id })));
         if (itemsError) throw itemsError;
       }
+
+      // Auto-assign preset to all job dates
+      if (jobDates.length > 0) {
+        const rows = await Promise.all(jobDates.map(async (dt) => {
+          const dateStr = format(dt, 'yyyy-MM-dd');
+          const { data: existing } = await supabase
+            .from('day_preset_assignments')
+            .select('order')
+            .eq('date', dateStr)
+            .order('order', { ascending: false })
+            .limit(1);
+          const nextOrder = existing && existing.length > 0 ? ((existing[0].order || 0) + 1) : 0;
+          return {
+            date: dateStr,
+            preset_id: created.id,
+            user_id: session?.user?.id || '00000000-0000-0000-0000-000000000000',
+            order: nextOrder,
+            source: 'job',
+            source_id: jobId
+          };
+        }));
+        const { error: assignError } = await supabase.from('day_preset_assignments').insert(rows);
+        if (assignError) {
+          console.error('Error auto-assigning preset:', assignError);
+          // Don't throw - preset was created successfully, just notify about assignment issue
+          toast({
+            title: 'Preset saved',
+            description: 'Preset created but could not auto-assign to dates',
+            variant: 'default'
+          });
+          queryClient.invalidateQueries({ queryKey: ['job-presets', jobId, department] });
+          setIsCreating(false);
+          setEditingPreset(null);
+          setCopyingPreset(null);
+          return;
+        }
+        queryClient.invalidateQueries({ queryKey: ['preset-assignments'] });
+      }
+
       queryClient.invalidateQueries({ queryKey: ['job-presets', jobId, department] });
       setIsCreating(false);
       setEditingPreset(null);
       setCopyingPreset(null);
-      toast({ title: 'Preset saved' });
+      toast({ title: 'Preset saved and assigned to all job dates' });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }

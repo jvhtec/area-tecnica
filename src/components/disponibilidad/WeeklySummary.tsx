@@ -11,7 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { exportWeeklySummaryPDF } from '@/lib/weeklySummaryPdfExport';
 import { ReloadButton } from '@/components/ui/reload-button';
@@ -441,27 +440,31 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
 
       <CollapsibleContent className="space-y-2">
         <Card className={cn(isMobile ? "p-3" : "p-3 sm:p-4")}>
-          <ScrollArea className="h-[500px] w-full">
-            <Table className="min-w-[768px] md:min-w-[960px] lg:min-w-[1120px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className={cn(isMobile && "text-xs")}>Equipo</TableHead>
-                  <TableHead className={cn(isMobile && "text-xs")}>Categoría</TableHead>
-                  <TableHead className={cn(isMobile && "text-xs")}>Stock Total</TableHead>
-                  {weekDates.map((date) => (
-                    <TableHead key={date.toISOString()} className={cn("text-center", isMobile && "text-xs")}>
-                      {format(date, 'EEE d', { locale: es })}
+          <div className="overflow-x-auto">
+            <div className="min-w-[768px] md:min-w-[960px] lg:min-w-[1120px]">
+              <Table>
+                <TableHeader className="bg-background">
+                  <TableRow>
+                    <TableHead className={cn(isMobile && "text-xs")}>Equipo</TableHead>
+                    <TableHead className={cn(isMobile && "text-xs")}>Categoría</TableHead>
+                    <TableHead className={cn(isMobile && "text-xs")}>Stock Total</TableHead>
+                    {weekDates.map((date) => (
+                      <TableHead key={date.toISOString()} className={cn("text-center", isMobile && "text-xs")}>
+                        {format(date, 'EEE d', { locale: es })}
+                      </TableHead>
+                    ))}
+                    <TableHead className={cn("text-right", isMobile && "text-xs")}>
+                      Disponible
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        ({format(selectedDate || currentWeekStart, 'EEE d', { locale: es })})
+                      </span>
                     </TableHead>
-                  ))}
-                  <TableHead className={cn("text-right", isMobile && "text-xs")}>
-                    Disponible
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      ({format(selectedDate || currentWeekStart, 'EEE d', { locale: es })})
-                    </span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                  </TableRow>
+                </TableHeader>
+              </Table>
+              <div className="overflow-y-auto max-h-[500px]">
+                <Table>
+                  <TableBody>
                 {filteredEquipment?.map((item) => {
                   const remainingEachDay = weekDates.map(date => {
                     const used = getUsedQuantity(item.id, date);
@@ -559,10 +562,11 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
                   </TableRow>
                   );
                 })}
-              </TableBody>
-            </Table>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+                </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
         </Card>
       </CollapsibleContent>
     </Collapsible>
