@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
 import { ANNOUNCEMENT_LEVEL_STYLES, type AnnouncementLevel } from '@/constants/announcementLevels';
 import { Plane, Wrench, Star, Moon, Mic } from 'lucide-react';
 import SplashScreen from '@/components/SplashScreen';
+import { WallboardApi, WallboardApiError } from '@/lib/wallboard-api';
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -313,6 +314,57 @@ function formatDateKey(date: Date): string {
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
   const day = `${date.getDate()}`.padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function buildCalendarFromJobsList(jobs: JobsOverviewJob[]): CalendarFeed {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const offset = (startOfMonth.getDay() + 6) % 7;
+  const gridStart = new Date(startOfMonth.getTime() - offset * MS_PER_DAY);
+  const gridEnd = new Date(gridStart.getTime() + 42 * MS_PER_DAY - 1);
+
+  const calendarStartISO = gridStart.toISOString();
+  const calendarEndISO = gridEnd.toISOString();
+  const calendarStartMs = gridStart.getTime();
+  const calendarEndMs = gridEnd.getTime();
+
+  const jobsByDate: Record<string, JobsOverviewJob[]> = {};
+  const jobDateLookup: Record<string, string> = {};
+  const sorted = [...jobs].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+  sorted.forEach(job => {
+    const startTs = new Date(job.start_time).getTime();
+    const endTs = new Date(job.end_time).getTime();
+    if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) return;
+
+    const spanStart = Math.max(startTs, calendarStartMs);
+    const spanEnd = Math.min(endTs, calendarEndMs);
+    if (spanEnd < spanStart) return;
+
+    const primaryKey = formatDateKey(new Date(job.start_time));
+    jobDateLookup[job.id] = primaryKey;
+
+    let day = new Date(spanStart);
+    day.setHours(0, 0, 0, 0);
+    const lastDay = new Date(spanEnd);
+    lastDay.setHours(0, 0, 0, 0);
+
+    while (day.getTime() <= lastDay.getTime()) {
+      const key = formatDateKey(day);
+      const bucket = jobsByDate[key] ?? (jobsByDate[key] = []);
+      bucket.push(job);
+      day = new Date(day.getTime() + MS_PER_DAY);
+    }
+  });
+
+  return {
+    jobs: sorted,
+    jobsByDate,
+    jobDateLookup,
+    range: { start: calendarStartISO, end: calendarEndISO },
+    focusMonth: now.getMonth(),
+    focusYear: now.getFullYear(),
+  };
 }
 
 function buildCalendarModel(data: CalendarFeed | null, highlightIds?: Set<string>, currentMonthOnly: boolean = true): { dayNames: readonly string[]; monthLabel: string; cells: CalendarCell[] } {
@@ -943,11 +995,22 @@ function coerceSeconds(value: unknown, fallback: number, min = 1, max = 600): nu
 }
 
 // Main wallboard component - can be used with or without auth
-function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { presetSlug?: string; skipSplash?: boolean } = {}) {
+function WallboardDisplay({
+  presetSlug: propPresetSlug,
+  skipSplash = false,
+  wallboardApiToken,
+  onFatalError,
+}: {
+  presetSlug?: string;
+  skipSplash?: boolean;
+  wallboardApiToken?: string;
+  onFatalError?: (message?: string) => void;
+} = {}) {
   const { presetSlug: urlPresetSlug } = useParams<{ presetSlug?: string }>();
   const presetSlug = propPresetSlug !== undefined ? propPresetSlug : urlPresetSlug;
   const effectiveSlug = (presetSlug?.trim() || 'default').toLowerCase();
   const isProduccionPreset = effectiveSlug === 'produccion';
+  const isApiMode = Boolean(wallboardApiToken);
 
   const [isLoading, setIsLoading] = useState(!skipSplash); // Skip loading splash if already shown
   const [isAlien, setIsAlien] = useState(false);
@@ -978,6 +1041,45 @@ function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { 
     pending: 0,
     calendar: 0,
   });
+
+  const processAnnouncements = useCallback((rows: Array<{ id?: string; message?: string | null; level?: string | null; created_at?: string | null }>) => {
+    const regex = /^\s*\[HIGHLIGHT_JOB:([a-f0-9\-]+)\]\s*/i;
+    const now = Date.now();
+    const ttl = Math.max(1000, highlightTtlMs);
+    const staleIds: string[] = [];
+    const messages: TickerMessage[] = [];
+
+    setHighlightJobs(prev => {
+      const updated = new Map(prev);
+      (rows || []).forEach((a) => {
+        let m = a?.message || '';
+        const levelRaw = (a?.level ?? 'info') as AnnouncementLevel;
+        const level: AnnouncementLevel = ['info','warn','critical'].includes(levelRaw) ? levelRaw : 'info';
+        const match = m.match(regex);
+        if (match) {
+          const jobId = match[1];
+          const created = a?.created_at ? new Date(a.created_at).getTime() : now;
+          const expireAt = created + ttl;
+          if (expireAt > now) {
+            updated.set(jobId, expireAt);
+          } else if (a?.id) {
+            staleIds.push(a.id);
+          }
+          m = m.replace(regex, '');
+        }
+        if (m.trim()) messages.push({ message: m.trim(), level });
+      });
+      for (const [jid, exp] of updated) {
+        if (exp < now) {
+          updated.delete(jid);
+        }
+      }
+      return updated;
+    });
+
+    setTickerMsgs(messages);
+    return staleIds;
+  }, [highlightTtlMs]);
 
   useEffect(() => {
     setIdx(0);
@@ -1024,6 +1126,18 @@ function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { 
   }, [idx, panelOrder, panelDurations, rotationFallbackSeconds, panelPages, overview, crew, logistics]);
 
   useEffect(() => {
+    if (isApiMode) {
+      setPanelOrder([...DEFAULT_PANEL_ORDER]);
+      setPanelDurations({ ...DEFAULT_PANEL_DURATIONS });
+      setRotationFallbackSeconds(DEFAULT_ROTATION_FALLBACK_SECONDS);
+      setHighlightTtlMs(DEFAULT_HIGHLIGHT_TTL_SECONDS * 1000);
+      setTickerIntervalMs(DEFAULT_TICKER_SECONDS * 1000);
+      setPresetMessage(null);
+      setHighlightJobs(new Map());
+      setIdx(0);
+      return;
+    }
+
     let cancelled = false;
     setPresetMessage(null);
     const loadPreset = async () => {
@@ -1093,12 +1207,15 @@ function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { 
     return () => {
       cancelled = true;
     };
-  }, [effectiveSlug]);
+  }, [effectiveSlug, isApiMode]);
 
   // Data polling (client-side via RLS-safe views)
   // Note: State declarations moved earlier to avoid temporal dead zone issues
   
   useEffect(() => {
+    if (isApiMode) {
+      return;
+    }
     let cancelled = false;
     let isFirstLoad = true;
     const fetchAll = async () => {
@@ -1556,9 +1673,47 @@ function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { 
     fetchAll();
     const id = setInterval(fetchAll, 60000); // 60s polling
     return () => { cancelled = true; clearInterval(id); };
-  }, []);
+  }, [isApiMode]);
 
   useEffect(() => {
+    if (!wallboardApiToken) {
+      return;
+    }
+    let cancelled = false;
+    setLogistics([]);
+    const api = new WallboardApi(wallboardApiToken);
+
+    const fetchAll = async () => {
+      try {
+        const [overviewData, crewData, docData, pendingData] = await Promise.all([
+          api.jobsOverview(),
+          api.crewAssignments(),
+          api.docProgress(),
+          api.pendingActions(),
+        ]);
+        if (cancelled) return;
+        setOverview(overviewData);
+        setCalendarData(buildCalendarFromJobsList(overviewData.jobs));
+        setCrew(crewData);
+        setDocs(docData);
+        setPending(pendingData);
+        setIsLoading(false);
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Wallboard API fetch error:', err);
+        if (err instanceof WallboardApiError && (err.status === 401 || err.status === 403)) {
+          onFatalError?.('Access token expired or invalid. Please request a new wallboard link.');
+        }
+      }
+    };
+
+    fetchAll();
+    const id = window.setInterval(fetchAll, 60000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [wallboardApiToken, onFatalError]);
+
+  useEffect(() => {
+    if (wallboardApiToken) return;
     let cancelled = false;
     const fetchAnns = async () => {
       const { data } = await supabase
@@ -1567,49 +1722,17 @@ function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { 
         .eq('active', true)
         .order('created_at', { ascending: false })
         .limit(20);
-      if (!cancelled) {
-        const regex = /^\s*\[HIGHLIGHT_JOB:([a-f0-9\-]+)\]\s*/i;
-        const messages: TickerMessage[] = [];
-        const now = Date.now();
-        const updated = new Map(highlightJobs);
-        const ttl = Math.max(1000, highlightTtlMs);
-        const staleIds: string[] = [];
-        (data||[]).forEach((a:any) => {
-          let m = a.message || '';
-          const levelRaw = (a.level ?? 'info') as AnnouncementLevel;
-          const level: AnnouncementLevel = ['info','warn','critical'].includes(levelRaw) ? levelRaw : 'info';
-          const match = m.match(regex);
-          if (match) {
-            const jobId = match[1];
-            const created = a.created_at ? new Date(a.created_at).getTime() : now;
-            const expireAt = created + ttl;
-            if (expireAt > now) {
-              updated.set(jobId, expireAt);
-            } else if (a.id) {
-              staleIds.push(a.id);
-            }
-            m = m.replace(regex, '');
-          }
-          // Always include the message body in the ticker
-          if (m.trim()) messages.push({ message: m.trim(), level });
-        });
-        // Drop expired
-        for (const [jid, exp] of updated) {
-          if (exp < now) updated.delete(jid);
-        }
-        setHighlightJobs(updated);
-        setTickerMsgs(messages);
+      if (cancelled) return;
+      const staleIds = processAnnouncements(data || []);
 
-        // Best-effort cleanup of stale highlight announcements (DB flip to inactive)
-        if (staleIds.length) {
-          try {
-            await supabase
-              .from('announcements')
-              .update({ active: false })
-              .in('id', staleIds);
-          } catch (e) {
-            // ignore cleanup errors to avoid UI disruption
-          }
+      if (staleIds.length) {
+        try {
+          await supabase
+            .from('announcements')
+            .update({ active: false })
+            .in('id', staleIds);
+        } catch (e) {
+          // ignore cleanup errors to avoid UI disruption
         }
       }
     };
@@ -1617,7 +1740,30 @@ function WallboardDisplay({ presetSlug: propPresetSlug, skipSplash = false }: { 
     const interval = Math.max(5000, tickerIntervalMs);
     const id = setInterval(fetchAnns, interval); // ticker polling
     return () => { cancelled = true; clearInterval(id); };
-  }, [highlightTtlMs, tickerIntervalMs]);
+  }, [tickerIntervalMs, wallboardApiToken, processAnnouncements]);
+
+  useEffect(() => {
+    if (!wallboardApiToken) return;
+    let cancelled = false;
+    const api = new WallboardApi(wallboardApiToken);
+    const fetchAnns = async () => {
+      try {
+        const { announcements } = await api.announcements();
+        if (cancelled) return;
+        processAnnouncements(announcements || []);
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Wallboard API announcements error:', err);
+        if (err instanceof WallboardApiError && (err.status === 401 || err.status === 403)) {
+          onFatalError?.('Access token expired or invalid. Please request a new wallboard link.');
+        }
+      }
+    };
+    fetchAnns();
+    const interval = Math.max(5000, tickerIntervalMs);
+    const id = window.setInterval(fetchAnns, interval);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [wallboardApiToken, tickerIntervalMs, processAnnouncements, onFatalError]);
 
   // Periodic cleanup of expired highlights
   useEffect(() => {
