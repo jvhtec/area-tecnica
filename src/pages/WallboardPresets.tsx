@@ -62,6 +62,28 @@ function clampNumber(value: number, min: number, max: number, fallback: number) 
   return Math.round(value);
 }
 
+function getPublicDisplayUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  // 1) Build absolute URL from the stored display_url
+  let url = trimmed;
+  if (!(trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      if (trimmed.startsWith('/')) url = `${window.location.origin}${trimmed}`;
+      else url = `${window.location.origin}/${trimmed}`;
+    }
+  }
+
+  // 2) Append wallboard token if configured and not already present
+  const token = (import.meta as any).env?.VITE_WALLBOARD_TOKEN as string | undefined;
+  if (token && !url.includes('wallboardToken=')) {
+    const separator = url.includes('?') ? '&' : '?';
+    url = `${url}${separator}wallboardToken=${encodeURIComponent(token)}`;
+  }
+
+  return url;
+}
+
 export default function WallboardPresets() {
   useRoleGuard(['admin', 'management']);
   const { toast } = useToast();
@@ -130,7 +152,7 @@ export default function WallboardPresets() {
   useEffect(() => {
     if (!activePreset || isSavingRef.current) return;
     setSlugInput(activePreset.slug);
-    setDisplayUrlInput(activePreset.display_url ?? '');
+    setDisplayUrlInput(getPublicDisplayUrl(activePreset.display_url ?? ''));
     setPanelOrder(normaliseOrder(activePreset.panel_order));
     setPanelDurations((prev) => {
       const next: Record<PanelKey, number> = { ...prev };
@@ -257,7 +279,7 @@ export default function WallboardPresets() {
   const resetChanges = () => {
     if (!activePreset) return;
     setSlugInput(activePreset.slug);
-    setDisplayUrlInput(activePreset.display_url ?? '');
+    setDisplayUrlInput(getPublicDisplayUrl(activePreset.display_url ?? ''));
     setPanelOrder(normaliseOrder(activePreset.panel_order));
     setPanelDurations((durations) => {
       const next = { ...durations };
@@ -276,11 +298,12 @@ export default function WallboardPresets() {
 
   const copyDisplayUrl = async (value: string) => {
     if (!value) return;
+    const publicUrl = getPublicDisplayUrl(value);
     try {
       if (typeof navigator === 'undefined' || !navigator.clipboard) {
         throw new Error('Clipboard API unavailable');
       }
-      await navigator.clipboard.writeText(value);
+      await navigator.clipboard.writeText(publicUrl);
       toast({ title: 'Copiado', description: 'URL copiada al portapapeles.' });
     } catch (error) {
       console.error('Failed to copy wallboard URL', error);
@@ -436,7 +459,7 @@ export default function WallboardPresets() {
                   </div>
                   <div className="flex flex-col gap-2 md:w-[28rem]">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <Input readOnly value={preset.display_url} className="flex-1" />
+                      <Input readOnly value={getPublicDisplayUrl(preset.display_url)} className="flex-1" />
                       <Button
                         type="button"
                         variant="outline"
@@ -582,7 +605,11 @@ export default function WallboardPresets() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Comparta este enlace con cualquier dispositivo que deba mostrar el wallboard.
+                  URL pública resultante:{' '}
+                  <span className="font-mono break-all">
+                    {displayUrlInput ? getPublicDisplayUrl(displayUrlInput) : '—'}
+                  </span>
+                  . Comparta este enlace con cualquier dispositivo que deba mostrar el wallboard.
                 </p>
               </div>
             </div>
