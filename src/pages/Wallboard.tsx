@@ -6,6 +6,7 @@ import { ANNOUNCEMENT_LEVEL_STYLES, type AnnouncementLevel } from '@/constants/a
 import { Plane, Wrench, Star, Moon, Mic } from 'lucide-react';
 import SplashScreen from '@/components/SplashScreen';
 import { WallboardApi, WallboardApiError } from '@/lib/wallboard-api';
+import { useLgScreensaverBlock } from '@/hooks/useLgScreensaverBlock';
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -1011,6 +1012,8 @@ function WallboardDisplay({
   const effectiveSlug = (presetSlug?.trim() || 'default').toLowerCase();
   const isProduccionPreset = effectiveSlug === 'produccion';
   const isApiMode = Boolean(wallboardApiToken);
+
+  useLgScreensaverBlock();
 
   const [isLoading, setIsLoading] = useState(!skipSplash); // Skip loading splash if already shown
   const [isAlien, setIsAlien] = useState(false);
