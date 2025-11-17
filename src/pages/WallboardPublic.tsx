@@ -18,6 +18,7 @@ import { exchangeWallboardToken } from '@/lib/wallboard-api';
 export default function WallboardPublic() {
   const { token, presetSlug } = useParams<{ token: string; presetSlug?: string }>();
   const navigate = useNavigate();
+  const DEFAULT_WALLBOARD_TOKEN = 'f3c98b2df1a4e7650fbd44c9ce19ab73c6d7a0e49b3f25ea18fd6740a2ce9b1d';
   const [isValidating, setIsValidating] = useState(true);
   const [isValid, setIsValid] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +51,7 @@ export default function WallboardPublic() {
       }
 
       // Step 1: Validate the token against environment variable
-      const expectedToken = import.meta.env.VITE_WALLBOARD_TOKEN || 'demo-wallboard-token';
+      const expectedToken = import.meta.env.VITE_WALLBOARD_TOKEN || DEFAULT_WALLBOARD_TOKEN;
 
       // Debug logging with no secrets
       console.log('🔐 Token validation:', {
