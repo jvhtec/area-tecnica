@@ -173,7 +173,7 @@ const Sound = () => {
             onDateTypeChange={() => {}}
           />
         </div>
-        <div className="w-full hidden md:block">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <TodaySchedule
             jobs={getSelectedDateJobs()}
             onEditClick={handleEditClick}
