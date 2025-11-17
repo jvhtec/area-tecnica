@@ -1067,7 +1067,7 @@ export function JobCardNew({
                       <span className="hidden sm:inline">Assign</span>
                       <span className="sm:hidden">Assign</span>
                     </Button>
-                  }
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
