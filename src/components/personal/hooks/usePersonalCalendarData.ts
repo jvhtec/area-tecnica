@@ -38,20 +38,25 @@ interface VacationPeriod {
   notes?: string;
 }
 
+const dateOnly = (date: Date) => date.toISOString().split('T')[0];
+
 export const usePersonalCalendarData = (currentMonth: Date) => {
   const [houseTechs, setHouseTechs] = useState<HouseTech[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [vacationPeriods, setVacationPeriods] = useState<VacationPeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`; // Stable key per month to avoid refetch on day clicks
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchData = async () => {
       setIsLoading(true);
-      console.log('PersonalCalendar: Starting data fetch for month:', currentMonth);
-      
+
       try {
-        // Fetch house technicians
-        console.log('PersonalCalendar: Fetching house technicians...');
+        const startDate = subDays(startOfMonth(currentMonth), 7);
+        const endDate = addDays(endOfMonth(currentMonth), 7);
+
         const { data: techsData, error: techsError } = await supabase
           .from('profiles')
           .select('id, first_name, last_name, department, phone')
@@ -59,119 +64,118 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
           .order('first_name');
 
         if (techsError) {
-          console.error('PersonalCalendar: Error fetching house techs:', techsError);
-          setIsLoading(false);
-          return;
+          throw techsError;
         }
 
-        console.log('PersonalCalendar: House techs fetched:', techsData?.length || 0);
-        setHouseTechs(techsData || []);
+        const techIds = (techsData ?? []).map((tech) => tech.id);
 
-        // Calculate date range (current month ± 1 week for better performance)
-        const startDate = subDays(startOfMonth(currentMonth), 7);
-        const endDate = addDays(endOfMonth(currentMonth), 7);
+        let assignmentResults: Assignment[] = [];
 
-        console.log('PersonalCalendar: Date range:', startDate, 'to', endDate);
-
-        // Fetch job assignments for house techs within date range
-        console.log('PersonalCalendar: Fetching job assignments...');
-        const { data: assignmentsData, error: assignmentsError } = await supabase
-          .from('job_assignments')
-          .select(`
-            technician_id,
-            sound_role,
-            lights_role,
-            video_role,
-            single_day,
-            assignment_date,
-            jobs!inner (
-              id,
-              title,
-              color,
-              start_time,
-              end_time,
-              status,
-              locations (
-                name
+        if (techIds.length > 0) {
+          const { data: assignmentsData, error: assignmentsError } = await supabase
+            .from('job_assignments')
+            .select(`
+              technician_id,
+              sound_role,
+              lights_role,
+              video_role,
+              single_day,
+              assignment_date,
+              jobs!inner (
+                id,
+                title,
+                color,
+                start_time,
+                end_time,
+                status,
+                locations ( name )
               )
-            )
-          `)
-          .in('technician_id', (techsData || []).map(tech => tech.id))
-          .lte('jobs.start_time', endDate.toISOString())
-          .gte('jobs.end_time', startDate.toISOString());
+            `)
+            .in('technician_id', techIds)
+            .lte('jobs.start_time', endDate.toISOString())
+            .gte('jobs.end_time', startDate.toISOString());
 
-        if (assignmentsError) {
-          console.error('PersonalCalendar: Error fetching assignments:', assignmentsError);
-          setIsLoading(false);
-          return;
-        }
-
-        console.log('PersonalCalendar: Raw assignments data:', assignmentsData);
-
-        // Fetch vacation periods (approved vacations showing as unavailable)
-        console.log('PersonalCalendar: Fetching vacation periods...');
-        const { data: vacationData, error: vacationError } = await supabase
-          .from('availability_schedules')
-          .select('user_id, date, source, notes')
-          .in('user_id', (techsData || []).map(tech => tech.id))
-          .eq('status', 'unavailable')
-          .eq('source', 'vacation')
-          .gte('date', startDate.toISOString().split('T')[0])
-          .lte('date', endDate.toISOString().split('T')[0]);
-
-        if (vacationError) {
-          console.error('PersonalCalendar: Error fetching vacation periods:', vacationError);
-        } else {
-          console.log('PersonalCalendar: Vacation periods fetched:', vacationData?.length || 0);
-          setVacationPeriods(vacationData?.map(v => ({
-            technician_id: v.user_id,
-            date: v.date,
-            source: v.source,
-            notes: v.notes
-          })) || []);
-        }
-
-        // Transform the data to match our interface
-        const transformedAssignments: Assignment[] = (assignmentsData || []).map(assignment => {
-          // Handle the case where jobs might be an array or object
-          const jobData = Array.isArray(assignment.jobs) ? assignment.jobs[0] : assignment.jobs;
-          
-          if (!jobData) {
-            console.warn('PersonalCalendar: No job data found for assignment:', assignment);
-            return null;
+          if (assignmentsError) {
+            throw assignmentsError;
           }
 
-          const transformedAssignment = {
-            technician_id: assignment.technician_id,
-            sound_role: assignment.sound_role,
-            lights_role: assignment.lights_role,
-            video_role: assignment.video_role,
-            single_day: assignment.single_day,
-            assignment_date: assignment.assignment_date,
-            job: {
-              id: jobData.id,
-              title: jobData.title,
-              color: jobData.color,
-              start_time: jobData.start_time,
-              end_time: jobData.end_time,
-              status: jobData.status,
-              location: jobData.locations && Array.isArray(jobData.locations) && jobData.locations.length > 0 
-                ? { name: jobData.locations[0].name } 
-                : null,
-            },
-          };
+          assignmentResults = (assignmentsData ?? [])
+            .map((assignment) => {
+              const jobData = Array.isArray(assignment.jobs) ? assignment.jobs[0] : assignment.jobs;
+              if (!jobData) {
+                return null;
+              }
 
-          console.log('PersonalCalendar: Transformed assignment:', transformedAssignment);
-          return transformedAssignment;
-        }).filter(Boolean) as Assignment[]; // Filter out null values
+              const locationValue = Array.isArray(jobData.locations)
+                ? jobData.locations[0]
+                : jobData.locations;
 
-        console.log('PersonalCalendar: Final transformed assignments:', transformedAssignments.length);
-        setAssignments(transformedAssignments);
+              return {
+                technician_id: assignment.technician_id,
+                sound_role: assignment.sound_role,
+                lights_role: assignment.lights_role,
+                video_role: assignment.video_role,
+                single_day: assignment.single_day,
+                assignment_date: assignment.assignment_date,
+                job: {
+                  id: jobData.id,
+                  title: jobData.title,
+                  color: jobData.color,
+                  start_time: jobData.start_time,
+                  end_time: jobData.end_time,
+                  status: jobData.status,
+                  location: locationValue?.name ? { name: locationValue.name } : null,
+                },
+              };
+            })
+            .filter(Boolean) as Assignment[];
+        }
+
+        let vacationResults: VacationPeriod[] = [];
+
+        if (techIds.length > 0) {
+          const { data: vacationData, error: vacationError } = await supabase
+            .from('availability_schedules')
+            .select('user_id, date, source, notes')
+            .in('user_id', techIds)
+            .eq('status', 'unavailable')
+            .eq('source', 'vacation')
+            .gte('date', dateOnly(startDate))
+            .lte('date', dateOnly(endDate));
+
+          if (vacationError) {
+            throw vacationError;
+          }
+
+          vacationResults = (vacationData ?? []).map((entry) => ({
+            technician_id: entry.user_id,
+            date: entry.date,
+            source: entry.source,
+            notes: entry.notes ?? undefined,
+          }));
+        }
+
+        if (!isMounted) {
+          return;
+        }
+
+        setHouseTechs(techsData ?? []);
+        setAssignments(assignmentResults);
+        setVacationPeriods(vacationResults);
       } catch (error) {
-        console.error('PersonalCalendar: Error in fetchData:', error);
+        console.error('PersonalCalendar: Error fetching data', error);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setHouseTechs([]);
+        setAssignments([]);
+        setVacationPeriods([]);
       } finally {
-        setIsLoading(false);
-        console.log('PersonalCalendar: Data fetch completed');
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -212,10 +216,12 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
       .subscribe();
 
     return () => {
+      isMounted = false;
       supabase.removeChannel(assignmentChannel);
       supabase.removeChannel(availabilityChannel);
     };
-  }, [currentMonth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthKey]); // Only refetch when the month changes, not every day selection
 
   return { houseTechs, assignments, vacationPeriods, isLoading };
 };

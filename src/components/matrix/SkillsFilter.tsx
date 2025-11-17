@@ -12,12 +12,25 @@ type Skill = { id: string; name: string; category: string | null };
 interface SkillsFilterProps {
   selected: string[]; // skill names
   onChange: (skills: string[]) => void;
+  department?: string;
 }
 
-export const SkillsFilter: React.FC<SkillsFilterProps> = ({ selected, onChange }) => {
+const LIGHTS_PRESET_SKILLS: Skill[] = [
+  { id: 'lights-ma2', name: 'Operador (MA2)', category: 'lights' },
+  { id: 'lights-ma3', name: 'Operador (MA3)', category: 'lights' },
+  { id: 'lights-hog', name: 'Operador (HOG)', category: 'lights' },
+  { id: 'lights-avo', name: 'Operador (AVO)', category: 'lights' },
+  { id: 'lights-dim', name: 'Dimmer', category: 'lights' },
+  { id: 'lights-rig', name: 'Rigging', category: 'lights' },
+  { id: 'lights-mont', name: 'Montador', category: 'lights' },
+];
+const SOUND_EXTRA_SKILLS: Skill[] = [
+  { id: 'sound-height', name: 'Trabajo en altura', category: 'sound' },
+];
+
+export const SkillsFilter: React.FC<SkillsFilterProps> = ({ selected, onChange, department }) => {
   const [open, setOpen] = React.useState(false);
   const [skills, setSkills] = React.useState<Skill[]>([]);
-  const [query, setQuery] = React.useState('');
 
   React.useEffect(() => {
     let mounted = true;
@@ -32,12 +45,33 @@ export const SkillsFilter: React.FC<SkillsFilterProps> = ({ selected, onChange }
       if (error) {
         console.warn('Failed to fetch skills:', error);
         setSkills([]);
-      } else {
-        setSkills(data || []);
+        return;
       }
+
+      const dept = (department || '').toLowerCase();
+      const base = (data || []).filter((s) => !!s?.name);
+      if (dept === 'lights') {
+        // For lights, present the curated set only
+        setSkills(LIGHTS_PRESET_SKILLS);
+        return;
+      }
+
+      if (dept === 'sound') {
+        const filtered = base.filter((s) => (s.category || '').toLowerCase().startsWith('sound'));
+        const merged = [...filtered];
+        SOUND_EXTRA_SKILLS.forEach((extra) => {
+          if (!merged.some((s) => s.name.toLowerCase() === extra.name.toLowerCase())) {
+            merged.push(extra);
+          }
+        });
+        setSkills(merged);
+        return;
+      }
+
+      setSkills(base);
     })();
     return () => { mounted = false };
-  }, []);
+  }, [department]);
 
   const toggle = (name: string, checked: boolean) => {
     const next = new Set(selected);
@@ -71,24 +105,21 @@ export const SkillsFilter: React.FC<SkillsFilterProps> = ({ selected, onChange }
       <PopoverContent className="p-0 w-80" align="start">
         {open && (
           <Command>
-            <CommandInput placeholder="Search skills..." value={query} onValueChange={setQuery} />
             <CommandList>
               <CommandEmpty>No skills found.</CommandEmpty>
               {grouped.map(([category, list]) => (
                 <CommandGroup key={category} heading={category}>
-                  {list
-                    .filter(s => !query || s.name.toLowerCase().includes(query.toLowerCase()))
-                    .map(s => {
-                      const checked = selected.includes(s.name);
-                      return (
-                        <CommandItem key={s.id} onSelect={() => toggle(s.name, !checked)}>
-                          <div className="mr-2">
-                            <Checkbox checked={checked} onCheckedChange={(v) => toggle(s.name, !!v)} />
-                          </div>
-                          <span>{s.name}</span>
-                        </CommandItem>
-                      );
-                    })}
+                  {list.map(s => {
+                    const checked = selected.includes(s.name);
+                    return (
+                      <CommandItem key={s.id} onSelect={() => toggle(s.name, !checked)}>
+                        <div className="mr-2">
+                          <Checkbox checked={checked} onCheckedChange={(v) => toggle(s.name, !!v)} />
+                        </div>
+                        <span>{s.name}</span>
+                      </CommandItem>
+                    );
+                  })}
                 </CommandGroup>
               ))}
             </CommandList>

@@ -178,6 +178,8 @@ const Lights = () => {
             onJobClick={handleJobClick}
             userRole={userRole}
             selectedDate={date}
+            detailsOnlyMode
+            department={currentDepartment}
           />
         </div>
       </div>

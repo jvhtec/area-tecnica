@@ -66,10 +66,24 @@ interface SendCorporateEmailRequest {
   inlineImages?: InlineImage[];
 }
 
+interface RecipientStatus {
+  email: string;
+  success: boolean;
+  error?: string;
+}
+
 interface EmailLogMetadata {
   inlineImagePaths?: string[] | null;
   inlineImageRetentionUntil?: string | null;
   inlineImageCleanupCompletedAt?: string | null;
+}
+
+const BREVO_MAX_BATCH_SIZE = 50;
+const EMAIL_REGEX =
+  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+
+function isValidEmail(email: string): boolean {
+  return EMAIL_REGEX.test(email.toLowerCase());
 }
 
 /**
@@ -353,6 +367,15 @@ async function cleanupImages(filePaths: string[]): Promise<boolean> {
   }
 }
 
+function chunkArray<T>(items: T[], chunkSize: number): T[][] {
+  if (chunkSize <= 0) return [items];
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    chunks.push(items.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -450,9 +473,9 @@ serve(async (req) => {
       departments: body.recipients.departments || [],
       roles: body.recipients.roles || [],
     });
-    const recipientEmails = await fetchRecipientEmails(body.recipients);
+    const fetchedRecipientEmails = await fetchRecipientEmails(body.recipients);
 
-    if (recipientEmails.length === 0) {
+    if (fetchedRecipientEmails.length === 0) {
       return new Response(
         JSON.stringify({
           error: "No recipients",
@@ -465,7 +488,46 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[send-corporate-email] Found ${recipientEmails.length} unique recipients`);
+    const normalizedRecipients = Array.from(
+      new Set(
+        fetchedRecipientEmails
+          .map((email) => email.trim())
+          .filter((email) => email.length > 0)
+      )
+    );
+
+    const validRecipients: string[] = [];
+    const invalidRecipientStatuses: RecipientStatus[] = [];
+    for (const email of normalizedRecipients) {
+      if (isValidEmail(email)) {
+        validRecipients.push(email);
+      } else {
+        invalidRecipientStatuses.push({
+          email,
+          success: false,
+          error: "Invalid email address",
+        });
+      }
+    }
+
+    console.log(
+      `[send-corporate-email] Found ${normalizedRecipients.length} unique recipients (${validRecipients.length} valid, ${invalidRecipientStatuses.length} invalid)`
+    );
+
+    if (validRecipients.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "No valid email addresses",
+          totalRecipients: normalizedRecipients.length,
+          recipientStatuses: invalidRecipientStatuses,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     // Step 7: Upload inline images to temporary storage and get URLs
     const uploadedImagePaths: string[] = [];
@@ -533,55 +595,106 @@ serve(async (req) => {
       subject: body.subject,
     });
 
-    // Step 9: Build Brevo payload
-    const emailPayload: Record<string, unknown> = {
-      sender: { email: BREVO_FROM, name: senderName },
-      to: recipientEmails.map((email) => ({ email })),
-      subject: body.subject,
-      htmlContent,
-    };
+    // Step 9 & 10: Send via Brevo in batches so invalid batches don't block others
+    console.log(
+      `[send-corporate-email] Sending ${validRecipients.length} recipients via Brevo in batches of ${BREVO_MAX_BATCH_SIZE}...`
+    );
+    const recipientStatuses: RecipientStatus[] = [...invalidRecipientStatuses];
+    const deliveredRecipients: string[] = [];
+    const failedValidRecipients: RecipientStatus[] = [];
+    const brevoMessageIds: string[] = [];
+    const brevoErrors: string[] = [];
+    let lastErrorStatus: number | undefined;
 
-    // Add PDF attachments
-    if (body.pdfAttachments && body.pdfAttachments.length > 0) {
-      emailPayload.attachment = body.pdfAttachments.map((pdf) => ({
-        content: pdf.content,
-        name: pdf.filename,
-      }));
-    }
+    const recipientBatches = chunkArray(validRecipients, BREVO_MAX_BATCH_SIZE);
+    for (const batch of recipientBatches) {
+      const emailPayload: Record<string, unknown> = {
+        sender: { email: BREVO_FROM, name: senderName },
+        to: batch.map((email) => ({ email })),
+        subject: body.subject,
+        htmlContent,
+      };
 
-    // Step 10: Send via Brevo
-    console.log("[send-corporate-email] Sending via Brevo...");
-    let sendRes: Response;
-    try {
-      sendRes = await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: {
-          "api-key": BREVO_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(emailPayload),
-      });
-    } catch (error) {
-      // Clean up uploaded images on send failure
-      await cleanupImages(uploadedImagePaths);
-      throw error;
-    }
-
-    const success = sendRes.ok;
-    let messageId: string | undefined;
-    let errorMessage: string | undefined;
-    let retentionUntil: string | null = null;
-    let logMetadata: EmailLogMetadata | undefined;
-
-    if (success) {
-      try {
-        const brevoResponse = await sendRes.json();
-        messageId = brevoResponse.messageId;
-      } catch (e) {
-        console.warn("[send-corporate-email] Could not parse Brevo response", e);
+      if (body.pdfAttachments && body.pdfAttachments.length > 0) {
+        emailPayload.attachment = body.pdfAttachments.map((pdf) => ({
+          content: pdf.content,
+          name: pdf.filename,
+        }));
       }
 
-      if (uploadedImagePaths.length > 0) {
+      let batchResponse: Response | null = null;
+      try {
+        batchResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: {
+            "api-key": BREVO_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(emailPayload),
+        });
+      } catch (error) {
+        const errMsg = (error as Error).message || "Unknown error";
+        console.error("[send-corporate-email] Brevo request error:", errMsg);
+        lastErrorStatus = lastErrorStatus ?? 500;
+        brevoErrors.push(errMsg);
+        batch.forEach((email) => {
+          const status: RecipientStatus = { email, success: false, error: errMsg };
+          recipientStatuses.push(status);
+          failedValidRecipients.push(status);
+        });
+        continue;
+      }
+
+      if (batchResponse.ok) {
+        try {
+          const brevoResponse = await batchResponse.json();
+          if (brevoResponse?.messageId) {
+            brevoMessageIds.push(brevoResponse.messageId);
+          }
+        } catch (e) {
+          console.warn("[send-corporate-email] Could not parse Brevo response", e);
+        }
+
+        batch.forEach((email) => {
+          const status: RecipientStatus = { email, success: true };
+          recipientStatuses.push(status);
+        });
+        deliveredRecipients.push(...batch);
+      } else {
+        const errorMessage = await batchResponse.text();
+        lastErrorStatus = batchResponse.status;
+        console.error(
+          "[send-corporate-email] Brevo batch error:",
+          batchResponse.status,
+          errorMessage
+        );
+        brevoErrors.push(errorMessage || `Brevo responded with status ${batchResponse.status}`);
+        batch.forEach((email) => {
+          const status: RecipientStatus = {
+            email,
+            success: false,
+            error: errorMessage || "Brevo rejected batch",
+          };
+          recipientStatuses.push(status);
+          failedValidRecipients.push(status);
+        });
+      }
+    }
+
+    const totalDelivered = deliveredRecipients.length;
+    const deliveryStatus: 'success' | 'partial' | 'failed' =
+      totalDelivered === 0
+        ? 'failed'
+        : failedValidRecipients.length > 0
+          ? 'partial'
+          : 'success';
+    const success = deliveryStatus === 'success';
+    let retentionUntil: string | null = null;
+    let logMetadata: EmailLogMetadata | undefined;
+    const aggregatedErrorMessage = brevoErrors.filter(Boolean).join("; ") || undefined;
+
+    if (uploadedImagePaths.length > 0) {
+      if (totalDelivered > 0) {
         retentionUntil = new Date(Date.now() + INLINE_IMAGE_RETENTION_MS).toISOString();
         console.log(
           `[send-corporate-email] Retaining ${uploadedImagePaths.length} inline images until ${retentionUntil} (${INLINE_IMAGE_RETENTION_HOURS}h)`
@@ -590,12 +703,7 @@ serve(async (req) => {
           inlineImagePaths: uploadedImagePaths,
           inlineImageRetentionUntil: retentionUntil,
         };
-      }
-    } else {
-      errorMessage = await sendRes.text();
-      console.error("[send-corporate-email] Brevo error:", sendRes.status, errorMessage);
-
-      if (uploadedImagePaths.length > 0) {
+      } else {
         console.log(
           `[send-corporate-email] Cleaning up ${uploadedImagePaths.length} temporary images due to send failure...`
         );
@@ -619,52 +727,48 @@ serve(async (req) => {
       user.id,
       body.subject,
       body.bodyHtml,
-      recipientEmails,
-      success ? recipientEmails.length : 0,
-      recipientEmails.length,
-      errorMessage,
+      normalizedRecipients,
+      totalDelivered,
+      normalizedRecipients.length,
+      aggregatedErrorMessage,
       logMetadata
     );
 
     // Step 13: Return response
-    if (success) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          sentCount: recipientEmails.length,
-          totalRecipients: recipientEmails.length,
-          recipientStatuses: recipientEmails.map((email) => ({
-            email,
-            success: true,
-          })),
-          messageId,
-          inlineImageRetentionExpiresAt: retentionUntil,
-          inlineImageRetentionHours: INLINE_IMAGE_RETENTION_HOURS,
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    } else {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          sentCount: 0,
-          totalRecipients: recipientEmails.length,
-          recipientStatuses: recipientEmails.map((email) => ({
-            email,
-            success: false,
-            error: errorMessage,
-          })),
-          error: "Email delivery failed",
-        }),
-        {
-          status: sendRes.status,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    const responsePayload: Record<string, unknown> = {
+      success,
+      deliveryStatus,
+      sentCount: totalDelivered,
+      totalRecipients: normalizedRecipients.length,
+      recipientStatuses,
+      invalidRecipientCount: invalidRecipientStatuses.length,
+      messageId: brevoMessageIds[0],
+      messageIds: brevoMessageIds,
+    };
+
+    if (retentionUntil) {
+      responsePayload.inlineImageRetentionExpiresAt = retentionUntil;
+      responsePayload.inlineImageRetentionHours = INLINE_IMAGE_RETENTION_HOURS;
     }
+
+    if (aggregatedErrorMessage) {
+      responsePayload.error =
+        deliveryStatus === "partial"
+          ? `Partial delivery: ${aggregatedErrorMessage}`
+          : aggregatedErrorMessage;
+    }
+
+    let responseStatus = 200;
+    if (deliveryStatus === "partial") {
+      responseStatus = 207;
+    } else if (deliveryStatus === "failed") {
+      responseStatus = lastErrorStatus ?? 500;
+    }
+
+    return new Response(JSON.stringify(responsePayload), {
+      status: responseStatus,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
     console.error("[send-corporate-email] Unexpected error", err);
     return new Response(

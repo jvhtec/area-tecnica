@@ -348,8 +348,16 @@ export default function JobAssignmentMatrix() {
       console.warn('Failed to read outstanding hash from storage', error);
     }
   }, []);
-  const specialtyOptions = ['foh','monitores','sistemas','rf','escenario','PA'] as const;
-  const toggleSpecialty = (name: (typeof specialtyOptions)[number]) => {
+  const specialtyOptions = React.useMemo(() => {
+    if (selectedDepartment === 'lights') {
+      return ['Operador (MA2)','Operador (MA3)','Operador (HOG)','Operador (AVO)','Dimmer','Rigging','Montador'] as const;
+    }
+    if (selectedDepartment === 'sound') {
+      return ['foh','monitores','sistemas','rf','Trabajo en altura','Tecnico de Escenario','Montador'] as const;
+    }
+    return [] as const;
+  }, [selectedDepartment]);
+  const toggleSpecialty = (name: string) => {
     setSelectedSkills(prev => prev.includes(name) ? prev.filter(s => s !== name) : [...prev, name]);
   };
 
@@ -994,20 +1002,22 @@ export default function JobAssignmentMatrix() {
               className="w-48 min-w-0 flex-1 sm:flex-none"
             />
 
-            <SkillsFilter selected={selectedSkills} onChange={setSelectedSkills} />
-            {/* Quick specialties for sound */}
-            <div className="flex items-center gap-1">
-              {specialtyOptions.map(opt => (
-                <Badge
-                  key={opt}
-                  variant={selectedSkills.includes(opt) ? 'default' : 'outline'}
-                  className="cursor-pointer capitalize"
-                  onClick={() => toggleSpecialty(opt)}
-                >
-                  {opt}
-                </Badge>
-              ))}
-            </div>
+            <SkillsFilter selected={selectedSkills} onChange={setSelectedSkills} department={selectedDepartment} />
+            {/* Quick specialties */}
+            {specialtyOptions.length > 0 && (
+              <div className="flex items-center gap-1">
+                {specialtyOptions.map((opt) => (
+                  <Badge
+                    key={opt}
+                    variant={selectedSkills.includes(opt) ? 'default' : 'outline'}
+                    className="cursor-pointer capitalize"
+                    onClick={() => toggleSpecialty(opt)}
+                  >
+                    {opt}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
@@ -1132,7 +1142,21 @@ export default function JobAssignmentMatrix() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <SkillsFilter selected={selectedSkills} onChange={setSelectedSkills} />
+              <SkillsFilter selected={selectedSkills} onChange={setSelectedSkills} department={selectedDepartment} />
+              {specialtyOptions.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {specialtyOptions.map((opt) => (
+                    <Badge
+                      key={opt}
+                      variant={selectedSkills.includes(opt) ? 'default' : 'outline'}
+                      className="cursor-pointer capitalize"
+                      onClick={() => toggleSpecialty(opt)}
+                    >
+                      {opt}
+                    </Badge>
+                  ))}
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Refrigerator className="h-4 w-4" />

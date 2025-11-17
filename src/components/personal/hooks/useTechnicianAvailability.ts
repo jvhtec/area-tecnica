@@ -32,6 +32,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
   const [availabilityData, setAvailabilityData] = useState<Record<string, 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | 'warehouse'>>({});
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`; // Keep effect stable within same month
 
   useEffect(() => {
     const fetchAvailability = async () => {
@@ -167,7 +168,8 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
       supabase.removeChannel(schedulesChannel);
       supabase.removeChannel(vacationRequestsChannel);
     };
-  }, [currentMonth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthKey]); // Only refetch when month boundary changes
 
   const updateAvailability = async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
