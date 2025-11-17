@@ -1179,168 +1179,217 @@ export function JobCardNew({
           </div>
         </div>
 
-        <div className="px-3 sm:px-6 pb-3 sm:pb-6">
-          <div className="space-y-2 text-xs sm:text-sm">
-            <div className="flex items-center gap-2">
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <span className="truncate">
-                  {format(new Date(job.start_time), "MMM d, yyyy")} -{" "}
-                  {format(new Date(job.end_time), "MMM d, yyyy")}
-                </span>
-                <span className="text-muted-foreground">
-                  {format(new Date(job.start_time), "HH:mm")}
-                </span>
-              </div>
-            </div>
-            {job.location?.name && (
-              <div className="flex items-center gap-2">
-                <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
-                <span className="font-medium truncate">{job.location.name}</span>
-              </div>
-            )}
-            {job.job_type !== "dryhire" && (
-              <>
-                {assignedTechnicians.length > 0 && (
-                  <div className="flex items-start gap-2">
-                    <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0 mt-0.5" />
-                    <div className="flex flex-wrap gap-1 min-w-0">
-                      {assignedTechnicians.map((tech) => {
-                        const extraClasses = getBadgeClassesForTimesheet(tech.id);
-                        return (
-                          <Badge key={tech.id} variant="secondary" className={cn("text-xs max-w-full border", extraClasses)}>
-                            <span className="truncate">{tech.name} {tech.role && `(${tech.role})`}</span>
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                
-                {documents.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <div className="text-xs sm:text-sm font-medium">Documents</div>
-                    <div className="space-y-2">
-                      {documents.map((doc) => {
-                        const isTemplate = doc.template_type === 'soundvision';
-                        const isReadOnly = Boolean(doc.read_only);
-                        return (
-                          <div
-                            key={doc.id}
-                            className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="flex flex-col min-w-0 flex-1 mr-2">
-                              <span className="text-xs sm:text-sm font-medium truncate flex items-center gap-2" title={doc.file_name}>
-                                {doc.file_name}
-                                {isTemplate && (
-                                  <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                                    Template SoundVision File
-                                  </Badge>
-                                )}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                Uploaded {format(new Date(doc.uploaded_at), "MMM d, yyyy")}
-                                {isReadOnly && <span className="ml-2 italic">Read-only</span>}
-                              </span>
-                            </div>
-                            <div className="flex gap-1 shrink-0">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleViewDocument(doc)}
-                                title="View"
-                                disabled={isJobBeingDeleted}
-                                className="h-7 w-7 sm:h-8 sm:w-8"
-                              >
-                                <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDownload(doc)}
-                                title="Download"
-                                disabled={isJobBeingDeleted}
-                                className="h-7 w-7 sm:h-8 sm:w-8"
-                              >
-                                <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-                              </Button>
-                              {canDeleteDocuments(userRole) && !isReadOnly && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteDocument(doc)}
-                                  title="Delete"
-                                  disabled={isJobBeingDeleted}
-                                  className="h-7 w-7 sm:h-8 sm:w-8"
-                                >
-                                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+        {isDetailsOnlyMode ? (
+          <div className="px-3 sm:px-6 pb-3 sm:pb-6">
+            <p className="text-xs text-muted-foreground">
+              Open Job Details to review assignments, documents, and tasks for this job.
+            </p>
           </div>
-
-          {!collapsed && job.job_type !== "dryhire" && !hideTasks && (
-            <>
-              {department === "sound" && personnel && (
-                <>
-                  <div className="mt-2 p-2 bg-accent/20 rounded-md">
-                    <div className="text-xs font-medium mb-1">
-                      Required Personnel: {getTotalPersonnel()}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>FOH Engineers: {personnel.foh_engineers || 0}</div>
-                      <div>MON Engineers: {personnel.mon_engineers || 0}</div>
-                      <div>PA Techs: {personnel.pa_techs || 0}</div>
-                      <div>RF Techs: {personnel.rf_techs || 0}</div>
-                    </div>
+        ) : (
+          <>
+            <div className="px-3 sm:px-6 pb-3 sm:pb-6">
+              <div className="space-y-2 text-xs sm:text-sm">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="truncate">
+                      {format(new Date(job.start_time), "MMM d, yyyy")} -{" "}
+                      {format(new Date(job.end_time), "MMM d, yyyy")}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {format(new Date(job.start_time), "HH:mm")}
+                    </span>
                   </div>
-
-                  {soundTasks?.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>
-                          Task Progress ({getCompletedTasks()}/{soundTasks.length} completed)
-                        </span>
-                        <span>{calculateTotalProgress()}%</span>
-                      </div>
-                      <Progress value={calculateTotalProgress()} className="h-1" />
-                      <div className="space-y-1">
-                        {soundTasks.map((task: any) => (
-                          <div key={task.id} className="flex items-center justify-between text-xs">
-                            <span>{task.task_type}</span>
-                            <div className="flex items-center gap-2">
-                              {task.assigned_to && (
-                                <span className="text-muted-foreground">
-                                  {task.assigned_to.first_name} {task.assigned_to.last_name}
-                                </span>
-                              )}
-                              <Badge variant={task.status === "completed" ? "default" : "secondary"}>
-                                {task.status === "not_started"
-                                  ? "Not Started"
-                                  : task.status === "in_progress"
-                                  ? "In Progress"
-                                  : "Completed"}
+                </div>
+                {job.location?.name && (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                    <span className="font-medium truncate">{job.location.name}</span>
+                  </div>
+                )}
+                {job.job_type !== "dryhire" && (
+                  <>
+                    {assignedTechnicians.length > 0 && (
+                      <div className="flex items-start gap-2">
+                        <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <div className="flex flex-wrap gap-1 min-w-0">
+                          {assignedTechnicians.map((tech) => {
+                            const extraClasses = getBadgeClassesForTimesheet(tech.id);
+                            return (
+                              <Badge key={tech.id} variant="secondary" className={cn("text-xs max-w-full border", extraClasses)}>
+                                <span className="truncate">{tech.name} {tech.role && `(${tech.role})`}</span>
                               </Badge>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {documents.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        <div className="text-xs sm:text-sm font-medium">Documents</div>
+                        <div className="space-y-2">
+                          {documents.map((doc) => {
+                            const isTemplate = doc.template_type === 'soundvision';
+                            const isReadOnly = Boolean(doc.read_only);
+                            return (
+                              <div
+                                key={doc.id}
+                                className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="flex flex-col min-w-0 flex-1 mr-2">
+                                  <span className="text-xs sm:text-sm font-medium truncate flex items-center gap-2" title={doc.file_name}>
+                                    {doc.file_name}
+                                    {isTemplate && (
+                                      <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                                        Template SoundVision File
+                                      </Badge>
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Uploaded {format(new Date(doc.uploaded_at), "MMM d, yyyy")}
+                                    {isReadOnly && <span className="ml-2 italic">Read-only</span>}
+                                  </span>
+                                </div>
+                                <div className="flex gap-1 shrink-0">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleViewDocument(doc)}
+                                    title="View"
+                                    disabled={isJobBeingDeleted}
+                                    className="h-7 w-7 sm:h-8 sm:w-8"
+                                  >
+                                    <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDownload(doc)}
+                                    title="Download"
+                                    disabled={isJobBeingDeleted}
+                                    className="h-7 w-7 sm:h-8 sm:w-8"
+                                  >
+                                    <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  </Button>
+                                  {canDeleteDocuments(userRole) && !isReadOnly && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeleteDocument(doc)}
+                                      title="Delete"
+                                      disabled={isJobBeingDeleted}
+                                      className="h-7 w-7 sm:h-8 sm:w-8"
+                                    >
+                                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {!collapsed && job.job_type !== "dryhire" && !hideTasks && (
+                <>
+                  {department === "sound" && personnel && (
+                    <>
+                      <div className="mt-2 p-2 bg-accent/20 rounded-md">
+                        <div className="text-xs font-medium mb-1">
+                          Required Personnel: {getTotalPersonnel()}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>FOH Engineers: {personnel.foh_engineers || 0}</div>
+                          <div>MON Engineers: {personnel.mon_engineers || 0}</div>
+                          <div>PA Techs: {personnel.pa_techs || 0}</div>
+                          <div>RF Techs: {personnel.rf_techs || 0}</div>
+                        </div>
+                      </div>
+
+                      {soundTasks?.length > 0 && (
+                        <div className="mt-4 space-y-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>
+                              Task Progress ({getCompletedTasks()}/{soundTasks.length} completed)
+                            </span>
+                            <span>{calculateTotalProgress()}%</span>
+                          </div>
+                          <Progress value={calculateTotalProgress()} className="h-1" />
+                          <div className="space-y-1">
+                            {soundTasks.map((task: any) => (
+                              <div key={task.id} className="flex items-center justify-between text-xs">
+                                <span>{task.task_type}</span>
+                                <div className="flex items-center gap-2">
+                                  {task.assigned_to && (
+                                    <span className="text-muted-foreground">
+                                      {task.assigned_to.first_name} {task.assigned_to.last_name}
+                                    </span>
+                                  )}
+                                  <Badge variant={task.status === "completed" ? "default" : "secondary"}>
+                                    {task.status === "not_started"
+                                      ? "Not Started"
+                                      : task.status === "in_progress"
+                                        ? "In Progress"
+                                        : "Completed"}
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {department === "lights" && lightsRequirements && (
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                      <div>LD: {lightsRequirements.ld || 0}</div>
+                      <div>Programmers: {lightsRequirements.programmers || 0}</div>
+                      <div>Dimmer Techs: {lightsRequirements.dimmer_techs || 0}</div>
+                      <div>Floor Techs: {lightsRequirements.floor_techs || 0}</div>
+                    </div>
+                  )}
+
+                  <div className="mt-4">
+                    <h4 className="text-sm font-semibold mb-2">Tasks</h4>
+                    {tasks.length > 0 ? (
+                      <div className="space-y-1">
+                        {tasks.map((task) => (
+                          <div key={task.id} className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={cn(
+                                  "w-2 h-2 rounded-full",
+                                  task.status === "completed"
+                                    ? "bg-green-500"
+                                    : task.status === "in_progress"
+                                      ? "bg-yellow-500"
+                                      : "bg-muted-foreground"
+                                )}
+                              />
+                              <span className="truncate">{task.title}</span>
                             </div>
+                            <Badge variant="secondary" className="text-[10px] capitalize">
+                              {task.status.replace("_", " ")}
+                            </Badge>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No tasks available</p>
+                    )}
+                  </div>
                 </>
               )}
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </Card>
 
       {!isJobBeingDeleted && (

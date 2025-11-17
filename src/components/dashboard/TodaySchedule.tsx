@@ -12,6 +12,7 @@ interface TodayScheduleProps {
   isLoading?: boolean;
   hideTasks?: boolean;
   detailsOnlyMode?: boolean;
+  department?: string;
 }
 
 export const TodaySchedule = ({
@@ -23,7 +24,8 @@ export const TodaySchedule = ({
   selectedDate,
   isLoading = false,
   hideTasks = false,
-  detailsOnlyMode = false
+  detailsOnlyMode = false,
+  department
 }: TodayScheduleProps) => {
   console.log("TodaySchedule received jobs:", jobs);
 
@@ -97,7 +99,7 @@ export const TodaySchedule = ({
                 onDeleteClick={onDeleteClick}
                 onJobClick={onJobClick}
                 userRole={userRole}
-                department={job.department || jobData.department || "sound"}
+                department={department || job.department || jobData.department || "sound"}
                 hideTasks={hideTasks}
                 showManageArtists={isFestivalJob}
                 detailsOnlyMode={detailsOnlyMode}

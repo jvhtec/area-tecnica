@@ -178,6 +178,8 @@ const Lights = () => {
             onJobClick={handleJobClick}
             userRole={userRole}
             selectedDate={date}
+            department={currentDepartment}
+            detailsOnlyMode={userRole ? ["admin","management","house_tech"].includes(userRole) : false}
           />
         </div>
       </div>
