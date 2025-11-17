@@ -198,30 +198,6 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     enabled: open
   });
 
-  const {
-    data: liveJobDocuments = [],
-    isLoading: isJobDocumentsLoading,
-    error: jobDocumentsError
-  } = useQuery({
-    queryKey: ['job-documents', job.id],
-    enabled: open && !!job?.id,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_documents')
-        .select('id, file_name, file_path, uploaded_at, file_size, visible_to_tech, read_only, template_type')
-        .eq('job_id', job.id)
-        .order('uploaded_at', { ascending: false });
-      if (error) throw error;
-      return data || [];
-    }
-  });
-
-  useEffect(() => {
-    if (jobDocumentsError) {
-      console.error('[JobDetailsDialog] Failed to load job documents via dedicated query', jobDocumentsError);
-    }
-  }, [jobDocumentsError]);
-
   // Artist list for job (to avoid join issues under RLS)
   const { data: jobArtists = [] } = useQuery({
     queryKey: ['job-artists', job.id],
@@ -252,10 +228,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const showTourRatesTab = !isDryhire
     && jobDetails?.job_type === 'tourdate'
     && canSeeRateTabs;
-  const resolvedDocuments = liveJobDocuments.length > 0
-    ? liveJobDocuments
-    : jobDetails?.job_documents || job?.job_documents || [];
-  const documentsLoading = isJobLoading || isJobDocumentsLoading;
+  const resolvedDocuments = jobDetails?.job_documents || job?.job_documents || [];
+  const documentsLoading = isJobLoading;
   const normalizedDepartment = department?.toLowerCase?.() ?? null;
   const filteredAssignments = React.useMemo(() => {
     const assignments = jobDetails?.job_assignments ?? [];
