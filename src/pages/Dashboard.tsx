@@ -186,7 +186,7 @@ const Dashboard = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-4 md:space-y-8">
       <DashboardHeader timeSpan={timeSpan} onTimeSpanChange={setTimeSpan} />
 
-      {userRole === "management" && (
+      {userRole && ["admin", "management"].includes(userRole) && (
         <Card className="w-full">
           <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2">
@@ -251,7 +251,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {userRole === "management" && (
+      {userRole && ["admin", "management"].includes(userRole) && (
         <Card className="w-full">
           <CardHeader>
             <Button 

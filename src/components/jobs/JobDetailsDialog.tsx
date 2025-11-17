@@ -129,6 +129,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const { userRole, user } = useOptimizedAuth();
   const isManager = ['admin','management'].includes(userRole || '');
   const isTechnicianRole = ['technician', 'house_tech'].includes(userRole || '');
+  const isHouseTech = userRole === 'house_tech';
   const queryClient = useQueryClient();
   const [isSendingPayoutEmails, setIsSendingPayoutEmails] = useState(false);
   const triggerPayoutEmails = React.useCallback(
@@ -222,10 +223,36 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const { data: approvalStatus, isLoading: approvalStatusLoading } = useJobApprovalStatus(resolvedJobId);
   const isDryhire = (jobDetails?.job_type || job?.job_type) === 'dryhire';
   console.log('JobDetailsDialog: isDryhire =', isDryhire, 'job_type =', jobDetails?.job_type || job?.job_type);
-  const showExtrasTab = !isDryhire && (isManager || (jobRatesApproved && jobExtras.length > 0));
+  const showExtrasTab = !isDryhire && (isManager || isHouseTech || (jobRatesApproved && jobExtras.length > 0));
+  const canSeeRateTabs = (isManager || jobRatesApproved) && !isHouseTech;
   const showTourRatesTab = !isDryhire
     && jobDetails?.job_type === 'tourdate'
-    && (isManager || jobRatesApproved);
+    && canSeeRateTabs;
+  const resolvedDocuments = jobDetails?.job_documents || job?.job_documents || [];
+  const documentsLoading = isJobLoading;
+  const normalizedDepartment = department?.toLowerCase?.() ?? null;
+  const filteredAssignments = React.useMemo(() => {
+    const assignments = jobDetails?.job_assignments ?? [];
+    if (!normalizedDepartment) {
+      return assignments;
+    }
+    return assignments.filter((assignment: any) => {
+      const profileDept = assignment.profiles?.department?.toLowerCase?.();
+      if (profileDept === normalizedDepartment) {
+        return true;
+      }
+      if (normalizedDepartment === 'sound' && assignment.sound_role) {
+        return true;
+      }
+      if (normalizedDepartment === 'lights' && assignment.lights_role) {
+        return true;
+      }
+      if (normalizedDepartment === 'video' && assignment.video_role) {
+        return true;
+      }
+      return false;
+    });
+  }, [jobDetails?.job_assignments, normalizedDepartment]);
 
   // Flex Work Orders progress (manager-only)
   const [isSyncingWorkOrders, setIsSyncingWorkOrders] = useState(false);
@@ -1182,9 +1209,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
-                ) : jobDetails?.job_assignments && jobDetails.job_assignments.length > 0 ? (
+                ) : filteredAssignments.length > 0 ? (
                   <div className="space-y-3">
-                    {jobDetails.job_assignments.map((assignment: any) => (
+                    {filteredAssignments.map((assignment: any) => (
                       <div key={assignment.technician_id} className="flex items-center justify-between p-3 bg-muted rounded">
                         <div>
                           <p className="font-medium">
@@ -1243,13 +1270,21 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   Documentos del trabajo
                 </h3>
 
-                {isJobLoading ? (
+                {jobDocumentsError && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertDescription>
+                      No se pudieron cargar todos los documentos. {jobDocumentsError.message}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {documentsLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
-                ) : jobDetails?.job_documents && jobDetails.job_documents.length > 0 ? (
+                ) : resolvedDocuments.length > 0 ? (
                   <div className="space-y-2">
-                    {jobDetails.job_documents.map((doc: any) => {
+                    {resolvedDocuments.map((doc: any) => {
                       const isTemplate = doc.template_type === 'soundvision';
                       const isReadOnly = Boolean(doc.read_only);
                       return (

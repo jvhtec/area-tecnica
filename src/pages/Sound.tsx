@@ -181,6 +181,8 @@ const Sound = () => {
             onJobClick={handleJobClick}
             userRole={userRole}
             selectedDate={date}
+            detailsOnlyMode={userRole ? ["admin","management","house_tech"].includes(userRole) : false}
+            department={currentDepartment}
           />
         </div>
       </div>

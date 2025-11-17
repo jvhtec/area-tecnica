@@ -12,6 +12,8 @@ export interface JobsOverviewFeed {
     crewNeeded: Record<string, number>;
     docs: Record<string, { have: number; need: number }>;
     status: 'green' | 'yellow' | 'red';
+    color?: string | null;
+    job_type?: string | null;
   }>;
 }
 
@@ -49,6 +51,14 @@ export interface AnnouncementsFeed {
   announcements: Array<{ id: string; message: string; level: string; created_at: string; active: boolean }>;
 }
 
+export class WallboardApiError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export class WallboardApi {
   private token?: string;
   private base = "/functions/v1/wallboard-feed";
@@ -58,30 +68,28 @@ export class WallboardApi {
     return this.token ? { Authorization: `Bearer ${this.token}` } : {};
   }
 
-  async jobsOverview(): Promise<JobsOverviewFeed> {
-    const res = await fetch(`${this.base}/jobs-overview`, { headers: this.headers() });
-    if (!res.ok) throw new Error(`jobs-overview failed: ${res.status}`);
+  private async request<T>(path: string): Promise<T> {
+    const res = await fetch(`${this.base}${path}`, { headers: this.headers() });
+    if (!res.ok) {
+      throw new WallboardApiError(`${path} failed`, res.status);
+    }
     return res.json();
   }
-  async crewAssignments(): Promise<CrewAssignmentsFeed> {
-    const res = await fetch(`${this.base}/crew-assignments`, { headers: this.headers() });
-    if (!res.ok) throw new Error(`crew-assignments failed: ${res.status}`);
-    return res.json();
+
+  jobsOverview(): Promise<JobsOverviewFeed> {
+    return this.request('/jobs-overview');
   }
-  async docProgress(): Promise<DocProgressFeed> {
-    const res = await fetch(`${this.base}/doc-progress`, { headers: this.headers() });
-    if (!res.ok) throw new Error(`doc-progress failed: ${res.status}`);
-    return res.json();
+  crewAssignments(): Promise<CrewAssignmentsFeed> {
+    return this.request('/crew-assignments');
   }
-  async pendingActions(): Promise<PendingActionsFeed> {
-    const res = await fetch(`${this.base}/pending-actions`, { headers: this.headers() });
-    if (!res.ok) throw new Error(`pending-actions failed: ${res.status}`);
-    return res.json();
+  docProgress(): Promise<DocProgressFeed> {
+    return this.request('/doc-progress');
   }
-  async announcements(): Promise<AnnouncementsFeed> {
-    const res = await fetch(`${this.base}/announcements`, { headers: this.headers() });
-    if (!res.ok) throw new Error(`announcements failed: ${res.status}`);
-    return res.json();
+  pendingActions(): Promise<PendingActionsFeed> {
+    return this.request('/pending-actions');
+  }
+  announcements(): Promise<AnnouncementsFeed> {
+    return this.request('/announcements');
   }
 }
 
