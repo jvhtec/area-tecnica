@@ -646,10 +646,58 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       }
       
       console.log("Creating job_date_types:", jobDateTypes);
-      const { error: dateTypeError } = await supabase
+      const {
+        error: upsertDateTypeError,
+      } = await supabase
         .from("job_date_types")
         .upsert(jobDateTypes, { onConflict: "job_id,date" });
-      
+
+      let dateTypeError = upsertDateTypeError;
+
+      if (
+        upsertDateTypeError?.message?.includes(
+          "no unique or exclusion constraint matching the ON CONFLICT specification"
+        )
+      ) {
+        console.warn(
+          "job_date_types upsert failed due to missing constraint. Falling back to manual dedup insert."
+        );
+
+        const { data: existingDateTypes, error: existingDateTypesError } =
+          await supabase
+            .from("job_date_types")
+            .select("date,type")
+            .eq("job_id", newJob.id);
+
+        if (existingDateTypesError) {
+          dateTypeError = existingDateTypesError;
+        } else {
+          const existingDateTypeKeys = new Set(
+            (existingDateTypes || []).map(
+              (dateType) => `${dateType.date}:${dateType.type}`
+            )
+          );
+
+          const newDateTypes = jobDateTypes.filter((dateType) => {
+            const key = `${dateType.date}:${dateType.type}`;
+            if (existingDateTypeKeys.has(key)) {
+              return false;
+            }
+            existingDateTypeKeys.add(key);
+            return true;
+          });
+
+          if (newDateTypes.length) {
+            const { error: fallbackInsertError } = await supabase
+              .from("job_date_types")
+              .insert(newDateTypes);
+            dateTypeError = fallbackInsertError;
+          } else {
+            dateTypeError = null;
+          }
+        }
+      }
+
       if (dateTypeError) {
         console.error("FAILED at job_date_types creation:", dateTypeError);
         console.error("Job date types error details:", {
