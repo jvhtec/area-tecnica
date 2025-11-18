@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTableSubscription } from "@/hooks/useTableSubscription";
 import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { openFlexElement } from "@/utils/flex-folders";
+import { saveJobDateType } from "@/services/saveJobDateType";
 
 interface DateTypeContextMenuProps {
   children: React.ReactNode;
@@ -43,15 +44,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         return { ...old, [key]: { type, job_id: jobId, date: formattedDate } };
       });
 
-      const { error } = await supabase
-        .from('job_date_types')
-        .upsert({
-          job_id: jobId,
-          date: formattedDate,
-          type
-        }, {
-          onConflict: 'job_id,date'
-        });
+      const { error } = await saveJobDateType(jobId, formattedDate, type);
 
       if (error) throw error;
 

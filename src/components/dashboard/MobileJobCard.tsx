@@ -39,6 +39,7 @@ import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQueryClient } from "@tanstack/react-query";
 import { openFlexElement } from "@/utils/flex-folders";
+import { saveJobDateType } from "@/services/saveJobDateType";
 
 interface MobileJobCardProps {
   job: any;
@@ -189,15 +190,7 @@ export function MobileJobCard({
     try {
       const dateStr = format(currentDate, 'yyyy-MM-dd');
       
-      const { error } = await supabase
-        .from('job_date_types')
-        .upsert({
-          job_id: job.id,
-          date: dateStr,
-          type: newType
-        }, {
-          onConflict: 'job_id,date'
-        });
+      const { error } = await saveJobDateType(job.id, dateStr, newType);
 
       if (error) throw error;
 
