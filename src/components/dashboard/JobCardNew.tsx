@@ -1342,47 +1342,14 @@ export function JobCardNew({
                           </div>
                         </div>
                       )}
-                    </>
-                  )}
+                  </>
+                )}
 
-                  {department === "lights" && lightsRequirements && (
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                      <div>LD: {lightsRequirements.ld || 0}</div>
-                      <div>Programmers: {lightsRequirements.programmers || 0}</div>
-                      <div>Dimmer Techs: {lightsRequirements.dimmer_techs || 0}</div>
-                      <div>Floor Techs: {lightsRequirements.floor_techs || 0}</div>
-                    </div>
-                  )}
+                {/* Future: Add lights requirements display when implemented */}
+                {/* {department === "lights" && lightsRequirements && (...)} */}
 
-                  <div className="mt-4">
-                    <h4 className="text-sm font-semibold mb-2">Tasks</h4>
-                    {tasks.length > 0 ? (
-                      <div className="space-y-1">
-                        {tasks.map((task) => (
-                          <div key={task.id} className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={cn(
-                                  "w-2 h-2 rounded-full",
-                                  task.status === "completed"
-                                    ? "bg-green-500"
-                                    : task.status === "in_progress"
-                                      ? "bg-yellow-500"
-                                      : "bg-muted-foreground"
-                                )}
-                              />
-                              <span className="truncate">{task.title}</span>
-                            </div>
-                            <Badge variant="secondary" className="text-[10px] capitalize">
-                              {task.status.replace("_", " ")}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No tasks available</p>
-                    )}
-                  </div>
+                {/* Future: Add generic tasks display when implemented */}
+                {/* <div className="mt-4">...</div> */}
                 </>
               )}
             </div>

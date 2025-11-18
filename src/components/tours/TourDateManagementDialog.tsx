@@ -571,6 +571,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw tourError;
       }
 
+      console.log("Creating job for tour date:", newTourDate.id);
       const { data: newJob, error: jobError } = await supabase
         .from("jobs")
         .insert({
@@ -589,11 +590,20 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         })
         .select()
         .single();
+      
       if (jobError) {
-        console.error("Error creating job:", jobError);
-        throw jobError;
+        console.error("FAILED at job creation:", jobError);
+        console.error("Job creation error details:", {
+          message: jobError.message,
+          code: jobError.code,
+          details: jobError.details,
+          hint: jobError.hint
+        });
+        // Clean up the orphaned tour_date
+        await supabase.from("tour_dates").delete().eq("id", newTourDate.id);
+        throw new Error(`Failed to create job: ${jobError.message}`);
       }
-      console.log("Job created:", newJob);
+      console.log("✓ Job created successfully:", newJob.id);
 
       const departments =
         tourData.tour_dates?.[0]?.jobs?.[0]?.job_departments?.map(
@@ -603,13 +613,25 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         job_id: newJob.id,
         department,
       }));
+      
+      console.log("Creating job departments:", jobDepartments);
       const { error: deptError } = await supabase
         .from("job_departments")
         .insert(jobDepartments);
+      
       if (deptError) {
-        console.error("Error creating job departments:", deptError);
-        throw deptError;
+        console.error("FAILED at job departments creation:", deptError);
+        console.error("Job departments error details:", {
+          message: deptError.message,
+          code: deptError.code,
+          details: deptError.details
+        });
+        // Clean up job and tour_date
+        await supabase.from("jobs").delete().eq("id", newJob.id);
+        await supabase.from("tour_dates").delete().eq("id", newTourDate.id);
+        throw new Error(`Failed to create job departments: ${deptError.message}`);
       }
+      console.log("✓ Job departments created successfully");
 
       // Create job date types for each day in the date range
       const jobDateTypes = [];
@@ -623,13 +645,26 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         });
       }
       
+      console.log("Creating job_date_types:", jobDateTypes);
       const { error: dateTypeError } = await supabase
         .from("job_date_types")
         .insert(jobDateTypes);
+      
       if (dateTypeError) {
-        console.error("Error creating job date types:", dateTypeError);
-        throw dateTypeError;
+        console.error("FAILED at job_date_types creation:", dateTypeError);
+        console.error("Job date types error details:", {
+          message: dateTypeError.message,
+          code: dateTypeError.code,
+          details: dateTypeError.details,
+          hint: dateTypeError.hint
+        });
+        // Clean up everything created so far
+        await supabase.from("job_departments").delete().eq("job_id", newJob.id);
+        await supabase.from("jobs").delete().eq("id", newJob.id);
+        await supabase.from("tour_dates").delete().eq("id", newTourDate.id);
+        throw new Error(`Failed to create job date types: ${dateTypeError.message}`);
       }
+      console.log("✓ Job date types created successfully");
 
       // Force refresh all related queries after successful creation
       await Promise.all([
