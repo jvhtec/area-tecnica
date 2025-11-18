@@ -648,7 +648,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       console.log("Creating job_date_types:", jobDateTypes);
       const { error: dateTypeError } = await supabase
         .from("job_date_types")
-        .insert(jobDateTypes);
+        .upsert(jobDateTypes, { onConflict: "job_id,date" });
       
       if (dateTypeError) {
         console.error("FAILED at job_date_types creation:", dateTypeError);
