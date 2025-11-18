@@ -2,15 +2,17 @@
 -- This fixes the "there is no unique or exclusion constraint matching the ON CONFLICT specification" error
 
 -- First, remove any duplicate entries that might exist
-DELETE FROM job_date_types a USING (
-  SELECT MIN(id) as id, job_id, date
-  FROM job_date_types
-  GROUP BY job_id, date
-  HAVING COUNT(*) > 1
-) b
-WHERE a.job_id = b.job_id
-  AND a.date = b.date
-  AND a.id <> b.id;
+-- Keep the first row (by created_at) for each (job_id, date) combination
+DELETE FROM job_date_types
+WHERE id IN (
+  SELECT id
+  FROM (
+    SELECT id,
+           ROW_NUMBER() OVER (PARTITION BY job_id, date ORDER BY created_at ASC, id) as rn
+    FROM job_date_types
+  ) t
+  WHERE t.rn > 1
+);
 
 -- Add the unique constraint
 ALTER TABLE job_date_types
