@@ -48,6 +48,28 @@ async function getJwtKey() {
 }
 
 async function authenticate(req: Request, url: URL): Promise<AuthResult> {
+  // Check for JWT in x-wallboard-jwt header (new client format)
+  const jwtHeader = req.headers.get("x-wallboard-jwt") ?? req.headers.get("X-Wallboard-JWT");
+  if (jwtHeader) {
+    const token = jwtHeader.trim();
+    if (!token) {
+      throw new HttpError(401, "Missing JWT token");
+    }
+    try {
+      const key = await getJwtKey();
+      const payload: Record<string, unknown> = await verify(token, key);
+      if (payload.scope !== "wallboard") {
+        throw new HttpError(403, "Invalid wallboard scope");
+      }
+      const presetSlug = typeof payload.preset === "string" ? payload.preset : undefined;
+      return { method: "jwt", presetSlug };
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      throw new HttpError(401, "Invalid token");
+    }
+  }
+
+  // Check for JWT in Authorization header (legacy format)
   const headerToken = req.headers.get("authorization") ?? req.headers.get("Authorization") ?? "";
   if (headerToken.startsWith("Bearer ")) {
     const token = headerToken.slice(7).trim();
