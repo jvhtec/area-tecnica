@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Department } from "@/types/department";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
 
 interface SignUpFormData {
   email: string;
@@ -147,15 +148,14 @@ export const SignUpFormFields = ({ onSubmit, error, isLoading, hidePassword = fa
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="residencia">Residencia</Label>
-        <Input
-          id="residencia"
-          type="text"
-          value={formData.residencia}
-          onChange={(e) => handleChange("residencia", e.target.value)}
-        />
-      </div>
+      <CityAutocomplete
+        id="residencia"
+        value={formData.residencia}
+        onChange={(city) => handleChange("residencia", city)}
+        placeholder="Enter city"
+        label="Residencia"
+        className="space-y-2"
+      />
 
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? (

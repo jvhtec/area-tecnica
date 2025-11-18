@@ -15,6 +15,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
+import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
 
 export const Profile = () => {
   const { toast } = useToast();
@@ -103,6 +104,7 @@ export const Profile = () => {
           department: profile.department,
           dni: profile.dni,
           residencia: profile.residencia,
+          bg_color: profile.bg_color || null,
           custom_folder_structure: folderStructure,
           custom_tour_folder_structure: tourFolderStructure,
         })
@@ -328,13 +330,53 @@ export const Profile = () => {
                   />
                 </div>
 
+                <CityAutocomplete
+                  id="residencia"
+                  value={profile.residencia || ''}
+                  onChange={(city) => setProfile({ ...profile, residencia: city })}
+                  placeholder="Enter city"
+                  label="Residencia"
+                  className="space-y-2"
+                />
+
                 <div className="space-y-2">
-                  <Label htmlFor="residencia">Residencia</Label>
-                  <Input
-                    id="residencia"
-                    value={profile.residencia || ''}
-                    onChange={(e) => setProfile({ ...profile, residencia: e.target.value })}
-                  />
+                  <Label htmlFor="bg_color">Color de fondo de fila</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { color: '#DC2626', name: 'Rojo' },
+                      { color: '#2563EB', name: 'Azul' },
+                      { color: '#16A34A', name: 'Verde' },
+                      { color: '#CA8A04', name: 'Amarillo' },
+                      { color: '#9333EA', name: 'Púrpura' },
+                      { color: '#EA580C', name: 'Naranja' },
+                      { color: '#DB2777', name: 'Rosa' },
+                      { color: '#0891B2', name: 'Cian' },
+                      { color: '#65A30D', name: 'Lima' },
+                      { color: '#7C3AED', name: 'Violeta' },
+                      { color: '#0D9488', name: 'Teal' },
+                      { color: '#64748B', name: 'Pizarra' },
+                    ].map(({ color, name }) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setProfile({ ...profile, bg_color: color })}
+                        className={`w-10 h-10 rounded border-2 transition-all hover:scale-110 ${
+                          profile.bg_color === color ? 'border-white ring-2 ring-white' : 'border-gray-300'
+                        }`}
+                        style={{ backgroundColor: color }}
+                        title={name}
+                      />
+                    ))}
+                    {profile.bg_color && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setProfile({ ...profile, bg_color: '' })}
+                      >
+                        Limpiar
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2">

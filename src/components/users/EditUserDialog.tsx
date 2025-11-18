@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { HouseTechRateEditor } from "@/components/settings/HouseTechRateEditor";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { formatUserName } from "@/utils/userName";
+import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
 
 interface EditUserDialogProps {
   user: Profile | null;
@@ -32,6 +33,8 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   const [flexUrl, setFlexUrl] = useState<string>("");
   const [flexResourceId, setFlexResourceId] = useState<string>(user?.flex_resource_id || "");
   const [isSendingOnboarding, setIsSendingOnboarding] = useState(false);
+  const [residencia, setResidencia] = useState<string>(user?.residencia || "");
+  const [bgColor, setBgColor] = useState<string>(user?.bg_color || "");
 
   useEffect(() => {
     setAssignableAsTech(!!user?.assignable_as_tech);
@@ -40,6 +43,8 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     setFlexResourceId(user?.flex_resource_id || "");
     setFlexUrl("");
     setIsAutonomo(user?.autonomo !== false);
+    setResidencia(user?.residencia || "");
+    setBgColor(user?.bg_color || "");
   }, [user?.id]);
 
   const isSoundTechnician = user?.department === 'sound' && user?.role === 'technician';
@@ -80,7 +85,8 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       phone: formData.get('phone') as string,
       department: formData.get('department') as Department,
       dni: formData.get('dni') as string,
-      residencia: formData.get('residencia') as string,
+      residencia: residencia,
+      bg_color: bgColor || null,
       role: formData.get('role') as string,
       assignable_as_tech: assignableAsTech,
       flex_resource_id: (formData.get('flex_resource_id') as string || flexResourceId || '').trim() || null,
@@ -301,13 +307,52 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
                 defaultValue={user?.dni || ''}
               />
             </div>
+            <CityAutocomplete
+              id="residencia"
+              value={residencia}
+              onChange={setResidencia}
+              placeholder="Enter city"
+              label="Residencia"
+              className="space-y-2"
+            />
             <div className="space-y-2">
-              <Label htmlFor="residencia">Residencia</Label>
-              <Input
-                id="residencia"
-                name="residencia"
-                defaultValue={user?.residencia || ''}
-              />
+              <Label htmlFor="bg_color">Row Background Color</Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { color: '#DC2626', name: 'Red' },
+                  { color: '#2563EB', name: 'Blue' },
+                  { color: '#16A34A', name: 'Green' },
+                  { color: '#CA8A04', name: 'Yellow' },
+                  { color: '#9333EA', name: 'Purple' },
+                  { color: '#EA580C', name: 'Orange' },
+                  { color: '#DB2777', name: 'Pink' },
+                  { color: '#0891B2', name: 'Cyan' },
+                  { color: '#65A30D', name: 'Lime' },
+                  { color: '#7C3AED', name: 'Violet' },
+                  { color: '#0D9488', name: 'Teal' },
+                  { color: '#64748B', name: 'Slate' },
+                ].map(({ color, name }) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setBgColor(color)}
+                    className={`w-10 h-10 rounded border-2 transition-all hover:scale-110 ${
+                      bgColor === color ? 'border-white ring-2 ring-white' : 'border-gray-300'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    title={name}
+                  />
+                ))}
+                {bgColor && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setBgColor('')}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>

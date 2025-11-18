@@ -53,6 +53,7 @@ interface OptimizedAssignmentMatrixProps {
     dni?: string | null;
     department: string;
     role: string;
+    bg_color?: string | null;
     skills?: Array<{ name?: string; category?: string | null; proficiency?: number | null; is_primary?: boolean | null }>;
   }>;
   dates: Date[];
@@ -789,11 +790,40 @@ export const OptimizedAssignmentMatrix = ({
         techs.sort((a, b) => {
           const resA = techResidencias?.get(a.id) || '';
           const resB = techResidencias?.get(b.id) || '';
+
           // Sort by residencia, with empty values at the end
           if (resA && !resB) return -1;
           if (!resA && resB) return 1;
-          if (resA !== resB) return resA.localeCompare(resB);
-          // Secondary sort by first name
+          if (!resA && !resB) return a.first_name.localeCompare(b.first_name);
+
+          // Parse city and country (format: "City, Country" or just "City")
+          const parseLocation = (loc: string) => {
+            const parts = loc.split(',').map(p => p.trim());
+            if (parts.length > 1) {
+              return { city: parts[0], country: parts[1] };
+            }
+            return { city: parts[0], country: 'España' }; // Default to Spain
+          };
+
+          const locA = parseLocation(resA);
+          const locB = parseLocation(resB);
+
+          // First sort by country (Spain first, then alphabetically)
+          const isSpainA = locA.country === 'España' || locA.country === 'Spain';
+          const isSpainB = locB.country === 'España' || locB.country === 'Spain';
+
+          if (isSpainA && !isSpainB) return -1;
+          if (!isSpainA && isSpainB) return 1;
+          if (!isSpainA && !isSpainB) {
+            const countryCompare = locA.country.localeCompare(locB.country, 'es');
+            if (countryCompare !== 0) return countryCompare;
+          }
+
+          // Then sort by city within same country
+          const cityCompare = locA.city.localeCompare(locB.city, 'es');
+          if (cityCompare !== 0) return cityCompare;
+
+          // Finally sort by first name
           return a.first_name.localeCompare(b.first_name);
         });
         break;
