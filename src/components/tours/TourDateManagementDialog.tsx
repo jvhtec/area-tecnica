@@ -496,21 +496,105 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   };
 
   const handleAddDate = async (
-    location: string, 
+    location: string,
     tourDateType: 'show' | 'rehearsal' | 'travel' = 'show',
     startDate: string,
     endDate: string,
     isTourPackOnly: boolean = false
   ) => {
+    const finalEndDate = endDate || startDate;
+    const creationMetadata = {
+      tourId,
+      location,
+      startDate,
+      endDate: finalEndDate,
+      tourDateType,
+      isTourPackOnly,
+      traceId: `${tourId ?? 'unknown'}-${Date.now()}`,
+    };
+    const createdRecords = {
+      tourDateId: null as string | null,
+      jobId: null as string | null,
+    };
+    let creationStage: string = 'preparing';
+
+    const rollbackCreatedRecords = async () => {
+      if (!createdRecords.tourDateId && !createdRecords.jobId) {
+        return;
+      }
+
+      console.warn("Rolling back partial tour date creation", createdRecords);
+
+      if (createdRecords.jobId) {
+        try {
+          await deleteJobDateTypes(createdRecords.jobId);
+        } catch (rollbackError) {
+          console.error("Rollback failed for job_date_types:", rollbackError);
+        }
+
+        try {
+          const { error } = await supabase
+            .from("job_departments")
+            .delete()
+            .eq("job_id", createdRecords.jobId);
+          if (error) throw error;
+        } catch (rollbackError) {
+          console.error("Rollback failed for job_departments:", rollbackError);
+        }
+
+        try {
+          const { error } = await supabase
+            .from("jobs")
+            .delete()
+            .eq("id", createdRecords.jobId);
+          if (error) throw error;
+        } catch (rollbackError) {
+          console.error("Rollback failed for jobs:", rollbackError);
+        }
+      }
+
+      if (createdRecords.tourDateId) {
+        try {
+          const { error } = await supabase
+            .from("tour_dates")
+            .delete()
+            .eq("id", createdRecords.tourDateId);
+          if (error) throw error;
+        } catch (rollbackError) {
+          console.error("Rollback failed for tour_dates:", rollbackError);
+        }
+      }
+    };
+
+    const alertCreationFailure = async (error: any) => {
+      console.error(
+        `[TourDateManagement] Failed during ${creationStage}:`,
+        error,
+        creationMetadata
+      );
+      try {
+        await supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'tour.date.creation.failed',
+            stage: creationStage,
+            message: error?.message ?? 'Unknown error',
+            metadata: creationMetadata,
+          },
+        });
+      } catch (pushError) {
+        console.error('Failed to send tour date creation failure alert:', pushError);
+      }
+    };
+
     try {
       if (!tourId) {
         throw new Error("Tour ID is required");
       }
-      const finalEndDate = endDate || startDate;
       const rehearsalDays = Math.ceil((new Date(finalEndDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      
+
       console.log("Adding new tour date:", { startDate, finalEndDate, location, tourId, tourDateType, isTourPackOnly });
-      
+
       let locationId: string | null = null;
       if (newLocationDetails && newLocationDetails.name) {
         locationId = await getOrCreateLocationWithDetails(newLocationDetails);
@@ -518,6 +602,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         locationId = await getOrCreateLocation(location);
       }
       console.log("Location ID:", locationId);
+
+      creationStage = 'tour_dates';
       const { data: newTourDate, error: tourDateError } = await supabase
         .from("tour_dates")
         .insert({
@@ -548,9 +634,10 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         console.error("Error creating tour date:", tourDateError);
         throw tourDateError;
       }
+      createdRecords.tourDateId = newTourDate.id;
       console.log("Tour date created:", newTourDate);
 
-      // ... keep existing code (job creation and department assignment)
+      creationStage = 'fetch_tour';
       const { data: tourData, error: tourError } = await supabase
         .from("tours")
         .select(`
@@ -571,11 +658,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw tourError;
       }
 
+      creationStage = 'jobs';
       const { data: newJob, error: jobError } = await supabase
         .from("jobs")
         .insert({
-          title: tourDateType === 'rehearsal' 
-            ? `${tourData.name} - Rehearsal (${location})` 
+          title: tourDateType === 'rehearsal'
+            ? `${tourData.name} - Rehearsal (${location})`
             : tourDateType === 'travel'
             ? `${tourData.name} - Travel (${location})`
             : `${tourData.name} (${location || 'No Location'})`,
@@ -593,8 +681,10 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         console.error("Error creating job:", jobError);
         throw jobError;
       }
+      createdRecords.jobId = newJob.id;
       console.log("Job created:", newJob);
 
+      creationStage = 'job_departments';
       const departments =
         tourData.tour_dates?.[0]?.jobs?.[0]?.job_departments?.map(
           (dept: any) => dept.department
@@ -611,6 +701,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw deptError;
       }
 
+      creationStage = 'job_date_types';
       // Create job date types for each day in the date range
       const jobDateTypes = [];
       const start = new Date(startDate);
@@ -622,7 +713,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           type: tourDateType
         });
       }
-      
+
       const { error: dateTypeError } = await supabase
         .from("job_date_types")
         .insert(jobDateTypes);
@@ -631,6 +722,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw dateTypeError;
       }
 
+      creationStage = 'completed';
       // Force refresh all related queries after successful creation
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
@@ -644,10 +736,11 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         description: "Tour date and job created successfully",
       });
     } catch (error: any) {
-      console.error("Error adding date:", error);
+      await rollbackCreatedRecords();
+      await alertCreationFailure(error);
       toast({
         title: "Error adding date",
-        description: error.message,
+        description: error?.message || 'Failed to add tour date',
         variant: "destructive",
       });
     }
