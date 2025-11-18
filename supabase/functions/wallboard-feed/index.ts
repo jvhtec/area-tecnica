@@ -126,7 +126,20 @@ serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/\/+$/, "");
+
+  // Support both invoke (path in body) and direct HTTP (path in URL)
+  let path = url.pathname.replace(/\/+$/, "");
+  try {
+    const contentType = req.headers.get("content-type") || "";
+    if (contentType.includes("application/json") && req.method === "POST") {
+      const body = await req.clone().json().catch(() => null);
+      if (body?.path) {
+        path = body.path;
+      }
+    }
+  } catch {
+    // If body parsing fails, use URL path
+  }
 
   try {
     const auth = await authenticate(req, url);
