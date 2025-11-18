@@ -1129,26 +1129,34 @@ function WallboardDisplay({
   }, [idx, panelOrder, panelDurations, rotationFallbackSeconds, panelPages, overview, crew, logistics]);
 
   useEffect(() => {
-    if (isApiMode) {
-      setPanelOrder([...DEFAULT_PANEL_ORDER]);
-      setPanelDurations({ ...DEFAULT_PANEL_DURATIONS });
-      setRotationFallbackSeconds(DEFAULT_ROTATION_FALLBACK_SECONDS);
-      setHighlightTtlMs(DEFAULT_HIGHLIGHT_TTL_SECONDS * 1000);
-      setTickerIntervalMs(DEFAULT_TICKER_SECONDS * 1000);
-      setPresetMessage(null);
-      setHighlightJobs(new Map());
-      setIdx(0);
-      return;
-    }
-
     let cancelled = false;
     setPresetMessage(null);
+
     const loadPreset = async () => {
-      const { data, error } = await supabase
-        .from('wallboard_presets')
-        .select('panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds')
-        .eq('slug', effectiveSlug)
-        .maybeSingle();
+      let data: any = null;
+      let error: any = null;
+
+      // For API mode (public wallboards), fetch config via API
+      if (isApiMode) {
+        try {
+          const api = new WallboardApi(wallboardApiToken);
+          const response = await api.presetConfig();
+          data = response.config;
+        } catch (err) {
+          console.error('Failed to load preset config via API:', err);
+          // Fall through to use defaults
+          error = err;
+        }
+      } else {
+        // For authenticated wallboards, fetch directly from database
+        const result = await supabase
+          .from('wallboard_presets')
+          .select('panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds')
+          .eq('slug', effectiveSlug)
+          .maybeSingle();
+        data = result.data;
+        error = result.error;
+      }
 
       if (cancelled) return;
 
@@ -1210,7 +1218,7 @@ function WallboardDisplay({
     return () => {
       cancelled = true;
     };
-  }, [effectiveSlug, isApiMode]);
+  }, [effectiveSlug, isApiMode, wallboardApiToken]);
 
   // Data polling (client-side via RLS-safe views)
   // Note: State declarations moved earlier to avoid temporal dead zone issues

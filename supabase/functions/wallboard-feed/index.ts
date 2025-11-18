@@ -382,6 +382,40 @@ serve(async (req) => {
       });
     }
 
+    if (path.endsWith("/preset-config")) {
+      // Return preset configuration for the given slug
+      if (!presetSlug) {
+        return new Response(JSON.stringify({ error: "No preset slug provided" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders() },
+        });
+      }
+
+      const { data, error } = await sb
+        .from("wallboard_presets")
+        .select("panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds")
+        .eq("slug", presetSlug)
+        .maybeSingle();
+
+      if (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders() },
+        });
+      }
+
+      if (!data) {
+        return new Response(JSON.stringify({ error: "Preset not found", slug: presetSlug }), {
+          status: 404,
+          headers: { "Content-Type": "application/json", ...corsHeaders() },
+        });
+      }
+
+      return new Response(JSON.stringify({ config: data, slug: presetSlug }), {
+        headers: { "Content-Type": "application/json", ...corsHeaders() },
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Not Found" }), {
       status: 404,
       headers: { "Content-Type": "application/json", ...corsHeaders() },
