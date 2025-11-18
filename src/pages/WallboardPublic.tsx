@@ -18,7 +18,6 @@ import { exchangeWallboardToken } from '@/lib/wallboard-api';
 export default function WallboardPublic() {
   const { token, presetSlug } = useParams<{ token: string; presetSlug?: string }>();
   const navigate = useNavigate();
-  const DEFAULT_WALLBOARD_TOKEN = 'f3c98b2df1a4e7650fbd44c9ce19ab73c6d7a0e49b3f25ea18fd6740a2ce9b1d';
   const [isValidating, setIsValidating] = useState(true);
   const [isValid, setIsValid] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,33 +49,24 @@ export default function WallboardPublic() {
         return;
       }
 
-      // Step 1: Validate the token against environment variable
-      const expectedToken = import.meta.env.VITE_WALLBOARD_TOKEN || DEFAULT_WALLBOARD_TOKEN;
+      console.log('🔐 Attempting token exchange...', { tokenLength: token.length });
 
-      // Debug logging with no secrets
-      console.log('🔐 Token validation:', {
-        providedLength: token.length,
-        envVarSet: !!import.meta.env.VITE_WALLBOARD_TOKEN,
-        match: token === expectedToken,
-      });
-
-      if (token !== expectedToken) {
-        setError('Invalid access token');
-        setIsValidating(false);
-        setAuthComplete(true);
-        return;
-      }
-
-      // Step 2: Exchange for short-lived JWT for wallboard feeds
+      // Step 1: Exchange the shared token for a short-lived JWT
       try {
-        const { token: jwt } = await exchangeWallboardToken(token);
-        setWallboardToken(jwt);
+        const result = await exchangeWallboardToken(token);
+        console.log('✅ Token exchange successful', { jwtLength: result.token.length, expiresIn: result.expiresIn });
+        setWallboardToken(result.token);
         setIsValid(true);
         setIsValidating(false);
         setAuthComplete(true);
-      } catch (err) {
-        console.error('Wallboard token exchange failed:', err);
-        setError('Failed to initialize wallboard session. Please refresh your shared link.');
+      } catch (err: any) {
+        console.error('❌ Wallboard token exchange failed:', err);
+        console.error('Error details:', {
+          message: err?.message,
+          status: err?.status,
+          stack: err?.stack,
+        });
+        setError(`Failed to initialize wallboard session: ${err?.message || 'Unknown error'}. Please refresh your shared link.`);
         setIsValid(false);
         setIsValidating(false);
         setAuthComplete(true);
