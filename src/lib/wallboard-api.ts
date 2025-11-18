@@ -51,6 +51,17 @@ export interface AnnouncementsFeed {
   announcements: Array<{ id: string; message: string; level: string; created_at: string; active: boolean }>;
 }
 
+export interface PresetConfigFeed {
+  config: {
+    panel_order: string[] | null;
+    panel_durations: Record<string, number> | null;
+    rotation_fallback_seconds: number | null;
+    highlight_ttl_seconds: number | null;
+    ticker_poll_interval_seconds: number | null;
+  };
+  slug: string;
+}
+
 export class WallboardApiError extends Error {
   status?: number;
   constructor(message: string, status?: number) {
@@ -105,6 +116,9 @@ export class WallboardApi {
   }
   announcements(): Promise<AnnouncementsFeed> {
     return this.request('/announcements');
+  }
+  presetConfig(): Promise<PresetConfigFeed> {
+    return this.request('/preset-config');
   }
 }
 
