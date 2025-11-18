@@ -474,45 +474,6 @@ export type Database = {
           },
         ]
       }
-      corporate_email_logs: {
-        Row: {
-          body_html: string | null
-          body_text: string | null
-          created_at: string | null
-          id: string
-          inline_image_cleanup_completed_at: string | null
-          inline_image_paths: string[] | null
-          inline_image_retention_until: string | null
-          recipients: string[] | null
-          sender: string | null
-          subject: string | null
-        }
-        Insert: {
-          body_html?: string | null
-          body_text?: string | null
-          created_at?: string | null
-          id?: string
-          inline_image_cleanup_completed_at?: string | null
-          inline_image_paths?: string[] | null
-          inline_image_retention_until?: string | null
-          recipients?: string[] | null
-          sender?: string | null
-          subject?: string | null
-        }
-        Update: {
-          body_html?: string | null
-          body_text?: string | null
-          created_at?: string | null
-          id?: string
-          inline_image_cleanup_completed_at?: string | null
-          inline_image_paths?: string[] | null
-          inline_image_retention_until?: string | null
-          recipients?: string[] | null
-          sender?: string | null
-          subject?: string | null
-        }
-        Relationships: []
-      }
       day_assignments: {
         Row: {
           created_at: string | null
@@ -4236,7 +4197,6 @@ export type Database = {
         Row: {
           assignable_as_tech: boolean
           autonomo: boolean
-          calendar_ics_token: string | null
           created_at: string
           custom_folder_structure: Json | null
           custom_tour_folder_structure: Json | null
@@ -4267,7 +4227,6 @@ export type Database = {
         Insert: {
           assignable_as_tech?: boolean
           autonomo?: boolean
-          calendar_ics_token?: string | null
           created_at?: string
           custom_folder_structure?: Json | null
           custom_tour_folder_structure?: Json | null
@@ -4298,7 +4257,6 @@ export type Database = {
         Update: {
           assignable_as_tech?: boolean
           autonomo?: boolean
-          calendar_ics_token?: string | null
           created_at?: string
           custom_folder_structure?: Json | null
           custom_tour_folder_structure?: Json | null
@@ -5103,36 +5061,6 @@ export type Database = {
           },
         ]
       }
-      system_errors: {
-        Row: {
-          context: Json | null
-          created_at: string | null
-          error_message: string | null
-          error_type: string
-          id: string
-          system: string
-          user_id: string | null
-        }
-        Insert: {
-          context?: Json | null
-          created_at?: string | null
-          error_message?: string | null
-          error_type: string
-          id?: string
-          system: string
-          user_id?: string | null
-        }
-        Update: {
-          context?: Json | null
-          created_at?: string | null
-          error_message?: string | null
-          error_type?: string
-          id?: string
-          system?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       task_documents: {
         Row: {
           file_name: string
@@ -5246,14 +5174,14 @@ export type Database = {
           {
             foreignKeyName: "technician_departments_technician_id_fkey"
             columns: ["technician_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "technician_departments_technician_id_fkey"
             columns: ["technician_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
           },
@@ -7105,30 +7033,6 @@ export type Database = {
         }
         Relationships: []
       }
-      system_health_assignments: {
-        Row: {
-          active_jobs: number | null
-          assigned_24h: number | null
-          assigned_technicians: number | null
-          confirmed: number | null
-          declined: number | null
-          invited: number | null
-          missing_assignment_date: number | null
-          total_assignments: number | null
-        }
-        Relationships: []
-      }
-      system_health_timesheets: {
-        Row: {
-          approved: number | null
-          avg_approval_time_seconds: number | null
-          created_24h: number | null
-          drafts: number | null
-          submitted: number | null
-          updated_1h: number | null
-        }
-        Relationships: []
-      }
       v_job_tech_payout_2025: {
         Row: {
           extras_breakdown: Json | null
@@ -7290,7 +7194,6 @@ export type Database = {
       }
     }
     Functions: {
-      assert_soundvision_access: { Args: never; Returns: boolean }
       auto_complete_past_jobs: { Args: never; Returns: number }
       can_manage_users: { Args: never; Returns: boolean }
       check_technician_conflicts: {
@@ -7523,7 +7426,6 @@ export type Database = {
         Args: { _actor_id: string; _code: string; _job_id: string }
         Returns: Database["public"]["Enums"]["activity_visibility"]
       }
-      rotate_my_calendar_ics_token: { Args: never; Returns: string }
       sync_preset_assignments_for_tour: {
         Args: { _preset_id: string; _tour_id: string }
         Returns: undefined

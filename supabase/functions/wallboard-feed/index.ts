@@ -4,14 +4,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-// Allow fallbacks for local/dev to avoid runtime crashes; prod should set both env vars
-const FALLBACK_JWT_SECRET = "wallboard-dev-secret";
-const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? FALLBACK_JWT_SECRET;
-const FALLBACK_SHARED_TOKEN = Deno.env.get("VITE_WALLBOARD_TOKEN") ?? "demo-wallboard-token";
-const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? FALLBACK_SHARED_TOKEN;
-
-// DEBUG: Log secret being used (first 5 chars for security)
-console.log("🔐 [wallboard-feed] JWT Secret prefix:", WALLBOARD_JWT_SECRET.slice(0, 5), "length:", WALLBOARD_JWT_SECRET.length);
+const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? "";
+const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? "";
 
 type AuthResult = {
   method: "jwt" | "shared";
@@ -23,7 +17,7 @@ type Dept = "sound" | "lights" | "video";
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-wallboard-jwt",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
   } as Record<string, string>;
 }
@@ -54,31 +48,22 @@ async function getJwtKey() {
 }
 
 async function authenticate(req: Request, url: URL): Promise<AuthResult> {
-  // Check for JWT in Authorization header or x-wallboard-jwt header
-  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization") ?? "";
-  const jwtHeader = req.headers.get("x-wallboard-jwt") ?? "";
-
-  let token = "";
-  if (authHeader.startsWith("Bearer ")) {
-    token = authHeader.slice(7).trim();
-  } else if (jwtHeader) {
-    token = jwtHeader.trim();
-  }
-
-  if (token) {
+  const headerToken = req.headers.get("authorization") ?? req.headers.get("Authorization") ?? "";
+  if (headerToken.startsWith("Bearer ")) {
+    const token = headerToken.slice(7).trim();
+    if (!token) {
+      throw new HttpError(401, "Missing bearer token");
+    }
     try {
       const key = await getJwtKey();
       const payload: Record<string, unknown> = await verify(token, key);
       if (payload.scope !== "wallboard") {
-        console.error("JWT scope invalid:", payload.scope);
         throw new HttpError(403, "Invalid wallboard scope");
       }
       const presetSlug = typeof payload.preset === "string" ? payload.preset : undefined;
-      console.log("JWT authenticated successfully, preset:", presetSlug);
       return { method: "jwt", presetSlug };
     } catch (err) {
       if (err instanceof HttpError) throw err;
-      console.error("JWT verification failed:", err);
       throw new HttpError(401, "Invalid token");
     }
   }
@@ -119,20 +104,7 @@ serve(async (req) => {
   }
 
   const url = new URL(req.url);
-
-  // Support both invoke (path in body) and direct HTTP (path in URL)
-  let path = url.pathname.replace(/\/+$/, "");
-  try {
-    const contentType = req.headers.get("content-type") || "";
-    if (contentType.includes("application/json") && req.method === "POST") {
-      const body = await req.clone().json().catch(() => null);
-      if (body?.path) {
-        path = body.path;
-      }
-    }
-  } catch {
-    // If body parsing fails, use URL path
-  }
+  const path = url.pathname.replace(/\/+$/, "");
 
   try {
     const auth = await authenticate(req, url);
@@ -140,12 +112,10 @@ serve(async (req) => {
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     if (path.endsWith("/jobs-overview")) {
-      // Calendar month grid window (42 days to cover 6 weeks)
+      // Today + tomorrow window
       const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const monthOffset = (startOfMonth.getDay() + 6) % 7; // Monday-based offset
-      const calendarGridStart = new Date(startOfMonth.getTime() - monthOffset * 24 * 60 * 60 * 1000);
-      const calendarGridEnd = new Date(calendarGridStart.getTime() + 42 * 24 * 60 * 60 * 1000 - 1);
+      const todayStart = startOfDay(now);
+      const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -154,69 +124,32 @@ serve(async (req) => {
           title,
           start_time,
           end_time,
-          status,
-          location_id,
-          job_type,
-          tour_id,
-          timezone,
-          color,
+          locations(id, name),
           job_departments(department),
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
-        .in("job_type", ["single", "festival", "tourdate", "dryhire"])
-        .in("status", ["Confirmado", "Tentativa", "Completado"])
-        .lte("start_time", calendarGridEnd.toISOString())
-        .gte("end_time", calendarGridStart.toISOString())
+        .in("job_type", ["single", "festival", "tourdate"])
+        .gte("start_time", todayStart.toISOString())
+        .lte("start_time", tomorrowEnd.toISOString())
         .order("start_time", { ascending: true });
 
       if (error) throw error;
 
-      // Exclude jobs whose parent tour is cancelled
-      let jobArr = jobs ?? [];
-      const tourIds = Array.from(new Set(jobArr.map((j: any) => j.tour_id).filter(Boolean)));
-      if (tourIds.length) {
-        const { data: toursMeta, error: toursErr } = await sb
-          .from("tours")
-          .select("id, status")
-          .in("id", tourIds);
-        if (!toursErr && toursMeta && toursMeta.length) {
-          const cancelledTours = new Set(
-            (toursMeta as any[]).filter((t: any) => t.status === "cancelled").map((t: any) => t.id)
-          );
-          if (cancelledTours.size) {
-            jobArr = jobArr.filter((j: any) => !j.tour_id || !cancelledTours.has(j.tour_id));
-          }
-        }
-      }
-
-      // Exclude dryhire jobs from overview
-      const dryhireIds = new Set<string>(jobArr.filter((j: any) => j.job_type === "dryhire").map((j: any) => j.id));
-      const nonDryhireJobs = jobArr.filter((j: any) => !dryhireIds.has(j.id));
-
-      // Get location names
-      const locationIds = Array.from(new Set(nonDryhireJobs.map((j: any) => j.location_id).filter(Boolean)));
-      const locById = new Map<string, string>();
-      if (locationIds.length) {
-        const { data: locRows } = await sb.from("locations").select("id, name").in("id", locationIds);
-        (locRows ?? []).forEach((l: any) => locById.set(l.id, l.name));
-      }
-
       const result = {
-        jobs: nonDryhireJobs.map((j: any) => {
-          const deptsAll: Dept[] = Array.from(
+        jobs: (jobs ?? []).map((j: any) => {
+          const depts: Dept[] = Array.from(
             new Set((j.job_departments ?? []).map((d: any) => d.department).filter(Boolean))
           );
-          // Filter out video department
-          const depts: Dept[] = deptsAll.filter((d) => d !== "video");
 
-          const crewAssigned = { sound: 0, lights: 0, video: 0 } as Record<string, number>;
+          const crewAssigned = { sound: 0, lights: 0, video: 0, total: 0 } as Record<string, number>;
           (j.job_assignments ?? []).forEach((a: any) => {
             if (a.sound_role) crewAssigned.sound++;
             if (a.lights_role) crewAssigned.lights++;
             if (a.video_role) crewAssigned.video++;
           });
+          crewAssigned.total = crewAssigned.sound + crewAssigned.lights + crewAssigned.video;
 
-          const crewNeeded = { sound: 0, lights: 0, video: 0 } as Record<string, number>;
+          const crewNeeded = { sound: 0, lights: 0, video: 0, total: 0 } as Record<string, number>;
 
           // Simple status: green if all present depts have >=1 assigned; yellow if some; red if none
           const presentCounts = depts.map((d) => crewAssigned[d]);
@@ -224,25 +157,23 @@ serve(async (req) => {
           const allHave = depts.length > 0 && presentCounts.every((n) => n > 0);
           const status = allHave ? "green" : hasAny ? "yellow" : "red";
 
-          // Docs placeholder counts per dept
-          const docs: Record<string, { have: number; need: number }> = {};
-          depts.forEach((d) => {
-            docs[d] = { have: 0, need: 0 };
-          });
+          // Docs placeholder counts per dept (wire up in next phase)
+          const docs = depts.reduce((acc, d) => {
+            (acc as any)[d] = { have: 0, need: 0 };
+            return acc;
+          }, {} as Record<Dept, { have: number; need: number }>);
 
           return {
             id: j.id,
             title: j.title,
             start_time: j.start_time,
             end_time: j.end_time,
-            location: { name: j.location_id ? (locById.get(j.location_id) ?? null) : null },
+            location: { name: j.locations?.[0]?.name ?? j.locations?.name ?? null },
             departments: depts,
-            crewAssigned: { ...crewAssigned, total: crewAssigned.sound + crewAssigned.lights + crewAssigned.video },
-            crewNeeded: { ...crewNeeded, total: crewNeeded.sound + crewNeeded.lights + crewNeeded.video },
+            crewAssigned: { ...crewAssigned },
+            crewNeeded: { ...crewNeeded },
             docs,
             status,
-            color: j.color ?? null,
-            job_type: j.job_type ?? null,
           };
         }),
       } as any;

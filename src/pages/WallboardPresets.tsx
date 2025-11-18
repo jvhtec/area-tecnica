@@ -98,6 +98,7 @@ export default function WallboardPresets() {
   const [panelDurations, setPanelDurations] = useState<Record<PanelKey, number>>({
     overview: 12,
     crew: 12,
+    docs: 12,
     logistics: 12,
     calendar: 12,
     pending: 12,

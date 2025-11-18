@@ -6,10 +6,6 @@ const FALLBACK_SHARED_TOKEN = Deno.env.get("VITE_WALLBOARD_TOKEN") ?? "demo-wall
 const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? FALLBACK_SHARED_TOKEN;
 const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? "wallboard-dev-secret";
 const WALLBOARD_PRESET_SLUG = Deno.env.get("WALLBOARD_PRESET_SLUG") ?? "almacen";
-
-// DEBUG: Log secret being used (first 5 chars for security)
-console.log("🔐 [wallboard-auth] JWT Secret prefix:", WALLBOARD_JWT_SECRET.slice(0, 5), "length:", WALLBOARD_JWT_SECRET.length);
-
 const missingSecrets = [
   !WALLBOARD_SHARED_TOKEN && "WALLBOARD_SHARED_TOKEN",
   !WALLBOARD_JWT_SECRET && "WALLBOARD_JWT_SECRET",
