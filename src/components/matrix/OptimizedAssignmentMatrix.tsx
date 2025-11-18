@@ -20,13 +20,16 @@ import { supabase } from '@/lib/supabase';
 import { checkTimeConflictEnhanced } from '@/utils/technicianAvailability';
 import { useStaffingMatrixStatuses } from '@/features/staffing/hooks/useStaffingMatrixStatuses';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Calendar as CalendarIcon } from 'lucide-react';
+import { UserPlus, Calendar as CalendarIcon, ArrowUpDown } from 'lucide-react';
 import { CreateUserDialog } from '@/components/users/CreateUserDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+
+// Technician sorting method type
+type TechSortMethod = 'default' | 'location' | 'name-asc' | 'name-desc' | 'surname-asc' | 'surname-desc';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 interface MatrixJob {
@@ -110,6 +113,8 @@ export const OptimizedAssignmentMatrix = ({
   const qc = useQueryClient();
   // Sorting focus by job
   const [sortJobId, setSortJobId] = useState<string | null>(null);
+  // Technician column sorting
+  const [techSortMethod, setTechSortMethod] = useState<TechSortMethod>('default');
   
   // Performance monitoring
   const { startRenderTimer, endRenderTimer, incrementCellRender } = usePerformanceMonitor('AssignmentMatrix');
@@ -174,6 +179,30 @@ export const OptimizedAssignmentMatrix = ({
     enabled: !!sortJobId,
     staleTime: 2_000,
     gcTime: 60_000,
+  });
+
+  // Fetch residencia for all technicians for location-based sorting
+  const { data: techResidencias } = useQuery({
+    queryKey: ['tech-residencias', allTechIds.join(',')],
+    queryFn: async () => {
+      if (!allTechIds.length) return new Map<string, string | null>();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, residencia')
+        .in('id', allTechIds);
+      if (error) {
+        console.warn('Failed to fetch residencias', error);
+        return new Map<string, string | null>();
+      }
+      const map = new Map<string, string | null>();
+      (data || []).forEach((r: any) => {
+        map.set(r.id, r.residencia);
+      });
+      return map;
+    },
+    enabled: allTechIds.length > 0 && techSortMethod === 'location',
+    staleTime: 60_000, // 1 minute
+    gcTime: 300_000, // 5 minutes
   });
 
   // Listen for assignment updates and refresh data
@@ -714,46 +743,88 @@ export const OptimizedAssignmentMatrix = ({
 
   // Batched staffing statuses for visible window
   const orderedTechnicians = useMemo(() => {
-    if (!sortJobId) return technicians;
-    const baseOrder = new Map<string, number>();
-    technicians.forEach((t, i) => baseOrder.set(t.id, i));
-    // Build engagement scores for current sort job
-    // Pull data via queries in a synchronous manner using cache, or compute fallbacks
-    // We'll compute from cached assignment/query sources where possible
-    const scoreMap = new Map<string, number>();
-    // Prefer using allAssignments (confirmed assignment) for the job
-    (allAssignments as any[])?.forEach((a: any) => {
-      if (a.job_id !== sortJobId) return;
-      const cur = scoreMap.get(a.technician_id) || 0;
-      const status = (a.status || '').toLowerCase();
-      const add = status === 'confirmed' ? 3 : (status === 'invited' ? 1 : 0);
-      scoreMap.set(a.technician_id, Math.max(cur, add));
-    });
-    // Use fetched statuses for all technicians to boost scores consistently
-    if (sortJobStatuses && sortJobStatuses.size) {
-      technicians.forEach(t => {
-        const s = sortJobStatuses.get(t.id);
-        if (!s) return;
-        const cur = scoreMap.get(t.id) || 0;
-        let add = 0;
-        if (s.offer_status === 'confirmed') add = Math.max(add, 2);
-        else if (s.offer_status === 'sent') add = Math.max(add, 1.5);
-        if (s.availability_status === 'confirmed') add = Math.max(add, 1.2);
-        else if (s.availability_status === 'requested') add = Math.max(add, 1);
-        if (add > 0) scoreMap.set(t.id, Math.max(cur, add));
+    let techs = [...technicians];
+
+    // Job sorting takes precedence over column sorting
+    if (sortJobId) {
+      const baseOrder = new Map<string, number>();
+      technicians.forEach((t, i) => baseOrder.set(t.id, i));
+      // Build engagement scores for current sort job
+      const scoreMap = new Map<string, number>();
+      // Prefer using allAssignments (confirmed assignment) for the job
+      (allAssignments as any[])?.forEach((a: any) => {
+        if (a.job_id !== sortJobId) return;
+        const cur = scoreMap.get(a.technician_id) || 0;
+        const status = (a.status || '').toLowerCase();
+        const add = status === 'confirmed' ? 3 : (status === 'invited' ? 1 : 0);
+        scoreMap.set(a.technician_id, Math.max(cur, add));
       });
+      // Use fetched statuses for all technicians to boost scores consistently
+      if (sortJobStatuses && sortJobStatuses.size) {
+        technicians.forEach(t => {
+          const s = sortJobStatuses.get(t.id);
+          if (!s) return;
+          const cur = scoreMap.get(t.id) || 0;
+          let add = 0;
+          if (s.offer_status === 'confirmed') add = Math.max(add, 2);
+          else if (s.offer_status === 'sent') add = Math.max(add, 1.5);
+          if (s.availability_status === 'confirmed') add = Math.max(add, 1.2);
+          else if (s.availability_status === 'requested') add = Math.max(add, 1);
+          if (add > 0) scoreMap.set(t.id, Math.max(cur, add));
+        });
+      }
+      // Sort by score desc, then original order
+      techs.sort((a, b) => {
+        const sa = scoreMap.get(a.id) || 0;
+        const sb = scoreMap.get(b.id) || 0;
+        if (sb !== sa) return sb - sa;
+        return (baseOrder.get(a.id)! - baseOrder.get(b.id)!);
+      });
+      return techs;
     }
-    // Note: sorting relies on confirmed assignments and aggregated job statuses for the selected job.
-    // Sort by score desc, then original order
-    const arr = [...technicians];
-    arr.sort((a, b) => {
-      const sa = scoreMap.get(a.id) || 0;
-      const sb = scoreMap.get(b.id) || 0;
-      if (sb !== sa) return sb - sa;
-      return (baseOrder.get(a.id)! - baseOrder.get(b.id)!);
-    });
-    return arr;
-  }, [technicians, sortJobId, allAssignments, sortJobStatuses]);
+
+    // Apply technician column sorting
+    switch (techSortMethod) {
+      case 'location':
+        techs.sort((a, b) => {
+          const resA = techResidencias?.get(a.id) || '';
+          const resB = techResidencias?.get(b.id) || '';
+          // Sort by residencia, with empty values at the end
+          if (resA && !resB) return -1;
+          if (!resA && resB) return 1;
+          if (resA !== resB) return resA.localeCompare(resB);
+          // Secondary sort by first name
+          return a.first_name.localeCompare(b.first_name);
+        });
+        break;
+      case 'name-asc':
+        techs.sort((a, b) => a.first_name.localeCompare(b.first_name));
+        break;
+      case 'name-desc':
+        techs.sort((a, b) => b.first_name.localeCompare(a.first_name));
+        break;
+      case 'surname-asc':
+        techs.sort((a, b) => a.last_name.localeCompare(b.last_name));
+        break;
+      case 'surname-desc':
+        techs.sort((a, b) => b.last_name.localeCompare(a.last_name));
+        break;
+      case 'default':
+      default:
+        // House techs first, then maintain original order
+        techs.sort((a, b) => {
+          const aIsHouse = a.role === 'house_tech';
+          const bIsHouse = b.role === 'house_tech';
+          if (aIsHouse && !bIsHouse) return -1;
+          if (!aIsHouse && bIsHouse) return 1;
+          // Maintain original order for same type
+          return 0;
+        });
+        break;
+    }
+
+    return techs;
+  }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses]);
 
   const visibleTechIds = useMemo(() => {
     const start = Math.max(0, visibleRows.start - 10);
@@ -809,6 +880,31 @@ export const OptimizedAssignmentMatrix = ({
     }
   }, [availabilityDialog?.open]);
 
+  // Cycle through technician sorting methods
+  const cycleTechSort = useCallback(() => {
+    const methods: TechSortMethod[] = ['default', 'location', 'name-asc', 'name-desc', 'surname-asc', 'surname-desc'];
+    const currentIndex = methods.indexOf(techSortMethod);
+    const nextIndex = (currentIndex + 1) % methods.length;
+    setTechSortMethod(methods[nextIndex]);
+    // Clear job sorting when changing tech sorting
+    if (sortJobId) {
+      setSortJobId(null);
+    }
+  }, [techSortMethod, sortJobId]);
+
+  // Get label for current sorting method
+  const getSortLabel = useCallback(() => {
+    switch (techSortMethod) {
+      case 'location': return mobile ? '📍 Loc' : '📍 Location';
+      case 'name-asc': return mobile ? 'A→Z' : 'A→Z Name';
+      case 'name-desc': return mobile ? 'Z→A' : 'Z→A Name';
+      case 'surname-asc': return mobile ? 'A→Z Sur' : 'A→Z Surname';
+      case 'surname-desc': return mobile ? 'Z→A Sur' : 'Z→A Surname';
+      case 'default': return '';
+      default: return '';
+    }
+  }, [techSortMethod, mobile]);
+
   if (isInitialLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -829,29 +925,45 @@ export const OptimizedAssignmentMatrix = ({
         </div>
       )}
       {/* Fixed Corner Header */}
-      <div 
+      <div
         className="matrix-corner"
-        style={{ 
-          width: TECHNICIAN_WIDTH, 
-          height: HEADER_HEIGHT 
+        style={{
+          width: TECHNICIAN_WIDTH,
+          height: HEADER_HEIGHT
         }}
       >
-        <div className="flex items-center justify-between h-full bg-card border-r border-b px-2">
-          {mobile ? (
-            <div className="font-semibold text-sm" aria-label="Technicians">Techs</div>
-          ) : (
-            <div className="font-semibold" aria-label="Technicians">Technicians</div>
-          )}
-          {isManagementUser && (
-            mobile ? (
-              <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => setCreateUserOpen(true)} aria-label="Add user">
-                <UserPlus className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" className="h-8" onClick={() => setCreateUserOpen(true)}>
-                <UserPlus className="h-4 w-4 mr-1" /> Add
-              </Button>
-            )
+        <div className="flex flex-col h-full bg-card border-r border-b">
+          <div className="flex items-center justify-between px-2 py-1 border-b">
+            <button
+              className="flex items-center gap-1 font-semibold hover:text-primary transition-colors cursor-pointer group"
+              onClick={cycleTechSort}
+              title="Click to cycle through sorting methods"
+            >
+              {mobile ? (
+                <span className="text-sm">Techs</span>
+              ) : (
+                <span>Technicians</span>
+              )}
+              <ArrowUpDown className="h-3.5 w-3.5 opacity-50 group-hover:opacity-100" />
+            </button>
+            {isManagementUser && (
+              mobile ? (
+                <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => setCreateUserOpen(true)} aria-label="Add user">
+                  <UserPlus className="h-3.5 w-3.5" />
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setCreateUserOpen(true)}>
+                  <UserPlus className="h-3.5 w-3.5 mr-1" /> Add
+                </Button>
+              )
+            )}
+          </div>
+          {getSortLabel() && (
+            <div className="flex items-center justify-center px-2 py-1 flex-1">
+              <span className="text-xs font-medium text-muted-foreground bg-accent/50 px-2 py-0.5 rounded">
+                {getSortLabel()}
+              </span>
+            </div>
           )}
         </div>
       </div>
