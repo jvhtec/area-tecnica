@@ -611,21 +611,25 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw deptError;
       }
 
-      // Create job date types for each day in the date range using RPC function
+      // Create job date types for each day in the date range
+      const jobDateTypes = [];
       const start = new Date(startDate);
       const end = new Date(finalEndDate);
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const { error: dateTypeError } = await supabase
-          .rpc('upsert_job_date_types', {
-            p_job_id: newJob.id,
-            p_date: d.toISOString().split('T')[0],
-            p_type: tourDateType
-          });
+        jobDateTypes.push({
+          job_id: newJob.id,
+          date: d.toISOString().split('T')[0],
+          type: tourDateType
+        });
+      }
 
-        if (dateTypeError) {
-          console.error("Error creating job date type:", dateTypeError);
-          throw dateTypeError;
-        }
+      const { error: dateTypeError } = await supabase
+        .from("job_date_types")
+        .upsert(jobDateTypes);
+
+      if (dateTypeError) {
+        console.error("Error creating job date types:", dateTypeError);
+        throw dateTypeError;
       }
 
       // Force refresh all related queries after successful creation
@@ -764,19 +768,25 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
             .delete()
             .eq("job_id", job.id);
 
-          // Create new job date types for the updated date range using RPC function
+          // Create new job date types for the updated date range
+          const jobDateTypes = [];
           const start = new Date(startDate);
           const end = new Date(finalEndDate);
           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            jobDateTypes.push({
+              job_id: job.id,
+              date: d.toISOString().split('T')[0],
+              type: tourDateType
+            });
+          }
+
+          if (jobDateTypes.length > 0) {
             const { error: dateTypeError } = await supabase
-              .rpc('upsert_job_date_types', {
-                p_job_id: job.id,
-                p_date: d.toISOString().split('T')[0],
-                p_type: tourDateType
-              });
+              .from("job_date_types")
+              .upsert(jobDateTypes);
 
             if (dateTypeError) {
-              console.error("Error updating job date type:", dateTypeError);
+              console.error("Error updating job date types:", dateTypeError);
             }
           }
         }

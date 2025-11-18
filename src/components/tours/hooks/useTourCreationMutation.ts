@@ -321,12 +321,13 @@ export const useTourCreationMutation = () => {
 
         if (dateDeptError) throw dateDeptError;
 
-        // Create job_date_types entry for the tour date job using RPC function
+        // Create job_date_types entry for the tour date job
         const { error: dateTypeError } = await supabase
-          .rpc('upsert_job_date_types', {
-            p_job_id: dateJob.id,
-            p_date: dateInfo.date,
-            p_type: "show" // Default to show, can be changed later
+          .from("job_date_types")
+          .upsert({
+            job_id: dateJob.id,
+            date: dateInfo.date,
+            type: "show" // Default to show, can be changed later
           });
 
         if (dateTypeError) throw dateTypeError;
