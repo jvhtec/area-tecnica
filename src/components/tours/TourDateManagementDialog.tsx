@@ -38,6 +38,7 @@ import { createFlexFolder } from "@/utils/flex-folders/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { deleteJobDateTypes } from "@/services/deleteJobDateTypes";
+import { saveJobDateType } from "@/services/saveJobDateType";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 
 interface TourDateManagementDialogProps {
@@ -664,62 +665,25 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       }
       console.log("✓ Job departments created successfully");
 
-      // Create job date types for each day in the date range
+      // Create job date types for each day in the date range using helper that gracefully handles duplicates
       const jobDateTypes = [];
       const start = new Date(startDate);
       const end = new Date(finalEndDate);
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         jobDateTypes.push({
-          job_id: newJob.id,
-          date: d.toISOString().split('T')[0],
-          type: tourDateType
+          date: d.toISOString().split("T")[0],
+          type: tourDateType,
         });
       }
-      
+
       console.log("Creating job_date_types:", jobDateTypes);
-      const { error: insertDateTypeError } = await supabase
-        .from("job_date_types")
-        .insert(jobDateTypes);
 
-      let dateTypeError = insertDateTypeError;
-
-      if (insertDateTypeError?.code === "23505") {
-        console.warn(
-          "job_date_types insert hit duplicate constraint. Falling back to manual dedup insert."
-        );
-
-        const { data: existingDateTypes, error: existingDateTypesError } =
-          await supabase
-            .from("job_date_types")
-            .select("date,type")
-            .eq("job_id", newJob.id);
-
-        if (existingDateTypesError) {
-          dateTypeError = existingDateTypesError;
-        } else {
-          const existingDateTypeKeys = new Set(
-            (existingDateTypes || []).map(
-              (dateType) => `${dateType.date}:${dateType.type}`
-            )
-          );
-
-          const newDateTypes = jobDateTypes.filter((dateType) => {
-            const key = `${dateType.date}:${dateType.type}`;
-            if (existingDateTypeKeys.has(key)) {
-              return false;
-            }
-            existingDateTypeKeys.add(key);
-            return true;
-          });
-
-          if (newDateTypes.length) {
-            const { error: fallbackInsertError } = await supabase
-              .from("job_date_types")
-              .insert(newDateTypes);
-            dateTypeError = fallbackInsertError;
-          } else {
-            dateTypeError = null;
-          }
+      let dateTypeError: any = null;
+      for (const { date, type } of jobDateTypes) {
+        const { error } = await saveJobDateType(newJob.id, date, type);
+        if (error) {
+          dateTypeError = error;
+          break;
         }
       }
 
@@ -732,6 +696,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           hint: dateTypeError.hint
         });
         // Clean up everything created so far
+        await supabase.from("job_date_types").delete().eq("job_id", newJob.id);
         await supabase.from("job_departments").delete().eq("job_id", newJob.id);
         await supabase.from("jobs").delete().eq("id", newJob.id);
         await supabase.from("tour_dates").delete().eq("id", newTourDate.id);
