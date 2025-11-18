@@ -14,10 +14,19 @@ WHERE id IN (
   WHERE t.rn > 1
 );
 
--- Add the unique constraint
-ALTER TABLE job_date_types
-ADD CONSTRAINT job_date_types_job_id_date_unique
-UNIQUE (job_id, date);
+-- Add the unique constraint only if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'job_date_types_job_id_date_unique'
+  ) THEN
+    ALTER TABLE job_date_types
+    ADD CONSTRAINT job_date_types_job_id_date_unique
+    UNIQUE (job_id, date);
+  END IF;
+END $$;
 
 -- Create an index for better performance
 CREATE INDEX IF NOT EXISTS idx_job_date_types_job_id_date
