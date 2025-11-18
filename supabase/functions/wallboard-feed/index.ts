@@ -141,8 +141,21 @@ serve(async (req) => {
     // If body parsing fails, use URL path
   }
 
+  console.log("🔍 Request details:", {
+    method: req.method,
+    url: url.toString(),
+    pathname: url.pathname,
+    extractedPath: path,
+    headers: {
+      'x-wallboard-jwt': req.headers.get("x-wallboard-jwt") ? "present" : "missing",
+      'authorization': req.headers.get("authorization") ? "present" : "missing",
+      'content-type': req.headers.get("content-type")
+    }
+  });
+
   try {
     const auth = await authenticate(req, url);
+    console.log("✅ Auth successful:", { method: auth.method, presetSlug: auth.presetSlug });
     const presetSlug = auth.presetSlug?.trim().toLowerCase() ?? undefined;
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
@@ -151,6 +164,12 @@ serve(async (req) => {
       const now = new Date();
       const todayStart = startOfDay(now);
       const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+
+      console.log("📅 Querying jobs-overview:", {
+        todayStart: todayStart.toISOString(),
+        tomorrowEnd: tomorrowEnd.toISOString(),
+        presetSlug
+      });
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -168,7 +187,12 @@ serve(async (req) => {
         .lte("start_time", tomorrowEnd.toISOString())
         .order("start_time", { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Jobs query error:", error);
+        throw error;
+      }
+
+      console.log(`✅ Jobs query returned ${jobs?.length || 0} results`);
 
       const result = {
         jobs: (jobs ?? []).map((j: any) => {
@@ -212,6 +236,12 @@ serve(async (req) => {
           };
         }),
       } as any;
+
+      console.log("📤 Returning jobs-overview:", {
+        jobCount: result.jobs.length,
+        presetSlug,
+        jobTitles: result.jobs.map((j: any) => j.title)
+      });
 
       return new Response(JSON.stringify({ ...result, presetSlug }), {
         headers: { "Content-Type": "application/json", ...corsHeaders() },
