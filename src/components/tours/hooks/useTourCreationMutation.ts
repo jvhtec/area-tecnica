@@ -328,7 +328,7 @@ export const useTourCreationMutation = () => {
             job_id: dateJob.id,
             date: dateInfo.date,
             type: "show" // Default to show, can be changed later
-          });
+          }, { onConflict: 'job_id,date' });
 
         if (dateTypeError) throw dateTypeError;
       }
