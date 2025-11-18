@@ -10,6 +10,7 @@ import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useJobActions } from '@/hooks/useJobActions';
 import { useFolderExistence } from "@/hooks/useFolderExistence";
 import { supabase } from "@/lib/supabase";
+import { upsertJobDateTypes } from "@/services/upsertJobDateTypes";
 import { format } from "date-fns";
 import { 
   MoreVertical, 
@@ -189,17 +190,11 @@ export function MobileJobCard({
     try {
       const dateStr = format(currentDate, 'yyyy-MM-dd');
       
-      const { error } = await supabase
-        .from('job_date_types')
-        .upsert({
-          job_id: job.id,
-          date: dateStr,
-          type: newType
-        }, {
-          onConflict: 'job_id,date'
-        });
-
-      if (error) throw error;
+      await upsertJobDateTypes({
+        job_id: job.id,
+        date: dateStr,
+        type: newType as any,
+      });
 
       toast({
         title: "Date type updated",

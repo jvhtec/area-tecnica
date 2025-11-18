@@ -38,6 +38,8 @@ import { createFlexFolder } from "@/utils/flex-folders/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { deleteJobDateTypes } from "@/services/deleteJobDateTypes";
+import { upsertJobDateTypes } from "@/services/upsertJobDateTypes";
+import type { JobDateTypeUpsertPayload } from "@/services/upsertJobDateTypes";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 
 interface TourDateManagementDialogProps {
@@ -703,7 +705,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
       creationStage = 'job_date_types';
       // Create job date types for each day in the date range
-      const jobDateTypes = [];
+      const jobDateTypes: JobDateTypeUpsertPayload[] = [];
       const start = new Date(startDate);
       const end = new Date(finalEndDate);
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -714,10 +716,9 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         });
       }
 
-      const { error: dateTypeError } = await supabase
-        .from("job_date_types")
-        .insert(jobDateTypes);
-      if (dateTypeError) {
+      try {
+        await upsertJobDateTypes(jobDateTypes);
+      } catch (dateTypeError) {
         console.error("Error creating job date types:", dateTypeError);
         throw dateTypeError;
       }

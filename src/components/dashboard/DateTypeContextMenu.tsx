@@ -2,13 +2,14 @@
 import { useEffect, useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Plane, Wrench, Star, Moon, Mic, ExternalLink, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfDay } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTableSubscription } from "@/hooks/useTableSubscription";
 import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { openFlexElement } from "@/utils/flex-folders";
+import { upsertJobDateTypes } from "@/services/upsertJobDateTypes";
+import { supabase } from "@/lib/supabase";
 
 interface DateTypeContextMenuProps {
   children: React.ReactNode;
@@ -43,17 +44,11 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         return { ...old, [key]: { type, job_id: jobId, date: formattedDate } };
       });
 
-      const { error } = await supabase
-        .from('job_date_types')
-        .upsert({
-          job_id: jobId,
-          date: formattedDate,
-          type
-        }, {
-          onConflict: 'job_id,date'
-        });
-
-      if (error) throw error;
+      await upsertJobDateTypes({
+        job_id: jobId,
+        date: formattedDate,
+        type,
+      });
 
       // Broadcast push: job date type changed (per-job, per-day)
       try {
