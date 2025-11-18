@@ -589,20 +589,16 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       }
 
       if (tourStartDate && normalizedStartDate < tourStartDate) {
+        const formattedTourStart = format(tourStartDate, "PPP");
         throw new Error(
-          `This date starts before the tour window (${format(
-            tourStartDate,
-            "PPP"
-          )}). Update the tour dates first."
+          `This date starts before the tour window (${formattedTourStart}). Update the tour dates first.`
         );
       }
 
       if (tourEndDate && normalizedEndDate > tourEndDate) {
+        const formattedTourEnd = format(tourEndDate, "PPP");
         throw new Error(
-          `This date extends beyond the tour window (${format(
-            tourEndDate,
-            "PPP"
-          )}). Update the tour dates first."
+          `This date extends beyond the tour window (${formattedTourEnd}). Update the tour dates first.`
         );
       }
 
