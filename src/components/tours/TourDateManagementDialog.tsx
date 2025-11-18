@@ -556,6 +556,9 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         .select(`
           name,
           color,
+          start_date,
+          end_date,
+          status,
           tour_dates (
             jobs (
               job_departments (
@@ -569,6 +572,38 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       if (tourError) {
         console.error("Error fetching tour:", tourError);
         throw tourError;
+      }
+
+      const normalizedStartDate = new Date(startDate);
+      const normalizedEndDate = new Date(finalEndDate);
+      const tourStartDate = tourData.start_date
+        ? new Date(tourData.start_date)
+        : null;
+      const tourEndDate = tourData.end_date ? new Date(tourData.end_date) : null;
+      const tourStatus = (tourData.status || "").toLowerCase();
+
+      if (tourStatus === "completed") {
+        throw new Error(
+          "This tour is marked as completed. Reopen or duplicate it before adding new dates."
+        );
+      }
+
+      if (tourStartDate && normalizedStartDate < tourStartDate) {
+        throw new Error(
+          `This date starts before the tour window (${format(
+            tourStartDate,
+            "PPP"
+          )}). Update the tour dates first."
+        );
+      }
+
+      if (tourEndDate && normalizedEndDate > tourEndDate) {
+        throw new Error(
+          `This date extends beyond the tour window (${format(
+            tourEndDate,
+            "PPP"
+          )}). Update the tour dates first."
+        );
       }
 
       console.log("Creating job for tour date:", newTourDate.id);
@@ -646,21 +681,15 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       }
       
       console.log("Creating job_date_types:", jobDateTypes);
-      const {
-        error: upsertDateTypeError,
-      } = await supabase
+      const { error: insertDateTypeError } = await supabase
         .from("job_date_types")
-        .upsert(jobDateTypes, { onConflict: "job_id,date" });
+        .insert(jobDateTypes);
 
-      let dateTypeError = upsertDateTypeError;
+      let dateTypeError = insertDateTypeError;
 
-      if (
-        upsertDateTypeError?.message?.includes(
-          "no unique or exclusion constraint matching the ON CONFLICT specification"
-        )
-      ) {
+      if (insertDateTypeError?.code === "23505") {
         console.warn(
-          "job_date_types upsert failed due to missing constraint. Falling back to manual dedup insert."
+          "job_date_types insert hit duplicate constraint. Falling back to manual dedup insert."
         );
 
         const { data: existingDateTypes, error: existingDateTypesError } =
