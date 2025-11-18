@@ -10,6 +10,9 @@ const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? FALLBACK_JW
 const FALLBACK_SHARED_TOKEN = Deno.env.get("VITE_WALLBOARD_TOKEN") ?? "demo-wallboard-token";
 const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? FALLBACK_SHARED_TOKEN;
 
+// DEBUG: Log secret being used (first 5 chars for security)
+console.log("🔐 [wallboard-feed] JWT Secret prefix:", WALLBOARD_JWT_SECRET.slice(0, 5), "length:", WALLBOARD_JWT_SECRET.length);
+
 type AuthResult = {
   method: "jwt" | "shared";
   presetSlug?: string | null;
