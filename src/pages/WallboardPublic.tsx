@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
 import SplashScreen from '@/components/SplashScreen';
 import { WallboardDisplay } from './Wallboard';
+import { exchangeWallboardToken } from '@/lib/wallboard-api';
 
 /**
  * WallboardPublic - Tokenized access to wallboard with JWT-based authentication
@@ -12,7 +12,7 @@ import { WallboardDisplay } from './Wallboard';
  * Authentication flow:
  * 1. Validates the provided token against VITE_WALLBOARD_TOKEN
  * 2. Calls the wallboard-auth edge function to get a JWT
- * 3. Authenticates with Supabase using a dedicated wallboard service account
+ * 3. Passes that JWT to WallboardDisplay so it can call wallboard feeds directly
  * 4. Displays the wallboard with proper data access
  */
 export default function WallboardPublic() {
@@ -23,6 +23,7 @@ export default function WallboardPublic() {
   const [error, setError] = useState<string | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [authComplete, setAuthComplete] = useState(false);
+  const [wallboardToken, setWallboardToken] = useState<string | null>(null);
 
   // Handle splash screen completion
   const handleSplashComplete = () => {
@@ -48,68 +49,25 @@ export default function WallboardPublic() {
         return;
       }
 
-      // Step 1: Validate the token against environment variable
-      const expectedToken = import.meta.env.VITE_WALLBOARD_TOKEN || 'demo-wallboard-token';
+      console.log('🔐 Attempting token exchange...', { tokenLength: token.length });
 
-      // Debug logging (remove in production)
-      console.log('🔐 Token validation:', {
-        urlToken: token,
-        expectedToken: expectedToken,
-        envVarSet: !!import.meta.env.VITE_WALLBOARD_TOKEN,
-        match: token === expectedToken
-      });
-
-      if (token !== expectedToken) {
-        setError('Invalid access token');
+      // Step 1: Exchange the shared token for a short-lived JWT
+      try {
+        const result = await exchangeWallboardToken(token);
+        console.log('✅ Token exchange successful', { jwtLength: result.token.length, expiresIn: result.expiresIn });
+        setWallboardToken(result.token);
+        setIsValid(true);
         setIsValidating(false);
         setAuthComplete(true);
-        return;
-      }
-
-      // Step 2: Authenticate with Supabase using wallboard service account
-      try {
-        // Check if there are wallboard credentials configured
-        const wallboardEmail = import.meta.env.VITE_WALLBOARD_USER_EMAIL;
-        const wallboardPassword = import.meta.env.VITE_WALLBOARD_USER_PASSWORD;
-
-        if (wallboardEmail && wallboardPassword) {
-          // Sign in with dedicated wallboard account
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: wallboardEmail,
-            password: wallboardPassword,
-          });
-
-          if (signInError) {
-            console.error('Wallboard auth error:', signInError);
-            setError('Failed to authenticate wallboard session. Please check configuration.');
-            setIsValidating(false);
-            setAuthComplete(true);
-            return;
-          }
-
-          // Successfully authenticated
-          setIsValid(true);
-          setIsValidating(false);
-          setAuthComplete(true);
-        } else {
-          // No credentials configured - check if there's already a valid session
-          const { data: { session } } = await supabase.auth.getSession();
-
-          if (session) {
-            // User is already logged in, use their session
-            setIsValid(true);
-            setIsValidating(false);
-            setAuthComplete(true);
-          } else {
-            // No credentials and no session - provide setup instructions
-            setError('Wallboard service account not configured. See documentation for setup instructions.');
-            setIsValidating(false);
-            setAuthComplete(true);
-          }
-        }
-      } catch (err) {
-        console.error('Authentication exception:', err);
-        setError('Failed to authenticate. Please try again.');
+      } catch (err: any) {
+        console.error('❌ Wallboard token exchange failed:', err);
+        console.error('Error details:', {
+          message: err?.message,
+          status: err?.status,
+          stack: err?.stack,
+        });
+        setError(`Failed to initialize wallboard session: ${err?.message || 'Unknown error'}. Please refresh your shared link.`);
+        setIsValid(false);
         setIsValidating(false);
         setAuthComplete(true);
       }
@@ -117,6 +75,12 @@ export default function WallboardPublic() {
 
     validateTokenAndAuthenticate();
   }, [token]);
+
+  const handleWallboardFatalError = (message?: string) => {
+    setError(message || 'Access token expired or invalid. Please request a new wallboard link.');
+    setIsValid(false);
+    setAuthComplete(true);
+  };
 
   // Show error if token is invalid (before splash completes)
   if (!isValid && error && authComplete) {
@@ -158,7 +122,12 @@ export default function WallboardPublic() {
       {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
       {shouldLoadWallboard && (
         <div style={{ visibility: showSplash ? 'hidden' : 'visible' }}>
-          <WallboardDisplay presetSlug={presetSlug} skipSplash={true} />
+          <WallboardDisplay
+            presetSlug={presetSlug}
+            skipSplash={true}
+            wallboardApiToken={wallboardToken ?? undefined}
+            onFatalError={handleWallboardFatalError}
+          />
         </div>
       )}
     </>
