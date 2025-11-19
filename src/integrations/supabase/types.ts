@@ -2779,6 +2779,72 @@ export type Database = {
           },
         ]
       }
+      job_assignments_unified: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          assignment_date: string | null
+          assignment_source: string | null
+          id: string
+          job_id: string
+          lights_role: string | null
+          response_time: string | null
+          single_day: boolean
+          sound_role: string | null
+          status: Database["public"]["Enums"]["assignment_status"] | null
+          technician_id: string
+          use_tour_multipliers: boolean | null
+          video_role: string | null
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          assignment_date?: string | null
+          assignment_source?: string | null
+          id?: string
+          job_id: string
+          lights_role?: string | null
+          response_time?: string | null
+          single_day?: boolean
+          sound_role?: string | null
+          status?: Database["public"]["Enums"]["assignment_status"] | null
+          technician_id: string
+          use_tour_multipliers?: boolean | null
+          video_role?: string | null
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          assignment_date?: string | null
+          assignment_source?: string | null
+          id?: string
+          job_id?: string
+          lights_role?: string | null
+          response_time?: string | null
+          single_day?: boolean
+          sound_role?: string | null
+          status?: Database["public"]["Enums"]["assignment_status"] | null
+          technician_id?: string
+          use_tour_multipliers?: boolean | null
+          video_role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_assignments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_assignment_days_temp: {
         Row: {
           assignment_date: string

@@ -131,12 +131,13 @@ serve(async (req: Request) => {
     if (!job || jobErr) return new Response(JSON.stringify({ error: 'Job not found', details: jobErr?.message }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     // Fetch assignments + profiles
+    // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
     const { data: assigns, error: assignsErr } = await supabaseAdmin
-      .from('job_assignments')
+      .from('job_assignments_unified')
       .select(`
         technician_id,
         sound_role, lights_role, video_role,
-        profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
+        profiles!job_assignments_unified_technician_id_fkey ( first_name, last_name, phone )
       `)
       .eq('job_id', job_id);
     if (assignsErr) {

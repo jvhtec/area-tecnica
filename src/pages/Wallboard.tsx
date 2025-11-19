@@ -1304,8 +1304,9 @@ function WallboardDisplay({
       });
 
       // 3) Fetch assignments for crew counts (restrict to detail window)
+      // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
       const { data: assignRows, error: assignErr } = detailJobIds.length
-        ? await supabase.from('job_assignments').select('job_id,technician_id,sound_role,lights_role,video_role').in('job_id', detailJobIds)
+        ? await supabase.from('job_assignments_unified').select('job_id,technician_id,sound_role,lights_role,video_role').in('job_id', detailJobIds)
         : { data: [], error: null } as any;
       if (assignErr) console.error('Wallboard job_assignments error:', assignErr);
       const assignsByJob = new Map<string, any[]>();

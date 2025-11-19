@@ -72,8 +72,9 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
         let assignmentResults: Assignment[] = [];
 
         if (techIds.length > 0) {
+          // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
           const { data: assignmentsData, error: assignmentsError } = await supabase
-            .from('job_assignments')
+            .from('job_assignments_unified')
             .select(`
               technician_id,
               sound_role,

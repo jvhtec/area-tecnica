@@ -363,9 +363,10 @@ export function JobCardNew({
     if (!(userRole === 'management' || userRole === 'admin')) return;
     try {
       // Pre-check: warn for missing phones
+      // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
       const { data: rows } = await supabase
-        .from('job_assignments')
-        .select('sound_role, lights_role, video_role, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
+        .from('job_assignments_unified')
+        .select('sound_role, lights_role, video_role, profiles!job_assignments_unified_technician_id_fkey(first_name,last_name,phone)')
         .eq('job_id', job.id);
       const deptKey = department === 'sound' ? 'sound_role' : department === 'lights' ? 'lights_role' : 'video_role';
       const crew = (rows || []).filter((r: any) => !!r[deptKey]);

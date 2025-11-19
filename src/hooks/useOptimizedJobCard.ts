@@ -53,9 +53,10 @@ export const useOptimizedJobCard = (
   const refreshAssignments = useCallback(async () => {
     if (!job?.id) return;
     try {
+      // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
       const { data, error } = await supabase
-        .from('job_assignments')
-        .select(`*, profiles(first_name, nickname, last_name)`) 
+        .from('job_assignments_unified')
+        .select(`*, profiles(first_name, nickname, last_name)`)
         .eq('job_id', job.id);
       if (!error) setAssignments(data || []);
     } catch {}
