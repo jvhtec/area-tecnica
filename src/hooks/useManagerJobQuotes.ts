@@ -12,13 +12,13 @@ export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: s
 
       // Tour dates: reuse RPC quote computation per assignment
       if (jt === 'tourdate') {
-        // Get job-level assignments
-        const { data: jobAssignments, error: jaErr } = await supabase
-          .from('job_assignments')
+        const { data: timesheetRows, error: tsErr } = await supabase
+          .from('timesheets')
           .select('technician_id')
-          .eq('job_id', jobId);
-        if (jaErr) throw jaErr;
-        const techIds = Array.from(new Set((jobAssignments || []).map((a: any) => a.technician_id).filter(Boolean)));
+          .eq('job_id', jobId)
+          .eq('is_schedule_only', false);
+        if (tsErr) throw tsErr;
+        const techIds = Array.from(new Set((timesheetRows || []).map((row: any) => row?.technician_id).filter(Boolean)));
         if (techIds.length === 0) return [] as TourJobRateQuote[];
 
         const results = await Promise.all(

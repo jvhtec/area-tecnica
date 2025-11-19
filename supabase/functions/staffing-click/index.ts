@@ -15,6 +15,69 @@ function b64uToU8(b64u: string) {
   return new Uint8Array([...bin].map(c => c.charCodeAt(0)));
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function parseDateOnly(value: string | null | undefined) {
+  if (!value) return null;
+  const iso = `${value}T00:00:00Z`;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function collapseTimesheetDates(dates: string[]) {
+  const sorted = [...new Set(dates.filter(Boolean))].sort();
+  if (!sorted.length) return [] as Array<{ start: string; end: string }>;
+  const ranges: Array<{ start: string; end: string }> = [];
+  let rangeStart = sorted[0]!;
+  let prev = sorted[0]!;
+  for (let i = 1; i < sorted.length; i++) {
+    const current = sorted[i]!;
+    const prevDate = parseDateOnly(prev);
+    const currentDate = parseDateOnly(current);
+    if (!prevDate || !currentDate) {
+      ranges.push({ start: rangeStart, end: prev });
+      rangeStart = current;
+      prev = current;
+      continue;
+    }
+    const diff = Math.round((currentDate.getTime() - prevDate.getTime()) / DAY_MS);
+    if (diff === 1) {
+      prev = current;
+      continue;
+    }
+    ranges.push({ start: rangeStart, end: prev });
+    rangeStart = current;
+    prev = current;
+  }
+  ranges.push({ start: rangeStart, end: prev });
+  return ranges;
+}
+
+function buildTimesheetCoverageWindows(jobId: string, dates: string[] = [], jobInfo?: JobTimeInfo) {
+  const coverages: AssignmentCoverage[] = [];
+  const ranges = collapseTimesheetDates(dates);
+  for (const range of ranges) {
+    const startDate = parseDateOnly(range.start);
+    const endDate = parseDateOnly(range.end);
+    if (!startDate || !endDate) continue;
+    const sameDay = range.start === range.end;
+    const window = sameDay
+      ? { kind: 'day' as const, start: startDate, end: new Date(startDate.getTime() + DAY_MS) }
+      : { kind: 'range' as const, start: startDate, end: new Date(endDate.getTime() + DAY_MS) };
+    coverages.push({
+      window,
+      meta: {
+        job_id: jobId,
+        job_title: jobInfo?.title ?? null,
+        ...(sameDay ? { assignment_date: range.start } : {}),
+        start_time: jobInfo?.rawStart ?? null,
+        end_time: jobInfo?.rawEnd ?? null,
+      },
+    });
+  }
+  return coverages;
+}
+
 serve(async (req) => {
   // 🔍 EARLY REQUEST LOGGING - Log all incoming requests for debugging
   console.log('📥 INCOMING REQUEST:', {
@@ -299,14 +362,27 @@ serve(async (req) => {
             meta: { role: chosenRole, department: prof.department, job_id: job.id, profile_id: row.profile_id }
           });
           // 3) Conflict check: ensure no other confirmed assignment overlaps
-          const { data: confirmedAssigns, error: assignErr } = await supabase
-            .from('job_assignments')
-            .select('job_id,status,single_day,assignment_date')
+          const { data: confirmedTimesheets, error: timesheetErr } = await supabase
+            .from('timesheets')
+            .select('job_id,date,job_assignments!inner(status)')
             .eq('technician_id', row.profile_id)
-            .eq('status', 'confirmed');
-          const confirmedAssignments = !assignErr && Array.isArray(confirmedAssigns) ? confirmedAssigns : [];
-          const otherJobIds = Array.from(new Set(confirmedAssignments.map(a => a.job_id).filter(id => id !== row.job_id)));
-          let otherJobs: { id: number; start_time: string | null; end_time: string | null; title: string | null }[] = [];
+            .eq('is_schedule_only', false)
+            .eq('job_assignments.status', 'confirmed');
+
+          const otherJobDates = new Map<string, string[]>();
+          if (!timesheetErr && Array.isArray(confirmedTimesheets)) {
+            for (const tsRow of confirmedTimesheets) {
+              const jobIdValue = tsRow?.job_id;
+              const day = tsRow?.date;
+              if (!jobIdValue || jobIdValue === row.job_id || !day) continue;
+              const list = otherJobDates.get(jobIdValue) ?? [];
+              list.push(day);
+              otherJobDates.set(jobIdValue, list);
+            }
+          }
+
+          const otherJobIds = Array.from(otherJobDates.keys());
+          let otherJobs: { id: string; start_time: string | null; end_time: string | null; title: string | null }[] = [];
           if (otherJobIds.length > 0) {
             const { data: otherJobsData } = await supabase
               .from('jobs')
@@ -315,7 +391,7 @@ serve(async (req) => {
             otherJobs = otherJobsData ?? [];
           }
 
-          const jobTimeMap = new Map<number, JobTimeInfo>();
+          const jobTimeMap = new Map<string, JobTimeInfo>();
           if (job) {
             jobTimeMap.set(job.id, {
               title: job.title ?? null,
@@ -335,43 +411,11 @@ serve(async (req) => {
             });
           }
 
-          const DAY_MS = 24 * 60 * 60 * 1000;
-          const toDateOrNull = (value: string | null | undefined) => {
-            if (!value) return null;
-            const d = new Date(value);
-            return Number.isNaN(d.getTime()) ? null : d;
-          };
-          const addDays = (date: Date, days: number) => new Date(date.getTime() + days * DAY_MS);
-
           const existingAssignmentWindows: AssignmentCoverage[] = [];
-          for (const assign of confirmedAssignments) {
-            if (assign.job_id === row.job_id) continue;
-            if (assign.single_day && assign.assignment_date) {
-              const dayStart = toDateOrNull(assign.assignment_date);
-              if (!dayStart) continue;
-              existingAssignmentWindows.push({
-                window: { kind: 'day', start: dayStart, end: addDays(dayStart, 1) },
-                meta: {
-                  job_id: assign.job_id,
-                  job_title: jobTimeMap.get(assign.job_id)?.title ?? null,
-                  assignment_date: assign.assignment_date,
-                },
-              });
-              continue;
-            }
-            const jobInfo = jobTimeMap.get(assign.job_id);
-            if (!jobInfo || !jobInfo.start || !jobInfo.end) continue;
-            if (jobInfo.start.getTime() >= jobInfo.end.getTime()) continue;
-            existingAssignmentWindows.push({
-              window: { kind: 'range', start: jobInfo.start, end: jobInfo.end },
-              meta: {
-                job_id: assign.job_id,
-                job_title: jobInfo.title ?? null,
-                start_time: jobInfo.rawStart,
-                end_time: jobInfo.rawEnd,
-              },
-            });
-          }
+          otherJobDates.forEach((dates, otherJobId) => {
+            const windows = buildTimesheetCoverageWindows(otherJobId, dates, jobTimeMap.get(otherJobId));
+            existingAssignmentWindows.push(...windows);
+          });
 
           // 4) Upsert assignment(s): handles single or batch dates
           async function upsertAssignmentFor(targetDate: string | null) {
