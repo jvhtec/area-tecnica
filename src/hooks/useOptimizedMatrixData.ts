@@ -101,17 +101,19 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     queryKey: ['optimized-matrix-assignments', jobIds, technicianIds, format(dateRange.start, 'yyyy-MM-dd')],
     queryFn: async (): Promise<AssignmentWithJob[]> => {
       if (jobIds.length === 0 || technicianIds.length === 0) return [];
-      
+
       console.log('Fetching assignments for', jobIds.length, 'jobs and', technicianIds.length, 'technicians');
-      
+
       // Much smaller batch size for faster queries
       const batchSize = 25;
-      const promises = [];
-      
+      const legacyPromises = [];
+      const tempPromises = [];
+
       for (let i = 0; i < jobIds.length; i += batchSize) {
         const jobBatch = jobIds.slice(i, i + batchSize);
-        
-        promises.push(
+
+        // Fetch from legacy job_assignments table
+        legacyPromises.push(
           supabase
             .from('job_assignments')
             .select(`
@@ -136,22 +138,54 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
             .in('technician_id', technicianIds)
             .limit(500) // Limit per batch
         );
+
+        // ====================================================================
+        // TEMPORARY HOTFIX: Fetch from temp per-day assignment table
+        // TODO: Remove when timesheet architecture is deployed (2025-11-24)
+        // ====================================================================
+        tempPromises.push(
+          supabase
+            .from('job_assignment_days_temp')
+            .select(`
+              job_id,
+              technician_id,
+              assignment_date,
+              source
+            `)
+            .in('job_id', jobBatch)
+            .in('technician_id', technicianIds)
+            .limit(500)
+        );
       }
-      
+
       try {
-        const results = await Promise.all(promises);
-        const allData = results.flatMap(result => {
+        const [legacyResults, tempResults] = await Promise.all([
+          Promise.all(legacyPromises),
+          Promise.all(tempPromises)
+        ]);
+
+        // Process legacy assignments
+        const legacyData = legacyResults.flatMap(result => {
           if (result.error) {
             console.error('Assignment query error:', result.error);
             return [];
           }
           return result.data || [];
         });
-        
-        console.log('Fetched', allData.length, 'assignments');
-        
-        // Transform and filter the data
-        const transformedData = allData.map(item => ({
+
+        // Process temp table assignments
+        const tempData = tempResults.flatMap(result => {
+          if (result.error) {
+            console.error('[TEMP HOTFIX] Temp assignment query error:', result.error);
+            return [];
+          }
+          return result.data || [];
+        });
+
+        console.log(`Fetched ${legacyData.length} legacy assignments + ${tempData.length} temp assignments`);
+
+        // Transform legacy data
+        const transformedLegacy = legacyData.map(item => ({
           job_id: item.job_id,
           technician_id: item.technician_id,
           sound_role: item.sound_role,
@@ -163,11 +197,29 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           assigned_at: item.assigned_at,
           // Prefer the jobs array provided to the hook to avoid losing rows when join is blocked by RLS
           job: jobsById.get(item.job_id) || (Array.isArray(item.jobs) ? item.jobs[0] : item.jobs)
-        }))
+        }));
+
+        // Transform temp table data to match expected structure
+        const transformedTemp = tempData.map(item => ({
+          job_id: item.job_id,
+          technician_id: item.technician_id,
+          sound_role: null, // Temp table doesn't store roles
+          lights_role: null,
+          video_role: null,
+          single_day: true, // All temp assignments are single-day
+          assignment_date: item.assignment_date,
+          status: 'confirmed' as const, // Infer confirmed status for existing assignments
+          assigned_at: null,
+          job: jobsById.get(item.job_id)
+        }));
+
+        // Merge both datasets
+        const allData = [...transformedLegacy, ...transformedTemp];
+
         // Keep rows even if the join returned no job; a fallback from jobsById will usually satisfy it
-        .filter(item => !!item.job);
-        
-        return transformedData as AssignmentWithJob[];
+        const filteredData = allData.filter(item => !!item.job);
+
+        return filteredData as AssignmentWithJob[];
       } catch (error) {
         console.error('Error fetching assignments:', error);
         return [];
@@ -436,9 +488,33 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         console.log('🔔 job_assignments subscription status:', status);
       });
 
+    // ====================================================================
+    // TEMPORARY HOTFIX: Subscribe to temp table changes
+    // TODO: Remove when timesheet architecture is deployed (2025-11-24)
+    // ====================================================================
+    const tempChannel = supabase
+      .channel('matrix-job-assignments-temp')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_assignment_days_temp'
+        },
+        (payload) => {
+          console.log('[TEMP HOTFIX] 🔔 job_assignment_days_temp change detected:', payload.eventType, payload);
+          // Immediately invalidate and refetch
+          invalidateAssignmentQueries();
+        }
+      )
+      .subscribe((status) => {
+        console.log('[TEMP HOTFIX] 🔔 job_assignment_days_temp subscription status:', status);
+      });
+
     return () => {
-      console.log('🔔 Cleaning up job_assignments realtime subscription');
+      console.log('🔔 Cleaning up job_assignments realtime subscriptions');
       supabase.removeChannel(channel);
+      supabase.removeChannel(tempChannel);
     };
   }, [invalidateAssignmentQueries]);
 

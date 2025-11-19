@@ -2779,6 +2779,51 @@ export type Database = {
           },
         ]
       }
+      job_assignment_days_temp: {
+        Row: {
+          assignment_date: string
+          created_at: string
+          id: string
+          job_id: string
+          source: string | null
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_date: string
+          created_at?: string
+          id?: string
+          job_id: string
+          source?: string | null
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_date?: string
+          created_at?: string
+          id?: string
+          job_id?: string
+          source?: string | null
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_assignment_days_temp_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignment_days_temp_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_date_types: {
         Row: {
           created_at: string | null
