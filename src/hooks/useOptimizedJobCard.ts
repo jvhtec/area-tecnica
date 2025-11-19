@@ -73,6 +73,13 @@ export const useOptimizedJobCard = (
         table: 'job_assignments',
         filter: `job_id=eq.${job.id}`,
       }, async () => { await refreshAssignments(); })
+      // TEMP HOTFIX: Subscribe to temp table for realtime updates (2025-11-24 rollback)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'job_assignment_days_temp',
+        filter: `job_id=eq.${job.id}`,
+      }, async () => { await refreshAssignments(); })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
