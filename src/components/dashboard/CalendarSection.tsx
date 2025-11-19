@@ -1175,7 +1175,14 @@ const JobCard: React.FC<JobCardProps> = ({
   };
 
   const totalRequired = getTotalRequiredPersonnel(job);
-  const currentlyAssigned = job.job_assignments?.length || 0;
+  const dayKey = format(date, 'yyyy-MM-dd');
+  const hasTimesheetAssignments = Array.isArray(job.timesheet_assignments);
+  const currentlyAssigned = hasTimesheetAssignments
+    ? (job.timesheet_assignments || []).filter((assignment: any) => {
+        const dates: string[] = Array.isArray(assignment?.timesheet_dates) ? assignment.timesheet_dates : [];
+        return dates.includes(dayKey);
+      }).length
+    : job.job_assignments?.length || 0;
   const jobTimezone = job.timezone || 'Europe/Madrid';
   const dateTypeIcon = getDateTypeIcon(job.id, date);
 
