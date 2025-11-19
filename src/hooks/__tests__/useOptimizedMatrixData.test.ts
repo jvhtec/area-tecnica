@@ -50,4 +50,30 @@ describe('buildAssignmentDateMap', () => {
 
     expect(map.get('tech-b-2025-03-02')).toBe(assignments[2]);
   });
+
+  it('drops technicians once all of their per-day rows are removed (matrix reload)', () => {
+    const assignments: any[] = [
+      {
+        job_id: 'job-a',
+        technician_id: 'tech-a',
+        date: '2025-05-01',
+        job: { id: 'job-a' },
+      },
+      {
+        job_id: 'job-a',
+        technician_id: 'tech-a',
+        date: '2025-05-02',
+        job: { id: 'job-a' },
+      },
+    ];
+
+    const dates = [createDate('2025-05-01'), createDate('2025-05-02')];
+
+    const populated = buildAssignmentDateMap(assignments as any, dates);
+    expect(populated.get('tech-a-2025-05-01')).toBeTruthy();
+
+    const afterRemoval = buildAssignmentDateMap([], dates);
+    expect(afterRemoval.get('tech-a-2025-05-01')).toBeUndefined();
+    expect(afterRemoval.get('tech-a-2025-05-02')).toBeUndefined();
+  });
 });
