@@ -70,7 +70,7 @@ export default function MorningSummary() {
         .select(`
           technician_id,
           job:jobs!inner(title, start_time),
-          profile:profiles!job_assignments_unified_technician_id_fkey!inner(first_name, last_name, nickname, department, role)
+          profile:profiles!job_assignments_technician_id_fkey!inner(first_name, last_name, nickname, department, role)
         `)
         .eq('status', 'confirmed')
         .eq('profile.department', dept)

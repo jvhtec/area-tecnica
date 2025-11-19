@@ -137,7 +137,7 @@ serve(async (req: Request) => {
       .select(`
         technician_id,
         sound_role, lights_role, video_role,
-        profiles!job_assignments_unified_technician_id_fkey ( first_name, last_name, phone )
+        profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
       `)
       .eq('job_id', job_id);
     if (assignsErr) {

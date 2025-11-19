@@ -273,7 +273,7 @@ export const generateTravelDaySheet = async (
         .from('job_assignments_unified')
         .select(`
           *,
-          profiles!job_assignments_unified_technician_id_fkey (
+          profiles!job_assignments_technician_id_fkey (
             first_name,
             last_name,
             phone
@@ -621,7 +621,7 @@ export const generateEnhancedEventDaySheet = async (
         .from('job_assignments_unified')
         .select(`
           *,
-          profiles!job_assignments_unified_technician_id_fkey (
+          profiles!job_assignments_technician_id_fkey (
             first_name,
             last_name,
             phone
