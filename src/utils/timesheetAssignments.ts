@@ -22,6 +22,8 @@ export interface AggregatedTimesheetAssignment extends Record<string, any> {
   timesheet_ranges: Array<{ start: string; end: string }>;
 }
 
+export type TimesheetJobTechnicianRow = Pick<TimesheetRowWithTechnician, 'job_id' | 'technician_id' | 'date'>;
+
 function normalizeProfile(profile: any) {
   if (!profile) return profile;
   return Array.isArray(profile) ? profile[0] : profile;
@@ -143,4 +145,26 @@ export function aggregateJobTimesheets(
   });
 
   return result;
+}
+
+export function buildJobTechnicianIndex(rows: TimesheetJobTechnicianRow[] = []) {
+  const index = new Map<string, Set<string>>();
+  rows.forEach((row) => {
+    const jobId = row?.job_id;
+    const techId = row?.technician_id;
+    if (!jobId || !techId) return;
+    const existing = index.get(jobId) ?? new Set<string>();
+    existing.add(techId);
+    index.set(jobId, existing);
+  });
+  return index;
+}
+
+export function countJobTechnicians(rows: TimesheetJobTechnicianRow[] = []) {
+  const counts: Record<string, number> = {};
+  const index = buildJobTechnicianIndex(rows);
+  index.forEach((set, jobId) => {
+    counts[jobId] = set.size;
+  });
+  return counts;
 }

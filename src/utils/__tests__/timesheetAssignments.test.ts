@@ -1,4 +1,10 @@
-import { aggregateJobTimesheets, aggregateTimesheetsForJob, collapseConsecutiveDates } from '../timesheetAssignments';
+import {
+  aggregateJobTimesheets,
+  aggregateTimesheetsForJob,
+  buildJobTechnicianIndex,
+  collapseConsecutiveDates,
+  countJobTechnicians,
+} from '../timesheetAssignments';
 
 describe('timesheetAssignments helpers', () => {
   it('collapses consecutive dates into ranges', () => {
@@ -66,5 +72,24 @@ describe('timesheetAssignments helpers', () => {
 
     const afterRemoval = aggregateTimesheetsForJob('job-4', [], []);
     expect(afterRemoval).toHaveLength(0);
+  });
+
+  it('deduplicates per-day rows when counting technicians per job', () => {
+    const rows = [
+      { job_id: 'job-9', technician_id: 'tech-5', date: '2025-07-01' },
+      { job_id: 'job-9', technician_id: 'tech-5', date: '2025-07-02' },
+      { job_id: 'job-9', technician_id: 'tech-6', date: '2025-07-02' },
+      { job_id: 'job-10', technician_id: 'tech-7', date: '2025-07-03' },
+    ];
+
+    const index = buildJobTechnicianIndex(rows as any);
+    expect(index.get('job-9')?.size).toBe(2);
+    expect(index.get('job-10')?.size).toBe(1);
+
+    const counts = countJobTechnicians(rows as any);
+    expect(counts).toEqual({ 'job-9': 2, 'job-10': 1 });
+
+    const afterRemoval = countJobTechnicians(rows.filter((row) => row.technician_id !== 'tech-6') as any);
+    expect(afterRemoval).toEqual({ 'job-9': 1, 'job-10': 1 });
   });
 });
