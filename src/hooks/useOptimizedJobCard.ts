@@ -53,9 +53,10 @@ export const useOptimizedJobCard = (
   const refreshAssignments = useCallback(async () => {
     if (!job?.id) return;
     try {
+      // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
       const { data, error } = await supabase
-        .from('job_assignments')
-        .select(`*, profiles(first_name, nickname, last_name)`) 
+        .from('job_assignments_unified')
+        .select(`*, profiles(first_name, nickname, last_name)`)
         .eq('job_id', job.id);
       if (!error) setAssignments(data || []);
     } catch {}
@@ -70,6 +71,13 @@ export const useOptimizedJobCard = (
         event: '*',
         schema: 'public',
         table: 'job_assignments',
+        filter: `job_id=eq.${job.id}`,
+      }, async () => { await refreshAssignments(); })
+      // TEMP HOTFIX: Subscribe to temp table for realtime updates (2025-11-24 rollback)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'job_assignment_days_temp',
         filter: `job_id=eq.${job.id}`,
       }, async () => { await refreshAssignments(); })
       .on('postgres_changes', {

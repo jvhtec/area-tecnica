@@ -74,9 +74,10 @@ export async function buildTourRatesExportPayload(
     return { jobsWithQuotes: [], profiles: [] };
   }
 
+  // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
   const [assignmentsResult, lpoResult] = await Promise.all([
     supabase
-      .from('job_assignments')
+      .from('job_assignments_unified')
       .select('job_id, technician_id')
       .in('job_id', jobIds),
     supabase

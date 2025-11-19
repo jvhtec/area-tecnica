@@ -72,8 +72,9 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
         let assignmentResults: Assignment[] = [];
 
         if (techIds.length > 0) {
+          // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
           const { data: assignmentsData, error: assignmentsError } = await supabase
-            .from('job_assignments')
+            .from('job_assignments_unified')
             .select(`
               technician_id,
               sound_role,
@@ -198,6 +199,23 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
       )
       .subscribe();
 
+    // TEMP HOTFIX: Subscribe to temp table for realtime updates (2025-11-24 rollback)
+    const tempAssignmentChannel = supabase
+      .channel('personal-calendar-temp-assignments')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_assignment_days_temp'
+        },
+        () => {
+          console.log('PersonalCalendar: Real-time update received from job_assignment_days_temp, refetching data');
+          fetchData();
+        }
+      )
+      .subscribe();
+
     // Set up real-time subscription for availability/vacation changes
     const availabilityChannel = supabase
       .channel('personal-calendar-availability')
@@ -218,6 +236,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
     return () => {
       isMounted = false;
       supabase.removeChannel(assignmentChannel);
+      supabase.removeChannel(tempAssignmentChannel);
       supabase.removeChannel(availabilityChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

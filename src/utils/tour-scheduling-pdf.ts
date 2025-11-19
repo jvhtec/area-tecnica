@@ -305,9 +305,10 @@ export const generateTourDaySheet = async (
     }
 
     // Load crew assignments
+    // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
     if (jobQuery.data?.id) {
       const { data: assignments, error: assignmentsError } = await supabase
-        .from('job_assignments')
+        .from('job_assignments_unified')
         .select(`
           *,
           profiles!job_assignments_technician_id_fkey (

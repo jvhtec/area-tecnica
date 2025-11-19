@@ -267,9 +267,10 @@ export const generateTravelDaySheet = async (
       .eq('tour_date_id', tourDate.id)
       .maybeSingle();
 
+    // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
     if (jobQuery.data?.id) {
       const { data: assignments } = await supabase
-        .from('job_assignments')
+        .from('job_assignments_unified')
         .select(`
           *,
           profiles!job_assignments_technician_id_fkey (
@@ -614,9 +615,10 @@ export const generateEnhancedEventDaySheet = async (
       .eq('tour_date_id', tourDate.id)
       .maybeSingle();
 
+    // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
     if (jobQuery.data?.id) {
       const { data: assignments } = await supabase
-        .from('job_assignments')
+        .from('job_assignments_unified')
         .select(`
           *,
           profiles!job_assignments_technician_id_fkey (

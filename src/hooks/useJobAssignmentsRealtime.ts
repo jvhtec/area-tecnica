@@ -56,8 +56,9 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       // Add retry logic
       const fetchWithRetry = async (retries = 3) => {
         try {
+          // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
           const { data, error } = await supabase
-            .from("job_assignments")
+            .from("job_assignments_unified")
             .select(`
               *,
               profiles (

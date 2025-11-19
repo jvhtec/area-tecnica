@@ -1304,8 +1304,9 @@ function WallboardDisplay({
       });
 
       // 3) Fetch assignments for crew counts (restrict to detail window)
+      // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
       const { data: assignRows, error: assignErr } = detailJobIds.length
-        ? await supabase.from('job_assignments').select('job_id,technician_id,sound_role,lights_role,video_role').in('job_id', detailJobIds)
+        ? await supabase.from('job_assignments_unified').select('job_id,technician_id,sound_role,lights_role,video_role').in('job_id', detailJobIds)
         : { data: [], error: null } as any;
       if (assignErr) console.error('Wallboard job_assignments error:', assignErr);
       const assignsByJob = new Map<string, any[]>();
@@ -1365,10 +1366,28 @@ function WallboardDisplay({
         const depts: Dept[] = deptsAll.filter(d => d !== 'video');
         const crewAssigned: Record<string, number> = { sound: 0, lights: 0, video: 0 };
         const assignmentRows = detailJobSet.has(j.id) ? (assignsByJob.get(j.id) ?? []) : [];
+
+        // TEMP HOTFIX: Deduplicate by technician_id to avoid counting same tech multiple times
+        // when they have multiple single-day assignments (from job_assignment_days_temp)
+        const seenTechsByDept: Record<string, Set<string>> = {
+          sound: new Set(),
+          lights: new Set(),
+          video: new Set()
+        };
+
         assignmentRows.forEach((a:any)=>{
-          if (a.sound_role) crewAssigned.sound++;
-          if (a.lights_role) crewAssigned.lights++;
-          if (a.video_role) crewAssigned.video++;
+          if (a.sound_role && !seenTechsByDept.sound.has(a.technician_id)) {
+            crewAssigned.sound++;
+            seenTechsByDept.sound.add(a.technician_id);
+          }
+          if (a.lights_role && !seenTechsByDept.lights.has(a.technician_id)) {
+            crewAssigned.lights++;
+            seenTechsByDept.lights.add(a.technician_id);
+          }
+          if (a.video_role && !seenTechsByDept.video.has(a.technician_id)) {
+            crewAssigned.video++;
+            seenTechsByDept.video.add(a.technician_id);
+          }
         });
         const crewNeeded: Record<string, number> = { sound: 0, lights: 0, video: 0 };
         depts.forEach(d => {
@@ -1471,9 +1490,18 @@ function WallboardDisplay({
             .filter((j:any)=> !dryhireIds.has(j.id))
             .filter(jobOverlapsWeek)
             .map((j:any)=>{
+              // TEMP HOTFIX: Deduplicate crew by technician_id to avoid duplicate entries
+              // when same tech has multiple single-day assignments
+              const seenTechs = new Set<string>();
               const crew = (assignsByJob.get(j.id) ?? [])
                 // Hide video crew
                 .filter((a:any)=> a.video_role == null)
+                // Deduplicate by technician_id
+                .filter((a:any)=> {
+                  if (seenTechs.has(a.technician_id)) return false;
+                  seenTechs.add(a.technician_id);
+                  return true;
+                })
                 .map((a:any)=>{
                   const dept: Dept | null = a.sound_role ? 'sound' : a.lights_role ? 'lights' : null;
                   const role = a.sound_role || a.lights_role || 'assigned';

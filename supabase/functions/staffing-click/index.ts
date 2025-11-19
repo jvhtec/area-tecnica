@@ -407,10 +407,36 @@ serve(async (req) => {
               let upsertAttemptSummary: string | null = null;
 
               const attemptUpsert = async () => {
-                const { error } = await supabase
-                  .from('job_assignments')
-                  .upsert(upsertPayload, { onConflict: onConflictKeys });
-                return error;
+                // ====================================================================
+                // TEMPORARY HOTFIX: Route single-day assignments to temp table
+                // TODO: Remove when timesheet architecture is deployed (2025-11-24)
+                // ====================================================================
+                if (targetDate) {
+                  // Single-day assignment -> write to temp table with role information
+                  const tempPayload = {
+                    job_id: row.job_id,
+                    technician_id: row.profile_id,
+                    assignment_date: targetDate,
+                    source: 'staffing', // Track that this came from auto-assignment
+                    ...rolePatch, // Include role information (sound_role, lights_role, or video_role)
+                  };
+
+                  console.log('[TEMP HOTFIX] Routing single-day assignment with roles to temp table:', tempPayload);
+
+                  const { error } = await supabase
+                    .from('job_assignment_days_temp')
+                    .upsert(tempPayload, {
+                      onConflict: 'job_id,technician_id,assignment_date',
+                      ignoreDuplicates: false // Update if exists
+                    });
+                  return error;
+                } else {
+                  // Whole-job assignment -> use existing logic
+                  const { error } = await supabase
+                    .from('job_assignments')
+                    .upsert(upsertPayload, { onConflict: onConflictKeys });
+                  return error;
+                }
               };
 
               // Attempt upsert using the appropriate unique index
@@ -462,16 +488,21 @@ serve(async (req) => {
                 });
                 await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_error', meta: { message: upsertErr.message, target_date: targetDate, on_conflict: onConflictKeys, attempt: upsertAttemptSummary } });
               } else {
+                // Verify assignment was created (check appropriate table based on targetDate)
+                const verifyTable = targetDate ? 'job_assignment_days_temp' : 'job_assignments';
+                const verifySelect = targetDate ? 'id,assignment_date' : 'id,assignment_date,status';
+
                 const { data: assignmentProbe, error: probeErr } = await supabase
-                  .from('job_assignments')
-                  .select('id,assignment_date,status')
+                  .from(verifyTable)
+                  .select(verifySelect)
                   .eq('job_id', row.job_id)
                   .eq('technician_id', row.profile_id)
-                  .order('assignment_date', { ascending: true });
+                  .order('assignment_date', { ascending: true, nullsFirst: false });
+
                 if (probeErr) {
-                  console.warn('⚠️ Unable to verify job_assignments after upsert', { job_id: row.job_id, technician_id: row.profile_id, error: probeErr });
+                  console.warn(`⚠️ Unable to verify ${verifyTable} after upsert`, { job_id: row.job_id, technician_id: row.profile_id, error: probeErr });
                 } else {
-                  console.log('✅ job_assignments per-day verification', {
+                  console.log(`✅ ${verifyTable} verification`, {
                     job_id: row.job_id,
                     technician_id: row.profile_id,
                     targetDate,

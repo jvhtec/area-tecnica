@@ -302,36 +302,38 @@ export const AssignJobDialog = ({
       } else {
         // No row exists yet. Use insert-first with conflict fallback to update.
         if (coverageMode === 'multi') {
+          // ====================================================================
+          // TEMPORARY HOTFIX: Write multi-day assignments to temp table
+          // This enables multiple single-day assignments within a job span
+          // TODO: Remove when timesheet architecture is deployed (2025-11-24)
+          // ====================================================================
           const uniqueKeys = Array.from(new Set((multiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
           if (uniqueKeys.length === 0) throw new Error('Select at least one date');
+
           for (const dk of uniqueKeys) {
-            const row = { ...basePayload, single_day: true, assignment_date: dk };
-            console.log('Inserting single-day assignment row:', row);
-            const { error: insErr } = await supabase.from('job_assignments').insert(row);
-            if (insErr) {
-              if (insErr.code === '23505') {
-                // Duplicate -> update existing per-day row
-                console.warn('Duplicate on insert (per-day). Updating existing row.', { date: dk });
-                const { error: updErr } = await supabase
-                  .from('job_assignments')
-                  .update({
-                    sound_role: row.sound_role,
-                    lights_role: row.lights_role,
-                    video_role: row.video_role,
-                    assigned_by: row.assigned_by,
-                    assigned_at: row.assigned_at,
-                    status: row.status,
-                    response_time: row.response_time,
-                    single_day: true,
-                    assignment_date: dk,
-                  })
-                  .eq('job_id', selectedJobId)
-                  .eq('technician_id', technicianId)
-                  .eq('assignment_date', dk);
-                if (updErr) throw updErr;
-              } else {
-                throw insErr;
-              }
+            const tempRow = {
+              job_id: selectedJobId,
+              technician_id: technicianId,
+              assignment_date: dk,
+              source: 'manual', // Track that this came from UI assignment
+              sound_role: soundRole !== 'none' ? soundRole : null,
+              lights_role: lightsRole !== 'none' ? lightsRole : null,
+              video_role: videoRole !== 'none' ? videoRole : null,
+            };
+
+            console.log('[TEMP HOTFIX] Inserting per-day assignment with roles to temp table:', tempRow);
+
+            // Use upsert for cleaner conflict handling (UNIQUE constraint on job_id, technician_id, assignment_date)
+            const { error: tempErr } = await supabase
+              .from('job_assignment_days_temp')
+              .upsert(tempRow, {
+                onConflict: 'job_id,technician_id,assignment_date',
+                ignoreDuplicates: false // Update if exists
+              });
+
+            if (tempErr) {
+              console.error('[TEMP HOTFIX] Error writing to temp table:', tempErr);
+              throw tempErr;
             }
           }
         } else {
@@ -366,12 +368,11 @@ export const AssignJobDialog = ({
       }
 
       // Verification: ensure at least one assignment row now exists for this job/tech
-      const verifyQuery = supabase
-        .from('job_assignments')
-        .select('job_id')
-        .eq('job_id', selectedJobId)
-        .eq('technician_id', technicianId)
-        .limit(1);
+      // For multi-day assignments, check the temp table; otherwise check job_assignments
+      const verifyQuery = coverageMode === 'multi'
+        ? supabase.from('job_assignment_days_temp').select('job_id').eq('job_id', selectedJobId).eq('technician_id', technicianId).limit(1)
+        : supabase.from('job_assignments').select('job_id').eq('job_id', selectedJobId).eq('technician_id', technicianId).limit(1);
+
       const { data: verifyData, error: verifyErr } = await verifyQuery;
       if (verifyErr) throw verifyErr;
       if (!verifyData || verifyData.length === 0) {

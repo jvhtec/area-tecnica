@@ -98,8 +98,9 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       console.log("autoCreateTimesheets started for jobId:", jobId);
       
       // Get job assignments and job details
+      // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
       const { data: assignments, error: assignmentsError } = await supabase
-        .from("job_assignments")
+        .from("job_assignments_unified")
         .select("technician_id")
         .eq("job_id", jobId);
 

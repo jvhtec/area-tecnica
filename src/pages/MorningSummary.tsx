@@ -64,8 +64,9 @@ export default function MorningSummary() {
 
       for (const dept of departments) {
         // Get assignments
+        // TEMP HOTFIX: Use unified view to include temp assignments (2025-11-24 rollback)
       const { data: assignments } = await supabase
-        .from('job_assignments')
+        .from('job_assignments_unified')
         .select(`
           technician_id,
           job:jobs!inner(title, start_time),
