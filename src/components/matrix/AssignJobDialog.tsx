@@ -38,6 +38,7 @@ import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
 import { checkTimeConflictEnhanced, ConflictCheckResult } from '@/utils/technicianAvailability';
 import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
+import { removeTimesheetAssignment } from '@/services/removeTimesheetAssignment';
 
 interface AssignJobDialogProps {
   open: boolean;
@@ -224,22 +225,20 @@ export const AssignJobDialog = ({
       console.log('Role assignments:', { soundRole, lightsRole, videoRole, department: technician.department });
 
       if (isReassignment) {
-        const { error: deleteError } = await supabase
-          .from('job_assignments')
-          .delete()
-          .eq('job_id', existingAssignment.job_id)
-          .eq('technician_id', technicianId);
+        const { deleted_assignment } = await removeTimesheetAssignment(existingAssignment.job_id, technicianId);
 
-        if (deleteError) {
-          console.error('Error removing old assignment:', deleteError);
-          throw deleteError;
+        if (!deleted_assignment) {
+          const { error: deleteError } = await supabase
+            .from('job_assignments')
+            .delete()
+            .eq('job_id', existingAssignment.job_id)
+            .eq('technician_id', technicianId);
+
+          if (deleteError) {
+            console.error('Error removing old assignment after RPC fallback:', deleteError);
+            throw deleteError;
+          }
         }
-
-        await supabase
-          .from('timesheets')
-          .delete()
-          .eq('job_id', existingAssignment.job_id)
-          .eq('technician_id', technicianId);
 
         const departmentsToRemove = determineFlexDepartmentsForAssignment(existingAssignment, technician?.department);
         if (existingAssignment?.job_id && departmentsToRemove.length > 0) {
@@ -468,12 +467,16 @@ export const AssignJobDialog = ({
     if (isRemoving) return;
     setIsRemoving(true);
     try {
-      const { error } = await supabase
-        .from('job_assignments')
-        .delete()
-        .eq('job_id', existingAssignment.job_id)
-        .eq('technician_id', technicianId);
-      if (error) throw error;
+      const { deleted_assignment } = await removeTimesheetAssignment(existingAssignment.job_id, technicianId);
+
+      if (!deleted_assignment) {
+        const { error } = await supabase
+          .from('job_assignments')
+          .delete()
+          .eq('job_id', existingAssignment.job_id)
+          .eq('technician_id', technicianId);
+        if (error) throw error;
+      }
 
       const departmentsToRemove = determineFlexDepartmentsForAssignment(existingAssignment, technician?.department);
       if (existingAssignment?.job_id && departmentsToRemove.length > 0) {
