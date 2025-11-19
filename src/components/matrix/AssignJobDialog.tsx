@@ -37,6 +37,7 @@ import { toast } from 'sonner';
 import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
 import { checkTimeConflictEnhanced, ConflictCheckResult } from '@/utils/technicianAvailability';
+import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
 
 interface AssignJobDialogProps {
   open: boolean;
@@ -234,6 +235,12 @@ export const AssignJobDialog = ({
           throw deleteError;
         }
 
+        await supabase
+          .from('timesheets')
+          .delete()
+          .eq('job_id', existingAssignment.job_id)
+          .eq('technician_id', technicianId);
+
         const departmentsToRemove = determineFlexDepartmentsForAssignment(existingAssignment, technician?.department);
         if (existingAssignment?.job_id && departmentsToRemove.length > 0) {
           await Promise.allSettled(departmentsToRemove.map(async (department) => {
@@ -277,6 +284,9 @@ export const AssignJobDialog = ({
         .eq('technician_id', technicianId)
         .maybeSingle();
 
+      const desiredSingleDay = coverageMode === 'single';
+      const desiredAssignmentDate = coverageMode === 'single' ? assignmentDate : null;
+
       if (existingRow) {
         // Update the existing base row (whole job or single) to align with the requested coverage
         const updatePayload: any = {
@@ -288,8 +298,8 @@ export const AssignJobDialog = ({
           // Do not downgrade a confirmed assignment to invited
           status: existingRow.status === 'confirmed' && basePayload.status !== 'confirmed' ? 'confirmed' : basePayload.status,
           response_time: basePayload.status === 'confirmed' ? basePayload.response_time : existingRow.status === 'confirmed' ? (existingRow as any).response_time ?? null : null,
-          single_day: coverageMode === 'single',
-          assignment_date: coverageMode === 'single' ? assignmentDate : null,
+          single_day: desiredSingleDay,
+          assignment_date: desiredAssignmentDate,
         };
 
         console.log('Updating existing assignment with data:', updatePayload);
@@ -300,69 +310,56 @@ export const AssignJobDialog = ({
           .eq('technician_id', technicianId);
         if (error) throw error;
       } else {
-        // No row exists yet. Use insert-first with conflict fallback to update.
-        if (coverageMode === 'multi') {
-          const uniqueKeys = Array.from(new Set((multiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
-          if (uniqueKeys.length === 0) throw new Error('Select at least one date');
-          for (const dk of uniqueKeys) {
-            const row = { ...basePayload, single_day: true, assignment_date: dk };
-            console.log('Inserting single-day assignment row:', row);
-            const { error: insErr } = await supabase.from('job_assignments').insert(row);
-            if (insErr) {
-              if (insErr.code === '23505') {
-                // Duplicate -> update existing per-day row
-                console.warn('Duplicate on insert (per-day). Updating existing row.', { date: dk });
-                const { error: updErr } = await supabase
-                  .from('job_assignments')
-                  .update({
-                    sound_role: row.sound_role,
-                    lights_role: row.lights_role,
-                    video_role: row.video_role,
-                    assigned_by: row.assigned_by,
-                    assigned_at: row.assigned_at,
-                    status: row.status,
-                    response_time: row.response_time,
-                    single_day: true,
-                    assignment_date: dk,
-                  })
-                  .eq('job_id', selectedJobId)
-                  .eq('technician_id', technicianId)
-                  .eq('assignment_date', dk);
-                if (updErr) throw updErr;
-              } else {
-                throw insErr;
-              }
-            }
-          }
-        } else {
-          const row = { ...basePayload, single_day: coverageMode === 'single', assignment_date: coverageMode === 'single' ? assignmentDate : null };
-          console.log('Inserting assignment row:', row);
-          const { error: insErr } = await supabase.from('job_assignments').insert(row);
-          if (insErr) {
-            if (insErr.code === '23505') {
-              // Already exists -> update
-              console.warn('Duplicate on insert. Updating existing base row.');
-              const { error: updErr } = await supabase
-                .from('job_assignments')
-                .update({
-                  sound_role: row.sound_role,
-                  lights_role: row.lights_role,
-                  video_role: row.video_role,
-                  assigned_by: row.assigned_by,
-                  assigned_at: row.assigned_at,
-                  status: row.status,
-                  response_time: row.response_time,
-                  single_day: row.single_day,
-                  assignment_date: row.assignment_date,
-                })
-                .eq('job_id', selectedJobId)
-                .eq('technician_id', technicianId);
-              if (updErr) throw updErr;
-            } else {
-              throw insErr;
-            }
+        const row = { ...basePayload, single_day: desiredSingleDay, assignment_date: desiredAssignmentDate };
+        console.log('Inserting assignment row:', row);
+        const { error: insErr } = await supabase.from('job_assignments').insert(row);
+        if (insErr) {
+          if (insErr.code === '23505') {
+            console.warn('Duplicate on insert. Updating existing base row.');
+            const { error: updErr } = await supabase
+              .from('job_assignments')
+              .update({
+                sound_role: row.sound_role,
+                lights_role: row.lights_role,
+                video_role: row.video_role,
+                assigned_by: row.assigned_by,
+                assigned_at: row.assigned_at,
+                status: row.status,
+                response_time: row.response_time,
+                single_day: row.single_day,
+                assignment_date: row.assignment_date,
+              })
+              .eq('job_id', selectedJobId)
+              .eq('technician_id', technicianId);
+            if (updErr) throw updErr;
+          } else {
+            throw insErr;
           }
         }
+      }
+
+      const coverageDates: string[] = (() => {
+        if (coverageMode === 'multi') {
+          const uniqueKeys = Array.from(new Set((multiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
+          if (uniqueKeys.length === 0) {
+            throw new Error('Select at least one date');
+          }
+          return uniqueKeys;
+        }
+        if (coverageMode === 'single' && assignmentDate) {
+          return [assignmentDate];
+        }
+        return [];
+      })();
+
+      for (const dateIso of coverageDates) {
+        await toggleTimesheetDay({
+          jobId: selectedJobId,
+          technicianId,
+          dateIso,
+          present: true,
+          source: 'assignment-dialog',
+        });
       }
 
       // Verification: ensure at least one assignment row now exists for this job/tech

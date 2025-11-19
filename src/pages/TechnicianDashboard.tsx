@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { addWeeks, addMonths } from "date-fns";
+import { addWeeks, addMonths, differenceInCalendarDays } from "date-fns";
 import { TimeSpanSelector } from "@/components/technician/TimeSpanSelector";
 import { MessageManagementDialog } from "@/components/technician/MessageManagementDialog";
 import { AssignmentsList } from "@/components/technician/AssignmentsList";
@@ -20,6 +20,159 @@ import { useTechnicianDashboardSubscriptions } from "@/hooks/useMobileRealtimeSu
 import { TechnicianTourRates } from "@/components/dashboard/TechnicianTourRates";
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 import { getCategoryFromAssignment } from "@/utils/roleCategory";
+
+type TechnicianJobDocument = {
+  id: string;
+  file_name: string;
+  file_path: string;
+  visible_to_tech: boolean;
+  uploaded_at: string | null;
+  read_only: boolean | null;
+  template_type: string | null;
+};
+
+type TechnicianJob = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  timezone: string | null;
+  location_id: string | null;
+  job_type: string | null;
+  color: string | null;
+  status: string | null;
+  location?: { name: string | null } | null;
+  job_documents?: TechnicianJobDocument[] | null;
+};
+
+export type TimesheetAssignmentRow = {
+  job_id: string;
+  technician_id: string;
+  date: string;
+  is_schedule_only?: boolean | null;
+  jobs: TechnicianJob | null;
+};
+
+export type AssignmentMetadata = {
+  job_id: string;
+  technician_id: string;
+  sound_role?: string | null;
+  lights_role?: string | null;
+  video_role?: string | null;
+  status?: string | null;
+  assigned_at?: string | null;
+};
+
+export type TechnicianAssignment = {
+  id: string;
+  job_id: string;
+  technician_id: string;
+  jobs: TechnicianJob;
+  department: string;
+  role: string;
+  category: string | null;
+  sound_role?: string | null;
+  lights_role?: string | null;
+  video_role?: string | null;
+  status?: string | null;
+  assigned_at?: string | null;
+  covered_dates: string[];
+  date_ranges: Array<{ start: string; end: string }>;
+};
+
+const determineDepartment = (meta?: AssignmentMetadata | null) => {
+  if (!meta) return "unknown";
+  if (meta.sound_role) return "sound";
+  if (meta.lights_role) return "lights";
+  if (meta.video_role) return "video";
+  return "unknown";
+};
+
+export const compressTimesheetDateRanges = (dates: string[]) => {
+  if (!dates.length) return [] as Array<{ start: string; end: string }>;
+
+  const sorted = Array.from(new Set(dates)).sort();
+  const ranges: Array<{ start: string; end: string }> = [];
+  let rangeStart = sorted[0];
+  let prev = sorted[0];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const current = sorted[i];
+    const diff = differenceInCalendarDays(new Date(current), new Date(prev));
+    if (diff === 1) {
+      prev = current;
+      continue;
+    }
+
+    ranges.push({ start: rangeStart, end: prev });
+    rangeStart = current;
+    prev = current;
+  }
+
+  ranges.push({ start: rangeStart, end: prev });
+  return ranges;
+};
+
+export const buildTechnicianAssignmentsFromTimesheets = (
+  rows: TimesheetAssignmentRow[],
+  metadataMap: Map<string, AssignmentMetadata>
+): TechnicianAssignment[] => {
+  const grouped = new Map<string, {
+    meta: AssignmentMetadata;
+    job: TechnicianJob;
+    dates: Set<string>;
+  }>();
+
+  rows.forEach(row => {
+    if (!row.jobs || row.is_schedule_only) return;
+    const key = `${row.job_id}:${row.technician_id}`;
+    const meta = metadataMap.get(key);
+    if (!meta || meta.status !== 'confirmed') return;
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        meta,
+        job: row.jobs,
+        dates: new Set<string>([row.date]),
+      });
+    } else {
+      grouped.get(key)!.dates.add(row.date);
+    }
+  });
+
+  return Array.from(grouped.entries()).map(([key, payload]) => {
+    const dates = Array.from(payload.dates).sort();
+    const assignmentBase = {
+      job_id: payload.meta.job_id,
+      technician_id: payload.meta.technician_id,
+      sound_role: payload.meta.sound_role ?? null,
+      lights_role: payload.meta.lights_role ?? null,
+      video_role: payload.meta.video_role ?? null,
+    };
+
+    return {
+      id: `job-${payload.meta.job_id}`,
+      job_id: payload.meta.job_id,
+      technician_id: payload.meta.technician_id,
+      jobs: payload.job,
+      department: determineDepartment(payload.meta),
+      role: payload.meta.sound_role || payload.meta.lights_role || payload.meta.video_role || "Assigned",
+      category: getCategoryFromAssignment(assignmentBase),
+      sound_role: assignmentBase.sound_role,
+      lights_role: assignmentBase.lights_role,
+      video_role: assignmentBase.video_role,
+      status: payload.meta.status ?? null,
+      assigned_at: payload.meta.assigned_at ?? null,
+      covered_dates: dates,
+      date_ranges: compressTimesheetDateRanges(dates),
+    } satisfies TechnicianAssignment;
+  }).sort((a, b) => {
+    const firstDateA = a.covered_dates[0] ?? '';
+    const firstDateB = b.covered_dates[0] ?? '';
+    return firstDateA.localeCompare(firstDateB);
+  });
+};
 
 const TechnicianDashboard = () => {
   const [timeSpan, setTimeSpan] = useState<string>("1week");
@@ -96,7 +249,7 @@ const TechnicianDashboard = () => {
   };
 
   // Use our new real-time query hook for fetching assignments
-  const { data: assignments = [], isLoading, refetch } = useRealtimeQuery(
+  const { data: assignments = [], isLoading, refetch } = useRealtimeQuery<TechnicianAssignment[]>(
     ['assignments', timeSpan, viewMode],
     async () => {
       try {
@@ -110,18 +263,23 @@ const TechnicianDashboard = () => {
 
         console.log("Fetching assignments for user:", user.id);
         
-        const endDate = getTimeSpanEndDate();
-        console.log("Fetching assignments until:", endDate, "viewMode:", viewMode);
-        
-        let query = supabase
-          .from('job_assignments')
+        const endBoundary = getTimeSpanEndDate();
+        const today = new Date();
+        const startDate = viewMode === 'upcoming' ? today : endBoundary;
+        const endDate = viewMode === 'upcoming' ? endBoundary : today;
+
+        console.log("Fetching assignments between:", startDate, endDate, "viewMode:", viewMode);
+
+        const startIso = startDate.toISOString().split('T')[0];
+        const endIso = endDate.toISOString().split('T')[0];
+
+        const { data: timesheetRows, error: timesheetError } = await supabase
+          .from('timesheets')
           .select(`
             job_id,
             technician_id,
-            sound_role,
-            lights_role,
-            video_role,
-            assigned_at,
+            date,
+            is_schedule_only,
             jobs (
               id,
               title,
@@ -134,64 +292,53 @@ const TechnicianDashboard = () => {
               color,
               status,
               location:locations(name),
-            job_documents(
-              id,
-              file_name,
-              file_path,
-              visible_to_tech,
-              uploaded_at,
-              read_only,
-              template_type
-            )
+              job_documents(
+                id,
+                file_name,
+                file_path,
+                visible_to_tech,
+                uploaded_at,
+                read_only,
+                template_type
+              )
             )
           `)
           .eq('technician_id', user.id)
-          .eq('status', 'confirmed');
+          .eq('is_schedule_only', false)
+          .gte('date', startIso)
+          .lte('date', endIso)
+          .order('date', { ascending: viewMode !== 'past' });
 
-        if (viewMode === 'upcoming') {
-          // Show upcoming and ongoing jobs
-          query = query
-            .lte('jobs.start_time', endDate.toISOString())
-            .gte('jobs.end_time', new Date().toISOString());
-        } else {
-          // Show past jobs - jobs that have already ended
-          query = query
-            .lte('jobs.end_time', new Date().toISOString());
-        }
-
-        const { data: jobAssignments, error: jobAssignmentsError } = await query
-          .order('start_time', { referencedTable: 'jobs' });
-
-        if (jobAssignmentsError) {
-          console.error("Error fetching job assignments:", jobAssignmentsError);
+        if (timesheetError) {
+          console.error("Error fetching timesheets:", timesheetError);
           toast.error("Error loading assignments");
-          throw jobAssignmentsError;
+          throw timesheetError;
         }
 
-        console.log("Fetched job assignments:", jobAssignments || []);
-        
-        const transformedJobs = jobAssignments
-          .filter(assignment => assignment.jobs)
-          .map(assignment => {
-            let department = "unknown";
-            if (assignment.sound_role) department = "sound";
-            else if (assignment.lights_role) department = "lights";
-            else if (assignment.video_role) department = "video";
-            
-            // Determine category from the role code
-            const category = getCategoryFromAssignment(assignment);
-            
-            return {
-              id: `job-${assignment.job_id}`,
-              job_id: assignment.job_id,
-              technician_id: assignment.technician_id,
-              department,
-              role: assignment.sound_role || assignment.lights_role || assignment.video_role || "Assigned",
-              category: category,
-              jobs: assignment.jobs
-            };
-          });
-        
+        const jobIds = Array.from(new Set((timesheetRows || []).map(row => row.job_id))).filter(Boolean) as string[];
+        const metadataMap = new Map<string, AssignmentMetadata>();
+
+        if (jobIds.length > 0) {
+          const { data: assignmentMetadata, error: assignmentError } = await supabase
+            .from('job_assignments')
+            .select('job_id, technician_id, sound_role, lights_role, video_role, status, assigned_at')
+            .eq('technician_id', user.id)
+            .in('job_id', jobIds);
+
+          if (assignmentError) {
+            console.error("Error fetching assignment metadata:", assignmentError);
+          } else {
+            (assignmentMetadata || []).forEach(meta => {
+              metadataMap.set(`${meta.job_id}:${meta.technician_id}`, meta);
+            });
+          }
+        }
+
+        const transformedJobs = buildTechnicianAssignmentsFromTimesheets(
+          (timesheetRows || []) as TimesheetAssignmentRow[],
+          metadataMap
+        );
+
         console.log("Final transformed assignments:", transformedJobs);
         return transformedJobs || [];
       } catch (error) {
@@ -200,7 +347,7 @@ const TechnicianDashboard = () => {
         return [];
       }
     },
-    'job_assignments',
+    'timesheets',
     {
       refetchOnWindowFocus: true,
       refetchOnMount: true,

@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-type Dept = 'sound' | 'lights' | 'video';
+import { Dept, TimesheetCrewRow, selectTimesheetCrew } from "../_shared/timesheetWhatsappUtils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -130,17 +129,19 @@ serve(async (req: Request) => {
       .maybeSingle();
     if (!job || jobErr) return new Response(JSON.stringify({ error: 'Job not found', details: jobErr?.message }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    // Fetch assignments + profiles
-    const { data: assigns, error: assignsErr } = await supabaseAdmin
-      .from('job_assignments')
+    // Fetch per-day timesheets for this job
+    const { data: timesheetRows, error: timesheetErr } = await supabaseAdmin
+      .from('timesheets')
       .select(`
         technician_id,
-        sound_role, lights_role, video_role,
-        profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
+        date,
+        job_assignments!inner(sound_role, lights_role, video_role),
+        profile:profiles!timesheets_technician_id_fkey(first_name, last_name, phone)
       `)
-      .eq('job_id', job_id);
-    if (assignsErr) {
-      console.warn('job_assignments fetch error', assignsErr);
+      .eq('job_id', job_id)
+      .eq('is_schedule_only', false);
+    if (timesheetErr) {
+      console.warn('timesheets fetch error', timesheetErr);
     }
 
     const defaultCC = Deno.env.get('WA_DEFAULT_COUNTRY_CODE') || '+34';
@@ -148,16 +149,12 @@ serve(async (req: Request) => {
     const missing: string[] = [];
     const invalid: string[] = [];
 
-    const rows = (assigns ?? []).filter((r: any) => {
-      if (department === 'sound') return !!r.sound_role;
-      if (department === 'lights') return !!r.lights_role;
-      if (department === 'video') return !!r.video_role;
-      return false;
-    });
+    const rows = selectTimesheetCrew((timesheetRows as TimesheetCrewRow[] | null) || [], department);
 
     for (const r of rows) {
-      const fullName = `${r.profiles?.first_name ?? ''} ${r.profiles?.last_name ?? ''}`.trim() || 'Tecnico';
-      const rawPhone = (r.profiles?.phone || '').trim();
+      const profile = Array.isArray(r.profile) ? r.profile[0] : r.profile;
+      const fullName = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Tecnico';
+      const rawPhone = (profile?.phone || '').trim();
       if (!rawPhone) {
         missing.push(fullName);
         continue;
