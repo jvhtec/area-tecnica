@@ -42,9 +42,9 @@ SELECT
   id,
   job_id,
   technician_id,
-  NULL::text as sound_role,                    -- Temp table doesn't store roles
-  NULL::text as lights_role,                   -- Temp table doesn't store roles
-  NULL::text as video_role,                    -- Temp table doesn't store roles
+  sound_role,                                  -- Temp table now stores role information
+  lights_role,                                 -- Temp table now stores role information
+  video_role,                                  -- Temp table now stores role information
   true as single_day,                          -- All temp assignments are single-day
   assignment_date,
   'confirmed'::public.assignment_status as status,  -- Infer confirmed status
@@ -90,8 +90,8 @@ GRANT SELECT ON public.job_assignments_unified TO anon;
 --    The UNION ALL means both tables are queried. For large datasets,
 --    consider adding WHERE clauses to filter early.
 --
--- 5. NULL HANDLING:
---    Temp records have NULL for role columns (sound_role, lights_role, video_role).
---    Your UI should handle these gracefully.
+-- 5. ROLE INFORMATION:
+--    Temp records store full role information (sound_role, lights_role, video_role)
+--    just like permanent assignments - seamless user experience.
 --
 -- ============================================================================

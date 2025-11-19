@@ -316,9 +316,12 @@ export const AssignJobDialog = ({
               technician_id: technicianId,
               assignment_date: dk,
               source: 'manual', // Track that this came from UI assignment
+              sound_role: soundRole !== 'none' ? soundRole : null,
+              lights_role: lightsRole !== 'none' ? lightsRole : null,
+              video_role: videoRole !== 'none' ? videoRole : null,
             };
 
-            console.log('[TEMP HOTFIX] Inserting per-day assignment to temp table:', tempRow);
+            console.log('[TEMP HOTFIX] Inserting per-day assignment with roles to temp table:', tempRow);
 
             // Use upsert for cleaner conflict handling (UNIQUE constraint on job_id, technician_id, assignment_date)
             const { error: tempErr } = await supabase

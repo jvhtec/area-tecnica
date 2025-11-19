@@ -2851,27 +2851,36 @@ export type Database = {
           created_at: string
           id: string
           job_id: string
+          lights_role: string | null
+          sound_role: string | null
           source: string | null
           technician_id: string
           updated_at: string
+          video_role: string | null
         }
         Insert: {
           assignment_date: string
           created_at?: string
           id?: string
           job_id: string
+          lights_role?: string | null
+          sound_role?: string | null
           source?: string | null
           technician_id: string
           updated_at?: string
+          video_role?: string | null
         }
         Update: {
           assignment_date?: string
           created_at?: string
           id?: string
           job_id?: string
+          lights_role?: string | null
+          sound_role?: string | null
           source?: string | null
           technician_id?: string
           updated_at?: string
+          video_role?: string | null
         }
         Relationships: [
           {

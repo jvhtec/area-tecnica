@@ -150,7 +150,10 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
               job_id,
               technician_id,
               assignment_date,
-              source
+              source,
+              sound_role,
+              lights_role,
+              video_role
             `)
             .in('job_id', jobBatch)
             .in('technician_id', technicianIds)
@@ -203,9 +206,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         const transformedTemp = tempData.map(item => ({
           job_id: item.job_id,
           technician_id: item.technician_id,
-          sound_role: null, // Temp table doesn't store roles
-          lights_role: null,
-          video_role: null,
+          sound_role: item.sound_role ?? null, // Temp table now stores role information
+          lights_role: item.lights_role ?? null,
+          video_role: item.video_role ?? null,
           single_day: true, // All temp assignments are single-day
           assignment_date: item.assignment_date,
           status: 'confirmed' as const, // Infer confirmed status for existing assignments

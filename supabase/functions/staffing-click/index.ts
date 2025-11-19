@@ -412,15 +412,16 @@ serve(async (req) => {
                 // TODO: Remove when timesheet architecture is deployed (2025-11-24)
                 // ====================================================================
                 if (targetDate) {
-                  // Single-day assignment -> write to temp table
+                  // Single-day assignment -> write to temp table with role information
                   const tempPayload = {
                     job_id: row.job_id,
                     technician_id: row.profile_id,
                     assignment_date: targetDate,
                     source: 'staffing', // Track that this came from auto-assignment
+                    ...rolePatch, // Include role information (sound_role, lights_role, or video_role)
                   };
 
-                  console.log('[TEMP HOTFIX] Routing single-day assignment to temp table:', tempPayload);
+                  console.log('[TEMP HOTFIX] Routing single-day assignment with roles to temp table:', tempPayload);
 
                   const { error } = await supabase
                     .from('job_assignment_days_temp')
