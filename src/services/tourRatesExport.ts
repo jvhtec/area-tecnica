@@ -74,28 +74,43 @@ export async function buildTourRatesExportPayload(
     return { jobsWithQuotes: [], profiles: [] };
   }
 
-  const [assignmentsResult, lpoResult] = await Promise.all([
+  const [timesheetsResult, lpoResult] = await Promise.all([
     supabase
-      .from('job_assignments')
-      .select('job_id, technician_id')
-      .in('job_id', jobIds),
+      .from('timesheets')
+      .select('job_id, technician_id, date, is_schedule_only')
+      .in('job_id', jobIds)
+      .eq('is_schedule_only', false),
     supabase
       .from('flex_work_orders')
       .select('job_id, technician_id, lpo_number')
       .in('job_id', jobIds),
   ]);
 
-  if (assignmentsResult.error) throw assignmentsResult.error;
+  if (timesheetsResult.error) throw timesheetsResult.error;
   if (lpoResult.error) throw lpoResult.error;
 
-  const assignmentsByJob = new Map<string, Set<string>>();
-  (assignmentsResult.data || []).forEach((row) => {
-    if (!row.job_id || !row.technician_id) return;
-    if (!assignmentsByJob.has(row.job_id)) {
-      assignmentsByJob.set(row.job_id, new Set());
-    }
-    assignmentsByJob.get(row.job_id)!.add(row.technician_id);
+  const timesheetsByJob = new Map<string, Array<{ technician_id: string; date: string | null }>>();
+  (timesheetsResult.data || []).forEach((row) => {
+    if (!row?.job_id || !row?.technician_id) return;
+    const roster = timesheetsByJob.get(row.job_id) ?? [];
+    roster.push({ technician_id: row.technician_id, date: row.date ?? null });
+    timesheetsByJob.set(row.job_id, roster);
   });
+
+  const getJobTimesheets = (
+    job: TourRatesExportJob
+  ): Array<{ technician_id: string; date: string | null }> => {
+    const jobType = String(job.job_type ?? '').toLowerCase();
+    const rows = timesheetsByJob.get(job.id) ?? [];
+    if (jobType !== 'tourdate') {
+      return rows;
+    }
+    const jobStart = job.start_time ? job.start_time.slice(0, 10) : null;
+    if (!jobStart) {
+      return rows;
+    }
+    return rows.filter((row) => row.date === jobStart);
+  };
 
   const lpoByJob = new Map<string, Map<string, string | null>>();
   (lpoResult.data || []).forEach((row) => {
@@ -142,7 +157,14 @@ export async function buildTourRatesExportPayload(
   const jobsWithQuotes: TourJobQuotesWithLPO[] = [];
 
   for (const job of jobs) {
-    const techIds = Array.from(assignmentsByJob.get(job.id) ?? []);
+    const jobTimesheets = getJobTimesheets(job);
+    const techIds = Array.from(
+      new Set(
+        jobTimesheets
+          .map((row) => row.technician_id)
+          .filter((techId): techId is string => Boolean(techId))
+      )
+    );
     if (techIds.length === 0) continue;
 
     let filteredQuotes: TourJobRateQuote[] = [];

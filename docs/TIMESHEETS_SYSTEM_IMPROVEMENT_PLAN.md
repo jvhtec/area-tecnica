@@ -14,6 +14,21 @@ This document outlines the complete roadmap to transform the timesheets system f
 
 ## Phase 1: Critical Security & Data Integrity (Sprint 1 - 2-3 days)
 
+### Canonical scheduling metadata (COMPLETED)
+
+To let the timesheets table power both payroll and per-day staffing views without introducing yet another table, two new fields
+were added via `20250716090000_timesheets_schedule_flags.sql`:
+
+| Column | Type | Purpose |
+| --- | --- | --- |
+| `is_schedule_only boolean NOT NULL DEFAULT false` | Marks rows that exist purely for scheduling/matrix purposes so payroll logic can continue filtering to `false`. |
+| `source text DEFAULT 'assignment'` | Captures which workflow generated the per-day row (`assignment`, `matrix`, future automation, etc.). |
+
+The migration also cleaned duplicate `(job_id, technician_id, date)` rows, enforced `UNIQUE (job_id, technician_id, date)`, and
+backfilled `is_schedule_only = true` for dryhire/tourdate jobs so those jobs can appear in the matrix without leaking into payroll.
+All foreign keys and the missing indexes listed below are now in place, which means Supabase RLS + ON CONFLICT logic can finally
+trust the per-day data model.
+
 ### 1.1 Add Authentication to Edge Function
 
 **File:** `supabase/functions/recalc-timesheet-amount/index.ts`

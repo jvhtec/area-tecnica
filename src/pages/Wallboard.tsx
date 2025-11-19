@@ -7,8 +7,9 @@ import { Plane, Wrench, Star, Moon, Mic } from 'lucide-react';
 import SplashScreen from '@/components/SplashScreen';
 import { WallboardApi, WallboardApiError } from '@/lib/wallboard-api';
 import { useLgScreensaverBlock } from '@/hooks/useLgScreensaverBlock';
+import { aggregateCrewFromTimesheets, type WallboardAssignmentRoleRow, type WallboardDept, type WallboardTimesheetRow } from '@/pages/utils/wallboardCrewUtils';
 
-type Dept = 'sound' | 'lights' | 'video';
+type Dept = WallboardDept;
 
 interface JobsOverviewFeed { jobs: Array<{ id:string; title:string; start_time:string; end_time:string; location:{ name:string|null }|null; departments: Dept[]; crewAssigned: Record<string, number>; crewNeeded: Record<string, number>; docs: Record<string, { have:number; need:number }>; status: 'green'|'yellow'|'red'; color?: string | null; job_type?: string | null; }> }
 type JobsOverviewJob = JobsOverviewFeed['jobs'][number];
@@ -1239,6 +1240,8 @@ function WallboardDisplay({
       const calendarGridEnd = new Date(calendarGridStart.getTime() + 42 * MS_PER_DAY - 1);
       const weekStartISO = todayStart.toISOString();
       const weekEndISO = weekEnd.toISOString();
+      const weekStartDate = weekStartISO.slice(0, 10);
+      const weekEndDate = weekEndISO.slice(0, 10);
       const calendarStartISO = calendarGridStart.toISOString();
       const calendarEndISO = calendarGridEnd.toISOString();
       const weekStartMs = todayStart.getTime();
@@ -1288,6 +1291,25 @@ function WallboardDisplay({
       const jobIds = jobArr.map(j=>j.id);
       const detailJobSet = new Set(jobArr.filter(jobOverlapsWeek).map((j:any)=>j.id));
       const detailJobIds = Array.from(detailJobSet);
+      const jobDayWindows = new Map<string, string[]>();
+      jobArr.filter(jobOverlapsWeek).forEach((job:any) => {
+        const startTs = Math.max(new Date(job.start_time).getTime(), weekStartMs);
+        const endTs = Math.min(new Date(job.end_time).getTime(), weekEndMs);
+        if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs < startTs) {
+          jobDayWindows.set(job.id, []);
+          return;
+        }
+        const dates: string[] = [];
+        let cursor = new Date(startTs);
+        cursor.setHours(0, 0, 0, 0);
+        const last = new Date(endTs);
+        last.setHours(0, 0, 0, 0);
+        while (cursor.getTime() <= last.getTime()) {
+          dates.push(formatDateKey(cursor));
+          cursor = new Date(cursor.getTime() + MS_PER_DAY);
+        }
+        jobDayWindows.set(job.id, dates);
+      });
       const dryhireIds = new Set<string>(jobArr.filter((j:any)=>j.job_type==='dryhire').map((j:any)=>j.id));
       const locationIds = Array.from(new Set(jobArr.map((j:any)=>j.location_id).filter(Boolean)));
 
@@ -1303,17 +1325,28 @@ function WallboardDisplay({
         deptsByJob.set(r.job_id, list as Dept[]);
       });
 
-      // 3) Fetch assignments for crew counts (restrict to detail window)
+      // 3) Fetch per-day timesheets for crew counts (restrict to detail window)
+      const { data: timesheetRows, error: timesheetErr } = detailJobIds.length
+        ? await supabase
+            .from('timesheets')
+            .select('job_id,technician_id,date')
+            .in('job_id', detailJobIds)
+            .eq('is_schedule_only', false)
+            .gte('date', weekStartDate)
+            .lte('date', weekEndDate)
+        : { data: [], error: null } as any;
+      if (timesheetErr) console.error('Wallboard timesheets error:', timesheetErr);
+      const timesheetData = (timesheetRows || []) as WallboardTimesheetRow[];
+
       const { data: assignRows, error: assignErr } = detailJobIds.length
         ? await supabase.from('job_assignments').select('job_id,technician_id,sound_role,lights_role,video_role').in('job_id', detailJobIds)
         : { data: [], error: null } as any;
       if (assignErr) console.error('Wallboard job_assignments error:', assignErr);
-      const assignsByJob = new Map<string, any[]>();
-      (assignRows||[]).forEach((a:any)=>{
-        const list = assignsByJob.get(a.job_id) ?? [];
-        list.push(a);
-        assignsByJob.set(a.job_id, list);
-      });
+      const assignmentRows = (assignRows || []) as WallboardAssignmentRoleRow[];
+      const assignmentByJobTech = new Map<string, WallboardAssignmentRoleRow>();
+      assignmentRows.forEach(row => assignmentByJobTech.set(`${row.job_id}:${row.technician_id}`, row));
+
+      const { jobDeptMinimums, jobTechSets } = aggregateCrewFromTimesheets(timesheetData, assignmentRows, jobDayWindows);
 
       // Fetch required-role summaries for these jobs
       const { data: reqRows, error: reqErr } = detailJobIds.length
@@ -1363,13 +1396,10 @@ function WallboardDisplay({
       const mapJob = (j:any): JobsOverviewJob => {
         const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
         const depts: Dept[] = deptsAll.filter(d => d !== 'video');
-        const crewAssigned: Record<string, number> = { sound: 0, lights: 0, video: 0 };
-        const assignmentRows = detailJobSet.has(j.id) ? (assignsByJob.get(j.id) ?? []) : [];
-        assignmentRows.forEach((a:any)=>{
-          if (a.sound_role) crewAssigned.sound++;
-          if (a.lights_role) crewAssigned.lights++;
-          if (a.video_role) crewAssigned.video++;
-        });
+        const countsFromTimesheets = jobDeptMinimums.get(j.id);
+        const crewAssigned: Record<string, number> = countsFromTimesheets
+          ? { ...countsFromTimesheets }
+          : { sound: 0, lights: 0, video: 0 };
         const crewNeeded: Record<string, number> = { sound: 0, lights: 0, video: 0 };
         depts.forEach(d => {
           crewNeeded[d] = detailJobSet.has(j.id) ? (needByJobDept.get(`${j.id}:${d}`) || 0) : 0;
@@ -1471,16 +1501,15 @@ function WallboardDisplay({
             .filter((j:any)=> !dryhireIds.has(j.id))
             .filter(jobOverlapsWeek)
             .map((j:any)=>{
-              const crew = (assignsByJob.get(j.id) ?? [])
-                // Hide video crew
-                .filter((a:any)=> a.video_role == null)
-                .map((a:any)=>{
-                  const dept: Dept | null = a.sound_role ? 'sound' : a.lights_role ? 'lights' : null;
-                  const role = a.sound_role || a.lights_role || 'assigned';
-                  const list = assignedTechsByJob.get(j.id) ?? [];
-                  list.push(a.technician_id);
-                  assignedTechsByJob.set(j.id, list);
-                  return { name: '', role, dept, timesheetStatus: 'missing' as TimesheetStatus, technician_id: a.technician_id } as any;
+              const activeTechs = Array.from(jobTechSets.get(j.id) ?? new Set<string>());
+              assignedTechsByJob.set(j.id, activeTechs);
+              const crew = activeTechs
+                .map((techId) => assignmentByJobTech.get(`${j.id}:${techId}`))
+                .filter((assignment): assignment is WallboardAssignmentRoleRow => Boolean(assignment && assignment.video_role == null))
+                .map((assignment) => {
+                  const dept: Dept | null = assignment.sound_role ? 'sound' : assignment.lights_role ? 'lights' : null;
+                  const role = assignment.sound_role || assignment.lights_role || 'assigned';
+                  return { name: '', role, dept, timesheetStatus: 'missing' as TimesheetStatus, technician_id: assignment.technician_id } as any;
                 });
               return { id: j.id, title: j.title, jobType: j.job_type, start_time: j.start_time, end_time: j.end_time, color: j.color ?? null, crew };
             })
