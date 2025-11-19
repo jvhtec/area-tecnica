@@ -50,6 +50,7 @@ create policy job_required_roles_select on public.job_required_roles
 create or replace function public.trg_job_required_roles_set_updated_at()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   new.updated_at := now();

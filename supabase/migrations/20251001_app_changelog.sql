@@ -20,7 +20,7 @@ begin
   new.last_updated = now();
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = '';
 
 drop trigger if exists trg_app_changelog_touch on public.app_changelog;
 create trigger trg_app_changelog_touch

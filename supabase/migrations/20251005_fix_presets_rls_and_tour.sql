@@ -19,6 +19,7 @@ CREATE INDEX IF NOT EXISTS idx_presets_tour_department ON public.presets(tour_id
 CREATE OR REPLACE FUNCTION public.presets_set_department_from_user()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 DECLARE
   dep text;
