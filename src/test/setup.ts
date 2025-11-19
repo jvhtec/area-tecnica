@@ -1,5 +1,31 @@
 import { expect, afterEach, vi } from 'vitest';
 
+const globalAny = globalThis as any;
+
+if (typeof globalAny.localStorage === 'undefined') {
+  const storage = new Map<string, string>();
+  globalAny.localStorage = {
+    get length() {
+      return storage.size;
+    },
+    clear() {
+      storage.clear();
+    },
+    getItem(key: string) {
+      return storage.has(key) ? storage.get(key)! : null;
+    },
+    key(index: number) {
+      return Array.from(storage.keys())[index] ?? null;
+    },
+    removeItem(key: string) {
+      storage.delete(key);
+    },
+    setItem(key: string, value: string) {
+      storage.set(key, value);
+    },
+  } as Storage;
+}
+
 // Only import testing-library/react and jest-dom if we're in a DOM environment
 if (typeof window !== 'undefined') {
   // @ts-ignore

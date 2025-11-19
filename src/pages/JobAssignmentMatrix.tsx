@@ -23,15 +23,12 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { format } from 'date-fns';
+import {
+  fetchMatrixTimesheetAssignments,
+  type MatrixJob as BaseMatrixJob,
+} from '@/hooks/useOptimizedMatrixData';
 
-type MatrixJob = {
-  id: string;
-  title: string;
-  start_time: string;
-  end_time: string;
-  color?: string | null;
-  status: string;
-  job_type: string;
+type MatrixJob = BaseMatrixJob & {
   _assigned_count?: number;
 };
 
@@ -73,69 +70,27 @@ async function fetchJobsForWindow(start: Date, end: Date, department: string) {
     .filter((j) => j.status !== 'Cancelado' || (j._assigned_count ?? 0) > 0);
 }
 
-async function fetchAssignmentsForWindow(jobIds: string[], technicianIds: string[], jobs: MatrixJob[]) {
+async function fetchAssignmentsForWindow(
+  jobIds: string[],
+  technicianIds: string[],
+  jobs: MatrixJob[],
+  start?: Date,
+  end?: Date
+) {
   if (!jobIds.length || !technicianIds.length) return [];
 
-  const jobsById = new Map<string, MatrixJob>();
+  const jobsById = new Map<string, BaseMatrixJob>();
   jobs.forEach((job) => {
     if (job?.id) jobsById.set(job.id, job);
   });
 
-  const batchSize = 25;
-  const promises: any[] = [];
-
-  for (let i = 0; i < jobIds.length; i += batchSize) {
-    const jobBatch = jobIds.slice(i, i + batchSize);
-    promises.push(
-      supabase
-        .from('job_assignments')
-        .select(`
-          job_id,
-          technician_id,
-          sound_role,
-          lights_role,
-          video_role,
-          single_day,
-          assignment_date,
-          status,
-          assigned_at,
-          jobs!job_id (
-            id,
-            title,
-            start_time,
-            end_time,
-            color
-          )
-        `)
-        .in('job_id', jobBatch)
-        .in('technician_id', technicianIds)
-        .limit(500)
-    );
-  }
-
-  const results = await Promise.all(promises);
-  const allData = results.flatMap((result: any) => {
-    if (result.error) {
-      console.error('Assignment prefetch error:', result.error);
-      return [];
-    }
-    return result.data || [];
+  return fetchMatrixTimesheetAssignments({
+    jobIds,
+    technicianIds,
+    jobsById,
+    startDate: start,
+    endDate: end,
   });
-
-  return allData
-    .map((item: any) => ({
-      job_id: item.job_id,
-      technician_id: item.technician_id,
-      sound_role: item.sound_role,
-      lights_role: item.lights_role,
-      video_role: item.video_role,
-      single_day: item.single_day,
-      assignment_date: item.assignment_date,
-      status: item.status,
-      assigned_at: item.assigned_at,
-      job: jobsById.get(item.job_id) || (Array.isArray(item.jobs) ? item.jobs[0] : item.jobs),
-    }))
-    .filter((item) => !!item.job);
 }
 
 async function fetchAvailabilityForWindow(technicianIds: string[], start: Date, end: Date) {
@@ -642,8 +597,14 @@ export default function JobAssignmentMatrix() {
 
       if (!cancelled && jobIds.length && technicianIds.length) {
         await qc.prefetchQuery({
-          queryKey: ['optimized-matrix-assignments', jobIds, technicianIds, format(start, 'yyyy-MM-dd')],
-          queryFn: () => fetchAssignmentsForWindow(jobIds, technicianIds, jobsForWindow),
+          queryKey: [
+            'optimized-matrix-assignments',
+            jobIds,
+            technicianIds,
+            format(start, 'yyyy-MM-dd'),
+            format(end, 'yyyy-MM-dd'),
+          ],
+          queryFn: () => fetchAssignmentsForWindow(jobIds, technicianIds, jobsForWindow, start, end),
           staleTime: 30 * 1000,
           gcTime: 2 * 60 * 1000,
         });

@@ -81,7 +81,13 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
     const key = assignment.technician_id ? `tech:${assignment.technician_id}` : `ext:${name}`;
     const roleLabel = roleCode ? labelForCode(roleCode) : null;
     const isFromTour = assignment.assignment_source === 'tour';
+    const timesheetDates: string[] = Array.isArray(assignment.timesheet_dates) ? assignment.timesheet_dates : [];
     const date = assignment.single_day && assignment.assignment_date ? assignment.assignment_date : null;
+    const dateSet = new Set<string>();
+    timesheetDates.forEach(d => dateSet.add(d));
+    if (date && dateSet.size === 0) {
+      dateSet.add(date);
+    }
 
     if (!grouped.has(key)) {
       grouped.set(key, {
@@ -90,14 +96,14 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
         role: roleLabel,
         isFromTour,
         isExternal,
-        dates: new Set(date ? [date] : [])
+        dates: dateSet
       });
     } else {
       const g = grouped.get(key)!;
       // Preserve first non-null role label; otherwise keep existing
       if (!g.role && roleLabel) g.role = roleLabel;
       if (isFromTour) g.isFromTour = true;
-      if (date) g.dates.add(date);
+      dateSet.forEach(value => g.dates.add(value));
     }
   }
 

@@ -112,34 +112,60 @@ serve(async (req: Request) => {
       const crew_call_id = crewCallRow.id as string;
       const flex_crew_call_id = crewCallRow.flex_element_id as string;
 
-      // Desired assignments
+      // Desired assignments sourced from canonical timesheets
       const { data: desiredRows } = await supabase
-        .from("job_assignments")
+        .from('timesheets')
         .select(`
           technician_id,
-          sound_role,
-          lights_role,
-          video_role,
-          profiles!job_assignments_technician_id_fkey(id, flex_resource_id, department)
+          date,
+          job_assignments!inner(sound_role,lights_role,video_role,status),
+          profile:profiles!timesheets_technician_id_fkey(id,flex_resource_id,department)
         `)
-        .eq("job_id", job_id);
+        .eq('job_id', job_id)
+        .eq('is_schedule_only', false)
+        .eq('job_assignments.status', 'confirmed');
 
-      const desired = (desiredRows ?? [])
-        .filter((r: any) => r?.profiles?.flex_resource_id)
-        .filter((r: any) => {
-          if (dept === "sound") return !!r.sound_role || r.profiles?.department === "sound";
-          if (dept === "lights") return !!r.lights_role || r.profiles?.department === "lights";
-          if (dept === "video") return !!r.video_role || r.profiles?.department === "video";
-          return false;
+      const desiredMap = new Map<string, { assignment: any; profile: any }>();
+      (desiredRows ?? []).forEach((row: any) => {
+        const techId = row?.technician_id as string | undefined;
+        if (!techId || desiredMap.has(techId)) return;
+        const assignment = Array.isArray(row?.job_assignments)
+          ? row.job_assignments[0]
+          : row?.job_assignments;
+        const profile = Array.isArray(row?.profile) ? row.profile[0] : row?.profile;
+        desiredMap.set(techId, { assignment, profile });
+      });
+
+      const desired = Array.from(desiredMap.entries())
+        .map(([techId, payload]) => {
+          const profile = payload.profile || {};
+          const assignment = payload.assignment || {};
+          const flexId = profile?.flex_resource_id as string | undefined;
+          if (!flexId) return null;
+          const deptMatch =
+            dept === 'sound'
+              ? !!assignment?.sound_role || profile?.department === 'sound'
+              : dept === 'lights'
+                ? !!assignment?.lights_role || profile?.department === 'lights'
+                : dept === 'video'
+                  ? !!assignment?.video_role || profile?.department === 'video'
+                  : false;
+          if (!deptMatch) return null;
+          const role =
+            dept === 'sound'
+              ? assignment?.sound_role ?? null
+              : dept === 'lights'
+                ? assignment?.lights_role ?? null
+                : dept === 'video'
+                  ? assignment?.video_role ?? null
+                  : null;
+          return {
+            technician_id: techId,
+            flex_resource_id: flexId,
+            role,
+          };
         })
-        .map((r: any) => ({
-          technician_id: r.technician_id as string,
-          flex_resource_id: r.profiles.flex_resource_id as string,
-          role: (dept === "sound") ? (r.sound_role ?? null)
-              : (dept === "lights") ? (r.lights_role ?? null)
-              : (dept === "video") ? (r.video_role ?? null)
-              : null,
-        }));
+        .filter((row): row is { technician_id: string; flex_resource_id: string; role: string | null } => !!row);
 
       const desiredIds = new Set(desired.map((d) => d.technician_id));
       const desiredResourceIds = new Set(desired.map((d) => d.flex_resource_id));

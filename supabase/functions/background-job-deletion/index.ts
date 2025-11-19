@@ -435,11 +435,12 @@ async function deleteLogisticsData(supabase: any, jobId: string) {
 async function deleteAssignmentData(supabase: any, jobId: string) {
   try {
     console.log(`Deleting assignment data for job: ${jobId}`);
-    
+
     await Promise.all([
+      supabase.from('timesheets').delete().eq('job_id', jobId),
       // Job assignments
       supabase.from('job_assignments').delete().eq('job_id', jobId),
-      
+
       // Assignment notifications
       supabase.from('assignment_notifications').delete().eq('job_id', jobId),
       

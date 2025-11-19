@@ -4,14 +4,23 @@ import { buildAssignmentDateMap } from '../useOptimizedMatrixData';
 const createDate = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
 describe('buildAssignmentDateMap', () => {
-  it('maps multi-day assignments across the visible range', () => {
+  it('maps consecutive timesheet rows directly by technician/date', () => {
     const assignments: any[] = [
       {
         job_id: 'job-a',
         technician_id: 'tech-a',
-        sound_role: 'mix',
-        single_day: false,
-        assignment_date: null,
+        date: '2025-03-01',
+        job: {
+          id: 'job-a',
+          title: 'Main Show',
+          start_time: '2025-03-01T08:00:00Z',
+          end_time: '2025-03-03T23:00:00Z',
+        },
+      },
+      {
+        job_id: 'job-a',
+        technician_id: 'tech-a',
+        date: '2025-03-02',
         job: {
           id: 'job-a',
           title: 'Main Show',
@@ -22,9 +31,7 @@ describe('buildAssignmentDateMap', () => {
       {
         job_id: 'job-b',
         technician_id: 'tech-b',
-        lights_role: 'lx-lead',
-        single_day: true,
-        assignment_date: '2025-03-02',
+        date: '2025-03-02',
         job: {
           id: 'job-b',
           title: 'Support Day',
@@ -38,11 +45,35 @@ describe('buildAssignmentDateMap', () => {
     const map = buildAssignmentDateMap(assignments as any, dates);
 
     expect(map.get('tech-a-2025-03-01')).toBe(assignments[0]);
-    expect(map.get('tech-a-2025-03-02')).toBe(assignments[0]);
-    expect(map.get('tech-a-2025-03-03')).toBe(assignments[0]);
+    expect(map.get('tech-a-2025-03-02')).toBe(assignments[1]);
+    expect(map.get('tech-a-2025-03-03')).toBeUndefined();
 
-    expect(map.get('tech-b-2025-03-02')).toBe(assignments[1]);
-    expect(map.get('tech-b-2025-03-01')).toBeUndefined();
-    expect(map.get('tech-b-2025-03-03')).toBeUndefined();
+    expect(map.get('tech-b-2025-03-02')).toBe(assignments[2]);
+  });
+
+  it('drops technicians once all of their per-day rows are removed (matrix reload)', () => {
+    const assignments: any[] = [
+      {
+        job_id: 'job-a',
+        technician_id: 'tech-a',
+        date: '2025-05-01',
+        job: { id: 'job-a' },
+      },
+      {
+        job_id: 'job-a',
+        technician_id: 'tech-a',
+        date: '2025-05-02',
+        job: { id: 'job-a' },
+      },
+    ];
+
+    const dates = [createDate('2025-05-01'), createDate('2025-05-02')];
+
+    const populated = buildAssignmentDateMap(assignments as any, dates);
+    expect(populated.get('tech-a-2025-05-01')).toBeTruthy();
+
+    const afterRemoval = buildAssignmentDateMap([], dates);
+    expect(afterRemoval.get('tech-a-2025-05-01')).toBeUndefined();
+    expect(afterRemoval.get('tech-a-2025-05-02')).toBeUndefined();
   });
 });

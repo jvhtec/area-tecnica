@@ -6,6 +6,8 @@ import { Assignment } from "@/types/assignment";
 import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
+import { aggregateTimesheetsForJob, TimesheetRowWithTechnician } from "@/utils/timesheetAssignments";
+import { removeTimesheetAssignment } from "@/services/removeTimesheetAssignment";
 
 export interface AssignmentInsertOptions {
   singleDay?: boolean;
@@ -51,44 +53,84 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
   } = useRealtimeQuery<Assignment[]>(
     ["job-assignments", jobId],
     async () => {
-      console.log("Fetching assignments for job:", jobId);
-      
-      // Add retry logic
-      const fetchWithRetry = async (retries = 3) => {
+      console.log("Fetching per-day assignments for job:", jobId);
+
+      const fetchWithRetry = async (retries = 3): Promise<Assignment[]> => {
         try {
-          const { data, error } = await supabase
-            .from("job_assignments")
+          const { data: timesheetRows, error: timesheetError } = await supabase
+            .from('timesheets')
             .select(`
-              *,
-              profiles (
+              job_id,
+              technician_id,
+              date,
+              is_schedule_only,
+              technician:profiles!fk_timesheets_technician_id (
+                id,
                 first_name,
                 last_name,
+                nickname,
                 email,
                 department
               )
             `)
-            .eq("job_id", jobId);
+            .eq('job_id', jobId)
+            .eq('is_schedule_only', false)
+            .order('date', { ascending: true });
 
-          if (error) {
-            console.error("Error fetching assignments:", error);
-            throw error;
+          if (timesheetError) {
+            console.error('Error fetching job timesheets:', timesheetError);
+            throw timesheetError;
           }
 
-          console.log(`Successfully fetched ${data?.length || 0} assignments for job ${jobId}`);
-          return data as unknown as Assignment[];
+          const { data: assignmentRows, error: assignmentError } = await supabase
+            .from('job_assignments')
+            .select(`
+              id,
+              job_id,
+              technician_id,
+              sound_role,
+              lights_role,
+              video_role,
+              single_day,
+              assignment_date,
+              assignment_source,
+              external_technician_name,
+              profiles!job_assignments_technician_id_fkey (
+                id,
+                first_name,
+                last_name,
+                nickname,
+                email,
+                department
+              )
+            `)
+            .eq('job_id', jobId);
+
+          if (assignmentError) {
+            console.error('Error fetching parent assignments:', assignmentError);
+            throw assignmentError;
+          }
+
+          const aggregated = aggregateTimesheetsForJob(
+            jobId,
+            (timesheetRows || []) as TimesheetRowWithTechnician[],
+            assignmentRows || []
+          );
+
+          return aggregated as Assignment[];
         } catch (error) {
           if (retries > 0) {
             console.log(`Retrying assignments fetch... ${retries} attempts remaining`);
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            await new Promise(resolve => setTimeout(resolve, 1000));
             return fetchWithRetry(retries - 1);
           }
           throw error;
         }
       };
-      
+
       return fetchWithRetry();
     },
-    "job_assignments",
+    "timesheets",
     {
       staleTime: 1000 * 60 * 2, // Consider data fresh for 2 minutes
       refetchOnWindowFocus: true,
@@ -110,14 +152,26 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
         {
           event: '*',
           schema: 'public',
+          table: 'timesheets',
+          filter: `job_id=eq.${jobId}`
+        },
+        (payload) => {
+          console.log(`Timesheet change detected for job ${jobId}:`, payload);
+          manualRefresh();
+          queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
           table: 'job_assignments',
           filter: `job_id=eq.${jobId}`
         },
         (payload) => {
-          console.log(`Assignment change detected for job ${jobId}:`, payload);
-          // Force immediate refresh
+          console.log(`Assignment metadata change detected for job ${jobId}:`, payload);
           manualRefresh();
-          // Also invalidate jobs to update JobCard lists that depend on job relations
           queryClient.invalidateQueries({ queryKey: ["jobs"] });
         }
       )
@@ -127,7 +181,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       console.log(`Cleaning up job assignment subscription for job ${jobId}`);
       supabase.removeChannel(channel);
     };
-  }, [jobId, manualRefresh]);
+  }, [jobId, manualRefresh, queryClient]);
 
   const { manageFlexCrewAssignment } = useFlexCrewAssignments();
 
@@ -208,28 +262,19 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
         return old.map((j) => {
           if (j.id !== jobId) return j;
           const current = Array.isArray(j.job_assignments) ? j.job_assignments : [];
+          const currentTimesheets = Array.isArray(j.timesheet_assignments) ? j.timesheet_assignments : [];
           return {
             ...j,
             job_assignments: current.filter((a: any) => a.technician_id !== technicianId),
+            timesheet_assignments: currentTimesheets.filter((a: any) => a.technician_id !== technicianId),
           };
         });
       });
 
       // Get the assignment details before removal for Flex cleanup
       const assignmentToRemove = assignments.find(a => a.technician_id === technicianId);
-      
-      // Remove from database
-      const { error } = await supabase
-        .from('job_assignments')
-        .delete()
-        .eq('job_id', jobId)
-        .eq('technician_id', technicianId);
 
-      if (error) {
-        console.error('Error removing assignment:', error);
-        toast.error("Failed to remove assignment");
-        return;
-      }
+      await removeTimesheetAssignment(jobId, technicianId);
 
       // Remove from Flex crew calls if applicable
       if (assignmentToRemove) {
@@ -245,6 +290,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       toast.success("Assignment removed successfully");
       // Invalidate jobs so JobCard lists refresh assignments relation
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["job-assignments", jobId] });
     } catch (error: any) {
       console.error('Error in removeAssignment:', error);
       toast.error("Failed to remove assignment");

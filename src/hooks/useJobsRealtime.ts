@@ -1,9 +1,11 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useOptimizedRealtime } from './useOptimizedRealtime';
 import { toast } from 'sonner';
+import { aggregateJobTimesheets, TimesheetRowWithTechnician } from '@/utils/timesheetAssignments';
+import type { AggregatedTimesheetAssignment } from '@/utils/timesheetAssignments';
 
 /**
  * Hook to fetch jobs with real-time updates
@@ -24,7 +26,25 @@ export function useJobsRealtime() {
         .select(`
           *,
           job_departments(department),
-          job_assignments(technician_id, status)
+          job_assignments(
+            id,
+            technician_id,
+            sound_role,
+            lights_role,
+            video_role,
+            assignment_source,
+            status,
+            single_day,
+            assignment_date,
+            external_technician_name,
+            profiles!job_assignments_technician_id_fkey(
+              id,
+              first_name,
+              last_name,
+              nickname,
+              department
+            )
+          )
         `)
         .order('start_time', { ascending: true });
       
@@ -38,9 +58,55 @@ export function useJobsRealtime() {
         throw error;
       }
 
+      const jobsWithAssignments = data || [];
+
+      // Build per-day assignment data from timesheets
+      const jobIds = jobsWithAssignments.map(job => job.id).filter(Boolean);
+      let timesheetAssignments: Record<string, AggregatedTimesheetAssignment[]> = {};
+
+      if (jobIds.length > 0) {
+        const { data: timesheetRows, error: timesheetError } = await supabase
+          .from('timesheets')
+          .select(`
+            job_id,
+            technician_id,
+            date,
+            is_schedule_only,
+            technician:profiles!fk_timesheets_technician_id(
+              id,
+              first_name,
+              last_name,
+              nickname,
+              department
+            )
+          `)
+          .eq('is_schedule_only', false)
+          .in('job_id', jobIds);
+
+        if (timesheetError) {
+          console.error('Error fetching timesheet assignments:', timesheetError);
+          throw timesheetError;
+        }
+
+        const assignmentLookup = jobsWithAssignments.reduce<Record<string, any[]>>((acc, job) => {
+          acc[job.id] = job.job_assignments || [];
+          return acc;
+        }, {});
+
+        timesheetAssignments = aggregateJobTimesheets(
+          (timesheetRows || []) as TimesheetRowWithTechnician[],
+          assignmentLookup
+        );
+      }
+
+      const enrichedJobs = jobsWithAssignments.map(job => ({
+        ...job,
+        timesheet_assignments: timesheetAssignments[job.id] || [],
+      }));
+
       setRetryCount(0); // Reset retry count on success
       setIsPaused(false);
-      return data || [];
+      return enrichedJobs;
     } catch (error) {
       console.error("Error in fetchJobs:", error);
       
@@ -72,20 +138,34 @@ export function useJobsRealtime() {
   });
   
   // Set up optimized realtime subscription
-  const realtimeStatus = useOptimizedRealtime('jobs', 'jobs', {
+  const jobsRealtimeStatus = useOptimizedRealtime('jobs', 'jobs', {
     enabled: !isPaused,
     priority: 'high'
   });
-  
+
+  const timesheetsRealtimeStatus = useOptimizedRealtime('timesheets', ['jobs', 'timesheets'], {
+    enabled: !isPaused,
+    priority: 'high'
+  });
+
+  const realtimeStatus = useMemo(() => ({
+    isConnected: jobsRealtimeStatus.isConnected && timesheetsRealtimeStatus.isConnected,
+    isLoading: jobsRealtimeStatus.isLoading || timesheetsRealtimeStatus.isLoading,
+    error: jobsRealtimeStatus.error || timesheetsRealtimeStatus.error,
+    retryCount: jobsRealtimeStatus.retryCount + timesheetsRealtimeStatus.retryCount,
+    retry: jobsRealtimeStatus.retry,
+    stats: jobsRealtimeStatus.stats,
+  }), [jobsRealtimeStatus, timesheetsRealtimeStatus]);
+
   // Show toast notifications for connection issues
-  useState(() => {
+  useEffect(() => {
     if (realtimeStatus.error && !isLoading) {
       toast.warning("Real-time updates experiencing issues", {
         description: "Data will still update, but may be slightly delayed.",
         duration: 3000,
       });
     }
-  });
+  }, [realtimeStatus.error, isLoading]);
   
   // Manual refresh function with simplified error handling
   const manualRefetch = async () => {

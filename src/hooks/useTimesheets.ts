@@ -28,6 +28,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         .from("timesheets")
         .select("*")
         .eq("job_id", jobId)
+        .eq('is_schedule_only', false)
         .order("date", { ascending: true })
         .order("created_at", { ascending: true });
 
@@ -163,7 +164,8 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       const { data: existingTimesheets } = await supabase
         .from("timesheets")
         .select("technician_id, date")
-        .eq("job_id", jobId);
+        .eq("job_id", jobId)
+        .eq('is_schedule_only', false);
 
       console.log("Existing timesheets:", existingTimesheets);
 
@@ -185,6 +187,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
               technician_id: assignment.technician_id,
               date: date,
               created_by: (await supabase.auth.getUser()).data.user?.id,
+              is_schedule_only: false,
             });
           }
         }
@@ -256,6 +259,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         technician_id: technicianId,
         date: date,
         created_by: (await supabase.auth.getUser()).data.user?.id,
+        is_schedule_only: false,
       };
       
       // Include category if provided, otherwise let DB trigger resolve it
