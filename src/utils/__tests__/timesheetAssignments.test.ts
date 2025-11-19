@@ -53,4 +53,18 @@ describe('timesheetAssignments helpers', () => {
     expect(aggregated[0].profiles).toEqual({ first_name: 'Leo', last_name: 'Sanchez' });
     expect(aggregated[0].timesheet_dates).toEqual(['2025-04-01']);
   });
+
+  it('drops technicians once their per-day rows are deleted', () => {
+    const rows = [
+      { job_id: 'job-4', technician_id: 'tech-8', date: '2025-06-01' },
+      { job_id: 'job-4', technician_id: 'tech-8', date: '2025-06-02' },
+    ];
+
+    const populated = aggregateTimesheetsForJob('job-4', rows as any, []);
+    expect(populated).toHaveLength(1);
+    expect(populated[0].timesheet_dates).toEqual(['2025-06-01', '2025-06-02']);
+
+    const afterRemoval = aggregateTimesheetsForJob('job-4', [], []);
+    expect(afterRemoval).toHaveLength(0);
+  });
 });
