@@ -13,6 +13,118 @@ type AuthResult = {
 };
 
 type Dept = "sound" | "lights" | "video";
+type AssignmentRow = {
+  job_id: string;
+  technician_id: string;
+  sound_role?: string | null;
+  lights_role?: string | null;
+  video_role?: string | null;
+};
+type TimesheetRow = { job_id: string; technician_id: string; date: string };
+type DeptCounts = Record<Dept, number>;
+
+function createDeptSets() {
+  return {
+    sound: new Set<string>(),
+    lights: new Set<string>(),
+    video: new Set<string>(),
+  } as Record<Dept, Set<string>>;
+}
+
+function getDept(row: AssignmentRow): Dept | null {
+  if (row.sound_role) return "sound";
+  if (row.lights_role) return "lights";
+  if (row.video_role) return "video";
+  return null;
+}
+
+function aggregateCrew(timesheets: TimesheetRow[], assignments: AssignmentRow[], jobDayWindows?: Map<string, string[]>) {
+  const assignmentsByKey = new Map<string, AssignmentRow>();
+  assignments.forEach((row) => {
+    assignmentsByKey.set(`${row.job_id}:${row.technician_id}`, row);
+  });
+
+  const jobDayDeptSets = new Map<string, Map<string, Record<Dept, Set<string>>>>();
+  const jobTechSets = new Map<string, Set<string>>();
+
+  timesheets.forEach((ts) => {
+    const assignment = assignmentsByKey.get(`${ts.job_id}:${ts.technician_id}`);
+    if (!assignment) return;
+    const dept = getDept(assignment);
+    if (!dept) return;
+    const dayMap = jobDayDeptSets.get(ts.job_id) ?? new Map<string, Record<Dept, Set<string>>>();
+    const deptSets = dayMap.get(ts.date) ?? createDeptSets();
+    deptSets[dept].add(ts.technician_id);
+    dayMap.set(ts.date, deptSets);
+    jobDayDeptSets.set(ts.job_id, dayMap);
+
+    const techSet = jobTechSets.get(ts.job_id) ?? new Set<string>();
+    techSet.add(ts.technician_id);
+    jobTechSets.set(ts.job_id, techSet);
+  });
+
+  if (jobDayWindows) {
+    jobDayWindows.forEach((dates, jobId) => {
+      if (!dates || dates.length === 0) return;
+      const dayMap = jobDayDeptSets.get(jobId) ?? new Map<string, Record<Dept, Set<string>>>();
+      dates.forEach((isoDate) => {
+        if (!dayMap.has(isoDate)) {
+          dayMap.set(isoDate, createDeptSets());
+        }
+      });
+      jobDayDeptSets.set(jobId, dayMap);
+    });
+  }
+
+  const jobDeptMinimums = new Map<string, DeptCounts>();
+  jobDayDeptSets.forEach((dayMap, jobId) => {
+    const counts: DeptCounts = { sound: 0, lights: 0, video: 0 };
+    ("sound lights video".split(" ") as Dept[]).forEach((dept) => {
+      let min: number | null = null;
+      dayMap.forEach((deptSets) => {
+        const size = deptSets[dept].size;
+        if (min === null || size < min) {
+          min = size;
+        }
+      });
+      counts[dept] = min ?? 0;
+    });
+    jobDeptMinimums.set(jobId, counts);
+  });
+
+  return { jobDeptMinimums, jobTechSets };
+}
+
+function buildJobDayWindows(jobs: any[], windowStart: Date, windowEnd: Date) {
+  const startMs = windowStart.getTime();
+  const endMs = windowEnd.getTime();
+  const map = new Map<string, string[]>();
+  jobs.forEach((job) => {
+    const jobStart = new Date(job.start_time).getTime();
+    const jobEnd = new Date(job.end_time).getTime();
+    if (!Number.isFinite(jobStart) || !Number.isFinite(jobEnd)) {
+      map.set(job.id, []);
+      return;
+    }
+    const spanStart = Math.max(jobStart, startMs);
+    const spanEnd = Math.min(jobEnd, endMs);
+    if (spanEnd < spanStart) {
+      map.set(job.id, []);
+      return;
+    }
+    const dates: string[] = [];
+    let cursor = new Date(spanStart);
+    cursor.setHours(0, 0, 0, 0);
+    const last = new Date(spanEnd);
+    last.setHours(0, 0, 0, 0);
+    while (cursor.getTime() <= last.getTime()) {
+      dates.push(cursor.toISOString().slice(0, 10));
+      cursor = new Date(cursor.getTime() + 24 * 3600 * 1000);
+    }
+    map.set(job.id, dates);
+  });
+  return map;
+}
 
 function corsHeaders() {
   return {
@@ -116,6 +228,8 @@ serve(async (req) => {
       const now = new Date();
       const todayStart = startOfDay(now);
       const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+      const startDateStr = todayStart.toISOString().slice(0, 10);
+      const endDateStr = tomorrowEnd.toISOString().slice(0, 10);
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -124,9 +238,10 @@ serve(async (req) => {
           title,
           start_time,
           end_time,
+          color,
+          job_type,
           locations(id, name),
-          job_departments(department),
-          job_assignments(technician_id, sound_role, lights_role, video_role)
+          job_departments(department)
         `)
         .in("job_type", ["single", "festival", "tourdate"])
         .gte("start_time", todayStart.toISOString())
@@ -135,19 +250,42 @@ serve(async (req) => {
 
       if (error) throw error;
 
+      const jobsArr = jobs ?? [];
+      const jobIds = jobsArr.map((j: any) => j.id);
+      const dayWindows = buildJobDayWindows(jobsArr, todayStart, tomorrowEnd);
+
+      const { data: assignmentRows, error: assignmentErr } = jobIds.length
+        ? await sb
+            .from("job_assignments")
+            .select("job_id, technician_id, sound_role, lights_role, video_role")
+            .in("job_id", jobIds)
+        : { data: [], error: null } as { data: AssignmentRow[] | null; error: any };
+      if (assignmentErr) throw assignmentErr;
+
+      const { data: timesheetRows, error: timesheetErr } = jobIds.length
+        ? await sb
+            .from("timesheets")
+            .select("job_id, technician_id, date")
+            .in("job_id", jobIds)
+            .eq("is_schedule_only", false)
+            .gte("date", startDateStr)
+            .lte("date", endDateStr)
+        : { data: [], error: null } as { data: TimesheetRow[] | null; error: any };
+      if (timesheetErr) throw timesheetErr;
+
+      const { jobDeptMinimums } = aggregateCrew(timesheetRows ?? [], assignmentRows ?? [], dayWindows);
+
       const result = {
-        jobs: (jobs ?? []).map((j: any) => {
+        jobs: jobsArr.map((j: any) => {
           const depts: Dept[] = Array.from(
             new Set((j.job_departments ?? []).map((d: any) => d.department).filter(Boolean))
           );
 
-          const crewAssigned = { sound: 0, lights: 0, video: 0, total: 0 } as Record<string, number>;
-          (j.job_assignments ?? []).forEach((a: any) => {
-            if (a.sound_role) crewAssigned.sound++;
-            if (a.lights_role) crewAssigned.lights++;
-            if (a.video_role) crewAssigned.video++;
-          });
-          crewAssigned.total = crewAssigned.sound + crewAssigned.lights + crewAssigned.video;
+          const counts = jobDeptMinimums.get(j.id) ?? { sound: 0, lights: 0, video: 0 };
+          const crewAssigned = {
+            ...counts,
+            total: counts.sound + counts.lights + counts.video,
+          } as Record<string, number>;
 
           const crewNeeded = { sound: 0, lights: 0, video: 0, total: 0 } as Record<string, number>;
 
@@ -187,6 +325,8 @@ serve(async (req) => {
       const now = new Date();
       const todayStart = startOfDay(now);
       const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+      const startDateStr = todayStart.toISOString().slice(0, 10);
+      const endDateStr = tomorrowEnd.toISOString().slice(0, 10);
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -195,6 +335,8 @@ serve(async (req) => {
           title,
           start_time,
           end_time,
+          job_type,
+          color,
           job_assignments(
             technician_id,
             sound_role,
@@ -210,47 +352,73 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      // Preload timesheets per job to compute status fast
       const jobsArr = jobs ?? [];
       const jobIds = jobsArr.map((j: any) => j.id);
-      const timesheetsByJob = new Map<string, any[]>();
+      const dayWindows = buildJobDayWindows(jobsArr, todayStart, tomorrowEnd);
 
-      if (jobIds.length > 0) {
-        const { data: ts } = await sb
-          .from("timesheets")
-          .select("id, job_id, technician_id, status, date")
-          .in("job_id", jobIds);
-        (ts ?? []).forEach((t) => {
-          const arr = timesheetsByJob.get(t.job_id) ?? [];
-          arr.push(t);
-          timesheetsByJob.set(t.job_id, arr);
+      const assignments: AssignmentRow[] = [];
+      jobsArr.forEach((j: any) => {
+        (j.job_assignments ?? []).forEach((a: any) => {
+          assignments.push({
+            job_id: j.id,
+            technician_id: a.technician_id,
+            sound_role: a.sound_role,
+            lights_role: a.lights_role,
+            video_role: a.video_role,
+          });
         });
-      }
+      });
 
-      const computeStatus = (job: any, techId: string): "submitted" | "draft" | "missing" | "approved" => {
-        const list = timesheetsByJob.get(job.id) ?? [];
-        const ts = list.filter((t) => t.technician_id === techId);
-        if (ts.length === 0) return "missing";
-        const hasApproved = ts.some((t) => t.status === "approved");
-        const hasSubmitted = ts.some((t) => t.status === "submitted");
-        const inPast = new Date(job.end_time) < new Date();
-        if (inPast && hasApproved) return "approved";
-        if (hasSubmitted) return "submitted";
-        return "draft";
-      };
+      const { data: timesheetRows, error: timesheetErr } = jobIds.length
+        ? await sb
+            .from("timesheets")
+            .select("job_id, technician_id, date")
+            .in("job_id", jobIds)
+            .eq("is_schedule_only", false)
+            .gte("date", startDateStr)
+            .lte("date", endDateStr)
+        : { data: [], error: null } as { data: TimesheetRow[] | null; error: any };
+      if (timesheetErr) throw timesheetErr;
+
+      const { jobTechSets } = aggregateCrew(timesheetRows ?? [], assignments, dayWindows);
+
+      const { data: statusRows, error: statusErr } = jobIds.length
+        ? await sb
+            .from("wallboard_timesheet_status")
+            .select("job_id, technician_id, status")
+            .in("job_id", jobIds)
+        : { data: [], error: null } as { data: { job_id: string; technician_id: string; status: string }[] | null; error: any };
+      if (statusErr) throw statusErr;
+      const tsStatus = new Map<string, Map<string, string>>();
+      (statusRows ?? []).forEach((row) => {
+        const byJob = tsStatus.get(row.job_id) ?? new Map<string, string>();
+        byJob.set(row.technician_id, row.status);
+        tsStatus.set(row.job_id, byJob);
+      });
 
       const result = {
-        jobs: jobsArr.map((j: any) => ({
-          id: j.id,
-          title: j.title,
-          crew: (j.job_assignments ?? []).map((a: any) => {
-            const dept: Dept | null = a.sound_role ? "sound" : a.lights_role ? "lights" : a.video_role ? "video" : null;
-            const role = a.sound_role || a.lights_role || a.video_role || "assigned";
-            const name = [a.profiles?.first_name, a.profiles?.last_name].filter(Boolean).join(" ") || "";
-            const timesheetStatus = computeStatus(j, a.technician_id);
-            return { name, role, dept, timesheetStatus };
-          }),
-        })),
+        jobs: jobsArr.map((j: any) => {
+          const activeTechs = Array.from(jobTechSets.get(j.id) ?? new Set<string>());
+          const crew = activeTechs
+            .map((techId) => (j.job_assignments ?? []).find((a: any) => a.technician_id === techId))
+            .filter((assignment): assignment is any => Boolean(assignment && assignment.video_role == null))
+            .map((assignment: any) => {
+              const dept: Dept | null = assignment.sound_role ? "sound" : assignment.lights_role ? "lights" : null;
+              const role = assignment.sound_role || assignment.lights_role || "assigned";
+              const name = [assignment.profiles?.first_name, assignment.profiles?.last_name].filter(Boolean).join(" ") || "";
+              const statusValue = tsStatus.get(j.id)?.get(assignment.technician_id) ?? "missing";
+              return { name, role, dept, timesheetStatus: statusValue };
+            });
+          return {
+            id: j.id,
+            title: j.title,
+            jobType: j.job_type,
+            start_time: j.start_time,
+            end_time: j.end_time,
+            color: j.color ?? null,
+            crew,
+          };
+        }),
       } as any;
 
       return new Response(JSON.stringify({ ...result, presetSlug }), {

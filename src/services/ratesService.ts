@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { RateExtraRow } from '@/hooks/useRateExtrasCatalog';
 import { TourBaseRateRow } from '@/hooks/useTourBaseRates';
 import { RATES_QUERY_KEYS } from '@/constants/ratesQueryKeys';
+import { countJobTechnicians } from '@/utils/timesheetAssignments';
 
 type Nullable<T> = T | null | undefined;
 
@@ -200,25 +201,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
       jobReviewIds.add(job.id);
     });
 
-    if (tourJobIds.length > 0) {
-      const { data: assignments, error: assignmentsError } = await supabase
-        .from('job_assignments')
-        .select('job_id')
-        .in('job_id', tourJobIds);
-
-      if (assignmentsError) throw assignmentsError;
-
-      const assignmentCountByJob: Record<string, number> = {};
-
-      (assignments || []).forEach((assignment) => {
-        if (!assignment.job_id) return;
-        assignmentCountByJob[assignment.job_id] = (assignmentCountByJob[assignment.job_id] || 0) + 1;
-      });
-
-      Object.values(tourCounts).forEach((info) => {
-        info.assignmentCount = info.jobIds.reduce((acc, jobId) => acc + (assignmentCountByJob[jobId] || 0), 0);
-      });
-    }
+    // assignmentCount will be computed later from timesheets; keep jobIds for aggregation
   }
 
   // 2) Fetch jobs that follow the timesheet approval flow
@@ -242,9 +225,9 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
   const jobIds = jobsNeedingTimesheetApproval.map((j) => j.id);
   jobIds.forEach((id) => jobReviewIds.add(id));
 
-  const assignmentCountByJob: Record<string, number> = {};
   const timesheetInfoByJob: Record<string, { total: number; approved: number; rejected: number }> = {};
   const extrasInfoByJob: Record<string, { pending: number; rejected: number }> = {};
+  const assignmentCountByJob: Record<string, number> = {};
   if (jobIds.length > 0) {
     const { data: assignments2, error: assignmentsError2 } = await supabase
       .from('job_assignments')
@@ -263,8 +246,9 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
     const [{ data: timesheets, error: timesheetsError }, { data: extras, error: extrasError }] = await Promise.all([
       supabase
         .from('timesheets')
-        .select('job_id, status')
-        .in('job_id', reviewList),
+        .select('job_id, status, technician_id, date, is_schedule_only')
+        .in('job_id', reviewList)
+        .eq('is_schedule_only', false),
       supabase
         .from('job_rate_extras')
         .select('job_id, status')
@@ -272,6 +256,11 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
     ]);
     if (timesheetsError) throw timesheetsError;
     if (extrasError) throw extrasError;
+
+    const technicianCounts = countJobTechnicians(timesheets || []);
+    Object.entries(technicianCounts).forEach(([jobId, count]) => {
+      assignmentCountByJob[jobId] = count;
+    });
 
     (timesheets || []).forEach((t: any) => {
       if (!t.job_id) return;
@@ -290,6 +279,13 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
       if (status === 'rejected') bucket.rejected += 1;
     });
   }
+
+  Object.values(tourCounts).forEach((info) => {
+    info.assignmentCount = info.jobIds.reduce(
+      (acc, jobId) => acc + (assignmentCountByJob[jobId] || 0),
+      0
+    );
+  });
 
   const tourRows: RatesApprovalRow[] = tourList.map((tour) => {
     const counts = tourCounts[tour.id] || { jobCount: 0, jobIds: [], assignmentCount: 0 };

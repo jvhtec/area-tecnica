@@ -1,6 +1,7 @@
 import { deleteJobAssignments } from "./deleteJobAssignments";
 import { deleteJobDepartments } from "./deleteJobDepartments";
 import { deleteJobDateTypes } from "./deleteJobDateTypes";
+import { deleteJobTimesheets } from "./deleteJobTimesheets";
 import { deleteFestivalLogos } from "./deleteFestivalLogos";
 import { deleteFlexFolders } from "./flexFolderDeletionService";
 import { supabase } from "@/lib/supabase";
@@ -80,6 +81,9 @@ export const deleteJobWithCleanup = async (jobId: string): Promise<void> => {
 
     // Remove Flex crew assignments first
     await removeFlexCrewAssignments(jobId);
+
+    // Delete per-day timesheets before removing parent assignments
+    await deleteJobTimesheets(jobId);
 
     // Delete job assignments
     await deleteJobAssignments(jobId);

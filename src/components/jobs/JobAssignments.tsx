@@ -11,6 +11,8 @@ import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useEffect, useState } from "react";
 import { labelForCode } from '@/utils/roles';
 import { format } from "date-fns";
+import { buildTimesheetTooltip, formatTimesheetCoverage } from "@/components/jobs/utils/timesheetCoverage";
+import { removeTimesheetAssignment } from "@/services/removeTimesheetAssignment";
 
 interface JobAssignmentsProps {
   jobId: string;
@@ -36,7 +38,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
         {
           event: '*',
           schema: 'public',
-          table: 'job_assignments',
+          table: 'timesheets',
           filter: `job_id=eq.${jobId}`
         },
         (payload) => {
@@ -55,17 +57,11 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
     };
   }, [jobId, queryClient]);
 
-  const handleDelete = async (technicianId: string) => {
+  const handleDelete = async (assignment: Assignment) => {
     if (userRole === 'logistics') return;
-    
-    try {
-      const { error } = await supabase
-        .from("job_assignments")
-        .delete()
-        .eq("job_id", jobId)
-        .eq("technician_id", technicianId);
 
-      if (error) throw error;
+    try {
+      await removeTimesheetAssignment(jobId, assignment.technician_id);
 
       // Refresh both assignments and jobs data
       await Promise.all([
@@ -74,7 +70,10 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
         queryClient.invalidateQueries({ queryKey: ["available-technicians"] })
       ]);
 
-      toast.success("Assignment deleted successfully");
+      const name = assignment.profiles
+        ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`.trim()
+        : 'technician';
+      toast.success(`${name || 'Technician'} removed from this job`);
     } catch (error: any) {
       console.error("Error deleting assignment:", error);
       toast.error("Failed to delete assignment");
@@ -160,7 +159,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
           {filteredAssignments.length} assignment{filteredAssignments.length !== 1 ? 's' : ''}
         </span>
         <div className="flex items-center gap-1">
-          <SubscriptionIndicator tables={["job_assignments"]} variant="compact" showRefreshButton onRefresh={refetch} />
+          <SubscriptionIndicator tables={["timesheets"]} variant="compact" showRefreshButton onRefresh={refetch} />
           {department && ['sound','lights','video'].includes(department) && (
             <Button
               variant="secondary"
@@ -209,11 +208,27 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
                   </span>
                   <span className="text-xs">({displayRole})</span>
                 </div>
-                {assignment.single_day && assignment.assignment_date && (
-                  <span className="text-xs text-muted-foreground">
-                    Single-day: {format(new Date(`${assignment.assignment_date}T00:00:00`), "PPP")}
-                  </span>
-                )}
+                {(() => {
+                  const coverage = formatTimesheetCoverage(assignment.timesheet_ranges || []);
+                  const tooltip = buildTimesheetTooltip(assignment.timesheet_dates || []);
+                  if (!coverage && !(assignment.single_day && assignment.assignment_date)) return null;
+
+                  const label = coverage
+                    || (assignment.assignment_date
+                      ? format(new Date(`${assignment.assignment_date}T00:00:00`), 'PPP')
+                      : null);
+
+                  if (!label) return null;
+
+                  return (
+                    <span
+                      className="text-xs text-muted-foreground"
+                      title={tooltip || undefined}
+                    >
+                      Coverage: {label}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
             {userRole !== 'logistics' && (
@@ -221,7 +236,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6"
-                onClick={() => handleDelete(assignment.technician_id)}
+                onClick={() => handleDelete(assignment)}
               >
                 <X className="h-4 w-4" />
               </Button>

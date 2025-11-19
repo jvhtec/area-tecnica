@@ -481,6 +481,19 @@ serve(async (req) => {
                   });
                 }
                 await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_ok', meta: { role: chosenRole, department: prof.department, target_date: targetDate, attempt: upsertAttemptSummary } });
+
+                if (targetDate) {
+                  const { error: toggleErr } = await supabase.rpc('toggle_timesheet_day', {
+                    p_job_id: row.job_id,
+                    p_technician_id: row.profile_id,
+                    p_date: targetDate,
+                    p_present: true,
+                    p_source: 'staffing-click',
+                  });
+                  if (toggleErr) {
+                    console.warn('⚠️ toggle_timesheet_day failed after staffing confirmation', { targetDate, error: toggleErr });
+                  }
+                }
               }
             }
 
