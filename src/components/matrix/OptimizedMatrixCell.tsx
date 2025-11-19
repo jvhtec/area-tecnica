@@ -14,6 +14,7 @@ import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
 import { pickTextColor, rgbaFromHex } from '@/utils/color';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
+import { removeTimesheetAssignment } from '@/services/removeTimesheetAssignment';
 
 interface OptimizedMatrixCellProps {
   technician: {
@@ -601,7 +602,7 @@ export const OptimizedMatrixCell = memo(({
                 onClick={async () => {
                   try {
                     if (!assignment?.job_id) { setPendingRemoveAssignment(false); return; }
-                    await supabase.from('job_assignments').delete().eq('job_id', assignment.job_id).eq('technician_id', technician.id)
+                    await removeTimesheetAssignment(assignment.job_id, technician.id)
 
                     const flexDepartments = determineFlexDepartmentsForAssignment(assignment, technician.department);
                     if (flexDepartments.length > 0) {
