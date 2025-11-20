@@ -38,6 +38,7 @@ import { createFlexFolder } from "@/utils/flex-folders/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { deleteJobDateTypes } from "@/services/deleteJobDateTypes";
+import { deleteJobTimesheets } from "@/services/deleteJobTimesheets";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 
 interface TourDateManagementDialogProps {
@@ -850,6 +851,16 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       if (jobs && jobs.length > 0) {
         const jobIds = jobs.map(j => j.id);
         console.log("Deleting job-related data for jobs:", jobIds);
+
+        await Promise.all(
+          jobIds.map(async (jobId) => {
+            try {
+              await deleteJobTimesheets(jobId);
+            } catch (error) {
+              console.error(`Error deleting timesheets for job ${jobId}:`, error);
+            }
+          })
+        );
 
         // Delete in the correct order to avoid foreign key constraints
         const deletionSteps = [

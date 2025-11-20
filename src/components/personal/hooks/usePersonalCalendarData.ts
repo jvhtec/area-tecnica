@@ -11,13 +11,13 @@ interface HouseTech {
   phone: string | null;
 }
 
-interface Assignment {
+export interface PersonalCalendarAssignment {
   technician_id: string;
+  date: string;
+  is_schedule_only: boolean;
   sound_role: string | null;
   lights_role: string | null;
   video_role: string | null;
-  single_day: boolean;
-  assignment_date: string | null;
   job: {
     id: string;
     title: string;
@@ -42,7 +42,7 @@ const dateOnly = (date: Date) => date.toISOString().split('T')[0];
 
 export const usePersonalCalendarData = (currentMonth: Date) => {
   const [houseTechs, setHouseTechs] = useState<HouseTech[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [assignments, setAssignments] = useState<PersonalCalendarAssignment[]>([]);
   const [vacationPeriods, setVacationPeriods] = useState<VacationPeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`; // Stable key per month to avoid refetch on day clicks
@@ -69,18 +69,16 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
         const techIds = (techsData ?? []).map((tech) => tech.id);
 
-        let assignmentResults: Assignment[] = [];
+        let assignmentResults: PersonalCalendarAssignment[] = [];
 
         if (techIds.length > 0) {
-          const { data: assignmentsData, error: assignmentsError } = await supabase
-            .from('job_assignments')
+          const { data: timesheetsData, error: timesheetsError } = await supabase
+            .from('timesheets')
             .select(`
+              job_id,
               technician_id,
-              sound_role,
-              lights_role,
-              video_role,
-              single_day,
-              assignment_date,
+              date,
+              is_schedule_only,
               jobs!inner (
                 id,
                 title,
@@ -92,16 +90,49 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
               )
             `)
             .in('technician_id', techIds)
-            .lte('jobs.start_time', endDate.toISOString())
-            .gte('jobs.end_time', startDate.toISOString());
+            .eq('is_schedule_only', false)
+            .gte('date', dateOnly(startDate))
+            .lte('date', dateOnly(endDate))
+            .order('date');
 
-          if (assignmentsError) {
-            throw assignmentsError;
+          if (timesheetsError) {
+            throw timesheetsError;
           }
 
-          assignmentResults = (assignmentsData ?? [])
-            .map((assignment) => {
-              const jobData = Array.isArray(assignment.jobs) ? assignment.jobs[0] : assignment.jobs;
+          const timesheetRows = timesheetsData ?? [];
+
+          const uniqueJobIds = Array.from(new Set(timesheetRows.map((row) => row.job_id).filter(Boolean)));
+          const uniqueTechIds = Array.from(new Set(timesheetRows.map((row) => row.technician_id).filter(Boolean)));
+
+          let rolesMap = new Map<string, { sound_role: string | null; lights_role: string | null; video_role: string | null }>();
+
+          if (uniqueJobIds.length > 0 && uniqueTechIds.length > 0) {
+            const { data: jobAssignmentData, error: jobAssignmentError } = await supabase
+              .from('job_assignments')
+              .select('job_id, technician_id, sound_role, lights_role, video_role')
+              .in('job_id', uniqueJobIds)
+              .in('technician_id', uniqueTechIds);
+
+            if (jobAssignmentError) {
+              throw jobAssignmentError;
+            }
+
+            rolesMap = new Map(
+              (jobAssignmentData ?? []).map((assignment) => [
+                `${assignment.job_id}:${assignment.technician_id}`,
+                {
+                  sound_role: assignment.sound_role,
+                  lights_role: assignment.lights_role,
+                  video_role: assignment.video_role,
+                },
+              ])
+            );
+          }
+
+          assignmentResults = timesheetRows
+            .map((timesheet) => {
+              const jobData = Array.isArray(timesheet.jobs) ? timesheet.jobs[0] : timesheet.jobs;
+
               if (!jobData) {
                 return null;
               }
@@ -110,13 +141,19 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
                 ? jobData.locations[0]
                 : jobData.locations;
 
+              const roles = rolesMap.get(`${timesheet.job_id}:${timesheet.technician_id}`) ?? {
+                sound_role: null,
+                lights_role: null,
+                video_role: null,
+              };
+
               return {
-                technician_id: assignment.technician_id,
-                sound_role: assignment.sound_role,
-                lights_role: assignment.lights_role,
-                video_role: assignment.video_role,
-                single_day: assignment.single_day,
-                assignment_date: assignment.assignment_date,
+                technician_id: timesheet.technician_id,
+                date: timesheet.date,
+                is_schedule_only: Boolean(timesheet.is_schedule_only),
+                sound_role: roles.sound_role,
+                lights_role: roles.lights_role,
+                video_role: roles.video_role,
                 job: {
                   id: jobData.id,
                   title: jobData.title,
@@ -126,9 +163,9 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
                   status: jobData.status,
                   location: locationValue?.name ? { name: locationValue.name } : null,
                 },
-              };
+              } as PersonalCalendarAssignment;
             })
-            .filter(Boolean) as Assignment[];
+            .filter(Boolean) as PersonalCalendarAssignment[];
         }
 
         let vacationResults: VacationPeriod[] = [];
@@ -189,10 +226,10 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
         {
           event: '*',
           schema: 'public',
-          table: 'job_assignments'
+          table: 'timesheets'
         },
         () => {
-          console.log('PersonalCalendar: Real-time update received from job_assignments, refetching data');
+          console.log('PersonalCalendar: Real-time update received from timesheets, refetching data');
           fetchData();
         }
       )

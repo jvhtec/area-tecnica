@@ -12,10 +12,11 @@ import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { startOfMonth, endOfMonth, startOfYear, endOfYear, formatISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { formatUserName } from '@/utils/userName';
 import { CityAutocomplete } from '@/components/maps/CityAutocomplete';
+import { computeTechnicianTimesheetMetrics } from '@/components/matrix/utils/technicianMetrics';
 
 interface TechnicianRowProps {
   technician: {
@@ -47,6 +48,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
 
   const [metricsLoading, setMetricsLoading] = React.useState(false);
   const [metrics, setMetrics] = React.useState<{ monthConfirmed: number; yearConfirmed: number }>({ monthConfirmed: 0, yearConfirmed: 0 });
+  const metricsCacheRef = React.useRef<{ monthConfirmed: number; yearConfirmed: number } | null>(null);
   const [residencia, setResidencia] = React.useState<string | null>(null);
   const [residenciaLoading, setResidenciaLoading] = React.useState(false);
   const [sendingOnboarding, setSendingOnboarding] = React.useState(false);
@@ -69,39 +71,43 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
   });
 
   const loadMetrics = React.useCallback(async () => {
+    if (metricsCacheRef.current) {
+      setMetrics(metricsCacheRef.current);
+      return;
+    }
+
     try {
       setMetricsLoading(true);
       const now = new Date();
-      const mStart = startOfMonth(now).toISOString();
-      const mEnd = endOfMonth(now).toISOString();
-      const yStart = startOfYear(now).toISOString();
-      const yEnd = endOfYear(now).toISOString();
+      const monthStart = startOfMonth(now);
+      const monthEnd = endOfMonth(now);
+      const yearStart = startOfYear(now);
+      const yearEnd = endOfYear(now);
 
-      // Count confirmed assignments within a date range via inner join to jobs; avoid HEAD to prevent 400s
-      const countInRange = async (fromISO: string, toISO: string) => {
-        const { count, error } = await supabase
-          .from('job_assignments')
-          .select('job_id,jobs!inner(id)', { count: 'exact' })
-          .eq('technician_id', technician.id)
-          .eq('status', 'confirmed')
-          .gte('jobs.start_time', fromISO)
-          .lte('jobs.end_time', toISO)
-          .limit(1);
-        if (error) {
-          console.warn('Metrics count error', error);
-          return 0;
-        }
-        return count || 0;
-      };
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('job_id,date,job_assignments!inner(status)')
+        .eq('technician_id', technician.id)
+        .eq('is_schedule_only', false)
+        .eq('job_assignments.status', 'confirmed')
+        .gte('date', formatISO(yearStart, { representation: 'date' }))
+        .lte('date', formatISO(yearEnd, { representation: 'date' }));
 
-      const [m, y] = await Promise.all([
-        countInRange(mStart, mEnd),
-        countInRange(yStart, yEnd)
-      ]);
-      setMetrics({ monthConfirmed: m, yearConfirmed: y });
+      if (error) {
+        console.warn('Metrics timesheet load error', error);
+        return;
+      }
+
+      const computed = computeTechnicianTimesheetMetrics(data || [], monthStart, monthEnd);
+      metricsCacheRef.current = computed;
+      setMetrics(computed);
     } finally {
       setMetricsLoading(false);
     }
+  }, [technician.id]);
+
+  React.useEffect(() => {
+    metricsCacheRef.current = null;
   }, [technician.id]);
 
   const loadProfileResidencia = React.useCallback(async () => {

@@ -130,17 +130,13 @@ serve(async (req: Request) => {
       .maybeSingle();
     if (!job || jobErr) return new Response(JSON.stringify({ error: 'Job not found', details: jobErr?.message }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    // Fetch assignments + profiles
-    const { data: assigns, error: assignsErr } = await supabaseAdmin
-      .from('job_assignments')
-      .select(`
-        technician_id,
-        sound_role, lights_role, video_role,
-        profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
-      `)
-      .eq('job_id', job_id);
-    if (assignsErr) {
-      console.warn('job_assignments fetch error', assignsErr);
+    // Call SQL function to get crew filtered by department
+    const { data: crewData, error: crewErr } = await supabaseAdmin.rpc('select_timesheet_crew_by_dept', {
+      p_job_id: job_id,
+      p_department: department
+    });
+    if (crewErr) {
+      console.warn('select_timesheet_crew_by_dept error', crewErr);
     }
 
     const defaultCC = Deno.env.get('WA_DEFAULT_COUNTRY_CODE') || '+34';
@@ -148,16 +144,26 @@ serve(async (req: Request) => {
     const missing: string[] = [];
     const invalid: string[] = [];
 
-    const rows = (assigns ?? []).filter((r: any) => {
-      if (department === 'sound') return !!r.sound_role;
-      if (department === 'lights') return !!r.lights_role;
-      if (department === 'video') return !!r.video_role;
-      return false;
-    });
+    const crew = (crewData ?? []) as Array<{
+      technician_id: string;
+      date: string;
+      role: string;
+      first_name: string | null;
+      last_name: string | null;
+      phone: string | null;
+    }>;
 
-    for (const r of rows) {
-      const fullName = `${r.profiles?.first_name ?? ''} ${r.profiles?.last_name ?? ''}`.trim() || 'Tecnico';
-      const rawPhone = (r.profiles?.phone || '').trim();
+    // Group by technician to dedupe (SQL function may return multiple rows per tech if multiple dates)
+    const techMap = new Map<string, typeof crew[0]>();
+    for (const r of crew) {
+      if (!techMap.has(r.technician_id)) {
+        techMap.set(r.technician_id, r);
+      }
+    }
+
+    for (const r of techMap.values()) {
+      const fullName = `${r.first_name ?? ''} ${r.last_name ?? ''}`.trim() || 'Tecnico';
+      const rawPhone = (r.phone || '').trim();
       if (!rawPhone) {
         missing.push(fullName);
         continue;

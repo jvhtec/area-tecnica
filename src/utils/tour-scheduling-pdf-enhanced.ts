@@ -6,6 +6,7 @@ import { es } from 'date-fns/locale';
 import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { getWeatherForJob } from '@/utils/weather/weatherApi';
+import { fetchTourCrewForJobDate } from '@/utils/tourTimesheetCrew';
 
 const CORPORATE_RED: [number, number, number] = [125, 1, 1];
 const HEADER_HEIGHT = 30;
@@ -268,19 +269,10 @@ export const generateTravelDaySheet = async (
       .maybeSingle();
 
     if (jobQuery.data?.id) {
-      const { data: assignments } = await supabase
-        .from('job_assignments')
-        .select(`
-          *,
-          profiles!job_assignments_technician_id_fkey (
-            first_name,
-            last_name,
-            phone
-          )
-        `)
-        .eq('job_id', jobQuery.data.id);
+      const crewDateIso = format(new Date(tourDate.date), 'yyyy-MM-dd');
+      const crewMembers = await fetchTourCrewForJobDate(jobQuery.data.id, crewDateIso);
 
-      if (assignments && assignments.length > 0) {
+      if (crewMembers.length > 0) {
         if (currentY > 220) {
           pdf.addPage();
           addPDFHeader(pdf, tourData.name, `${title} (continuación)`, tourLogoUrl);
@@ -294,19 +286,11 @@ export const generateTravelDaySheet = async (
         pdf.setTextColor(0, 0, 0);
         currentY += 10;
 
-        const crewData = assignments.map((a: any) => {
-          const profile = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles;
-          const roles = [];
-          if (a.sound_role) roles.push(`Sound: ${a.sound_role}`);
-          if (a.lights_role) roles.push(`Lights: ${a.lights_role}`);
-          if (a.video_role) roles.push(`Video: ${a.video_role}`);
-
-          return [
-            `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim(),
-            roles.join(', ') || '-',
-            profile?.phone || '-',
-          ];
-        });
+        const crewData = crewMembers.map((member) => [
+          member.fullName,
+          member.roles.join(', ') || '-',
+          member.phone || '-',
+        ]);
 
         autoTable(pdf, {
           head: [['Nombre', 'Roles', 'Teléfono']],
@@ -615,19 +599,10 @@ export const generateEnhancedEventDaySheet = async (
       .maybeSingle();
 
     if (jobQuery.data?.id) {
-      const { data: assignments } = await supabase
-        .from('job_assignments')
-        .select(`
-          *,
-          profiles!job_assignments_technician_id_fkey (
-            first_name,
-            last_name,
-            phone
-          )
-        `)
-        .eq('job_id', jobQuery.data.id);
+      const crewDateIso = format(new Date(tourDate.date), 'yyyy-MM-dd');
+      const crewMembers = await fetchTourCrewForJobDate(jobQuery.data.id, crewDateIso);
 
-      if (assignments && assignments.length > 0) {
+      if (crewMembers.length > 0) {
         if (currentY > 200) {
           pdf.addPage();
           addPDFHeader(pdf, tourData.name, 'Event Day Sheet (continuación)', tourLogoUrl);
@@ -641,19 +616,11 @@ export const generateEnhancedEventDaySheet = async (
         pdf.setTextColor(0, 0, 0);
         currentY += 10;
 
-        const crewData = assignments.map((a: any) => {
-          const profile = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles;
-          const roles = [];
-          if (a.sound_role) roles.push(`Sound: ${a.sound_role}`);
-          if (a.lights_role) roles.push(`Lights: ${a.lights_role}`);
-          if (a.video_role) roles.push(`Video: ${a.video_role}`);
-
-          return [
-            `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim(),
-            roles.join(', ') || '-',
-            profile?.phone || '-',
-          ];
-        });
+        const crewData = crewMembers.map((member) => [
+          member.fullName,
+          member.roles.join(', ') || '-',
+          member.phone || '-',
+        ]);
 
         autoTable(pdf, {
           head: [['Nombre', 'Roles', 'Teléfono']],

@@ -33,5 +33,7 @@ describe('Timesheets Critical Paths (Current Behavior)', () => {
     test.todo('Cannot create duplicate timesheets');
     test.todo('Status transitions are valid');
     test.todo('Signature required for submission');
+    test.todo('Schedule-only rows stay hidden from payroll views');
+    test.todo('toggle_timesheet_day respects is_schedule_only for dry hire jobs');
   });
 });

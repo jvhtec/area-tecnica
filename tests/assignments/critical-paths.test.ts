@@ -30,4 +30,10 @@ describe('Assignments Critical Paths (Current Behavior)', () => {
     test.todo('Detects unavailability conflicts');
     test.todo('Handles overnight/multi-day jobs');
   });
+
+  describe('Matrix Timesheet Toggles', () => {
+    test.todo('toggle_timesheet_day inserts schedule rows when enabling a day');
+    test.todo('toggle_timesheet_day removes the day when turning a cell off');
+    test.todo('Matrix RPC never duplicates parent job_assignments rows');
+  });
 });

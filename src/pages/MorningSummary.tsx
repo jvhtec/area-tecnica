@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Calendar, ArrowLeft, Users, Briefcase, Home, Plane, Heart, Sun } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { buildJobAssignmentsFromTimesheets } from '@/pages/utils/morningSummaryUtils';
 
 type MorningSummaryData = {
   department: string;
@@ -56,46 +57,42 @@ export default function MorningSummary() {
       setLoading(true);
       setError(null);
 
-      const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
-      const tomorrowDate = nextDate.toISOString().split('T')[0];
-
       const summaries: MorningSummaryData[] = [];
 
       for (const dept of departments) {
-        // Get assignments
-      const { data: assignments } = await supabase
-        .from('job_assignments')
-        .select(`
-          technician_id,
-          job:jobs!inner(title, start_time),
-          profile:profiles!job_assignments_technician_id_fkey!inner(first_name, last_name, nickname, department, role)
-        `)
-        .eq('status', 'confirmed')
-        .eq('profile.department', dept)
-        .eq('profile.role', 'house_tech')
-        .gte('job.start_time', date)
-        .lt('job.start_time', tomorrowDate);
+        // Get per-day assignments from timesheets
+        const { data: timesheetAssignments } = await supabase
+          .from('timesheets')
+          .select(`
+            job_id,
+            date,
+            job:jobs!inner(id, title, start_time),
+            profile:profiles!timesheets_technician_id_fkey!inner(id, first_name, last_name, nickname, department, role)
+          `)
+          .eq('date', date)
+          .eq('is_schedule_only', false)
+          .eq('profile.department', dept)
+          .eq('profile.role', 'house_tech');
 
         // Get unavailable
-      const { data: unavailable } = await supabase
-        .from('availability_schedules')
-        .select(`
-          user_id,
-          source,
-          profile:profiles!availability_schedules_user_id_fkey!inner(first_name, last_name, nickname, department, role)
-        `)
-        .eq('date', date)
-        .eq('status', 'unavailable')
-        .eq('profile.department', dept)
-        .eq('profile.role', 'house_tech');
+        const { data: unavailable } = await supabase
+          .from('availability_schedules')
+          .select(`
+            user_id,
+            source,
+            profile:profiles!availability_schedules_user_id_fkey!inner(first_name, last_name, nickname, department, role)
+          `)
+          .eq('date', date)
+          .eq('status', 'unavailable')
+          .eq('profile.department', dept)
+          .eq('profile.role', 'house_tech');
 
         // Get all house techs (population)
-      const { data: allTechs } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, nickname')
-        .eq('department', dept)
-        .eq('role', 'house_tech');
+        const { data: allTechs } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, nickname')
+          .eq('department', dept)
+          .eq('role', 'house_tech');
 
         // Legacy fallback: include legacy per-day marks so counts match the Personal calendar
         let unavailableMerged = unavailable || [];
@@ -139,17 +136,13 @@ export default function MorningSummary() {
         }
 
         // Process data
-        const jobGroups: Record<string, string[]> = {};
-        for (const assignment of assignments || []) {
-          const jobTitle = (assignment as any).job.title;
-          const techName = (assignment as any).profile.nickname || (assignment as any).profile.first_name;
-          if (!jobGroups[jobTitle]) {
-            jobGroups[jobTitle] = [];
-          }
-          jobGroups[jobTitle].push(techName);
-        }
+        const jobAssignments = buildJobAssignmentsFromTimesheets(timesheetAssignments || []);
 
-        const assignedIds = new Set((assignments || []).map((a: any) => a.technician_id));
+        const assignedIds = new Set(
+          (timesheetAssignments || [])
+            .map((a: any) => a.profile?.id)
+            .filter((id: string | undefined): id is string => Boolean(id))
+        );
         const unavailableIds = new Set((unavailableMerged || []).map((u: any) => u.user_id));
         const warehouse = (allTechs || [])
           .filter(t => !assignedIds.has(t.id) && !unavailableIds.has(t.id))
@@ -164,7 +157,7 @@ export default function MorningSummary() {
 
         summaries.push({
           department: dept,
-          assignments: Object.entries(jobGroups).map(([job_title, techs]) => ({ job_title, techs })),
+          assignments: jobAssignments,
           warehouse,
           vacation: bySource.vacation || [],
           travel: bySource.travel || [],

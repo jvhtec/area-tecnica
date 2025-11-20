@@ -13,18 +13,18 @@ export function useTourJobRateQuotesForManager(jobId?: string, tourId?: string) 
     queryFn: async (): Promise<TourJobRateQuote[]> => {
       if (!jobId || !tourId) return []
 
-      // Get technician assignments for the selected tour date (job-level)
-      const { data: jobAssignments, error: jaErr } = await supabase
-        .from('job_assignments')
+      const { data: timesheetRows, error: tsErr } = await supabase
+        .from('timesheets')
         .select('technician_id')
         .eq('job_id', jobId)
+        .eq('is_schedule_only', false)
 
-      if (jaErr) throw jaErr
+      if (tsErr) throw tsErr
 
       const techIds = Array.from(
         new Set(
-          (jobAssignments || [])
-            .map((a: any) => a.technician_id)
+          (timesheetRows || [])
+            .map((row: any) => row?.technician_id)
             .filter((id: string | null): id is string => !!id)
         )
       )

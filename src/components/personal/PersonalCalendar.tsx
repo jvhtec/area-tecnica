@@ -11,14 +11,13 @@ import {
   addDays,
   subDays,
   isToday,
-  isSameDay,
-  isWithinInterval,
-  parse
+  isSameDay
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { HouseTechBadge } from "./HouseTechBadge";
 import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
+import { filterAssignmentsByDate } from "./hooks/calendarAssignmentUtils";
 
 interface PersonalCalendarProps {
   date: Date;
@@ -99,20 +98,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     return dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
   };
 
-  const getAssignmentsForDate = (day: Date) => {
-    return assignments.filter(assignment => {
-      // Check if this is a single-day assignment
-      if (assignment.single_day && assignment.assignment_date) {
-        const assignmentDate = parse(assignment.assignment_date, "yyyy-MM-dd", new Date());
-        return isSameDay(day, assignmentDate);
-      }
-      
-      // Otherwise, use the job's full date range
-      const startDate = new Date(assignment.job.start_time);
-      const endDate = new Date(assignment.job.end_time);
-      return isSameDay(day, startDate) || isWithinInterval(day, { start: startDate, end: endDate });
-    });
-  };
+  const getAssignmentsForDate = (day: Date) => filterAssignmentsByDate(assignments, day);
 
   const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => {
     updateAvailability(techId, status, date);

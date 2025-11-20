@@ -8,12 +8,21 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { supabase } from '@/lib/supabase';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { CalendarDays, CheckCircle, XCircle, Clock, Users, Download } from 'lucide-react';
 import { VacationRequestForm } from './VacationRequestForm';
 import { VacationRequestHistory } from './VacationRequestHistory';
 import type { VacationRequest } from '@/lib/vacation-requests';
 import { downloadVacationRequestPDF } from '@/utils/vacationRequestPdfExport';
+import {
+  groupTimesheetCollisions,
+  type GroupedVacationCollision,
+  type TimesheetCollisionRow,
+} from '@/components/personal/utils/vacationCollisionUtils';
+
+const collisionCache = new Map<string, GroupedVacationCollision[]>();
+const buildCollisionCacheKey = (request: VacationRequest) =>
+  `${request.technician_id ?? 'unknown'}:${request.start_date ?? ''}:${request.end_date ?? ''}`;
 
 interface VacationRequestsTabsProps {
   userRole: 'house_tech' | 'management' | 'admin';
@@ -90,40 +99,49 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
   const StatusWithConflicts: React.FC<{ request: VacationRequest }> = ({ request }) => {
     const [open, setOpen] = React.useState(false);
     const [loading, setLoading] = React.useState(false);
-    const [collisions, setCollisions] = React.useState<any[] | null>(null);
+    const [collisions, setCollisions] = React.useState<GroupedVacationCollision[] | null>(null);
 
-    const fetchCollisions = async () => {
+    const fetchCollisions = React.useCallback(async () => {
       if (!request?.technician_id || !request?.start_date || !request?.end_date) return;
+      const cacheKey = buildCollisionCacheKey(request);
+      if (collisionCache.has(cacheKey)) {
+        setCollisions(collisionCache.get(cacheKey)!);
+        return;
+      }
       setLoading(true);
       try {
-        const startRange = new Date(`${request.start_date}T00:00:00`);
-        const endRange = new Date(`${request.end_date}T23:59:59.999`);
         const { data, error } = await supabase
-          .from('job_assignments')
-          .select(`
-            jobs!inner (
+          .from('timesheets')
+          .select(
+            `id, date, jobs!inner (
               id,
               title,
               start_time,
               end_time,
               locations(name)
-            )
-          `)
+            )`
+          )
           .eq('technician_id', request.technician_id)
-          .lte('jobs.start_time', endRange.toISOString())
-          .gte('jobs.end_time', startRange.toISOString());
+          .eq('is_schedule_only', false)
+          .gte('date', request.start_date)
+          .lte('date', request.end_date)
+          .order('date', { ascending: true });
 
         if (error) throw error;
-        // Normalize joined shape
-        const rows = (data || []).map((row: any) => Array.isArray(row.jobs) ? row.jobs[0] : row.jobs).filter(Boolean);
-        setCollisions(rows);
+        const grouped = groupTimesheetCollisions((data || []) as TimesheetCollisionRow[]);
+        collisionCache.set(cacheKey, grouped);
+        setCollisions(grouped);
       } catch (e) {
         console.error('Error checking collisions for request', request.id, e);
         setCollisions([]);
       } finally {
         setLoading(false);
       }
-    };
+    }, [request.end_date, request.id, request.start_date, request.technician_id]);
+
+    React.useEffect(() => {
+      setCollisions(null);
+    }, [request.end_date, request.start_date, request.technician_id]);
 
     const handleOpenChange = (next: boolean) => {
       setOpen(next);
@@ -134,14 +152,13 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
 
     // Prefetch collisions so badge can show a dot/count immediately
     React.useEffect(() => {
-      // Only prefetch once
       if (collisions === null) {
         fetchCollisions();
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [collisions, fetchCollisions]);
 
-    const conflictsCount = collisions?.length ?? 0;
+    const conflictsCount =
+      collisions?.reduce((total, collision) => total + collision.dateRanges.length, 0) ?? 0;
 
     return (
       <HoverCard open={open} onOpenChange={handleOpenChange}>
@@ -164,20 +181,34 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
             )}
             {!loading && collisions && collisions.length > 0 && (
               <div className="max-h-64 overflow-auto space-y-2">
-                {collisions.map((job: any) => {
-                  const start = new Date(job.start_time);
-                  const end = new Date(job.end_time);
-                  const locName = job.locations && Array.isArray(job.locations) && job.locations[0]?.name ? ` • ${job.locations[0].name}` : '';
+                {collisions.map(collision => {
+                  const locationLabel = collision.locationName ? ` • ${collision.locationName}` : '';
                   return (
-                    <div key={job.id} className="rounded-md border p-2">
+                    <div key={collision.jobId} className="rounded-md border p-2 space-y-1">
                       <div className="text-sm font-medium">
-                        <a className="text-blue-600 hover:underline" href={`/jobs/view/${job.id}`} target="_blank" rel="noopener noreferrer">
-                          {job.title || 'Job'}
+                        <a
+                          className="text-blue-600 hover:underline"
+                          href={`/jobs/view/${collision.jobId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {collision.title || 'Job'}
                         </a>
-                        {locName}
+                        {locationLabel}
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {format(start, 'PPpp')} – {format(end, 'PPpp')}
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        {collision.dateRanges.map(range => {
+                          const start = parseISO(range.start);
+                          const end = parseISO(range.end);
+                          const label = isNaN(start.getTime())
+                            ? ''
+                            : range.start === range.end
+                            ? format(start, 'PP')
+                            : `${format(start, 'PP')} – ${format(end, 'PP')}`;
+                          return (
+                            <div key={`${range.start}-${range.end}`}>{label}</div>
+                          );
+                        })}
                       </div>
                     </div>
                   );

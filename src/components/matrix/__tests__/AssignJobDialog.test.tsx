@@ -4,16 +4,31 @@ import userEvent from '@testing-library/user-event';
 
 import { AssignJobDialog } from '../AssignJobDialog';
 
-const useQueryMock = vi.fn();
-const checkTimeConflictEnhancedMock = vi.fn();
-const insertMock = vi.fn();
-const deleteMock = vi.fn();
-const fromMock = vi.fn();
-const authGetUserMock = vi.fn();
-const functionsInvokeMock = vi.fn();
-const toastFn = Object.assign(vi.fn(), {
-  error: vi.fn(),
-  success: vi.fn(),
+const {
+  useQueryMock,
+  checkTimeConflictEnhancedMock,
+  insertMock,
+  deleteMock,
+  updateMock,
+  fromMock,
+  authGetUserMock,
+  functionsInvokeMock,
+  removeTimesheetAssignmentMock,
+  toastFn,
+} = vi.hoisted(() => {
+  const toast = Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() });
+  return {
+    useQueryMock: vi.fn(),
+    checkTimeConflictEnhancedMock: vi.fn(),
+    insertMock: vi.fn(),
+    deleteMock: vi.fn(),
+    updateMock: vi.fn(),
+    fromMock: vi.fn(),
+    authGetUserMock: vi.fn(),
+    functionsInvokeMock: vi.fn(),
+    removeTimesheetAssignmentMock: vi.fn(),
+    toastFn: toast,
+  };
 });
 
 type ConflictCheckResult = {
@@ -52,9 +67,25 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
+vi.mock('@/services/removeTimesheetAssignment', () => ({
+  removeTimesheetAssignment: removeTimesheetAssignmentMock,
+}));
+
 vi.mock('sonner', () => ({
   toast: toastFn,
 }));
+
+beforeAll(() => {
+  if (!window.HTMLElement.prototype.hasPointerCapture) {
+    window.HTMLElement.prototype.hasPointerCapture = () => false;
+  }
+  if (!window.HTMLElement.prototype.releasePointerCapture) {
+    window.HTMLElement.prototype.releasePointerCapture = () => {};
+  }
+  if (!window.HTMLElement.prototype.scrollIntoView) {
+    window.HTMLElement.prototype.scrollIntoView = () => {};
+  }
+});
 
 const baseJob = {
   id: 'job-1',
@@ -75,11 +106,31 @@ beforeEach(() => {
   useQueryMock.mockReturnValue({ data: defaultTechnician });
   insertMock.mockResolvedValue({ error: null });
   deleteMock.mockResolvedValue({ error: null });
+  updateMock.mockResolvedValue({ error: null });
+  removeTimesheetAssignmentMock.mockResolvedValue({
+    deleted_timesheets: 3,
+    deleted_assignment: true,
+  });
   fromMock.mockImplementation((table: string) => {
     if (table === 'job_assignments') {
+      const selectExistingChain: any = {
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      };
+      const selectVerifyChain: any = {
+        eq: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue({ data: [{ job_id: 'job-1' }], error: null }),
+      };
       return {
         insert: insertMock,
         delete: deleteMock,
+        update: updateMock,
+        select: vi.fn().mockImplementation((columns?: string) => {
+          if (columns && columns.includes('technician_id')) {
+            return selectExistingChain;
+          }
+          return selectVerifyChain;
+        }),
       };
     }
     return {
@@ -127,8 +178,11 @@ describe('AssignJobDialog conflict handling', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /choose a role/i }));
-    await user.click(screen.getByText(/foh/i));
+    const roleTrigger = screen.getByText(/choose a role/i).closest('button');
+    if (!roleTrigger) throw new Error('role select trigger not found');
+    await user.click(roleTrigger);
+    const [roleOption] = await screen.findAllByText(/foh/i);
+    await user.click(roleOption);
 
     await user.click(screen.getByRole('button', { name: /assign job/i }));
 
@@ -181,8 +235,11 @@ describe('AssignJobDialog conflict handling', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /choose a role/i }));
-    await user.click(screen.getByText(/foh/i));
+    const roleTrigger = screen.getByText(/choose a role/i).closest('button');
+    if (!roleTrigger) throw new Error('role select trigger not found');
+    await user.click(roleTrigger);
+    const [roleOption] = await screen.findAllByText(/foh/i);
+    await user.click(roleOption);
 
     await user.click(screen.getByRole('button', { name: /assign job/i }));
 
@@ -194,5 +251,39 @@ describe('AssignJobDialog conflict handling', () => {
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
     });
+  });
+
+  it('removes assignments via the timesheet cleanup helper', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+
+    const existingAssignment = {
+      job_id: 'job-legacy',
+      technician_id: 'tech-99',
+      status: 'confirmed',
+    };
+
+    render(
+      <AssignJobDialog
+        open
+        onClose={onClose}
+        technicianId="tech-99"
+        date={new Date('2024-07-01T00:00:00Z')}
+        availableJobs={[baseJob]}
+        existingAssignment={existingAssignment}
+        preSelectedJobId="job-1"
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /remove assignment/i }));
+
+    await waitFor(() => {
+      expect(removeTimesheetAssignmentMock).toHaveBeenCalledWith('job-legacy', 'tech-99');
+    });
+    expect(deleteMock).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(toastFn.success).toHaveBeenCalledWith('Assignment removed');
+    });
+    expect(onClose).toHaveBeenCalled();
   });
 });

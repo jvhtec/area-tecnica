@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { createQueryKey } from '@/lib/optimized-react-query';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
+import { aggregateTimesheetsForJob, TimesheetRowWithTechnician } from '@/utils/timesheetAssignments';
 
 export const useOptimizedJobCard = (
   job: any,
@@ -32,7 +33,8 @@ export const useOptimizedJobCard = (
 
   // Local state
   const [collapsed, setCollapsed] = useState(true);
-  const [assignments, setAssignments] = useState(job.job_assignments || []);
+  const [assignmentMeta, setAssignmentMeta] = useState(job.job_assignments || []);
+  const [assignments, setAssignments] = useState(job.timesheet_assignments || []);
   const [documents, setDocuments] = useState(job.job_documents || []);
   const [soundTaskDialogOpen, setSoundTaskDialogOpen] = useState(false);
   const [lightsTaskDialogOpen, setLightsTaskDialogOpen] = useState(false);
@@ -42,24 +44,68 @@ export const useOptimizedJobCard = (
 
   // Keep local state in sync with incoming job prop updates for instant UI
   useEffect(() => {
-    setAssignments(job.job_assignments || []);
+    setAssignmentMeta(job.job_assignments || []);
   }, [job.job_assignments]);
+
+  useEffect(() => {
+    setAssignments(job.timesheet_assignments || []);
+  }, [job.timesheet_assignments]);
 
   useEffect(() => {
     setDocuments(job.job_documents || []);
   }, [job.job_documents]);
 
   // Helper to fetch and update assignments for this job
-  const refreshAssignments = useCallback(async () => {
-    if (!job?.id) return;
+  const refreshAssignmentMetadata = useCallback(async () => {
+    if (!job?.id) return [];
     try {
       const { data, error } = await supabase
         .from('job_assignments')
-        .select(`*, profiles(first_name, nickname, last_name)`) 
+        .select(`*, profiles(first_name, nickname, last_name, department)`)
         .eq('job_id', job.id);
-      if (!error) setAssignments(data || []);
-    } catch {}
-  }, [job?.id]);
+      if (!error) {
+        setAssignmentMeta(data || []);
+        return data || [];
+      }
+    } catch (err) {
+      console.error('useOptimizedJobCard: Failed to refresh assignment metadata', err);
+    }
+    return assignmentMeta;
+  }, [job?.id, assignmentMeta]);
+
+  const refreshAssignments = useCallback(async (metaOverride?: any[]) => {
+    if (!job?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select(`
+          job_id,
+          technician_id,
+          date,
+          is_schedule_only,
+          technician:profiles!fk_timesheets_technician_id(
+            id,
+            first_name,
+            last_name,
+            nickname,
+            department
+          )
+        `)
+        .eq('job_id', job.id)
+        .eq('is_schedule_only', false);
+
+      if (!error) {
+        const aggregated = aggregateTimesheetsForJob(
+          job.id,
+          (data || []) as TimesheetRowWithTechnician[],
+          metaOverride ?? assignmentMeta
+        );
+        setAssignments(aggregated);
+      }
+    } catch (err) {
+      console.error('useOptimizedJobCard: Failed to refresh assignments', err);
+    }
+  }, [job?.id, assignmentMeta]);
 
   // Realtime: subscribe to assignment changes for this job and refresh local state instantly
   useEffect(() => {
@@ -69,9 +115,18 @@ export const useOptimizedJobCard = (
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'job_assignments',
+        table: 'timesheets',
         filter: `job_id=eq.${job.id}`,
       }, async () => { await refreshAssignments(); })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'job_assignments',
+        filter: `job_id=eq.${job.id}`,
+      }, async () => {
+        const latest = await refreshAssignmentMetadata();
+        await refreshAssignments(latest);
+      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -97,7 +152,7 @@ export const useOptimizedJobCard = (
       window.removeEventListener('assignment-updated', handler);
       supabase.removeChannel(channel);
     };
-  }, [job?.id, refreshAssignments]);
+  }, [job?.id, refreshAssignments, refreshAssignmentMetadata]);
 
   // Memoized permission checks
   const permissions = useMemo(() => {

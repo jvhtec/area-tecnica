@@ -164,17 +164,41 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         return;
       }
 
-      // Optional pre-check: warn about missing phones for selected department
-      const { data: rows } = await supabase
-        .from('job_assignments')
-        .select('sound_role, lights_role, video_role, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
-        .eq('job_id', jobRow.id);
+      // Optional pre-check: warn about missing phones using per-day timesheets
+      const selectedDate = tour?.tour_dates?.find((d: any) => d.id === waSelectedDateId)?.date;
+      const tsQuery = supabase
+        .from('timesheets')
+        .select(`
+          technician_id,
+          date,
+          job_assignments!inner(sound_role, lights_role, video_role),
+          profile:profiles!timesheets_technician_id_fkey(first_name,last_name,phone)
+        `)
+        .eq('job_id', jobRow.id)
+        .eq('is_schedule_only', false);
+      if (selectedDate) {
+        tsQuery.eq('date', selectedDate);
+      }
+      const { data: timesheetRows, error: timesheetErr } = await tsQuery;
+      if (timesheetErr) {
+        console.error('Timesheet lookup failed for WhatsApp validation', timesheetErr);
+      }
       const deptKey = waDepartment === 'sound' ? 'sound_role' : waDepartment === 'lights' ? 'lights_role' : 'video_role';
-      const crew = (rows || []).filter((r: any) => !!r[deptKey]);
+      const uniqueCrew = new Map<string, any>();
+      (timesheetRows || []).forEach((row: any) => {
+        const techId = row.technician_id;
+        if (!techId) return;
+        const assignment = Array.isArray(row.job_assignments) ? row.job_assignments[0] : row.job_assignments;
+        if (!assignment?.[deptKey]) return;
+        if (!uniqueCrew.has(techId)) {
+          uniqueCrew.set(techId, row);
+        }
+      });
+      const crew = Array.from(uniqueCrew.values());
       const missing: string[] = [];
       let validPhones = 0;
-      for (const r of crew) {
-        const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+      for (const row of crew) {
+        const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
         const full = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Técnico';
         const ph = (profile?.phone || '').trim();
         if (!ph) missing.push(full); else validPhones += 1;

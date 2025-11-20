@@ -49,6 +49,22 @@ function technicianDisplayName(profile?: {
   return combined || 'Sin nombre';
 }
 
+function normalizeProfileRow<T extends Record<string, any> | null | undefined>(profile: T) {
+  if (!profile) return null;
+  return Array.isArray(profile) ? profile[0] : profile;
+}
+
+interface TimesheetCrewRow {
+  technician_id: string | null;
+  date: string;
+  profile?: {
+    first_name?: string | null;
+    last_name?: string | null;
+    flex_resource_id?: string | null;
+    department?: string | null;
+  } | null;
+}
+
 async function createWorkOrderElement(options: {
   parentElementId: string;
   job: { id: string; title: string; start_time: string; end_time: string; location_id: string | null };
@@ -629,25 +645,76 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
     console.log(`[FlexWorkOrders] Created work_orders folder: ${newElementId}`);
   }
 
-  const { data: assignments, error: assignmentError } = await supabase
+  const timesheetQuery = supabase
+    .from('timesheets')
+    .select(
+      `job_id, technician_id, date,
+       profile:profiles!timesheets_technician_id_fkey(first_name, last_name, flex_resource_id, department)`
+    )
+    .eq('job_id', jobId)
+    .eq('is_schedule_only', false);
+
+  if (job.job_type === 'tourdate') {
+    const jobDate = formatDate(job.start_time);
+    if (jobDate) {
+      timesheetQuery.eq('date', jobDate);
+    }
+  }
+
+  const { data: timesheetRows, error: timesheetError } = await timesheetQuery;
+
+  if (timesheetError) throw timesheetError;
+
+  const timesheetTechnicians = Array.from(
+    new Set(((timesheetRows as TimesheetCrewRow[] | null | undefined) || []).map((row) => row?.technician_id).filter(Boolean))
+  ) as string[];
+
+  if (timesheetTechnicians.length === 0) {
+    return { created, skipped, errors };
+  }
+
+  const timesheetProfiles = new Map<string, TimesheetCrewRow['profile']>();
+  (timesheetRows as TimesheetCrewRow[] | null | undefined)?.forEach((row) => {
+    if (!row?.technician_id) return;
+    const normalized = normalizeProfileRow(row.profile);
+    if (normalized) {
+      timesheetProfiles.set(row.technician_id, normalized);
+    }
+  });
+
+  const { data: assignmentRows, error: assignmentError } = await supabase
     .from('job_assignments')
     .select(
       `technician_id, sound_role, lights_role, video_role, status,
        profiles!job_assignments_technician_id_fkey(first_name, last_name, flex_resource_id, department)`
     )
-    .eq('job_id', jobId);
+    .eq('job_id', jobId)
+    .in('technician_id', timesheetTechnicians);
 
   if (assignmentError) throw assignmentError;
 
-  const { data: extras, error: extrasError } = await supabase
-    .from('job_rate_extras')
-    .select('technician_id, extra_type, quantity, status')
-    .eq('job_id', jobId);
+  const assignmentsByTechnician = new Map<string, AssignmentRow>();
+  (assignmentRows as AssignmentRow[] | null | undefined)?.forEach((row) => {
+    if (row?.technician_id && !assignmentsByTechnician.has(row.technician_id)) {
+      assignmentsByTechnician.set(row.technician_id, row);
+    }
+  });
 
-  if (extrasError) throw extrasError;
+  let extrasRows: ExtraRow[] = [];
+  if (timesheetTechnicians.length > 0) {
+    const extrasQuery = supabase
+      .from('job_rate_extras')
+      .select('technician_id, extra_type, quantity, status')
+      .eq('job_id', jobId)
+      .in('technician_id', timesheetTechnicians);
+
+    const { data: extras, error: extrasError } = await extrasQuery;
+    if (extrasError) throw extrasError;
+    extrasRows = (extras as ExtraRow[] | null | undefined) ?? [];
+  }
 
   const extrasByTechnician = new Map<string, ExtraRow[]>();
-  (extras as ExtraRow[] | null | undefined)?.forEach((row) => {
+  extrasRows.forEach((row) => {
     if (!row || row.quantity <= 0) return;
     if (row.status && row.status !== 'approved') return;
     const list = extrasByTechnician.get(row.technician_id) || [];
@@ -663,9 +730,14 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
   if (existingError) throw existingError;
   const existingMap = new Map<string, string>((existingRows || []).map((row) => [row.technician_id, row.flex_document_id]));
 
-  for (const assignment of (assignments as AssignmentRow[] | null | undefined) || []) {
-    const technicianId = assignment.technician_id;
+  for (const technicianId of timesheetTechnicians) {
     if (!technicianId) continue;
+    const assignment = assignmentsByTechnician.get(technicianId);
+    if (!assignment) {
+      errors.push(`Técnico ${technicianId} no tiene job_assignment asociado, se omite la orden de trabajo.`);
+      skipped += 1;
+      continue;
+    }
     if (assignment.status === 'declined') {
       skipped += 1;
       continue;
@@ -675,7 +747,9 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
       continue;
     }
 
-    const flexResourceId = assignment.profiles?.flex_resource_id || null;
+    const profileFallback =
+      normalizeProfileRow(assignment.profiles) || timesheetProfiles.get(technicianId) || null;
+    const flexResourceId = (profileFallback as any)?.flex_resource_id || null;
     if (!flexResourceId) {
       errors.push(`Técnico ${technicianId} no tiene Flex Resource ID, se omite la orden de trabajo.`);
       skipped += 1;
@@ -683,7 +757,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
     }
 
     try {
-      const technicianName = technicianDisplayName(assignment.profiles || undefined);
+      const technicianName = technicianDisplayName(profileFallback || undefined);
       const { documentId, raw: createdRaw } = await createWorkOrderElement({
         parentElementId: parentFolder.element_id,
         job,

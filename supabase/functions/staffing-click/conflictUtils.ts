@@ -3,7 +3,7 @@ export type RangeWindow = { kind: 'range'; start: Date; end: Date };
 export type TimeWindow = DayWindow | RangeWindow;
 
 export type AssignmentCoverageMeta = {
-  job_id: number;
+  job_id: string;
   job_title: string | null;
   assignment_date?: string;
   start_time?: string | null;
@@ -27,7 +27,7 @@ export type ConflictContext = {
   targetDate: string | null;
   existingAssignmentWindows: AssignmentCoverage[];
   jobInfo: JobTimeInfo | undefined;
-  jobId: number;
+  jobId: string;
   jobStartTime: string | null;
   jobEndTime: string | null;
 };

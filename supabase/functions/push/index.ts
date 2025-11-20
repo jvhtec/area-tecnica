@@ -832,23 +832,22 @@ async function getMorningSummaryDataForDepartment(
   department: string,
   targetDate: string, // YYYY-MM-DD
 ): Promise<MorningSummaryData> {
-  const nextDate = new Date(targetDate);
-  nextDate.setDate(nextDate.getDate() + 1);
-  const tomorrowDate = nextDate.toISOString().split('T')[0];
-
-  // 1) Get today's assignments for this department (house tech only)
+  // 1) Get today's assignments for this department (house tech only) using per-day timesheets
   const { data: assignments = [] } = await client
-    .from('job_assignments')
+    .from('timesheets')
     .select(`
       technician_id,
+      job_id,
+      date,
       job:jobs!inner(title, start_time),
-      profile:profiles!job_assignments_technician_id_fkey!inner(first_name, last_name, nickname, department, role)
+      profile:profiles!timesheets_technician_id_fkey!inner(first_name, last_name, nickname, department, role),
+      job_assignments!inner(status)
     `)
-    .eq('status', 'confirmed')
+    .eq('is_schedule_only', false)
+    .eq('job_assignments.status', 'confirmed')
     .eq('profile.department', department)
     .eq('profile.role', 'house_tech')
-    .gte('job.start_time', targetDate)
-    .lt('job.start_time', tomorrowDate);
+    .eq('date', targetDate);
 
   // 2) Get today's unavailability for this department (primary source)
   const { data: unavailable = [] } = await client

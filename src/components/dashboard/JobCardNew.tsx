@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -55,6 +55,7 @@ import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 
 import { useFolderExistence } from "@/hooks/useFolderExistence";
+import { aggregateTimesheetsForJob, TimesheetRowWithTechnician } from "@/utils/timesheetAssignments";
 
 // File System Access API types
 declare global {
@@ -121,7 +122,8 @@ export function JobCardNew({
   const appliedBgColor = isDark ? (job.darkColor ? `${job.darkColor}15` : bgColor) : bgColor;
 
   const [collapsed, setCollapsed] = useState(true);
-  const [assignments, setAssignments] = useState(job.job_assignments || []);
+  const [assignmentMeta, setAssignmentMeta] = useState(job.job_assignments || []);
+  const [assignments, setAssignments] = useState(job.timesheet_assignments || []);
   const [documents, setDocuments] = useState<JobDocument[]>(job.job_documents || []);
   const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
   const [soundTaskDialogOpen, setSoundTaskDialogOpen] = useState(false);
@@ -170,12 +172,67 @@ export function JobCardNew({
 
   // Keep local state in sync with incoming props
   useEffect(() => {
-    setAssignments(job.job_assignments || []);
+    setAssignmentMeta(job.job_assignments || []);
   }, [job.job_assignments]);
+
+  useEffect(() => {
+    setAssignments(job.timesheet_assignments || []);
+  }, [job.timesheet_assignments]);
 
   useEffect(() => {
     setDocuments(job.job_documents || []);
   }, [job.job_documents]);
+
+  const refreshAssignmentMetadata = useCallback(async () => {
+    if (!job?.id) return [];
+    try {
+      const { data, error } = await supabase
+        .from('job_assignments')
+        .select(`*, profiles(first_name, nickname, last_name, department)`)
+        .eq('job_id', job.id);
+      if (!error) {
+        setAssignmentMeta(data || []);
+        return data || [];
+      }
+    } catch (err) {
+      console.error('Dashboard JobCardNew: failed to refresh assignment metadata', err);
+    }
+    return assignmentMeta;
+  }, [job?.id, assignmentMeta]);
+
+  const refreshAssignments = useCallback(async (metaOverride?: any[]) => {
+    if (!job?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select(`
+          job_id,
+          technician_id,
+          date,
+          is_schedule_only,
+          technician:profiles!fk_timesheets_technician_id(
+            id,
+            first_name,
+            last_name,
+            nickname,
+            department
+          )
+        `)
+        .eq('job_id', job.id)
+        .eq('is_schedule_only', false);
+
+      if (!error) {
+        const aggregated = aggregateTimesheetsForJob(
+          job.id,
+          (data || []) as TimesheetRowWithTechnician[],
+          metaOverride ?? assignmentMeta
+        );
+        setAssignments(aggregated);
+      }
+    } catch (err) {
+      console.error('Dashboard JobCardNew: failed to refresh assignments', err);
+    }
+  }, [job?.id, assignmentMeta]);
 
   // Realtime subscription for assignment changes (instant UI refresh)
   useEffect(() => {
@@ -185,25 +242,26 @@ export function JobCardNew({
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
+        table: 'timesheets',
+        filter: `job_id=eq.${job.id}`,
+      }, async () => {
+        await refreshAssignments();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
         table: 'job_assignments',
         filter: `job_id=eq.${job.id}`,
       }, async () => {
-        try {
-          const { data, error } = await supabase
-            .from('job_assignments')
-            .select(`*, profiles(first_name, nickname, last_name)`) 
-            .eq('job_id', job.id);
-          if (!error) {
-            setAssignments(data || []);
-          }
-        } catch {}
+        const latest = await refreshAssignmentMetadata();
+        await refreshAssignments(latest);
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [job?.id]);
+  }, [job?.id, refreshAssignments, refreshAssignmentMetadata]);
 
   useEffect(() => {
     async function fetchDateTypes() {

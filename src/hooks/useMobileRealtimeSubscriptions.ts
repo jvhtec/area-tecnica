@@ -9,6 +9,8 @@ export const useMobileRealtimeSubscriptions = (options: {
   includeJobs?: boolean;
   /** Include job assignment tables */
   includeAssignments?: boolean;
+  /** Include per-day timesheet tables */
+  includeTimesheets?: boolean;
   /** Include job date types table */
   includeDateTypes?: boolean;
   /** Include job departments table */
@@ -21,6 +23,7 @@ export const useMobileRealtimeSubscriptions = (options: {
   const {
     includeJobs = true,
     includeAssignments = false,
+    includeTimesheets = false,
     includeDateTypes = false,
     includeDepartments = false,
     queryKey = ['mobile-data'],
@@ -40,6 +43,12 @@ export const useMobileRealtimeSubscriptions = (options: {
   if (includeAssignments) {
     tables.push(
       { table: 'job_assignments', queryKey, priority }
+    );
+  }
+
+  if (includeTimesheets) {
+    tables.push(
+      { table: 'timesheets', queryKey, priority }
     );
   }
 
@@ -67,6 +76,7 @@ export const useTechnicianDashboardSubscriptions = () => {
   return useMobileRealtimeSubscriptions({
     includeJobs: true,
     includeAssignments: true,
+    includeTimesheets: true,
     includeDepartments: true,
     queryKey: ['assignments'],
     priority: 'high'
@@ -92,6 +102,7 @@ export const useMobileDayCalendarSubscriptions = () => {
 export const useAssignmentsListSubscriptions = () => {
   return useMobileRealtimeSubscriptions({
     includeJobs: true,
+    includeTimesheets: true,
     queryKey: ['assignments'],
     priority: 'medium'
   });

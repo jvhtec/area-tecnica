@@ -3,13 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, ChevronLeft, ChevronRight, Users, Warehouse, Briefcase, Sun, CalendarOff, Car, Thermometer, Printer } from "lucide-react";
 import { PrintDialog, PrintSettings } from "@/components/dashboard/PrintDialog";
-import { format, addDays, subDays, isToday, isSameDay, isWithinInterval } from "date-fns";
+import { format, addDays, subDays, isToday } from "date-fns";
 import { cn } from "@/lib/utils";
 import { HouseTechBadge } from "./HouseTechBadge";
 import { TechContextMenu } from "./TechContextMenu";
 import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 import { TechDetailModal } from "./TechDetailModal";
+import { filterAssignmentsByDate } from "./hooks/calendarAssignmentUtils";
 
 interface MobilePersonalCalendarProps {
   date: Date;
@@ -55,20 +56,10 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     isLoading: isAvailabilityLoading
   } = useTechnicianAvailability(currentDate);
 
-  const getAssignmentsForDate = useCallback((targetDate: Date) => {
-    return assignments.filter(assignment => {
-      // Check if this is a single-day assignment
-      if (assignment.single_day && assignment.assignment_date) {
-        const assignmentDate = new Date(assignment.assignment_date);
-        return isSameDay(targetDate, assignmentDate);
-      }
-      
-      // Otherwise, use the job's full date range
-      const startDate = new Date(assignment.job.start_time);
-      const endDate = new Date(assignment.job.end_time);
-      return isSameDay(targetDate, startDate) || isWithinInterval(targetDate, { start: startDate, end: endDate });
-    });
-  }, [assignments]);
+  const getAssignmentsForDate = useCallback(
+    (targetDate: Date) => filterAssignmentsByDate(assignments, targetDate),
+    [assignments]
+  );
 
   const currentDateAssignments = getAssignmentsForDate(currentDate);
 

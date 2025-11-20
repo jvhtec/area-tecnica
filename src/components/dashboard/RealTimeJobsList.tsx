@@ -98,8 +98,8 @@ export function RealTimeJobsList({
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-xl">{title}</CardTitle>
           <div className="flex items-center gap-2">
-            <SubscriptionIndicator 
-              tables={['jobs', 'job_assignments', 'job_departments']} 
+            <SubscriptionIndicator
+              tables={['jobs', 'timesheets', 'job_departments']}
               variant="compact"
               showRefreshButton
               onRefresh={refetch}

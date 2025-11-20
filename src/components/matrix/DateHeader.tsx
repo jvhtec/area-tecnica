@@ -7,6 +7,15 @@ import { Calendar, Clock, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import {
+  calculateOpenSlotTotals,
+  EMPTY_DATE_COVERAGE_SUMMARY,
+  summarizeDateCoverage,
+  type DateCoverageSummary,
+  type TimesheetCoverageRow,
+  type AssignmentMetaRow,
+  type RequiredRoleRow,
+} from '@/components/matrix/utils/dateCoverage';
 
 interface DateHeaderProps {
   date: Date;
@@ -87,30 +96,36 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
   };
 
   const jobColors = getJobIndicatorColors();
-  const { data: confirmedForDate } = useDateConfirmedCount(date, jobs, technicianIds);
+  const jobIds = React.useMemo(() => (jobs || []).map(j => j.id).filter(Boolean), [jobs]);
+  const coverageQuery = useDateCoverageMetrics(date, jobIds, technicianIds);
+  const coverage = coverageQuery.data || EMPTY_DATE_COVERAGE_SUMMARY;
+  const confirmedForDate = coverage.confirmedCount;
 
   // Aggregate open slots across jobs on this date (all departments)
-  const jobIds = React.useMemo(() => (jobs || []).map(j => j.id), [jobs]);
-  const { data: openSlots } = useQuery({
-    queryKey: ['matrix-open-slots', jobIds.join(',')],
+  const { data: requiredRoles } = useQuery({
+    queryKey: ['matrix-required-roles', jobIds.join(',')],
     queryFn: async () => {
-      if (!jobIds.length) return { required: 0, assigned: 0, open: 0 };
-      const [{ data: req }, { data: a1 }, { data: a2 }, { data: a3 }] = await Promise.all([
-        supabase.from('job_required_roles_summary').select('total_required, job_id').in('job_id', jobIds),
-        supabase.from('job_assignments').select('id,sound_role').in('job_id', jobIds),
-        supabase.from('job_assignments').select('id,lights_role').in('job_id', jobIds),
-        supabase.from('job_assignments').select('id,video_role').in('job_id', jobIds),
-      ]);
-      const required = (req || []).reduce((acc: number, r: any) => acc + (Number(r.total_required || 0)), 0);
-      const assigned = (a1 || []).filter((r:any)=> r.sound_role != null).length
-        + (a2 || []).filter((r:any)=> r.lights_role != null).length
-        + (a3 || []).filter((r:any)=> r.video_role != null).length;
-      const open = Math.max(required - assigned, 0);
-      return { required, assigned, open };
+      if (!jobIds.length) return [] as RequiredRoleRow[];
+      const { data, error } = await supabase
+        .from('job_required_roles_summary')
+        .select('job_id, department, roles')
+        .in('job_id', jobIds);
+      if (error) {
+        console.warn('Matrix required roles query error', error);
+        return [] as RequiredRoleRow[];
+      }
+      return (data || []) as RequiredRoleRow[];
     },
-    staleTime: 10_000,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
     enabled: hasJobs,
   });
+
+  const openSlots = React.useMemo(() => {
+    if (!hasJobs) return null;
+    const rows = requiredRoles || [];
+    return calculateOpenSlotTotals(rows, coverage.roleCounts);
+  }, [coverage.roleCounts, hasJobs, requiredRoles]);
 
   return (
     <Popover>
@@ -258,44 +273,78 @@ function JobRowWithCounts({ job, technicianIds, onJobClick }: { job: { id: strin
   );
 }
 
-// Total confirmed technicians for a specific date across the provided jobs
-function useDateConfirmedCount(date: Date, jobs: Array<{ id: string }>, technicianIds?: string[]) {
+interface DateCoverageArgs {
+  dateStr: string;
+  jobIds: string[];
+  technicianIds?: string[];
+}
+
+async function fetchDateCoverageMetrics({
+  dateStr,
+  jobIds,
+  technicianIds,
+}: DateCoverageArgs): Promise<DateCoverageSummary> {
+  if (!jobIds.length) return EMPTY_DATE_COVERAGE_SUMMARY;
+  if (technicianIds && technicianIds.length === 0) return EMPTY_DATE_COVERAGE_SUMMARY;
+
+  let timesheetQuery = supabase
+    .from('timesheets')
+    .select('job_id, technician_id')
+    .eq('date', dateStr)
+    .eq('is_schedule_only', false)
+    .in('job_id', jobIds)
+    .order('job_id', { ascending: true })
+    .limit(5000);
+
+  if (technicianIds?.length) {
+    timesheetQuery = timesheetQuery.in('technician_id', technicianIds);
+  }
+
+  const { data: timesheetRows, error: timesheetError } = await timesheetQuery;
+  if (timesheetError) {
+    console.warn('Matrix date coverage timesheet error', timesheetError);
+    return EMPTY_DATE_COVERAGE_SUMMARY;
+  }
+
+  const normalizedRows = (timesheetRows || []).filter(
+    (row): row is TimesheetCoverageRow => Boolean(row?.job_id && row?.technician_id)
+  );
+
+  if (!normalizedRows.length) return EMPTY_DATE_COVERAGE_SUMMARY;
+
+  const technicianSet = Array.from(new Set(normalizedRows.map((row) => row.technician_id).filter(Boolean)));
+  if (!technicianSet.length) return EMPTY_DATE_COVERAGE_SUMMARY;
+
+  let assignmentsQuery = supabase
+    .from('job_assignments')
+    .select('job_id, technician_id, status, sound_role, lights_role, video_role')
+    .in('job_id', jobIds);
+
+  if (technicianSet.length) {
+    assignmentsQuery = assignmentsQuery.in('technician_id', technicianSet);
+  }
+
+  const { data: assignmentRows, error: assignmentError } = await assignmentsQuery;
+  if (assignmentError) {
+    console.warn('Matrix date coverage assignment error', assignmentError);
+    return summarizeDateCoverage(normalizedRows, []);
+  }
+
+  return summarizeDateCoverage(
+    normalizedRows,
+    (assignmentRows || []) as AssignmentMetaRow[]
+  );
+}
+
+function useDateCoverageMetrics(date: Date, jobIds: string[], technicianIds?: string[]) {
   const dateStr = format(date, 'yyyy-MM-dd');
-  const jobIds = (jobs || []).map(j => j.id);
+  const technicianKey = (technicianIds || []).join(',');
   return useQuery({
-    queryKey: ['matrix-date-confirmed-count', dateStr, jobIds.join(','), (technicianIds || []).join(',')],
-    queryFn: async () => {
-      if (!jobIds.length) return 0;
-      if (technicianIds && technicianIds.length > 0) {
-        const { data, error } = await supabase
-          .from('job_assignments')
-          .select('technician_id')
-          .in('job_id', jobIds)
-          .eq('status', 'confirmed')
-          .in('technician_id', technicianIds);
-        if (error) {
-          console.warn('Confirmed count error', error);
-          return 0;
-        }
-        const unique = new Set<string>();
-        (data || []).forEach((r: any) => { if (r.technician_id) unique.add(r.technician_id); });
-        return unique.size;
-      } else {
-        const { count, error } = await supabase
-          .from('job_assignments')
-          .select('technician_id', { count: 'exact', head: true })
-          .in('job_id', jobIds)
-          .eq('status', 'confirmed');
-        if (error) {
-          console.warn('Confirmed count(head) error', error);
-          return 0;
-        }
-        return count || 0;
-      }
-    },
-    staleTime: 2_000,
+    queryKey: ['matrix-date-coverage', dateStr, jobIds.join(','), technicianKey],
+    queryFn: () => fetchDateCoverageMetrics({ dateStr, jobIds, technicianIds }),
+    staleTime: 5_000,
     gcTime: 60_000,
-    enabled: jobIds.length > 0,
+    enabled: jobIds.length > 0 && (!technicianIds || technicianIds.length > 0),
   });
 }
 
