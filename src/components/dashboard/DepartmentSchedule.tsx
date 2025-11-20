@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { JobCardNew } from "./JobCardNew";
+import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
 import { LucideIcon, RefreshCw } from "lucide-react";
 import { Department } from "@/types/department";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ export const DepartmentSchedule = ({
       setIsRefreshing(true);
       console.log(`Refreshing ${name} department schedule...`);
       // Invalidate and refetch the jobs query
-      await queryClient.invalidateQueries({ 
+      await queryClient.invalidateQueries({
         queryKey: ["jobs"],
         refetchType: "active",
         exact: false

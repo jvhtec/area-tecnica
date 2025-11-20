@@ -11,7 +11,7 @@ import { aggregateCrewFromTimesheets, type WallboardAssignmentRoleRow, type Wall
 
 type Dept = WallboardDept;
 
-interface JobsOverviewFeed { jobs: Array<{ id:string; title:string; start_time:string; end_time:string; location:{ name:string|null }|null; departments: Dept[]; crewAssigned: Record<string, number>; crewNeeded: Record<string, number>; docs: Record<string, { have:number; need:number }>; status: 'green'|'yellow'|'red'; color?: string | null; job_type?: string | null; }> }
+interface JobsOverviewFeed { jobs: Array<{ id: string; title: string; start_time: string; end_time: string; location: { name: string | null } | null; departments: Dept[]; crewAssigned: Record<string, number>; crewNeeded: Record<string, number>; docs: Record<string, { have: number; need: number }>; status: 'green' | 'yellow' | 'red'; color?: string | null; job_type?: string | null; }> }
 type JobsOverviewJob = JobsOverviewFeed['jobs'][number];
 type CalendarFeed = {
   jobs: JobsOverviewJob[];
@@ -21,33 +21,33 @@ type CalendarFeed = {
   focusMonth: number;
   focusYear: number;
 };
-type TimesheetStatus = 'submitted'|'draft'|'missing'|'approved'|'rejected';
+type TimesheetStatus = 'submitted' | 'draft' | 'missing' | 'approved' | 'rejected';
 
 interface CrewAssignmentsFeed {
   jobs: Array<{
-    id:string;
-    title:string;
+    id: string;
+    title: string;
     jobType?: string | null;
     start_time?: string;
     end_time?: string;
     color?: string | null;
     crew: Array<{
-      name:string;
-      role:string;
-      dept:Dept|null;
-      timesheetStatus:TimesheetStatus;
+      name: string;
+      role: string;
+      dept: Dept | null;
+      timesheetStatus: TimesheetStatus;
     }>;
   }>;
 }
 interface DocProgressFeed {
   jobs: Array<{
-    id:string;
-    title:string;
+    id: string;
+    title: string;
     color?: string | null;
-    departments: Array<{ dept:Dept; have:number; need:number; missing:string[] }>;
+    departments: Array<{ dept: Dept; have: number; need: number; missing: string[] }>;
   }>;
 }
-interface PendingActionsFeed { items: Array<{ severity:'red'|'yellow'; text:string }> }
+interface PendingActionsFeed { items: Array<{ severity: 'red' | 'yellow'; text: string }> }
 interface LogisticsItem {
   id: string;
   date: string;
@@ -62,14 +62,14 @@ interface LogisticsItem {
   color?: string | null;
 }
 
-const PanelContainer: React.FC<{ children: React.ReactNode; theme?: 'light' | 'dark' }>=({ children, theme = 'light' })=> (
+const PanelContainer: React.FC<{ children: React.ReactNode; theme?: 'light' | 'dark' }> = ({ children, theme = 'light' }) => (
   <div className={`w-full p-6 space-y-4 ${theme === 'light' ? 'bg-white text-zinc-900' : 'bg-black text-white'}`}>
     {children}
   </div>
 );
 
-const StatusDot: React.FC<{ color: 'green'|'yellow'|'red' }>=({ color }) => (
-  <span className={`inline-block w-3 h-3 rounded-full mr-2 ${color==='green'?'bg-green-500':color==='yellow'?'bg-yellow-400':'bg-red-500'}`} />
+const StatusDot: React.FC<{ color: 'green' | 'yellow' | 'red' }> = ({ color }) => (
+  <span className={`inline-block w-3 h-3 rounded-full mr-2 ${color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'}`} />
 );
 
 function translateTimesheetStatus(status: TimesheetStatus): string {
@@ -111,13 +111,13 @@ function formatJobDateTypeLabel(start?: string, end?: string): string | null {
 function getJobCardBackground(colorHex?: string | null, theme: 'light' | 'dark' = 'light'): string {
   if (colorHex && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(colorHex)) {
     // Normalize to 6-digit hex
-    let hex = colorHex.replace('#','');
+    let hex = colorHex.replace('#', '');
     if (hex.length === 3) {
       hex = hex.split('').map(ch => ch + ch).join('');
     }
-    const r = parseInt(hex.slice(0,2), 16);
-    const g = parseInt(hex.slice(2,4), 16);
-    const b = parseInt(hex.slice(4,6), 16);
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
     const alpha = theme === 'light' ? 0.35 : 0.55; // stronger but still soft
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
@@ -221,7 +221,7 @@ const AutoScrollWrapper: React.FC<{ children: React.ReactNode; speed?: number; r
 
       const maxScroll = container.scrollHeight - container.clientHeight;
 
-       if (debugFrames < 10) {
+      if (debugFrames < 10) {
         console.log('AutoScrollWrapper: frame', {
           speed,
           resetKey,
@@ -297,9 +297,9 @@ const AutoScrollWrapper: React.FC<{ children: React.ReactNode; speed?: number; r
   );
 };
 
-const DAY_LABELS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'] as const;
+const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as const;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const SPANISH_DAY_NAMES = ['DOMINGO','LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO'] as const;
+const SPANISH_DAY_NAMES = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'] as const;
 
 type CalendarCell = {
   date: Date;
@@ -460,11 +460,10 @@ const CalendarCellJobsList: React.FC<{ jobs: JobsOverviewJob[]; highlightSet: Se
         return (
           <div
             key={job.id}
-            className={`flex items-center gap-1.5 rounded px-2 py-1 text-xs border ${
-              highlight
+            className={`flex items-center gap-1.5 rounded px-2 py-1 text-xs border ${highlight
                 ? 'border-amber-400'
                 : (theme === 'light' ? 'border-zinc-200' : 'border-zinc-700')
-            }`}
+              }`}
             style={{ backgroundColor: getJobCardBackground((job as any).color, theme) }}
           >
             <StatusDot color={job.status} />
@@ -478,9 +477,8 @@ const CalendarCellJobsList: React.FC<{ jobs: JobsOverviewJob[]; highlightSet: Se
               </div>
             </div>
             {dateTypeIcon && (
-              <div className={`w-5 h-5 rounded-md flex items-center justify-center ${
-                theme === 'light' ? 'bg-white/70 text-zinc-700' : 'bg-black/40 text-zinc-100'
-              }`}>
+              <div className={`w-5 h-5 rounded-md flex items-center justify-center ${theme === 'light' ? 'bg-white/70 text-zinc-700' : 'bg-black/40 text-zinc-100'
+                }`}>
                 {dateTypeIcon}
               </div>
             )}
@@ -494,7 +492,7 @@ const CalendarCellJobsList: React.FC<{ jobs: JobsOverviewJob[]; highlightSet: Se
   );
 };
 
-const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string>; page?: number; pageSize?: number; theme?: 'light' | 'dark' }>=({ data, highlightIds, page = 0, pageSize = 6, theme = 'light' })=> {
+const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string>; page?: number; pageSize?: number; theme?: 'light' | 'dark' }> = ({ data, highlightIds, page = 0, pageSize = 6, theme = 'light' }) => {
   const jobs = data?.jobs ?? [];
   const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(jobs.length / pageSize);
@@ -502,83 +500,81 @@ const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?
   return (
     <AutoScrollWrapper speed={50} resetKey={page}>
       <PanelContainer theme={theme}>
-      <div className={`sticky top-0 z-10 pb-4 ${theme === 'light' ? 'bg-white' : 'bg-black'}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-5xl font-semibold">Trabajos – Próximos días</h1>
-          {totalPages > 1 && (
-            <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
-          )}
+        <div className={`sticky top-0 z-10 pb-4 ${theme === 'light' ? 'bg-white' : 'bg-black'}`}>
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-5xl font-semibold">Trabajos – Próximos días</h1>
+            {totalPages > 1 && (
+              <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {paginatedJobs.map(j => {
-          const jt = (j as any).jobType || (j as any).job_type || '';
-          const jtKey = String(jt).toLowerCase();
-          const dateTypeIcon = getDateTypeIcon(
-            getDateTypeForJobOnDay(
-              { id: j.id, job_type: jtKey, start_time: j.start_time, end_time: j.end_time },
-              new Date(j.start_time)
-            )
-          );
-          return (
-            <div
-              key={j.id}
-              className={`rounded-lg p-4 border shadow-sm ${
-                highlightIds?.has(j.id)
-                  ? (theme === 'light' ? 'border-amber-500 ring-4 ring-amber-400/40 animate-pulse' : 'border-amber-400 ring-4 ring-amber-400/40 animate-pulse')
-                  : (theme === 'light' ? 'border-zinc-200' : 'border-zinc-800')
-              }`}
-              style={{ backgroundColor: getJobCardBackground((j as any).color, theme) }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="text-38 font-medium truncate pr-2">{j.title}</div>
-                <div className="flex items-center gap-2">
-                  <StatusDot color={j.status} />
-                  {dateTypeIcon && (
-                    <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                      theme === 'light' ? 'bg-white/80 text-zinc-700' : 'bg-black/40 text-zinc-100'
-                    }`}>
-                      {dateTypeIcon}
-                    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {paginatedJobs.map(j => {
+            const jt = (j as any).jobType || (j as any).job_type || '';
+            const jtKey = String(jt).toLowerCase();
+            const dateTypeIcon = getDateTypeIcon(
+              getDateTypeForJobOnDay(
+                { id: j.id, job_type: jtKey, start_time: j.start_time, end_time: j.end_time },
+                new Date(j.start_time)
+              )
+            );
+            return (
+              <div
+                key={j.id}
+                className={`rounded-lg p-4 border shadow-sm ${highlightIds?.has(j.id)
+                    ? (theme === 'light' ? 'border-amber-500 ring-4 ring-amber-400/40 animate-pulse' : 'border-amber-400 ring-4 ring-amber-400/40 animate-pulse')
+                    : (theme === 'light' ? 'border-zinc-200' : 'border-zinc-800')
+                  }`}
+                style={{ backgroundColor: getJobCardBackground((j as any).color, theme) }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-38 font-medium truncate pr-2">{j.title}</div>
+                  <div className="flex items-center gap-2">
+                    <StatusDot color={j.status} />
+                    {dateTypeIcon && (
+                      <div className={`w-6 h-6 rounded-md flex items-center justify-center ${theme === 'light' ? 'bg-white/80 text-zinc-700' : 'bg-black/40 text-zinc-100'
+                        }`}>
+                        {dateTypeIcon}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                  {formatJobTypeLabel(jt) && (
+                    <span className={`px-2 py-0.5 rounded-full border ${theme === 'light' ? 'bg-white/70 text-blue-800 border-blue-200' : 'bg-black/40 text-blue-200 border-blue-700/60'}`}>
+                      {formatJobTypeLabel(jt)}
+                    </span>
+                  )}
+                  {formatJobDateTypeLabel((j as any).start_time, (j as any).end_time) && (
+                    <span className={`px-2 py-0.5 rounded-full border ${theme === 'light' ? 'bg-white/70 text-zinc-800 border-zinc-300' : 'bg-black/40 text-zinc-200 border-zinc-700/60'}`}>
+                      {formatJobDateTypeLabel((j as any).start_time, (j as any).end_time)}
+                    </span>
                   )}
                 </div>
-              </div>
-              <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                {formatJobTypeLabel(jt) && (
-                  <span className={`px-2 py-0.5 rounded-full border ${theme === 'light' ? 'bg-white/70 text-blue-800 border-blue-200' : 'bg-black/40 text-blue-200 border-blue-700/60'}`}>
-                    {formatJobTypeLabel(jt)}
-                  </span>
-                )}
-                {formatJobDateTypeLabel((j as any).start_time, (j as any).end_time) && (
-                  <span className={`px-2 py-0.5 rounded-full border ${theme === 'light' ? 'bg-white/70 text-zinc-800 border-zinc-300' : 'bg-black/40 text-zinc-200 border-zinc-700/60'}`}>
-                    {formatJobDateTypeLabel((j as any).start_time, (j as any).end_time)}
-                  </span>
-                )}
-              </div>
-            <div className={`text-30 mt-1 ${theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}`}>{j.location?.name ?? '—'}</div>
-            <div className={`mt-2 text-32 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>{new Date(j.start_time).toLocaleString()} → {new Date(j.end_time).toLocaleTimeString()}</div>
-            <div className="mt-3 flex gap-6 text-30">
-              {j.departments.map(d => (
-                <div key={d} className="flex items-center gap-2">
-                  <span className="text-38">{d==='sound'?'🎧':d==='lights'?'💡':'📹'}</span>
-                  <span className="tabular-nums">{(j.crewAssigned as any)[d] || 0}/{(j.crewNeeded as any)[d] ?? 0}</span>
+                <div className={`text-30 mt-1 ${theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}`}>{j.location?.name ?? '—'}</div>
+                <div className={`mt-2 text-32 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>{new Date(j.start_time).toLocaleString()} → {new Date(j.end_time).toLocaleTimeString()}</div>
+                <div className="mt-3 flex gap-6 text-30">
+                  {j.departments.map(d => (
+                    <div key={d} className="flex items-center gap-2">
+                      <span className="text-38">{d === 'sound' ? '🎧' : d === 'lights' ? '💡' : '📹'}</span>
+                      <span className="tabular-nums">{(j.crewAssigned as any)[d] || 0}/{(j.crewNeeded as any)[d] ?? 0}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className={`mt-2 text-2xl ${theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}`}>Docs: {j.departments.map(d=>`${d[0].toUpperCase()}${d.slice(1)} ${j.docs[d]?.have ?? 0}/${j.docs[d]?.need ?? 0}`).join(' • ')}</div>
-            </div>
-          );
-        })}
-        {jobs.length===0 && (
-          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No hay trabajos en los próximos 7 días</div>
-        )}
-      </div>
-    </PanelContainer>
+                <div className={`mt-2 text-2xl ${theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}`}>Docs: {j.departments.map(d => `${d[0].toUpperCase()}${d.slice(1)} ${j.docs[d]?.have ?? 0}/${j.docs[d]?.need ?? 0}`).join(' • ')}</div>
+              </div>
+            );
+          })}
+          {jobs.length === 0 && (
+            <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No hay trabajos en los próximos 7 días</div>
+          )}
+        </div>
+      </PanelContainer>
     </AutoScrollWrapper>
   );
 };
 
-const CrewAssignmentsPanel: React.FC<{ data: CrewAssignmentsFeed | null; page?: number; pageSize?: number; theme?: 'light' | 'dark' }>=({ data, page = 0, pageSize = 4, theme = 'light' })=> {
+const CrewAssignmentsPanel: React.FC<{ data: CrewAssignmentsFeed | null; page?: number; pageSize?: number; theme?: 'light' | 'dark' }> = ({ data, page = 0, pageSize = 4, theme = 'light' }) => {
   const jobs = data?.jobs ?? [];
   const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(jobs.length / pageSize);
@@ -586,23 +582,108 @@ const CrewAssignmentsPanel: React.FC<{ data: CrewAssignmentsFeed | null; page?: 
   return (
     <AutoScrollWrapper speed={50} resetKey={page}>
       <PanelContainer theme={theme}>
-      <div className={`sticky top-0 z-10 pb-4 ${theme === 'light' ? 'bg-white' : 'bg-black'}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-5xl font-semibold">Asignaciones de Equipo</h1>
-          {totalPages > 1 && (
-            <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
+        <div className={`sticky top-0 z-10 pb-4 ${theme === 'light' ? 'bg-white' : 'bg-black'}`}>
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-5xl font-semibold">Asignaciones de Equipo</h1>
+            {totalPages > 1 && (
+              <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col gap-4">
+          {paginatedJobs.map(job => (
+            <div
+              key={job.id}
+              className={`rounded-lg p-4 border ${theme === 'light' ? 'border-zinc-200' : 'border-zinc-800'}`}
+              style={{ backgroundColor: getJobCardBackground((job as any).color, theme) }}
+            >
+              <div className="mb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-38 font-medium">{job.title}</div>
+                  {getDateTypeIcon(
+                    getDateTypeForJobOnDay(
+                      { id: job.id, job_type: (job as any).jobType, start_time: (job as any).start_time || '', end_time: (job as any).end_time || '' },
+                      new Date((job as any).start_time || '')
+                    )
+                  ) && (
+                      <div className={`w-6 h-6 rounded-md flex items-center justify-center ${theme === 'light' ? 'bg-white/80 text-zinc-700' : 'bg-black/40 text-zinc-100'
+                        }`}>
+                        {getDateTypeIcon(
+                          getDateTypeForJobOnDay(
+                            { id: job.id, job_type: (job as any).jobType, start_time: (job as any).start_time || '', end_time: (job as any).end_time || '' },
+                            new Date((job as any).start_time || '')
+                          )
+                        )}
+                      </div>
+                    )}
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                  {formatJobTypeLabel((job as any).jobType || (job as any).job_type) && (
+                    <span className={`px-2 py-0.5 rounded-full border ${theme === 'light' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-blue-900/40 text-blue-200 border-blue-700/60'}`}>
+                      {formatJobTypeLabel((job as any).jobType || (job as any).job_type)}
+                    </span>
+                  )}
+                  {formatJobDateTypeLabel((job as any).start_time, (job as any).end_time) && (
+                    <span className={`px-2 py-0.5 rounded-full border ${theme === 'light' ? 'bg-zinc-50 text-zinc-700 border-zinc-300' : 'bg-zinc-900/40 text-zinc-200 border-zinc-700/60'}`}>
+                      {formatJobDateTypeLabel((job as any).start_time, (job as any).end_time)}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {job.crew.map((c, i) => (
+                  <div key={i} className={`flex items-center justify-between rounded-md px-3 py-2 ${theme === 'light' ? 'bg-zinc-100' : 'bg-zinc-800/50'}`}>
+                    <div className="flex items-center gap-3 truncate">
+                      <span className="text-38">{c.dept === 'sound' ? '🎧' : c.dept === 'lights' ? '💡' : c.dept === 'video' ? '📹' : '👤'}</span>
+                      <div className="truncate">
+                        <div className="text-32 truncate">{c.name || '—'}</div>
+                        <div className={`text-xl truncate ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>{c.role}</div>
+                      </div>
+                    </div>
+                    {String(((job as any).jobType || (job as any).job_type || '')).toLowerCase() !== 'tourdate' && (
+                      <div className={`px-2 py-1 rounded text-xl ${c.timesheetStatus === 'approved' ? 'bg-green-600' : c.timesheetStatus === 'submitted' ? 'bg-blue-600' : c.timesheetStatus === 'draft' ? 'bg-amber-600' : 'bg-red-600'} text-white`}>
+                        {translateTimesheetStatus(c.timesheetStatus)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {job.crew.length === 0 && <div className={`text-30 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Aún no hay equipo asignado</div>}
+              </div>
+            </div>
+          ))}
+          {jobs.length === 0 && (
+            <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No hay trabajos para mostrar</div>
           )}
         </div>
-      </div>
-      <div className="flex flex-col gap-4">
-        {paginatedJobs.map(job => (
-          <div
-            key={job.id}
-            className={`rounded-lg p-4 border ${theme === 'light' ? 'border-zinc-200' : 'border-zinc-800'}`}
-            style={{ backgroundColor: getJobCardBackground((job as any).color, theme) }}
-          >
-            <div className="mb-3">
-              <div className="flex items-center justify-between gap-2">
+      </PanelContainer>
+    </AutoScrollWrapper>
+  );
+};
+
+const DocProgressPanel: React.FC<{ data: DocProgressFeed | null; page?: number; pageSize?: number; theme?: 'light' | 'dark' }> = ({ data, page = 0, pageSize = 4, theme = 'light' }) => {
+  const jobs = data?.jobs ?? [];
+  const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
+  const totalPages = Math.ceil(jobs.length / pageSize);
+
+  return (
+    <AutoScrollWrapper speed={50} resetKey={page}>
+      <PanelContainer theme={theme}>
+        <div className={`sticky top-0 z-10 pb-4 ${theme === 'light' ? 'bg-white' : 'bg-black'}`}>
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-5xl font-semibold">Progreso de Documentos</h1>
+            {totalPages > 1 && (
+              <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col gap-4">
+          {paginatedJobs.map(job => (
+            <div
+              key={job.id}
+              className={`rounded-lg p-4 border ${theme === 'light' ? 'border-zinc-200' : 'border-zinc-800'}`}
+              style={{ backgroundColor: getJobCardBackground((job as any).color, theme) }}
+            >
+              <div className="flex items-center justify-between gap-2 mb-3">
                 <div className="text-38 font-medium">{job.title}</div>
                 {getDateTypeIcon(
                   getDateTypeForJobOnDay(
@@ -610,166 +691,79 @@ const CrewAssignmentsPanel: React.FC<{ data: CrewAssignmentsFeed | null; page?: 
                     new Date((job as any).start_time || '')
                   )
                 ) && (
-                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                    theme === 'light' ? 'bg-white/80 text-zinc-700' : 'bg-black/40 text-zinc-100'
-                  }`}>
-                    {getDateTypeIcon(
-                      getDateTypeForJobOnDay(
-                        { id: job.id, job_type: (job as any).jobType, start_time: (job as any).start_time || '', end_time: (job as any).end_time || '' },
-                        new Date((job as any).start_time || '')
-                      )
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                {formatJobTypeLabel((job as any).jobType || (job as any).job_type) && (
-                  <span className={`px-2 py-0.5 rounded-full border ${theme === 'light' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-blue-900/40 text-blue-200 border-blue-700/60'}`}>
-                    {formatJobTypeLabel((job as any).jobType || (job as any).job_type)}
-                  </span>
-                )}
-                {formatJobDateTypeLabel((job as any).start_time, (job as any).end_time) && (
-                  <span className={`px-2 py-0.5 rounded-full border ${theme === 'light' ? 'bg-zinc-50 text-zinc-700 border-zinc-300' : 'bg-zinc-900/40 text-zinc-200 border-zinc-700/60'}`}>
-                    {formatJobDateTypeLabel((job as any).start_time, (job as any).end_time)}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {job.crew.map((c, i) => (
-                <div key={i} className={`flex items-center justify-between rounded-md px-3 py-2 ${theme === 'light' ? 'bg-zinc-100' : 'bg-zinc-800/50'}`}>
-                  <div className="flex items-center gap-3 truncate">
-                    <span className="text-38">{c.dept==='sound'?'🎧':c.dept==='lights'?'💡':c.dept==='video'?'📹':'👤'}</span>
-                    <div className="truncate">
-                      <div className="text-32 truncate">{c.name || '—'}</div>
-                      <div className={`text-xl truncate ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>{c.role}</div>
-                    </div>
-                  </div>
-                  {String(((job as any).jobType || (job as any).job_type || '')).toLowerCase() !== 'tourdate' && (
-                    <div className={`px-2 py-1 rounded text-xl ${c.timesheetStatus==='approved'?'bg-green-600':c.timesheetStatus==='submitted'?'bg-blue-600':c.timesheetStatus==='draft'?'bg-amber-600':'bg-red-600'} text-white`}>
-                      {translateTimesheetStatus(c.timesheetStatus)}
+                    <div className={`w-6 h-6 rounded-md flex items-center justify-center ${theme === 'light' ? 'bg-white/80 text-zinc-700' : 'bg-black/40 text-zinc-100'
+                      }`}>
+                      {getDateTypeIcon(
+                        getDateTypeForJobOnDay(
+                          { id: job.id, job_type: (job as any).jobType, start_time: (job as any).start_time || '', end_time: (job as any).end_time || '' },
+                          new Date((job as any).start_time || '')
+                        )
+                      )}
                     </div>
                   )}
-                </div>
-              ))}
-              {job.crew.length===0 && <div className={`text-30 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Aún no hay equipo asignado</div>}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {job.departments.map(dep => {
+                  const pct = dep.need > 0 ? Math.round((dep.have / dep.need) * 100) : 0;
+                  return (
+                    <div key={dep.dept} className={`rounded-md p-3 ${theme === 'light' ? 'bg-zinc-100' : 'bg-zinc-800/50'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-32 flex items-center gap-2">
+                          <span className="text-38">{dep.dept === 'sound' ? '🎧' : dep.dept === 'lights' ? '💡' : '📹'}</span>
+                          <span className="capitalize">{dep.dept}</span>
+                        </div>
+                        <div className={`text-2xl ${theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}`}>{dep.have}/{dep.need}</div>
+                      </div>
+                      <div className={`h-3 rounded ${theme === 'light' ? 'bg-zinc-300' : 'bg-zinc-700'}`}>
+                        <div className="h-3 bg-blue-500 rounded" style={{ width: `${pct}%` }} />
+                      </div>
+                      {dep.missing.length > 0 && (
+                        <div className={`text-xl mt-2 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Faltante: {dep.missing.join(', ')}</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
-        {jobs.length===0 && (
-          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No hay trabajos para mostrar</div>
-        )}
-      </div>
-    </PanelContainer>
-    </AutoScrollWrapper>
-  );
-};
-
-const DocProgressPanel: React.FC<{ data: DocProgressFeed | null; page?: number; pageSize?: number; theme?: 'light' | 'dark' }>=({ data, page = 0, pageSize = 4, theme = 'light' })=> {
-  const jobs = data?.jobs ?? [];
-  const paginatedJobs = jobs.slice(page * pageSize, (page + 1) * pageSize);
-  const totalPages = Math.ceil(jobs.length / pageSize);
-
-  return (
-    <AutoScrollWrapper speed={50} resetKey={page}>
-      <PanelContainer theme={theme}>
-      <div className={`sticky top-0 z-10 pb-4 ${theme === 'light' ? 'bg-white' : 'bg-black'}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-5xl font-semibold">Progreso de Documentos</h1>
-          {totalPages > 1 && (
-            <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
+          ))}
+          {jobs.length === 0 && (
+            <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Nada pendiente</div>
           )}
         </div>
-      </div>
-      <div className="flex flex-col gap-4">
-        {paginatedJobs.map(job => (
-          <div
-            key={job.id}
-            className={`rounded-lg p-4 border ${theme === 'light' ? 'border-zinc-200' : 'border-zinc-800'}`}
-            style={{ backgroundColor: getJobCardBackground((job as any).color, theme) }}
-          >
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="text-38 font-medium">{job.title}</div>
-              {getDateTypeIcon(
-                getDateTypeForJobOnDay(
-                  { id: job.id, job_type: (job as any).jobType, start_time: (job as any).start_time || '', end_time: (job as any).end_time || '' },
-                  new Date((job as any).start_time || '')
-                )
-              ) && (
-                <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                  theme === 'light' ? 'bg-white/80 text-zinc-700' : 'bg-black/40 text-zinc-100'
-                }`}>
-                  {getDateTypeIcon(
-                    getDateTypeForJobOnDay(
-                      { id: job.id, job_type: (job as any).jobType, start_time: (job as any).start_time || '', end_time: (job as any).end_time || '' },
-                      new Date((job as any).start_time || '')
-                    )
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {job.departments.map(dep => {
-                const pct = dep.need>0 ? Math.round((dep.have/dep.need)*100) : 0;
-                return (
-                  <div key={dep.dept} className={`rounded-md p-3 ${theme === 'light' ? 'bg-zinc-100' : 'bg-zinc-800/50'}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-32 flex items-center gap-2">
-                        <span className="text-38">{dep.dept==='sound'?'🎧':dep.dept==='lights'?'💡':'📹'}</span>
-                        <span className="capitalize">{dep.dept}</span>
-                      </div>
-                      <div className={`text-2xl ${theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}`}>{dep.have}/{dep.need}</div>
-                    </div>
-                    <div className={`h-3 rounded ${theme === 'light' ? 'bg-zinc-300' : 'bg-zinc-700'}`}>
-                      <div className="h-3 bg-blue-500 rounded" style={{ width: `${pct}%` }} />
-                    </div>
-                    {dep.missing.length>0 && (
-                      <div className={`text-xl mt-2 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Faltante: {dep.missing.join(', ')}</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-        {jobs.length===0 && (
-          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Nada pendiente</div>
-        )}
-      </div>
-    </PanelContainer>
+      </PanelContainer>
     </AutoScrollWrapper>
   );
 };
 
-const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null; theme?: 'light' | 'dark' }>=({ data, theme = 'light' })=> {
+const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null; theme?: 'light' | 'dark' }> = ({ data, theme = 'light' }) => {
   const resetKey = (data?.items ?? []).map((it) => `${it.severity}:${it.text}`).join('|');
   return (
-  <AutoScrollWrapper speed={50} resetKey={resetKey}>
-    <PanelContainer theme={theme}>
-      <div className={`sticky top-0 z-10 pb-4 ${theme === 'light' ? 'bg-white' : 'bg-black'}`}>
-        <h1 className="text-5xl font-semibold">Acciones Pendientes</h1>
-      </div>
-      <div className="flex flex-col gap-3 text-38">
-        {(data?.items ?? []).map((it, i) => (
-          <div
-            key={i}
-            className={`rounded-md px-4 py-3 border ${
-              it.severity==='red'
-                ? (theme === 'light' ? 'border-red-500/60' : 'border-red-500/60')
-                : (theme === 'light' ? 'border-amber-500/60' : 'border-amber-500/60')
-            }`}
-            style={{ backgroundColor: it.severity==='red' ? getJobCardBackground('#ef4444', theme) : getJobCardBackground('#f59e0b', theme) }}
-          >
-            {it.text}
-          </div>
-        ))}
-        {(data?.items.length ?? 0)===0 && <div className={theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}>Todo bien ✅</div>}
-      </div>
-    </PanelContainer>
-  </AutoScrollWrapper>
-)};
+    <AutoScrollWrapper speed={50} resetKey={resetKey}>
+      <PanelContainer theme={theme}>
+        <div className={`sticky top-0 z-10 pb-4 ${theme === 'light' ? 'bg-white' : 'bg-black'}`}>
+          <h1 className="text-5xl font-semibold">Acciones Pendientes</h1>
+        </div>
+        <div className="flex flex-col gap-3 text-38">
+          {(data?.items ?? []).map((it, i) => (
+            <div
+              key={i}
+              className={`rounded-md px-4 py-3 border ${it.severity === 'red'
+                  ? (theme === 'light' ? 'border-red-500/60' : 'border-red-500/60')
+                  : (theme === 'light' ? 'border-amber-500/60' : 'border-amber-500/60')
+                }`}
+              style={{ backgroundColor: it.severity === 'red' ? getJobCardBackground('#ef4444', theme) : getJobCardBackground('#f59e0b', theme) }}
+            >
+              {it.text}
+            </div>
+          ))}
+          {(data?.items.length ?? 0) === 0 && <div className={theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}>Todo bien ✅</div>}
+        </div>
+      </PanelContainer>
+    </AutoScrollWrapper>
+  )
+};
 
-const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<string>; theme?: 'light' | 'dark'; scrollSpeed?: number }>=({ data, highlightIds, theme = 'light', scrollSpeed = 50 }) => {
+const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<string>; theme?: 'light' | 'dark'; scrollSpeed?: number }> = ({ data, highlightIds, theme = 'light', scrollSpeed = 50 }) => {
   const { dayNames, monthLabel, cells } = buildCalendarModel(data, highlightIds, true);
   const resetKey = data ? `${data.range.start}-${data.range.end}-${data.jobs.length}` : 'no-data';
 
@@ -794,30 +788,30 @@ const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<st
         </div>
         <div className="grid grid-cols-7 gap-2" style={{ gridAutoRows: 'minmax(12rem, auto)' }}>
           {cells.map((cell, idx) => {
-          const jobs = cell.jobs;
-          const highlightSet = cell.highlightJobIds;
-          const classes = [
-            'rounded-lg border p-3 flex flex-col gap-2 shadow-inner transition-all duration-300',
-            theme === 'light'
-              ? (cell.inMonth ? 'bg-white border-zinc-200 text-zinc-900' : 'bg-zinc-50 border-zinc-100 text-zinc-400')
-              : (cell.inMonth ? 'bg-zinc-950/90 border-zinc-800 text-white' : 'bg-zinc-900/40 border-zinc-800/40 text-zinc-500'),
-            cell.isToday ? 'border-blue-400/80 ring-2 ring-blue-400/30 shadow-[0_0_45px_rgba(96,165,250,0.35)]' : '',
-            cell.hasHighlight ? 'border-amber-400/80 ring-4 ring-amber-400/30 shadow-[0_0_55px_rgba(251,191,36,0.35)]' : '',
-          ].filter(Boolean).join(' ');
-          return (
-            <div key={cell.isoKey + idx} className={classes}>
-              <div className="flex items-start justify-between">
-                <div className={`text-38 font-bold leading-none ${cell.inMonth ? '' : (theme === 'light' ? 'text-zinc-300' : 'text-zinc-600')}`}>{cell.date.getDate()}</div>
-                {jobs.length > 0 && (
-                  <div className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 text-lg font-semibold tabular-nums">
-                    {jobs.length}
-                  </div>
-                )}
+            const jobs = cell.jobs;
+            const highlightSet = cell.highlightJobIds;
+            const classes = [
+              'rounded-lg border p-3 flex flex-col gap-2 shadow-inner transition-all duration-300',
+              theme === 'light'
+                ? (cell.inMonth ? 'bg-white border-zinc-200 text-zinc-900' : 'bg-zinc-50 border-zinc-100 text-zinc-400')
+                : (cell.inMonth ? 'bg-zinc-950/90 border-zinc-800 text-white' : 'bg-zinc-900/40 border-zinc-800/40 text-zinc-500'),
+              cell.isToday ? 'border-blue-400/80 ring-2 ring-blue-400/30 shadow-[0_0_45px_rgba(96,165,250,0.35)]' : '',
+              cell.hasHighlight ? 'border-amber-400/80 ring-4 ring-amber-400/30 shadow-[0_0_55px_rgba(251,191,36,0.35)]' : '',
+            ].filter(Boolean).join(' ');
+            return (
+              <div key={cell.isoKey + idx} className={classes}>
+                <div className="flex items-start justify-between">
+                  <div className={`text-38 font-bold leading-none ${cell.inMonth ? '' : (theme === 'light' ? 'text-zinc-300' : 'text-zinc-600')}`}>{cell.date.getDate()}</div>
+                  {jobs.length > 0 && (
+                    <div className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 text-lg font-semibold tabular-nums">
+                      {jobs.length}
+                    </div>
+                  )}
+                </div>
+                <CalendarCellJobsList jobs={jobs} highlightSet={highlightSet} theme={theme} cellKey={cell.isoKey} cellDate={cell.date} />
               </div>
-              <CalendarCellJobsList jobs={jobs} highlightSet={highlightSet} theme={theme} cellKey={cell.isoKey} cellDate={cell.date} />
-            </div>
-          );
-        })}
+            );
+          })}
         </div>
       </PanelContainer>
     </AutoScrollWrapper>
@@ -826,7 +820,7 @@ const CalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<st
 
 type TickerMessage = { message: string; level: AnnouncementLevel };
 
-const Ticker: React.FC<{ messages: TickerMessage[]; bottomOffset?: number; theme?: 'light' | 'dark'; onMeasureHeight?: (h: number) => void }>=({ messages, bottomOffset = 0, theme = 'light', onMeasureHeight })=> {
+const Ticker: React.FC<{ messages: TickerMessage[]; bottomOffset?: number; theme?: 'light' | 'dark'; onMeasureHeight?: (h: number) => void }> = ({ messages, bottomOffset = 0, theme = 'light', onMeasureHeight }) => {
   const [posX, setPosX] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const textRef = useRef<HTMLSpanElement | null>(null);
@@ -953,9 +947,9 @@ const FooterLogo: React.FC<{ onToggle?: () => void; onMeasure?: (h: number) => v
   );
 };
 
-type PanelKey = 'overview'|'crew'|'logistics'|'pending'|'calendar';
+type PanelKey = 'overview' | 'crew' | 'logistics' | 'pending' | 'calendar';
 
-const PANEL_KEYS: PanelKey[] = ['overview','crew','logistics','pending','calendar'];
+const PANEL_KEYS: PanelKey[] = ['overview', 'crew', 'logistics', 'pending', 'calendar'];
 const DEFAULT_PANEL_ORDER: PanelKey[] = [...PANEL_KEYS];
 const DEFAULT_PANEL_DURATIONS: Record<PanelKey, number> = {
   overview: 12,
@@ -1026,14 +1020,14 @@ function WallboardDisplay({
   const [tickerIntervalMs, setTickerIntervalMs] = useState<number>(DEFAULT_TICKER_SECONDS * 1000);
   const [presetMessage, setPresetMessage] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
-  
+
   // Data polling state - declared here to avoid temporal dead zone in useEffect below
-  const [overview, setOverview] = useState<JobsOverviewFeed|null>(null);
-  const [calendarData, setCalendarData] = useState<CalendarFeed|null>(null);
-  const [crew, setCrew] = useState<CrewAssignmentsFeed|null>(null);
-  const [docs, setDocs] = useState<DocProgressFeed|null>(null);
-  const [pending, setPending] = useState<PendingActionsFeed|null>(null);
-  const [logistics, setLogistics] = useState<LogisticsItem[]|null>(null);
+  const [overview, setOverview] = useState<JobsOverviewFeed | null>(null);
+  const [calendarData, setCalendarData] = useState<CalendarFeed | null>(null);
+  const [crew, setCrew] = useState<CrewAssignmentsFeed | null>(null);
+  const [docs, setDocs] = useState<DocProgressFeed | null>(null);
+  const [pending, setPending] = useState<PendingActionsFeed | null>(null);
+  const [logistics, setLogistics] = useState<LogisticsItem[] | null>(null);
   const [tickerMsgs, setTickerMsgs] = useState<TickerMessage[]>([]);
   const [highlightJobs, setHighlightJobs] = useState<Map<string, number>>(new Map());
   const [footerH, setFooterH] = useState<number>(72);
@@ -1058,7 +1052,7 @@ function WallboardDisplay({
       (rows || []).forEach((a) => {
         let m = a?.message || '';
         const levelRaw = (a?.level ?? 'info') as AnnouncementLevel;
-        const level: AnnouncementLevel = ['info','warn','critical'].includes(levelRaw) ? levelRaw : 'info';
+        const level: AnnouncementLevel = ['info', 'warn', 'critical'].includes(levelRaw) ? levelRaw : 'info';
         const match = m.match(regex);
         if (match) {
           const jobId = match[1];
@@ -1223,7 +1217,7 @@ function WallboardDisplay({
 
   // Data polling (client-side via RLS-safe views)
   // Note: State declarations moved earlier to avoid temporal dead zone issues
-  
+
   useEffect(() => {
     if (isApiMode) {
       return;
@@ -1249,12 +1243,12 @@ function WallboardDisplay({
       const calendarStartMs = calendarGridStart.getTime();
       const calendarEndMs = calendarGridEnd.getTime();
 
-      const jobOverlapsWeek = (j:any) => {
+      const jobOverlapsWeek = (j: any) => {
         const startTime = new Date(j.start_time).getTime();
         const endTime = new Date(j.end_time).getTime();
         return endTime >= weekStartMs && startTime <= weekEndMs;
       };
-      const jobWithinCalendarWindow = (j:any) => {
+      const jobWithinCalendarWindow = (j: any) => {
         const startTime = new Date(j.start_time).getTime();
         const endTime = new Date(j.end_time).getTime();
         return endTime >= calendarStartMs && startTime <= calendarEndMs;
@@ -1264,8 +1258,8 @@ function WallboardDisplay({
       const { data: jobs, error: jobsError } = await supabase
         .from('jobs')
         .select('id,title,start_time,end_time,status,location_id,job_type,tour_id,timezone,color')
-        .in('job_type', ['single','festival','tourdate','dryhire'])
-        .in('status', ['Confirmado','Tentativa','Completado'])
+        .in('job_type', ['single', 'festival', 'tourdate', 'dryhire'])
+        .in('status', ['Confirmado', 'Tentativa', 'Completado'])
         .lte('start_time', calendarEndISO)
         .gte('end_time', calendarStartISO)
         .order('start_time', { ascending: true });
@@ -1273,7 +1267,7 @@ function WallboardDisplay({
       let jobArr = jobs || [];
 
       // Exclude jobs whose parent tour is cancelled (some entries may still be Confirmado)
-      const tourIds = Array.from(new Set(jobArr.map((j:any)=>j.tour_id).filter(Boolean)));
+      const tourIds = Array.from(new Set(jobArr.map((j: any) => j.tour_id).filter(Boolean)));
       if (tourIds.length) {
         const { data: toursMeta, error: toursErr } = await supabase
           .from('tours')
@@ -1282,17 +1276,17 @@ function WallboardDisplay({
         if (toursErr) {
           console.warn('Wallboard tours meta error:', toursErr);
         } else if (toursMeta && toursMeta.length) {
-          const cancelledTours = new Set((toursMeta as any[]).filter(t=>t.status==='cancelled').map(t=>t.id));
+          const cancelledTours = new Set((toursMeta as any[]).filter(t => t.status === 'cancelled').map(t => t.id));
           if (cancelledTours.size) {
-            jobArr = jobArr.filter((j:any)=> !j.tour_id || !cancelledTours.has(j.tour_id));
+            jobArr = jobArr.filter((j: any) => !j.tour_id || !cancelledTours.has(j.tour_id));
           }
         }
       }
-      const jobIds = jobArr.map(j=>j.id);
-      const detailJobSet = new Set(jobArr.filter(jobOverlapsWeek).map((j:any)=>j.id));
+      const jobIds = jobArr.map(j => j.id);
+      const detailJobSet = new Set(jobArr.filter(jobOverlapsWeek).map((j: any) => j.id));
       const detailJobIds = Array.from(detailJobSet);
       const jobDayWindows = new Map<string, string[]>();
-      jobArr.filter(jobOverlapsWeek).forEach((job:any) => {
+      jobArr.filter(jobOverlapsWeek).forEach((job: any) => {
         const startTs = Math.max(new Date(job.start_time).getTime(), weekStartMs);
         const endTs = Math.min(new Date(job.end_time).getTime(), weekEndMs);
         if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs < startTs) {
@@ -1310,8 +1304,8 @@ function WallboardDisplay({
         }
         jobDayWindows.set(job.id, dates);
       });
-      const dryhireIds = new Set<string>(jobArr.filter((j:any)=>j.job_type==='dryhire').map((j:any)=>j.id));
-      const locationIds = Array.from(new Set(jobArr.map((j:any)=>j.location_id).filter(Boolean)));
+      const dryhireIds = new Set<string>(jobArr.filter((j: any) => j.job_type === 'dryhire').map((j: any) => j.id));
+      const locationIds = Array.from(new Set(jobArr.map((j: any) => j.location_id).filter(Boolean)));
 
       // 2) Fetch departments for these jobs
       const { data: deptRows, error: deptErr } = jobIds.length
@@ -1319,7 +1313,7 @@ function WallboardDisplay({
         : { data: [], error: null } as any;
       if (deptErr) console.error('Wallboard job_departments error:', deptErr);
       const deptsByJob = new Map<string, Dept[]>();
-      (deptRows||[]).forEach((r:any)=>{
+      (deptRows || []).forEach((r: any) => {
         const list = deptsByJob.get(r.job_id) ?? [];
         list.push(r.department);
         deptsByJob.set(r.job_id, list as Dept[]);
@@ -1328,12 +1322,12 @@ function WallboardDisplay({
       // 3) Fetch per-day timesheets for crew counts (restrict to detail window)
       const { data: timesheetRows, error: timesheetErr } = detailJobIds.length
         ? await supabase
-            .from('timesheets')
-            .select('job_id,technician_id,date')
-            .in('job_id', detailJobIds)
-            .eq('is_schedule_only', false)
-            .gte('date', weekStartDate)
-            .lte('date', weekEndDate)
+          .from('timesheets')
+          .select('job_id,technician_id,date')
+          .in('job_id', detailJobIds)
+          .eq('is_schedule_only', false)
+          .gte('date', weekStartDate)
+          .lte('date', weekEndDate)
         : { data: [], error: null } as any;
       if (timesheetErr) console.error('Wallboard timesheets error:', timesheetErr);
       const timesheetData = (timesheetRows || []) as WallboardTimesheetRow[];
@@ -1351,13 +1345,13 @@ function WallboardDisplay({
       // Fetch required-role summaries for these jobs
       const { data: reqRows, error: reqErr } = detailJobIds.length
         ? await supabase
-            .from('job_required_roles_summary')
-            .select('job_id, department, total_required')
-            .in('job_id', detailJobIds)
+          .from('job_required_roles_summary')
+          .select('job_id, department, total_required')
+          .in('job_id', detailJobIds)
         : { data: [], error: null } as any;
       if (reqErr) console.error('Wallboard job_required_roles_summary error:', reqErr);
       const needByJobDept = new Map<string, number>();
-      (reqRows || []).forEach((r:any) => {
+      (reqRows || []).forEach((r: any) => {
         needByJobDept.set(`${r.job_id}:${r.department}`, Number(r.total_required || 0));
       });
 
@@ -1367,10 +1361,10 @@ function WallboardDisplay({
         : { data: [], error: null } as any;
       if (locErr) console.error('Wallboard locations error:', locErr);
       const locById = new Map<string, string>();
-      (locRows||[]).forEach((l:any)=> locById.set(l.id, l.name));
+      (locRows || []).forEach((l: any) => locById.set(l.id, l.name));
 
       // Timesheet statuses via view
-      const tsByJobTech = new Map<string, Map<string,string>>();
+      const tsByJobTech = new Map<string, Map<string, string>>();
       if (detailJobIds.length) {
         const { data: ts } = await supabase
           .from('wallboard_timesheet_status')
@@ -1389,11 +1383,11 @@ function WallboardDisplay({
         supabase.from('wallboard_doc_requirements').select('department,need')
       ]);
 
-      const needByDept = new Map<string, number>((reqs||[]).map(r=>[r.department, r.need]));
+      const needByDept = new Map<string, number>((reqs || []).map(r => [r.department, r.need]));
       const haveByJobDept = new Map<string, number>();
-      (counts||[]).forEach((c:any)=> haveByJobDept.set(`${c.job_id}:${c.department}`, c.have));
+      (counts || []).forEach((c: any) => haveByJobDept.set(`${c.job_id}:${c.department}`, c.have));
 
-      const mapJob = (j:any): JobsOverviewJob => {
+      const mapJob = (j: any): JobsOverviewJob => {
         const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
         const depts: Dept[] = deptsAll.filter(d => d !== 'video');
         const countsFromTimesheets = jobDeptMinimums.get(j.id);
@@ -1404,7 +1398,7 @@ function WallboardDisplay({
         depts.forEach(d => {
           crewNeeded[d] = detailJobSet.has(j.id) ? (needByJobDept.get(`${j.id}:${d}`) || 0) : 0;
         });
-        let status: 'green'|'yellow'|'red';
+        let status: 'green' | 'yellow' | 'red';
         if (detailJobSet.has(j.id)) {
           const hasReq = depts.some(d => (crewNeeded[d] || 0) > 0);
           if (hasReq) {
@@ -1419,16 +1413,16 @@ function WallboardDisplay({
             const minCov = Math.min(...perDept);
             status = minCov >= 1 ? 'green' : (minCov > 0 ? 'yellow' : 'red');
           } else {
-            const present = depts.map(d=>crewAssigned[d]);
-            const hasAny = present.some(n=>n>0);
-            const allHave = depts.length>0 && present.every(n=>n>0);
+            const present = depts.map(d => crewAssigned[d]);
+            const hasAny = present.some(n => n > 0);
+            const allHave = depts.length > 0 && present.every(n => n > 0);
             status = allHave ? 'green' : hasAny ? 'yellow' : 'red';
           }
         } else {
           status = j.status === 'Confirmado' ? 'green' : 'yellow';
         }
-        const docs: Record<string, { have:number; need:number }> = {};
-        depts.forEach(d=>{
+        const docs: Record<string, { have: number; need: number }> = {};
+        depts.forEach(d => {
           const have = detailJobSet.has(j.id) ? (haveByJobDept.get(`${j.id}:${d}`) ?? 0) : 0;
           const need = needByDept.get(d) ?? 0;
           docs[d] = { have, need };
@@ -1440,7 +1434,7 @@ function WallboardDisplay({
           end_time: j.end_time,
           location: { name: (j.location_id ? (locById.get(j.location_id) ?? null) : null) },
           departments: depts,
-          crewAssigned: { ...crewAssigned, total: (crewAssigned.sound+crewAssigned.lights+crewAssigned.video) },
+          crewAssigned: { ...crewAssigned, total: (crewAssigned.sound + crewAssigned.lights + crewAssigned.video) },
           crewNeeded: { ...crewNeeded, total: (crewNeeded.sound + crewNeeded.lights + crewNeeded.video) },
           docs,
           status,
@@ -1450,13 +1444,13 @@ function WallboardDisplay({
       };
 
       const calendarJobs: JobsOverviewJob[] = jobArr
-        .filter((j:any)=> !dryhireIds.has(j.id))
+        .filter((j: any) => !dryhireIds.has(j.id))
         .filter(jobWithinCalendarWindow)
         .map(mapJob)
         .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
       const jobsForWeek: JobsOverviewJob[] = jobArr
-        .filter((j:any)=> !dryhireIds.has(j.id))
+        .filter((j: any) => !dryhireIds.has(j.id))
         .filter(jobOverlapsWeek)
         .map(mapJob)
         .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
@@ -1494,43 +1488,43 @@ function WallboardDisplay({
         jobs: jobsForWeek,
       };
 
-        // Crew assignments
-        const assignedTechsByJob = new Map<string, string[]>();
-        const crewPayload: CrewAssignmentsFeed = {
-          jobs: jobArr
-            .filter((j:any)=> !dryhireIds.has(j.id))
-            .filter(jobOverlapsWeek)
-            .map((j:any)=>{
-              const activeTechs = Array.from(jobTechSets.get(j.id) ?? new Set<string>());
-              assignedTechsByJob.set(j.id, activeTechs);
-              const crew = activeTechs
-                .map((techId) => assignmentByJobTech.get(`${j.id}:${techId}`))
-                .filter((assignment): assignment is WallboardAssignmentRoleRow => Boolean(assignment && assignment.video_role == null))
-                .map((assignment) => {
-                  const dept: Dept | null = assignment.sound_role ? 'sound' : assignment.lights_role ? 'lights' : null;
-                  const role = assignment.sound_role || assignment.lights_role || 'assigned';
-                  return { name: '', role, dept, timesheetStatus: 'missing' as TimesheetStatus, technician_id: assignment.technician_id } as any;
-                });
-              return { id: j.id, title: j.title, jobType: j.job_type, start_time: j.start_time, end_time: j.end_time, color: j.color ?? null, crew };
-            })
-        } as any;
+      // Crew assignments
+      const assignedTechsByJob = new Map<string, string[]>();
+      const crewPayload: CrewAssignmentsFeed = {
+        jobs: jobArr
+          .filter((j: any) => !dryhireIds.has(j.id))
+          .filter(jobOverlapsWeek)
+          .map((j: any) => {
+            const activeTechs = Array.from(jobTechSets.get(j.id) ?? new Set<string>());
+            assignedTechsByJob.set(j.id, activeTechs);
+            const crew = activeTechs
+              .map((techId) => assignmentByJobTech.get(`${j.id}:${techId}`))
+              .filter((assignment): assignment is WallboardAssignmentRoleRow => Boolean(assignment && assignment.video_role == null))
+              .map((assignment) => {
+                const dept: Dept | null = assignment.sound_role ? 'sound' : assignment.lights_role ? 'lights' : null;
+                const role = assignment.sound_role || assignment.lights_role || 'assigned';
+                return { name: '', role, dept, timesheetStatus: 'missing' as TimesheetStatus, technician_id: assignment.technician_id } as any;
+              });
+            return { id: j.id, title: j.title, jobType: j.job_type, start_time: j.start_time, end_time: j.end_time, color: j.color ?? null, crew };
+          })
+      } as any;
 
-        // Fill names in one request
-        const techIds = Array.from(new Set(crewPayload.jobs.flatMap(j=>j.crew.map((c:any)=>c.technician_id))));
-        if (techIds.length) {
+      // Fill names in one request
+      const techIds = Array.from(new Set(crewPayload.jobs.flatMap(j => j.crew.map((c: any) => c.technician_id))));
+      if (techIds.length) {
         const { data: profs } = await supabase
           .from('wallboard_profiles')
           .select('id,first_name,last_name,department')
           .in('id', techIds);
-        const byId = new Map<string, any>((profs||[]).map(p=>[p.id, p]));
-        crewPayload.jobs.forEach(j=>{
-          j.crew.forEach((c:any)=>{
+        const byId = new Map<string, any>((profs || []).map(p => [p.id, p]));
+        crewPayload.jobs.forEach(j => {
+          j.crew.forEach((c: any) => {
             const p = byId.get(c.technician_id);
             c.name = [p?.first_name, p?.last_name].filter(Boolean).join(' ') || '';
             const s = tsByJobTech.get(j.id)?.get(c.technician_id) as any;
-            const inPast = new Date(jobArr.find(x=>x.id===j.id)?.end_time||Date.now()) < new Date();
+            const inPast = new Date(jobArr.find(x => x.id === j.id)?.end_time || Date.now()) < new Date();
             const normalizedStatus = s === 'rejected' ? 'rejected' : s;
-            c.timesheetStatus = inPast && normalizedStatus==='approved' ? 'approved' : (normalizedStatus || 'missing');
+            c.timesheetStatus = inPast && normalizedStatus === 'approved' ? 'approved' : (normalizedStatus || 'missing');
             delete c.technician_id;
           });
         });
@@ -1539,15 +1533,15 @@ function WallboardDisplay({
       // Doc progress
       const docPayload: DocProgressFeed = {
         jobs: jobArr
-          .filter((j:any)=> !dryhireIds.has(j.id))
+          .filter((j: any) => !dryhireIds.has(j.id))
           .filter(jobOverlapsWeek)
-          .map((j:any)=>{
+          .map((j: any) => {
             const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
             return {
               id: j.id,
               title: j.title,
               color: j.color ?? null,
-              departments: deptsAll.map((d:Dept)=>({
+              departments: deptsAll.map((d: Dept) => ({
                 dept: d,
                 have: haveByJobDept.get(`${j.id}:${d}`) ?? 0,
                 need: needByDept.get(d) ?? 0,
@@ -1559,49 +1553,49 @@ function WallboardDisplay({
 
       // Pending actions
       const items: PendingActionsFeed['items'] = [];
-      overviewPayload.jobs.forEach(j=>{
+      overviewPayload.jobs.forEach(j => {
         if (dryhireIds.has(j.id)) return; // skip dryhire for pending
         // Under-staffed alerts based on requirements where present (sound/lights only)
-        j.departments.filter((d)=> d!=='video').forEach((d:Dept)=>{
+        j.departments.filter((d) => d !== 'video').forEach((d: Dept) => {
           const need = (j.crewNeeded as any)[d] || 0;
           const have = (j.crewAssigned as any)[d] || 0;
           if (need > 0 && have < need) {
             const startsInMs = new Date(j.start_time).getTime() - Date.now();
-            const within24h = startsInMs <= 24*3600*1000;
-            items.push({ severity: within24h ? 'red' : 'yellow', text: `${j.title} – ${need-have} open ${d} slot(s)`});
+            const within24h = startsInMs <= 24 * 3600 * 1000;
+            items.push({ severity: within24h ? 'red' : 'yellow', text: `${j.title} – ${need - have} open ${d} slot(s)` });
           }
         });
-        const ended24h = new Date(j.end_time).getTime() < Date.now() - 24*3600*1000;
+        const ended24h = new Date(j.end_time).getTime() < Date.now() - 24 * 3600 * 1000;
         if (ended24h) {
           // count missing statuses for this job (assigned techs without submitted/approved)
-          const m = tsByJobTech.get(j.id) ?? new Map<string,string>();
+          const m = tsByJobTech.get(j.id) ?? new Map<string, string>();
           const techList = assignedTechsByJob.get(j.id) ?? [];
           const missingCount = techList.filter(tid => {
             const s = m.get(tid);
             return !(s === 'approved' || s === 'submitted');
           }).length;
-          if (missingCount>0) items.push({ severity: 'red', text: `${j.title} – ${missingCount} missing timesheets`});
+          if (missingCount > 0) items.push({ severity: 'red', text: `${j.title} – ${missingCount} missing timesheets` });
         }
       });
 
-        if (!cancelled) {
-          setOverview(overviewPayload);
-          setCalendarData({
-            jobs: calendarJobs,
-            jobsByDate,
-            jobDateLookup,
-            range: { start: calendarStartISO, end: calendarEndISO },
-            focusMonth: todayStart.getMonth(),
-            focusYear: todayStart.getFullYear(),
-          });
-          setCrew(crewPayload);
-          setDocs(docPayload);
-          setPending({ items });
-        }
+      if (!cancelled) {
+        setOverview(overviewPayload);
+        setCalendarData({
+          jobs: calendarJobs,
+          jobsByDate,
+          jobDateLookup,
+          range: { start: calendarStartISO, end: calendarEndISO },
+          focusMonth: todayStart.getMonth(),
+          focusYear: todayStart.getFullYear(),
+        });
+        setCrew(crewPayload);
+        setDocs(docPayload);
+        setPending({ items });
+      }
 
       // 5) Logistics calendar (next 7 days)
-      const startDate = weekStartISO.slice(0,10);
-      const endDate = weekEndISO.slice(0,10);
+      const startDate = weekStartISO.slice(0, 10);
+      const endDate = weekEndISO.slice(0, 10);
       const { data: le, error: leErr } = await supabase
         .from('logistics_events')
         .select('id,event_date,event_time,title,transport_type,license_plate,job_id,event_type,loading_bay,color,logistics_event_departments(department)')
@@ -1613,15 +1607,15 @@ function WallboardDisplay({
         console.error('Wallboard logistics_events error:', leErr);
       }
       const evts = le || [];
-      const evtJobIds = Array.from(new Set(evts.map((e:any)=>e.job_id).filter(Boolean)));
-      const titlesByJob = new Map<string,string>();
+      const evtJobIds = Array.from(new Set(evts.map((e: any) => e.job_id).filter(Boolean)));
+      const titlesByJob = new Map<string, string>();
       if (evtJobIds.length) {
         const { data: trows } = await supabase.from('jobs').select('id,title').in('id', evtJobIds);
-        (trows||[]).forEach((r:any)=> titlesByJob.set(r.id, r.title));
+        (trows || []).forEach((r: any) => titlesByJob.set(r.id, r.title));
       }
-      const logisticsItemsBase: LogisticsItem[] = evts.map((e:any)=>{
+      const logisticsItemsBase: LogisticsItem[] = evts.map((e: any) => {
         const departments: string[] = Array.isArray(e.logistics_event_departments)
-          ? (e.logistics_event_departments as any[]).map(dep=>dep?.department).filter(Boolean)
+          ? (e.logistics_event_departments as any[]).map(dep => dep?.department).filter(Boolean)
           : [];
         return {
           id: e.id,
@@ -1649,13 +1643,13 @@ function WallboardDisplay({
           const time = timeFmt.format(d); // HH:mm for en-GB
           return { date, time };
         } catch {
-          return { date: (iso || '').slice(0,10), time: (iso || '').slice(11,16) };
+          return { date: (iso || '').slice(0, 10), time: (iso || '').slice(11, 16) };
         }
       };
 
       const dryHireItems: LogisticsItem[] = jobArr
-        .filter((j:any)=> j.job_type==='dryhire' && (j.status==='Confirmado'))
-        .flatMap((j:any)=>{
+        .filter((j: any) => j.job_type === 'dryhire' && (j.status === 'Confirmado'))
+        .flatMap((j: any) => {
           const nowParts = toTZParts(new Date().toISOString(), j.timezone);
           const pickupParts = toTZParts(j.start_time, j.timezone);
           const returnParts = j.end_time ? toTZParts(j.end_time, j.timezone) : null;
@@ -1687,21 +1681,21 @@ function WallboardDisplay({
                 id: `dryhire-return-${j.id}`,
                 date: returnParts.date,
                 time: returnParts.time,
-              title: j.title || 'Dry Hire',
-              transport_type: 'devolución cliente',
-              plate: null,
-              job_title: j.title || null,
-              procedure: 'unload',
-              loadingBay: null,
-              departments: [],
-            });
-          }
+                title: j.title || 'Dry Hire',
+                transport_type: 'devolución cliente',
+                plate: null,
+                job_title: j.title || null,
+                procedure: 'unload',
+                loadingBay: null,
+                departments: [],
+              });
+            }
           }
 
           return items;
         });
       const logisticsItems: LogisticsItem[] = [...logisticsItemsBase, ...dryHireItems]
-        .sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
+        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
       if (!cancelled) {
         setLogistics(logisticsItems);
         if (isFirstLoad) {
@@ -1837,11 +1831,11 @@ function WallboardDisplay({
         </div>
       )}
       <div className="overflow-hidden" style={{ height: `calc(100vh - ${footerH + tickerH}px)` }}>{/* Subtract measured ticker + footer height */}
-        {current==='overview' && (isAlien ? <AlienJobsPanel data={overview} highlightIds={new Set(highlightJobs.keys())} /> : <JobsOverviewPanel data={overview} highlightIds={new Set(highlightJobs.keys())} page={panelPages.overview} theme={theme} />)}
-        {current==='crew' && (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} page={panelPages.crew} theme={theme} />)}
-        {current==='logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} page={panelPages.logistics} theme={theme} />)}
-        {current==='pending' && (isAlien ? <AlienPendingPanel data={pending} /> : <PendingActionsPanel data={pending} theme={theme} />)}
-        {current==='calendar' && (isAlien ? (
+        {current === 'overview' && (isAlien ? <AlienJobsPanel data={overview} highlightIds={new Set(highlightJobs.keys())} /> : <JobsOverviewPanel data={overview} highlightIds={new Set(highlightJobs.keys())} page={panelPages.overview} theme={theme} />)}
+        {current === 'crew' && (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} page={panelPages.crew} theme={theme} />)}
+        {current === 'logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} page={panelPages.logistics} theme={theme} />)}
+        {current === 'pending' && (isAlien ? <AlienPendingPanel data={pending} /> : <PendingActionsPanel data={pending} theme={theme} />)}
+        {current === 'calendar' && (isAlien ? (
           <AlienCalendarPanel data={calendarData} highlightIds={new Set(highlightJobs.keys())} />
         ) : (
           <CalendarPanel
@@ -1859,8 +1853,8 @@ function WallboardDisplay({
 }
 
 // Alien-styled panels
-const AlienShell: React.FC<{ title: string; kind?: 'standard'|'critical'|'env'|'tracker'; children: React.ReactNode }>=({ title, kind='standard', children })=> {
-  const headerCls = kind==='critical' ? 'bg-red-400' : kind==='env' ? 'bg-blue-400' : kind==='tracker' ? 'bg-green-400' : 'bg-amber-400';
+const AlienShell: React.FC<{ title: string; kind?: 'standard' | 'critical' | 'env' | 'tracker'; children: React.ReactNode }> = ({ title, kind = 'standard', children }) => {
+  const headerCls = kind === 'critical' ? 'bg-red-400' : kind === 'env' ? 'bg-blue-400' : kind === 'tracker' ? 'bg-green-400' : 'bg-amber-400';
   return (
     <div className="bg-black border border-amber-400 h-full overflow-hidden font-mono">
       <div className={`${headerCls} text-black px-3 py-1 text-sm font-bold tracking-wider uppercase`}>{title}</div>
@@ -1871,7 +1865,7 @@ const AlienShell: React.FC<{ title: string; kind?: 'standard'|'critical'|'env'|'
   );
 };
 
-const AlienCalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds })=> {
+const AlienCalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<string> }> = ({ data, highlightIds }) => {
   const { dayNames, monthLabel, cells } = buildCalendarModel(data, highlightIds);
   return (
     <AlienShell title={`VENTANA DE CALENDARIO – ${monthLabel.toUpperCase()}`} kind="tracker">
@@ -1937,14 +1931,14 @@ const AlienCalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: S
   );
 };
 
-const AlienJobsPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds })=> (
+const AlienJobsPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string> }> = ({ data, highlightIds }) => (
   <div className="p-2 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 min-h-[calc(100vh-120px)]">
     {(data?.jobs ?? []).map(j => (
       <AlienShell key={j.id} title="RESUMEN DE TRABAJOS - OPERACIONES">
         <div className="space-y-2">
           <div className={`flex justify-between items-center ${highlightIds?.has(j.id) ? 'animate-pulse' : ''}`}>
             <div className={`text-amber-100 text-sm font-bold uppercase tracking-wider ${highlightIds?.has(j.id) ? 'bg-amber-400 text-black px-1' : ''}`}>{j.title}</div>
-            <div className={`w-2 h-2 ${j.status==='green'?'bg-green-400 animate-pulse': j.status==='yellow'?'bg-yellow-400':'bg-red-400'}`} />
+            <div className={`w-2 h-2 ${j.status === 'green' ? 'bg-green-400 animate-pulse' : j.status === 'yellow' ? 'bg-yellow-400' : 'bg-red-400'}`} />
           </div>
           <div className="text-amber-300 text-xs">{j.location?.name ?? '—'}</div>
           <div className="text-amber-200 text-xs tabular-nums">{new Date(j.start_time).toLocaleString()} → {new Date(j.end_time).toLocaleTimeString()}</div>
@@ -1960,13 +1954,13 @@ const AlienJobsPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: S
         </div>
       </AlienShell>
     ))}
-    {(!data || data.jobs.length===0) && (
+    {(!data || data.jobs.length === 0) && (
       <AlienShell title="RESUMEN DE TRABAJOS - OPERACIONES"><div className="text-amber-300">NO HAY TRABAJOS EN VENTANA</div></AlienShell>
     )}
   </div>
 );
 
-const AlienCrewPanel: React.FC<{ data: CrewAssignmentsFeed | null }>=({ data })=> (
+const AlienCrewPanel: React.FC<{ data: CrewAssignmentsFeed | null }> = ({ data }) => (
   <AlienShell title="ESTADO DEL EQUIPO - MONITOR BIOSIGN" kind="tracker">
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
       {(data?.jobs ?? []).map(job => (
@@ -1976,24 +1970,24 @@ const AlienCrewPanel: React.FC<{ data: CrewAssignmentsFeed | null }>=({ data })=
             {job.crew.map((c, i) => (
               <div key={i} className="flex items-center justify-between text-amber-200 text-xs">
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 ${c.timesheetStatus==='approved'?'bg-green-400 animate-pulse': c.timesheetStatus==='submitted'?'bg-blue-400': c.timesheetStatus==='draft'?'bg-yellow-400':'bg-red-400'}`} />
+                  <div className={`w-2 h-2 ${c.timesheetStatus === 'approved' ? 'bg-green-400 animate-pulse' : c.timesheetStatus === 'submitted' ? 'bg-blue-400' : c.timesheetStatus === 'draft' ? 'bg-yellow-400' : 'bg-red-400'}`} />
                   <span className="truncate">{c.name || '—'} ({c.dept || '—'})</span>
                 </div>
                 <div className="uppercase text-amber-300 text-[10px]">{c.role}</div>
               </div>
             ))}
-            {job.crew.length===0 && <div className="text-amber-300 text-xs">NO HAY EQUIPO ASIGNADO</div>}
+            {job.crew.length === 0 && <div className="text-amber-300 text-xs">NO HAY EQUIPO ASIGNADO</div>}
           </div>
         </div>
       ))}
-      {(!data || data.jobs.length===0) && (
+      {(!data || data.jobs.length === 0) && (
         <div className="text-amber-300">NO HAY TRABAJOS</div>
       )}
     </div>
   </AlienShell>
 );
 
-const AlienDocsPanel: React.FC<{ data: DocProgressFeed | null }>=({ data })=> (
+const AlienDocsPanel: React.FC<{ data: DocProgressFeed | null }> = ({ data }) => (
   <AlienShell title="DOCUMENTACIÓN - CONTROL AMBIENTAL" kind="env">
     <div className="space-y-2">
       {(data?.jobs ?? []).map(job => (
@@ -2001,7 +1995,7 @@ const AlienDocsPanel: React.FC<{ data: DocProgressFeed | null }>=({ data })=> (
           <div className="uppercase text-amber-100 text-xs font-bold tracking-wider mb-1">{job.title}</div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             {job.departments.map(dep => {
-              const pct = dep.need>0 ? Math.round((dep.have/dep.need)*100) : 0;
+              const pct = dep.need > 0 ? Math.round((dep.have / dep.need) * 100) : 0;
               return (
                 <div key={dep.dept}>
                   <div className="flex justify-between items-center text-amber-300 text-[10px] uppercase mb-1">
@@ -2009,7 +2003,7 @@ const AlienDocsPanel: React.FC<{ data: DocProgressFeed | null }>=({ data })=> (
                     <span>{dep.have}/{dep.need}</span>
                   </div>
                   <div className="w-full h-2 bg-black border border-blue-400/50">
-                    <div className={`${pct<100?'bg-blue-400':'bg-green-400'} h-full`} style={{ width: `${pct}%` }} />
+                    <div className={`${pct < 100 ? 'bg-blue-400' : 'bg-green-400'} h-full`} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
@@ -2017,26 +2011,26 @@ const AlienDocsPanel: React.FC<{ data: DocProgressFeed | null }>=({ data })=> (
           </div>
         </div>
       ))}
-      {(!data || data.jobs.length===0) && (
+      {(!data || data.jobs.length === 0) && (
         <div className="text-amber-300">NO HAY PROGRESO DE DOCUMENTOS DISPONIBLE</div>
       )}
     </div>
   </AlienShell>
 );
 
-const AlienPendingPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data })=> (
+const AlienPendingPanel: React.FC<{ data: PendingActionsFeed | null }> = ({ data }) => (
   <AlienShell title="ALERTAS DEL SISTEMA - PROTOCOLO DE EMERGENCIA" kind="critical">
     <div className="space-y-2">
       {(data?.items ?? []).map((it, i) => (
-        <div key={i} className={`px-2 py-1 text-xs font-mono ${it.severity==='red'?'bg-red-600 text-white':'bg-yellow-600 text-black'}`}>{it.text}</div>
+        <div key={i} className={`px-2 py-1 text-xs font-mono ${it.severity === 'red' ? 'bg-red-600 text-white' : 'bg-yellow-600 text-black'}`}>{it.text}</div>
       ))}
-      {(data?.items.length ?? 0)===0 && <div className="text-amber-300">TODOS LOS SISTEMAS NOMINALES</div>}
+      {(data?.items.length ?? 0) === 0 && <div className="text-amber-300">TODOS LOS SISTEMAS NOMINALES</div>}
     </div>
   </AlienShell>
 );
 
 // Logistics Panels
-const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null; page?: number; pageSize?: number; theme?: 'light' | 'dark' }>=({ data, page = 0, pageSize = 6, theme = 'light' })=> {
+const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null; page?: number; pageSize?: number; theme?: 'light' | 'dark' }> = ({ data, page = 0, pageSize = 6, theme = 'light' }) => {
   const items = data ?? [];
   const paginatedItems = items.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(items.length / pageSize);
@@ -2044,66 +2038,66 @@ const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null; page?: number; pa
   return (
     <AutoScrollWrapper speed={75}>
       <PanelContainer theme={theme}>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-5xl font-semibold">Logística – Próximos días</h1>
-        {totalPages > 1 && (
-          <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
-        )}
-      </div>
-      <div className="flex flex-col gap-3">
-        {paginatedItems.map(ev => (
-          <div
-            key={ev.id}
-            className={`border rounded p-3 flex items-center justify-between ${theme === 'light' ? 'border-zinc-200' : 'border-zinc-800'}`}
-            style={{ backgroundColor: getJobCardBackground(ev.color || undefined, theme) }}
-          >
-            <div className="flex items-center gap-4">
-              <div>
-                <div className={`text-32 tabular-nums ${theme === 'light' ? 'text-zinc-700' : 'text-zinc-200'}`}>
-                  {ev.date} {ev.time?.slice(0,5)}
-                </div>
-                <div className={`text-2xl font-semibold ${theme === 'light' ? 'text-zinc-700' : 'text-zinc-100'}`}>
-                  {SPANISH_DAY_NAMES[new Date(ev.date).getDay()]}
-                </div>
-              </div>
-              {getTransportIcon(ev.transport_type as any, ev.procedure as any, 'text-38')}
-              <div>
-                <div className="text-38 font-medium">{ev.title}</div>
-                <div className={`mt-1 flex flex-wrap items-center gap-2 text-2xl ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                  {ev.procedure ? (
-                    <span className={`px-2 py-0.5 rounded capitalize ${theme === 'light' ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-200'}`}>{ev.procedure.replace(/_/g, ' ')}</span>
-                  ) : null}
-                  <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>{ev.transport_type || 'transport'}</span>
-                  {ev.loadingBay && <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>Bay {ev.loadingBay}</span>}
-                  {ev.plate && <span className={theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}>Plate {ev.plate}</span>}
-                </div>
-                {ev.departments.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {ev.departments.map(dep => (
-                      <span key={dep} className={`px-2 py-0.5 rounded text-lg uppercase tracking-wide ${theme === 'light' ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-200'}`}>
-                        {dep}
-                      </span>
-                    ))}
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-5xl font-semibold">Logística – Próximos días</h1>
+          {totalPages > 1 && (
+            <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Página {page + 1} de {totalPages}</div>
+          )}
+        </div>
+        <div className="flex flex-col gap-3">
+          {paginatedItems.map(ev => (
+            <div
+              key={ev.id}
+              className={`border rounded p-3 flex items-center justify-between ${theme === 'light' ? 'border-zinc-200' : 'border-zinc-800'}`}
+              style={{ backgroundColor: getJobCardBackground(ev.color || undefined, theme) }}
+            >
+              <div className="flex items-center gap-4">
+                <div>
+                  <div className={`text-32 tabular-nums ${theme === 'light' ? 'text-zinc-700' : 'text-zinc-200'}`}>
+                    {ev.date} {ev.time?.slice(0, 5)}
                   </div>
-                )}
+                  <div className={`text-2xl font-semibold ${theme === 'light' ? 'text-zinc-700' : 'text-zinc-100'}`}>
+                    {SPANISH_DAY_NAMES[new Date(ev.date).getDay()]}
+                  </div>
+                </div>
+                {getTransportIcon(ev.transport_type as any, ev.procedure as any, 'text-38')}
+                <div>
+                  <div className="text-38 font-medium">{ev.title}</div>
+                  <div className={`mt-1 flex flex-wrap items-center gap-2 text-2xl ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                    {ev.procedure ? (
+                      <span className={`px-2 py-0.5 rounded capitalize ${theme === 'light' ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-200'}`}>{ev.procedure.replace(/_/g, ' ')}</span>
+                    ) : null}
+                    <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>{ev.transport_type || 'transport'}</span>
+                    {ev.loadingBay && <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>Bay {ev.loadingBay}</span>}
+                    {ev.plate && <span className={theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}>Plate {ev.plate}</span>}
+                  </div>
+                  {ev.departments.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {ev.departments.map(dep => (
+                        <span key={dep} className={`px-2 py-0.5 rounded text-lg uppercase tracking-wide ${theme === 'light' ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-200'}`}>
+                          {dep}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-        {items.length===0 && <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No hay logística en los próximos 7 días</div>}
-      </div>
-    </PanelContainer>
+          ))}
+          {items.length === 0 && <div className={`text-38 ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>No hay logística en los próximos 7 días</div>}
+        </div>
+      </PanelContainer>
     </AutoScrollWrapper>
   );
 };
 
-const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })=> (
+const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }> = ({ data }) => (
   <AlienShell title="LOGÍSTICA - ESCANEO DE PROXIMIDAD" kind="tracker">
     <div className="space-y-2">
       {(data ?? []).map(ev => (
         <div key={ev.id} className="border border-[var(--alien-border-dim)] p-2 flex items-center justify-between text-amber-200 text-xs">
           <div className="flex items-center gap-3">
-            <div className="font-mono tabular-nums">{ev.date} {ev.time?.slice(0,5)}</div>
+            <div className="font-mono tabular-nums">{ev.date} {ev.time?.slice(0, 5)}</div>
             <div className="uppercase text-amber-100">{ev.title}</div>
           </div>
           <div className="text-right">
@@ -2127,7 +2121,7 @@ const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })
           </div>
         </div>
       ))}
-      {(!data || data.length===0) && <div className="text-amber-300">NO HAY LOGÍSTICA EN VENTANA</div>}
+      {(!data || data.length === 0) && <div className="text-amber-300">NO HAY LOGÍSTICA EN VENTANA</div>}
     </div>
   </AlienShell>
 );
@@ -2137,6 +2131,6 @@ export { WallboardDisplay };
 
 // Default export with auth guard for authenticated route
 export default function Wallboard() {
-  useRoleGuard(['admin','management','wallboard']);
+  useRoleGuard(['admin', 'management', 'wallboard']);
   return <WallboardDisplay />;
 }

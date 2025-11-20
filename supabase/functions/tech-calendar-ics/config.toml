@@ -1,5 +1,0 @@
-verify_jwt = false
-
-[deploy]
-allowed_imports = ["https://deno.land/std/*", "https://esm.sh/*", "npm:*"]
-

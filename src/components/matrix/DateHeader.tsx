@@ -50,7 +50,7 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
         console.warn('Counts staffing_requests error', reqErr);
       }
 
-      const latestByTechPhase = new Map<string, { phase: 'availability'|'offer'; status: string | null; t: number }>();
+      const latestByTechPhase = new Map<string, { phase: 'availability' | 'offer'; status: string | null; t: number }>();
       (reqRows || []).forEach((r: any) => {
         const key = `${r.profile_id}-${r.phase}`;
         const t = r.updated_at ? new Date(r.updated_at).getTime() : 0;
@@ -89,7 +89,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
 
   const getJobIndicatorColors = () => {
     if (jobs.length === 0) return [];
-    
+
     // Get unique colors from jobs, fallback to default colors
     const colors = jobs.map(job => job.color || '#7E69AB');
     return [...new Set(colors)]; // Remove duplicates
@@ -130,22 +130,21 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <div 
+        <div
           className={cn(
             'border-r text-center text-xs font-medium bg-card cursor-pointer',
             'flex flex-col justify-center items-center relative transition-colors',
-            'hover:bg-accent/50 flex-shrink-0',
+            'hover:bg-accent/50 flex-shrink-0 h-full',
             {
               'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300': isTodayHeader,
               'bg-muted/50 text-muted-foreground': isWeekendHeader && !isTodayHeader,
               'ring-2 ring-blue-500/30 ring-inset': hasJobs,
             }
           )}
-          style={{ 
+          style={{
             width: `${width}px`,
             minWidth: `${width}px`,
-            maxWidth: `${width}px`,
-            height: '100%'
+            maxWidth: `${width}px`
           }}
         >
           <div className="font-semibold text-xs">
@@ -164,7 +163,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
               {format(date, 'yyyy')}
             </div>
           )}
-          
+
           {/* Job indicators */}
           {hasJobs && (
             <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-1">
@@ -180,7 +179,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
               )}
             </div>
           )}
-          
+
           {/* Job count badge */}
           {hasJobs && (
             <div className="absolute top-0.5 right-0.5 flex flex-col items-end gap-0.5">
@@ -199,7 +198,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
           )}
         </div>
       </PopoverTrigger>
-      
+
       {hasJobs && (
         <PopoverContent className="w-80" side="bottom" align="center">
           <div className="space-y-3">
@@ -209,13 +208,13 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
                 {format(date, 'EEEE, MMMM d, yyyy')}
               </span>
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Users className="h-3 w-3" />
                 <span>{jobs.length} job{jobs.length > 1 ? 's' : ''} scheduled</span>
               </div>
-              
+
               {jobs.map((job) => (
                 <JobRowWithCounts
                   key={job.id}

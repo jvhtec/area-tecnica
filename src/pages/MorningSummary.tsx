@@ -104,7 +104,7 @@ export default function MorningSummary() {
               .select('technician_id, date, status')
               .in('technician_id', techIds)
               .eq('date', date)
-              .in('status', ['vacation','travel','sick','day_off']);
+              .in('status', ['vacation', 'travel', 'sick', 'day_off']);
             if (legacyRows && legacyRows.length) {
               const existing = new Set((unavailable || []).map((u: any) => u.user_id));
               for (const row of legacyRows as any[]) {

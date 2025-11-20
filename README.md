@@ -1,291 +1,183 @@
-# Sector Pro
+# Supabase CLI
 
-**URL**: 
-http://sector-pro.work
+[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=main)](https://coveralls.io/github/supabase/cli?branch=main) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
+](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
 
-## Project info
+[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
 
-Sector Pro – Technical Operations Platform
+This repository contains all the functionality for Supabase CLI.
 
-Sector Pro is an integrated operations platform for live events, festivals, tours, logistics, technical crews and production workflows.
-It consolidates tools and processes that are traditionally spread across emails, spreadsheets, messaging apps and standalone software.
+- [x] Running Supabase locally
+- [x] Managing database migrations
+- [x] Creating and deploying Supabase Functions
+- [x] Generating types directly from your database schema
+- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
 
-The platform is mobile-first, built as a Progressive Web App, supports iPhone & Android, and includes:
-	•	Freelancer portal
-	•	Festival manager
-	•	Tour/gig manager
-	•	Logistics & warehouse flows
-	•	Multi-department crew assignment
-	•	Push notifications
-	•	Flex Rental Solutions integration
-	•	PDF generation engine
-	•	Technical calculators & production tools
+## Getting started
 
-All workflows are designed based on real operational experience and validated by technicians, coordinators, and production departments.
+### Install the CLI
 
-⸻
+Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
 
-📸 Screenshots
+```bash
+npm i supabase --save-dev
+```
 
-Dashboard
+To install the beta release channel:
 
-Festival Manager
+```bash
+npm i supabase@beta --save-dev
+```
 
-Tour Management
-
-Day Sheet
+When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
 
-Freelancer Portal
+```
+NODE_OPTIONS=--no-experimental-fetch yarn add supabase
+```
 
-Crew Assignment Matrix
+> **Note**
+For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
 
-Technical Tools
+<details>
+  <summary><b>macOS</b></summary>
 
-Digital Signage
+  Available via [Homebrew](https://brew.sh). To install:
 
+  ```sh
+  brew install supabase/tap/supabase
+  ```
 
-⸻
+  To install the beta release channel:
+  
+  ```sh
+  brew install supabase/tap/supabase-beta
+  brew link --overwrite supabase-beta
+  ```
+  
+  To upgrade:
 
-✨ Features
+  ```sh
+  brew upgrade supabase
+  ```
+</details>
 
-Festivals
-	•	Rider management with versioning
-	•	Equipment collision detection
-	•	Technical requirements assistant
-	•	Complete festival agenda
-	•	Auto-generated PDFs
+<details>
+  <summary><b>Windows</b></summary>
 
-Tours & Single Shows
-	•	Full itinerary creation
-	•	Day Sheets & Tour Books
-	•	Travel, transport & hotel planning
-	•	Maps, weather & recommendations
-	•	Access levels per department
+  Available via [Scoop](https://scoop.sh). To install:
 
-Freelancer Portal
-	•	Secure job-based access
-	•	Payment status, schedules, location, hospitality
-	•	Document sharing
-	•	Digital signature for timesheets
-	•	Incident reporting
-	•	Push notifications
-	•	Messaging with management
+  ```powershell
+  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+  scoop install supabase
+  ```
 
-Crew Assignment (Multi-Department)
-	•	Role-based assignment matrix
-	•	Real-time availability
-	•	Conflict detection
-	•	Bulk or individual assignment
+  To upgrade:
 
-Automations & Communication
-	•	Email automation (with corporate branding)
-	•	WhatsApp alerts
-	•	Push notifications
-	•	Internal announcements (push & digital signage)
-	•	In-app messaging
+  ```powershell
+  scoop update supabase
+  ```
+</details>
 
-Logistics & Warehouse
-	•	Load-in / load-out tracking
-	•	Technician time tracking
-	•	Warehouse staff control
-	•	Operational checklists
+<details>
+  <summary><b>Linux</b></summary>
 
-Inventory (Daily View)
-	•	Daily material allocation
-	•	Conflict & shortage alerts
-	•	Fast material assignment
+  Available via [Homebrew](https://brew.sh) and Linux packages.
 
-Flex Integration
-	•	Create work structures and elements
-	•	Sync crew calls
-	•	Generate work orders
-	•	Status updates
+  #### via Homebrew
 
-Technical Tools
-	•	Weight Calculator
-	•	Power Calculator
-	•	Amplifier Load Calculator
-	•	SoundVision utilities
-	•	Memoria Técnica generator
-	•	Incident report generator
-	•	Production tools
+  To install:
 
-Digital Signage
-	•	Real-time sync with platform
-	•	Schedules, crew lists, alerts
-	•	Corporate templates
+  ```sh
+  brew install supabase/tap/supabase
+  ```
 
-Reporting & PDF Generation
-	•	Custom corporate PDFs
-	•	Hours, roles, payments, logistics reports
-	•	Accounting exports
+  To upgrade:
 
-⸻
+  ```sh
+  brew upgrade supabase
+  ```
 
-🧱 Technology Stack
+  #### via Linux packages
 
-Layer	Tech
-Frontend	React + TypeScript + Vite
-Backend	Supabase (Auth, DB, Storage, Edge Functions)
-Mobile	PWA (iOS & Android)
-Maps & Location	Google Places, Mapbox
-Weather	Weather API
-Communication	WhatsApp + Email templates
-Documents	Custom PDF Engine
-Deployment	Vercel / Netlify (depending on setup)
+  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
 
+  ```sh
+  sudo apk add --allow-untrusted <...>.apk
+  ```
 
-⸻
+  ```sh
+  sudo dpkg -i <...>.deb
+  ```
 
-🗺️ Roadmap
+  ```sh
+  sudo rpm -i <...>.rpm
+  ```
 
-## Q1-Q2 (Jan-Jun): Consolidation Phase
+  ```sh
+  sudo pacman -U <...>.pkg.tar.zst
+  ```
+</details>
 
-**Focus:** Stability, performance, and technical debt
+<details>
+  <summary><b>Other Platforms</b></summary>
 
-### Performance & Critical Bugs (Months 1-2)
+  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
 
-- Fix Android performance (<2s load time)
-- Resolve top 5 critical bugs
-- Complete iCal export functionality
+  ```sh
+  go install github.com/supabase/cli@latest
+  ```
 
-### Refactoring & Cleanup (Months 3-4)
+  Add a symlink to the binary in `$PATH` for easier access:
 
-- Refactor festivals module
-- Refactor assignment system
-- Remove unused features
-- Basic test coverage for critical flows
+  ```sh
+  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
+  ```
 
-### Documentation & Sustainability (Months 5-6)
+  This works on other non-standard Linux distros.
+</details>
 
-- Complete technical documentation
-- Setup error monitoring
-- Backup & recovery plan
-- Architecture decision records (ADRs)
+<details>
+  <summary><b>Community Maintained Packages</b></summary>
 
-**Expected outcome:** Stable, maintainable platform with 0 critical bugs
+  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
+  To install in your working directory:
 
------
+  ```bash
+  pkgx install supabase
+  ```
 
-## Q3 (Jul-Sep): Re-evaluation & Decision
+  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
+</details>
 
-**Evaluate 4 options:**
+### Run the CLI
 
-**A) Maintenance mode only**
+```bash
+supabase bootstrap
+```
 
-- Critical bugs only
-- No new features
-- Minimal time investment
+Or using npx:
 
-**B) Selective feature development**
+```bash
+npx supabase bootstrap
+```
 
-- Pick 2-3 high-impact features from original roadmap
-- Strict scope control
-- Solo sustainable
+The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
 
-**C) Team expansion**
+## Docs
 
-- Hire 1 developer
-- Knowledge transfer
-- Resume roadmap with support
+Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
 
-**D) Partial SaaS migration**
+## Breaking changes
 
-- Identify modules to replace
-- Begin transition plan
-- Reduce maintenance burden
+We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
 
-**Decision deadline:** End of Q3
+However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
 
------
+## Developing
 
-## Q4 (Oct-Dec): Execute Decision
+To run from source:
 
-Depends on Q3 decision:
-
-### If A (Maintenance):
-
-- Bug fixes only
-- Platform stability monitoring
-
-### If B (Selective):
-
-- 2-3 prioritized features:
-  - Travel & hotel booking integration?
-  - Internal chat by project?
-  - Advanced permissions?
-
-### If C (Team):
-
-- Onboarding new developer
-- Knowledge transfer
-- Begin distributed development
-
-### If D (Migration):
-
-- Start SaaS transition
-- Parallel systems
-- User training
-
------
-
-## Key Metrics to Track
-
-**Performance:**
-
-- Android load time: < 2s ✓/✗
-- Error rate: < 1% ✓/✗
-- Uptime: > 99.5% ✓/✗
-
-**Usage:**
-
-- Weekly active users
-- Feature adoption rates
-- Support ticket volume
-
-**Sustainability:**
-
-- Monthly maintenance hours
-- Critical bugs backlog
-- Technical debt score
-
------
-
-## Non-Goals for 2026
-
-✗ Full original roadmap  
-✗ 10+ new features  
-✗ QR equipment scanning  
-✗ Truck load optimization  
-✗ AI route optimization  
-✗ Provider portal
-
-**Reality:** Without additional resources, ambitious features stay parked.
-
------
-
-## Success Criteria (End of 2026)
-
-✓ Platform is faster and more stable  
-✓ Android performance is excellent  
-✓ Another developer could take over  
-✓ Clear path forward exists  
-✓ Sustainable workload established
-
-**Most important:** Platform is still useful and not a burden.​​​​​​​​​​​​​​​​
-
-⸻
-
-🎯 Vision
-
-Sector Pro aims to streamline the entire operational chain of live-event production by integrating planning, crew management, logistics, communication, and technical tools into a single, fast, reliable platform.
-
-All workflows are built from real usage scenarios and validated by active field technicians and production staff, ensuring immediate practical value.
-
-⸻
-
-📬 Contact
-
-For inquiries, support or collaboration opportunities, please contact:
-jvadillotecnico@gmail.com
-
+```sh
+# Go >= 1.22
+go run . help
+```
