@@ -17,8 +17,8 @@ type Dept = "sound" | "lights" | "video";
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-wallboard-jwt",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   } as Record<string, string>;
 }
 
@@ -48,6 +48,28 @@ async function getJwtKey() {
 }
 
 async function authenticate(req: Request, url: URL): Promise<AuthResult> {
+  // Check for JWT in x-wallboard-jwt header (new client format)
+  const jwtHeader = req.headers.get("x-wallboard-jwt") ?? req.headers.get("X-Wallboard-JWT");
+  if (jwtHeader) {
+    const token = jwtHeader.trim();
+    if (!token) {
+      throw new HttpError(401, "Missing JWT token");
+    }
+    try {
+      const key = await getJwtKey();
+      const payload: Record<string, unknown> = await verify(token, key);
+      if (payload.scope !== "wallboard") {
+        throw new HttpError(403, "Invalid wallboard scope");
+      }
+      const presetSlug = typeof payload.preset === "string" ? payload.preset : undefined;
+      return { method: "jwt", presetSlug };
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      throw new HttpError(401, "Invalid token");
+    }
+  }
+
+  // Check for JWT in Authorization header (legacy format)
   const headerToken = req.headers.get("authorization") ?? req.headers.get("Authorization") ?? "";
   if (headerToken.startsWith("Bearer ")) {
     const token = headerToken.slice(7).trim();
@@ -104,10 +126,36 @@ serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/\/+$/, "");
+
+  // Support both invoke (path in body) and direct HTTP (path in URL)
+  let path = url.pathname.replace(/\/+$/, "");
+  try {
+    const contentType = req.headers.get("content-type") || "";
+    if (contentType.includes("application/json") && req.method === "POST") {
+      const body = await req.clone().json().catch(() => null);
+      if (body?.path) {
+        path = body.path;
+      }
+    }
+  } catch {
+    // If body parsing fails, use URL path
+  }
+
+  console.log("🔍 Request details:", {
+    method: req.method,
+    url: url.toString(),
+    pathname: url.pathname,
+    extractedPath: path,
+    headers: {
+      'x-wallboard-jwt': req.headers.get("x-wallboard-jwt") ? "present" : "missing",
+      'authorization': req.headers.get("authorization") ? "present" : "missing",
+      'content-type': req.headers.get("content-type")
+    }
+  });
 
   try {
     const auth = await authenticate(req, url);
+    console.log("✅ Auth successful:", { method: auth.method, presetSlug: auth.presetSlug });
     const presetSlug = auth.presetSlug?.trim().toLowerCase() ?? undefined;
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
@@ -116,6 +164,12 @@ serve(async (req) => {
       const now = new Date();
       const todayStart = startOfDay(now);
       const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+
+      console.log("📅 Querying jobs-overview:", {
+        todayStart: todayStart.toISOString(),
+        tomorrowEnd: tomorrowEnd.toISOString(),
+        presetSlug
+      });
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -133,7 +187,12 @@ serve(async (req) => {
         .lte("start_time", tomorrowEnd.toISOString())
         .order("start_time", { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Jobs query error:", error);
+        throw error;
+      }
+
+      console.log(`✅ Jobs query returned ${jobs?.length || 0} results`);
 
       const result = {
         jobs: (jobs ?? []).map((j: any) => {
@@ -177,6 +236,12 @@ serve(async (req) => {
           };
         }),
       } as any;
+
+      console.log("📤 Returning jobs-overview:", {
+        jobCount: result.jobs.length,
+        presetSlug,
+        jobTitles: result.jobs.map((j: any) => j.title)
+      });
 
       return new Response(JSON.stringify({ ...result, presetSlug }), {
         headers: { "Content-Type": "application/json", ...corsHeaders() },
