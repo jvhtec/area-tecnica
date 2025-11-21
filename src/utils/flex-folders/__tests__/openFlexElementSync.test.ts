@@ -3,13 +3,15 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const toastMock = vi.hoisted(() => ({
+  error: vi.fn(),
+  warning: vi.fn(),
+  success: vi.fn(),
+}));
+
 // Mock toast BEFORE importing the module that uses it
 vi.mock('sonner', () => ({
-  toast: {
-    error: vi.fn(),
-    warning: vi.fn(),
-    success: vi.fn(),
-  },
+  toast: toastMock,
 }));
 
 import { openFlexElementSync } from '../openFlexElementSync';
@@ -29,6 +31,7 @@ describe('openFlexElementSync', () => {
   let createElementSpy: any;
   let appendChildSpy: any;
   let removeChildSpy: any;
+  let originalCreateElement: typeof document.createElement;
 
   beforeEach(() => {
     // Mock anchor element
@@ -41,7 +44,12 @@ describe('openFlexElementSync', () => {
     };
 
     // Spy on document methods instead of replacing document
-    createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as any);
+    originalCreateElement = document.createElement.bind(document);
+    createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      return tagName.toLowerCase() === 'a'
+        ? (mockAnchor as any)
+        : originalCreateElement(tagName);
+    });
     appendChildSpy = vi.spyOn(document.body, 'appendChild').mockReturnValue(mockAnchor as any);
     removeChildSpy = vi.spyOn(document.body, 'removeChild').mockReturnValue(mockAnchor as any);
 
@@ -94,83 +102,67 @@ describe('openFlexElementSync', () => {
   });
 
   it('should reject empty elementId', () => {
-    const { toast } = require('sonner');
-
     openFlexElementSync({
       elementId: '',
     });
 
     // Verify toast.error was called
-    expect(toast.error).toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalled();
 
     // Verify no anchor was created
     expect(createElementSpy).not.toHaveBeenCalled();
   });
 
   it('should reject null elementId', () => {
-    const { toast } = require('sonner');
-
     openFlexElementSync({
       elementId: null as any,
     });
 
     // Verify toast.error was called
-    expect(toast.error).toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalled();
 
     // Verify no anchor was created
     expect(createElementSpy).not.toHaveBeenCalled();
   });
 
   it('should reject undefined elementId', () => {
-    const { toast } = require('sonner');
-
     openFlexElementSync({
       elementId: undefined as any,
     });
 
     // Verify toast.error was called
-    expect(toast.error).toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalled();
 
     // Verify no anchor was created
     expect(createElementSpy).not.toHaveBeenCalled();
   });
 
   it('should reject whitespace-only elementId', () => {
-    const { toast } = require('sonner');
-
     openFlexElementSync({
       elementId: '   ',
     });
 
     // Verify toast.error was called
-    expect(toast.error).toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalled();
 
     // Verify no anchor was created
     expect(createElementSpy).not.toHaveBeenCalled();
   });
 
-  it('should use fallback URL when resolver returns empty', () => {
-    const { toast } = require('sonner');
+  it('shows an error toast when resolver returns an empty URL', () => {
     vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue('');
 
     openFlexElementSync({
       elementId: 'test-id',
     });
 
-    // Verify fallback URL was used
-    expect(mockAnchor.href).toBe(
-      'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/test-id/view/simple-element/detail'
+    expect(toastMock.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to construct URL')
     );
-
-    // Verify anchor was clicked
-    expect(mockAnchor.click).toHaveBeenCalled();
-
-    // Verify warning toast was shown
-    expect(toast.warning).toHaveBeenCalled();
+    expect(mockAnchor.click).not.toHaveBeenCalled();
   });
 
   it('should show error toast when both primary and fallback fail', () => {
-    const { toast } = require('sonner');
     vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockImplementation(() => {
       throw new Error('URL construction failed');
     });
@@ -185,7 +177,7 @@ describe('openFlexElementSync', () => {
     });
 
     // Verify error toast was shown
-    expect(toast.error).toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalled();
   });
 
   it('should handle financial document with definitionId', () => {
@@ -234,7 +226,6 @@ describe('openFlexElementSync', () => {
   });
 
   it('should handle element with display name in error messages', () => {
-    const { toast } = require('sonner');
     vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue('');
 
     openFlexElementSync({
@@ -243,7 +234,7 @@ describe('openFlexElementSync', () => {
     });
 
     // Verify error message includes display name
-    expect(toast.error).toHaveBeenCalledWith(
+    expect(toastMock.error).toHaveBeenCalledWith(
       expect.stringContaining('Test Element Name')
     );
   });

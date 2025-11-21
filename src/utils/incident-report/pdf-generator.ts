@@ -16,9 +16,9 @@ interface IncidentReportPDFData {
 }
 
 export const generateIncidentReportPDF = async (
-  data: IncidentReportPDFData, 
+  data: IncidentReportPDFData,
   options: { saveToDatabase?: boolean; downloadLocal?: boolean } = { saveToDatabase: false, downloadLocal: true }
-): Promise<{ documentId?: string; filename: string }> => {
+): Promise<{ documentId?: string; filename: string; storagePath?: string }> => {
   const pdfDoc = new PDFDocument();
   const { width: pageWidth, height: pageHeight } = pdfDoc.dimensions;
   
@@ -228,18 +228,18 @@ export const generateIncidentReportPDF = async (
     const pdfOutput = pdfDoc.document.output('blob');
     
     try {
-      await uploadJobPdfWithCleanup(
+      const storagePath = await uploadJobPdfWithCleanup(
         data.jobId,
         pdfOutput,
         filename,
         'incident-reports'
       );
-      
+
       if (options.downloadLocal) {
         pdfDoc.save(filename);
       }
-      
-      return { filename };
+
+      return { filename, storagePath };
     } catch (error) {
       console.error('Error uploading incident report to database:', error);
       throw error;

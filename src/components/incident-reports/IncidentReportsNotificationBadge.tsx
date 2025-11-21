@@ -53,11 +53,21 @@ export const IncidentReportsNotificationBadge = ({
         return;
       }
 
-      const count = data?.length || 0;
-      setNewReportsCount(count);
-      setHasNewReports(count > 0);
-      
-      console.log("New incident reports:", { count, hasNew: count > 0 });
+      const internalCount = data?.length || 0;
+      const { count: pendingPublicCount, error: publicError } = await supabase
+        .from('public_incident_reports')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
+      if (publicError) {
+        console.error('Error fetching public incident reports:', publicError);
+      }
+
+      const total = internalCount + (pendingPublicCount ?? 0);
+      setNewReportsCount(total);
+      setHasNewReports(total > 0);
+
+      console.log("New incident reports:", { total, internalCount, pendingPublicCount });
       
     } catch (error) {
       console.error("Error checking new incident reports:", error);
@@ -93,10 +103,24 @@ export const IncidentReportsNotificationBadge = ({
         console.log("Incident reports subscription status:", status);
       });
 
+    const publicChannel = supabase
+      .channel('public-incident-reports-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'public_incident_reports'
+        },
+        () => setTimeout(fetchNewIncidentReports, 500)
+      )
+      .subscribe();
+
     return () => {
       clearTimeout(timeoutId);
       console.log("Cleaning up incident reports subscription");
       supabase.removeChannel(channel);
+      supabase.removeChannel(publicChannel);
     };
   }, [fetchNewIncidentReports]);
 

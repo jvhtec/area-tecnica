@@ -129,11 +129,13 @@ export function EquipmentManagement() {
           </AlertDescription>
         </Alert>
       ) : (
-        <StockCreationManager 
-          stock={stockEntries}
-          onStockUpdate={handleStockUpdate}
-          department={userDepartment}
-        />
+        <div className="space-y-8">
+          <StockCreationManager
+            stock={stockEntries}
+            onStockUpdate={handleStockUpdate}
+            department={userDepartment}
+          />
+        </div>
       )}
     </div>
   );

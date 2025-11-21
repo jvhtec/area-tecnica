@@ -7,10 +7,17 @@ import * as resolveFlexUrl from '@/utils/flex-folders/resolveFlexUrl';
 import * as useFlexUuidModule from '@/hooks/useFlexUuid';
 import * as flexMainFolderId from '@/utils/flexMainFolderId';
 
-const FlexElementSelectorDialogMock = vi.fn(() => null);
-const openFlexElementMock = vi.fn();
-const getElementTreeMock = vi.fn();
-const MOCK_PRESUPUESTO_DRYHIRE_ID = 'mock-presupuesto-dryhire';
+const {
+  FlexElementSelectorDialogMock,
+  openFlexElementMock,
+  getElementTreeMock,
+  MOCK_PRESUPUESTO_DRYHIRE_ID,
+} = vi.hoisted(() => ({
+  FlexElementSelectorDialogMock: vi.fn(() => null),
+  openFlexElementMock: vi.fn(),
+  getElementTreeMock: vi.fn(),
+  MOCK_PRESUPUESTO_DRYHIRE_ID: 'mock-presupuesto-dryhire',
+}));
 
 // Mock modules
 vi.mock('@/hooks/use-toast', () => ({
