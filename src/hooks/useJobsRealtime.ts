@@ -23,30 +23,31 @@ export function useJobsRealtime() {
       // Fetch the jobs with joined data - simplified query for performance
       const { data, error } = await supabase
         .from('jobs')
-        .select(`
-          *,
-          job_departments(department),
-          job_assignments(
-            id,
-            technician_id,
-            sound_role,
-            lights_role,
-            video_role,
-            assignment_source,
-            status,
-            single_day,
-            assignment_date,
-            external_technician_name,
-            profiles!job_assignments_technician_id_fkey(
+          .select(`
+            *,
+            location:locations(name),
+            job_departments!inner(department),
+            job_assignments(
               id,
-              first_name,
-              last_name,
-              nickname,
-              department
-            )
-          )
-        `)
-        .order('start_time', { ascending: true });
+              technician_id,
+              sound_role,
+              lights_role,
+              video_role,
+              assignment_source,
+              status,
+              single_day,
+              assignment_date,
+              profiles!job_assignments_technician_id_fkey(
+                id,
+                first_name,
+                last_name,
+                nickname,
+                department
+              )
+            ),
+            job_documents(*),
+            tour_date:tour_dates(*)
+          `)
       
       if (error) {
         console.error("Error fetching jobs:", error);

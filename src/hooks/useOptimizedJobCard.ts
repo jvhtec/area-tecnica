@@ -129,7 +129,7 @@ export const useOptimizedJobCard = (
 
     const rows = Array.isArray(assignments) ? assignments : [];
     for (const a of rows) {
-      const techId = a.technician_id || `ext:${a.external_technician_name || ''}`;
+      const techId = a.technician_id;
       if (a.sound_role) {
         soundSet.add(techId);
         roleSets[a.sound_role] = roleSets[a.sound_role] || new Set<string>();

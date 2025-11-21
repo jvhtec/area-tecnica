@@ -43,7 +43,6 @@ export const useJobs = () => {
                 status,
                 single_day,
                 assignment_date,
-                external_technician_name,
                 profiles!job_assignments_technician_id_fkey(
                   id,
                   first_name,

@@ -200,6 +200,16 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     isVisible: ({ userRole }) => userRole === "admin",
   },
   {
+    id: "admin-sound",
+    label: "Sonido",
+    mobileLabel: "Sonido",
+    icon: Music2,
+    mobilePriority: 6,
+    mobileSlot: "secondary",
+    getPath: () => "/sound",
+    isVisible: ({ userRole }) => userRole === "admin",
+  },
+  {
     id: "house-department",
     label: ({ userDepartment }) =>
       departmentLabelMap[userDepartment?.toLowerCase() ?? ""] ||
@@ -377,6 +387,8 @@ const resolveIcon = (
 const adminExcludedIds = new Set([
   "technician-dashboard",
   "technician-unavailability",
+  "management-department",
+  "house-department",
 ])
 
 export const buildNavigationItems = (

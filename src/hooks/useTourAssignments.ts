@@ -7,7 +7,6 @@ export interface TourAssignment {
   id: string;
   tour_id: string;
   technician_id?: string;
-  external_technician_name?: string;
   department: string;
   role: string;
   assigned_by?: string;
@@ -50,7 +49,6 @@ export const useTourAssignments = (tourId: string) => {
   const createAssignmentMutation = useMutation({
     mutationFn: async (assignmentData: {
       technician_id?: string;
-      external_technician_name?: string;
       department: string;
       role: string;
       notes?: string;
