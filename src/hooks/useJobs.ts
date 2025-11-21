@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase-client"; // Updated import path
 import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { trackError } from "@/lib/errorTracking";
+import { aggregateJobTimesheets, TimesheetRowWithTechnician, AggregatedTimesheetAssignment } from "@/utils/timesheetAssignments";
 
 export const useJobs = () => {
   const queryClient = useQueryClient();
@@ -15,6 +16,7 @@ export const useJobs = () => {
     { table: 'job_assignments', queryKey: 'jobs' },
     { table: 'job_departments', queryKey: 'jobs' },
     { table: 'job_documents', queryKey: 'jobs' },
+    { table: 'timesheets', queryKey: 'jobs' },
   ]);
 
   return useQuery({
@@ -32,13 +34,22 @@ export const useJobs = () => {
               location:locations(name),
               job_departments!inner(department),
               job_assignments(
+                id,
                 technician_id,
                 sound_role,
                 lights_role,
                 video_role,
-                profiles(
+                assignment_source,
+                status,
+                single_day,
+                assignment_date,
+                external_technician_name,
+                profiles!job_assignments_technician_id_fkey(
+                  id,
                   first_name,
-                  last_name
+                  last_name,
+                  nickname,
+                  department
                 )
               ),
               job_documents(*),
@@ -55,8 +66,70 @@ export const useJobs = () => {
 
           const allJobs = jobs || [];
 
+          const jobIds = allJobs.map(j => j.id).filter(Boolean);
+          const assignmentLookup = allJobs.reduce<Record<string, any[]>>((acc, job) => {
+            acc[job.id] = job.job_assignments || [];
+            return acc;
+          }, {});
+
+          let timesheetAssignments: Record<string, AggregatedTimesheetAssignment[]> = {};
+          if (jobIds.length > 0) {
+            // Batch job IDs to avoid URL length limits (max ~100 UUIDs per request)
+            const BATCH_SIZE = 100;
+            const batches: string[][] = [];
+
+            for (let i = 0; i < jobIds.length; i += BATCH_SIZE) {
+              batches.push(jobIds.slice(i, i + BATCH_SIZE));
+            }
+
+            // Execute all batches in parallel for better performance
+            const batchPromises = batches.map(batchIds =>
+              supabase
+                .from('timesheets')
+                .select(`
+                  job_id,
+                  technician_id,
+                  date,
+                  is_schedule_only,
+                  technician:profiles!fk_timesheets_technician_id(
+                    id,
+                    first_name,
+                    last_name,
+                    nickname,
+                    department
+                  )
+                `)
+                .eq('is_schedule_only', false)
+                .in('job_id', batchIds)
+            );
+
+            const batchResults = await Promise.all(batchPromises);
+
+            // Check for errors and collect all rows
+            const allTimesheetRows: TimesheetRowWithTechnician[] = [];
+            for (const { data: timesheetRows, error: timesheetError } of batchResults) {
+              if (timesheetError) {
+                console.error('useJobs: Error fetching timesheets', timesheetError);
+                throw timesheetError;
+              }
+              if (timesheetRows) {
+                allTimesheetRows.push(...(timesheetRows as TimesheetRowWithTechnician[]));
+              }
+            }
+
+            timesheetAssignments = aggregateJobTimesheets(
+              allTimesheetRows,
+              assignmentLookup
+            );
+          }
+
+          const jobsWithTimesheets = allJobs.map(job => ({
+            ...job,
+            timesheet_assignments: timesheetAssignments[job.id] || [],
+          }));
+
           // Load tour metadata to hide cancelled/deleted tours
-          const tourIds = Array.from(new Set(allJobs.map(j => j.tour_id).filter(Boolean)));
+          const tourIds = Array.from(new Set(jobsWithTimesheets.map(j => j.tour_id).filter(Boolean)));
           const tourMeta: Record<string, { status: string | null; deleted: boolean | null }> = {};
           if (tourIds.length > 0) {
             const { data: toursData, error: toursError } = await supabase
@@ -73,7 +146,7 @@ export const useJobs = () => {
           }
 
           // Filter out jobs from cancelled/deleted tours and explicitly cancelled jobs
-          const filteredJobs = allJobs.filter(j => {
+          const filteredJobs = jobsWithTimesheets.filter(j => {
             if (j.status === 'Cancelado') return false;
             const meta = j.tour_id ? tourMeta[j.tour_id] : null;
             if (meta && (meta.status === 'cancelled' || meta.deleted === true)) return false;

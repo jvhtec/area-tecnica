@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useUnifiedSubscriptions } from "@/hooks/useUnifiedSubscriptions";
 import { Department } from "@/types/department";
 import { sanitizeLogData } from "@/lib/enhanced-security-config";
+import { aggregateJobTimesheets, TimesheetRowWithTechnician, AggregatedTimesheetAssignment } from "@/utils/timesheetAssignments";
 
 /**
  * Optimized jobs hook that consolidates multiple queries and subscriptions
@@ -24,6 +25,7 @@ export const useOptimizedJobs = (
     'job_assignments', 
     'job_departments',
     'job_documents',
+    'timesheets',
     'job_date_types',
     'sound_job_tasks',
     'lights_job_tasks', 
@@ -114,16 +116,72 @@ export const useOptimizedJobs = (
       throw error;
     }
 
+    const jobs = data || [];
+    const jobIds = jobs.map(job => job.id).filter(Boolean);
+    const assignmentLookup = jobs.reduce<Record<string, any[]>>((acc, job) => {
+      acc[job.id] = job.job_assignments || [];
+      return acc;
+    }, {});
+
+    let timesheetAssignments: Record<string, AggregatedTimesheetAssignment[]> = {};
+    if (jobIds.length > 0) {
+      // Batch job IDs to avoid URL length limits (max ~100 UUIDs per request)
+      const BATCH_SIZE = 100;
+      const batches: string[][] = [];
+
+      for (let i = 0; i < jobIds.length; i += BATCH_SIZE) {
+        batches.push(jobIds.slice(i, i + BATCH_SIZE));
+      }
+
+      // Execute all batches in parallel for better performance
+      const batchPromises = batches.map(batchIds =>
+        supabase
+          .from('timesheets')
+          .select(`
+            job_id,
+            technician_id,
+            date,
+            is_schedule_only,
+            technician:profiles!fk_timesheets_technician_id(
+              id,
+              first_name,
+              last_name,
+              nickname,
+              department
+            )
+          `)
+          .eq('is_schedule_only', false)
+          .in('job_id', batchIds)
+      );
+
+      const batchResults = await Promise.all(batchPromises);
+
+      // Check for errors and collect all rows
+      const allTimesheetRows: TimesheetRowWithTechnician[] = [];
+      for (const { data: timesheetRows, error: timesheetError } of batchResults) {
+        if (timesheetError) {
+          console.error('useOptimizedJobs: Error fetching timesheet rows', sanitizeLogData(timesheetError));
+          throw timesheetError;
+        }
+        if (timesheetRows) {
+          allTimesheetRows.push(...(timesheetRows as TimesheetRowWithTechnician[]));
+        }
+      }
+
+      timesheetAssignments = aggregateJobTimesheets(
+        allTimesheetRows,
+        assignmentLookup
+      );
+    }
+
     // Process the data to match expected format with optimized processing
-    const processedJobs = data?.map(job => ({
+    const processedJobs = jobs.map(job => ({
       ...job,
-      // Include all documents; filtering (if needed) is handled in UI
       job_documents: job.job_documents || [],
-      // Add computed properties
       flex_folders_exist: (job.flex_folders?.length || 0) > 0,
-      // Flatten assignments for easier access
-      assignments: job.job_assignments || []
-    })) || [];
+      assignments: timesheetAssignments[job.id] || [],
+      timesheet_assignments: timesheetAssignments[job.id] || []
+    }));
 
     // Load tour metadata so cancelled tours can be hidden from calendars and lists
     const tourIds = Array.from(

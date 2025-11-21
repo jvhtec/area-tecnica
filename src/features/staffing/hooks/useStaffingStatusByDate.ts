@@ -35,11 +35,36 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
 
       // Then check staffing requests for this technician for any of these jobs
       const jobIds = jobs.map(j => j.id)
-      const { data: rawStatuses, error: statusesError } = await supabase
-        .from('staffing_requests')
-        .select('job_id, phase, status, updated_at, single_day, target_date')
-        .eq('profile_id', profileId)
-        .in('job_id', jobIds)
+
+      // Batch job IDs to avoid URL length limits (max ~100 UUIDs per request)
+      const BATCH_SIZE = 100;
+      const batches: string[][] = [];
+      for (let i = 0; i < jobIds.length; i += BATCH_SIZE) {
+        batches.push(jobIds.slice(i, i + BATCH_SIZE));
+      }
+
+      const batchPromises = batches.map(batchIds =>
+        supabase
+          .from('staffing_requests')
+          .select('job_id, phase, status, updated_at, single_day, target_date')
+          .eq('profile_id', profileId)
+          .in('job_id', batchIds)
+      );
+
+      const batchResults = await Promise.all(batchPromises);
+
+      // Collect all results and check for errors
+      let rawStatuses: any[] = [];
+      let statusesError = null;
+      for (const result of batchResults) {
+        if (result.error) {
+          statusesError = result.error;
+          break;
+        }
+        if (result.data) {
+          rawStatuses.push(...result.data);
+        }
+      }
 
       if (statusesError) {
         console.warn('⚠️ staffing view by date error:', statusesError)

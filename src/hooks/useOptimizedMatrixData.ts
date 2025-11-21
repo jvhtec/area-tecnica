@@ -4,34 +4,31 @@ import React, { useMemo, useEffect, useCallback } from 'react';
 import { format, isWithinInterval, isSameDay } from 'date-fns';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
-interface MatrixJob {
+export interface MatrixJob {
   id: string;
   title: string;
   start_time: string;
   end_time: string;
-  color?: string;
+  color?: string | null;
   status: string;
   job_type: string;
 }
 
-// Define the assignment type with proper job structure
-interface AssignmentWithJob {
+// Define the timesheet-backed assignment type with proper job structure
+export interface MatrixTimesheetAssignment {
   job_id: string;
   technician_id: string;
-  sound_role?: string;
-  lights_role?: string;
-  video_role?: string;
+  date: string;
+  job: MatrixJob;
+  status: string | null;
+  assigned_at: string | null;
   single_day?: boolean | null;
   assignment_date?: string | null;
-  status: string;
-  assigned_at: string;
-  job: {
-    id: string;
-    title: string;
-    start_time: string;
-    end_time: string;
-    color?: string;
-  };
+  sound_role?: string | null;
+  lights_role?: string | null;
+  video_role?: string | null;
+  is_schedule_only?: boolean | null;
+  source?: string | null;
 }
 
 interface OptimizedMatrixDataProps {
@@ -41,38 +38,122 @@ interface OptimizedMatrixDataProps {
 }
 
 export const buildAssignmentDateMap = (
-  assignments: AssignmentWithJob[],
-  dates: Date[]
+  assignments: MatrixTimesheetAssignment[],
+  _dates: Date[]
 ) => {
-  const map = new Map<string, AssignmentWithJob>();
-  const visibleDateKeys = new Set(dates.map(date => format(date, 'yyyy-MM-dd')));
+  const map = new Map<string, MatrixTimesheetAssignment>();
 
   assignments.forEach((assignment) => {
-    if (!assignment.job) return;
-
-    if (assignment.single_day && assignment.assignment_date) {
-      if (visibleDateKeys.size === 0 || visibleDateKeys.has(assignment.assignment_date)) {
-        map.set(`${assignment.technician_id}-${assignment.assignment_date}`, assignment);
-      }
-      return;
-    }
-
-    const jobStart = new Date(assignment.job.start_time);
-    const jobEnd = new Date(assignment.job.end_time);
-
-    dates.forEach(date => {
-      if (
-        isWithinInterval(date, { start: jobStart, end: jobEnd }) ||
-        isSameDay(date, jobStart) ||
-        isSameDay(date, jobEnd)
-      ) {
-        const key = `${assignment.technician_id}-${format(date, 'yyyy-MM-dd')}`;
-        map.set(key, assignment);
-      }
-    });
+    if (!assignment.job || !assignment.date) return;
+    const key = `${assignment.technician_id}-${assignment.date}`;
+    map.set(key, assignment);
   });
 
   return map;
+};
+
+interface FetchMatrixTimesheetArgs {
+  jobIds: string[];
+  technicianIds: string[];
+  jobsById: Map<string, MatrixJob>;
+  startDate?: Date;
+  endDate?: Date;
+}
+
+export const fetchMatrixTimesheetAssignments = async ({
+  jobIds,
+  technicianIds,
+  jobsById,
+  startDate,
+  endDate,
+}: FetchMatrixTimesheetArgs): Promise<MatrixTimesheetAssignment[]> => {
+  if (!jobIds.length || !technicianIds.length) return [];
+
+  const startIso = startDate ? format(startDate, 'yyyy-MM-dd') : null;
+  const endIso = endDate ? format(endDate, 'yyyy-MM-dd') : null;
+
+  const batchSize = 25;
+  const promises: Promise<any>[] = [];
+
+  for (let i = 0; i < jobIds.length; i += batchSize) {
+    const jobBatch = jobIds.slice(i, i + batchSize);
+    let query = supabase
+      .from('timesheets')
+      .select('job_id, technician_id, date, is_schedule_only, source')
+      .in('job_id', jobBatch)
+      .in('technician_id', technicianIds)
+      .order('date', { ascending: true })
+      .limit(1500);
+
+    if (startIso) query = query.gte('date', startIso);
+    if (endIso) query = query.lte('date', endIso);
+
+    promises.push(query);
+  }
+
+  // Batch job_assignments query to avoid URL length limits
+  const assignmentBatchSize = 100;
+  const assignmentPromises: Promise<any>[] = [];
+
+  for (let i = 0; i < jobIds.length; i += assignmentBatchSize) {
+    const jobBatch = jobIds.slice(i, i + assignmentBatchSize);
+    assignmentPromises.push(
+      supabase
+        .from('job_assignments')
+        .select('job_id, technician_id, sound_role, lights_role, video_role, single_day, assignment_date, status, assigned_at')
+        .in('job_id', jobBatch)
+        .in('technician_id', technicianIds)
+    );
+  }
+
+  const [timesheetResults, ...assignmentResults] = await Promise.all([
+    Promise.all(promises),
+    ...assignmentPromises,
+  ]);
+
+  const assignmentMap = new Map<string, any>();
+  // Process all assignment batch results
+  for (const result of assignmentResults) {
+    if (result.error) {
+      console.error('Assignment metadata query error:', result.error);
+    } else {
+      (result.data || []).forEach((row: any) => {
+        assignmentMap.set(`${row.job_id}:${row.technician_id}`, row);
+      });
+    }
+  }
+
+  const rows: MatrixTimesheetAssignment[] = [];
+
+  timesheetResults.forEach((result) => {
+    if (result.error) {
+      console.error('Timesheet query error:', result.error);
+      return;
+    }
+
+    (result.data || []).forEach((row: any) => {
+      const job = jobsById.get(row.job_id);
+      if (!job) return;
+      const meta = assignmentMap.get(`${row.job_id}:${row.technician_id}`);
+      rows.push({
+        job_id: row.job_id,
+        technician_id: row.technician_id,
+        date: row.date,
+        job,
+        status: meta?.status ?? null,
+        assigned_at: meta?.assigned_at ?? null,
+        single_day: meta?.single_day ?? Boolean(meta?.assignment_date),
+        assignment_date: meta?.assignment_date ?? null,
+        sound_role: meta?.sound_role ?? null,
+        lights_role: meta?.lights_role ?? null,
+        video_role: meta?.video_role ?? null,
+        is_schedule_only: row.is_schedule_only ?? null,
+        source: row.source ?? null,
+      });
+    });
+  });
+
+  return rows;
 };
 
 export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMatrixDataProps) => {
@@ -98,82 +179,32 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     isLoading: assignmentsInitialLoading,
     isFetching: assignmentsFetching,
   } = useQuery({
-    queryKey: ['optimized-matrix-assignments', jobIds, technicianIds, format(dateRange.start, 'yyyy-MM-dd')],
-    queryFn: async (): Promise<AssignmentWithJob[]> => {
+    queryKey: [
+      'optimized-matrix-assignments',
+      jobIds,
+      technicianIds,
+      format(dateRange.start, 'yyyy-MM-dd'),
+      format(dateRange.end, 'yyyy-MM-dd'),
+    ],
+    queryFn: async (): Promise<MatrixTimesheetAssignment[]> => {
       if (jobIds.length === 0 || technicianIds.length === 0) return [];
-      
-      console.log('Fetching assignments for', jobIds.length, 'jobs and', technicianIds.length, 'technicians');
-      
-      // Much smaller batch size for faster queries
-      const batchSize = 25;
-      const promises = [];
-      
-      for (let i = 0; i < jobIds.length; i += batchSize) {
-        const jobBatch = jobIds.slice(i, i + batchSize);
-        
-        promises.push(
-          supabase
-            .from('job_assignments')
-            .select(`
-              job_id,
-              technician_id,
-              sound_role,
-              lights_role,
-              video_role,
-              single_day,
-              assignment_date,
-              status,
-              assigned_at,
-              jobs!job_id (
-                id,
-                title,
-                start_time,
-                end_time,
-                color
-              )
-            `)
-            .in('job_id', jobBatch)
-            .in('technician_id', technicianIds)
-            .limit(500) // Limit per batch
-        );
-      }
-      
+
+      console.log('Fetching timesheet assignments for', jobIds.length, 'jobs and', technicianIds.length, 'technicians');
+
       try {
-        const results = await Promise.all(promises);
-        const allData = results.flatMap(result => {
-          if (result.error) {
-            console.error('Assignment query error:', result.error);
-            return [];
-          }
-          return result.data || [];
+        return await fetchMatrixTimesheetAssignments({
+          jobIds,
+          technicianIds,
+          jobsById,
+          startDate: dateRange.start,
+          endDate: dateRange.end,
         });
-        
-        console.log('Fetched', allData.length, 'assignments');
-        
-        // Transform and filter the data
-        const transformedData = allData.map(item => ({
-          job_id: item.job_id,
-          technician_id: item.technician_id,
-          sound_role: item.sound_role,
-          lights_role: item.lights_role,
-          video_role: item.video_role,
-          single_day: item.single_day,
-          assignment_date: item.assignment_date,
-          status: item.status,
-          assigned_at: item.assigned_at,
-          // Prefer the jobs array provided to the hook to avoid losing rows when join is blocked by RLS
-          job: jobsById.get(item.job_id) || (Array.isArray(item.jobs) ? item.jobs[0] : item.jobs)
-        }))
-        // Keep rows even if the join returned no job; a fallback from jobsById will usually satisfy it
-        .filter(item => !!item.job);
-        
-        return transformedData as AssignmentWithJob[];
       } catch (error) {
-        console.error('Error fetching assignments:', error);
+        console.error('Error fetching timesheet assignments:', error);
         return [];
       }
     },
-    enabled: jobIds.length > 0 && technicianIds.length > 0 && !!dateRange.start,
+    enabled: jobIds.length > 0 && technicianIds.length > 0 && !!dateRange.start && !!dateRange.end,
     staleTime: 30 * 1000, // 30 seconds - more frequent updates
     gcTime: 2 * 60 * 1000, // 2 minutes cache
     refetchOnWindowFocus: false, // Disable automatic refetch on focus
@@ -441,6 +472,33 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       supabase.removeChannel(channel);
     };
   }, [invalidateAssignmentQueries]);
+
+  // Realtime subscription for per-day timesheets updates
+  useEffect(() => {
+    console.log('🔔 Setting up timesheets realtime subscription for matrix');
+
+    const channel = supabase
+      .channel('matrix-timesheets')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'timesheets',
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] });
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔔 timesheets subscription status:', status);
+      });
+
+    return () => {
+      console.log('🔔 Cleaning up timesheets realtime subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const isInitialLoading = assignmentsInitialLoading || availabilityInitialLoading;
   const isFetching = assignmentsFetching || availabilityFetching;
