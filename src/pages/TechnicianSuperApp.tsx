@@ -30,7 +30,7 @@ import {
   Download, Send, RefreshCw, UploadCloud, Play, Sliders,
   Radio, Mic2, Speaker, ListMusic, Save, ArrowLeft, Activity,
   Search, Filter, Map, Layers, Globe, LayoutList, LayoutGrid,
-  Loader2, Eye, Briefcase, Shuffle, Lightbulb, Sparkles, Users
+  Loader2, Eye, Briefcase, Shuffle, Lightbulb, Sparkles, Users, Euro
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { TechnicianIncidentReportDialog } from '@/components/incident-reports/TechnicianIncidentReportDialog';
 import { JobDetailsDialog } from '@/components/jobs/JobDetailsDialog';
 import { MessageManagementDialog } from '@/components/technician/MessageManagementDialog';
+import { TechnicianTourRates } from '@/components/dashboard/TechnicianTourRates';
 
 // --- THEME STYLES (using next-themes compatible approach) ---
 const getThemeStyles = (isDark: boolean) => ({
@@ -1877,11 +1878,12 @@ interface DashboardScreenProps {
   onOpenSV: () => void;
   onOpenObliqueStrategy: () => void;
   onOpenTour: (tourId: string) => void;
+  onOpenRates: () => void;
   hasSoundVisionAccess: boolean;
   onSwitchTab: (tab: string) => void;
 }
 
-const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy, onOpenTour, hasSoundVisionAccess, onSwitchTab }: DashboardScreenProps) => {
+const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy, onOpenTour, onOpenRates, hasSoundVisionAccess, onSwitchTab }: DashboardScreenProps) => {
   const { activeTours } = useMyTours();
 
   const userInitials = userProfile?.first_name && userProfile?.last_name
@@ -1982,6 +1984,13 @@ const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoad
             </DialogTrigger>
             <MessageManagementDialog department={userProfile?.department || null} trigger={false} />
           </Dialog>
+          <button
+            onClick={onOpenRates}
+            className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-emerald-500 transition-colors text-left group`}
+          >
+            <Euro size={20} className="text-emerald-500 group-hover:scale-110 transition-transform" />
+            <span className={`text-xs font-bold ${theme.textMain}`}>Mis<br />tarifas</span>
+          </button>
         </div>
       </div>
 
@@ -2770,6 +2779,7 @@ export default function TechnicianSuperApp() {
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [showObliqueStrategy, setShowObliqueStrategy] = useState(false);
   const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
+  const [showRatesModal, setShowRatesModal] = useState(false);
 
   // Set up real-time subscriptions
   useTechnicianDashboardSubscriptions();
@@ -2904,6 +2914,7 @@ export default function TechnicianSuperApp() {
             onOpenSV={() => setActiveModal('soundvision')}
             onOpenObliqueStrategy={() => setShowObliqueStrategy(true)}
             onOpenTour={(tourId) => setSelectedTourId(tourId)}
+            onOpenRates={() => setShowRatesModal(true)}
             hasSoundVisionAccess={hasSoundVisionAccess}
             onSwitchTab={setTab}
           />
@@ -2973,6 +2984,28 @@ export default function TechnicianSuperApp() {
       )}
       {showObliqueStrategy && (
         <ObliqueStrategyModal theme={t} isDark={isDark} onClose={() => setShowObliqueStrategy(false)} />
+      )}
+      {showRatesModal && (
+        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${t.modalOverlay} p-4 animate-in fade-in duration-200`}>
+          <div className={`w-full max-w-2xl max-h-[90vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${t.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
+            {/* Header */}
+            <div className={`p-4 border-b ${t.divider} flex justify-between items-center shrink-0`}>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-emerald-500 text-white">
+                  <Euro size={18} />
+                </div>
+                <h2 className={`text-lg font-bold ${t.textMain}`}>Mis tarifas</h2>
+              </div>
+              <button onClick={() => setShowRatesModal(false)} className={`p-2 ${t.textMuted} hover:${t.textMain} rounded-full transition-colors`}>
+                <X size={20} />
+              </button>
+            </div>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <TechnicianTourRates />
+            </div>
+          </div>
+        </div>
       )}
       {selectedTourId && (
         <TourDetailView
