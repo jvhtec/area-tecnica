@@ -18,6 +18,7 @@ import Settings from '@/pages/Settings';
 import ProjectManagement from '@/pages/ProjectManagement';
 import TechnicianDashboard from '@/pages/TechnicianDashboard';
 import TechnicianUnavailability from '@/pages/TechnicianUnavailability';
+import TechnicianSuperApp from '@/pages/TechnicianSuperApp';
 import Personal from '@/pages/Personal';
 import MorningSummary from '@/pages/MorningSummary';
 import Tours from '@/pages/Tours';
@@ -138,6 +139,8 @@ export default function App() {
                       <Route path="/wallboard/public/:token/:presetSlug?" element={<WallboardPublic />} />
                       {/* Wallboard: protected, full-screen (no Layout) */}
                       <Route path="/wallboard/:presetSlug?" element={<RequireAuth><Wallboard /></RequireAuth>} />
+                      {/* TechnicianSuperApp: full-screen mobile interface for technicians */}
+                      <Route path="/tech-app" element={<RequireAuth><ProtectedRoute allowedRoles={['technician', 'house_tech']}><TechnicianSuperApp /></ProtectedRoute></RequireAuth>} />
                       {/* Public Routes */}
                       <Route path="festival">
                         <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
