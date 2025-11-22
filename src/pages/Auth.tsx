@@ -298,31 +298,63 @@ const Auth = () => {
               <div className="pt-2">
                 <div
                   ref={trackRef}
-                  className="relative h-14 rounded-full overflow-hidden cursor-pointer"
+                  className="relative h-14 rounded-full overflow-hidden cursor-pointer select-none"
                   style={{
-                    background: 'linear-gradient(90deg, rgba(59,130,246,0.2) 0%, rgba(139,92,246,0.2) 100%)',
+                    background: 'linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(139,92,246,0.15) 100%)',
                     border: '1px solid rgba(255,255,255,0.1)',
                   }}
                   onTouchStart={onTouchStart}
                   onTouchMove={onTouchMove}
                   onTouchEnd={onTouchEnd}
                 >
+                  {/* Shimmer effect */}
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
+                      backgroundSize: '200% 100%',
+                      animation: 'shimmer 2s ease-in-out infinite',
+                    }}
+                  />
+
+                  {/* Progress fill */}
+                  <div
+                    className="absolute inset-0 rounded-full pointer-events-none transition-opacity"
+                    style={{
+                      background: 'linear-gradient(90deg, rgba(59,130,246,0.3) 0%, rgba(139,92,246,0.4) 100%)',
+                      opacity: swipeX > 0 ? Math.min(swipeX / 200, 0.8) : 0,
+                    }}
+                  />
+
                   {/* Track label */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-slate-400 text-sm font-medium tracking-wide">
+                    <span
+                      className="text-slate-400 text-sm font-medium tracking-wide transition-opacity"
+                      style={{ opacity: isSubmitting ? 1 : Math.max(0.3, 1 - swipeX / 150) }}
+                    >
                       {isSubmitting ? 'Iniciando sesión...' : 'Desliza para acceder'}
                     </span>
+                    {/* Chevrons hint */}
+                    {!isSubmitting && swipeX < 20 && (
+                      <div className="absolute right-4 flex gap-0.5 opacity-40">
+                        <ChevronRight className="w-4 h-4 text-slate-400 animate-pulse" style={{ animationDelay: '0ms' }} />
+                        <ChevronRight className="w-4 h-4 text-slate-400 animate-pulse" style={{ animationDelay: '150ms' }} />
+                      </div>
+                    )}
                   </div>
 
                   {/* Draggable handle */}
                   <div
-                    className={`absolute top-1 left-1 w-12 h-12 rounded-full flex items-center justify-center transition-transform ${isDragging ? '' : 'transition-all duration-300'}`}
+                    className="absolute top-1 left-1 w-12 h-12 rounded-full flex items-center justify-center touch-none"
                     style={{
-                      transform: `translateX(${swipeX}px)`,
+                      transform: `translateX(${swipeX}px) scale(${isDragging ? 1.05 : 1})`,
+                      transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
                       background: isSubmitting
                         ? 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)'
                         : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-                      boxShadow: '0 4px 15px rgba(59,130,246,0.4)',
+                      boxShadow: isDragging
+                        ? '0 8px 25px rgba(59,130,246,0.5), 0 0 0 4px rgba(59,130,246,0.2)'
+                        : '0 4px 15px rgba(59,130,246,0.4)',
                     }}
                     onMouseDown={onMouseDown}
                     onTouchStart={onTouchStart}
@@ -330,7 +362,10 @@ const Auth = () => {
                     {isSubmitting ? (
                       <Loader2 className="w-5 h-5 text-white animate-spin" />
                     ) : (
-                      <ChevronRight className="w-5 h-5 text-white" />
+                      <ChevronRight
+                        className="w-5 h-5 text-white transition-transform"
+                        style={{ transform: `translateX(${isDragging ? 2 : 0}px)` }}
+                      />
                     )}
                   </div>
                 </div>
@@ -440,6 +475,10 @@ const Auth = () => {
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
         }
       `}</style>
 

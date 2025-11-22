@@ -42,8 +42,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TechnicianIncidentReportDialog } from '@/components/incident-reports/TechnicianIncidentReportDialog';
 import { JobDetailsDialog } from '@/components/jobs/JobDetailsDialog';
-import { MessageManagementDialog } from '@/components/technician/MessageManagementDialog';
 import { TechnicianTourRates } from '@/components/dashboard/TechnicianTourRates';
+import { SendMessage } from '@/components/messages/SendMessage';
+import { MessagesList } from '@/components/messages/MessagesList';
+import { DirectMessagesList } from '@/components/messages/DirectMessagesList';
 
 // --- THEME STYLES (using next-themes compatible approach) ---
 const getThemeStyles = (isDark: boolean) => ({
@@ -1866,6 +1868,74 @@ const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: TourDetai
   );
 };
 
+// --- MESSAGES MODAL ---
+interface MessagesModalProps {
+  theme: ReturnType<typeof getThemeStyles>;
+  isDark: boolean;
+  userProfile: any;
+  onClose: () => void;
+}
+
+const MessagesModal = ({ theme, isDark, userProfile, onClose }: MessagesModalProps) => {
+  const [activeTab, setActiveTab] = useState<'department' | 'direct'>('department');
+  const department = userProfile?.department || null;
+
+  return (
+    <div className={`fixed inset-0 z-[70] flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
+      <div className={`w-full max-w-2xl max-h-[85vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
+        {/* Header */}
+        <div className={`p-4 border-b ${theme.divider} flex justify-between items-center shrink-0`}>
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-purple-500 text-white">
+              <MessageSquare size={18} />
+            </div>
+            <h2 className={`text-lg font-bold ${theme.textMain}`}>Mensajes</h2>
+          </div>
+          <button onClick={onClose} className={`p-2 ${theme.textMuted} hover:${theme.textMain} rounded-full transition-colors`}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Tab switcher */}
+        <div className={`flex border-b ${theme.divider} shrink-0`}>
+          <button
+            onClick={() => setActiveTab('department')}
+            className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'department'
+                ? `${theme.textMain} border-b-2 border-purple-500`
+                : `${theme.textMuted} hover:${theme.textMain}`
+            }`}
+          >
+            Departamento
+          </button>
+          <button
+            onClick={() => setActiveTab('direct')}
+            className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'direct'
+                ? `${theme.textMain} border-b-2 border-purple-500`
+                : `${theme.textMuted} hover:${theme.textMain}`
+            }`}
+          >
+            Directos
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {activeTab === 'department' ? (
+            <div className="space-y-4">
+              {department && <SendMessage department={department} />}
+              <MessagesList />
+            </div>
+          ) : (
+            <DirectMessagesList />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- DASHBOARD SCREEN ---
 interface DashboardScreenProps {
   theme: ReturnType<typeof getThemeStyles>;
@@ -1879,11 +1949,12 @@ interface DashboardScreenProps {
   onOpenObliqueStrategy: () => void;
   onOpenTour: (tourId: string) => void;
   onOpenRates: () => void;
+  onOpenMessages: () => void;
   hasSoundVisionAccess: boolean;
   onSwitchTab: (tab: string) => void;
 }
 
-const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy, onOpenTour, onOpenRates, hasSoundVisionAccess, onSwitchTab }: DashboardScreenProps) => {
+const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy, onOpenTour, onOpenRates, onOpenMessages, hasSoundVisionAccess, onSwitchTab }: DashboardScreenProps) => {
   const { activeTours } = useMyTours();
 
   const userInitials = userProfile?.first_name && userProfile?.last_name
@@ -1973,17 +2044,13 @@ const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoad
             <CalendarIcon size={20} className="text-amber-500" />
             <span className={`text-xs font-bold ${theme.textMain}`}>Mi<br />disponibilidad</span>
           </button>
-          <Dialog>
-            <DialogTrigger asChild>
-              <button
-                className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-purple-500 transition-colors text-left group`}
-              >
-                <MessageSquare size={20} className="text-purple-500 group-hover:scale-110 transition-transform" />
-                <span className={`text-xs font-bold ${theme.textMain}`}>Mensajes</span>
-              </button>
-            </DialogTrigger>
-            <MessageManagementDialog department={userProfile?.department || null} trigger={false} />
-          </Dialog>
+          <button
+            onClick={onOpenMessages}
+            className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-purple-500 transition-colors text-left group`}
+          >
+            <MessageSquare size={20} className="text-purple-500 group-hover:scale-110 transition-transform" />
+            <span className={`text-xs font-bold ${theme.textMain}`}>Mensajes</span>
+          </button>
           <button
             onClick={onOpenRates}
             className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-emerald-500 transition-colors text-left group`}
@@ -2460,11 +2527,6 @@ interface ProfileViewProps {
   onSwitchTab: (tab: string) => void;
 }
 
-const PROFILE_COLORS = [
-  "#ef4444", "#3b82f6", "#10b981", "#f59e0b",
-  "#8b5cf6", "#ec4899", "#06b6d4", "#6366f1"
-];
-
 const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme, onSwitchTab }: ProfileViewProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -2653,34 +2715,7 @@ const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme, onSwitchTa
         </Button>
       </div>
 
-      {/* 3. Preferences (Color Picker) */}
-      <div>
-        <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 mt-6 px-1 ${theme.textMuted}`}>
-          Personalización
-        </h3>
-        <div className={`p-5 rounded-2xl border ${theme.card}`}>
-          <label className={`text-xs font-bold mb-3 block ${theme.textMuted}`}>Color de perfil</label>
-          <div className="flex flex-wrap gap-3">
-            {PROFILE_COLORS.map(c => (
-              <button
-                key={c}
-                onClick={() => setSelectedColor(c)}
-                className={`w-10 h-10 rounded-full transition-transform hover:scale-110 flex items-center justify-center ${
-                  selectedColor === c ? 'ring-2 ring-offset-2 ring-white' : ''
-                }`}
-                style={{
-                  backgroundColor: c,
-                  ringOffsetColor: isDark ? '#05070a' : '#f8fafc'
-                }}
-              >
-                {selectedColor === c && <Check size={16} className="text-white drop-shadow-md" />}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* 4. App Settings */}
+      {/* App Settings */}
       <div>
         <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 mt-6 px-1 ${theme.textMuted}`}>
           Ajustes de App
@@ -2780,6 +2815,7 @@ export default function TechnicianSuperApp() {
   const [showObliqueStrategy, setShowObliqueStrategy] = useState(false);
   const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
   const [showRatesModal, setShowRatesModal] = useState(false);
+  const [showMessagesModal, setShowMessagesModal] = useState(false);
 
   // Set up real-time subscriptions
   useTechnicianDashboardSubscriptions();
@@ -2915,6 +2951,7 @@ export default function TechnicianSuperApp() {
             onOpenObliqueStrategy={() => setShowObliqueStrategy(true)}
             onOpenTour={(tourId) => setSelectedTourId(tourId)}
             onOpenRates={() => setShowRatesModal(true)}
+            onOpenMessages={() => setShowMessagesModal(true)}
             hasSoundVisionAccess={hasSoundVisionAccess}
             onSwitchTab={setTab}
           />
@@ -3006,6 +3043,14 @@ export default function TechnicianSuperApp() {
             </div>
           </div>
         </div>
+      )}
+      {showMessagesModal && (
+        <MessagesModal
+          theme={t}
+          isDark={isDark}
+          userProfile={userProfile}
+          onClose={() => setShowMessagesModal(false)}
+        />
       )}
       {selectedTourId && (
         <TourDetailView
