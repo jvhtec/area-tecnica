@@ -38,10 +38,11 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TechnicianIncidentReportDialog } from '@/components/incident-reports/TechnicianIncidentReportDialog';
 import { JobDetailsDialog } from '@/components/jobs/JobDetailsDialog';
+import { MessageManagementDialog } from '@/components/technician/MessageManagementDialog';
 
 // --- THEME STYLES (using next-themes compatible approach) ---
 const getThemeStyles = (isDark: boolean) => ({
@@ -1241,6 +1242,17 @@ const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoad
             <CalendarIcon size={20} className="text-amber-500" />
             <span className={`text-xs font-bold ${theme.textMain}`}>Mi<br />disponibilidad</span>
           </button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <button
+                className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-purple-500 transition-colors text-left group`}
+              >
+                <MessageSquare size={20} className="text-purple-500 group-hover:scale-110 transition-transform" />
+                <span className={`text-xs font-bold ${theme.textMain}`}>Mensajes</span>
+              </button>
+            </DialogTrigger>
+            <MessageManagementDialog department={userProfile?.department || null} trigger={false} />
+          </Dialog>
         </div>
       </div>
 
@@ -1287,30 +1299,154 @@ interface JobsViewProps {
 }
 
 const JobsView = ({ theme, isDark, assignments, isLoading, onOpenAction, techName, onOpenObliqueStrategy }: JobsViewProps) => {
+  const [viewMode, setViewMode] = useState<'upcoming' | 'past'>('upcoming');
+  const [timeSpan, setTimeSpan] = useState('2weeks');
+
   const isCrewChief = assignments.some(a => {
     const category = getCategoryFromAssignment(a);
     return category === 'responsable';
   });
 
+  // Calculate date ranges based on timeSpan
+  const getDateRange = () => {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date;
+
+    if (viewMode === 'upcoming') {
+      startDate = now;
+      switch (timeSpan) {
+        case '1week':
+          endDate = addWeeks(now, 1);
+          break;
+        case '2weeks':
+          endDate = addWeeks(now, 2);
+          break;
+        case '1month':
+          endDate = addMonths(now, 1);
+          break;
+        case '3months':
+          endDate = addMonths(now, 3);
+          break;
+        default:
+          endDate = addWeeks(now, 2);
+      }
+    } else {
+      endDate = now;
+      switch (timeSpan) {
+        case '1week':
+          startDate = addWeeks(now, -1);
+          break;
+        case '2weeks':
+          startDate = addWeeks(now, -2);
+          break;
+        case '1month':
+          startDate = addMonths(now, -1);
+          break;
+        case '3months':
+          startDate = addMonths(now, -3);
+          break;
+        default:
+          startDate = addWeeks(now, -2);
+      }
+    }
+    return { startDate, endDate };
+  };
+
+  // Filter assignments based on view mode and time span
+  const filteredAssignments = assignments.filter(assignment => {
+    const jobData = assignment.jobs || assignment;
+    if (!jobData?.start_time) return false;
+
+    const jobStart = new Date(jobData.start_time);
+    const { startDate, endDate } = getDateRange();
+
+    if (viewMode === 'upcoming') {
+      return jobStart >= startDate && jobStart <= endDate;
+    } else {
+      return jobStart >= startDate && jobStart < endDate;
+    }
+  });
+
+  // Time span options based on view mode
+  const timeSpanOptions = viewMode === 'upcoming'
+    ? [
+        { value: '1week', label: 'Próxima semana' },
+        { value: '2weeks', label: 'Próximas 2 semanas' },
+        { value: '1month', label: 'Próximo mes' },
+        { value: '3months', label: 'Próximos 3 meses' },
+      ]
+    : [
+        { value: '1week', label: 'Semana pasada' },
+        { value: '2weeks', label: 'Últimas 2 semanas' },
+        { value: '1month', label: 'Mes pasado' },
+        { value: '3months', label: 'Últimos 3 meses' },
+      ];
+
   return (
-    <div className="space-y-6 animate-in fade-in">
-      <div className="flex justify-between items-end">
+    <div className="space-y-4 animate-in fade-in">
+      <div className="flex justify-between items-center">
         <h1 className={`text-2xl font-bold ${theme.textMain}`}>Mis trabajos</h1>
-        <Badge variant="outline">{assignments.length} asignaciones</Badge>
+        <Badge variant="outline">{filteredAssignments.length} asignaciones</Badge>
+      </div>
+
+      {/* Filters Row */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Upcoming/Past Toggle */}
+        <div className={`flex rounded-xl p-1 ${isDark ? 'bg-[#0a0c10]' : 'bg-slate-100'}`}>
+          <button
+            onClick={() => setViewMode('upcoming')}
+            className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'upcoming'
+                ? `${theme.accent} shadow-md`
+                : theme.textMuted
+            }`}
+          >
+            Próximos
+          </button>
+          <button
+            onClick={() => setViewMode('past')}
+            className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'past'
+                ? `${theme.accent} shadow-md`
+                : theme.textMuted
+            }`}
+          >
+            Pasados
+          </button>
+        </div>
+
+        {/* Time Span Selector */}
+        <div className={`flex-1 sm:flex-none`}>
+          <select
+            value={timeSpan}
+            onChange={(e) => setTimeSpan(e.target.value)}
+            className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold border ${theme.input} ${theme.card} appearance-none cursor-pointer`}
+          >
+            {timeSpanOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
         </div>
-      ) : assignments.length === 0 ? (
+      ) : filteredAssignments.length === 0 ? (
         <div className={`p-12 rounded-xl border ${theme.card} text-center`}>
           <Briefcase size={48} className={`mx-auto mb-4 ${theme.textMuted}`} />
-          <p className={theme.textMuted}>No tienes asignaciones próximas</p>
+          <p className={theme.textMuted}>
+            {viewMode === 'upcoming'
+              ? 'No tienes asignaciones próximas en este periodo'
+              : 'No tienes asignaciones pasadas en este periodo'
+            }
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {assignments.map((assignment, index) => (
+          {filteredAssignments.map((assignment, index) => (
             <TechJobCard
               key={assignment.id || index}
               job={assignment}
@@ -1699,13 +1835,15 @@ export default function TechnicianSuperApp() {
     enabled: !!user?.id,
   });
 
-  // Fetch assignments
+  // Fetch assignments (past 3 months to future 3 months for filtering)
   const { data: assignments = [], isLoading } = useRealtimeQuery(
     ['assignments-superapp'],
     async () => {
       if (!user?.id) return [];
 
-      const endDate = addWeeks(new Date(), 2);
+      // Fetch broader range for past/upcoming filtering
+      const startDate = addMonths(new Date(), -3);
+      const endDate = addMonths(new Date(), 3);
 
       const { data: jobAssignments, error } = await supabase
         .from('job_assignments')
@@ -1741,8 +1879,8 @@ export default function TechnicianSuperApp() {
         `)
         .eq('technician_id', user.id)
         .eq('status', 'confirmed')
+        .gte('jobs.start_time', startDate.toISOString())
         .lte('jobs.start_time', endDate.toISOString())
-        .gte('jobs.end_time', new Date().toISOString())
         .order('start_time', { referencedTable: 'jobs' });
 
       if (error) {
