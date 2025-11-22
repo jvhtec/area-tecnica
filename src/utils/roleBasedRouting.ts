@@ -7,7 +7,8 @@ export const getDashboardPath = (userRole: UserRole | null): string => {
       return '/wallboard';
     case 'technician':
     case 'house_tech':
-      return '/technician-dashboard';
+      // Route technician users to the new TechnicianSuperApp interface
+      return '/tech-app';
     case 'admin':
     case 'management':
     case 'logistics':
