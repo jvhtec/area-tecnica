@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PerformanceOptimizedSubscriptionManager } from '@/lib/performance-optimized-subscription-manager';
 
@@ -28,6 +28,12 @@ export function useOptimizedRealtime(
     priority = 'medium',
     dependencies = []
   } = options;
+
+  const serializedQueryKey = useMemo(
+    () => JSON.stringify(queryKey),
+    [queryKey]
+  );
+  const stableQueryKey = useMemo(() => queryKey, [serializedQueryKey]);
   
   const queryClient = useQueryClient();
   const subscriptionManager = PerformanceOptimizedSubscriptionManager.getInstance(queryClient);
@@ -49,11 +55,7 @@ export function useOptimizedRealtime(
     
     try {
       // Subscribe to table
-      subscriptionRef.current = subscriptionManager.subscribeToTable(
-        table,
-        queryKey,
-        priority
-      );
+      subscriptionRef.current = subscriptionManager.subscribeToTable(table, stableQueryKey, priority);
       
       setStatus(prev => ({
         ...prev,
@@ -79,7 +81,7 @@ export function useOptimizedRealtime(
         subscriptionRef.current = null;
       }
     };
-  }, [enabled, table, JSON.stringify(queryKey), priority, ...dependencies]);
+  }, [enabled, table, stableQueryKey, serializedQueryKey, priority, subscriptionManager, ...dependencies]);
   
   // Cleanup on unmount
   useEffect(() => {

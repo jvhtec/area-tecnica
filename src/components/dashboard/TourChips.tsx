@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Plus, Eye, EyeOff, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { TourDateManagementDialog } from "../tours/TourDateManagementDialog";
 import { TourCard } from "../tours/TourCard";
 import CreateTourDialog from "../tours/CreateTourDialog";
@@ -99,32 +99,42 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
     }
   };
 
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const sortedTourDatesById = useMemo(() => {
+    const map = new Map<string, any[]>();
+    tours.forEach((tour: any) => {
+      if (!tour?.tour_dates) return;
+      const sortedDates = [...tour.tour_dates].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      map.set(tour.id, sortedDates);
+    });
+    return map;
+  }, [tours]);
+
   const getSortedTourDates = (tourId: string) => {
-    const tour = tours.find((t: any) => t.id === tourId);
-    if (!tour?.tour_dates) return [];
-    
-    return [...tour.tour_dates].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    return sortedTourDatesById.get(tourId) || [];
   };
 
   // Filter tours based on completion status
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const activeTours = tours.filter((tour: any) => {
+  const activeTours = useMemo(() => tours.filter((tour: any) => {
     if (!tour.end_date) return true; // Tours without end_date are considered active
     const endDate = new Date(tour.end_date);
     endDate.setHours(0, 0, 0, 0);
     return endDate >= today;
-  });
+  }), [today, tours]);
 
-  const completedTours = tours.filter((tour: any) => {
+  const completedTours = useMemo(() => tours.filter((tour: any) => {
     if (!tour.end_date) return false;
     const endDate = new Date(tour.end_date);
     endDate.setHours(0, 0, 0, 0);
     return endDate < today;
-  });
+  }), [today, tours]);
 
   const displayedTours = showCompletedTours ? tours : activeTours;
   

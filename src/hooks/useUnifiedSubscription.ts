@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 import { useLocation } from 'react-router-dom';
@@ -21,16 +21,26 @@ export function useTableSubscription(
   const manager = UnifiedSubscriptionManager.getInstance(queryClient);
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   const location = useLocation();
+  const serializedQueryKey = useMemo(
+    () => JSON.stringify(queryKey),
+    [queryKey]
+  );
+  const serializedFilter = useMemo(
+    () => (filter ? JSON.stringify(filter) : undefined),
+    [filter]
+  );
+  const stableQueryKey = useMemo(() => queryKey, [serializedQueryKey]);
+  const stableFilter = useMemo(() => filter, [serializedFilter]);
+  const subscriptionKey = useMemo(() => {
+    const key = Array.isArray(queryKey) ? serializedQueryKey : queryKey;
+    return `${table}::${key}`;
+  }, [table, serializedQueryKey, queryKey]);
   
   useEffect(() => {
     // Subscribe to the table
-    subscriptionRef.current = manager.subscribeToTable(table, queryKey, filter, priority);
+    subscriptionRef.current = manager.subscribeToTable(table, stableQueryKey, stableFilter, priority);
     
     // Register this subscription with the current route
-    const subscriptionKey = Array.isArray(queryKey) 
-      ? `${table}::${JSON.stringify(queryKey)}`
-      : `${table}::${queryKey}`;
-      
     manager.registerRouteSubscription(location.pathname, subscriptionKey);
     
     // Cleanup on unmount
@@ -40,7 +50,7 @@ export function useTableSubscription(
         subscriptionRef.current = null;
       }
     };
-  }, [table, JSON.stringify(queryKey), JSON.stringify(filter), priority, location.pathname, manager]);
+  }, [table, serializedQueryKey, serializedFilter, stableQueryKey, stableFilter, priority, location.pathname, manager, subscriptionKey]);
 
   // Get subscription status
   const [status, setStatus] = useState({
@@ -52,7 +62,7 @@ export function useTableSubscription(
   // Update status periodically
   useEffect(() => {
     const intervalId = setInterval(() => {
-      const subscriptionStatus = manager.getSubscriptionStatus(table, queryKey);
+      const subscriptionStatus = manager.getSubscriptionStatus(table, stableQueryKey);
       setStatus({
         isConnected: subscriptionStatus.isConnected,
         lastActivity: subscriptionStatus.lastActivity,
@@ -61,7 +71,7 @@ export function useTableSubscription(
     }, 10000);
     
     return () => clearInterval(intervalId);
-  }, [table, JSON.stringify(queryKey), manager]);
+  }, [table, serializedQueryKey, manager, stableQueryKey]);
   
   return {
     isSubscribed: status.isConnected,
@@ -89,16 +99,28 @@ export function useMultiTableSubscription(
   const manager = UnifiedSubscriptionManager.getInstance(queryClient);
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   const location = useLocation();
+  const serializedTables = useMemo(
+    () => JSON.stringify(tables),
+    [tables]
+  );
+  const tableConfigs = useMemo(
+    () => tables.map(t => ({
+      table: t.table,
+      queryKey: t.queryKey || t.table,
+      filter: t.filter,
+      priority: t.priority || 'medium'
+    })),
+    [serializedTables]
+  );
   
   useEffect(() => {
     // Create subscription to multiple tables
-    subscriptionRef.current = manager.subscribeToTables(tables);
+    subscriptionRef.current = manager.subscribeToTables(tableConfigs);
     
     // Register all subscriptions with current route
-    tables.forEach(({ table, queryKey }) => {
-      const subscriptionKey = Array.isArray(queryKey) 
-        ? `${table}::${JSON.stringify(queryKey)}`
-        : `${table}::${queryKey}`;
+    tableConfigs.forEach(({ table, queryKey }) => {
+      const normalizedKey = Array.isArray(queryKey) ? JSON.stringify(queryKey) : queryKey;
+      const subscriptionKey = `${table}::${normalizedKey}`;
         
       manager.registerRouteSubscription(location.pathname, subscriptionKey);
     });
@@ -110,7 +132,7 @@ export function useMultiTableSubscription(
         subscriptionRef.current = null;
       }
     };
-  }, [JSON.stringify(tables), location.pathname, manager]);
+  }, [tableConfigs, location.pathname, manager, serializedTables]);
   
   // Get subscription status for all tables
   const [statuses, setStatuses] = useState<Record<string, any>>({});
@@ -119,7 +141,7 @@ export function useMultiTableSubscription(
     const intervalId = setInterval(() => {
       const newStatuses: Record<string, any> = {};
       
-      tables.forEach(({ table, queryKey }) => {
+      tableConfigs.forEach(({ table, queryKey }) => {
         const subscriptionStatus = manager.getSubscriptionStatus(table, queryKey);
         const key = Array.isArray(queryKey) ? JSON.stringify(queryKey) : queryKey;
         
@@ -134,7 +156,7 @@ export function useMultiTableSubscription(
     }, 10000);
     
     return () => clearInterval(intervalId);
-  }, [JSON.stringify(tables), manager]);
+  }, [manager, tableConfigs, serializedTables]);
   
   // Determine overall status
   const allConnected = Object.values(statuses).every(status => status?.isConnected);

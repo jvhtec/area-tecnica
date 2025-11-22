@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -205,6 +205,22 @@ export function JobCardNew({
     };
   }, [job?.id]);
 
+  const jobStartDate = useMemo(() => new Date(job.start_time), [job.start_time]);
+  const jobEndDate = useMemo(() => new Date(job.end_time), [job.end_time]);
+  const jobDateKey = useMemo(() => `${job.id}-${format(jobStartDate, "yyyy-MM-dd")}`, [job.id, jobStartDate]);
+  const jobStartIso = useMemo(
+    () => jobStartDate.toISOString().split(".")[0] + ".000Z",
+    [jobStartDate]
+  );
+  const jobEndIso = useMemo(
+    () => jobEndDate.toISOString().split(".")[0] + ".000Z",
+    [jobEndDate]
+  );
+  const jobDatesDisplay = useMemo(() => ({
+    range: `${format(jobStartDate, "MMM d, yyyy")} - ${format(jobEndDate, "MMM d, yyyy")}`,
+    startTime: format(jobStartDate, "HH:mm")
+  }), [jobEndDate, jobStartDate]);
+
   useEffect(() => {
     async function fetchDateTypes() {
       if (isJobBeingDeleted) return; // Prevent queries during deletion
@@ -214,12 +230,11 @@ export function JobCardNew({
         .select("*")
         .eq("job_id", job.id);
       if (!error && data && data.length > 0) {
-        const key = `${job.id}-${format(new Date(job.start_time), "yyyy-MM-dd")}`;
-        setDateTypes({ [key]: data[0] });
+        setDateTypes({ [jobDateKey]: data[0] });
       }
     }
     fetchDateTypes();
-  }, [job.id, job.start_time, isJobBeingDeleted]);
+  }, [job.id, jobDateKey, isJobBeingDeleted]);
 
   const assignedTechnicians = job.job_type !== "dryhire"
     ? assignments
@@ -513,11 +528,10 @@ export function JobCardNew({
       }
 
       // Use the correct ISO datetime format that works with Flex API
-      const startDate = new Date(job.start_time);
-      const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
+      const documentNumber = jobStartDate.toISOString().slice(2, 10).replace(/-/g, "");
 
-      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
-      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
+      const formattedStartDate = jobStartIso;
+      const formattedEndDate = jobEndIso;
 
       toast({
         title: "Creating folders...",
@@ -959,7 +973,7 @@ export function JobCardNew({
           <div className="mb-3 sm:mb-4">
             <div className="flex items-start gap-2">
               <div className="shrink-0 mt-0.5 sm:mt-1">
-                {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
+                {getDateTypeIcon(job.id, jobStartDate, dateTypes)}
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-medium text-sm sm:text-lg leading-tight break-words">{job.title}</h3>
@@ -1191,11 +1205,10 @@ export function JobCardNew({
                   <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
                   <div className="flex flex-col min-w-0">
                     <span className="truncate">
-                      {format(new Date(job.start_time), "MMM d, yyyy")} -{" "}
-                      {format(new Date(job.end_time), "MMM d, yyyy")}
+                      {jobDatesDisplay.range}
                     </span>
                     <span className="text-muted-foreground">
-                      {format(new Date(job.start_time), "HH:mm")}
+                      {jobDatesDisplay.startTime}
                     </span>
                   </div>
                 </div>

@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { format, isSameDay, isWithinInterval } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
 import { MatrixCell } from './MatrixCell';
@@ -11,6 +11,7 @@ import { MarkUnavailableDialog } from './MarkUnavailableDialog';
 import { useJobAssignmentsRealtime } from '@/hooks/useJobAssignmentsRealtime';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { throttle } from '@/utils/throttle';
 
 interface AssignmentMatrixProps {
   technicians: Array<{
@@ -178,7 +179,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   }, []);
 
   // Main scroll handler
-  const handleMainScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  const handleMainScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (syncInProgressRef.current) return;
     
     const scrollLeft = e.currentTarget.scrollLeft;
@@ -188,7 +189,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   }, [syncScrollPositions]);
 
   // Date headers scroll handler
-  const handleDateHeadersScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  const handleDateHeadersScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (syncInProgressRef.current) return;
     
     const scrollLeft = e.currentTarget.scrollLeft;
@@ -197,13 +198,36 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   }, [syncScrollPositions]);
 
   // Technician scroll handler
-  const handleTechnicianScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  const handleTechnicianScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (syncInProgressRef.current) return;
     
     const scrollTop = e.currentTarget.scrollTop;
     
     syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, 'technician');
   }, [syncScrollPositions]);
+
+  const handleMainScroll = useMemo(
+    () => throttle(handleMainScrollCore, 16),
+    [handleMainScrollCore]
+  );
+
+  const handleDateHeadersScroll = useMemo(
+    () => throttle(handleDateHeadersScrollCore, 16),
+    [handleDateHeadersScrollCore]
+  );
+
+  const handleTechnicianScroll = useMemo(
+    () => throttle(handleTechnicianScrollCore, 16),
+    [handleTechnicianScrollCore]
+  );
+
+  useEffect(() => {
+    return () => {
+      handleMainScroll.cancel();
+      handleDateHeadersScroll.cancel();
+      handleTechnicianScroll.cancel();
+    };
+  }, [handleDateHeadersScroll, handleMainScroll, handleTechnicianScroll]);
 
   // REMOVED: Complex dimension setup useEffect that was causing issues
 

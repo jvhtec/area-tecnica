@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/lib/enhanced-supabase-client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,13 +24,18 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
   
   // Normalize options to array
   const subscriptions = Array.isArray(options) ? options : [options];
+  const serializedSubscriptions = useMemo(
+    () => JSON.stringify(subscriptions),
+    [subscriptions]
+  );
+  const stableSubscriptions = useMemo(() => subscriptions, [serializedSubscriptions]);
   
   useEffect(() => {
     // Store current subscriptions for reconnect event
-    subscriptionsRef.current = subscriptions;
+    subscriptionsRef.current = stableSubscriptions;
     
     // Create a unique channel name based on the subscribed tables
-    const tables = subscriptions.map(sub => sub.table).join("-");
+    const tables = stableSubscriptions.map(sub => sub.table).join("-");
     const channelName = `${tables}-${Math.random().toString(36).substring(2, 10)}`;
     
     console.log(`Creating channel ${channelName} for tables: ${tables}`);
@@ -40,7 +45,7 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
     channelRef.current = channel;
     
     // Add subscriptions to the channel
-    subscriptions.forEach(sub => {
+    stableSubscriptions.forEach(sub => {
       const { table, schema = "public", event = "*", filter, queryKey } = sub;
       
       // Configure the subscription
@@ -171,7 +176,7 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
         channelRef.current = null;
       }
     };
-  }, [JSON.stringify(subscriptions), queryClient, toast]);
+  }, [serializedSubscriptions, stableSubscriptions, queryClient, toast]);
   
   return {
     isSubscribed: !!channelRef.current
