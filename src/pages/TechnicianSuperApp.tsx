@@ -2451,15 +2451,42 @@ interface ProfileViewProps {
   onSwitchTab: (tab: string) => void;
 }
 
+const PROFILE_COLORS = [
+  "#ef4444", "#3b82f6", "#10b981", "#f59e0b",
+  "#8b5cf6", "#ec4899", "#06b6d4", "#6366f1"
+];
+
 const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme, onSwitchTab }: ProfileViewProps) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [selectedColor, setSelectedColor] = useState(userProfile?.profile_color || '#3b82f6');
+  const [pushNotifications, setPushNotifications] = useState(true);
 
-  const userInitials = userProfile?.first_name && userProfile?.last_name
-    ? `${userProfile.first_name[0]}${userProfile.last_name[0]}`.toUpperCase()
+  // Form state
+  const [firstName, setFirstName] = useState(userProfile?.first_name || '');
+  const [lastName, setLastName] = useState(userProfile?.last_name || '');
+  const [phone, setPhone] = useState(userProfile?.phone || '');
+  const [city, setCity] = useState(userProfile?.city || '');
+  const [dni, setDni] = useState(userProfile?.dni || '');
+
+  // Update form when profile loads
+  useEffect(() => {
+    if (userProfile) {
+      setFirstName(userProfile.first_name || '');
+      setLastName(userProfile.last_name || '');
+      setPhone(userProfile.phone || '');
+      setCity(userProfile.city || '');
+      setDni(userProfile.dni || '');
+      setSelectedColor(userProfile.profile_color || '#3b82f6');
+    }
+  }, [userProfile]);
+
+  const userInitials = firstName && lastName
+    ? `${firstName[0]}`.toUpperCase()
     : user?.email?.[0]?.toUpperCase() || '?';
 
-  const userName = userProfile?.first_name && userProfile?.last_name
-    ? `${userProfile.first_name} ${userProfile.last_name}`
+  const userName = firstName && lastName
+    ? `${firstName} ${lastName}`
     : user?.email || 'Técnico';
 
   const roleLabels: Record<string, string> = {
@@ -2470,81 +2497,256 @@ const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme, onSwitchTa
   };
   const roleLabel = roleLabels[userProfile?.role] || userProfile?.role || 'Técnico';
 
+  const deptLabels: Record<string, string> = {
+    'sound': 'Sonido',
+    'lights': 'Luces',
+    'video': 'Vídeo',
+  };
+  const deptLabel = deptLabels[userProfile?.department?.toLowerCase()] || userProfile?.department || '';
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate('/');
   };
 
+  // Save profile mutation
+  const saveProfileMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error('No user');
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+          phone,
+          city,
+          dni,
+          profile_color: selectedColor,
+        })
+        .eq('id', user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Perfil actualizado');
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+    },
+    onError: (err: any) => {
+      toast.error(`Error: ${err.message}`);
+    },
+  });
+
   return (
-    <div className="space-y-6 animate-in fade-in">
+    <div className="space-y-6 animate-in fade-in pb-8">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className={`text-2xl font-bold ${theme.textMain}`}>Perfil</h1>
-        <Button variant="outline" size="sm" onClick={toggleTheme}>
-          {isDark ? <Sun size={14} className="mr-1" /> : <Moon size={14} className="mr-1" />}
+        <button
+          onClick={toggleTheme}
+          className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${theme.card} ${theme.textMuted}`}
+        >
           {isDark ? "Modo claro" : "Modo oscuro"}
+        </button>
+      </div>
+
+      {/* 1. Avatar & Identity */}
+      <div className={`p-6 rounded-2xl border flex flex-col items-center text-center relative overflow-hidden ${theme.card}`}>
+        {/* Color Banner Background */}
+        <div className="absolute top-0 left-0 w-full h-24 opacity-20" style={{ backgroundColor: selectedColor }} />
+
+        <div className="relative mt-4 mb-4">
+          <div
+            className={`w-24 h-24 rounded-full border-4 flex items-center justify-center text-3xl font-bold ${theme.bg} ${theme.textMain}`}
+            style={{ borderColor: selectedColor }}
+          >
+            {userInitials}
+          </div>
+          <button className="absolute bottom-0 right-0 p-2 rounded-full shadow-lg bg-blue-600 text-white hover:bg-blue-500">
+            <Camera size={14} />
+          </button>
+        </div>
+
+        <h2 className={`text-xl font-bold ${theme.textMain}`}>{userName}</h2>
+        <p className={`text-sm ${theme.textMuted}`}>{roleLabel} • {deptLabel}</p>
+      </div>
+
+      {/* 2. Personal Info Form */}
+      <div className={`p-5 rounded-2xl border ${theme.card}`}>
+        <h3 className={`flex items-center gap-2 font-bold mb-4 ${theme.textMain}`}>
+          <User size={18} className="text-blue-500" /> Información Personal
+        </h3>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={`text-xs font-bold mb-1.5 block ml-1 ${theme.textMuted}`}>Nombre</label>
+            <Input
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className={theme.input}
+            />
+          </div>
+          <div>
+            <label className={`text-xs font-bold mb-1.5 block ml-1 ${theme.textMuted}`}>Apellidos</label>
+            <Input
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className={theme.input}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <div>
+            <label className={`text-xs font-bold mb-1.5 block ml-1 ${theme.textMuted}`}>Teléfono</label>
+            <div className="relative">
+              <Phone size={16} className={`absolute left-3 top-3 ${theme.textMuted}`} />
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className={`pl-10 ${theme.input}`}
+              />
+            </div>
+          </div>
+          <div>
+            <label className={`text-xs font-bold mb-1.5 block ml-1 ${theme.textMuted}`}>Ciudad</label>
+            <div className="relative">
+              <MapPin size={16} className={`absolute left-3 top-3 ${theme.textMuted}`} />
+              <Input
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className={`pl-10 ${theme.input}`}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <label className={`text-xs font-bold mb-1.5 block ml-1 ${theme.textMuted}`}>DNI / NIE</label>
+          <div className="relative">
+            <CreditCard size={16} className={`absolute left-3 top-3 ${theme.textMuted}`} />
+            <Input
+              value={dni}
+              onChange={(e) => setDni(e.target.value)}
+              className={`pl-10 ${theme.input}`}
+            />
+          </div>
+        </div>
+
+        <Button
+          className="w-full mt-4"
+          onClick={() => saveProfileMutation.mutate()}
+          disabled={saveProfileMutation.isPending}
+        >
+          {saveProfileMutation.isPending ? (
+            <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Guardando...</>
+          ) : (
+            <><Save size={16} className="mr-2" /> Guardar cambios</>
+          )}
         </Button>
       </div>
 
-      {/* Profile Card */}
-      <div className={`p-6 rounded-2xl border flex flex-col items-center relative overflow-hidden ${theme.card}`}>
-        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-blue-500/20 to-purple-600/20" />
-        <div className="w-24 h-24 rounded-full border-4 border-blue-500 relative mt-4 mb-3 flex items-center justify-center text-3xl font-bold bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-          {userInitials}
+      {/* 3. Preferences (Color Picker) */}
+      <div>
+        <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 mt-6 px-1 ${theme.textMuted}`}>
+          Personalización
+        </h3>
+        <div className={`p-5 rounded-2xl border ${theme.card}`}>
+          <label className={`text-xs font-bold mb-3 block ${theme.textMuted}`}>Color de perfil</label>
+          <div className="flex flex-wrap gap-3">
+            {PROFILE_COLORS.map(c => (
+              <button
+                key={c}
+                onClick={() => setSelectedColor(c)}
+                className={`w-10 h-10 rounded-full transition-transform hover:scale-110 flex items-center justify-center ${
+                  selectedColor === c ? 'ring-2 ring-offset-2 ring-white' : ''
+                }`}
+                style={{
+                  backgroundColor: c,
+                  ringOffsetColor: isDark ? '#05070a' : '#f8fafc'
+                }}
+              >
+                {selectedColor === c && <Check size={16} className="text-white drop-shadow-md" />}
+              </button>
+            ))}
+          </div>
         </div>
-        <h2 className={`text-xl font-bold ${theme.textMain}`}>{userName}</h2>
-        <div className="flex items-center gap-2 mt-1">
-          <Badge variant="outline">{roleLabel}</Badge>
-          {userProfile?.department && (
-            <Badge variant="secondary">{userProfile.department}</Badge>
-          )}
-        </div>
-        {user?.email && (
-          <p className={`text-xs ${theme.textMuted} mt-2`}>{user.email}</p>
-        )}
       </div>
 
-      {/* Quick Actions */}
-      <div className={`rounded-xl border divide-y ${theme.divider} ${theme.card}`}>
-        <button
+      {/* 4. App Settings */}
+      <div>
+        <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 mt-6 px-1 ${theme.textMuted}`}>
+          Ajustes de App
+        </h3>
+
+        {/* Push Notifications Toggle */}
+        <div className={`p-4 rounded-xl border flex items-center justify-between mb-3 ${theme.card}`}>
+          <div className="pr-4">
+            <div className={`font-bold text-sm ${theme.textMain}`}>Notificaciones Push</div>
+            <div className={`text-xs mt-0.5 ${theme.textMuted}`}>Alertas de turnos y cambios de horario</div>
+          </div>
+          <button
+            onClick={() => setPushNotifications(!pushNotifications)}
+            className={`w-11 h-6 rounded-full relative transition-colors ${
+              pushNotifications ? 'bg-blue-600' : isDark ? 'bg-gray-700' : 'bg-slate-300'
+            }`}
+          >
+            <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${
+              pushNotifications ? 'left-6' : 'left-1'
+            }`} />
+          </button>
+        </div>
+
+        {/* Calendar Sync */}
+        <div className={`p-4 rounded-xl border mb-3 flex items-center justify-between cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400"><CalendarIcon size={18} /></div>
+            <div>
+              <div className={`font-bold text-sm ${theme.textMain}`}>Sincronizar Calendario</div>
+              <div className={`text-xs ${theme.textMuted}`}>Google / Apple Calendar (ICS)</div>
+            </div>
+          </div>
+          <ChevronRight size={18} className={theme.textMuted} />
+        </div>
+
+        {/* Change Password */}
+        <div className={`p-4 rounded-xl border mb-3 flex items-center justify-between cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400"><Lock size={18} /></div>
+            <div>
+              <div className={`font-bold text-sm ${theme.textMain}`}>Cambiar Contraseña</div>
+              <div className={`text-xs ${theme.textMuted}`}>Gestiona tu contraseña de acceso</div>
+            </div>
+          </div>
+          <ChevronRight size={18} className={theme.textMuted} />
+        </div>
+
+        {/* Availability shortcut */}
+        <div
           onClick={() => onSwitchTab('availability')}
-          className={`w-full p-4 flex justify-between items-center hover:bg-white/5 text-sm font-bold text-left ${theme.textMain}`}
+          className={`p-4 rounded-xl border mb-3 flex items-center justify-between cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}
         >
           <div className="flex items-center gap-3">
-            <CalendarIcon size={18} className={theme.textMuted} />
-            <span>Gestionar disponibilidad</span>
+            <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400"><CalendarIcon size={18} /></div>
+            <div>
+              <div className={`font-bold text-sm ${theme.textMain}`}>Mi Disponibilidad</div>
+              <div className={`text-xs ${theme.textMuted}`}>Gestiona tus días libres y ausencias</div>
+            </div>
           </div>
-          <ChevronRight size={16} className={theme.textMuted} />
-        </button>
-        <button
-          onClick={() => onSwitchTab('jobs')}
-          className={`w-full p-4 flex justify-between items-center hover:bg-white/5 text-sm font-bold text-left ${theme.textMain}`}
-        >
-          <div className="flex items-center gap-3">
-            <Clock size={18} className={theme.textMuted} />
-            <span>Partes de horas</span>
-          </div>
-          <ChevronRight size={16} className={theme.textMuted} />
-        </button>
-        <button
-          className={`w-full p-4 flex justify-between items-center hover:bg-white/5 text-sm font-bold text-left ${theme.textMain}`}
-        >
-          <div className="flex items-center gap-3">
-            <Bell size={18} className={theme.textMuted} />
-            <span>Notificaciones</span>
-          </div>
-          <ChevronRight size={16} className={theme.textMuted} />
-        </button>
+          <ChevronRight size={18} className={theme.textMuted} />
+        </div>
       </div>
 
-      {/* Sign Out */}
-      <Button
-        variant="destructive"
-        className="w-full"
+      {/* 5. Sign Out */}
+      <button
         onClick={handleSignOut}
+        className="w-full py-4 mt-4 text-red-500 font-bold text-sm bg-red-500/5 border border-red-500/20 rounded-xl flex items-center justify-center gap-2 hover:bg-red-500/10 transition-colors"
       >
-        <LogOut size={18} className="mr-2" />
-        Cerrar sesión
-      </Button>
+        <LogOut size={18} /> Cerrar Sesión
+      </button>
+
+      {/* Version */}
+      <div className={`text-center text-xs mt-6 ${theme.textMuted}`}>
+        Versión 2.4.1 (Build 2930)
+      </div>
     </div>
   );
 };
