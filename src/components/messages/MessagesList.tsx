@@ -6,7 +6,26 @@ import { useMessagesQuery } from "./hooks/useMessagesQuery";
 import { useMessageOperations } from "./hooks/useMessageOperations";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 
-export const MessagesList = () => {
+interface MessagesListProps {
+  theme?: {
+    bg: string;
+    nav: string;
+    card: string;
+    textMain: string;
+    textMuted: string;
+    accent: string;
+    input: string;
+    modalOverlay: string;
+    divider: string;
+    danger: string;
+    success: string;
+    warning: string;
+    cluster: string;
+  };
+  isDark?: boolean;
+}
+
+export const MessagesList = ({ theme, isDark = false }: MessagesListProps) => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const { toast } = useToast();
@@ -42,16 +61,16 @@ export const MessagesList = () => {
   const { handleDeleteMessage, handleMarkAsRead, handleGrantSoundVisionAccess } = useMessageOperations(messages, setMessages, toast);
 
   if (loading) {
-    return <div>Cargando mensajes...</div>;
+    return <div className={`text-sm ${theme?.textMuted || 'text-muted-foreground'} animate-pulse`}>Cargando mensajes...</div>;
   }
 
   return (
     <div className="space-y-4">
       {isFetching && !loading && (
-        <div className="text-xs text-muted-foreground mb-2">Actualizando mensajes...</div>
+        <div className={`text-xs ${theme?.textMuted || 'text-muted-foreground'} mb-2`}>Actualizando mensajes...</div>
       )}
       {messages.length === 0 ? (
-        <p className="text-muted-foreground">No hay mensajes en este departamento.</p>
+        <p className={theme?.textMuted || 'text-muted-foreground'}>No hay mensajes en este departamento.</p>
       ) : (
         messages.map((message) => (
           <MessageCard
@@ -62,6 +81,8 @@ export const MessagesList = () => {
             onMarkAsRead={handleMarkAsRead}
             onGrantSoundVisionAccess={handleGrantSoundVisionAccess}
             isManagement={userRole === 'management'}
+            theme={theme}
+            isDark={isDark}
           />
         ))
       )}

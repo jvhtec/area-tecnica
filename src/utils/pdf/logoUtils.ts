@@ -21,6 +21,49 @@ const withInflight = (bucket: string, path: string, fn: () => Promise<string | u
   return p;
 };
 
+const resolveTourLogoPath = async (tourId: string): Promise<string | null> => {
+  try {
+    const { data: tourLogo, error: tourLogoError } = await supabase
+      .from("tour_logos")
+      .select("file_path")
+      .eq("tour_id", tourId)
+      .maybeSingle();
+
+    if (tourLogo?.file_path) {
+      return tourLogo.file_path;
+    }
+
+    if (tourLogoError) {
+      console.warn("Error fetching tour logo record, falling back to storage search:", tourLogoError);
+    }
+  } catch (err) {
+    console.error("Unexpected error fetching tour logo record:", err);
+  }
+
+  try {
+    const { data: storageFiles, error: listError } = await supabase.storage
+      .from('tour-logos')
+      .list('', {
+        search: tourId,
+        limit: 1,
+      });
+
+    if (listError) {
+      console.error("Error searching tour logo in storage:", listError);
+      return null;
+    }
+
+    const match = (storageFiles || []).find(file =>
+      file.name?.toLowerCase().includes(tourId.toLowerCase())
+    ) || storageFiles?.[0];
+
+    return match?.name ?? null;
+  } catch (storageErr) {
+    console.error("Error listing tour logo files:", storageErr);
+    return null;
+  }
+};
+
 export const fetchLogoUrl = async (jobId: string): Promise<string | undefined> => {
   try {
     console.log("Fetching logo for job ID:", jobId);
@@ -104,67 +147,54 @@ export const fetchLogoUrl = async (jobId: string): Promise<string | undefined> =
 
 export const fetchTourLogo = async (tourId: string): Promise<string | undefined> => {
   try {
-    // Fetch the tour logo
-    const { data: tourLogo, error: tourLogoError } = await supabase
-      .from("tour_logos")
-      .select("file_path")
-      .eq("tour_id", tourId)
-      .maybeSingle();
-      
-    if (tourLogoError) {
-      console.error("Error fetching tour logo:", tourLogoError);
+    const logoPath = await resolveTourLogoPath(tourId);
+    if (!logoPath) {
       return undefined;
     }
-    
-    if (tourLogo?.file_path) {
-      try {
-        const cached = logoUrlCache.get('tour-logos', tourLogo.file_path);
-        if (cached) return cached;
 
-        return await withInflight('tour-logos', tourLogo.file_path, async () => {
-          const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-          .from('tour-logos')
-          .createSignedUrl(tourLogo.file_path, 60 * 60); // 1 hour expiry
-          
-        if (signedUrlError) {
-          console.error("Error creating tour logo signed URL:", signedUrlError);
-          // Try fallback to public URL if signed URL fails
-          const { data: publicUrlData } = supabase.storage
-            .from('tour-logos')
-            .getPublicUrl(tourLogo.file_path);
-            
-          if (publicUrlData?.publicUrl) {
-            console.log("Generated tour logo public URL (fallback):", publicUrlData.publicUrl);
-            logoUrlCache.set('tour-logos', tourLogo.file_path, publicUrlData.publicUrl, 15 * 60 * 1000);
-            return publicUrlData.publicUrl;
-          }
-          return undefined;
-        }
-          
-        if (signedUrlData?.signedUrl) {
-          console.log("Generated tour logo signed URL:", signedUrlData.signedUrl);
-          logoUrlCache.set('tour-logos', tourLogo.file_path, signedUrlData.signedUrl, 45 * 60 * 1000);
-          return signedUrlData.signedUrl;
-        }
-        
-        // Fallback to public URL
-        const { data: publicUrlData } = supabase.storage
-          .from('tour-logos')
-          .getPublicUrl(tourLogo.file_path);
-          
-        if (publicUrlData?.publicUrl) {
-          console.log("Generated tour logo public URL:", publicUrlData.publicUrl);
-          logoUrlCache.set('tour-logos', tourLogo.file_path, publicUrlData.publicUrl, 15 * 60 * 1000);
-          return publicUrlData.publicUrl;
-        }
-        return undefined;
-        });
-      } catch (storageErr) {
-        console.error("Error getting tour logo public URL:", storageErr);
-      }
+    let normalizedPath = logoPath.trim();
+    if (normalizedPath.startsWith('/')) {
+      normalizedPath = normalizedPath.slice(1);
     }
-    
-    return undefined;
+    if (normalizedPath.startsWith('tour-logos/')) {
+      normalizedPath = normalizedPath.slice('tour-logos/'.length);
+    }
+
+    const cached = logoUrlCache.get('tour-logos', normalizedPath);
+    if (cached) return cached;
+
+    if (normalizedPath.startsWith('http')) {
+      logoUrlCache.set('tour-logos', normalizedPath, normalizedPath, 45 * 60 * 1000);
+      return normalizedPath;
+    }
+
+    return await withInflight('tour-logos', normalizedPath, async () => {
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('tour-logos')
+        .createSignedUrl(normalizedPath, 60 * 60); // 1 hour expiry
+
+      if (signedUrlError) {
+        console.error("Error creating tour logo signed URL:", signedUrlError);
+      }
+
+      if (signedUrlData?.signedUrl) {
+        console.log("Generated tour logo signed URL:", signedUrlData.signedUrl);
+        logoUrlCache.set('tour-logos', normalizedPath, signedUrlData.signedUrl, 45 * 60 * 1000);
+        return signedUrlData.signedUrl;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('tour-logos')
+        .getPublicUrl(normalizedPath);
+
+      if (publicUrlData?.publicUrl) {
+        console.log("Generated tour logo public URL:", publicUrlData.publicUrl);
+        logoUrlCache.set('tour-logos', normalizedPath, publicUrlData.publicUrl, 15 * 60 * 1000);
+        return publicUrlData.publicUrl;
+      }
+
+      return undefined;
+    });
   } catch (err) {
     console.error("Error in tour logo fetch:", err);
     return undefined;
