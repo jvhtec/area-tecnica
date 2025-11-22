@@ -753,9 +753,9 @@ const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
                   <h3 className={`text-lg font-bold ${theme.textMain}`}>Documentos del trabajo</h3>
                 </div>
 
-                {job?.job_documents && job.job_documents.length > 0 ? (
+                {job?.job_documents && job.job_documents.filter((d: any) => d.visible_to_tech).length > 0 ? (
                   <div className="space-y-2">
-                    {job.job_documents.map((doc: any) => (
+                    {job.job_documents.filter((d: any) => d.visible_to_tech).map((doc: any) => (
                       <div key={doc.id} className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 flex items-center justify-between`}>
                         <div className="min-w-0 pr-4">
                           <div className={`text-sm font-bold ${theme.textMain} truncate mb-1`}>{doc.file_name}</div>
@@ -1394,8 +1394,12 @@ const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: TourDetai
 
   const handleDownloadDoc = async (doc: any) => {
     try {
-      const url = await createSignedUrl(supabase, doc.file_path, 60);
-      window.open(url, '_blank');
+      // Tour documents use the tour-documents bucket, not job-documents
+      const { data, error } = await supabase.storage
+        .from('tour-documents')
+        .createSignedUrl(doc.file_path, 60);
+      if (error || !data?.signedUrl) throw error || new Error('Failed to generate URL');
+      window.open(data.signedUrl, '_blank');
     } catch {
       toast.error('No se pudo abrir el documento');
     }
