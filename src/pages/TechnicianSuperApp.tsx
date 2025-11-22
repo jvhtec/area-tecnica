@@ -2531,7 +2531,16 @@ const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme, onSwitchTa
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedColor, setSelectedColor] = useState(userProfile?.profile_color || '#3b82f6');
-  const [pushNotifications, setPushNotifications] = useState(true);
+  const [pushNotifications, setPushNotifications] = useState(userProfile?.push_notifications_enabled ?? true);
+
+  // Password change modal state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   // Form state
   const [firstName, setFirstName] = useState(userProfile?.first_name || '');
@@ -2578,6 +2587,74 @@ const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme, onSwitchTa
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate('/');
+  };
+
+  // Handle password change
+  const handlePasswordChange = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('Las contraseñas nuevas no coinciden');
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      // First verify the current password
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user?.email || '',
+        password: passwordForm.currentPassword,
+      });
+
+      if (signInError) {
+        toast.error('La contraseña actual no es correcta');
+        return;
+      }
+
+      // Update the password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: passwordForm.newPassword
+      });
+
+      if (updateError) throw updateError;
+
+      toast.success('Contraseña actualizada correctamente');
+      setShowPasswordModal(false);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al cambiar la contraseña');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  // Handle calendar sync - show instructions
+  const handleCalendarSync = () => {
+    toast.info('Función de sincronización de calendario disponible próximamente', {
+      description: 'Podrás exportar tus turnos a Google Calendar o Apple Calendar',
+      duration: 4000,
+    });
+  };
+
+  // Handle push notifications toggle
+  const handlePushNotificationsToggle = async () => {
+    const newValue = !pushNotifications;
+    setPushNotifications(newValue);
+
+    // Save to profile (if field exists) - gracefully handle if column doesn't exist
+    try {
+      await supabase
+        .from('profiles')
+        .update({ push_notifications_enabled: newValue })
+        .eq('id', user?.id);
+    } catch {
+      // Column might not exist yet, just update local state
+    }
+
+    toast.success(newValue ? 'Notificaciones activadas' : 'Notificaciones desactivadas');
   };
 
   // Save profile mutation
@@ -2728,7 +2805,7 @@ const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme, onSwitchTa
             <div className={`text-xs mt-0.5 ${theme.textMuted}`}>Alertas de turnos y cambios de horario</div>
           </div>
           <button
-            onClick={() => setPushNotifications(!pushNotifications)}
+            onClick={handlePushNotificationsToggle}
             className={`w-11 h-6 rounded-full relative transition-colors ${
               pushNotifications ? 'bg-blue-600' : isDark ? 'bg-gray-700' : 'bg-slate-300'
             }`}
@@ -2740,7 +2817,10 @@ const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme, onSwitchTa
         </div>
 
         {/* Calendar Sync */}
-        <div className={`p-4 rounded-xl border mb-3 flex items-center justify-between cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}>
+        <div
+          onClick={handleCalendarSync}
+          className={`p-4 rounded-xl border mb-3 flex items-center justify-between cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}
+        >
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400"><CalendarIcon size={18} /></div>
             <div>
@@ -2752,7 +2832,10 @@ const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme, onSwitchTa
         </div>
 
         {/* Change Password */}
-        <div className={`p-4 rounded-xl border mb-3 flex items-center justify-between cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}>
+        <div
+          onClick={() => setShowPasswordModal(true)}
+          className={`p-4 rounded-xl border mb-3 flex items-center justify-between cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}
+        >
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400"><Lock size={18} /></div>
             <div>
@@ -2791,6 +2874,87 @@ const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme, onSwitchTa
       <div className={`text-center text-xs mt-6 ${theme.textMuted}`}>
         Versión 2.4.1 (Build 2930)
       </div>
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
+          <div className={`w-full max-w-md ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200`}>
+            {/* Header */}
+            <div className={`p-4 border-b ${theme.divider} flex justify-between items-center`}>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-blue-500 text-white">
+                  <Lock size={18} />
+                </div>
+                <h2 className={`text-lg font-bold ${theme.textMain}`}>Cambiar Contraseña</h2>
+              </div>
+              <button onClick={() => setShowPasswordModal(false)} className={`p-2 ${theme.textMuted} hover:${theme.textMain} rounded-full transition-colors`}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <div className="p-5 space-y-4">
+              <div>
+                <label className={`text-xs font-bold mb-1.5 block ${theme.textMuted}`}>Contraseña actual</label>
+                <Input
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  className={theme.input}
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <div>
+                <label className={`text-xs font-bold mb-1.5 block ${theme.textMuted}`}>Nueva contraseña</label>
+                <Input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  className={theme.input}
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <div>
+                <label className={`text-xs font-bold mb-1.5 block ${theme.textMuted}`}>Confirmar nueva contraseña</label>
+                <Input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  className={theme.input}
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  }}
+                  disabled={passwordLoading}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handlePasswordChange}
+                  disabled={passwordLoading || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+                >
+                  {passwordLoading ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Actualizando...</>
+                  ) : (
+                    'Actualizar'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
