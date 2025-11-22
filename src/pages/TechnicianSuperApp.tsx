@@ -30,7 +30,7 @@ import {
   Download, Send, RefreshCw, UploadCloud, Play, Sliders,
   Radio, Mic2, Speaker, ListMusic, Save, ArrowLeft, Activity,
   Search, Filter, Map, Layers, Globe, LayoutList, LayoutGrid,
-  Loader2, Eye, Briefcase, Shuffle, Lightbulb, Sparkles
+  Loader2, Eye, Briefcase, Shuffle, Lightbulb, Sparkles, Users
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -1303,7 +1303,7 @@ interface TourDetailViewProps {
 }
 
 const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: TourDetailViewProps) => {
-  // Fetch tour details
+  // Fetch tour details with correct schema
   const { data: tourData, isLoading: tourLoading } = useQuery({
     queryKey: ['tour-detail-tech', tourId],
     queryFn: async () => {
@@ -1311,7 +1311,15 @@ const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: TourDetai
         .from('tours')
         .select(`
           id, name, description, color, status, start_date, end_date,
-          tour_dates (id, date, city, venue, notes, job_id),
+          tour_dates (
+            id,
+            date,
+            start_date,
+            end_date,
+            location_id,
+            tour_date_type,
+            location:locations (id, name, formatted_address)
+          ),
           tour_assignments (
             id, role, department, notes,
             profiles:technician_id (id, first_name, last_name)
@@ -1325,13 +1333,13 @@ const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: TourDetai
     enabled: !!tourId,
   });
 
-  // Fetch recent tour documents
+  // Fetch recent tour documents (correct schema - no document_type column)
   const { data: tourDocs = [] } = useQuery({
     queryKey: ['tour-docs-tech', tourId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tour_documents')
-        .select('id, file_name, file_path, uploaded_at, document_type')
+        .select('id, file_name, file_path, uploaded_at, file_type')
         .eq('tour_id', tourId)
         .order('uploaded_at', { ascending: false })
         .limit(5);
@@ -1454,22 +1462,13 @@ const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: TourDetai
               <div className={`text-[10px] font-bold uppercase tracking-wider ${theme.textMuted} mb-1`}>Próximo</div>
               <div className="flex justify-between items-end">
                 <div>
-                  <h2 className={`text-xl font-bold ${theme.textMain}`}>{nextShow.city || 'Ciudad'}</h2>
-                  <div className={`text-sm ${theme.textMuted}`}>{nextShow.venue || 'Recinto'}</div>
+                  <h2 className={`text-xl font-bold ${theme.textMain}`}>{nextShow.location?.name || 'Recinto'}</h2>
+                  <div className={`text-sm ${theme.textMuted}`}>{nextShow.location?.formatted_address || nextShow.tour_date_type || 'Show'}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-mono font-bold text-blue-500">
                     {format(new Date(nextShow.date), "d 'de' MMM", { locale: es })}
                   </div>
-                  {nextShow.job_id && (
-                    <Button
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => onOpenJob(nextShow.job_id)}
-                    >
-                      Ver trabajo
-                    </Button>
-                  )}
                 </div>
               </div>
             </div>
@@ -1527,8 +1526,7 @@ const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: TourDetai
                   return (
                     <div
                       key={dateEntry.id}
-                      className={`flex items-center justify-between p-3 rounded-xl border ${theme.card} ${dateEntry.job_id ? 'cursor-pointer' : ''}`}
-                      onClick={() => dateEntry.job_id && onOpenJob(dateEntry.job_id)}
+                      className={`flex items-center justify-between p-3 rounded-xl border ${theme.card}`}
                     >
                       <div className="flex items-center gap-4">
                         <div className="text-center w-10">
@@ -1540,15 +1538,16 @@ const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: TourDetai
                           </div>
                         </div>
                         <div>
-                          <div className={`font-bold text-sm ${theme.textMain}`}>{dateEntry.city || 'Ciudad'}</div>
-                          <div className={`text-xs ${theme.textMuted}`}>{dateEntry.venue || 'Recinto'}</div>
+                          <div className={`font-bold text-sm ${theme.textMain}`}>{dateEntry.location?.name || 'Recinto'}</div>
+                          <div className={`text-xs ${theme.textMuted}`}>
+                            {dateEntry.location?.formatted_address || dateEntry.tour_date_type || 'Show'}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${statusStyles[status]}`}>
                           {statusLabels[status]}
                         </span>
-                        {dateEntry.job_id && <ChevronRight size={14} className={theme.textMuted} />}
                       </div>
                     </div>
                   );
