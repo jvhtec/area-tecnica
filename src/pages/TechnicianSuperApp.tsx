@@ -612,7 +612,7 @@ const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
                   <label className={`text-xs ${theme.textMuted} font-bold uppercase`}>Tipo de trabajo</label>
                   <div className="mt-2">
                     <span className={`px-3 py-1 rounded-full ${isDark ? 'bg-[#1a1d26] border-[#2a2e3b]' : 'bg-slate-100 border-slate-200'} border text-xs ${theme.textMain} font-medium`}>
-                      {job?.job_type || 'single'}
+                      {job?.job_type === 'multi_day' ? 'Varios días' : job?.job_type === 'single' ? 'Un solo día' : job?.job_type || 'Un solo día'}
                     </span>
                   </div>
                 </div>
@@ -1101,7 +1101,7 @@ const SoundVisionModal = ({ theme, isDark, onClose }: SoundVisionModalProps) => 
             <Search className={`absolute left-3 top-3 ${theme.textMuted}`} size={16} />
             <Input
               type="text"
-              placeholder="Buscar venues..."
+              placeholder="Buscar recintos..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={`w-full rounded-xl py-3 pl-10 pr-4 text-sm ${theme.input}`}
@@ -1467,7 +1467,7 @@ const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: TourDetai
               <div className="flex justify-between items-end">
                 <div>
                   <h2 className={`text-xl font-bold ${theme.textMain}`}>{nextShow.location?.name || 'Recinto'}</h2>
-                  <div className={`text-sm ${theme.textMuted}`}>{nextShow.location?.formatted_address || nextShow.tour_date_type || 'Show'}</div>
+                  <div className={`text-sm ${theme.textMuted}`}>{nextShow.location?.formatted_address || nextShow.tour_date_type || 'Concierto'}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-mono font-bold text-blue-500">
@@ -1544,7 +1544,7 @@ const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: TourDetai
                         <div>
                           <div className={`font-bold text-sm ${theme.textMain}`}>{dateEntry.location?.name || 'Recinto'}</div>
                           <div className={`text-xs ${theme.textMuted}`}>
-                            {dateEntry.location?.formatted_address || dateEntry.tour_date_type || 'Show'}
+                            {dateEntry.location?.formatted_address || dateEntry.tour_date_type || 'Concierto'}
                           </div>
                         </div>
                       </div>
