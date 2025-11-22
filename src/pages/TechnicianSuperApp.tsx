@@ -269,66 +269,367 @@ const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techName, onOp
   );
 };
 
-// --- TIMESHEET MODAL ---
-interface TimesheetModalProps {
+// --- TIMESHEET VIEW (Full Screen) ---
+interface TimesheetViewProps {
   theme: ReturnType<typeof getThemeStyles>;
   isDark: boolean;
   job: any;
   onClose: () => void;
+  userRole: string | null;
+  userId: string | null;
 }
 
-const TimesheetModal = ({ theme, isDark, job, onClose }: TimesheetModalProps) => {
-  const [signed, setSigned] = useState(false);
-  const navigate = useNavigate();
+interface TimeEntry {
+  id: string;
+  type: 'work' | 'break';
+  start: string;
+  end: string;
+  hours: number;
+}
 
-  const handleSubmit = () => {
-    if (job?.id) {
-      navigate(`/timesheets?jobId=${job.id}`);
+const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }: TimesheetViewProps) => {
+  const [signed, setSigned] = useState(false);
+  const [signedAt, setSignedAt] = useState<Date | null>(null);
+  const queryClient = useQueryClient();
+
+  // Fetch existing timesheet for this job/user
+  const { data: existingTimesheet, isLoading: timesheetLoading } = useQuery({
+    queryKey: ['timesheet', job?.id, userId],
+    queryFn: async () => {
+      if (!job?.id || !userId) return null;
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('*')
+        .eq('job_id', job.id)
+        .eq('technician_id', userId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!job?.id && !!userId,
+  });
+
+  // Calculate time entries from timesheet data
+  const timeEntries: TimeEntry[] = existingTimesheet ? [
+    ...(existingTimesheet.start_time && existingTimesheet.end_time ? [{
+      id: '1',
+      type: 'work' as const,
+      start: existingTimesheet.start_time?.slice(0, 5) || '09:00',
+      end: existingTimesheet.end_time?.slice(0, 5) || '18:00',
+      hours: calculateHours(existingTimesheet.start_time, existingTimesheet.end_time, existingTimesheet.break_minutes || 0),
+    }] : []),
+    ...(existingTimesheet.break_minutes > 0 ? [{
+      id: '2',
+      type: 'break' as const,
+      start: '14:00',
+      end: addMinutesToTime('14:00', existingTimesheet.break_minutes),
+      hours: existingTimesheet.break_minutes / 60,
+    }] : []),
+  ] : [];
+
+  // Form state for new/edit
+  const [startTime, setStartTime] = useState(existingTimesheet?.start_time?.slice(0, 5) || '09:00');
+  const [endTime, setEndTime] = useState(existingTimesheet?.end_time?.slice(0, 5) || '18:00');
+  const [breakMinutes, setBreakMinutes] = useState(existingTimesheet?.break_minutes || 60);
+
+  // Update form when data loads
+  useEffect(() => {
+    if (existingTimesheet) {
+      setStartTime(existingTimesheet.start_time?.slice(0, 5) || '09:00');
+      setEndTime(existingTimesheet.end_time?.slice(0, 5) || '18:00');
+      setBreakMinutes(existingTimesheet.break_minutes || 60);
+      if (existingTimesheet.signature_data) {
+        setSigned(true);
+        setSignedAt(existingTimesheet.signed_at ? new Date(existingTimesheet.signed_at) : null);
+      }
     }
-    onClose();
-  };
+  }, [existingTimesheet]);
+
+  // Calculate hours
+  const totalHours = calculateHours(startTime, endTime, breakMinutes);
+  const regularHours = Math.min(totalHours, 8);
+  const overtimeHours = Math.max(0, totalHours - 8);
+
+  // Submit mutation
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      if (!job?.id || !userId) throw new Error('Missing job or user');
+
+      const timesheetData = {
+        job_id: job.id,
+        technician_id: userId,
+        date: job.start_time ? new Date(job.start_time).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        start_time: startTime,
+        end_time: endTime,
+        break_minutes: breakMinutes,
+        overtime_hours: overtimeHours,
+        status: 'submitted' as const,
+        signature_data: signed ? 'signed' : null,
+        signed_at: signed ? new Date().toISOString() : null,
+      };
+
+      if (existingTimesheet?.id) {
+        const { error } = await supabase
+          .from('timesheets')
+          .update(timesheetData)
+          .eq('id', existingTimesheet.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('timesheets')
+          .insert({ ...timesheetData, created_by: userId });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success('Parte de horas enviado correctamente');
+      queryClient.invalidateQueries({ queryKey: ['timesheet'] });
+      onClose();
+    },
+    onError: (err: any) => {
+      toast.error(`Error: ${err.message}`);
+    },
+  });
 
   const jobDate = job?.start_time
-    ? format(new Date(job.start_time), "PPP", { locale: es })
+    ? format(new Date(job.start_time), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })
     : "Fecha no disponible";
 
-  return (
-    <Sheet open onOpenChange={onClose}>
-      <SheetContent side="bottom" className={`h-[70vh] rounded-t-2xl ${isDark ? 'bg-[#0f1219]' : 'bg-white'}`}>
-        <SheetHeader className="mb-6">
-          <SheetTitle className={theme.textMain}>Registrar horas</SheetTitle>
-        </SheetHeader>
+  const handleSign = () => {
+    setSigned(!signed);
+    if (!signed) {
+      setSignedAt(new Date());
+    } else {
+      setSignedAt(null);
+    }
+  };
 
-        <div className={`p-4 rounded-xl border ${theme.card} mb-4`}>
-          <div className="flex justify-between mb-2">
-            <span className={theme.textMuted}>Trabajo</span>
-            <span className={theme.textMain}>{job?.title || 'Sin título'}</span>
-          </div>
-          <div className="flex justify-between mb-2">
-            <span className={theme.textMuted}>Fecha</span>
-            <span className={theme.textMain}>{jobDate}</span>
+  return (
+    <div className={`fixed inset-0 z-[60] ${theme.bg} overflow-y-auto`}>
+      {/* Header */}
+      <div className={`sticky top-0 z-10 px-5 py-4 border-b ${theme.divider} ${theme.bg}`}>
+        <div className="flex justify-between items-center">
+          <div>
+            <button
+              onClick={onClose}
+              className={`flex items-center gap-1 text-xs font-bold mb-1 ${theme.textMuted}`}
+            >
+              <ChevronLeft size={14} /> Volver
+            </button>
+            <h1 className={`text-xl font-bold ${theme.textMain}`}>Mi parte de horas</h1>
           </div>
         </div>
+      </div>
 
-        <p className={`text-sm ${theme.textMuted} mb-6`}>
-          Para registrar tus horas completas, serás redirigido a la página de partes de horas.
-        </p>
+      {/* Content */}
+      <div className="p-5 space-y-5 pb-32">
+        {timesheetLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          </div>
+        ) : (
+          <>
+            {/* Daily Summary Card */}
+            <div className={`p-5 rounded-2xl border ${theme.card}`}>
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h2 className={`text-lg font-bold ${theme.textMain}`}>Registro diario</h2>
+                  <div className={`text-xs ${theme.textMuted} flex items-center gap-1.5 mt-1`}>
+                    <CalendarIcon size={12} /> {jobDate}
+                  </div>
+                  <div className={`text-xs ${theme.textMuted} flex items-center gap-1.5 mt-1`}>
+                    <MapPin size={12} /> {job?.location?.name || job?.title || 'Sin ubicación'}
+                  </div>
+                </div>
+                <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase ${
+                  existingTimesheet?.status === 'submitted' ? theme.warning :
+                  existingTimesheet?.status === 'approved' ? theme.success :
+                  isDark ? 'bg-gray-500/10 text-gray-400' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {existingTimesheet?.status === 'submitted' ? 'Pendiente' :
+                   existingTimesheet?.status === 'approved' ? 'Aprobado' : 'Borrador'}
+                </span>
+              </div>
 
-        <div className="mt-auto">
-          <label className={`text-xs font-bold uppercase mb-2 block ${theme.textMuted}`}>Firma para confirmar</label>
-          <SignaturePad isDark={isDark} signed={signed} onSign={() => setSigned(!signed)} />
+              <div className={`flex gap-4 pt-4 border-t ${theme.divider}`}>
+                <div className="flex-1">
+                  <label className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1 block`}>Horas totales</label>
+                  <div className={`text-2xl font-mono font-bold ${theme.textMain}`}>{totalHours.toFixed(1)}h</div>
+                </div>
+                <div className="flex-1">
+                  <label className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1 block`}>Horas extra</label>
+                  <div className="text-2xl font-mono font-bold text-amber-500">{overtimeHours.toFixed(1)}h</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Time Inputs */}
+            <div>
+              <h3 className={`text-xs font-bold uppercase tracking-wider ${theme.textMuted} mb-3 ml-1`}>Horario</h3>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className={`text-xs font-bold ${theme.textMuted} mb-1 block`}>Entrada</label>
+                  <Input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className={`${theme.input} text-center font-mono`}
+                    disabled={existingTimesheet?.status === 'approved'}
+                  />
+                </div>
+                <div>
+                  <label className={`text-xs font-bold ${theme.textMuted} mb-1 block`}>Salida</label>
+                  <Input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className={`${theme.input} text-center font-mono`}
+                    disabled={existingTimesheet?.status === 'approved'}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={`text-xs font-bold ${theme.textMuted} mb-1 block`}>Descanso (minutos)</label>
+                <Input
+                  type="number"
+                  value={breakMinutes}
+                  onChange={(e) => setBreakMinutes(parseInt(e.target.value) || 0)}
+                  className={`${theme.input} text-center font-mono`}
+                  min={0}
+                  max={180}
+                  step={15}
+                  disabled={existingTimesheet?.status === 'approved'}
+                />
+              </div>
+            </div>
+
+            {/* Activity Log */}
+            <div>
+              <h3 className={`text-xs font-bold uppercase tracking-wider ${theme.textMuted} mb-3 ml-1`}>Registro de actividad</h3>
+
+              {/* Work Entry */}
+              <div className={`flex items-center justify-between p-3 mb-2 rounded-lg border ${theme.card}`}>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-blue-500/10 text-blue-500">
+                    <Play size={16} className="fill-current" />
+                  </div>
+                  <div>
+                    <div className={`text-sm font-bold ${theme.textMain}`}>Trabajo</div>
+                    <div className={`text-xs ${theme.textMuted} font-mono`}>{startTime} - {endTime}</div>
+                  </div>
+                </div>
+                <div className={`text-sm font-mono font-bold ${theme.textMain}`}>{totalHours.toFixed(1)}h</div>
+              </div>
+
+              {/* Break Entry */}
+              {breakMinutes > 0 && (
+                <div className={`flex items-center justify-between p-3 mb-2 rounded-lg border ${theme.card}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-amber-500/10 text-amber-500">
+                      <Coffee size={16} />
+                    </div>
+                    <div>
+                      <div className={`text-sm font-bold ${theme.textMain}`}>Descanso</div>
+                      <div className={`text-xs ${theme.textMuted} font-mono`}>{breakMinutes} min</div>
+                    </div>
+                  </div>
+                  <div className={`text-sm font-mono font-bold ${theme.textMain}`}>-{(breakMinutes / 60).toFixed(1)}h</div>
+                </div>
+              )}
+            </div>
+
+            {/* Signature */}
+            {existingTimesheet?.status !== 'approved' && (
+              <div>
+                <h3 className={`text-xs font-bold uppercase tracking-wider ${theme.textMuted} mb-3 ml-1`}>Verificación</h3>
+                <div
+                  onClick={handleSign}
+                  className={`h-28 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all relative overflow-hidden ${
+                    signed
+                      ? 'bg-blue-900/10 border-blue-500 text-blue-400'
+                      : `${isDark ? 'border-gray-700 hover:bg-gray-800' : 'border-slate-300 hover:bg-slate-100'}`
+                  }`}
+                >
+                  {signed ? (
+                    <div className="flex flex-col items-center animate-in zoom-in">
+                      <div className="font-script text-2xl italic opacity-80 mb-1">Firmado</div>
+                      <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider">
+                        <CheckCircle2 size={12} /> Firmado digitalmente
+                      </div>
+                      {signedAt && (
+                        <div className="text-[9px] opacity-60 mt-1">
+                          {format(signedAt, "d MMM yyyy • HH:mm:ss", { locale: es })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <PenTool size={24} className="mb-2 opacity-50" />
+                      <span className={`text-xs font-bold uppercase ${theme.textMuted}`}>Toca para firmar</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 mt-4 px-1">
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center ${
+                    signed ? 'bg-blue-600 border-blue-600 text-white' : isDark ? 'border-gray-600' : 'border-slate-300'
+                  }`}>
+                    {signed && <Check size={14} />}
+                  </div>
+                  <p className={`text-xs leading-tight ${theme.textMuted}`}>
+                    Certifico que las horas registradas son correctas y cumplen con la normativa vigente.
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Fixed Bottom Action */}
+      {existingTimesheet?.status !== 'approved' && (
+        <div className={`fixed bottom-0 left-0 right-0 p-5 ${theme.bg} border-t ${theme.divider}`}>
           <Button
-            disabled={!signed}
-            onClick={handleSubmit}
-            className={`w-full mt-4 py-3 rounded-xl font-bold text-sm`}
+            onClick={() => submitMutation.mutate()}
+            disabled={!signed || submitMutation.isPending}
+            className={`w-full py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-xl ${
+              signed ? theme.accent : ''
+            }`}
           >
-            Ir a partes de horas
+            {submitMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Enviando...
+              </>
+            ) : (
+              <>
+                Enviar parte de horas <ArrowRight size={16} />
+              </>
+            )}
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      )}
+    </div>
   );
 };
+
+// Helper functions for time calculations
+function calculateHours(start: string, end: string, breakMins: number): number {
+  if (!start || !end) return 0;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const startMins = sh * 60 + sm;
+  const endMins = eh * 60 + em;
+  const totalMins = endMins - startMins - breakMins;
+  return Math.max(0, totalMins / 60);
+}
+
+function addMinutesToTime(time: string, mins: number): string {
+  const [h, m] = time.split(':').map(Number);
+  const totalMins = h * 60 + m + mins;
+  const newH = Math.floor(totalMins / 60) % 24;
+  const newM = totalMins % 60;
+  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+}
 
 // --- ENHANCED JOB DETAILS MODAL WITH TABS ---
 interface DetailsModalProps {
@@ -1577,10 +1878,10 @@ interface DashboardScreenProps {
   onOpenObliqueStrategy: () => void;
   onOpenTour: (tourId: string) => void;
   hasSoundVisionAccess: boolean;
+  onSwitchTab: (tab: string) => void;
 }
 
-const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy, onOpenTour, hasSoundVisionAccess }: DashboardScreenProps) => {
-  const navigate = useNavigate();
+const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy, onOpenTour, hasSoundVisionAccess, onSwitchTab }: DashboardScreenProps) => {
   const { activeTours } = useMyTours();
 
   const userInitials = userProfile?.first_name && userProfile?.last_name
@@ -1657,14 +1958,14 @@ const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoad
             </button>
           )}
           <button
-            onClick={() => navigate('/timesheets')}
+            onClick={() => onSwitchTab('jobs')}
             className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between text-left`}
           >
             <Clock size={20} className="text-emerald-500" />
             <span className={`text-xs font-bold ${theme.textMain}`}>Partes de<br />horas</span>
           </button>
           <button
-            onClick={() => navigate('/dashboard/unavailability')}
+            onClick={() => onSwitchTab('availability')}
             className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between text-left`}
           >
             <CalendarIcon size={20} className="text-amber-500" />
@@ -2147,9 +2448,10 @@ interface ProfileViewProps {
   user: any;
   userProfile: any;
   toggleTheme: () => void;
+  onSwitchTab: (tab: string) => void;
 }
 
-const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: ProfileViewProps) => {
+const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme, onSwitchTab }: ProfileViewProps) => {
   const navigate = useNavigate();
 
   const userInitials = userProfile?.first_name && userProfile?.last_name
@@ -2204,7 +2506,7 @@ const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: ProfileV
       {/* Quick Actions */}
       <div className={`rounded-xl border divide-y ${theme.divider} ${theme.card}`}>
         <button
-          onClick={() => navigate('/dashboard/unavailability')}
+          onClick={() => onSwitchTab('availability')}
           className={`w-full p-4 flex justify-between items-center hover:bg-white/5 text-sm font-bold text-left ${theme.textMain}`}
         >
           <div className="flex items-center gap-3">
@@ -2214,7 +2516,7 @@ const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: ProfileV
           <ChevronRight size={16} className={theme.textMuted} />
         </button>
         <button
-          onClick={() => navigate('/timesheets')}
+          onClick={() => onSwitchTab('jobs')}
           className={`w-full p-4 flex justify-between items-center hover:bg-white/5 text-sm font-bold text-left ${theme.textMain}`}
         >
           <div className="flex items-center gap-3">
@@ -2401,6 +2703,7 @@ export default function TechnicianSuperApp() {
             onOpenObliqueStrategy={() => setShowObliqueStrategy(true)}
             onOpenTour={(tourId) => setSelectedTourId(tourId)}
             hasSoundVisionAccess={hasSoundVisionAccess}
+            onSwitchTab={setTab}
           />
         )}
         {tab === 'jobs' && (
@@ -2424,6 +2727,7 @@ export default function TechnicianSuperApp() {
             user={user}
             userProfile={userProfile}
             toggleTheme={toggleTheme}
+            onSwitchTab={setTab}
           />
         )}
       </div>
@@ -2450,7 +2754,14 @@ export default function TechnicianSuperApp() {
 
       {/* Modals */}
       {activeModal === 'timesheet' && selectedJob && (
-        <TimesheetModal theme={t} isDark={isDark} job={selectedJob} onClose={() => setActiveModal(null)} />
+        <TimesheetView
+          theme={t}
+          isDark={isDark}
+          job={selectedJob}
+          onClose={() => setActiveModal(null)}
+          userRole={userProfile?.role || null}
+          userId={user?.id || null}
+        />
       )}
       {activeModal === 'details' && selectedJob && (
         <DetailsModal theme={t} isDark={isDark} job={selectedJob} onClose={() => setActiveModal(null)} />
