@@ -266,7 +266,7 @@ const TimesheetModal = ({ theme, isDark, job, onClose }: TimesheetModalProps) =>
   );
 };
 
-// --- JOB DETAILS MODAL ---
+// --- ENHANCED JOB DETAILS MODAL WITH TABS ---
 interface DetailsModalProps {
   theme: ReturnType<typeof getThemeStyles>;
   isDark: boolean;
@@ -274,8 +274,32 @@ interface DetailsModalProps {
   onClose: () => void;
 }
 
+type TabId = 'Info' | 'Ubicación' | 'Personal' | 'Docs' | 'Restau.' | 'Clima';
+
 const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
+  const [activeTab, setActiveTab] = useState<TabId>('Info');
   const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
+
+  // Fetch staff assignments for this job
+  const { data: staffAssignments = [], isLoading: staffLoading } = useQuery({
+    queryKey: ['job-staff', job?.id],
+    queryFn: async () => {
+      if (!job?.id) return [];
+      const { data, error } = await supabase
+        .from('job_assignments')
+        .select(`
+          sound_role,
+          lights_role,
+          video_role,
+          technician:profiles(id, first_name, last_name, email)
+        `)
+        .eq('job_id', job.id)
+        .eq('status', 'confirmed');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!job?.id,
+  });
 
   const handleViewDocument = async (doc: any) => {
     const docId = doc.id;
@@ -308,95 +332,328 @@ const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
     }
   };
 
-  const jobDate = job?.start_time
-    ? format(new Date(job.start_time), "PPP", { locale: es })
+  const handleOpenMaps = () => {
+    const address = job?.location?.name || '';
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+    window.open(url, '_blank');
+  };
+
+  const jobTimezone = job?.timezone || 'Europe/Madrid';
+  const jobStartDate = job?.start_time
+    ? format(new Date(job.start_time), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
+    : "Fecha no disponible";
+  const jobEndDate = job?.end_time
+    ? format(new Date(job.end_time), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
     : "Fecha no disponible";
 
-  return (
-    <Sheet open onOpenChange={onClose}>
-      <SheetContent side="bottom" className={`h-[80vh] rounded-t-2xl ${isDark ? 'bg-[#0f1219]' : 'bg-white'}`}>
-        <SheetHeader className={`mb-4 border-b pb-4 ${theme.divider}`}>
-          <div className="flex items-center gap-2">
-            <FileText size={18} className="text-blue-500" />
-            <SheetTitle className={theme.textMain}>{job?.title || 'Sin título'}</SheetTitle>
-          </div>
-        </SheetHeader>
+  const tabs: { id: TabId; label: string }[] = [
+    { id: 'Info', label: 'Info' },
+    { id: 'Ubicación', label: 'Ubicación' },
+    { id: 'Personal', label: 'Personal' },
+    { id: 'Docs', label: 'Docs' },
+    { id: 'Restau.', label: 'Restau.' },
+    { id: 'Clima', label: 'Clima' },
+  ];
 
-        <ScrollArea className="h-[calc(100%-80px)]">
-          <div className="space-y-6 pr-4">
-            {/* Location */}
-            <div>
-              <h3 className={`text-xs font-bold uppercase ${theme.textMuted} mb-2`}>Ubicación</h3>
-              <div className={`p-3 rounded-lg border ${theme.card} flex gap-3`}>
-                <div className={`w-12 h-12 ${isDark ? 'bg-gray-800' : 'bg-slate-100'} rounded-lg flex items-center justify-center`}>
-                  <MapPin size={20} className={theme.textMuted} />
+  // Get department badge for staff
+  const getDepartmentFromAssignment = (assignment: any): string => {
+    if (assignment.sound_role) return 'sound';
+    if (assignment.lights_role) return 'lights';
+    if (assignment.video_role) return 'video';
+    return 'unknown';
+  };
+
+  const getRoleFromAssignment = (assignment: any): string => {
+    const role = assignment.sound_role || assignment.lights_role || assignment.video_role;
+    return role ? (labelForCode(role) || role) : 'Técnico';
+  };
+
+  return (
+    <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
+      <div className={`w-full max-w-md md:max-w-lg lg:max-w-xl h-[85vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200`}>
+
+        {/* Header */}
+        <div className={`p-4 border-b ${theme.divider} flex justify-between items-center shrink-0`}>
+          <div className="flex items-center gap-2">
+            <CalendarIcon size={18} className={theme.textMuted} />
+            <h2 className={`text-lg font-bold ${theme.textMain}`}>{job?.title || 'Sin título'}</h2>
+          </div>
+          <button onClick={onClose} className={`p-2 ${theme.textMuted} hover:${theme.textMain} rounded-full transition-colors`}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Tab Bar */}
+        <div className={`flex border-b ${theme.divider} ${isDark ? 'bg-[#0a0c10]' : 'bg-slate-50'} overflow-x-auto shrink-0`}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                flex-1 py-3 px-4 text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors
+                ${activeTab === tab.id
+                  ? `${isDark ? 'bg-[#151820]' : 'bg-white'} ${theme.textMain} border-b-2 border-blue-500`
+                  : `${theme.textMuted} hover:${theme.textMain}`}
+              `}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content Area */}
+        <ScrollArea className="flex-1 p-5">
+
+          {/* TAB: INFO */}
+          {activeTab === 'Info' && (
+            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+              <div>
+                <h1 className={`text-2xl font-bold ${theme.textMain} mb-4`}>{job?.title}</h1>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                  <div>
+                    <label className={`text-xs ${theme.textMuted} font-bold uppercase`}>Hora de inicio</label>
+                    <div className={`text-sm ${theme.textMain} mt-1 leading-relaxed`}>{jobStartDate}</div>
+                  </div>
+                  <div>
+                    <label className={`text-xs ${theme.textMuted} font-bold uppercase`}>Hora de finalización</label>
+                    <div className={`text-sm ${theme.textMain} mt-1 leading-relaxed`}>{jobEndDate}</div>
+                  </div>
                 </div>
+
+                <div className="mb-4">
+                  <label className={`text-xs ${theme.textMuted} font-bold uppercase`}>Tipo de trabajo</label>
+                  <div className="mt-2">
+                    <span className={`px-3 py-1 rounded-full ${isDark ? 'bg-[#1a1d26] border-[#2a2e3b]' : 'bg-slate-100 border-slate-200'} border text-xs ${theme.textMain} font-medium`}>
+                      {job?.job_type || 'single'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Description */}
+              {job?.description && (
                 <div>
-                  <div className={`font-bold ${theme.textMain}`}>{job?.location?.name || 'Sin ubicación'}</div>
-                  <div className={`text-xs ${theme.textMuted}`}>{jobDate}</div>
+                  <label className={`text-xs ${theme.textMuted} font-bold uppercase`}>Descripción</label>
+                  <p className={`text-sm ${theme.textMain} mt-2 leading-relaxed`}>{job.description}</p>
+                </div>
+              )}
+
+              {/* Location Snippet */}
+              <div>
+                <label className={`text-xs ${theme.textMuted} font-bold uppercase`}>Recinto</label>
+                <div className={`text-sm ${theme.textMain} mt-1 leading-relaxed`}>
+                  {job?.location?.name || 'Sin ubicación'}
                 </div>
               </div>
             </div>
+          )}
 
-            {/* Description */}
-            {job?.description && (
-              <div>
-                <h3 className={`text-xs font-bold uppercase ${theme.textMuted} mb-2`}>Descripción</h3>
-                <p className={`text-sm ${theme.textMain}`}>{job.description}</p>
+          {/* TAB: UBICACIÓN */}
+          {activeTab === 'Ubicación' && (
+            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className={`text-lg font-bold ${theme.textMain}`}>{job?.location?.name || 'Sin ubicación'}</h2>
+                  <p className={`text-sm ${theme.textMuted} mt-1 max-w-xs leading-relaxed`}>
+                    {job?.location?.address || 'Dirección no disponible'}
+                  </p>
+                </div>
+                <Button onClick={handleOpenMaps} size="sm" className="whitespace-nowrap">
+                  <Map size={14} className="mr-2" /> Abrir mapas
+                </Button>
               </div>
-            )}
 
-            {/* Documents */}
-            {job?.job_documents && job.job_documents.length > 0 && (
-              <div>
-                <h3 className={`text-xs font-bold uppercase ${theme.textMuted} mb-2`}>Documentos</h3>
-                <div className="space-y-2">
-                  {job.job_documents.map((doc: any) => (
-                    <div key={doc.id} className={`p-3 rounded-lg border ${theme.card} flex justify-between items-center`}>
-                      <div className="flex items-center gap-3">
-                        <FileText size={16} className={theme.textMuted} />
-                        <div>
-                          <span className={`text-sm font-medium ${theme.textMain}`}>{doc.file_name}</span>
-                          {doc.template_type === 'soundvision' && (
-                            <Badge variant="outline" className="ml-2 text-[10px]">SoundVision</Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleViewDocument(doc)}
-                          disabled={documentLoading.has(doc.id)}
-                        >
-                          {documentLoading.has(doc.id) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDownload(doc)}
-                          disabled={documentLoading.has(doc.id)}
-                        >
-                          {documentLoading.has(doc.id) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Download className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+              {/* Map Placeholder */}
+              <div className={`rounded-xl overflow-hidden border ${theme.divider} relative h-48 ${isDark ? 'bg-[#0a0c10]' : 'bg-slate-100'}`}>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <MapPin size={32} className={theme.textMuted} />
+                    <p className={`text-xs ${theme.textMuted} mt-2`}>Vista previa del mapa no disponible</p>
+                  </div>
+                </div>
+                <div className="absolute bottom-3 right-3">
+                  <Button size="sm" onClick={handleOpenMaps}>
+                    Ver indicaciones
+                  </Button>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* TAB: PERSONAL */}
+          {activeTab === 'Personal' && (
+            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex items-center gap-2 mb-2">
+                <User size={18} className={theme.textMuted} />
+                <h3 className={`text-lg font-bold ${theme.textMain}`}>Personal asignado</h3>
+              </div>
+
+              {staffLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                </div>
+              ) : staffAssignments.length === 0 ? (
+                <div className={`h-32 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                  <User size={24} className="mb-2 opacity-50" />
+                  <span className="text-xs">No hay personal asignado</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {staffAssignments.map((assignment: any, idx: number) => {
+                    const tech = assignment.technician;
+                    const dept = getDepartmentFromAssignment(assignment);
+                    const role = getRoleFromAssignment(assignment);
+                    const deptColors: Record<string, string> = {
+                      sound: 'text-blue-400 bg-blue-900/30 border-blue-900/50',
+                      lights: 'text-amber-400 bg-amber-900/30 border-amber-900/50',
+                      video: 'text-purple-400 bg-purple-900/30 border-purple-900/50',
+                    };
+                    return (
+                      <div key={idx} className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4`}>
+                        <div className={`font-bold text-sm ${theme.textMain} mb-1`}>
+                          {tech?.first_name} {tech?.last_name}
+                        </div>
+                        <div className={`text-xs ${theme.textMuted}`}>{role}</div>
+                        <div className={`mt-2 inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${deptColors[dept] || theme.textMuted}`}>
+                          {dept}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: DOCS */}
+          {activeTab === 'Docs' && (
+            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText size={18} className={theme.textMuted} />
+                  <h3 className={`text-lg font-bold ${theme.textMain}`}>Documentos del trabajo</h3>
+                </div>
+
+                {job?.job_documents && job.job_documents.length > 0 ? (
+                  <div className="space-y-2">
+                    {job.job_documents.map((doc: any) => (
+                      <div key={doc.id} className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 flex items-center justify-between`}>
+                        <div className="min-w-0 pr-4">
+                          <div className={`text-sm font-bold ${theme.textMain} truncate mb-1`}>{doc.file_name}</div>
+                          <div className={`text-xs ${theme.textMuted}`}>
+                            {doc.uploaded_at && `Subido el ${format(new Date(doc.uploaded_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`}
+                          </div>
+                          {doc.template_type === 'soundvision' && (
+                            <Badge variant="outline" className="mt-1 text-[10px]">SoundVision</Badge>
+                          )}
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewDocument(doc)}
+                            disabled={documentLoading.has(doc.id)}
+                          >
+                            {documentLoading.has(doc.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Eye size={14} className="mr-1" /> Ver
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownload(doc)}
+                            disabled={documentLoading.has(doc.id)}
+                          >
+                            {documentLoading.has(doc.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Download size={14} className="mr-1" /> Descargar
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={`h-32 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                    <FileText size={24} className="mb-2 opacity-50" />
+                    <span className="text-xs">No hay documentos disponibles</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: RESTAU. */}
+          {activeTab === 'Restau.' && (
+            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex items-center gap-2 mb-2">
+                <Utensils size={18} className={theme.textMuted} />
+                <h3 className={`text-lg font-bold ${theme.textMain}`}>Restaurantes cercanos</h3>
+              </div>
+
+              <div className={`h-48 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                <Utensils size={32} className="mb-2 opacity-50" />
+                <span className="text-sm">Funcionalidad próximamente</span>
+                <p className="text-xs mt-1 text-center max-w-xs">
+                  Busca restaurantes cercanos en Google Maps
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => {
+                    const location = job?.location?.name || '';
+                    window.open(`https://www.google.com/maps/search/restaurants+near+${encodeURIComponent(location)}`, '_blank');
+                  }}
+                >
+                  <Globe size={14} className="mr-2" /> Buscar restaurantes
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: CLIMA */}
+          {activeTab === 'Clima' && (
+            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <CloudRain size={18} className={theme.textMuted} />
+                  <h3 className={`text-lg font-bold ${theme.textMain}`}>Pronóstico del Tiempo</h3>
+                </div>
+              </div>
+
+              <div className={`h-48 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                <CloudRain size={32} className="mb-2 opacity-50" />
+                <span className="text-sm">Funcionalidad próximamente</span>
+                <p className="text-xs mt-1 text-center max-w-xs">
+                  Consulta el tiempo en el recinto del evento
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => {
+                    const location = job?.location?.name || '';
+                    window.open(`https://www.google.com/search?q=weather+${encodeURIComponent(location)}`, '_blank');
+                  }}
+                >
+                  <Globe size={14} className="mr-2" /> Ver pronóstico
+                </Button>
+              </div>
+            </div>
+          )}
+
         </ScrollArea>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </div>
   );
 };
 
