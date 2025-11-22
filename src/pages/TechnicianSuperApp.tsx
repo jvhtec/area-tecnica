@@ -14,6 +14,10 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { labelForCode } from '@/utils/roles';
 import { createSignedUrl } from '@/utils/jobDocuments';
+import { PlacesRestaurantService } from '@/utils/hoja-de-ruta/services/places-restaurant-service';
+import { useWeatherData } from '@/hooks/useWeatherData';
+import type { Restaurant, WeatherData } from '@/types/hoja-de-ruta';
+import { OBLIQUE_STRATEGIES, type ObliqueStrategy } from '@/components/technician/obliqueStrategies';
 
 import {
   LayoutDashboard, Calendar as CalendarIcon, User, Menu,
@@ -26,7 +30,7 @@ import {
   Download, Send, RefreshCw, UploadCloud, Play, Sliders,
   Radio, Mic2, Speaker, ListMusic, Save, ArrowLeft, Activity,
   Search, Filter, Map, Layers, Globe, LayoutList, LayoutGrid,
-  Loader2, Eye, Briefcase
+  Loader2, Eye, Briefcase, Shuffle, Lightbulb, Sparkles
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -79,6 +83,82 @@ const SignaturePad = ({ isDark, onSign, signed }: { isDark: boolean; onSign: () 
   </div>
 );
 
+// --- OBLIQUE STRATEGY MODAL ---
+interface ObliqueStrategyModalProps {
+  theme: ReturnType<typeof getThemeStyles>;
+  isDark: boolean;
+  onClose: () => void;
+}
+
+const ObliqueStrategyModal = ({ theme, isDark, onClose }: ObliqueStrategyModalProps) => {
+  const [currentStrategy, setCurrentStrategy] = useState<ObliqueStrategy>(
+    () => OBLIQUE_STRATEGIES[Math.floor(Math.random() * OBLIQUE_STRATEGIES.length)]
+  );
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const drawNewCard = () => {
+    setIsAnimating(true);
+    setTimeout(() => {
+      setCurrentStrategy(OBLIQUE_STRATEGIES[Math.floor(Math.random() * OBLIQUE_STRATEGIES.length)]);
+      setIsAnimating(false);
+    }, 300);
+  };
+
+  return (
+    <div className={`fixed inset-0 z-[70] flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
+      <div className={`w-full max-w-sm ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200`}>
+        {/* Header */}
+        <div className={`p-4 border-b ${theme.divider} flex justify-between items-center bg-gradient-to-r ${isDark ? 'from-purple-900/30 to-blue-900/30' : 'from-purple-100 to-blue-100'}`}>
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 text-white">
+              <Lightbulb size={18} />
+            </div>
+            <div>
+              <h2 className={`text-lg font-bold ${theme.textMain}`}>Estrategias Oblicuas</h2>
+              <p className={`text-xs ${theme.textMuted}`}>Brian Eno & Peter Schmidt</p>
+            </div>
+          </div>
+          <button onClick={onClose} className={`p-2 ${theme.textMuted} hover:${theme.textMain} rounded-full transition-colors`}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Card Content */}
+        <div className="p-6">
+          <div className={`relative min-h-[200px] rounded-xl border-2 border-dashed ${isDark ? 'border-purple-500/30 bg-purple-500/5' : 'border-purple-200 bg-purple-50'} p-6 flex flex-col items-center justify-center text-center transition-all duration-300 ${isAnimating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
+            <Sparkles size={24} className={`mb-4 ${isDark ? 'text-purple-400' : 'text-purple-500'}`} />
+            <p className={`text-lg font-bold ${theme.textMain} mb-3 leading-relaxed`}>
+              {currentStrategy.spanish}
+            </p>
+            <p className={`text-sm ${theme.textMuted} italic`}>
+              "{currentStrategy.english}"
+            </p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className={`p-4 border-t ${theme.divider} flex gap-3`}>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={onClose}
+          >
+            Cerrar
+          </Button>
+          <Button
+            className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white"
+            onClick={drawNewCard}
+            disabled={isAnimating}
+          >
+            <Shuffle size={16} className={`mr-2 ${isAnimating ? 'animate-spin' : ''}`} />
+            Nueva carta
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- JOB CARD COMPONENT ---
 interface JobCardProps {
   job: any;
@@ -87,11 +167,10 @@ interface JobCardProps {
   onAction: (action: string, job?: any) => void;
   isCrewChief: boolean;
   techName?: string;
+  onOpenObliqueStrategy?: () => void;
 }
 
-const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techName }: JobCardProps) => {
-  const [showEasterEgg, setShowEasterEgg] = useState(false);
-
+const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techName, onOpenObliqueStrategy }: JobCardProps) => {
   const jobData = job.jobs || job;
   const jobTimezone = jobData?.timezone || 'Europe/Madrid';
 
@@ -128,34 +207,18 @@ const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techName }: Jo
   return (
     <div className={`rounded-xl border border-l-4 ${statusColor} ${theme.card} p-5 relative overflow-hidden group mb-4`}>
 
-      {/* Easter Egg Overlay */}
-      {showEasterEgg && (
-        <div className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center animate-in fade-in">
-          <div className="text-center">
-            <div className="text-4xl mb-2 animate-bounce">👾</div>
-            <h3 className="text-emerald-400 font-mono font-bold text-lg">LEVEL UP!</h3>
-            <p className="text-white text-xs mb-4">Crew Chief Mode Active</p>
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowEasterEgg(false); }}
-              className="px-4 py-1 bg-emerald-600 rounded text-xs font-bold text-white hover:bg-emerald-500"
-            >
-              Continuar
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className="flex items-center gap-2">
             <h3 className={`font-bold text-lg ${theme.textMain}`}>{jobData?.title || 'Sin título'}</h3>
-            {isCrewChief && (
+            {isCrewChief && onOpenObliqueStrategy && (
               <button
-                onClick={(e) => { e.stopPropagation(); setShowEasterEgg(true); }}
-                className="text-emerald-500/20 hover:text-emerald-400 transition-colors p-1"
+                onClick={(e) => { e.stopPropagation(); onOpenObliqueStrategy(); }}
+                className="text-purple-500/40 hover:text-purple-400 transition-colors p-1"
+                title="Estrategias Oblicuas"
               >
-                <Gamepad2 size={16} />
+                <Lightbulb size={16} />
               </button>
             )}
           </div>
@@ -279,6 +342,28 @@ type TabId = 'Info' | 'Ubicación' | 'Personal' | 'Docs' | 'Restau.' | 'Clima';
 const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
   const [activeTab, setActiveTab] = useState<TabId>('Info');
   const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
+  const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);
+  const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
+  const [isMapLoading, setIsMapLoading] = useState(false);
+
+  // Fetch full job details with location
+  const { data: jobDetails, isLoading: jobDetailsLoading } = useQuery({
+    queryKey: ['job-details-modal', job?.id],
+    queryFn: async () => {
+      if (!job?.id) return null;
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          locations(id, name, formatted_address, latitude, longitude)
+        `)
+        .eq('id', job.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!job?.id,
+  });
 
   // Fetch staff assignments for this job
   const { data: staffAssignments = [], isLoading: staffLoading } = useQuery({
@@ -300,6 +385,107 @@ const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
     },
     enabled: !!job?.id,
   });
+
+  // Fetch nearby restaurants using Google Places API
+  const { data: restaurants = [], isLoading: isRestaurantsLoading } = useQuery({
+    queryKey: ['job-restaurants-modal', job?.id, jobDetails?.locations?.formatted_address],
+    queryFn: async () => {
+      const locationData = jobDetails?.locations;
+      const address = locationData?.formatted_address || locationData?.name;
+
+      if (!address && !locationData?.latitude) {
+        return [];
+      }
+
+      const coordinates = locationData?.latitude && locationData?.longitude
+        ? { lat: Number(locationData.latitude), lng: Number(locationData.longitude) }
+        : undefined;
+
+      return await PlacesRestaurantService.searchRestaurantsNearVenue(
+        address || `${coordinates?.lat},${coordinates?.lng}`,
+        2000,
+        10,
+        coordinates
+      );
+    },
+    enabled: !!jobDetails?.locations && (!!jobDetails?.locations?.formatted_address || !!jobDetails?.locations?.name || (!!jobDetails?.locations?.latitude && !!jobDetails?.locations?.longitude))
+  });
+
+  // Weather data setup
+  const eventDatesString = (jobDetails?.start_time || job?.start_time) && (jobDetails?.end_time || job?.end_time)
+    ? new Date(jobDetails?.start_time || job?.start_time).toLocaleDateString('en-GB').split('/').join('/') +
+      (new Date(jobDetails?.start_time || job?.start_time).toDateString() !== new Date(jobDetails?.end_time || job?.end_time).toDateString()
+        ? ' - ' + new Date(jobDetails?.end_time || job?.end_time).toLocaleDateString('en-GB').split('/').join('/')
+        : '')
+    : '';
+
+  const weatherVenue = {
+    address: jobDetails?.locations?.formatted_address || jobDetails?.locations?.name,
+    coordinates: jobDetails?.locations?.latitude && jobDetails?.locations?.longitude
+      ? {
+          lat: typeof jobDetails.locations.latitude === 'number'
+            ? jobDetails.locations.latitude
+            : parseFloat(jobDetails.locations.latitude),
+          lng: typeof jobDetails.locations.longitude === 'number'
+            ? jobDetails.locations.longitude
+            : parseFloat(jobDetails.locations.longitude)
+        }
+      : undefined
+  };
+
+  const { isLoading: isWeatherLoading, error: weatherError, fetchWeather } = useWeatherData({
+    venue: weatherVenue,
+    eventDates: eventDatesString,
+    onWeatherUpdate: setWeatherData
+  });
+
+  // Load static map preview
+  useEffect(() => {
+    const loadStaticMap = async () => {
+      try {
+        const loc = jobDetails?.locations;
+        if (!loc) {
+          setMapPreviewUrl(null);
+          return;
+        }
+        const lat = typeof loc.latitude === 'number' ? loc.latitude : (typeof loc.latitude === 'string' ? parseFloat(loc.latitude) : undefined);
+        const lng = typeof loc.longitude === 'number' ? loc.longitude : (typeof loc.longitude === 'string' ? parseFloat(loc.longitude) : undefined);
+        const address = loc.formatted_address || loc.name || '';
+
+        setIsMapLoading(true);
+
+        const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+        if (error || !data?.apiKey) {
+          setMapPreviewUrl(null);
+          setIsMapLoading(false);
+          return;
+        }
+        const apiKey = data.apiKey as string;
+
+        const zoom = 15;
+        const width = 600;
+        const height = 300;
+        const scale = 2;
+        const center = Number.isFinite(lat) && Number.isFinite(lng)
+          ? `${lat},${lng}`
+          : encodeURIComponent(address);
+        const markers = Number.isFinite(lat) && Number.isFinite(lng)
+          ? `&markers=color:red|label:A|${lat},${lng}`
+          : (address ? `&markers=color:red|label:A|${encodeURIComponent(address)}` : '');
+        const url = `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=${zoom}&size=${width}x${height}&scale=${scale}${markers}&key=${encodeURIComponent(apiKey)}`;
+
+        setMapPreviewUrl(url);
+      } catch (e: any) {
+        console.warn('Failed to load static map preview:', e?.message || e);
+        setMapPreviewUrl(null);
+      } finally {
+        setIsMapLoading(false);
+      }
+    };
+    if (jobDetails?.locations) {
+      loadStaticMap();
+    }
+  }, [jobDetails?.locations]);
 
   const handleViewDocument = async (doc: any) => {
     const docId = doc.id;
@@ -333,17 +519,17 @@ const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
   };
 
   const handleOpenMaps = () => {
-    const address = job?.location?.name || '';
+    const address = jobDetails?.locations?.formatted_address || jobDetails?.locations?.name || job?.location?.name || '';
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
     window.open(url, '_blank');
   };
 
-  const jobTimezone = job?.timezone || 'Europe/Madrid';
-  const jobStartDate = job?.start_time
-    ? format(new Date(job.start_time), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
+  const locationData = jobDetails?.locations || job?.location;
+  const jobStartDate = (jobDetails?.start_time || job?.start_time)
+    ? format(new Date(jobDetails?.start_time || job?.start_time), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
     : "Fecha no disponible";
-  const jobEndDate = job?.end_time
-    ? format(new Date(job.end_time), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
+  const jobEndDate = (jobDetails?.end_time || job?.end_time)
+    ? format(new Date(jobDetails?.end_time || job?.end_time), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
     : "Fecha no disponible";
 
   const tabs: { id: TabId; label: string }[] = [
@@ -452,32 +638,63 @@ const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
           {/* TAB: UBICACIÓN */}
           {activeTab === 'Ubicación' && (
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className={`text-lg font-bold ${theme.textMain}`}>{job?.location?.name || 'Sin ubicación'}</h2>
-                  <p className={`text-sm ${theme.textMuted} mt-1 max-w-xs leading-relaxed`}>
-                    {job?.location?.address || 'Dirección no disponible'}
-                  </p>
+              {jobDetailsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                 </div>
-                <Button onClick={handleOpenMaps} size="sm" className="whitespace-nowrap">
-                  <Map size={14} className="mr-2" /> Abrir mapas
-                </Button>
-              </div>
-
-              {/* Map Placeholder */}
-              <div className={`rounded-xl overflow-hidden border ${theme.divider} relative h-48 ${isDark ? 'bg-[#0a0c10]' : 'bg-slate-100'}`}>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <MapPin size={32} className={theme.textMuted} />
-                    <p className={`text-xs ${theme.textMuted} mt-2`}>Vista previa del mapa no disponible</p>
+              ) : locationData ? (
+                <>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h2 className={`text-lg font-bold ${theme.textMain}`}>{locationData?.name || 'Sin ubicación'}</h2>
+                      <p className={`text-sm ${theme.textMuted} mt-1 max-w-xs leading-relaxed`}>
+                        {locationData?.formatted_address || locationData?.address || 'Dirección no disponible'}
+                      </p>
+                    </div>
+                    <Button onClick={handleOpenMaps} size="sm" className="whitespace-nowrap">
+                      <Map size={14} className="mr-2" /> Abrir mapas
+                    </Button>
                   </div>
+
+                  {/* Map Preview */}
+                  {isMapLoading && (
+                    <div className={`rounded-xl overflow-hidden border ${theme.divider} h-48 ${isDark ? 'bg-[#0a0c10]' : 'bg-slate-100'} flex items-center justify-center`}>
+                      <div className="text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-2" />
+                        <p className={`text-sm ${theme.textMuted}`}>Cargando vista previa del mapa...</p>
+                      </div>
+                    </div>
+                  )}
+                  {!isMapLoading && mapPreviewUrl && (
+                    <div className={`rounded-xl overflow-hidden border ${theme.divider}`}>
+                      <img src={mapPreviewUrl} alt="Mapa del recinto" className="w-full h-auto" />
+                      <div className="p-3 flex justify-end">
+                        <Button size="sm" onClick={handleOpenMaps}>
+                          Ver indicaciones
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {!isMapLoading && !mapPreviewUrl && (
+                    <div className={`rounded-xl overflow-hidden border ${theme.divider} relative h-48 ${isDark ? 'bg-[#0a0c10]' : 'bg-slate-100'}`}>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center">
+                          <MapPin size={32} className={theme.textMuted} />
+                          <p className={`text-xs ${theme.textMuted} mt-2`}>Vista previa del mapa no disponible</p>
+                          <Button size="sm" onClick={handleOpenMaps} className="mt-3">
+                            Abrir Google Maps
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className={`h-48 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                  <MapPin size={32} className="mb-2 opacity-50" />
+                  <span className="text-sm">No hay información de ubicación disponible</span>
                 </div>
-                <div className="absolute bottom-3 right-3">
-                  <Button size="sm" onClick={handleOpenMaps}>
-                    Ver indicaciones
-                  </Button>
-                </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -599,24 +816,77 @@ const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
                 <h3 className={`text-lg font-bold ${theme.textMain}`}>Restaurantes cercanos</h3>
               </div>
 
-              <div className={`h-48 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
-                <Utensils size={32} className="mb-2 opacity-50" />
-                <span className="text-sm">Funcionalidad próximamente</span>
-                <p className="text-xs mt-1 text-center max-w-xs">
-                  Busca restaurantes cercanos en Google Maps
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => {
-                    const location = job?.location?.name || '';
-                    window.open(`https://www.google.com/maps/search/restaurants+near+${encodeURIComponent(location)}`, '_blank');
-                  }}
-                >
-                  <Globe size={14} className="mr-2" /> Buscar restaurantes
-                </Button>
-              </div>
+              {(jobDetailsLoading || isRestaurantsLoading) ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+                  <p className={`text-sm ${theme.textMuted}`}>Buscando restaurantes cercanos...</p>
+                </div>
+              ) : restaurants && restaurants.length > 0 ? (
+                <div className="space-y-3">
+                  {restaurants.map((restaurant: Restaurant) => (
+                    <div key={restaurant.id} className={`p-4 rounded-xl border ${theme.card}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0 pr-3">
+                          <p className={`font-bold text-sm ${theme.textMain} truncate`}>{restaurant.name}</p>
+                          <p className={`text-xs ${theme.textMuted} mt-1 line-clamp-2`}>{restaurant.address}</p>
+
+                          <div className="flex items-center gap-2 mt-3 flex-wrap">
+                            {restaurant.rating && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
+                                ⭐ {restaurant.rating}
+                              </span>
+                            )}
+                            {restaurant.priceLevel !== undefined && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
+                                {'€'.repeat(restaurant.priceLevel + 1)}
+                              </span>
+                            )}
+                            {restaurant.distance && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>
+                                A {Math.round(restaurant.distance)} m
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-1 shrink-0">
+                          {restaurant.phone && (
+                            <a href={`tel:${restaurant.phone}`} className={`p-2 rounded-lg border ${theme.divider} hover:bg-white/5`}>
+                              <Phone size={14} className={theme.textMuted} />
+                            </a>
+                          )}
+                          {restaurant.website && (
+                            <a href={restaurant.website} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-lg border ${theme.divider} hover:bg-white/5`}>
+                              <Globe size={14} className={theme.textMuted} />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={`h-48 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                  <Utensils size={32} className="mb-2 opacity-50" />
+                  <span className="text-sm">
+                    {jobDetails?.locations?.formatted_address || jobDetails?.locations?.name
+                      ? "No se encontraron restaurantes cercanos"
+                      : "No hay dirección del recinto para buscar restaurantes"
+                    }
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => {
+                      const location = jobDetails?.locations?.formatted_address || jobDetails?.locations?.name || job?.location?.name || '';
+                      window.open(`https://www.google.com/maps/search/restaurants+near+${encodeURIComponent(location)}`, '_blank');
+                    }}
+                  >
+                    <Globe size={14} className="mr-2" /> Buscar en Google Maps
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -628,26 +898,109 @@ const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
                   <CloudRain size={18} className={theme.textMuted} />
                   <h3 className={`text-lg font-bold ${theme.textMain}`}>Pronóstico del Tiempo</h3>
                 </div>
+                {!jobDetailsLoading && weatherVenue.address && eventDatesString && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchWeather}
+                    disabled={isWeatherLoading}
+                  >
+                    {isWeatherLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : (
+                      <RefreshCw size={14} className="mr-1" />
+                    )}
+                    {isWeatherLoading ? 'Cargando...' : 'Actualizar'}
+                  </Button>
+                )}
               </div>
 
-              <div className={`h-48 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
-                <CloudRain size={32} className="mb-2 opacity-50" />
-                <span className="text-sm">Funcionalidad próximamente</span>
-                <p className="text-xs mt-1 text-center max-w-xs">
-                  Consulta el tiempo en el recinto del evento
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => {
-                    const location = job?.location?.name || '';
-                    window.open(`https://www.google.com/search?q=weather+${encodeURIComponent(location)}`, '_blank');
-                  }}
-                >
-                  <Globe size={14} className="mr-2" /> Ver pronóstico
-                </Button>
-              </div>
+              {jobDetailsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                </div>
+              ) : !weatherVenue.address && !weatherVenue.coordinates ? (
+                <div className={`flex items-center gap-2 text-sm ${theme.textMuted} py-4`}>
+                  <AlertTriangle size={16} />
+                  El pronóstico del tiempo requiere ubicación del lugar
+                </div>
+              ) : !eventDatesString ? (
+                <div className={`flex items-center gap-2 text-sm ${theme.textMuted} py-4`}>
+                  <AlertTriangle size={16} />
+                  El pronóstico del tiempo requiere fechas del evento
+                </div>
+              ) : weatherError ? (
+                <div className={`flex items-center gap-2 text-sm py-4 ${isDark ? 'text-red-400' : 'text-red-600'}`}>
+                  <AlertTriangle size={16} />
+                  {weatherError}
+                </div>
+              ) : isWeatherLoading ? (
+                <div className={`flex items-center gap-2 text-sm ${theme.textMuted} py-4`}>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Obteniendo pronóstico del tiempo...
+                </div>
+              ) : weatherData && weatherData.length > 0 ? (
+                <div className="space-y-2">
+                  {weatherData.map((weather, index) => {
+                    const getWeatherIcon = (condition: string) => {
+                      if (condition.toLowerCase().includes('sun')) return '☀️';
+                      if (condition.toLowerCase().includes('cloud')) return '☁️';
+                      if (condition.toLowerCase().includes('rain')) return '🌧️';
+                      if (condition.toLowerCase().includes('snow')) return '❄️';
+                      if (condition.toLowerCase().includes('storm')) return '⛈️';
+                      return '🌤️';
+                    };
+
+                    const formatWeatherDate = (dateStr: string) => {
+                      try {
+                        const date = new Date(dateStr);
+                        return date.toLocaleDateString('es-ES', { month: 'long', day: 'numeric' });
+                      } catch {
+                        return dateStr;
+                      }
+                    };
+
+                    return (
+                      <div key={index} className={`flex items-center justify-between p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}>
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{getWeatherIcon(weather.condition)}</span>
+                          <div>
+                            <div className={`font-bold text-sm ${theme.textMain}`}>
+                              {formatWeatherDate(weather.date)} – {weather.condition}
+                            </div>
+                            <div className={`text-xs ${theme.textMuted}`}>
+                              {Math.round(weather.maxTemp)}°C / {Math.round(weather.minTemp)}°C
+                              {weather.precipitationProbability > 0 && (
+                                <span>, {weather.precipitationProbability}% lluvia</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className={`text-xs ${theme.textMuted} mt-4`}>
+                    <strong>Fuente:</strong> Los datos del tiempo se obtienen de Open-Meteo y se actualizan automáticamente.
+                  </div>
+                </div>
+              ) : (
+                <div className={`h-48 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                  <CloudRain size={32} className="mb-2 opacity-50" />
+                  <span className="text-sm text-center">
+                    Datos del tiempo no disponibles para las fechas y ubicación seleccionadas.
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={fetchWeather}
+                    disabled={isWeatherLoading}
+                  >
+                    <RefreshCw size={14} className="mr-2" /> Obtener pronóstico
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -796,9 +1149,10 @@ interface DashboardScreenProps {
   isLoading: boolean;
   onOpenAction: (action: string, job?: any) => void;
   onOpenSV: () => void;
+  onOpenObliqueStrategy: () => void;
 }
 
-const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV }: DashboardScreenProps) => {
+const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy }: DashboardScreenProps) => {
   const navigate = useNavigate();
   const { activeTours } = useMyTours();
 
@@ -908,6 +1262,7 @@ const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoad
             onAction={onOpenAction}
             isCrewChief={isCrewChief}
             techName={userName}
+            onOpenObliqueStrategy={onOpenObliqueStrategy}
           />
         ) : (
           <div className={`p-8 rounded-xl border ${theme.card} text-center`}>
@@ -928,9 +1283,10 @@ interface JobsViewProps {
   isLoading: boolean;
   onOpenAction: (action: string, job?: any) => void;
   techName: string;
+  onOpenObliqueStrategy: () => void;
 }
 
-const JobsView = ({ theme, isDark, assignments, isLoading, onOpenAction, techName }: JobsViewProps) => {
+const JobsView = ({ theme, isDark, assignments, isLoading, onOpenAction, techName, onOpenObliqueStrategy }: JobsViewProps) => {
   const isCrewChief = assignments.some(a => {
     const category = getCategoryFromAssignment(a);
     return category === 'responsable';
@@ -963,6 +1319,7 @@ const JobsView = ({ theme, isDark, assignments, isLoading, onOpenAction, techNam
               onAction={onOpenAction}
               isCrewChief={isCrewChief}
               techName={techName}
+              onOpenObliqueStrategy={onOpenObliqueStrategy}
             />
           ))}
         </div>
@@ -1321,6 +1678,7 @@ export default function TechnicianSuperApp() {
   // Modal state
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [showObliqueStrategy, setShowObliqueStrategy] = useState(false);
 
   // Set up real-time subscriptions
   useTechnicianDashboardSubscriptions();
@@ -1451,6 +1809,7 @@ export default function TechnicianSuperApp() {
             isLoading={isLoading}
             onOpenAction={handleOpenAction}
             onOpenSV={() => setActiveModal('soundvision')}
+            onOpenObliqueStrategy={() => setShowObliqueStrategy(true)}
           />
         )}
         {tab === 'jobs' && (
@@ -1461,6 +1820,7 @@ export default function TechnicianSuperApp() {
             isLoading={isLoading}
             onOpenAction={handleOpenAction}
             techName={userName}
+            onOpenObliqueStrategy={() => setShowObliqueStrategy(true)}
           />
         )}
         {tab === 'availability' && (
@@ -1506,6 +1866,9 @@ export default function TechnicianSuperApp() {
       )}
       {activeModal === 'soundvision' && (
         <SoundVisionModal theme={t} isDark={isDark} onClose={() => setActiveModal(null)} />
+      )}
+      {showObliqueStrategy && (
+        <ObliqueStrategyModal theme={t} isDark={isDark} onClose={() => setShowObliqueStrategy(false)} />
       )}
     </div>
   );
