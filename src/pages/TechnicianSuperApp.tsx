@@ -1576,9 +1576,10 @@ interface DashboardScreenProps {
   onOpenSV: () => void;
   onOpenObliqueStrategy: () => void;
   onOpenTour: (tourId: string) => void;
+  hasSoundVisionAccess: boolean;
 }
 
-const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy, onOpenTour }: DashboardScreenProps) => {
+const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy, onOpenTour, hasSoundVisionAccess }: DashboardScreenProps) => {
   const navigate = useNavigate();
   const { activeTours } = useMyTours();
 
@@ -1646,13 +1647,15 @@ const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoad
       <div>
         <h2 className={`text-xs font-bold uppercase ${theme.textMuted} mb-3`}>Herramientas</h2>
         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-          <button
-            onClick={onOpenSV}
-            className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-blue-500 transition-colors text-left group`}
-          >
-            <Map size={20} className="text-blue-500 group-hover:scale-110 transition-transform" />
-            <span className={`text-xs font-bold ${theme.textMain}`}>SoundVision<br />Database</span>
-          </button>
+          {hasSoundVisionAccess && (
+            <button
+              onClick={onOpenSV}
+              className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-blue-500 transition-colors text-left group`}
+            >
+              <Map size={20} className="text-blue-500 group-hover:scale-110 transition-transform" />
+              <span className={`text-xs font-bold ${theme.textMain}`}>SoundVision<br />Database</span>
+            </button>
+          )}
           <button
             onClick={() => navigate('/timesheets')}
             className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between text-left`}
@@ -2248,7 +2251,7 @@ const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: ProfileV
 export default function TechnicianSuperApp() {
   const [tab, setTab] = useState('dashboard');
   const { theme: nextTheme, setTheme } = useTheme();
-  const { user } = useOptimizedAuth();
+  const { user, hasSoundVisionAccess } = useOptimizedAuth();
   const queryClient = useQueryClient();
 
   // Determine if dark mode
@@ -2397,6 +2400,7 @@ export default function TechnicianSuperApp() {
             onOpenSV={() => setActiveModal('soundvision')}
             onOpenObliqueStrategy={() => setShowObliqueStrategy(true)}
             onOpenTour={(tourId) => setSelectedTourId(tourId)}
+            hasSoundVisionAccess={hasSoundVisionAccess}
           />
         )}
         {tab === 'jobs' && (
@@ -2451,7 +2455,7 @@ export default function TechnicianSuperApp() {
       {activeModal === 'details' && selectedJob && (
         <DetailsModal theme={t} isDark={isDark} job={selectedJob} onClose={() => setActiveModal(null)} />
       )}
-      {activeModal === 'soundvision' && (
+      {activeModal === 'soundvision' && hasSoundVisionAccess && (
         <SoundVisionModal theme={t} isDark={isDark} onClose={() => setActiveModal(null)} />
       )}
       {showObliqueStrategy && (
