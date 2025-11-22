@@ -762,9 +762,14 @@ const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
                           <div className={`text-xs ${theme.textMuted}`}>
                             {doc.uploaded_at && `Subido el ${format(new Date(doc.uploaded_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`}
                           </div>
-                          {doc.template_type === 'soundvision' && (
-                            <Badge variant="outline" className="mt-1 text-[10px]">SoundVision</Badge>
-                          )}
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            {doc.template_type === 'soundvision' && (
+                              <Badge variant="outline" className="text-[10px]">SoundVision</Badge>
+                            )}
+                            {doc.read_only && (
+                              <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/50">Solo lectura</Badge>
+                            )}
+                          </div>
                         </div>
                         <div className="flex gap-2 shrink-0">
                           <Button
