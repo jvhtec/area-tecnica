@@ -29,9 +29,9 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          if (id.includes('node_modules/react')) return 'vendor-react';
-          if (id.includes('node_modules/react-router-dom')) return 'vendor-router';
-          if (id.includes('node_modules/@tanstack/react-query')) return 'vendor-rq';
+          // Bundle React + React Query together (React Query depends on React.createContext)
+          if (id.includes('node_modules/react') || id.includes('node_modules/@tanstack/react-query')) return 'framework';
+          if (id.includes('node_modules/react-router-dom')) return 'router';
           if (id.includes('node_modules/@radix-ui')) return 'vendor-ui';
           if (id.includes('node_modules/jspdf') || id.includes('pdf-lib')) return 'vendor-pdf';
           if (id.includes('node_modules/exceljs') || id.includes('node_modules/xlsx')) return 'vendor-excel';
