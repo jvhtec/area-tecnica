@@ -645,7 +645,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
         {/* Scroll wrapper to ensure the dialog always scrolls regardless of layout */}
         <div className="min-h-0 overflow-y-auto overflow-x-hidden max-h-[75vh]">
-          <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-col">
+          <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-col min-w-0">
             <TabsList className={`grid w-full ${gridColsClass} flex-shrink-0 h-auto text-xs md:text-sm overflow-x-auto no-scrollbar`}>
               <TabsTrigger value="info" className="py-2">Información</TabsTrigger>
               {!isDryhire && <TabsTrigger value="location" className="py-2">Ubicación</TabsTrigger>}
@@ -1130,7 +1130,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               </TabsContent>
 
               <TabsContent value="location" className="space-y-4 min-w-0 overflow-x-hidden">
-                <Card className="p-4">
+                <Card className="p-4 w-full min-w-0 overflow-hidden">
                   {isJobLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -1215,7 +1215,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               </TabsContent>
 
               <TabsContent value="personnel" className="space-y-4 min-w-0 overflow-x-hidden">
-                <Card className="p-4">
+                <Card className="p-4 w-full min-w-0 overflow-hidden">
                   <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     Personal asignado
@@ -1417,12 +1417,12 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     </div>
                   ) : restaurants && restaurants.length > 0 ? (
                       <div className="space-y-3">
-                        {restaurants.map((restaurant: Restaurant) => (
-                          <div key={restaurant.id} className="p-3 bg-[#0f1219] border border-[#1f232e] rounded">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium break-words">{restaurant.name}</p>
-                                <p className="text-sm text-muted-foreground break-words">{restaurant.address}</p>
+                      {restaurants.map((restaurant: Restaurant) => (
+                        <div key={restaurant.id} className="p-3 bg-[#0f1219] border border-[#1f232e] rounded">
+                          <div className="flex items-start justify-between gap-3 min-w-0">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium break-words">{restaurant.name}</p>
+                              <p className="text-sm text-muted-foreground break-words">{restaurant.address}</p>
 
                               <div className="flex items-center gap-2 mt-2">
                                 {restaurant.rating && (

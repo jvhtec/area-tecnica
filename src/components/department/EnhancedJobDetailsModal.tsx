@@ -375,7 +375,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
-            <div className={`w-full max-w-md md:max-w-lg lg:max-w-xl h-[85vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200`}>
+            <div className={`w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] h-[90vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden overflow-x-hidden animate-in zoom-in-95 duration-200`}>
 
                 {/* Header */}
                 <div className={`p-4 border-b ${theme.divider} flex justify-between items-center shrink-0`}>
@@ -406,13 +406,13 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                     ))}
                 </div>
 
-                <ScrollArea className="flex-1 p-5 overflow-x-hidden">
+                <ScrollArea className="flex-1 p-5 overflow-x-hidden min-w-0">
 
                     {/* TAB: INFO */}
                     {activeTab === 'Info' && (
-                        <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                        <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 min-w-0 overflow-x-hidden">
                             <div>
-                                <h1 className={`text-2xl font-bold ${theme.textMain} mb-4`}>{job?.title}</h1>
+                                <h1 className={`text-2xl font-bold ${theme.textMain} mb-4 break-words`}>{job?.title}</h1>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                                     <div>
@@ -436,20 +436,20 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                             </div>
 
                             {job?.description && (
-                                <div>
+                                <div className="min-w-0">
                                     <label className={`text-xs ${theme.textMuted} font-bold uppercase`}>Descripción</label>
-                                    <p className={`text-sm ${theme.textMain} mt-2 leading-relaxed`}>{job.description}</p>
+                                    <p className={`text-sm ${theme.textMain} mt-2 leading-relaxed break-words`}>{job.description}</p>
                                 </div>
                             )}
 
                             {locationData && (
-                                <div>
+                                <div className="min-w-0">
                                     <label className={`text-xs ${theme.textMuted} font-bold uppercase`}>Recinto</label>
-                                    <div className={`text-sm ${theme.textMain} mt-1 leading-relaxed`}>
+                                    <div className={`text-sm ${theme.textMain} mt-1 leading-relaxed break-words`}>
                                         {locationData?.name || 'Sin ubicación'}
                                     </div>
                                     {locationData?.formatted_address && (
-                                        <div className={`text-xs ${theme.textMuted}`}>{locationData.formatted_address}</div>
+                                        <div className={`text-xs ${theme.textMuted} break-words`}>{locationData.formatted_address}</div>
                                     )}
                                 </div>
                             )}
@@ -482,7 +482,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                             )}
 
                             {isManager && resolvedJobId && (
-                                <div className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-xl p-3`}>
+                                <div className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-xl p-3 w-full min-w-0 overflow-hidden`}>
                                     <h3 className={`text-sm font-semibold mb-3 ${theme.textMain}`}>Job Payout Totals</h3>
                                     <JobPayoutTotalsPanel jobId={resolvedJobId} />
                                 </div>
@@ -492,7 +492,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
                     {/* TAB: UBICACIÓN */}
                     {activeTab === 'Ubicación' && (
-                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-300 min-w-0 overflow-x-hidden">
                             {jobDetailsLoading ? (
                                 <div className="flex items-center justify-center py-8">
                                     <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -554,7 +554,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
                     {/* TAB: PERSONAL */}
                     {activeTab === 'Personal' && (
-                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-300 min-w-0 overflow-x-hidden">
                             <div className="flex items-center gap-2 mb-2">
                                 <User size={18} className={theme.textMuted} />
                                 <h3 className={`text-lg font-bold ${theme.textMain}`}>Personal asignado</h3>
@@ -581,11 +581,11 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                             video: 'text-purple-400 bg-purple-900/30 border-purple-900/50',
                                         };
                                         return (
-                                            <div key={idx} className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4`}>
-                                                <div className={`font-bold text-sm ${theme.textMain} mb-1`}>
+                                            <div key={idx} className={`${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 min-w-0 overflow-hidden`}>
+                                                <div className={`font-bold text-sm ${theme.textMain} mb-1 break-words`}>
                                                     {tech?.first_name} {tech?.last_name}
                                                 </div>
-                                                <div className={`text-xs ${theme.textMuted}`}>{role}</div>
+                                                <div className={`text-xs ${theme.textMuted} break-words`}>{role}</div>
                                                 <div className={`mt-2 inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${deptColors[dept] || theme.textMuted}`}>
                                                     {dept}
                                                 </div>
@@ -599,7 +599,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
                     {/* TAB: DOCS */}
                     {activeTab === 'Docs' && (
-                        <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                        <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 min-w-0 overflow-x-hidden">
                             <div>
                                 <div className="flex items-center gap-2 mb-3">
                                     <FileText size={18} className={theme.textMuted} />
@@ -613,10 +613,10 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                     return visibleDocs.length > 0 ? (
                                         <div className="space-y-2">
                                             {visibleDocs.map((doc) => (
-                                                <div key={doc.id} className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 flex items-center justify-between`}>
-                                                    <div className="min-w-0 pr-4">
-                                                        <div className={`text-sm font-bold ${theme.textMain} truncate mb-1`}>{doc.file_name}</div>
-                                                        <div className={`text-xs ${theme.textMuted}`}>
+                                                <div key={doc.id} className={`${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 flex items-center justify-between min-w-0`}>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className={`text-sm font-bold ${theme.textMain} break-words mb-1`}>{doc.file_name}</div>
+                                                        <div className={`text-xs ${theme.textMuted} break-words`}>
                                                             {doc.uploaded_at && `Subido el ${format(new Date(doc.uploaded_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`}
                                                         </div>
                                                         <div className="flex gap-1 mt-1 flex-wrap">
@@ -674,7 +674,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
                     {/* TAB: RESTAU. */}
                     {activeTab === 'Restau.' && (
-                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-300 min-w-0 overflow-x-hidden">
                             <div className="flex items-center gap-2 mb-2">
                                 <Utensils size={18} className={theme.textMuted} />
                                 <h3 className={`text-lg font-bold ${theme.textMain}`}>Restaurantes cercanos</h3>
@@ -688,11 +688,11 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                             ) : restaurants && restaurants.length > 0 ? (
                                 <div className="space-y-3">
                                     {restaurants.map((restaurant: Restaurant) => (
-                                        <div key={restaurant.id} className={`p-4 rounded-xl border ${theme.card}`}>
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1 min-w-0 pr-3">
-                                                    <p className={`font-bold text-sm ${theme.textMain} truncate`}>{restaurant.name}</p>
-                                                    <p className={`text-xs ${theme.textMuted} mt-1 line-clamp-2`}>{restaurant.address}</p>
+                                        <div key={restaurant.id} className={`p-4 rounded-xl border ${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-slate-50 border-slate-200'}`}>
+                                            <div className="flex items-start justify-between gap-3 min-w-0">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`font-bold text-sm ${theme.textMain} break-words`}>{restaurant.name}</p>
+                                                    <p className={`text-xs ${theme.textMuted} mt-1 break-words`}>{restaurant.address}</p>
 
                                                     <div className="flex items-center gap-2 mt-3 flex-wrap">
                                                         {restaurant.rating && (
@@ -850,13 +850,13 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
                     {/* TAB: TARIFAS */}
                     {activeTab === 'Tarifas' && showTourRatesTab && resolvedJobId && (
-                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-300 min-w-0 overflow-x-hidden">
                             <div className="flex items-center gap-2 mb-2">
                                 <Euro size={18} className={theme.textMuted} />
                                 <h3 className={`text-lg font-bold ${theme.textMain}`}>Tarifas del Tour</h3>
                             </div>
 
-                            <div className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4`}>
+                            <div className={`${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 w-full min-w-0 overflow-hidden`}>
                                 <TourRatesPanel
                                     jobId={resolvedJobId}
                                 />
@@ -866,13 +866,13 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
                     {/* TAB: EXTRAS */}
                     {activeTab === 'Extras' && showExtrasTab && resolvedJobId && (
-                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-300 min-w-0 overflow-x-hidden">
                             <div className="flex items-center gap-2 mb-2">
                                 <Euro size={18} className={theme.textMuted} />
                                 <h3 className={`text-lg font-bold ${theme.textMain}`}>Extras y Pagos</h3>
                             </div>
 
-                            <div className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4`}>
+                            <div className={`${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 w-full min-w-0 overflow-hidden`}>
                                 <JobExtrasManagement jobId={resolvedJobId} />
                             </div>
                         </div>

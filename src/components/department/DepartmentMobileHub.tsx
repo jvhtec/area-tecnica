@@ -221,7 +221,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
             <Button
               variant="outline"
               size="sm"
-              className={cn("rounded-lg px-3", t.card)}
+              className={cn("rounded-lg px-3", t.card, t.textMain)}
               onClick={handleToday}
             >
               Today
