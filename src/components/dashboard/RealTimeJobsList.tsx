@@ -38,7 +38,7 @@ export function RealTimeJobsList({
   const { jobs, isLoading, isRefreshing, refetch, realtimeStatus } = useJobsRealtime();
   const [timeFilter, setTimeFilter] = useState<"upcoming" | "past" | "all">("upcoming");
 
-  const displayedJobs = useMemo(() => {
+  const { jobs: displayedJobs, total: totalMatchingJobs } = useMemo(() => {
     const filtered = jobs.filter(job => {
       if (filterByDepartment && department) {
         const jobDepartments = job.job_departments.map(d => d.department);
@@ -49,13 +49,13 @@ export function RealTimeJobsList({
 
       const jobDate = new Date(job.start_time);
       const now = new Date();
-      
+
       if (timeFilter === "upcoming") {
         return jobDate >= now;
       } else if (timeFilter === "past") {
         return jobDate < now;
       }
-      
+
       return true;
     });
 
@@ -66,7 +66,10 @@ export function RealTimeJobsList({
       return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
     });
 
-    return limit ? sorted.slice(0, limit) : sorted;
+    const totalMatching = sorted.length;
+    const limited = limit ? sorted.slice(0, limit) : sorted;
+
+    return { jobs: limited, total: totalMatching };
   }, [jobs, filterByDepartment, department, timeFilter, limit]);
 
   // Group jobs by month for better organization
@@ -161,7 +164,7 @@ export function RealTimeJobsList({
                 </div>
               ))}
               
-              {limit && filteredJobs.length > limit && showAllButton && (
+              {limit && totalMatchingJobs > limit && showAllButton && (
                 <div className="flex justify-center pt-2">
                   <Button variant="outline" size="sm">View All Jobs</Button>
                 </div>
