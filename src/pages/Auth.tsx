@@ -30,6 +30,13 @@ const Auth = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const isRecovery = searchParams.get('type') === 'recovery';
 
+  // Track latest userRole in a ref to avoid stale closures in triggerTransition
+  const latestRoleRef = useRef<UserRole | null>(userRole as UserRole | null);
+
+  useEffect(() => {
+    latestRoleRef.current = userRole as UserRole | null;
+  }, [userRole]);
+
   // Form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,14 +50,14 @@ const Auth = () => {
   const trackRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef(0);
 
-  // Handle successful login transition
+  // Handle successful login transition - uses ref to get latest role
   const triggerTransition = useCallback(() => {
     setIsTransitioning(true);
     setTimeout(() => {
-      const dashboardPath = getDashboardPath(userRole as UserRole);
+      const dashboardPath = getDashboardPath(latestRoleRef.current);
       navigate(dashboardPath, { replace: true });
     }, 800);
-  }, [userRole, navigate]);
+  }, [navigate]);
 
   // Handle login
   const handleLogin = async () => {
