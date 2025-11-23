@@ -25,6 +25,7 @@ interface DateHeaderProps {
 }
 
 // Lightweight per-job engagement counts scoped to current filtered technicians
+// Timesheets are the source of truth for actual scheduled assignments
 function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefined) {
   return useQuery({
     queryKey: ['matrix-job-engagement-counts', jobId, (technicianIds || []).join(',')],
@@ -56,14 +57,22 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
         if (v.phase === 'offer' && v.status === 'pending') offers++;
       });
 
-      // Confirmed assignments for this job among current technicians
-      const { count: confirmations = 0 } = await supabase
-        .from('job_assignments')
-        .select('job_id', { count: 'exact' })
+      // Confirmed/scheduled technicians from timesheets (source of truth)
+      // Count unique technicians with timesheets for this job
+      const { data: tsData, error: tsErr } = await supabase
+        .from('timesheets')
+        .select('technician_id')
         .eq('job_id', jobId)
-        .eq('status', 'confirmed')
-        .in('technician_id', technicianIds)
-        .limit(1);
+        .in('technician_id', technicianIds);
+
+      if (tsErr) {
+        console.warn('Counts timesheets error', tsErr);
+      }
+
+      // Count unique technicians
+      const uniqueTechs = new Set<string>();
+      (tsData || []).forEach((r: any) => { if (r.technician_id) uniqueTechs.add(r.technician_id); });
+      const confirmations = uniqueTechs.size;
 
       return { invitations, offers, confirmations } as const;
     },
@@ -90,21 +99,63 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
   const { data: confirmedForDate } = useDateConfirmedCount(date, jobs, technicianIds);
 
   // Aggregate open slots across jobs on this date (all departments)
+  // Timesheets are source of truth - only count technicians who are actually scheduled
   const jobIds = React.useMemo(() => (jobs || []).map(j => j.id), [jobs]);
   const { data: openSlots } = useQuery({
     queryKey: ['matrix-open-slots', jobIds.join(',')],
     queryFn: async () => {
       if (!jobIds.length) return { required: 0, assigned: 0, open: 0 };
-      const [{ data: req }, { data: a1 }, { data: a2 }, { data: a3 }] = await Promise.all([
+
+      // First get technicians with timesheets (actually scheduled)
+      const { data: timesheetData } = await supabase
+        .from('timesheets')
+        .select('technician_id, job_id')
+        .in('job_id', jobIds);
+
+      // Get unique scheduled technician IDs per job
+      const scheduledTechsByJob = new Map<string, Set<string>>();
+      (timesheetData || []).forEach((t: any) => {
+        if (!scheduledTechsByJob.has(t.job_id)) {
+          scheduledTechsByJob.set(t.job_id, new Set());
+        }
+        scheduledTechsByJob.get(t.job_id)!.add(t.technician_id);
+      });
+
+      const allScheduledTechs = new Set<string>();
+      (timesheetData || []).forEach((t: any) => allScheduledTechs.add(t.technician_id));
+
+      if (allScheduledTechs.size === 0) {
+        // No scheduled technicians, just get required count
+        const { data: req } = await supabase
+          .from('job_required_roles_summary')
+          .select('total_required, job_id')
+          .in('job_id', jobIds);
+        const required = (req || []).reduce((acc: number, r: any) => acc + (Number(r.total_required || 0)), 0);
+        return { required, assigned: 0, open: required };
+      }
+
+      // Get requirements and assignments for scheduled technicians
+      const [{ data: req }, { data: assignments }] = await Promise.all([
         supabase.from('job_required_roles_summary').select('total_required, job_id').in('job_id', jobIds),
-        supabase.from('job_assignments').select('id,sound_role').in('job_id', jobIds),
-        supabase.from('job_assignments').select('id,lights_role').in('job_id', jobIds),
-        supabase.from('job_assignments').select('id,video_role').in('job_id', jobIds),
+        supabase.from('job_assignments')
+          .select('job_id, technician_id, sound_role, lights_role, video_role')
+          .in('job_id', jobIds)
+          .in('technician_id', Array.from(allScheduledTechs)),
       ]);
+
       const required = (req || []).reduce((acc: number, r: any) => acc + (Number(r.total_required || 0)), 0);
-      const assigned = (a1 || []).filter((r:any)=> r.sound_role != null).length
-        + (a2 || []).filter((r:any)=> r.lights_role != null).length
-        + (a3 || []).filter((r:any)=> r.video_role != null).length;
+
+      // Count assigned roles only for technicians who are actually scheduled (have timesheets)
+      let assigned = 0;
+      (assignments || []).forEach((a: any) => {
+        const scheduledForJob = scheduledTechsByJob.get(a.job_id);
+        if (scheduledForJob && scheduledForJob.has(a.technician_id)) {
+          if (a.sound_role != null) assigned++;
+          if (a.lights_role != null) assigned++;
+          if (a.video_role != null) assigned++;
+        }
+      });
+
       const open = Math.max(required - assigned, 0);
       return { required, assigned, open };
     },
@@ -258,7 +309,8 @@ function JobRowWithCounts({ job, technicianIds, onJobClick }: { job: { id: strin
   );
 }
 
-// Total confirmed technicians for a specific date across the provided jobs
+// Total confirmed/scheduled technicians for a specific date across the provided jobs
+// Timesheets are the source of truth for actual scheduled assignments
 function useDateConfirmedCount(date: Date, jobs: Array<{ id: string }>, technicianIds?: string[]) {
   const dateStr = format(date, 'yyyy-MM-dd');
   const jobIds = (jobs || []).map(j => j.id);
@@ -266,32 +318,29 @@ function useDateConfirmedCount(date: Date, jobs: Array<{ id: string }>, technici
     queryKey: ['matrix-date-confirmed-count', dateStr, jobIds.join(','), (technicianIds || []).join(',')],
     queryFn: async () => {
       if (!jobIds.length) return 0;
+
+      // Query timesheets for the specific date and jobs (source of truth)
+      let query = supabase
+        .from('timesheets')
+        .select('technician_id')
+        .in('job_id', jobIds)
+        .eq('date', dateStr);
+
       if (technicianIds && technicianIds.length > 0) {
-        const { data, error } = await supabase
-          .from('job_assignments')
-          .select('technician_id')
-          .in('job_id', jobIds)
-          .eq('status', 'confirmed')
-          .in('technician_id', technicianIds);
-        if (error) {
-          console.warn('Confirmed count error', error);
-          return 0;
-        }
-        const unique = new Set<string>();
-        (data || []).forEach((r: any) => { if (r.technician_id) unique.add(r.technician_id); });
-        return unique.size;
-      } else {
-        const { count, error } = await supabase
-          .from('job_assignments')
-          .select('technician_id', { count: 'exact', head: true })
-          .in('job_id', jobIds)
-          .eq('status', 'confirmed');
-        if (error) {
-          console.warn('Confirmed count(head) error', error);
-          return 0;
-        }
-        return count || 0;
+        query = query.in('technician_id', technicianIds);
       }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.warn('Confirmed count error', error);
+        return 0;
+      }
+
+      // Count unique technicians
+      const unique = new Set<string>();
+      (data || []).forEach((r: any) => { if (r.technician_id) unique.add(r.technician_id); });
+      return unique.size;
     },
     staleTime: 2_000,
     gcTime: 60_000,

@@ -162,16 +162,14 @@ export default function TechnicianSuperApp() {
       const startDate = addMonths(new Date(), -3);
       const endDate = addMonths(new Date(), 3);
 
-      const { data: jobAssignments, error } = await supabase
-        .from('job_assignments')
+      // Query timesheets as source of truth, joined with job_assignments for role/status
+      const { data: timesheetData, error } = await supabase
+        .from('timesheets')
         .select(`
           job_id,
           technician_id,
-          sound_role,
-          lights_role,
-          video_role,
-          assigned_at,
-          jobs (
+          date,
+          jobs!inner (
             id,
             title,
             description,
@@ -192,10 +190,17 @@ export default function TechnicianSuperApp() {
               read_only,
               template_type
             )
+          ),
+          job_assignments!inner (
+            sound_role,
+            lights_role,
+            video_role,
+            assigned_at,
+            status
           )
         `)
         .eq('technician_id', user.id)
-        .eq('status', 'confirmed')
+        .eq('job_assignments.status', 'confirmed')
         .gte('jobs.start_time', startDate.toISOString())
         .lte('jobs.start_time', endDate.toISOString())
         .order('start_time', { referencedTable: 'jobs' });
@@ -205,31 +210,44 @@ export default function TechnicianSuperApp() {
         return [];
       }
 
-      return jobAssignments
-        .filter(assignment => assignment.jobs)
-        .map(assignment => {
-          let department = "unknown";
-          if (assignment.sound_role) department = "sound";
-          else if (assignment.lights_role) department = "lights";
-          else if (assignment.video_role) department = "video";
+      // Deduplicate by job_id (timesheets have one row per date, we want one per job)
+      const seenJobIds = new Set<string>();
+      const jobAssignments = (timesheetData || []).filter(row => {
+        if (seenJobIds.has(row.job_id)) return false;
+        seenJobIds.add(row.job_id);
+        return true;
+      });
 
-          const category = getCategoryFromAssignment(assignment);
+      return jobAssignments
+        .filter(row => row.jobs)
+        .map(row => {
+          let department = "unknown";
+          const assignment = row.job_assignments;
+          if (assignment?.sound_role) department = "sound";
+          else if (assignment?.lights_role) department = "lights";
+          else if (assignment?.video_role) department = "video";
+
+          const category = getCategoryFromAssignment({
+            sound_role: assignment?.sound_role,
+            lights_role: assignment?.lights_role,
+            video_role: assignment?.video_role
+          });
 
           return {
-            id: `job-${assignment.job_id}`,
-            job_id: assignment.job_id,
-            technician_id: assignment.technician_id,
+            id: `job-${row.job_id}`,
+            job_id: row.job_id,
+            technician_id: row.technician_id,
             department,
-            role: assignment.sound_role || assignment.lights_role || assignment.video_role || "Assigned",
+            role: assignment?.sound_role || assignment?.lights_role || assignment?.video_role || "Assigned",
             category,
-            sound_role: assignment.sound_role,
-            lights_role: assignment.lights_role,
-            video_role: assignment.video_role,
-            jobs: assignment.jobs
+            sound_role: assignment?.sound_role,
+            lights_role: assignment?.lights_role,
+            video_role: assignment?.video_role,
+            jobs: row.jobs
           };
         });
     },
-    'job_assignments',
+    'timesheets',
     {
       refetchOnWindowFocus: true,
       refetchOnMount: true,
