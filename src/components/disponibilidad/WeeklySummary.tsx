@@ -21,6 +21,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { safeGetJSON, safeSetJSON } from '@/lib/storage';
 
 interface WeeklySummaryProps {
   selectedDate: Date;
@@ -50,10 +51,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
       setCurrentWeekStart(newStart);
     }
   }, [selectedDate]);
-  const [isOpen, setIsOpen] = useState(() => {
-    const stored = localStorage.getItem('weeklySummaryOpen');
-    return stored ? JSON.parse(stored) : true;
-  });
+  const [isOpen, setIsOpen] = useState(() => safeGetJSON('weeklySummaryOpen', true));
   
   const departmentCategories = getCategoriesForDepartment(department);
   // Filters disabled by default: show all categories until user opts in
@@ -62,7 +60,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('weeklySummaryOpen', JSON.stringify(isOpen));
+    safeSetJSON('weeklySummaryOpen', isOpen);
   }, [isOpen]);
 
   const weekDates = eachDayOfInterval({

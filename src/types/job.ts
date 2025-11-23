@@ -8,7 +8,30 @@ export interface JobDocument {
   template_type?: string | null;
 }
 
-export type JobType = "single" | "tour" | "tourdate" | "festival" | "dryhire";
+export type JobType = "single" | "multi_day" | "tour" | "tourdate" | "festival" | "dryhire";
+
+export interface Location {
+  id: string;
+  name: string;
+  formatted_address?: string;
+  address?: string;
+  latitude?: number | string;
+  longitude?: number | string;
+}
+
+export interface TechnicianProfile {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+}
+
+export interface StaffAssignment {
+  sound_role?: string;
+  lights_role?: string;
+  video_role?: string;
+  technician?: TechnicianProfile;
+}
 
 export interface Job {
   id: string;
@@ -24,4 +47,10 @@ export interface Job {
   created_at: string;
   job_type: JobType;
   flex_folders_created?: boolean;
+}
+
+export interface JobWithLocationAndDocs extends Job {
+  job_documents?: JobDocument[];
+  locations?: Location;
+  location?: Location;
 }

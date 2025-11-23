@@ -22,19 +22,22 @@ export default defineConfig(({ mode }) => ({
     'import.meta.env.VITE_APP_VERSION': JSON.stringify('1.0RTM'),
   },
   build: {
-    sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
-          forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
-          supabase: ['@supabase/supabase-js', '@supabase/auth-ui-react'],
-          charts: ['recharts'],
-          utils: ['date-fns', 'date-fns-tz', 'clsx', 'tailwind-merge'],
+    // Only disable sourcemaps and drop console/debugger in production
+    sourcemap: mode !== 'production',
+    ...(mode === 'production' && {
+      minify: 'esbuild',
+      rollupOptions: {
+        output: {
+          manualChunks: (id) => {
+            if (id.includes('node_modules/jspdf') || id.includes('node_modules/pdf-lib')) {
+              return 'vendor-pdf';
+            }
+          },
         },
       },
-    },
+    }),
   },
+  esbuild: mode === 'production' ? {
+    drop: ['console', 'debugger'],
+  } : undefined,
 }));

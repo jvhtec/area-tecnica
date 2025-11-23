@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 import { useQueryClient } from '@tanstack/react-query';
@@ -29,22 +29,31 @@ export function useTableSubscription(
   const manager = UnifiedSubscriptionManager.getInstance(queryClient);
   const { subscriptionsByTable } = useSubscriptionContext();
   const location = useLocation();
+  const actualQueryKey = useMemo(
+    () => queryKey || tableName,
+    [queryKey, tableName]
+  );
+  const serializedFilter = useMemo(
+    () => (filter ? JSON.stringify(filter) : undefined),
+    [filter]
+  );
+  const stableFilter = useMemo(() => filter, [serializedFilter]);
+  const subscriptionKey = useMemo(() => {
+    const key = typeof actualQueryKey === 'string' ? actualQueryKey : JSON.stringify(actualQueryKey);
+    return `${tableName}::${key}`;
+  }, [actualQueryKey, tableName]);
   
   useEffect(() => {
-    // Use provided query key or default to table name
-    const actualQueryKey = queryKey || tableName;
-    
     // Subscribe to the table
-    const subscription = manager.subscribeToTable(tableName, actualQueryKey, filter, priority);
+    const subscription = manager.subscribeToTable(tableName, actualQueryKey, stableFilter, priority);
     
     // Register this subscription with the current route
-    const subscriptionKey = `${tableName}::${typeof actualQueryKey === 'string' ? actualQueryKey : JSON.stringify(actualQueryKey)}`;
     manager.registerRouteSubscription(location.pathname, subscriptionKey);
     
     return () => {
       subscription.unsubscribe();
     };
-  }, [tableName, queryKey, filter, priority, location.pathname, manager]);
+  }, [actualQueryKey, priority, location.pathname, manager, stableFilter, subscriptionKey, tableName]);
   
   return {
     isSubscribed: subscriptionsByTable[tableName]?.length > 0
@@ -70,21 +79,26 @@ export function useMultiTableSubscription(
   const manager = UnifiedSubscriptionManager.getInstance(queryClient);
   const { subscriptionsByTable } = useSubscriptionContext();
   const location = useLocation();
-  
-  useEffect(() => {
-    // Format tables array for the subscribeToTables method
-    const tableConfigs = tables.map(t => ({
+  const serializedTables = useMemo(
+    () => JSON.stringify(tables),
+    [tables]
+  );
+  const tableConfigs = useMemo(
+    () => tables.map(t => ({
       table: t.table,
       queryKey: t.queryKey || t.table,
       filter: t.filter,
       priority: t.priority || 'medium'
-    }));
-    
+    })),
+    [serializedTables]
+  );
+  
+  useEffect(() => {
     // Subscribe to all tables
     const subscription = manager.subscribeToTables(tableConfigs);
     
     // Register all subscriptions with the current route
-    tables.forEach(t => {
+    tableConfigs.forEach(t => {
       const actualQueryKey = t.queryKey || t.table;
       const subscriptionKey = `${t.table}::${typeof actualQueryKey === 'string' ? actualQueryKey : JSON.stringify(actualQueryKey)}`;
       manager.registerRouteSubscription(location.pathname, subscriptionKey);
@@ -93,7 +107,7 @@ export function useMultiTableSubscription(
     return () => {
       subscription.unsubscribe();
     };
-  }, [JSON.stringify(tables), location.pathname, manager]);
+  }, [location.pathname, manager, serializedTables, tableConfigs]);
   
   return {
     isSubscribed: tables.every(t => subscriptionsByTable[t.table]?.length > 0)

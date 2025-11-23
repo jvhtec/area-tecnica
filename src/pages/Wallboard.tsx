@@ -1681,9 +1681,34 @@ function WallboardDisplay({
         }
       }
     };
+    let refreshTimer: number | null = null;
+    const scheduleRefresh = () => {
+      if (cancelled || refreshTimer) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        fetchAll();
+      }, 300);
+    };
+
+    const channel = supabase
+      .channel('wallboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_departments' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_documents' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'timesheets' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, scheduleRefresh)
+      .subscribe();
+
     fetchAll();
-    const id = setInterval(fetchAll, 60000); // 60s polling
-    return () => { cancelled = true; clearInterval(id); };
+
+    return () => { 
+      cancelled = true; 
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer);
+      }
+      supabase.removeChannel(channel);
+    };
   }, [isApiMode]);
 
   useEffect(() => {
@@ -1719,8 +1744,32 @@ function WallboardDisplay({
     };
 
     fetchAll();
-    const id = window.setInterval(fetchAll, 60000);
-    return () => { cancelled = true; window.clearInterval(id); };
+    let refreshTimer: number | null = null;
+    const scheduleRefresh = () => {
+      if (cancelled || refreshTimer) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        fetchAll();
+      }, 300);
+    };
+
+    const channel = supabase
+      .channel('wallboard-realtime-api')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_departments' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_documents' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'timesheets' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, scheduleRefresh)
+      .subscribe();
+
+    return () => { 
+      cancelled = true; 
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer);
+      }
+      supabase.removeChannel(channel);
+    };
   }, [wallboardApiToken, onFatalError]);
 
   useEffect(() => {

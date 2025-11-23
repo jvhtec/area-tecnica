@@ -53,7 +53,7 @@ export default function WallboardPublic() {
 
       // Step 1: Exchange the shared token for a short-lived JWT
       try {
-        const result = await exchangeWallboardToken(token);
+        const result = await exchangeWallboardToken(token, presetSlug);
         console.log('✅ Token exchange successful', { jwtLength: result.token.length, expiresIn: result.expiresIn });
         setWallboardToken(result.token);
         setIsValid(true);

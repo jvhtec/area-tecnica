@@ -27,6 +27,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import { throttle } from '@/utils/throttle';
 
 // Technician sorting method type
 type TechSortMethod = 'default' | 'location' | 'name-asc' | 'name-desc' | 'surname-asc' | 'surname-desc';
@@ -241,6 +242,21 @@ export const OptimizedAssignmentMatrix = ({
   const OVERSCAN_ROWS = 2;
   const OVERSCAN_COLS = 2;
 
+  // Mobile date navigation state
+  const [canNavLeft, setCanNavLeft] = useState(false);
+  const [canNavRight, setCanNavRight] = useState(true);
+  const [navStep, setNavStep] = useState(3);
+
+  const updateNavAvailability = useCallback(() => {
+    if (!mobile) return;
+    const el = dateHeadersRef.current;
+    if (!el) return;
+    const sl = el.scrollLeft;
+    const max = el.scrollWidth - el.clientWidth - 1;
+    setCanNavLeft(sl > 2);
+    setCanNavRight(sl < max);
+  }, [mobile]);
+
   const updateVisibleWindow = useCallback(() => {
     const el = mainScrollRef.current;
     if (!el) return;
@@ -307,14 +323,14 @@ export const OptimizedAssignmentMatrix = ({
     });
   }, []);
 
-  const handleMainScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  const handleMainScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (syncInProgressRef.current) return;
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
 
     const previousScrollLeftRef =
-      (handleMainScroll as any)._previousScrollLeftRef ||
-      ((handleMainScroll as any)._previousScrollLeftRef = { value: null as number | null });
+      (handleMainScrollCore as any)._previousScrollLeftRef ||
+      ((handleMainScrollCore as any)._previousScrollLeftRef = { value: null as number | null });
     const previousScrollLeft = previousScrollLeftRef.value;
     const horizontalDelta = previousScrollLeft === null ? 0 : scrollLeft - previousScrollLeft;
     const movedHorizontally = previousScrollLeft !== null && horizontalDelta !== 0;
@@ -343,7 +359,7 @@ export const OptimizedAssignmentMatrix = ({
     // Trigger expansion if we're near an edge and can expand
     // Edge expansion throttled to avoid repeated triggers
     const now = performance.now();
-    const lastEdgeRef = (handleMainScroll as any)._lastEdgeRef || ((handleMainScroll as any)._lastEdgeRef = { t: 0 });
+    const lastEdgeRef = (handleMainScrollCore as any)._lastEdgeRef || ((handleMainScrollCore as any)._lastEdgeRef = { t: 0 });
     if (movedHorizontally && now - lastEdgeRef.t > 300) {
       if (movingTowardLeftEdge && nearLeftEdge && canExpandBefore && onNearEdgeScroll) {
         onNearEdgeScroll('before');
@@ -361,20 +377,43 @@ export const OptimizedAssignmentMatrix = ({
     scheduleVisibleWindowUpdate();
   }, [syncScrollPositions, canExpandBefore, canExpandAfter, onNearEdgeScroll, scheduleVisibleWindowUpdate]);
 
-  const handleDateHeadersScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  const handleDateHeadersScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (syncInProgressRef.current) return;
     const scrollLeft = e.currentTarget.scrollLeft;
     syncScrollPositions(scrollLeft, mainScrollRef.current?.scrollTop || 0, 'dateHeaders');
     lastKnownScrollRef.current.left = scrollLeft;
     updateNavAvailability();
-  }, [syncScrollPositions]);
+  }, [syncScrollPositions, updateNavAvailability]);
 
-  const handleTechnicianScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  const handleTechnicianScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (syncInProgressRef.current) return;
     const scrollTop = e.currentTarget.scrollTop;
     syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, 'technician');
     lastKnownScrollRef.current.top = scrollTop;
   }, [syncScrollPositions]);
+
+  const handleMainScroll = useMemo(
+    () => throttle(handleMainScrollCore, 16),
+    [handleMainScrollCore]
+  );
+
+  const handleDateHeadersScroll = useMemo(
+    () => throttle(handleDateHeadersScrollCore, 16),
+    [handleDateHeadersScrollCore]
+  );
+
+  const handleTechnicianScroll = useMemo(
+    () => throttle(handleTechnicianScrollCore, 16),
+    [handleTechnicianScrollCore]
+  );
+
+  useEffect(() => {
+    return () => {
+      handleMainScroll.cancel();
+      handleDateHeadersScroll.cancel();
+      handleTechnicianScroll.cancel();
+    };
+  }, [handleDateHeadersScroll, handleMainScroll, handleTechnicianScroll]);
 
   const [availabilityPreferredChannel, setAvailabilityPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
   const [offerChannel, setOfferChannel] = useState<'email' | 'whatsapp'>('email');
@@ -692,17 +731,12 @@ export const OptimizedAssignmentMatrix = ({
     lastKnownScrollRef.current.top = lastTop;
 
     const previousScrollLeftRef =
-      (handleMainScroll as any)._previousScrollLeftRef ||
-      ((handleMainScroll as any)._previousScrollLeftRef = { value: null as number | null });
+      (handleMainScrollCore as any)._previousScrollLeftRef ||
+      ((handleMainScrollCore as any)._previousScrollLeftRef = { value: null as number | null });
     previousScrollLeftRef.value = targetLeft;
 
     prevDatesRef.current = dates.slice();
   }, [dates, CELL_WIDTH]);
-
-  // Mobile date navigation state
-  const [canNavLeft, setCanNavLeft] = useState(false);
-  const [canNavRight, setCanNavRight] = useState(true);
-  const [navStep, setNavStep] = useState(3);
 
   // Determine step (3-4) based on header width
   useEffect(() => {
@@ -716,16 +750,6 @@ export const OptimizedAssignmentMatrix = ({
     window.addEventListener('resize', updateStep);
     return () => window.removeEventListener('resize', updateStep);
   }, [mobile, CELL_WIDTH]);
-
-  const updateNavAvailability = useCallback(() => {
-    if (!mobile) return;
-    const el = dateHeadersRef.current;
-    if (!el) return;
-    const sl = el.scrollLeft;
-    const max = el.scrollWidth - el.clientWidth - 1;
-    setCanNavLeft(sl > 2);
-    setCanNavRight(sl < max);
-  }, [mobile]);
 
   useEffect(() => {
     if (!mobile) return;
@@ -1570,4 +1594,3 @@ export const OptimizedAssignmentMatrix = ({
     </div>
   );
 };
-

@@ -5,7 +5,7 @@ import { RefreshCw, Filter, CalendarIcon } from "lucide-react";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
 import { JobCardNew } from "./JobCardNew";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,39 +38,39 @@ export function RealTimeJobsList({
   const { jobs, isLoading, isRefreshing, refetch, realtimeStatus } = useJobsRealtime();
   const [timeFilter, setTimeFilter] = useState<"upcoming" | "past" | "all">("upcoming");
 
-  // Filter jobs based on department if needed
-  const filteredJobs = jobs.filter(job => {
-    // Filter by department if specified
-    if (filterByDepartment && department) {
-      const jobDepartments = job.job_departments.map(d => d.department);
-      if (!jobDepartments.includes(department)) {
-        return false;
+  const { jobs: displayedJobs, total: totalMatchingJobs } = useMemo(() => {
+    const filtered = jobs.filter(job => {
+      if (filterByDepartment && department) {
+        const jobDepartments = job.job_departments.map(d => d.department);
+        if (!jobDepartments.includes(department)) {
+          return false;
+        }
       }
-    }
 
-    // Filter by time
-    const jobDate = new Date(job.start_time);
-    const now = new Date();
-    
-    if (timeFilter === "upcoming") {
-      return jobDate >= now;
-    } else if (timeFilter === "past") {
-      return jobDate < now;
-    }
-    
-    return true;
-  });
+      const jobDate = new Date(job.start_time);
+      const now = new Date();
 
-  // Sort by date
-  const sortedJobs = [...filteredJobs].sort((a, b) => {
-    if (timeFilter === "past") {
-      return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
-    }
-    return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
-  });
+      if (timeFilter === "upcoming") {
+        return jobDate >= now;
+      } else if (timeFilter === "past") {
+        return jobDate < now;
+      }
 
-  // Apply limit if specified
-  const displayedJobs = limit ? sortedJobs.slice(0, limit) : sortedJobs;
+      return true;
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
+      if (timeFilter === "past") {
+        return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
+      }
+      return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+    });
+
+    const totalMatching = sorted.length;
+    const limited = limit ? sorted.slice(0, limit) : sorted;
+
+    return { jobs: limited, total: totalMatching };
+  }, [jobs, filterByDepartment, department, timeFilter, limit]);
 
   // Group jobs by month for better organization
   const groupedJobs: Record<string, any[]> = {};
@@ -164,7 +164,7 @@ export function RealTimeJobsList({
                 </div>
               ))}
               
-              {limit && filteredJobs.length > limit && showAllButton && (
+              {limit && totalMatchingJobs > limit && showAllButton && (
                 <div className="flex justify-center pt-2">
                   <Button variant="outline" size="sm">View All Jobs</Button>
                 </div>

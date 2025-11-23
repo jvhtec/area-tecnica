@@ -9,7 +9,26 @@ import { useTableSubscription } from "@/hooks/useSubscription";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
 import { useQueryClient } from "@tanstack/react-query";
 
-export const DirectMessagesList = () => {
+interface DirectMessagesListProps {
+  theme?: {
+    bg: string;
+    nav: string;
+    card: string;
+    textMain: string;
+    textMuted: string;
+    accent: string;
+    input: string;
+    modalOverlay: string;
+    divider: string;
+    danger: string;
+    success: string;
+    warning: string;
+    cluster: string;
+  };
+  isDark?: boolean;
+}
+
+export const DirectMessagesList = ({ theme, isDark = false }: DirectMessagesListProps) => {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string>();
@@ -55,7 +74,7 @@ export const DirectMessagesList = () => {
           `)
           .eq('recipient_id', userId)
           .order('created_at', { ascending: false }),
-        
+
         supabase
           .from('direct_messages')
           .select(`
@@ -101,12 +120,12 @@ export const DirectMessagesList = () => {
   // Set up a listener to invalidate and refetch when messages change
   useEffect(() => {
     if (!currentUserId) return;
-    
+
     const refreshData = () => {
       console.log("Message subscription triggered refresh");
       fetchMessages(currentUserId);
     };
-    
+
     // Listen for invalidations from the subscription manager
     const unsubscribe = queryClient.getQueryCache().subscribe(event => {
       // Handle proper event types from React Query cache
@@ -118,11 +137,11 @@ export const DirectMessagesList = () => {
         }
       }
     });
-    
+
     // Set up direct invalidation event
     const handleInvalidate = () => refreshData();
     window.addEventListener('direct_messages_invalidated', handleInvalidate);
-    
+
     return () => {
       unsubscribe();
       window.removeEventListener('direct_messages_invalidated', handleInvalidate);
@@ -132,14 +151,14 @@ export const DirectMessagesList = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between pb-2">
-        <h3 className="text-lg font-medium">Mensajes directos</h3>
+        <h3 className={`text-lg font-medium ${theme?.textMain || ''}`}>Mensajes directos</h3>
         <SubscriptionIndicator tables={['direct_messages']} variant="compact" />
       </div>
 
       {loading ? (
-        <p className="text-muted-foreground">Cargando mensajes...</p>
+        <p className={theme?.textMuted || 'text-muted-foreground'}>Cargando mensajes...</p>
       ) : messages.length === 0 ? (
-        <p className="text-muted-foreground">No hay mensajes directos.</p>
+        <p className={theme?.textMuted || 'text-muted-foreground'}>No hay mensajes directos.</p>
       ) : (
         messages.map((message) => (
           <DirectMessageCard
@@ -148,6 +167,8 @@ export const DirectMessagesList = () => {
             currentUserId={currentUserId}
             onDelete={handleDeleteMessage}
             onMarkAsRead={handleMarkAsRead}
+            theme={theme}
+            isDark={isDark}
           />
         ))
       )}

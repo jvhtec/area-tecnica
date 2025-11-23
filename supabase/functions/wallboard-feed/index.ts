@@ -17,7 +17,7 @@ type Dept = "sound" | "lights" | "video";
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-wallboard-jwt, x-wallboard-token, x-wallboard-shared-token, x-wallboard-shared",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
   } as Record<string, string>;
 }
@@ -48,6 +48,22 @@ async function getJwtKey() {
 }
 
 async function authenticate(req: Request, url: URL): Promise<AuthResult> {
+  const headerJwt = req.headers.get("x-wallboard-jwt")?.trim();
+  if (headerJwt) {
+    try {
+      const key = await getJwtKey();
+      const payload: Record<string, unknown> = await verify(headerJwt, key);
+      if (payload.scope !== "wallboard") {
+        throw new HttpError(403, "Invalid wallboard scope");
+      }
+      const presetSlug = typeof payload.preset === "string" ? payload.preset : undefined;
+      return { method: "jwt", presetSlug };
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      throw new HttpError(401, "Invalid token");
+    }
+  }
+
   const headerToken = req.headers.get("authorization") ?? req.headers.get("Authorization") ?? "";
   if (headerToken.startsWith("Bearer ")) {
     const token = headerToken.slice(7).trim();

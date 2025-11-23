@@ -43,12 +43,19 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors() });
   try {
     const url = new URL(req.url);
+    let presetFromReq = (url.searchParams.get("presetSlug") ?? url.searchParams.get("preset") ?? "").trim().toLowerCase();
     let token = url.searchParams.get("wallboardToken");
     if (!token) {
       const contentType = req.headers.get("content-type") || "";
       if (contentType.includes("application/json")) {
         const body = await req.json().catch(() => null);
         token = body?.wallboardToken || body?.token || null;
+        if (!presetFromReq) {
+          const rawPreset = body?.presetSlug || body?.preset || "";
+          if (typeof rawPreset === "string") {
+            presetFromReq = rawPreset.trim().toLowerCase();
+          }
+        }
       }
     }
     if (!token) {
@@ -60,14 +67,15 @@ serve(async (req) => {
     }
     const now = Math.floor(Date.now() / 1000);
     const ttl = Math.max(MIN_TTL_SECONDS, DEFAULT_TTL_SECONDS);
+    const preset = presetFromReq || WALLBOARD_PRESET_SLUG || "default";
     const jwt = await sign({
       iss: "wallboard-auth",
       iat: now,
       exp: getNumericDate(ttl),
       scope: "wallboard",
-      preset: WALLBOARD_PRESET_SLUG,
+      preset,
     });
-    return new Response(JSON.stringify({ token: jwt, expiresIn: ttl }), {
+    return new Response(JSON.stringify({ token: jwt, expiresIn: ttl, preset }), {
       headers: { "Content-Type": "application/json", ...cors() },
     });
   } catch (e: any) {

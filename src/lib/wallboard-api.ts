@@ -87,8 +87,15 @@ export class WallboardApi {
       if (error) throw error;
       return data as T;
     } catch (err) {
+      const anon =
+        (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY ||
+        (import.meta as any)?.env?.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const headers: Record<string, string> = this.token ? { "x-wallboard-jwt": this.token } : {};
+      if (anon) {
+        headers["Authorization"] = `Bearer ${anon}`;
+      }
       const res = await fetch(`/functions/v1/wallboard-feed${path}`, {
-        headers: this.token ? { "x-wallboard-jwt": this.token } : {},
+        headers,
         cache: 'no-store'
       });
       if (!res.ok) {
@@ -122,13 +129,13 @@ export class WallboardApi {
   }
 }
 
-export async function exchangeWallboardToken(shared: string): Promise<{ token: string; expiresIn: number }> {
+export async function exchangeWallboardToken(shared: string, presetSlug?: string): Promise<{ token: string; expiresIn: number; preset?: string }> {
   // Prefer Supabase Edge Function invoke to avoid CORS/base-path issues
   try {
     const mod = await import('@/integrations/supabase/client');
     const supabase = mod.supabase;
     const { data, error } = await supabase.functions.invoke('wallboard-auth', {
-      body: { wallboardToken: shared },
+      body: { wallboardToken: shared, preset: presetSlug, presetSlug },
     });
     if (error) throw error;
     if (data?.token) return data as { token: string; expiresIn: number };
@@ -136,7 +143,11 @@ export async function exchangeWallboardToken(shared: string): Promise<{ token: s
     console.warn('wallboard-auth invoke fallback to fetch:', err);
   }
 
-  const res = await fetch(`/functions/v1/wallboard-auth?wallboardToken=${encodeURIComponent(shared)}`);
+  let url = `/functions/v1/wallboard-auth?wallboardToken=${encodeURIComponent(shared)}`;
+  if (presetSlug) {
+    url += `&preset=${encodeURIComponent(presetSlug)}`;
+  }
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`wallboard-auth failed: ${res.status}`);
   return res.json();
 }

@@ -12,6 +12,10 @@ export interface MatrixJob {
   color?: string | null;
   status: string;
   job_type: string;
+  assigned_count?: number;
+  worked_count?: number;
+  total_cost_eur?: number;
+  approved_cost_eur?: number;
 }
 
 // Define the timesheet-backed assignment type with proper job structure
@@ -72,7 +76,7 @@ export const fetchMatrixTimesheetAssignments = async ({
   const startIso = startDate ? format(startDate, 'yyyy-MM-dd') : null;
   const endIso = endDate ? format(endDate, 'yyyy-MM-dd') : null;
 
-  const batchSize = 25;
+  const batchSize = 50;
   const promises: Promise<any>[] = [];
 
   for (let i = 0; i < jobIds.length; i += batchSize) {
@@ -83,13 +87,19 @@ export const fetchMatrixTimesheetAssignments = async ({
       .in('job_id', jobBatch)
       .in('technician_id', technicianIds)
       .order('date', { ascending: true })
-      .limit(1500);
+      .limit(2000);
 
     if (startIso) query = query.gte('date', startIso);
     if (endIso) query = query.lte('date', endIso);
 
     promises.push(query);
   }
+
+  // Leverage materialized view for staffing status/cost rollups per job
+  const staffingPromise = supabase
+    .from('v_job_staffing_summary')
+    .select('job_id, assigned_count, worked_count, total_cost_eur, approved_cost_eur')
+    .in('job_id', jobIds);
 
   // Batch job_assignments query to avoid URL length limits
   const assignmentBatchSize = 100;
@@ -106,8 +116,9 @@ export const fetchMatrixTimesheetAssignments = async ({
     );
   }
 
-  const [timesheetResults, ...assignmentResults] = await Promise.all([
+  const [timesheetResults, staffingResult, ...assignmentResults] = await Promise.all([
     Promise.all(promises),
+    staffingPromise,
     ...assignmentPromises,
   ]);
 
@@ -123,6 +134,20 @@ export const fetchMatrixTimesheetAssignments = async ({
     }
   }
 
+  const staffingMap = new Map<string, { assigned_count: number; worked_count: number; total_cost_eur: number; approved_cost_eur: number }>();
+  if (staffingResult.error) {
+    console.warn('Staffing summary view error:', staffingResult.error);
+  } else {
+    (staffingResult.data || []).forEach((row: any) => {
+      staffingMap.set(row.job_id, {
+        assigned_count: row.assigned_count ?? 0,
+        worked_count: row.worked_count ?? 0,
+        total_cost_eur: row.total_cost_eur ?? 0,
+        approved_cost_eur: row.approved_cost_eur ?? 0,
+      });
+    });
+  }
+
   const rows: MatrixTimesheetAssignment[] = [];
 
   timesheetResults.forEach((result) => {
@@ -135,11 +160,18 @@ export const fetchMatrixTimesheetAssignments = async ({
       const job = jobsById.get(row.job_id);
       if (!job) return;
       const meta = assignmentMap.get(`${row.job_id}:${row.technician_id}`);
+      const staffing = staffingMap.get(row.job_id);
       rows.push({
         job_id: row.job_id,
         technician_id: row.technician_id,
         date: row.date,
-        job,
+        job: {
+          ...job,
+          assigned_count: staffing?.assigned_count,
+          worked_count: staffing?.worked_count,
+          total_cost_eur: staffing?.total_cost_eur,
+          approved_cost_eur: staffing?.approved_cost_eur,
+        } as MatrixJob,
         status: meta?.status ?? null,
         assigned_at: meta?.assigned_at ?? null,
         single_day: meta?.single_day ?? Boolean(meta?.assignment_date),
