@@ -22,17 +22,25 @@ export default defineConfig(({ mode }) => ({
     'import.meta.env.VITE_APP_VERSION': JSON.stringify('1.0RTM'),
   },
   build: {
-    sourcemap: true,
+    sourcemap: false,
+    esbuild: {
+      drop: ['console', 'debugger'],
+    },
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
-          forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
-          supabase: ['@supabase/supabase-js', '@supabase/auth-ui-react'],
-          charts: ['recharts'],
-          utils: ['date-fns', 'date-fns-tz', 'clsx', 'tailwind-merge'],
+        manualChunks: (id) => {
+          if (id.includes('node_modules/react')) return 'vendor-react';
+          if (id.includes('node_modules/react-router-dom')) return 'vendor-router';
+          if (id.includes('node_modules/@tanstack/react-query')) return 'vendor-query';
+          if (id.includes('node_modules/@radix-ui')) return 'vendor-ui';
+          if (id.includes('node_modules/jspdf') || id.includes('pdf-lib')) return 'vendor-pdf';
+          if (id.includes('node_modules/exceljs') || id.includes('node_modules/xlsx')) return 'vendor-excel';
+          if (id.includes('node_modules/mapbox-gl')) return 'vendor-maps';
+          if (id.includes('node_modules/recharts')) return 'vendor-charts';
+          if (id.includes('/src/pages/Festival') || id.includes('/src/components/festival')) return 'feature-festival';
+          if (id.includes('/src/components/matrix') || id.includes('/src/pages/JobAssignmentMatrix')) return 'feature-matrix';
+          if (id.includes('/src/components/tours') || id.includes('/src/pages/Tour')) return 'feature-tours';
+          return undefined;
         },
       },
     },
