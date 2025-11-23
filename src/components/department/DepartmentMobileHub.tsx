@@ -1,23 +1,48 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calendar, ChevronLeft, ChevronRight, Clock, MapPin, Sun, Moon, Truck, Users } from "lucide-react";
+import {
+  Calendar, ChevronLeft, ChevronRight, Clock, MapPin,
+  Truck, Users, Plus, MoreVertical, Edit, Trash2
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useJobs } from "@/hooks/useJobs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { format, addDays, subDays, isWithinInterval, startOfDay, endOfDay, isToday } from "date-fns";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-interface ToolLink {
+interface ToolDefinition {
   label: string;
-  to: string;
+  to?: string;
+  onClick?: () => void;
   icon: React.ElementType;
+  color?: string;
 }
 
 interface DepartmentMobileHubProps {
   department: string;
   title: string;
   icon: React.ElementType;
-  tools: ToolLink[];
+  tools: ToolDefinition[];
+  canCreateJob?: boolean;
+  onCreateJob?: () => void;
+  userRole?: string | null;
+  onEditJob?: (job: any) => void;
+  onDeleteJob?: (jobId: string) => void;
+  onJobClick?: (jobId: string) => void;
+  onViewDetails?: (job: any) => void;
+  staffData?: {
+    warehouse: number;
+    onJob: number;
+    off: number;
+  };
+  onStaffClick?: () => void;
 }
 
 const themeTokens = {
@@ -27,6 +52,9 @@ const themeTokens = {
     textMain: "text-white",
     textMuted: "text-[#94a3b8]",
     divider: "border-[#1f232e]",
+    toolBg: "bg-[#151820] border-[#2a2e3b]",
+    accent: "bg-blue-600 text-white",
+    hover: "hover:bg-[#151820]",
   },
   light: {
     bg: "bg-[#f8fafc]",
@@ -34,6 +62,9 @@ const themeTokens = {
     textMain: "text-slate-900",
     textMuted: "text-slate-500",
     divider: "border-slate-100",
+    toolBg: "bg-white border-slate-200 shadow-sm",
+    accent: "bg-blue-600 text-white",
+    hover: "hover:bg-slate-50",
   },
 };
 
@@ -42,165 +73,262 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   title,
   icon: Icon,
   tools,
+  canCreateJob = false,
+  onCreateJob,
+  userRole,
+  onEditJob,
+  onDeleteJob,
+  onJobClick,
+  onViewDetails,
+  staffData,
+  onStaffClick,
 }) => {
   const isMobile = useIsMobile();
   const { data: jobs } = useJobs();
   const navigate = useNavigate();
   const [isDark, setIsDark] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   const t = isDark ? themeTokens.dark : themeTokens.light;
 
-  const today = useMemo(() => new Date(), []);
+  const canEdit = userRole ? ["admin", "management"].includes(userRole) : false;
+
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
     return jobs
-      .filter((job) => job.job_departments?.some((d: any) => d.department === department))
+      .filter((job) => {
+        // Filter out tour jobs (but keep tourdate jobs)
+        if (job.job_type === 'tour') return false;
+
+        const isInDepartment = job.job_departments?.some((d: any) => d.department === department);
+        if (job.tour_date_id) {
+          return isInDepartment && job.tour_date;
+        }
+        return isInDepartment;
+      })
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }, [jobs, department]);
 
-  const todayCount = filteredJobs.filter((job) => {
-    const start = new Date(job.start_time);
-    const end = new Date(job.end_time);
-    const todayMid = new Date(today);
-    todayMid.setHours(12, 0, 0, 0);
-    return start <= todayMid && todayMid <= end;
-  }).length;
+  const selectedDateJobs = useMemo(() => {
+    const dayStart = startOfDay(selectedDate);
+    const dayEnd = endOfDay(selectedDate);
 
-  const nextJobs = filteredJobs.slice(0, 3);
+    return filteredJobs.filter((job) => {
+      const jobStart = new Date(job.start_time);
+      const jobEnd = new Date(job.end_time);
+
+      return isWithinInterval(dayStart, { start: startOfDay(jobStart), end: endOfDay(jobEnd) }) ||
+        isWithinInterval(dayEnd, { start: startOfDay(jobStart), end: endOfDay(jobEnd) });
+    });
+  }, [filteredJobs, selectedDate]);
+
+  const handlePrevDay = () => setSelectedDate(prev => subDays(prev, 1));
+  const handleNextDay = () => setSelectedDate(prev => addDays(prev, 1));
+  const handleToday = () => setSelectedDate(new Date());
 
   if (!isMobile) return null;
 
   return (
-    <div className={cn("min-h-screen", t.bg, "font-sans px-safe pt-safe-4 pb-safe-6") }>
+    <div className={cn("min-h-screen", t.bg, "font-sans p-6 transition-colors duration-300")}>
       <div className="max-w-md mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-blue-500 text-xs font-semibold uppercase tracking-[0.08em]">
-              <Icon className="h-4 w-4" />
-              <span>{department}</span>
-            </div>
-            <h2 className={cn("text-2xl font-bold", t.textMain)}>{title}</h2>
-            <p className={cn("text-xs", t.textMuted)}>Herramientas y agenda diaria en móvil.</p>
+        {/* Header */}
+        <div>
+          <div className="flex items-center gap-2 text-blue-500 text-xs font-semibold uppercase tracking-[0.08em]">
+            <Icon className="h-5 w-5" />
+            <span>Department</span>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className={cn("rounded-full", t.card)}
-            onClick={() => setIsDark((prev) => !prev)}
-          >
-            {isDark ? <Sun className={cn("h-5 w-5", t.textMuted)} /> : <Moon className={cn("h-5 w-5", t.textMuted)} />}
-          </Button>
+          <h2 className={cn("text-2xl font-bold", t.textMain)}>{title}</h2>
         </div>
 
-        <Card className={cn("p-4 rounded-2xl", t.card)}>
-          <h3 className={cn("text-xs font-bold uppercase tracking-wider mb-3", t.textMuted)}>Herramientas rápidas</h3>
+        {/* Quick Tools */}
+        <div>
+          <h3 className={cn("text-xs font-bold uppercase tracking-wider mb-3", t.textMuted)}>Quick Tools</h3>
           <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-            {tools.map((tool) => (
-              <Button
-                key={tool.to}
-                variant="outline"
-                className={cn("min-w-[90px] h-[82px] flex flex-col items-center justify-center rounded-xl text-center transition-all hover:border-blue-500 hover:shadow-lg", t.card)}
-                onClick={() => navigate(tool.to)}
+            {tools.map((tool, idx) => (
+              <button
+                key={idx}
+                onClick={tool.onClick || (tool.to ? () => navigate(tool.to!) : undefined)}
+                className={cn(
+                  "flex flex-col items-center justify-center p-3 rounded-xl border min-w-[80px] h-[80px] flex-shrink-0 transition-all",
+                  t.toolBg,
+                  "hover:border-blue-500 hover:scale-105 active:scale-95"
+                )}
               >
-                <tool.icon className="h-5 w-5 mb-1 text-primary" />
-                <span className={cn("text-[11px] font-semibold leading-tight", t.textMain)}>{tool.label}</span>
-              </Button>
+                <tool.icon size={24} className={cn("mb-2", tool.color || "text-blue-500")} />
+                <span className={cn("text-[10px] font-bold text-center leading-tight", t.textMain)}>
+                  {tool.label}
+                </span>
+              </button>
             ))}
           </div>
-        </Card>
+        </div>
 
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="rounded-lg" aria-label="Día anterior">
-              <ChevronLeft className={cn("h-4 w-4", t.textMuted)} />
-            </Button>
-            <div className="text-left">
-              <div className={cn("text-lg font-bold leading-tight", t.textMain)}>Hoy</div>
-              <div className={cn("text-xs", t.textMuted)}>
-                {today.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+        {/* Staff Pulse */}
+        {staffData && (
+          <Card
+            className={cn("p-4 rounded-xl border flex items-center justify-between cursor-pointer", t.card, t.hover)}
+            onClick={onStaffClick}
+          >
+            <div>
+              <div className={cn("text-xs font-bold uppercase tracking-wider mb-1", t.textMuted)}>
+                Staff Availability
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-slate-500" />
+                  <span className={cn("text-sm font-bold", t.textMain)}>{staffData.warehouse} Warehouse</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className={cn("text-sm font-bold", t.textMain)}>{staffData.onJob} On Job</span>
+                </div>
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="rounded-lg" aria-label="Día siguiente">
-              <ChevronRight className={cn("h-4 w-4", t.textMuted)} />
-            </Button>
+            <ChevronRight size={20} className={t.textMuted} />
+          </Card>
+        )}
+
+        {/* Date Navigation */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrevDay}
+              className={cn("p-1 rounded hover:bg-white/10", t.textMain)}
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <div className="text-center cursor-pointer" onClick={handleToday}>
+              <div className={cn("text-lg font-bold", t.textMain)}>
+                {isToday(selectedDate) ? "Today" : format(selectedDate, "MMM d")}
+              </div>
+              <div className={cn("text-xs", t.textMuted)}>
+                {format(selectedDate, "EEE")}
+              </div>
+            </div>
+            <button
+              onClick={handleNextDay}
+              className={cn("p-1 rounded hover:bg-white/10", t.textMain)}
+            >
+              <ChevronRight size={20} />
+            </button>
           </div>
           <Button variant="outline" size="icon" className={cn("rounded-lg", t.card)}>
             <Calendar className={cn("h-4 w-4", t.textMain)} />
           </Button>
         </div>
 
-        <Card className={cn("p-4 rounded-2xl", t.card)}>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <div className={cn("text-xs font-bold uppercase tracking-wider", t.textMuted)}>Disponibilidad</div>
-              <div className={cn("text-sm", t.textMuted)}>Resumen de técnicos de planta</div>
-            </div>
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <ChevronRight className={cn("h-4 w-4", t.textMuted)} />
-            </Button>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className={cn("text-sm font-semibold", t.textMain)}>{todayCount} en activo</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-slate-500" />
-              <span className={cn("text-sm font-semibold", t.textMain)}>{Math.max(filteredJobs.length - todayCount, 0)} próximos</span>
-            </div>
-          </div>
-        </Card>
-
+        {/* Job List */}
         <div className="space-y-3">
-          {nextJobs.length === 0 ? (
+          {canCreateJob && onCreateJob && (
+            <Button
+              onClick={onCreateJob}
+              className={cn("w-full rounded-xl text-base font-semibold", t.accent)}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Create New Job
+            </Button>
+          )}
+
+          {selectedDateJobs.length === 0 ? (
             <Card className={cn("p-4 rounded-2xl", t.card)}>
-              <div className={cn("text-sm", t.textMuted)}>No hay trabajos asignados al departamento.</div>
+              <div className={cn("text-sm text-center", t.textMuted)}>
+                No jobs scheduled for this date.
+              </div>
             </Card>
           ) : (
-            nextJobs.map((job) => {
+            selectedDateJobs.map((job) => {
               const techniciansCount = job.job_assignments?.length ?? job.assignments_count ?? job.crew_size ?? 0;
               const trucksCount = job.logistics_events?.length ?? job.trucks_count ?? 0;
+              const isProduction = job.status === "production";
+              const jobColor = job.color || (isProduction ? "#10b981" : "#3b82f6");
+
               return (
                 <Card
                   key={job.id}
                   className={cn(
-                    "p-4 rounded-2xl border-l-4 transition-all hover:border-primary hover:shadow-lg",
-                    t.card,
-                    job.status === "production" ? "border-l-emerald-500" : "border-l-blue-500"
+                    "p-4 rounded-xl border-l-4 transition-all",
+                    t.card
                   )}
+                  style={{ borderLeftColor: jobColor }}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <div>
+                    <div className="flex-1">
                       <h3 className={cn("font-bold text-lg", t.textMain)}>{job.title}</h3>
-                      <div className={cn("text-xs flex items-center gap-1 mt-1", t.textMuted)}>
-                        <MapPin className="h-3 w-3" />
-                        {job.locations?.[0]?.name || "Sin ubicación"}
+                      <div className={cn("text-xs flex items-center gap-1 mt-0.5", t.textMuted)}>
+                        <MapPin size={12} />
+                        {job.location?.name || "Sin ubicación"}
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-primary/10 text-primary">
-                      {job.job_type}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {(() => {
+                        const statusLower = (job.status || "").toLowerCase();
+                        const statusColorMap: Record<string, string> = {
+                          tentativa: "bg-blue-500/10 text-blue-500",
+                          confirmado: "bg-cyan-500/10 text-cyan-500",
+                          completado: "bg-purple-500/10 text-purple-500",
+                          cancelado: "bg-red-500/10 text-red-500",
+                        };
+                        const colorClass = statusColorMap[statusLower] || "bg-slate-500/10 text-slate-500";
+
+                        return (
+                          <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase", colorClass)}>
+                            {job.status || "Sin estado"}
+                          </span>
+                        );
+                      })()}
+                      {canEdit && onEditJob && onDeleteJob && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical size={16} className={t.textMuted} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => onEditJob(job)}>
+                              <Edit size={14} className="mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => onDeleteJob(job.id)}
+                              className="text-red-600"
+                            >
+                              <Trash2 size={14} className="mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
                   </div>
-                  <div className={cn("flex items-center gap-4 text-xs mt-2 pb-3 border-b", t.textMuted, t.divider)}>
+
+                  <div className={cn("flex items-center gap-4 text-xs mt-3 pb-3 border-b border-dashed", t.textMuted, t.divider)}>
                     <div className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      {new Date(job.start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      <Clock size={14} />
+                      {format(new Date(job.start_time), "HH:mm")} - {format(new Date(job.end_time), "HH:mm")}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Users className="h-3.5 w-3.5" />
-                      {techniciansCount} técnicos
+                      <Users size={14} />
+                      {techniciansCount} Techs
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Truck className="h-3.5 w-3.5" />
-                      {trucksCount} camiones
+                      <Truck size={14} />
+                      {trucksCount} Trucks
                     </div>
                   </div>
+
                   <div className="flex gap-2 mt-3">
-                    <Button variant="outline" className="flex-1" onClick={() => navigate(`/jobs/view/${job.id}`)}>
-                      Ver detalles
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => onViewDetails?.(job)}
+                    >
+                      View Details
                     </Button>
-                    <Button className="flex-1" onClick={() => navigate(`/jobs/view/${job.id}`)}>
-                      Gestionar
+                    <Button
+                      className={cn("flex-1", t.accent)}
+                      onClick={() => onJobClick?.(job.id)}
+                    >
+                      Manage
                     </Button>
                   </div>
                 </Card>
