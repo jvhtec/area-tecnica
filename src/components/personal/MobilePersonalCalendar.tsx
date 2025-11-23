@@ -156,7 +156,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     const targetAssignments = getAssignmentsForDate(targetDate);
 
     const departmentSummary = houseTechs.reduce((acc, tech) => {
-      const dept = tech.department || 'Unknown';
+      const dept = tech.department || 'Desconocido';
       if (!acc[dept]) {
         acc[dept] = {
           total: 0,
@@ -358,12 +358,12 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   });
 
   const generatePDF = (range: "month" | "quarter" | "year") => {
-    console.log("Mobile house techs PDF generation not implemented for", range);
+    console.log("PDF móvil para técnicos de planta no implementado para", range);
     setShowPrintDialog(false);
   };
 
   const generateXLS = (range: "month" | "quarter" | "year") => {
-    console.log("Mobile house techs XLS generation not implemented for", range);
+    console.log("XLS móvil para técnicos de planta no implementado para", range);
     setShowPrintDialog(false);
   };
 
@@ -371,7 +371,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     return (
       <Card className="h-full flex flex-col">
         <CardContent className="flex-grow p-4 flex items-center justify-center">
-          <div className="text-muted-foreground">Loading calendar...</div>
+          <div className="text-muted-foreground">Cargando calendario...</div>
         </CardContent>
       </Card>
     );
@@ -381,13 +381,13 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     return (
       <Card className="h-full flex flex-col">
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-bold">House Techs</CardTitle>
+          <CardTitle className="text-lg font-bold">Técnicos de planta</CardTitle>
         </CardHeader>
         <CardContent className="flex-grow p-4 flex flex-col items-center justify-center text-center">
           <Users className="h-8 w-8 mb-2 text-muted-foreground" />
-          <p className="text-muted-foreground">No house technicians found</p>
+          <p className="text-muted-foreground">No se encontraron técnicos de planta</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Make sure there are users with the 'house_tech' role
+            Asegúrate de que hay usuarios con el rol "house_tech"
           </p>
         </CardContent>
       </Card>
@@ -399,17 +399,17 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
       <div className="rounded-2xl border bg-card shadow-sm px-4 py-3 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">Selected date</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">Fecha seleccionada</p>
             <div className="flex items-center gap-2 text-sm font-semibold">
               <Calendar className="h-4 w-4 text-primary" />
               <span className={cn("", isToday(currentDate) && "text-primary")}>{format(currentDate, "EEE, MMM d")}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={navigateToPrevious} aria-label="Previous day">
+            <Button variant="ghost" size="icon" onClick={navigateToPrevious} aria-label="Día anterior">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={navigateToNext} aria-label="Next day">
+            <Button variant="ghost" size="icon" onClick={navigateToNext} aria-label="Día siguiente">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -424,7 +424,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
             className="rounded-xl"
           >
             <Users className="h-4 w-4 mr-2" />
-            {selectedDepartment ? `${selectedDepartment}` : 'All departments'}
+            {selectedDepartment ? `${selectedDepartment}` : 'Todos los departamentos'}
           </Button>
           <Button
             variant="secondary"
@@ -432,24 +432,24 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
             onClick={navigateToToday}
             className={cn("rounded-xl", isToday(currentDate) && "bg-primary text-primary-foreground")}
           >
-            Today
+            Hoy
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)} className="ml-auto rounded-xl">
-            <Printer className="h-4 w-4 mr-2" /> Export
+            <Printer className="h-4 w-4 mr-2" /> Exportar
           </Button>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl border bg-muted/40 px-3 py-2">
-            <div className="text-[11px] uppercase font-semibold text-muted-foreground">On Job</div>
+            <div className="text-[11px] uppercase font-semibold text-muted-foreground">En trabajo</div>
             <div className="text-xl font-bold text-emerald-600">{personnelTotals.techsOnJobs}</div>
           </div>
           <div className="rounded-xl border bg-muted/40 px-3 py-2">
-            <div className="text-[11px] uppercase font-semibold text-muted-foreground">Warehouse</div>
+            <div className="text-[11px] uppercase font-semibold text-muted-foreground">Almacén</div>
             <div className="text-xl font-bold text-slate-700">{personnelTotals.techsInWarehouse}</div>
           </div>
           <div className="rounded-xl border bg-muted/40 px-3 py-2">
-            <div className="text-[11px] uppercase font-semibold text-muted-foreground">Off / Travel</div>
+            <div className="text-[11px] uppercase font-semibold text-muted-foreground">Fuera / Viaje</div>
             <div className="text-xl font-bold text-amber-600">{offTotal}</div>
           </div>
         </div>
@@ -467,17 +467,17 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
               onClick={() => setSelectedDepartment(prev => (prev === department ? null : department))}
             >
               <div className="capitalize">{department}</div>
-              <div className="text-[11px] text-muted-foreground">Jobs {stats.assignedAndAvailable} • Warehouse {stats.availableAndNotInWarehouse}</div>
+              <div className="text-[11px] text-muted-foreground">Trabajos {stats.assignedAndAvailable} • Base {stats.availableAndNotInWarehouse}</div>
             </button>
           ))}
         </div>
 
         <div className="grid grid-cols-4 gap-1 rounded-xl border bg-muted/40 p-1">
           {[
-            { key: 'all' as const, label: 'All', count: visibleTechs.length },
-            { key: 'job' as const, label: 'On job', count: personnelTotals.techsOnJobs },
-            { key: 'warehouse' as const, label: 'Warehouse', count: personnelTotals.techsInWarehouse },
-            { key: 'off' as const, label: 'Off', count: offTotal }
+            { key: 'all' as const, label: 'Todos', count: visibleTechs.length },
+            { key: 'job' as const, label: 'Asignados', count: personnelTotals.techsOnJobs },
+            { key: 'warehouse' as const, label: 'Base', count: personnelTotals.techsInWarehouse },
+            { key: 'off' as const, label: 'Fuera', count: offTotal }
           ].map(tab => (
             <button
               key={tab.key}
@@ -498,7 +498,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
         {filteredTechs.length > 0 ? (
           filteredTechs.map((tech) => {
             const statusMeta = getStatusMeta(tech);
-            const techName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || "Unknown Tech";
+            const techName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || "Técnico sin nombre";
             const initials = `${(tech.first_name?.[0] || '').toUpperCase()}${(tech.last_name?.[0] || '').toUpperCase()}` || 'HT';
 
             return (
@@ -541,8 +541,8 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
         ) : (
           <div className="flex flex-col items-center justify-center py-10 text-center rounded-2xl border bg-card">
             <Calendar className="h-8 w-8 mb-2 text-muted-foreground" />
-            <p className="text-muted-foreground">No technicians scheduled</p>
-            <p className="text-sm text-muted-foreground">for {format(currentDate, "MMMM d, yyyy")}</p>
+            <p className="text-muted-foreground">No hay técnicos programados</p>
+            <p className="text-sm text-muted-foreground">para {format(currentDate, "MMMM d, yyyy")}</p>
           </div>
         )}
       </div>

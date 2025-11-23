@@ -76,11 +76,11 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="outline" className="text-yellow-600"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+        return <Badge variant="outline" className="text-yellow-600"><Clock className="h-3 w-3 mr-1" />Pendiente</Badge>;
       case 'approved':
-        return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
+        return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Aprobada</Badge>;
       case 'rejected':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rechazada</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -146,7 +146,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
     return (
       <HoverCard open={open} onOpenChange={handleOpenChange}>
         <HoverCardTrigger asChild>
-          <div className="relative inline-flex cursor-default" title={conflictsCount > 0 ? `${conflictsCount} conflict(s)` : undefined}>
+          <div className="relative inline-flex cursor-default" title={conflictsCount > 0 ? `${conflictsCount} conflictos` : undefined}>
             {getStatusBadge(request.status)}
             {collisions && conflictsCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-[3px] rounded-full bg-red-600 text-white text-[10px] leading-[16px] text-center font-semibold shadow">
@@ -157,10 +157,10 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
         </HoverCardTrigger>
         <HoverCardContent className="w-96" side="top" align="center">
           <div className="space-y-2">
-            <div className="font-medium">Assignment collisions</div>
-            {loading && <div className="text-sm text-muted-foreground">Checking…</div>}
+            <div className="font-medium">Conflictos de asignación</div>
+            {loading && <div className="text-sm text-muted-foreground">Comprobando…</div>}
             {!loading && collisions && collisions.length === 0 && (
-              <div className="text-sm text-green-700">No conflicts detected for this period.</div>
+              <div className="text-sm text-green-700">No se detectaron conflictos en este periodo.</div>
             )}
             {!loading && collisions && collisions.length > 0 && (
               <div className="max-h-64 overflow-auto space-y-2">
@@ -172,7 +172,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
                     <div key={job.id} className="rounded-md border p-2">
                       <div className="text-sm font-medium">
                         <a className="text-blue-600 hover:underline" href={`/jobs/view/${job.id}`} target="_blank" rel="noopener noreferrer">
-                          {job.title || 'Job'}
+                          {job.title || 'Trabajo'}
                         </a>
                         {locName}
                       </div>
@@ -185,7 +185,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
               </div>
             )}
             {!loading && collisions === null && (
-              <div className="text-sm text-muted-foreground">Hover to check conflicts.</div>
+              <div className="text-sm text-muted-foreground">Pasa el cursor para comprobar conflictos.</div>
             )}
           </div>
         </HoverCardContent>
@@ -198,7 +198,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
       return (
         <Card>
           <CardContent className="flex items-center justify-center py-8">
-            <div className="text-muted-foreground">Loading department requests...</div>
+            <div className="text-muted-foreground">Cargando solicitudes del departamento...</div>
           </CardContent>
         </Card>
       );
@@ -211,31 +211,31 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
         <CardHeader className="px-3 sm:px-6 py-4 sm:py-6">
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Department Vacation Requests
+            Solicitudes de vacaciones del departamento
           </CardTitle>
         </CardHeader>
         <CardContent className="px-3 sm:px-6">
           {pendingDepartmentRequests.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No pending vacation requests in your department.
+              No hay solicitudes pendientes en tu departamento.
             </div>
           ) : (
             <>
               <div className="flex flex-col sm:flex-row justify-end gap-2 mb-4">
-                <Button 
-                  onClick={handleApproveSelected} 
+                <Button
+                  onClick={handleApproveSelected}
                   disabled={selectedRequests.length === 0 || isApproving}
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  Approve Selected ({selectedRequests.length})
+                  Aprobar seleccionadas ({selectedRequests.length})
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={handleRejectSelected} 
+                <Button
+                  variant="outline"
+                  onClick={handleRejectSelected}
                   disabled={selectedRequests.length === 0 || isRejecting}
                   className="border-red-200 text-red-600 hover:bg-red-50"
                 >
-                  Reject Selected ({selectedRequests.length})
+                  Rechazar seleccionadas ({selectedRequests.length})
                 </Button>
               </div>
               <div className="overflow-x-auto">
@@ -248,14 +248,14 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
                           onCheckedChange={(checked) => handleSelectAllRequests(checked as boolean, pendingDepartmentRequests)}
                         />
                       </TableHead>
-                      <TableHead>Technician</TableHead>
-                      <TableHead className="hidden sm:table-cell">Department</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>End Date</TableHead>
-                      <TableHead className="hidden lg:table-cell">Reason</TableHead>
-                      <TableHead className="hidden md:table-cell">Requested On</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
+                      <TableHead>Técnico</TableHead>
+                      <TableHead className="hidden sm:table-cell">Departamento</TableHead>
+                      <TableHead>Inicio</TableHead>
+                      <TableHead>Fin</TableHead>
+                      <TableHead className="hidden lg:table-cell">Motivo</TableHead>
+                      <TableHead className="hidden md:table-cell">Solicitada</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="w-[80px]">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -276,10 +276,10 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
                         <TableCell className="hidden sm:table-cell">
                           {request.technicians?.department || 'N/A'}
                         </TableCell>
-                        <TableCell>{format(new Date(request.start_date), 'MMM d, yyyy')}</TableCell>
-                        <TableCell>{format(new Date(request.end_date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>{format(new Date(request.start_date), 'd MMM yyyy')}</TableCell>
+                        <TableCell>{format(new Date(request.end_date), 'd MMM yyyy')}</TableCell>
                         <TableCell className="hidden lg:table-cell max-w-[200px] truncate">{request.reason}</TableCell>
-                        <TableCell className="hidden md:table-cell">{format(new Date(request.created_at), 'MMM d, yyyy')}</TableCell>
+                        <TableCell className="hidden md:table-cell">{format(new Date(request.created_at), 'd MMM yyyy')}</TableCell>
                         <TableCell>
                           <StatusWithConflicts request={request as unknown as VacationRequest} />
                         </TableCell>
@@ -289,7 +289,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
                             size="sm"
                             onClick={() => handleExportPDF(request)}
                             className="h-8 w-8 p-0"
-                            title="Export PDF"
+                            title="Exportar PDF"
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -311,12 +311,12 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
       <TabsList className="w-full">
         <TabsTrigger value="my-requests" className="flex-1 flex items-center justify-center gap-2">
           <CalendarDays className="h-4 w-4" />
-          My Requests
+          Mis solicitudes
         </TabsTrigger>
         {(userRole === 'management' || userRole === 'admin') && (
           <TabsTrigger value="department-requests" className="flex-1 flex items-center justify-center gap-2">
             <Users className="h-4 w-4" />
-            Department Requests
+            Solicitudes del departamento
           </TabsTrigger>
         )}
       </TabsList>

@@ -47,9 +47,9 @@ export const VacationRequestHistory = () => {
         body: { request_id: request.id }
       });
       if (error) throw error;
-      toast({ title: 'Email resent', description: 'Decision email has been resent with PDF attachment.' });
+      toast({ title: 'Correo reenviado', description: 'El correo con la decisión y PDF se ha reenviado.' });
     } catch (e: any) {
-      toast({ title: 'Failed to resend', description: e?.message || 'Error resending decision email.', variant: 'destructive' });
+      toast({ title: 'Error al reenviar', description: e?.message || 'No se pudo reenviar el correo de decisión.', variant: 'destructive' });
     } finally {
       setSendingIds(prev => prev.filter(id => id !== request.id));
     }
@@ -58,11 +58,11 @@ export const VacationRequestHistory = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="outline" className="text-yellow-600"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+        return <Badge variant="outline" className="text-yellow-600"><Clock className="h-3 w-3 mr-1" />Pendiente</Badge>;
       case 'approved':
-        return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
+        return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Aprobada</Badge>;
       case 'rejected':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rechazada</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -75,7 +75,7 @@ export const VacationRequestHistory = () => {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8">
-          <div className="text-muted-foreground">Loading requests...</div>
+          <div className="text-muted-foreground">Cargando solicitudes...</div>
         </CardContent>
       </Card>
     );
@@ -86,27 +86,27 @@ export const VacationRequestHistory = () => {
       <CardHeader className="px-3 sm:px-6 py-4 sm:py-6">
         <CardTitle className="flex items-center gap-2">
           <History className="h-5 w-5" />
-          Your Vacation Requests
+          Historial de solicitudes
         </CardTitle>
       </CardHeader>
       <CardContent className="px-3 sm:px-6">
         {rows.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            {isManager ? 'No vacation requests found for your department.' : "You haven't submitted any vacation requests yet."}
+            {isManager ? 'No hay solicitudes de vacaciones en tu departamento.' : "Aún no has enviado solicitudes de vacaciones."}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Technician</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>End Date</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Response</TableHead>
-                  <TableHead className="w-[120px]">Actions</TableHead>
+                  <TableHead>Técnico</TableHead>
+                  <TableHead>Inicio</TableHead>
+                  <TableHead>Fin</TableHead>
+                  <TableHead>Motivo</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Enviada</TableHead>
+                  <TableHead>Respuesta</TableHead>
+                  <TableHead className="w-[120px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -117,14 +117,14 @@ export const VacationRequestHistory = () => {
                         ? ((`${request.technicians.first_name ?? ''} ${request.technicians.last_name ?? ''}`.trim()) || request.technicians.email || request.technician_id)
                         : request.technician_id}
                     </TableCell>
-                    <TableCell>{format(new Date(request.start_date), 'MMM d, yyyy')}</TableCell>
-                    <TableCell>{format(new Date(request.end_date), 'MMM d, yyyy')}</TableCell>
+                    <TableCell>{format(new Date(request.start_date), 'd MMM yyyy')}</TableCell>
+                    <TableCell>{format(new Date(request.end_date), 'd MMM yyyy')}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{request.reason}</TableCell>
                     <TableCell>{getStatusBadge(request.status)}</TableCell>
-                    <TableCell>{format(new Date(request.created_at), 'MMM d, yyyy')}</TableCell>
+                    <TableCell>{format(new Date(request.created_at), 'd MMM yyyy')}</TableCell>
                     <TableCell>
-                      {request.approved_at 
-                        ? format(new Date(request.approved_at), 'MMM d, yyyy')
+                      {request.approved_at
+                        ? format(new Date(request.approved_at), 'd MMM yyyy')
                         : '-'
                       }
                     </TableCell>
@@ -134,7 +134,7 @@ export const VacationRequestHistory = () => {
                         size="sm"
                         onClick={() => handleExportPDF(request)}
                         className="h-8 w-8 p-0"
-                        title="Export PDF"
+                        title="Exportar PDF"
                       >
                         <Download className="h-4 w-4" />
                       </Button>
@@ -144,7 +144,7 @@ export const VacationRequestHistory = () => {
                           size="sm"
                           onClick={() => handleResendEmail(request)}
                           className="h-8 w-8 p-0"
-                          title="Resend decision email"
+                          title="Reenviar correo de decisión"
                           disabled={sendingIds.includes(request.id)}
                         >
                           <Send className="h-4 w-4" />

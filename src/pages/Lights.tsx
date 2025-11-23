@@ -10,12 +10,13 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
-import { Scale, Zap, Calendar, FileText, Plus } from "lucide-react";
+import { Scale, Zap, Calendar, FileText, Plus, Calculator, Lightbulb } from "lucide-react";
 import type { JobType } from "@/types/job";
 import { Button } from "@/components/ui/button";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
+import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
 
 const Lights = () => {
   const navigate = useNavigate();
@@ -29,6 +30,12 @@ const Lights = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [userRole, setUserRole] = useState<string | null>(null);
   const currentDepartment = "lights";
+
+  const mobileTools = [
+    { label: "Pesos", to: "/lights-pesos-tool", icon: Scale },
+    { label: "Consumos", to: "/lights-consumos-tool", icon: Calculator },
+    { label: "Memoria técnica", to: "/lights-memoria-tecnica", icon: FileText },
+  ];
   
   const { data: jobs, isLoading } = useJobs();
   const { toast } = useToast();
@@ -154,7 +161,13 @@ const Lights = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-3 py-4 sm:px-6 sm:py-6 space-y-6">
-      <LightsHeader 
+      <DepartmentMobileHub
+        department={currentDepartment}
+        title="Departamento de iluminación"
+        icon={Lightbulb}
+        tools={mobileTools}
+      />
+      <LightsHeader
         onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
         department="Luces"
         canCreate={userRole ? ["admin","management"].includes(userRole) : true}

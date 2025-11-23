@@ -60,7 +60,7 @@ export const LogisticsEventCard = ({
       ) : (
         <>
           <div className="flex items-center justify-between gap-2">
-            <Badge 
+            <Badge
               variant={event.event_type === 'load' ? 'default' : 'secondary'}
               className="flex items-center gap-1"
             >
@@ -69,7 +69,7 @@ export const LogisticsEventCard = ({
               ) : (
                 <PackageCheck className="h-3 w-3" />
               )}
-              <span className="capitalize">{event.event_type}</span>
+              <span className="capitalize">{event.event_type === 'load' ? 'Carga' : 'Descarga'}</span>
             </Badge>
             <Badge variant="outline" className="flex items-center gap-1">
               <Truck className="h-3 w-3" />
@@ -98,7 +98,7 @@ export const LogisticsEventCard = ({
 
           {event.loading_bay && (
             <div className="text-sm text-muted-foreground mt-2">
-              Loading Bay: {event.loading_bay}
+              Muelle: {event.loading_bay}
             </div>
           )}
         </>

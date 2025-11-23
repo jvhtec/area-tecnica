@@ -54,7 +54,7 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
         console.error('Error fetching events:', error);
         toast({
           title: "Error",
-          description: "Failed to load logistics events",
+          description: "No se pudieron cargar los eventos de logística",
           variant: "destructive",
         });
         throw error;
@@ -80,12 +80,12 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   const currentDateEvents = getEventsForDate(currentDate);
 
   const generatePDF = (range: "month" | "quarter" | "year") => {
-    console.log("Mobile logistics PDF generation not implemented for", range);
+    console.log("PDF móvil de logística no implementado para", range);
     setShowPrintDialog(false);
   };
 
   const generateXLS = (range: "month" | "quarter" | "year") => {
-    console.log("Mobile logistics XLS generation not implemented for", range);
+    console.log("XLS móvil de logística no implementado para", range);
     setShowPrintDialog(false);
   };
 
@@ -123,18 +123,18 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
       <div className="rounded-2xl border bg-card shadow-sm px-4 py-3 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">Logistics</p>
-            <h2 className="text-xl font-bold leading-tight">Mobile schedule</h2>
-            <p className="text-xs text-muted-foreground">Manage load and unload runs with quick actions.</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">Logística</p>
+            <h2 className="text-xl font-bold leading-tight">Agenda móvil</h2>
+            <p className="text-xs text-muted-foreground">Gestiona cargas y descargas con acciones rápidas.</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={navigateToPrevious} aria-label="Previous day">
+            <Button variant="ghost" size="icon" onClick={navigateToPrevious} aria-label="Día anterior">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={navigateToNext} aria-label="Next day">
+            <Button variant="ghost" size="icon" onClick={navigateToNext} aria-label="Día siguiente">
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={() => setShowPrintDialog(true)} aria-label="Export logistics">
+            <Button variant="outline" size="icon" onClick={() => setShowPrintDialog(true)} aria-label="Exportar logística">
               <Printer className="h-4 w-4" />
             </Button>
           </div>
@@ -144,20 +144,20 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
           <Calendar className="h-4 w-4 text-primary" />
           <span className={cn(isToday(currentDate) && "text-primary font-bold")}>{format(currentDate, "EEE, MMM d")}</span>
           <span className="text-muted-foreground">·</span>
-          <button onClick={navigateToToday} className="text-primary underline-offset-2 hover:underline">Today</button>
+          <button onClick={navigateToToday} className="text-primary underline-offset-2 hover:underline">Hoy</button>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <Button onClick={handleAddEvent} className="w-full rounded-xl flex items-center justify-center gap-2">
             <Plus className="h-4 w-4" />
-            Add event
+            Añadir evento
           </Button>
           <Button
             variant="outline"
             className="w-full rounded-xl"
             onClick={() => setShowPrintDialog(true)}
           >
-            <Printer className="h-4 w-4 mr-2" /> Export
+            <Printer className="h-4 w-4 mr-2" /> Exportar
           </Button>
         </div>
       </div>
@@ -165,7 +165,7 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
       <div className="space-y-3">
         {isLoading ? (
           <div className="flex items-center justify-center py-10 rounded-2xl border bg-card text-muted-foreground">
-            Loading events...
+            Cargando eventos...
           </div>
         ) : currentDateEvents.length > 0 ? (
           currentDateEvents.map((event) => (
@@ -179,8 +179,8 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center rounded-2xl border bg-card">
             <Calendar className="h-8 w-8 mb-2" />
-            <p className="text-muted-foreground">No logistics events scheduled</p>
-            <p className="text-sm text-muted-foreground">for {format(currentDate, "MMMM d, yyyy")}</p>
+            <p className="text-muted-foreground">No hay eventos de logística programados</p>
+            <p className="text-sm text-muted-foreground">para {format(currentDate, "MMMM d, yyyy")}</p>
           </div>
         )}
       </div>

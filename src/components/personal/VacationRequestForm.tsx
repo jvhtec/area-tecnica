@@ -39,14 +39,14 @@ export const VacationRequestForm: React.FC<VacationRequestFormProps> = ({ onSubm
       <CardHeader className="px-3 sm:px-6 py-4 sm:py-6">
         <CardTitle className="flex items-center gap-2">
           <CalendarDays className="h-5 w-5" />
-          Request Vacation Days
+          Solicitar vacaciones
         </CardTitle>
       </CardHeader>
       <CardContent className="px-3 sm:px-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex flex-col space-y-1.5">
-              <Label htmlFor="startDate">Start Date</Label>
+              <Label htmlFor="startDate">Fecha de inicio</Label>
               <Input
                 id="startDate"
                 type="date"
@@ -57,7 +57,7 @@ export const VacationRequestForm: React.FC<VacationRequestFormProps> = ({ onSubm
               />
             </div>
             <div className="flex flex-col space-y-1.5">
-              <Label htmlFor="endDate">End Date</Label>
+              <Label htmlFor="endDate">Fecha de fin</Label>
               <Input
                 id="endDate"
                 type="date"
@@ -70,24 +70,24 @@ export const VacationRequestForm: React.FC<VacationRequestFormProps> = ({ onSubm
             </div>
           </div>
           <div className="flex flex-col space-y-1.5">
-            <Label htmlFor="reason">Reason</Label>
+            <Label htmlFor="reason">Motivo</Label>
             <Textarea
               id="reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Enter reason for vacation"
+              placeholder="Escribe el motivo de la solicitud"
               required
               disabled={isSubmitting}
               rows={3}
             />
           </div>
           <Button 
-            type="submit" 
+            type="submit"
             disabled={!isFormValid || isSubmitting}
             className="w-full md:w-auto"
           >
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit Request
+            Enviar solicitud
           </Button>
         </form>
       </CardContent>
