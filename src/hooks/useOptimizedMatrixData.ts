@@ -122,7 +122,6 @@ export const fetchMatrixTimesheetAssignments = async ({
     ...assignmentPromises,
   ]);
 
-  // Build assignment map from job_assignments - this is the authoritative source
   const assignmentMap = new Map<string, any>();
   // Process all assignment batch results
   for (const result of assignmentResults) {
@@ -130,12 +129,6 @@ export const fetchMatrixTimesheetAssignments = async ({
       console.error('Assignment metadata query error:', result.error);
     } else {
       (result.data || []).forEach((row: any) => {
-        // For single-day assignments, key by job_id:technician_id:assignment_date
-        // For whole-job assignments, key by job_id:technician_id
-        if (row.single_day && row.assignment_date) {
-          assignmentMap.set(`${row.job_id}:${row.technician_id}:${row.assignment_date}`, row);
-        }
-        // Always also store by job_id:technician_id for backward compatibility
         assignmentMap.set(`${row.job_id}:${row.technician_id}`, row);
       });
     }
@@ -155,11 +148,8 @@ export const fetchMatrixTimesheetAssignments = async ({
     });
   }
 
-  // Track which (job_id, technician_id, date) combos we've already added from timesheets
-  const seenKeys = new Set<string>();
   const rows: MatrixTimesheetAssignment[] = [];
 
-  // First, add all entries from timesheets (existing behavior)
   timesheetResults.forEach((result) => {
     if (result.error) {
       console.error('Timesheet query error:', result.error);
@@ -169,16 +159,8 @@ export const fetchMatrixTimesheetAssignments = async ({
     (result.data || []).forEach((row: any) => {
       const job = jobsById.get(row.job_id);
       if (!job) return;
-
-      // Try to find assignment metadata - first by date-specific key, then by general key
-      const dateSpecificKey = `${row.job_id}:${row.technician_id}:${row.date}`;
-      const generalKey = `${row.job_id}:${row.technician_id}`;
-      const meta = assignmentMap.get(dateSpecificKey) || assignmentMap.get(generalKey);
-
+      const meta = assignmentMap.get(`${row.job_id}:${row.technician_id}`);
       const staffing = staffingMap.get(row.job_id);
-      const entryKey = `${row.job_id}:${row.technician_id}:${row.date}`;
-      seenKeys.add(entryKey);
-
       rows.push({
         job_id: row.job_id,
         technician_id: row.technician_id,
@@ -202,89 +184,6 @@ export const fetchMatrixTimesheetAssignments = async ({
       });
     });
   });
-
-  // Second, add assignments that DON'T have corresponding timesheets
-  // This ensures confirmed assignments show in the matrix even without timesheet entries
-  for (const result of assignmentResults) {
-    if (result.error) continue;
-
-    (result.data || []).forEach((assignment: any) => {
-      const job = jobsById.get(assignment.job_id);
-      if (!job) return;
-
-      const staffing = staffingMap.get(assignment.job_id);
-
-      if (assignment.single_day && assignment.assignment_date) {
-        // Single-day assignment - add for the specific date if not already seen
-        const entryKey = `${assignment.job_id}:${assignment.technician_id}:${assignment.assignment_date}`;
-        if (!seenKeys.has(entryKey)) {
-          seenKeys.add(entryKey);
-          rows.push({
-            job_id: assignment.job_id,
-            technician_id: assignment.technician_id,
-            date: assignment.assignment_date,
-            job: {
-              ...job,
-              assigned_count: staffing?.assigned_count,
-              worked_count: staffing?.worked_count,
-              total_cost_eur: staffing?.total_cost_eur,
-              approved_cost_eur: staffing?.approved_cost_eur,
-            } as MatrixJob,
-            status: assignment.status ?? null,
-            assigned_at: assignment.assigned_at ?? null,
-            single_day: true,
-            assignment_date: assignment.assignment_date,
-            sound_role: assignment.sound_role ?? null,
-            lights_role: assignment.lights_role ?? null,
-            video_role: assignment.video_role ?? null,
-            is_schedule_only: null,
-            source: 'assignment',
-          });
-        }
-      } else {
-        // Whole-job assignment - generate entries for each day of the job span
-        const jobStart = new Date(job.start_time);
-        const jobEnd = new Date(job.end_time);
-
-        // Iterate through each day of the job
-        for (let d = new Date(jobStart); d <= jobEnd; d.setDate(d.getDate() + 1)) {
-          const dateStr = format(d, 'yyyy-MM-dd');
-
-          // Check if within the requested date range
-          if (startDate && endDate) {
-            const currentDate = new Date(d);
-            if (currentDate < startDate || currentDate > endDate) continue;
-          }
-
-          const entryKey = `${assignment.job_id}:${assignment.technician_id}:${dateStr}`;
-          if (!seenKeys.has(entryKey)) {
-            seenKeys.add(entryKey);
-            rows.push({
-              job_id: assignment.job_id,
-              technician_id: assignment.technician_id,
-              date: dateStr,
-              job: {
-                ...job,
-                assigned_count: staffing?.assigned_count,
-                worked_count: staffing?.worked_count,
-                total_cost_eur: staffing?.total_cost_eur,
-                approved_cost_eur: staffing?.approved_cost_eur,
-              } as MatrixJob,
-              status: assignment.status ?? null,
-              assigned_at: assignment.assigned_at ?? null,
-              single_day: false,
-              assignment_date: null,
-              sound_role: assignment.sound_role ?? null,
-              lights_role: assignment.lights_role ?? null,
-              video_role: assignment.video_role ?? null,
-              is_schedule_only: null,
-              source: 'assignment',
-            });
-          }
-        }
-      }
-    });
-  }
 
   return rows;
 };
