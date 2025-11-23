@@ -151,9 +151,9 @@ const Auth = () => {
     }
   }, [session, isRecovery, isTransitioning, triggerTransition]);
 
-  // Already logged in - immediate redirect
+  // Already logged in - immediate redirect (use ref to avoid stale closure)
   if (session && !isRecovery && !isTransitioning) {
-    const dashboardPath = getDashboardPath(userRole as UserRole);
+    const dashboardPath = getDashboardPath(latestRoleRef.current);
     return <Navigate to={dashboardPath} replace />;
   }
 

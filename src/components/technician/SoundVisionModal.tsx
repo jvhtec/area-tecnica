@@ -163,6 +163,7 @@ export const SoundVisionModal = ({ theme, isDark, onClose }: SoundVisionModalPro
           style: 'mapbox://styles/mapbox/dark-v11',
           center: [0, 20],
           zoom: 1.5,
+          // Cast needed: mapbox-gl v3.15.0 types don't include 'globe' in ProjectionSpecification
           projection: 'globe' as any,
         });
 
@@ -354,7 +355,9 @@ export const SoundVisionModal = ({ theme, isDark, onClose }: SoundVisionModalPro
 
         {/* Back button */}
         <button
+          type="button"
           onClick={onClose}
+          aria-label="Volver"
           className="absolute top-6 left-6 z-20 p-3 bg-black/60 text-white rounded-full backdrop-blur-md border border-white/10 hover:bg-black/80 transition-colors"
         >
           <ArrowLeft size={20} />

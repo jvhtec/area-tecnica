@@ -19,6 +19,7 @@ import {
   Check,
   AlertCircle,
   Moon,
+  RefreshCw,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -97,6 +98,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
   const {
     timesheets,
     isLoading,
+    isError,
     updateTimesheet,
     submitTimesheet,
     signTimesheet,
@@ -244,6 +246,21 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            </div>
+          ) : isError ? (
+            <div className={`text-center py-8 ${theme.textMuted}`}>
+              <AlertCircle size={40} className="mx-auto mb-3 text-red-500" />
+              <p className={`font-medium ${theme.textMain}`}>Error al cargar los partes</p>
+              <p className="text-sm mt-1">No se pudieron obtener los datos</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                className="mt-4"
+              >
+                <RefreshCw size={14} className="mr-2" />
+                Reintentar
+              </Button>
             </div>
           ) : (
             <>
