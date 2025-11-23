@@ -36,12 +36,11 @@ export const useSoundVisionAccessRequest = () => {
           technicians:profiles!technician_id(first_name, last_name, department, email)
         `)
         .eq('technician_id', user.id)
-        .eq('start_date', 'end_date') // Same-day requests indicate SoundVision access
         .ilike('reason', `${SOUNDVISION_REQUEST_PREFIX}%`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as VacationRequest[];
+      return (data ?? []).filter((req) => req.start_date === req.end_date) as VacationRequest[];
     },
   });
 

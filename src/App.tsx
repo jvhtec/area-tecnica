@@ -19,6 +19,7 @@ import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
 import { ViewportProvider } from '@/hooks/use-mobile';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Lazy load all pages for better initial bundle size
 const Auth = lazy(() => import('@/pages/Auth'));
@@ -137,9 +138,10 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <ViewportProvider>
           <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme">
-            <SubscriptionProvider>
-              <AppBadgeProvider>
-                <Router>
+            <TooltipProvider>
+              <SubscriptionProvider>
+                <AppBadgeProvider>
+                  <Router>
                   <OptimizedAuthProvider>
                     <AppInit />
                     <ActivityPushFallbackInit />
@@ -155,28 +157,6 @@ export default function App() {
                           {/* TechnicianSuperApp: full-screen mobile interface for technicians */}
                           <Route path="/tech-app" element={<RequireAuth><ProtectedRoute allowedRoles={['technician', 'house_tech']}><TechnicianSuperApp /></ProtectedRoute></RequireAuth>} />
 
-                          {/* Routes outside Layout wrapper - full screen */}
-                          <Route
-                            path="/personal"
-                            element={
-                              <RequireAuth>
-                                <ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}>
-                                  <Personal />
-                                </ProtectedRoute>
-                              </RequireAuth>
-                            }
-                          />
-                          <Route
-                            path="/sound"
-                            element={
-                              <RequireAuth>
-                                <ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}>
-                                  <Sound />
-                                </ProtectedRoute>
-                              </RequireAuth>
-                            }
-                          />
-
                           {/* Public Routes */}
                           <Route path="festival">
                             <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
@@ -185,6 +165,8 @@ export default function App() {
 
                           {/* Protected Routes */}
                           <Route element={<RequireAuth><Layout /></RequireAuth>}>
+                            <Route path="/sound" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Sound /></ProtectedRoute>} />
+                            <Route path="/personal" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><Personal /></ProtectedRoute>} />
                             <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><Dashboard /></ProtectedRoute>} />
                             <Route path="/technician-dashboard" element={<ProtectedRoute allowedRoles={['technician', 'house_tech']}><TechnicianDashboard /></ProtectedRoute>} />
                             <Route path="/dashboard/unavailability" element={<ProtectedRoute allowedRoles={['technician', 'house_tech']}><TechnicianUnavailability /></ProtectedRoute>} />
@@ -260,9 +242,10 @@ export default function App() {
                       <SonnerToaster richColors position="top-right" />
                     </div>
                   </OptimizedAuthProvider>
-                </Router>
-              </AppBadgeProvider>
-            </SubscriptionProvider>
+                  </Router>
+                </AppBadgeProvider>
+              </SubscriptionProvider>
+            </TooltipProvider>
           </ThemeProvider>
         </ViewportProvider>
         <ReactQueryDevtools initialIsOpen={false} />
