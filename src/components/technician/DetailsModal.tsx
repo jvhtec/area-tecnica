@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map } from 'lucide-react';
+import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -14,11 +14,12 @@ import { PlacesRestaurantService } from '@/utils/hoja-de-ruta/services/places-re
 import { createSignedUrl } from '@/utils/jobDocuments';
 import { labelForCode } from '@/utils/roles';
 import type { Restaurant, WeatherData } from '@/types/hoja-de-ruta';
+import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from '@/types/job';
 
 interface DetailsModalProps {
     theme: Theme;
     isDark: boolean;
-    job: any;
+    job: JobWithLocationAndDocs;
     onClose: () => void;
 }
 
@@ -160,8 +161,9 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                 const url = `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=${zoom}&size=${width}x${height}&scale=${scale}${markers}&key=${encodeURIComponent(apiKey)}`;
 
                 setMapPreviewUrl(url);
-            } catch (e: any) {
-                console.warn('Failed to load static map preview:', e?.message || e);
+            } catch (e: unknown) {
+                const message = e instanceof Error ? e.message : String(e);
+                console.warn('Failed to load static map preview:', message);
                 setMapPreviewUrl(null);
             } finally {
                 setIsMapLoading(false);
@@ -172,20 +174,21 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         }
     }, [jobDetails?.locations]);
 
-    const handleViewDocument = async (doc: any) => {
+    const handleViewDocument = async (doc: JobDocument) => {
         const docId = doc.id;
         setDocumentLoading(prev => new Set(prev).add(docId));
         try {
             const url = await createSignedUrl(supabase, doc.file_path, 60);
             window.open(url, '_blank');
-        } catch (err: any) {
-            toast.error(`No se pudo abrir el documento: ${err.message}`);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            toast.error(`No se pudo abrir el documento: ${message}`);
         } finally {
             setDocumentLoading(prev => { const s = new Set(prev); s.delete(docId); return s; });
         }
     };
 
-    const handleDownload = async (doc: any) => {
+    const handleDownload = async (doc: JobDocument) => {
         const docId = doc.id;
         setDocumentLoading(prev => new Set(prev).add(docId));
         try {
@@ -196,8 +199,9 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-        } catch (err: any) {
-            toast.error(`No se pudo descargar el documento: ${err.message}`);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            toast.error(`No se pudo descargar el documento: ${message}`);
         } finally {
             setDocumentLoading(prev => { const s = new Set(prev); s.delete(docId); return s; });
         }
@@ -227,14 +231,14 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
     ];
 
     // Get department badge for staff
-    const getDepartmentFromAssignment = (assignment: any): string => {
+    const getDepartmentFromAssignment = (assignment: StaffAssignment): string => {
         if (assignment.sound_role) return 'sound';
         if (assignment.lights_role) return 'lights';
         if (assignment.video_role) return 'video';
         return 'unknown';
     };
 
-    const getRoleFromAssignment = (assignment: any): string => {
+    const getRoleFromAssignment = (assignment: StaffAssignment): string => {
         const role = assignment.sound_role || assignment.lights_role || assignment.video_role;
         return role ? (labelForCode(role) || role) : 'Técnico';
     };
@@ -337,7 +341,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                             </p>
                                         </div>
                                         <Button onClick={handleOpenMaps} size="sm" className="whitespace-nowrap">
-                                            <Map size={14} className="mr-2" /> Abrir mapas
+                                            <MapIcon size={14} className="mr-2" /> Abrir mapas
                                         </Button>
                                     </div>
 
@@ -402,7 +406,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                 </div>
                             ) : (
                                 <div className="space-y-2">
-                                    {staffAssignments.map((assignment: any, idx: number) => {
+                                    {(staffAssignments as StaffAssignment[]).map((assignment, idx) => {
                                         const tech = assignment.technician;
                                         const dept = getDepartmentFromAssignment(assignment);
                                         const role = getRoleFromAssignment(assignment);
@@ -437,9 +441,9 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                     <h3 className={`text-lg font-bold ${theme.textMain}`}>Documentos del trabajo</h3>
                                 </div>
 
-                                {job?.job_documents && job.job_documents.filter((d: any) => d.visible_to_tech).length > 0 ? (
+                                {job?.job_documents && job.job_documents.filter((d: JobDocument) => d.visible_to_tech).length > 0 ? (
                                     <div className="space-y-2">
-                                        {job.job_documents.filter((d: any) => d.visible_to_tech).map((doc: any) => (
+                                        {job.job_documents.filter((d: JobDocument) => d.visible_to_tech).map((doc) => (
                                             <div key={doc.id} className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 flex items-center justify-between`}>
                                                 <div className="min-w-0 pr-4">
                                                     <div className={`text-sm font-bold ${theme.textMain} truncate mb-1`}>{doc.file_name}</div>

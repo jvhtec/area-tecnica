@@ -9,11 +9,27 @@ import { Loader2, Save, User, Phone, MapPin, CreditCard, Calendar as CalendarIco
 import { Theme } from './types';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
+interface ProfileUser {
+    id: string;
+    email?: string;
+}
+
+interface UserProfile {
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+    city?: string;
+    dni?: string;
+    profile_color?: string;
+    role?: string;
+    department?: string;
+}
+
 interface ProfileViewProps {
     theme: Theme;
     isDark: boolean;
-    user: any;
-    userProfile: any;
+    user: ProfileUser | null;
+    userProfile: UserProfile | null;
     toggleTheme: () => void;
 }
 
@@ -127,8 +143,9 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
             toast.success('Contraseña actualizada correctamente');
             setShowPasswordModal(false);
             setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        } catch (err: any) {
-            toast.error(err?.message || 'Error al cambiar la contraseña');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error al cambiar la contraseña';
+            toast.error(message);
         } finally {
             setPasswordLoading(false);
         }
@@ -147,8 +164,9 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
         try {
             await enablePush();
             toast.success('Notificaciones push activadas');
-        } catch (err: any) {
-            toast.error(err?.message || 'Error al activar notificaciones');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error al activar notificaciones';
+            toast.error(message);
         }
     };
 
@@ -156,8 +174,9 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
         try {
             await disablePush();
             toast.success('Notificaciones push desactivadas');
-        } catch (err: any) {
-            toast.error(err?.message || 'Error al desactivar notificaciones');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error al desactivar notificaciones';
+            toast.error(message);
         }
     };
 
@@ -182,8 +201,9 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
             toast.success('Perfil actualizado');
             queryClient.invalidateQueries({ queryKey: ['user-profile'] });
         },
-        onError: (err: any) => {
-            toast.error(`Error: ${err.message}`);
+        onError: (err: unknown) => {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            toast.error(`Error: ${message}`);
         },
     });
 

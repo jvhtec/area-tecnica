@@ -2,7 +2,7 @@ import React from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
-import { Map, Calendar as CalendarIcon, MessageSquare, Euro, Loader2, Briefcase } from 'lucide-react';
+import { Map as MapIcon, Calendar as CalendarIcon, MessageSquare, Euro, Loader2, Briefcase } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useMyTours } from '@/hooks/useMyTours';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
@@ -98,7 +98,7 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                             onClick={onOpenSV}
                             className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-blue-500 transition-colors text-left group`}
                         >
-                            <Map size={20} className="text-blue-500 group-hover:scale-110 transition-transform" />
+                            <MapIcon size={20} className="text-blue-500 group-hover:scale-110 transition-transform" />
                             <span className={`text-xs font-bold ${theme.textMain}`}>SoundVision<br />Database</span>
                         </button>
                     )}
