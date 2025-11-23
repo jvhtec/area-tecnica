@@ -68,6 +68,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
   const [locationInput, setLocationInput] = useState("");
   const [requirements, setRequirements] = useState<Record<string, Array<{ role_code: string; quantity: number }>>>({});
   const navigate = useNavigate();
+  const fieldClass = "bg-[#0a0c10] border-[#1f232e] text-white placeholder:text-slate-500";
 
   const formatInput = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -301,14 +302,14 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
+      <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible bg-[#05070a] text-white border-[#1f232e]">
         <DialogHeader>
           <DialogTitle>Create New Job</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Title</Label>
-            <Input {...register("title")} />
+            <Input {...register("title")} className={fieldClass} />
             {errors.title && (
               <p className="text-sm text-destructive">{errors.title.message as string}</p>
             )}
@@ -316,7 +317,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
           <div className="space-y-2">
             <Label>Description</Label>
-            <Textarea {...register("description")} />
+            <Textarea {...register("description")} className={fieldClass} />
           </div>
 
           <div className="space-y-2">
@@ -333,6 +334,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
               }}
               placeholder="Enter venue location"
               label="Location"
+              className="text-white"
             />
             {errors.location && (
               <p className="text-sm text-destructive">
@@ -342,15 +344,24 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           </div>
 
           <div className="space-y-2">
+            <Label>Address</Label>
+            <Input
+              placeholder="Venue address"
+              {...register("location.address")}
+              className={fieldClass}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label>Timezone</Label>
             <Select
               onValueChange={(value) => setValue("timezone", value)}
               defaultValue={watch("timezone")}
             >
-              <SelectTrigger>
+              <SelectTrigger className={fieldClass}>
                 <SelectValue placeholder="Select timezone" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
                 <SelectItem value="Europe/Madrid">Europe/Madrid</SelectItem>
                 <SelectItem value="Europe/London">Europe/London</SelectItem>
                 <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
@@ -371,6 +382,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
               <Input
                 type="datetime-local"
                 {...register("start_time")}
+                className={fieldClass}
               />
               {errors.start_time && (
                 <p className="text-sm text-destructive">
@@ -383,6 +395,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
               <Input
                 type="datetime-local"
                 {...register("end_time")}
+                className={fieldClass}
               />
               {errors.end_time && (
                 <p className="text-sm text-destructive">
@@ -398,10 +411,10 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
               onValueChange={(value) => setValue("job_type", value as JobType)}
               defaultValue={watch("job_type")}
             >
-              <SelectTrigger>
+              <SelectTrigger className={fieldClass}>
                 <SelectValue placeholder="Select job type" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
                 <SelectItem value="single">Single</SelectItem>
                 <SelectItem value="tour">Tour</SelectItem>
                 <SelectItem value="festival">Festival</SelectItem>
@@ -435,6 +448,11 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                       : "outline"
                   }
                   onClick={() => toggleDepartment(department)}
+                  className={
+                    selectedDepartments.includes(department)
+                      ? "bg-blue-600 hover:bg-blue-500 text-white"
+                      : "bg-white/5 border-white/10 text-white hover:bg-white/10"
+                  }
                 >
                   {department}
                 </Button>
@@ -468,10 +486,10 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                               })
                             }}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className={fieldClass}>
                               <SelectValue placeholder="Select role" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
                               {roleOptionsForDiscipline(dept).map((opt) => (
                                 <SelectItem key={opt.code} value={opt.code}>{opt.label}</SelectItem>
                               ))}
@@ -492,6 +510,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                                 return { ...prev, [dept]: list }
                               })
                             }}
+                            className={fieldClass}
                           />
                         </div>
                         <div className="col-span-1 flex items-center justify-end">
@@ -519,6 +538,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                           list.push({ role_code: first, quantity: 1 })
                           return { ...prev, [dept]: list }
                         })}
+                        className="bg-white/5 border-white/10 text-white hover:bg-white/10"
                       >
                         Add role
                       </Button>
@@ -530,7 +550,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           )}
 
           <div className="w-full flex justify-end">
-            <Button type="submit" disabled={isSubmitting} className="gap-2">
+            <Button type="submit" disabled={isSubmitting} className="gap-2 bg-blue-600 hover:bg-blue-500 text-white">
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSubmitting ? "Creating..." : "Create Job"}
             </Button>

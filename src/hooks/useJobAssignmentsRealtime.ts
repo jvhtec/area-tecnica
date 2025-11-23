@@ -73,13 +73,36 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
             `)
             .eq("job_id", jobId);
 
+          // RLS-safe fallback mirroring JobDetailsDialog to avoid gaps for non-manager roles
+          let visibleTimesheets: any[] = [];
+          if (tsError?.code === 'PGRST200' || tsError?.code === 'PGRST301' || tsError?.code === '42501') {
+            try {
+              const { data: vis, error: visErr } = await supabase
+                .rpc('get_timesheet_amounts_visible')
+                .eq('job_id', jobId);
+              if (!visErr && Array.isArray(vis)) {
+                visibleTimesheets = vis;
+              }
+            } catch (err) {
+              console.warn('Visible timesheets fallback failed', err);
+            }
+          }
+
+          const combinedTimesheets = [
+            ...(timesheetData || []),
+            ...visibleTimesheets
+          ];
+
           if (tsError) {
             console.error("Error fetching timesheets:", tsError);
-            throw tsError;
+            // If we recovered via visibleTimesheets, continue; otherwise throw
+            if (!visibleTimesheets.length) {
+              throw tsError;
+            }
           }
 
           // Get unique technician IDs from timesheets
-          const techIds = [...new Set((timesheetData || []).map((t: any) => t.technician_id))];
+          const techIds = [...new Set(combinedTimesheets.map((t: any) => t.technician_id))];
 
           if (techIds.length === 0) {
             console.log(`No timesheets found for job ${jobId}`);
@@ -109,7 +132,10 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           const assignmentMap = new Map((assignmentData || []).map((a: any) => [a.technician_id, a]));
           const mergedAssignments = techIds.map(techId => {
             const assignment = assignmentMap.get(techId);
-            const tsRow = (timesheetData || []).find((t: any) => t.technician_id === techId);
+            const tsRow = combinedTimesheets.find((t: any) => t.technician_id === techId);
+            const tsDates = combinedTimesheets
+              .filter((t: any) => t.technician_id === techId)
+              .map((t: any) => t.date);
             return {
               job_id: jobId,
               technician_id: techId,
@@ -123,9 +149,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
               assigned_at: assignment?.assigned_at,
               assigned_by: assignment?.assigned_by,
               // Include dates from timesheets for per-day info
-              _timesheet_dates: (timesheetData || [])
-                .filter((t: any) => t.technician_id === techId)
-                .map((t: any) => t.date),
+              _timesheet_dates: Array.from(new Set(tsDates)).sort(),
             } as unknown as Assignment;
           });
 

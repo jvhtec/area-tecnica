@@ -97,21 +97,21 @@ export function JobExtrasEditor({
 
   if (isLoading || catalogLoading) {
     return (
-      <Card>
+      <Card className="bg-[#0f1219] border-[#1f232e] text-white">
         <CardHeader>
-          <CardTitle className="text-sm">Job Extras</CardTitle>
+          <CardTitle className="text-sm text-white">Job Extras</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-sm text-muted-foreground">Loading...</div>
+          <div className="text-sm text-slate-300">Loading...</div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="bg-[#0f1219] border-[#1f232e] text-white">
       <CardHeader>
-        <CardTitle className="text-sm flex items-center gap-2">
+        <CardTitle className="text-sm flex items-center gap-2 text-white">
           <Euro className="h-4 w-4" />
           Job Extras - {technicianName}
         </CardTitle>
@@ -129,15 +129,15 @@ export function JobExtrasEditor({
           return (
             <div key={extraType} className="space-y-2">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <Label className="text-sm font-medium">
+                <Label className="text-sm font-medium text-white">
                   {EXTRA_TYPE_LABELS[extraType]}
                 </Label>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs bg-white/5 border-white/10 text-white">
                     {formatCurrency(unitAmount)} each
                   </Badge>
                   {currentQuantity > 0 && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs bg-blue-500/15 border-blue-500/30 text-blue-100">
                       Current: {currentQuantity}
                     </Badge>
                   )}
@@ -152,6 +152,7 @@ export function JobExtrasEditor({
                       size="sm"
                       onClick={() => updateQuantity(extraType, displayQuantity - 1)}
                       disabled={displayQuantity <= 0 || upsertJobExtra.isPending}
+                      className="bg-white/5 border-white/10 text-white hover:bg-white/10"
                     >
                       <Minus className="h-3 w-3" />
                     </Button>
@@ -163,19 +164,17 @@ export function JobExtrasEditor({
                       value={displayQuantity}
                       onChange={(e) => updateQuantity(extraType, parseInt(e.target.value) || 0)}
                       onBlur={() => {
-                        // Auto-save on blur if value changed
                         if (hasUnsavedChange) {
                           saveExtra(extraType, displayQuantity);
                         }
                       }}
                       onKeyDown={(e) => {
-                        // Save on Enter key
                         if (e.key === 'Enter' && hasUnsavedChange) {
                           saveExtra(extraType, displayQuantity);
                         }
                       }}
                       disabled={upsertJobExtra.isPending}
-                      className="w-20 text-center"
+                      className="w-20 text-center bg-[#0a0c10] border-[#1f232e] text-white"
                     />
 
                     <Button
@@ -184,20 +183,20 @@ export function JobExtrasEditor({
                       onClick={() => {
                         const newQuantity = displayQuantity + 1;
                         updateQuantity(extraType, newQuantity);
-                        // Auto-save immediately when using +/- buttons
                         saveExtra(extraType, newQuantity);
                       }}
                       disabled={displayQuantity >= maxQuantity || upsertJobExtra.isPending}
+                      className="bg-white/5 border-white/10 text-white hover:bg-white/10"
                     >
                       <Plus className="h-3 w-3" />
                     </Button>
 
-                    <Badge variant="secondary" className="ml-auto">
+                    <Badge variant="secondary" className="ml-auto bg-blue-500/15 border-blue-500/30 text-blue-100">
                       {formatCurrency(displayTotal)}
                     </Badge>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
                     <span>Max {maxQuantity}</span>
                     {hasUnsavedChange && (
                       <Button
@@ -205,6 +204,7 @@ export function JobExtrasEditor({
                         variant="default"
                         onClick={() => saveExtra(extraType, displayQuantity)}
                         disabled={upsertJobExtra.isPending}
+                        className="bg-blue-600 hover:bg-blue-500 text-white"
                       >
                         {upsertJobExtra.isPending ? 'Saving...' : 'Save'}
                       </Button>
@@ -218,7 +218,7 @@ export function JobExtrasEditor({
                       {currentQuantity > 0 ? `${currentQuantity} × ${formatCurrency(unitAmount)}` : 'None'}
                     </span>
                     {currentQuantity > 0 && (
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="bg-blue-500/15 border-blue-500/30 text-blue-100">
                         {formatCurrency(currentTotal)}
                       </Badge>
                     )}
@@ -231,10 +231,10 @@ export function JobExtrasEditor({
         
         {totalExtrasAmount > 0 && (
           <>
-            <Separator />
-            <div className="flex items-center justify-between font-medium">
+            <Separator className="border-[#1f232e]" />
+            <div className="flex items-center justify-between font-medium text-white">
               <span>Total Extras:</span>
-              <Badge variant="default" className="text-sm">
+              <Badge variant="default" className="text-sm bg-blue-600 text-white">
                 {formatCurrency(totalExtrasAmount)}
               </Badge>
             </div>
@@ -242,9 +242,9 @@ export function JobExtrasEditor({
         )}
         
         {showVehicleDisclaimer && vehicleDisclaimerText && (
-          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-            <p className="text-sm text-amber-800">
+          <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-200">
+            <AlertCircle className="h-4 w-4 text-amber-300 mt-0.5 shrink-0" />
+            <p className="text-sm">
               {vehicleDisclaimerText}
             </p>
           </div>

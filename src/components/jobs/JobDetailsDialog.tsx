@@ -635,7 +635,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col overflow-y-auto">
+      <DialogContent className="w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] max-h-[92vh] flex flex-col overflow-y-auto overflow-x-hidden px-3 sm:px-6">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
             <Calendar className="h-4 w-4 md:h-5 md:w-5" />
@@ -644,14 +644,14 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         </DialogHeader>
 
         {/* Scroll wrapper to ensure the dialog always scrolls regardless of layout */}
-        <div className="min-h-0 overflow-y-auto max-h-[75vh]">
+        <div className="min-h-0 overflow-y-auto overflow-x-hidden max-h-[75vh]">
           <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-col">
-            <TabsList className={`grid w-full ${gridColsClass} flex-shrink-0 h-auto text-xs md:text-sm`}>
-              <TabsTrigger value="info" className="py-2">Info</TabsTrigger>
+            <TabsList className={`grid w-full ${gridColsClass} flex-shrink-0 h-auto text-xs md:text-sm overflow-x-auto no-scrollbar`}>
+              <TabsTrigger value="info" className="py-2">Información</TabsTrigger>
               {!isDryhire && <TabsTrigger value="location" className="py-2">Ubicación</TabsTrigger>}
               {!isDryhire && <TabsTrigger value="personnel" className="py-2">Personal</TabsTrigger>}
-              {!isDryhire && <TabsTrigger value="documents" className="py-2">Docs</TabsTrigger>}
-              {!isDryhire && <TabsTrigger value="restaurants" className="py-2">Restau.</TabsTrigger>}
+              {!isDryhire && <TabsTrigger value="documents" className="py-2">Documentos</TabsTrigger>}
+              {!isDryhire && <TabsTrigger value="restaurants" className="py-2">Restaurantes</TabsTrigger>}
               {!isDryhire && <TabsTrigger value="weather" className="py-2">Clima</TabsTrigger>}
               {showTourRatesTab && (
                 <TabsTrigger value="tour-rates" className="py-2">Tarifas</TabsTrigger>
@@ -659,9 +659,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               {!isDryhire && showExtrasTab && <TabsTrigger value="extras" className="py-2">Extras</TabsTrigger>}
             </TabsList>
 
-            <div className="mt-3 md:mt-4 px-1 pr-1">
-              <TabsContent value="info" className="space-y-4">
-                <Card className="p-4">
+            <div className="mt-3 md:mt-4 px-1 pr-1 min-w-0 overflow-x-hidden">
+              <TabsContent value="info" className="space-y-4 min-w-0 overflow-x-hidden">
+                <Card className="p-4 w-full min-w-0 overflow-hidden">
                   <div className="space-y-3">
                     <div>
                       <h3 className="font-semibold text-lg">{jobDetails?.title}</h3>
@@ -672,7 +672,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
                     <Separator />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm font-medium">Hora de inicio</p>
                         <p className="text-sm text-muted-foreground">
@@ -1129,7 +1129,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 )}
               </TabsContent>
 
-              <TabsContent value="location" className="space-y-4">
+              <TabsContent value="location" className="space-y-4 min-w-0 overflow-x-hidden">
                 <Card className="p-4">
                   {isJobLoading ? (
                     <div className="flex items-center justify-center py-8">
@@ -1214,7 +1214,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 </Card>
               </TabsContent>
 
-              <TabsContent value="personnel" className="space-y-4">
+              <TabsContent value="personnel" className="space-y-4 min-w-0 overflow-x-hidden">
                 <Card className="p-4">
                   <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <Users className="h-4 w-4" />
@@ -1298,8 +1298,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 </Card>
               </TabsContent>
 
-              <TabsContent value="documents" className="space-y-4">
-                <Card className="p-4">
+              <TabsContent value="documents" className="space-y-4 min-w-0 overflow-x-hidden">
+                <Card className="p-4 w-full min-w-0 overflow-hidden">
                   <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <FileText className="h-4 w-4" />
                     Documentos del trabajo
@@ -1323,9 +1323,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                         const isTemplate = doc.template_type === 'soundvision';
                         const isReadOnly = Boolean(doc.read_only);
                         return (
-                          <div key={doc.id} className="flex items-center justify-between p-3 bg-muted rounded">
-                            <div>
-                              <p className="font-medium flex items-center gap-2">
+                          <div key={doc.id} className="flex items-center justify-between p-3 bg-[#0f1219] border border-[#1f232e] rounded min-w-0">
+                            <div className="min-w-0">
+                              <p className="font-medium flex items-center gap-2 break-words">
                                 {doc.file_name}
                                 {isTemplate && (
                                   <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
@@ -1333,12 +1333,12 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                   </Badge>
                                 )}
                               </p>
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-sm text-muted-foreground break-words">
                                 {doc.uploaded_at ? `Subido el ${format(new Date(doc.uploaded_at), 'PPP', { locale: es })}` : 'Fecha de subida desconocida'}
                                 {isReadOnly && <span className="ml-2 italic">Solo lectura</span>}
                               </p>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 shrink-0">
                               <Button
                                 onClick={() => handleViewDocument(doc)}
                                 size="sm"
@@ -1403,8 +1403,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 </Card>
               </TabsContent>
 
-              <TabsContent value="restaurants" className="space-y-4">
-                <Card className="p-4">
+              <TabsContent value="restaurants" className="space-y-4 min-w-0 overflow-x-hidden">
+                <Card className="p-4 w-full min-w-0 overflow-hidden">
                   <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <UtensilsCrossed className="h-4 w-4" />
                     Restaurantes cercanos
@@ -1416,13 +1416,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                       <p className="text-muted-foreground">Buscando restaurantes cercanos...</p>
                     </div>
                   ) : restaurants && restaurants.length > 0 ? (
-                    <div className="space-y-3">
-                      {restaurants.map((restaurant: Restaurant) => (
-                        <div key={restaurant.id} className="p-3 bg-muted rounded">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <p className="font-medium">{restaurant.name}</p>
-                              <p className="text-sm text-muted-foreground">{restaurant.address}</p>
+                      <div className="space-y-3">
+                        {restaurants.map((restaurant: Restaurant) => (
+                          <div key={restaurant.id} className="p-3 bg-[#0f1219] border border-[#1f232e] rounded">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium break-words">{restaurant.name}</p>
+                                <p className="text-sm text-muted-foreground break-words">{restaurant.address}</p>
 
                               <div className="flex items-center gap-2 mt-2">
                                 {restaurant.rating && (
@@ -1477,7 +1477,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 </Card>
               </TabsContent>
 
-              <TabsContent value="weather" className="space-y-4">
+              <TabsContent value="weather" className="space-y-4 min-w-0 overflow-x-hidden">
                 <Card className="p-4">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold flex items-center gap-2">
@@ -1586,13 +1586,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               </TabsContent>
 
               {showTourRatesTab && resolvedJobId && (
-                <TabsContent value="tour-rates" className="space-y-4">
+                <TabsContent value="tour-rates" className="space-y-4 min-w-0 overflow-x-hidden">
                   <TourRatesPanel jobId={resolvedJobId} />
                 </TabsContent>
               )}
 
               {!isDryhire && showExtrasTab && (
-                <TabsContent value="extras" className="space-y-4">
+                <TabsContent value="extras" className="space-y-4 min-w-0 overflow-x-hidden">
                   <JobExtrasManagement
                     jobId={resolvedJobId}
                     isManager={isManager}

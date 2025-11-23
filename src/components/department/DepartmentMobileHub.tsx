@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Calendar, ChevronLeft, ChevronRight, Clock, MapPin,
+  Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin,
   Truck, Users, Plus, MoreVertical, Edit, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 interface ToolDefinition {
   label: string;
@@ -127,6 +129,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   const handlePrevDay = () => setSelectedDate(prev => subDays(prev, 1));
   const handleNextDay = () => setSelectedDate(prev => addDays(prev, 1));
   const handleToday = () => setSelectedDate(new Date());
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   if (!isMobile) return null;
 
@@ -191,7 +194,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
         )}
 
         {/* Date Navigation */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrevDay}
@@ -214,9 +217,36 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
               <ChevronRight size={20} />
             </button>
           </div>
-          <Button variant="outline" size="icon" className={cn("rounded-lg", t.card)}>
-            <Calendar className={cn("h-4 w-4", t.textMain)} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn("rounded-lg px-3", t.card)}
+              onClick={handleToday}
+            >
+              Today
+            </Button>
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="icon" className={cn("rounded-lg", t.card)}>
+                  <CalendarIcon className={cn("h-4 w-4", t.textMain)} />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className={cn("p-0 w-auto", t.card)} align="end" sideOffset={8}>
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      setSelectedDate(date);
+                      setCalendarOpen(false);
+                    }
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {/* Job List */}
@@ -285,7 +315,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                               <MoreVertical size={16} className={t.textMuted} />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className={cn("min-w-[140px]", t.card, t.textMain)}>
                             <DropdownMenuItem onClick={() => onEditJob(job)}>
                               <Edit size={14} className="mr-2" />
                               Edit

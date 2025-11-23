@@ -406,7 +406,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                     ))}
                 </div>
 
-                <ScrollArea className="flex-1 p-5">
+                <ScrollArea className="flex-1 p-5 overflow-x-hidden">
 
                     {/* TAB: INFO */}
                     {activeTab === 'Info' && (
