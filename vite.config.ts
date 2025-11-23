@@ -22,9 +22,22 @@ export default defineConfig(({ mode }) => ({
     'import.meta.env.VITE_APP_VERSION': JSON.stringify('1.0RTM'),
   },
   build: {
-    sourcemap: false,
-    esbuild: {
-      drop: ['console', 'debugger'],
-    },
+    // Only disable sourcemaps and drop console/debugger in production
+    sourcemap: mode !== 'production',
+    ...(mode === 'production' && {
+      minify: 'esbuild',
+      rollupOptions: {
+        output: {
+          manualChunks: (id) => {
+            if (id.includes('node_modules/jspdf') || id.includes('node_modules/pdf-lib')) {
+              return 'vendor-pdf';
+            }
+          },
+        },
+      },
+    }),
   },
+  esbuild: mode === 'production' ? {
+    drop: ['console', 'debugger'],
+  } : undefined,
 }));

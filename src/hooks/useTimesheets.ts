@@ -5,12 +5,10 @@ import { Timesheet } from "@/types/timesheet";
 import { toast } from "sonner";
 import { RATES_QUERY_KEYS } from "@/constants/ratesQueryKeys";
 
-type TimesheetVisibilityRow = {
-  amount_eur: number | null;
-  amount_breakdown: unknown;
-  amount_eur_visible: boolean | null;
-  amount_breakdown_visible: boolean | null;
-};
+type TimesheetVisibilityRow = Pick<
+  Timesheet,
+  'id' | 'amount_eur' | 'amount_breakdown' | 'amount_eur_visible' | 'amount_breakdown_visible'
+>;
 
 export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }) => {
   console.log("useTimesheets hook called with jobId:", jobId);
@@ -67,7 +65,9 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         console.warn('get_timesheets_batch error', visBatchErr);
       }
       const visibilityMap = new Map<string, TimesheetVisibilityRow>();
-      (visibilityRows || []).forEach((row: any) => visibilityMap.set(row.id, row));
+      (visibilityRows || []).forEach((row: TimesheetVisibilityRow) => {
+        visibilityMap.set(row.id, row);
+      });
 
       const enriched = data.map((t) => {
         const visible = visibilityMap.get(t.id);
