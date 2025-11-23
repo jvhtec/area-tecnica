@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { supabase } from '@/lib/supabase';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useVacationRequests } from '@/hooks/useVacationRequests';
-import { format } from 'date-fns';
-import { CalendarDays, CheckCircle, XCircle, Clock, Users, Download } from 'lucide-react';
-import { VacationRequestForm } from './VacationRequestForm';
-import { VacationRequestHistory } from './VacationRequestHistory';
-import type { VacationRequest } from '@/lib/vacation-requests';
-import { downloadVacationRequestPDF } from '@/utils/vacationRequestPdfExport';
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { supabase } from "@/lib/supabase";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useVacationRequests } from "@/hooks/useVacationRequests";
+import { format } from "date-fns";
+import { CalendarDays, CheckCircle, XCircle, Clock, Users, Download, Sun, Moon } from "lucide-react";
+import { VacationRequestForm } from "./VacationRequestForm";
+import { VacationRequestHistory } from "./VacationRequestHistory";
+import type { VacationRequest } from "@/lib/vacation-requests";
+import { downloadVacationRequestPDF } from "@/utils/vacationRequestPdfExport";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface VacationRequestsTabsProps {
   userRole: 'house_tech' | 'management' | 'admin';
@@ -26,6 +27,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
   onVacationRequestSubmit,
   isSubmitting,
 }) => {
+  const isMobile = useIsMobile();
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   const {
     departmentRequests,
@@ -76,19 +78,19 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="outline" className="text-yellow-600"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+        return <Badge variant="outline" className="text-yellow-600"><Clock className="h-3 w-3 mr-1" />Pendiente</Badge>;
       case 'approved':
-        return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
+        return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Aprobada</Badge>;
       case 'rejected':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rechazada</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
-  // Inline component: Status badge with hover popover to show collisions
-  const StatusWithConflicts: React.FC<{ request: VacationRequest }> = ({ request }) => {
-    const [open, setOpen] = React.useState(false);
+    // Inline component: Status badge with hover popover to show collisions
+    const StatusWithConflicts: React.FC<{ request: VacationRequest }> = ({ request }) => {
+      const [open, setOpen] = React.useState(false);
     const [loading, setLoading] = React.useState(false);
     const [collisions, setCollisions] = React.useState<any[] | null>(null);
 
@@ -146,7 +148,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
     return (
       <HoverCard open={open} onOpenChange={handleOpenChange}>
         <HoverCardTrigger asChild>
-          <div className="relative inline-flex cursor-default" title={conflictsCount > 0 ? `${conflictsCount} conflict(s)` : undefined}>
+          <div className="relative inline-flex cursor-default" title={conflictsCount > 0 ? `${conflictsCount} conflictos` : undefined}>
             {getStatusBadge(request.status)}
             {collisions && conflictsCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-[3px] rounded-full bg-red-600 text-white text-[10px] leading-[16px] text-center font-semibold shadow">
@@ -157,10 +159,10 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
         </HoverCardTrigger>
         <HoverCardContent className="w-96" side="top" align="center">
           <div className="space-y-2">
-            <div className="font-medium">Assignment collisions</div>
-            {loading && <div className="text-sm text-muted-foreground">Checking…</div>}
+            <div className="font-medium">Conflictos de asignación</div>
+            {loading && <div className="text-sm text-muted-foreground">Comprobando…</div>}
             {!loading && collisions && collisions.length === 0 && (
-              <div className="text-sm text-green-700">No conflicts detected for this period.</div>
+              <div className="text-sm text-green-700">No se detectaron conflictos en este periodo.</div>
             )}
             {!loading && collisions && collisions.length > 0 && (
               <div className="max-h-64 overflow-auto space-y-2">
@@ -172,7 +174,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
                     <div key={job.id} className="rounded-md border p-2">
                       <div className="text-sm font-medium">
                         <a className="text-blue-600 hover:underline" href={`/jobs/view/${job.id}`} target="_blank" rel="noopener noreferrer">
-                          {job.title || 'Job'}
+                          {job.title || 'Trabajo'}
                         </a>
                         {locName}
                       </div>
@@ -185,7 +187,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
               </div>
             )}
             {!loading && collisions === null && (
-              <div className="text-sm text-muted-foreground">Hover to check conflicts.</div>
+              <div className="text-sm text-muted-foreground">Pasa el cursor para comprobar conflictos.</div>
             )}
           </div>
         </HoverCardContent>
@@ -193,12 +195,88 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
     );
   };
 
+  if (isMobile) {
+    const rows = ['management', 'admin'].includes(userRole) ? departmentRequests : userRequests;
+    const pending = rows.filter((r) => r.status === 'pending').length;
+    const approved = rows.filter((r) => r.status === 'approved').length;
+    const rejected = rows.filter((r) => r.status === 'rejected').length;
+
+    const [isDark, setIsDark] = useState(true);
+    const theme = isDark
+      ? {
+          bg: "bg-[#05070a]",
+          card: "bg-[#0f1219] border-[#1f232e]",
+          textMain: "text-white",
+          textMuted: "text-[#94a3b8]",
+          accent: "bg-blue-600 text-white",
+          divider: "border-[#1f232e]",
+        }
+      : {
+          bg: "bg-[#f8fafc]",
+          card: "bg-white border-slate-200 shadow-sm",
+          textMain: "text-slate-900",
+          textMuted: "text-slate-500",
+          accent: "bg-blue-600 text-white",
+          divider: "border-slate-100",
+        };
+
+    return (
+      <div className={theme.bg + " rounded-[28px] p-4 space-y-4 shadow-inner border " + (isDark ? "border-[#1f232e]" : "border-slate-200") }>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-500">Vacaciones</p>
+            <h3 className={`text-xl font-bold ${theme.textMain}`}>Gestión de solicitudes</h3>
+            <p className={`text-xs ${theme.textMuted}`}>Envía, revisa y exporta desde el móvil.</p>
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className={`${theme.card} rounded-full`}
+            onClick={() => setIsDark((prev) => !prev)}
+            aria-label="Cambiar tema"
+          >
+            {isDark ? <Sun className={theme.textMuted + " h-4 w-4"} /> : <Moon className={theme.textMuted + " h-4 w-4"} />}
+          </Button>
+        </div>
+
+        <Card className={`${theme.card} rounded-2xl`}>
+          <CardContent className="p-4 space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl border px-3 py-2 text-center">
+                <p className={`text-[11px] uppercase font-semibold ${theme.textMuted}`}>Pendientes</p>
+                <p className={`text-lg font-bold ${theme.textMain}`}>{pending}</p>
+              </div>
+              <div className="rounded-xl border px-3 py-2 text-center">
+                <p className={`text-[11px] uppercase font-semibold ${theme.textMuted}`}>Aprobadas</p>
+                <p className={`text-lg font-bold text-emerald-500`}>{approved}</p>
+              </div>
+              <div className="rounded-xl border px-3 py-2 text-center">
+                <p className={`text-[11px] uppercase font-semibold ${theme.textMuted}`}>Rechazadas</p>
+                <p className={`text-lg font-bold text-red-500`}>{rejected}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <CalendarDays className="h-4 w-4" />
+              Copia al correo se envía al aprobar o rechazar.
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-3">
+          <VacationRequestForm onSubmit={onVacationRequestSubmit} isSubmitting={isSubmitting} />
+          <VacationRequestHistory />
+        </div>
+      </div>
+    );
+  }
+
   const renderDepartmentRequests = () => {
     if (isLoadingDepartmentRequests) {
       return (
         <Card>
           <CardContent className="flex items-center justify-center py-8">
-            <div className="text-muted-foreground">Loading department requests...</div>
+            <div className="text-muted-foreground">Cargando solicitudes del departamento...</div>
           </CardContent>
         </Card>
       );
@@ -211,31 +289,31 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
         <CardHeader className="px-3 sm:px-6 py-4 sm:py-6">
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Department Vacation Requests
+            Solicitudes de vacaciones del departamento
           </CardTitle>
         </CardHeader>
         <CardContent className="px-3 sm:px-6">
           {pendingDepartmentRequests.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No pending vacation requests in your department.
+              No hay solicitudes pendientes en tu departamento.
             </div>
           ) : (
             <>
               <div className="flex flex-col sm:flex-row justify-end gap-2 mb-4">
-                <Button 
-                  onClick={handleApproveSelected} 
+                <Button
+                  onClick={handleApproveSelected}
                   disabled={selectedRequests.length === 0 || isApproving}
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  Approve Selected ({selectedRequests.length})
+                  Aprobar seleccionadas ({selectedRequests.length})
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={handleRejectSelected} 
+                <Button
+                  variant="outline"
+                  onClick={handleRejectSelected}
                   disabled={selectedRequests.length === 0 || isRejecting}
                   className="border-red-200 text-red-600 hover:bg-red-50"
                 >
-                  Reject Selected ({selectedRequests.length})
+                  Rechazar seleccionadas ({selectedRequests.length})
                 </Button>
               </div>
               <div className="overflow-x-auto">
@@ -248,14 +326,14 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
                           onCheckedChange={(checked) => handleSelectAllRequests(checked as boolean, pendingDepartmentRequests)}
                         />
                       </TableHead>
-                      <TableHead>Technician</TableHead>
-                      <TableHead className="hidden sm:table-cell">Department</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>End Date</TableHead>
-                      <TableHead className="hidden lg:table-cell">Reason</TableHead>
-                      <TableHead className="hidden md:table-cell">Requested On</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
+                      <TableHead>Técnico</TableHead>
+                      <TableHead className="hidden sm:table-cell">Departamento</TableHead>
+                      <TableHead>Inicio</TableHead>
+                      <TableHead>Fin</TableHead>
+                      <TableHead className="hidden lg:table-cell">Motivo</TableHead>
+                      <TableHead className="hidden md:table-cell">Solicitada</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="w-[80px]">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -276,10 +354,10 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
                         <TableCell className="hidden sm:table-cell">
                           {request.technicians?.department || 'N/A'}
                         </TableCell>
-                        <TableCell>{format(new Date(request.start_date), 'MMM d, yyyy')}</TableCell>
-                        <TableCell>{format(new Date(request.end_date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>{format(new Date(request.start_date), 'd MMM yyyy')}</TableCell>
+                        <TableCell>{format(new Date(request.end_date), 'd MMM yyyy')}</TableCell>
                         <TableCell className="hidden lg:table-cell max-w-[200px] truncate">{request.reason}</TableCell>
-                        <TableCell className="hidden md:table-cell">{format(new Date(request.created_at), 'MMM d, yyyy')}</TableCell>
+                        <TableCell className="hidden md:table-cell">{format(new Date(request.created_at), 'd MMM yyyy')}</TableCell>
                         <TableCell>
                           <StatusWithConflicts request={request as unknown as VacationRequest} />
                         </TableCell>
@@ -289,7 +367,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
                             size="sm"
                             onClick={() => handleExportPDF(request)}
                             className="h-8 w-8 p-0"
-                            title="Export PDF"
+                            title="Exportar PDF"
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -311,12 +389,12 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
       <TabsList className="w-full">
         <TabsTrigger value="my-requests" className="flex-1 flex items-center justify-center gap-2">
           <CalendarDays className="h-4 w-4" />
-          My Requests
+          Mis solicitudes
         </TabsTrigger>
         {(userRole === 'management' || userRole === 'admin') && (
           <TabsTrigger value="department-requests" className="flex-1 flex items-center justify-center gap-2">
             <Users className="h-4 w-4" />
-            Department Requests
+            Solicitudes del departamento
           </TabsTrigger>
         )}
       </TabsList>

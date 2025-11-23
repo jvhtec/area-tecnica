@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { Calculator, PieChart, FileText, Zap, FileStack, Tent, AlertTriangle, Plus, Database, Lock } from 'lucide-react';
+import { Calculator, PieChart, FileText, Zap, FileStack, Tent, AlertTriangle, Plus, Database, Lock, Music, Box } from 'lucide-react';
 import type { JobType } from "@/types/job";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { IncidentReport } from "@/components/sound/tools/IncidentReport";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { SoundVisionAccessRequestDialog } from "@/components/soundvision/SoundVisionAccessRequestDialog";
+import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -42,6 +43,12 @@ const Sound = () => {
   const [showAccessRequestDialog, setShowAccessRequestDialog] = useState(false);
   // SoundVision now routes to a dedicated page
   const currentDepartment = "sound";
+
+  const mobileTools = [
+    { label: "Pesos", to: "/pesos-tool", icon: Box },
+    { label: "Consumos", to: "/consumos-tool", icon: Calculator },
+    { label: "Memoria técnica", to: "/soundvision-files", icon: FileText },
+  ];
   
   const { data: jobs } = useJobs();
   const { toast } = useToast();
@@ -155,8 +162,14 @@ const Sound = () => {
 
   return (
     <div className="space-y-4 md:space-y-8 w-full max-w-full">
+      <DepartmentMobileHub
+        department={currentDepartment}
+        title="Departamento de sonido"
+        icon={Music}
+        tools={mobileTools}
+      />
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <LightsHeader 
+        <LightsHeader
           onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
           department="Sound"
           canCreate={userRole ? ["admin","management"].includes(userRole) : true}

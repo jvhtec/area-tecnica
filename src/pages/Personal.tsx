@@ -48,7 +48,7 @@ const Personal = () => {
       return (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">Please log in to access vacation requests.</p>
+            <p className="text-muted-foreground">Inicia sesión para gestionar solicitudes de vacaciones.</p>
           </CardContent>
         </Card>
       );
@@ -64,29 +64,39 @@ const Personal = () => {
       );
     }
 
-    return (
-      <Card>
-        <CardContent className="text-center py-8">
-          <p className="text-muted-foreground">
-            Vacation request features are available for house technicians, admins, and management only.
-          </p>
-        </CardContent>
-      </Card>
-    );
+      return (
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-muted-foreground">
+              Las solicitudes de vacaciones solo están disponibles para técnicos de planta, administración y managers.
+            </p>
+          </CardContent>
+        </Card>
+      );
   };
 
   // House techs have read-only access (can't mark dates)
   const canEditDates = userRole === 'admin' || userRole === 'management';
 
   return (
-    <div className="w-full mx-auto px-2 sm:px-4 py-6 space-y-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-        <h1 className="text-xl md:text-3xl font-bold">House Technician Calendar</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Track house tech assignments and availability</p>
+    <div className="w-full mx-auto max-w-5xl px-safe pt-safe-3 pb-safe-4 sm:px-6 space-y-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">Técnicos de planta</p>
+          <h1 className="text-2xl md:text-3xl font-bold leading-tight">Agenda de técnicos de planta</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Controla asignaciones, disponibilidad y solicitudes de vacaciones en móvil.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setDate(new Date())}>
+            Ir a hoy
+          </Button>
+        </div>
       </div>
-      
+
       {isMobile ? (
-        <MobilePersonalCalendar 
+        <MobilePersonalCalendar
           date={date}
           onDateSelect={setDate}
           readOnly={!canEditDates}
@@ -115,7 +125,7 @@ const Personal = () => {
             ) : (
               <ChevronRight className="h-5 w-5" />
             )}
-            Vacation Requests
+            Solicitudes de vacaciones
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-4">
