@@ -1,16 +1,23 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, addMonths, subMonths, getDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, Trash2, X, Loader2, Check, Palmtree } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Loader2, Palmtree } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Theme } from './types';
+
+interface AvailabilityBlock {
+    id: string;
+    technician_id: string;
+    date: string;
+    status: 'vacation' | 'travel' | 'sick' | 'day_off';
+    created_at: string;
+}
 
 interface AvailabilityViewProps {
     theme: Theme;
@@ -18,7 +25,6 @@ interface AvailabilityViewProps {
 }
 
 export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
-    const navigate = useNavigate();
     const { user } = useOptimizedAuth();
     const queryClient = useQueryClient();
     const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -27,7 +33,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
     const [endDate, setEndDate] = useState('');
 
     // Fetch unavailability blocks
-    const { data: blocks = [], isLoading } = useQuery({
+    const { data: blocks = [], isLoading } = useQuery<AvailabilityBlock[]>({
         queryKey: ['my-unavailability', user?.id],
         queryFn: async () => {
             if (!user?.id) return [];
@@ -37,7 +43,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
                 .eq('technician_id', user.id)
                 .order('date', { ascending: true });
             if (error) throw error;
-            return data || [];
+            return (data as AvailabilityBlock[]) || [];
         },
         enabled: !!user?.id,
     });
@@ -65,7 +71,10 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
             setStartDate('');
             setEndDate('');
         },
-        onError: (e: any) => toast.error(e?.message || 'No se pudo crear'),
+        onError: (e: unknown) => {
+            const message = e instanceof Error ? e.message : 'No se pudo crear';
+            toast.error(message);
+        },
     });
 
     // Delete mutation
@@ -78,7 +87,10 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
             toast.success('Bloqueo eliminado');
             queryClient.invalidateQueries({ queryKey: ['my-unavailability'] });
         },
-        onError: (e: any) => toast.error(e?.message || 'No se pudo eliminar'),
+        onError: (e: unknown) => {
+            const message = e instanceof Error ? e.message : 'No se pudo eliminar';
+            toast.error(message);
+        },
     });
 
     // Calendar generation
@@ -88,7 +100,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
 
     // Check if a day has unavailability
     const getUnavailabilityForDay = (day: Date) => {
-        return blocks.find((b: any) => isSameDay(new Date(b.date), day));
+        return blocks.find(b => isSameDay(new Date(b.date), day));
     };
 
     const statusStyles: Record<string, string> = {
@@ -157,7 +169,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
                 </div>
             ) : (
                 <div className="space-y-2">
-                    {blocks.slice(0, 5).map((b: any) => (
+                    {blocks.slice(0, 5).map((b) => (
                         <div key={b.id} className={`p-3 rounded-xl border ${theme.card} flex items-center justify-between`}>
                             <div className="flex items-center gap-4">
                                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${statusStyles[b.status] || 'bg-emerald-500/10'}`}>
