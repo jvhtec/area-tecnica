@@ -65,8 +65,9 @@ const Auth = () => {
     try {
       await login(email, password);
       return true;
-    } catch (err: any) {
-      setFormError(err?.message || "Error al iniciar sesión");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error al iniciar sesión";
+      setFormError(message);
       return false;
     } finally {
       setIsSubmitting(false);
