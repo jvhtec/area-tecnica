@@ -37,6 +37,7 @@ interface DepartmentMobileHubProps {
   onDeleteJob?: (jobId: string) => void;
   onJobClick?: (jobId: string) => void;
   onViewDetails?: (job: any) => void;
+  onManageAssignments?: (job: any) => void;
   staffData?: {
     warehouse: number;
     onJob: number;
@@ -80,6 +81,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   onDeleteJob,
   onJobClick,
   onViewDetails,
+  onManageAssignments,
   staffData,
   onStaffClick,
 }) => {
@@ -326,7 +328,13 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                     </Button>
                     <Button
                       className={cn("flex-1", t.accent)}
-                      onClick={() => onJobClick?.(job.id)}
+                      onClick={() => {
+                        if (onManageAssignments) {
+                          onManageAssignments(job);
+                          return;
+                        }
+                        onJobClick?.(job.id);
+                      }}
                     >
                       Manage
                     </Button>

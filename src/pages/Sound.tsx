@@ -29,6 +29,8 @@ import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { buildNavigationItems } from "@/components/layout/SidebarNavigation";
 import { supabase } from "@/integrations/supabase/client";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
+import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDetailsModal";
+import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -49,6 +51,8 @@ const Sound = () => {
   const [showAccessRequestDialog, setShowAccessRequestDialog] = useState(false);
   const [showJobDetails, setShowJobDetails] = useState(false);
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<any>(null);
+  const [selectedJobForAssignments, setSelectedJobForAssignments] = useState<any>(null);
+  const [showMobileAssignments, setShowMobileAssignments] = useState(false);
 
   const currentDepartment = "sound";
   const { data: jobs } = useJobs();
@@ -67,6 +71,16 @@ const Sound = () => {
 
   const primaryItems = navigationItems.filter(item => item.mobileSlot === "primary");
   const trayItems = navigationItems.filter(item => item.mobileSlot === "secondary");
+  const mobileTheme = useMemo(() => ({
+    bg: "bg-[#05070a]",
+    card: "bg-[#0f1219] border-[#1f232e]",
+    textMain: "text-white",
+    textMuted: "text-[#94a3b8]",
+    divider: "border-[#1f232e]",
+    toolBg: "bg-[#151820] border-[#2a2e3b]",
+    accent: "bg-blue-600 text-white",
+    modalOverlay: "bg-black/90 backdrop-blur-md",
+  }), []);
 
   const handleSignOut = async () => {
     if (isLoggingOut) return;
@@ -150,6 +164,13 @@ const Sound = () => {
   };
 
   const handleJobClick = (jobId: string) => {
+    if (isMobile) {
+      const jobData = jobs?.find(j => j.id === jobId) || null;
+      setSelectedJobForAssignments(jobData);
+      setShowMobileAssignments(true);
+      setSelectedJobId(jobId);
+      return;
+    }
     setSelectedJobId(jobId);
     setIsAssignmentDialogOpen(true);
   };
@@ -212,6 +233,11 @@ const Sound = () => {
             onViewDetails={(job) => {
               setSelectedJobForDetails(job);
               setShowJobDetails(true);
+            }}
+            onManageAssignments={(job) => {
+              setSelectedJobForAssignments(job);
+              setSelectedJobId(job?.id || null);
+              setShowMobileAssignments(true);
             }}
             onStaffClick={() => navigate('/personal')}
           />
@@ -371,12 +397,17 @@ const Sound = () => {
           initialJobType={presetJobType}
           onCreated={(job) => {
             setSelectedJobId(job.id);
-            setIsAssignmentDialogOpen(true);
+            if (isMobile) {
+              setSelectedJobForAssignments(job);
+              setShowMobileAssignments(true);
+            } else {
+              setIsAssignmentDialogOpen(true);
+            }
           }}
         />
       )}
 
-      {selectedJobId && (
+      {!isMobile && selectedJobId && (
         <JobAssignmentDialog
           isOpen={isAssignmentDialogOpen}
           onClose={() => setIsAssignmentDialogOpen(false)}
@@ -435,12 +466,40 @@ const Sound = () => {
         onOpenChange={setShowAccessRequestDialog}
       />
 
-      {selectedJobForDetails && (
+      {isMobile && selectedJobForDetails && showJobDetails && (
+        <EnhancedJobDetailsModal
+          theme={mobileTheme}
+          isDark
+          job={selectedJobForDetails}
+          onClose={() => {
+            setShowJobDetails(false);
+            setSelectedJobForDetails(null);
+          }}
+          userRole={userRole}
+          department={currentDepartment}
+        />
+      )}
+      {!isMobile && selectedJobForDetails && (
         <JobDetailsDialog
           open={showJobDetails}
           onOpenChange={setShowJobDetails}
           job={selectedJobForDetails}
           department={currentDepartment}
+        />
+      )}
+
+      {isMobile && selectedJobForAssignments && (
+        <MobileAssignmentsDialog
+          open={showMobileAssignments}
+          onOpenChange={(open) => {
+            setShowMobileAssignments(open);
+            if (!open) {
+              setSelectedJobForAssignments(null);
+            }
+          }}
+          job={selectedJobForAssignments}
+          department={currentDepartment}
+          userRole={userRole}
         />
       )}
     </>

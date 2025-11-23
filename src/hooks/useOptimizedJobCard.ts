@@ -41,80 +41,114 @@ export const useOptimizedJobCard = (
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
 
   // Keep local state in sync with incoming job prop updates for instant UI
-  useEffect(() => {
-    setAssignments(job.job_assignments || []);
-  }, [job.job_assignments]);
+
 
   useEffect(() => {
     setDocuments(job.job_documents || []);
   }, [job.job_documents]);
 
+  const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
+
   // Helper to fetch and update assignments for this job
-  // Timesheets are the source of truth for display; join with job_assignments for role metadata
+  // job_assignments are the base; timesheets add per-day date info (with RLS-safe fallback)
   const refreshAssignments = useCallback(async () => {
     if (!job?.id) return;
     try {
-      // Query timesheets first, then join with job_assignments for role/status info
-      const { data: timesheetData, error: tsError } = await supabase
-        .from('timesheets')
-        .select(`
-          job_id,
-          technician_id,
-          date,
-          profiles!timesheets_technician_id_fkey (first_name, nickname, last_name, department)
-        `)
-        .eq('job_id', job.id);
+      const [{ data: assignmentData, error: assignError }, { data: directTimesheets, error: tsError }] = await Promise.all([
+        supabase
+          .from('job_assignments')
+          .select(`*, profiles!job_assignments_technician_id_fkey(first_name, nickname, last_name, department)`)
+          .eq('job_id', job.id),
+        supabase
+          .from('timesheets')
+          .select(`
+            job_id,
+            technician_id,
+            date,
+            profiles!fk_timesheets_technician_id (first_name, nickname, last_name, department)
+          `)
+          .eq('job_id', job.id)
+      ]);
 
       if (tsError) {
         console.warn('Error fetching timesheets for job card:', tsError);
-        return;
       }
-
-      // Get unique technician IDs from timesheets
-      const techIds = [...new Set((timesheetData || []).map((t: any) => t.technician_id))];
-
-      if (techIds.length === 0) {
-        setAssignments([]);
-        return;
-      }
-
-      // Fetch job_assignments for role metadata
-      const { data: assignmentData, error: assignError } = await supabase
-        .from('job_assignments')
-        .select(`*, profiles(first_name, nickname, last_name, department)`)
-        .eq('job_id', job.id)
-        .in('technician_id', techIds);
-
       if (assignError) {
         console.warn('Error fetching job_assignments metadata:', assignError);
       }
 
-      // Merge: use timesheets for presence, job_assignments for roles
-      const assignmentMap = new Map((assignmentData || []).map((a: any) => [a.technician_id, a]));
-      const mergedAssignments = techIds.map(techId => {
-        const assignment = assignmentMap.get(techId);
-        const tsRow = (timesheetData || []).find((t: any) => t.technician_id === techId);
-        return {
+      // Fallback to visibility function to avoid RLS gaps (mirrors JobDetailsDialog)
+      let visibleTimesheets: any[] = [];
+      try {
+        const { data: visible, error: visErr } = await supabase
+          .rpc('get_timesheet_amounts_visible')
+          .eq('job_id', job.id);
+        if (!visErr && Array.isArray(visible)) {
+          visibleTimesheets = visible;
+        }
+      } catch (err) {
+        console.warn('Error fetching visible timesheets for job card:', err);
+      }
+
+      // Merge direct + visible and de-duplicate per technician
+      const timesheetsByTech = new Map<string, string[]>();
+      const timesheetProfileByTech = new Map<string, any>();
+      const addTimesheetRow = (t: any) => {
+        if (!t?.technician_id || !t?.date) return;
+        const existing = timesheetsByTech.get(t.technician_id) || [];
+        existing.push(t.date);
+        timesheetsByTech.set(t.technician_id, existing);
+        if (t.profiles) {
+          timesheetProfileByTech.set(t.technician_id, normalizeProfile(t.profiles));
+        }
+      };
+
+      (directTimesheets || []).forEach(addTimesheetRow);
+      visibleTimesheets.forEach(addTimesheetRow);
+
+      // Deduplicate and sort dates per technician
+      const normalizedTimesheetsByTech = new Map<string, string[]>();
+      timesheetsByTech.forEach((dates, techId) => {
+        const uniqueSorted = Array.from(new Set(dates)).sort();
+        normalizedTimesheetsByTech.set(techId, uniqueSorted);
+      });
+
+      const mergedAssignments: any[] = (assignmentData || []).map((a: any) => ({
+        ...a,
+        profiles: normalizeProfile(a.profiles),
+        _timesheet_dates: normalizedTimesheetsByTech.get(a.technician_id) || [],
+      }));
+
+      // If timesheets exist for technicians not in job_assignments (edge cases), include them so badges still appear
+      const assignmentTechIds = new Set((assignmentData || []).map((a: any) => a.technician_id));
+      normalizedTimesheetsByTech.forEach((dates, techId) => {
+        if (assignmentTechIds.has(techId)) return;
+        mergedAssignments.push({
           job_id: job.id,
           technician_id: techId,
-          profiles: assignment?.profiles || tsRow?.profiles,
-          sound_role: assignment?.sound_role,
-          lights_role: assignment?.lights_role,
-          video_role: assignment?.video_role,
-          status: assignment?.status,
-          single_day: assignment?.single_day,
-          assignment_date: assignment?.assignment_date,
-          assigned_at: assignment?.assigned_at,
-          // Include dates from timesheets for per-day info
-          _timesheet_dates: (timesheetData || [])
-            .filter((t: any) => t.technician_id === techId)
-            .map((t: any) => t.date),
-        };
+          profiles: timesheetProfileByTech.get(techId) || null,
+          sound_role: null,
+          lights_role: null,
+          video_role: null,
+          status: null,
+          single_day: null,
+          assignment_date: null,
+          assigned_at: null,
+          _timesheet_dates: dates,
+        });
       });
 
       setAssignments(mergedAssignments);
-    } catch {}
+    } catch (err) {
+      console.warn('Error refreshing assignments', err);
+    }
   }, [job?.id]);
+
+  // Keep local state in sync with incoming job prop updates for instant UI
+  useEffect(() => {
+    setAssignments(job.job_assignments || []);
+    refreshAssignments();
+  }, [job.job_assignments, refreshAssignments]);
 
   // Realtime: subscribe to timesheet changes for this job (source of truth) and refresh local state instantly
   useEffect(() => {
