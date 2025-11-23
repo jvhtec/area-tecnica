@@ -113,16 +113,15 @@ const TechnicianDashboard = () => {
         const endDate = getTimeSpanEndDate();
         console.log("Fetching assignments until:", endDate, "viewMode:", viewMode);
         
+        // Query timesheets as source of truth, joined with job_assignments for role/status
+        // This ensures we only show assignments that have actual timesheet entries
         let query = supabase
-          .from('job_assignments')
+          .from('timesheets')
           .select(`
             job_id,
             technician_id,
-            sound_role,
-            lights_role,
-            video_role,
-            assigned_at,
-            jobs (
+            date,
+            jobs!inner (
               id,
               title,
               description,
@@ -134,19 +133,26 @@ const TechnicianDashboard = () => {
               color,
               status,
               location:locations(name),
-            job_documents(
-              id,
-              file_name,
-              file_path,
-              visible_to_tech,
-              uploaded_at,
-              read_only,
-              template_type
-            )
+              job_documents(
+                id,
+                file_name,
+                file_path,
+                visible_to_tech,
+                uploaded_at,
+                read_only,
+                template_type
+              )
+            ),
+            job_assignments!inner (
+              sound_role,
+              lights_role,
+              video_role,
+              assigned_at,
+              status
             )
           `)
           .eq('technician_id', user.id)
-          .eq('status', 'confirmed');
+          .eq('job_assignments.status', 'confirmed');
 
         if (viewMode === 'upcoming') {
           // Show upcoming and ongoing jobs
@@ -159,8 +165,24 @@ const TechnicianDashboard = () => {
             .lte('jobs.end_time', new Date().toISOString());
         }
 
-        const { data: jobAssignments, error: jobAssignmentsError } = await query
+        const { data: timesheetData, error: jobAssignmentsError } = await query
           .order('start_time', { referencedTable: 'jobs' });
+
+        // Deduplicate by job_id (timesheets have one row per date, we want one per job)
+        const seenJobIds = new Set<string>();
+        const jobAssignments = (timesheetData || []).filter(row => {
+          if (seenJobIds.has(row.job_id)) return false;
+          seenJobIds.add(row.job_id);
+          return true;
+        }).map(row => ({
+          job_id: row.job_id,
+          technician_id: row.technician_id,
+          sound_role: row.job_assignments?.sound_role,
+          lights_role: row.job_assignments?.lights_role,
+          video_role: row.job_assignments?.video_role,
+          assigned_at: row.job_assignments?.assigned_at,
+          jobs: row.jobs
+        }));
 
         if (jobAssignmentsError) {
           console.error("Error fetching job assignments:", jobAssignmentsError);
@@ -200,7 +222,7 @@ const TechnicianDashboard = () => {
         return [];
       }
     },
-    'job_assignments',
+    'timesheets',
     {
       refetchOnWindowFocus: true,
       refetchOnMount: true,
