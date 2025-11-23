@@ -13,7 +13,10 @@ import {
   Palmtree,
   Plane,
   Stethoscope,
-  AlertTriangle
+  AlertTriangle,
+  Volume2,
+  Lightbulb,
+  Truck
 } from "lucide-react";
 import { PrintDialog, PrintSettings } from "@/components/dashboard/PrintDialog";
 import { format, addDays, subDays, isToday, isSameDay, isWithinInterval } from "date-fns";
@@ -22,17 +25,22 @@ import { TechContextMenu } from "./TechContextMenu";
 import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 import { TechDetailModal } from "./TechDetailModal";
+import { Theme } from "@/components/technician/types";
 
 interface MobilePersonalCalendarProps {
   date: Date;
   onDateSelect: (date: Date) => void;
   readOnly?: boolean;
+  theme: Theme;
+  isDark: boolean;
 }
 
 export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   date,
   onDateSelect,
   readOnly = false,
+  theme,
+  isDark
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
@@ -75,7 +83,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
         const assignmentDate = new Date(assignment.assignment_date);
         return isSameDay(targetDate, assignmentDate);
       }
-      
+
       // Otherwise, use the job's full date range
       const startDate = new Date(assignment.job.start_time);
       const endDate = new Date(assignment.job.end_time);
@@ -369,9 +377,9 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
   if (isLoading || isAvailabilityLoading) {
     return (
-      <Card className="h-full flex flex-col">
+      <Card className={`h-full flex flex-col ${theme.card}`}>
         <CardContent className="flex-grow p-4 flex items-center justify-center">
-          <div className="text-muted-foreground">Cargando calendario...</div>
+          <div className={theme.textMuted}>Cargando calendario...</div>
         </CardContent>
       </Card>
     );
@@ -379,14 +387,14 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
   if (houseTechs.length === 0) {
     return (
-      <Card className="h-full flex flex-col">
+      <Card className={`h-full flex flex-col ${theme.card}`}>
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-bold">Técnicos de planta</CardTitle>
+          <CardTitle className={`text-lg font-bold ${theme.textMain}`}>Técnicos de planta</CardTitle>
         </CardHeader>
         <CardContent className="flex-grow p-4 flex flex-col items-center justify-center text-center">
-          <Users className="h-8 w-8 mb-2 text-muted-foreground" />
-          <p className="text-muted-foreground">No se encontraron técnicos de planta</p>
-          <p className="text-sm text-muted-foreground mt-1">
+          <Users className={`h-8 w-8 mb-2 ${theme.textMuted}`} />
+          <p className={theme.textMuted}>No se encontraron técnicos de planta</p>
+          <p className={`text-sm mt-1 ${theme.textMuted}`}>
             Asegúrate de que hay usuarios con el rol "house_tech"
           </p>
         </CardContent>
@@ -396,20 +404,20 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
   return (
     <div className="w-full max-w-[520px] mx-auto space-y-4">
-      <div className="rounded-2xl border bg-card shadow-sm px-4 py-3 space-y-3">
+      <div className={`rounded-2xl border px-4 py-3 space-y-3 ${theme.card}`}>
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">Fecha seleccionada</p>
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Calendar className="h-4 w-4 text-primary" />
-              <span className={cn("", isToday(currentDate) && "text-primary")}>{format(currentDate, "EEE, MMM d")}</span>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-500">Fecha seleccionada</p>
+            <div className={`flex items-center gap-2 text-sm font-semibold ${theme.textMain}`}>
+              <Calendar className="h-4 w-4 text-blue-500" />
+              <span className={cn("", isToday(currentDate) && "text-blue-500")}>{format(currentDate, "EEE, MMM d")}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={navigateToPrevious} aria-label="Día anterior">
+            <Button variant="ghost" size="icon" onClick={navigateToPrevious} aria-label="Día anterior" className={theme.textMain}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={navigateToNext} aria-label="Día siguiente">
+            <Button variant="ghost" size="icon" onClick={navigateToNext} aria-label="Día siguiente" className={theme.textMain}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -421,58 +429,79 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
             size="sm"
             onClick={() => setSelectedDepartment(null)}
             disabled={!selectedDepartment}
-            className="rounded-xl"
+            className={`rounded-xl ${theme.card} ${theme.textMain}`}
           >
             <Users className="h-4 w-4 mr-2" />
             {selectedDepartment ? `${selectedDepartment}` : 'Todos los departamentos'}
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={navigateToToday}
-            className={cn("rounded-xl", isToday(currentDate) && "bg-primary text-primary-foreground")}
-          >
-            Hoy
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)} className="ml-auto rounded-xl">
-            <Printer className="h-4 w-4 mr-2" /> Exportar
-          </Button>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl border bg-muted/40 px-3 py-2">
-            <div className="text-[11px] uppercase font-semibold text-muted-foreground">En trabajo</div>
+          <div className={`rounded-xl border px-3 py-2 ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`flex items-center gap-1 text-[11px] uppercase font-semibold ${theme.textMuted}`}>
+              <Briefcase className="h-3.5 w-3.5 text-emerald-600" />
+              En trabajo
+            </div>
             <div className="text-xl font-bold text-emerald-600">{personnelTotals.techsOnJobs}</div>
           </div>
-          <div className="rounded-xl border bg-muted/40 px-3 py-2">
-            <div className="text-[11px] uppercase font-semibold text-muted-foreground">Almacén</div>
-            <div className="text-xl font-bold text-slate-700">{personnelTotals.techsInWarehouse}</div>
+          <div className={`rounded-xl border px-3 py-2 ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`flex items-center gap-1 text-[11px] uppercase font-semibold ${theme.textMuted}`}>
+              <Home className="h-3.5 w-3.5" />
+              Almacén
+            </div>
+            <div className={`text-xl font-bold ${theme.textMain}`}>{personnelTotals.techsInWarehouse}</div>
           </div>
-          <div className="rounded-xl border bg-muted/40 px-3 py-2">
-            <div className="text-[11px] uppercase font-semibold text-muted-foreground">Fuera / Viaje</div>
+          <div className={`rounded-xl border px-3 py-2 ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`flex items-center gap-1 text-[11px] uppercase font-semibold ${theme.textMuted}`}>
+              <Plane className="h-3.5 w-3.5 text-amber-600" />
+              Fuera / Viaje
+            </div>
             <div className="text-xl font-bold text-amber-600">{offTotal}</div>
           </div>
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-          {Object.entries(personnelSummary).map(([department, stats]) => (
-            <button
-              key={department}
-              className={cn(
-                "px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors",
-                selectedDepartment === department
-                  ? "border-primary/70 bg-primary/5 text-primary"
-                  : "border-muted bg-muted/40 text-muted-foreground hover:text-foreground"
-              )}
-              onClick={() => setSelectedDepartment(prev => (prev === department ? null : department))}
-            >
-              <div className="capitalize">{department}</div>
-              <div className="text-[11px] text-muted-foreground">Trabajos {stats.assignedAndAvailable} • Base {stats.availableAndNotInWarehouse}</div>
-            </button>
-          ))}
+          {Object.entries(personnelSummary).map(([department, stats]) => {
+            const getDepartmentIcon = (dept: string) => {
+              const lower = dept.toLowerCase();
+              if (lower === 'sound') return <Volume2 className="h-4 w-4" />;
+              if (lower === 'lights') return <Lightbulb className="h-4 w-4" />;
+              if (lower === 'logistics') return <Truck className="h-4 w-4" />;
+              return <Users className="h-4 w-4" />;
+            };
+
+            return (
+              <button
+                key={department}
+                className={cn(
+                  "px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors flex-shrink-0",
+                  selectedDepartment === department
+                    ? "border-blue-500/70 bg-blue-500/5 text-blue-500"
+                    : `${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'} ${theme.textMuted} hover:${theme.textMain}`
+                )}
+                onClick={() => setSelectedDepartment(prev => (prev === department ? null : department))}
+              >
+                <div className="flex items-center gap-1.5 capitalize">
+                  {getDepartmentIcon(department)}
+                  {department}
+                </div>
+                <div className={`text-[11px] ${theme.textMuted} mt-0.5`}>
+                  <span className="inline-flex items-center gap-1">
+                    <Briefcase className="h-3 w-3" />
+                    {stats.assignedAndAvailable}
+                  </span>
+                  {' • '}
+                  <span className="inline-flex items-center gap-1">
+                    <Home className="h-3 w-3" />
+                    {stats.availableAndNotInWarehouse}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="grid grid-cols-4 gap-1 rounded-xl border bg-muted/40 p-1">
+        <div className={`grid grid-cols-4 gap-1 rounded-xl border p-1 ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
           {[
             { key: 'all' as const, label: 'Todos', count: visibleTechs.length },
             { key: 'job' as const, label: 'Asignados', count: personnelTotals.techsOnJobs },
@@ -484,11 +513,11 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
               onClick={() => setStatusFilter(tab.key)}
               className={cn(
                 "flex flex-col items-center justify-center rounded-lg px-2 py-2 text-[11px] font-semibold transition-colors",
-                statusFilter === tab.key ? "bg-card shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+                statusFilter === tab.key ? `${theme.card} shadow-sm text-blue-500` : `${theme.textMuted} hover:${theme.textMain}`
               )}
             >
               <span>{tab.label}</span>
-              <span className="text-[10px] text-muted-foreground">{tab.count}</span>
+              <span className={`text-[10px] ${theme.textMuted}`}>{tab.count}</span>
             </button>
           ))}
         </div>
@@ -510,18 +539,18 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
                 onAvailabilityRemove={readOnly ? undefined : handleAvailabilityRemove}
               >
                 <div
-                  className="rounded-2xl border bg-card px-4 py-3 shadow-sm transition-colors hover:border-primary/50 cursor-pointer"
+                  className={`rounded-2xl border px-4 py-3 shadow-sm transition-colors hover:border-blue-500/50 cursor-pointer ${theme.card}`}
                   onClick={() => openDetail(tech)}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-10 w-10 rounded-full bg-muted text-sm font-semibold flex items-center justify-center text-foreground uppercase">
+                      <div className={`h-10 w-10 rounded-full text-sm font-semibold flex items-center justify-center uppercase ${isDark ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-900'}`}>
                         {initials}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold truncate">{techName}</div>
+                        <div className={`text-sm font-semibold truncate ${theme.textMain}`}>{techName}</div>
                         {tech.department && (
-                          <div className="text-xs text-muted-foreground capitalize truncate">{tech.department}</div>
+                          <div className={`text-xs capitalize truncate ${theme.textMuted}`}>{tech.department}</div>
                         )}
                       </div>
                     </div>
@@ -532,17 +561,17 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
                   </div>
 
                   {statusMeta.jobTitle && (
-                    <div className="mt-2 text-xs text-muted-foreground line-clamp-1">{statusMeta.jobTitle}</div>
+                    <div className={`mt-2 text-xs line-clamp-1 ${theme.textMuted}`}>{statusMeta.jobTitle}</div>
                   )}
                 </div>
               </TechContextMenu>
             );
           })
         ) : (
-          <div className="flex flex-col items-center justify-center py-10 text-center rounded-2xl border bg-card">
-            <Calendar className="h-8 w-8 mb-2 text-muted-foreground" />
-            <p className="text-muted-foreground">No hay técnicos programados</p>
-            <p className="text-sm text-muted-foreground">para {format(currentDate, "MMMM d, yyyy")}</p>
+          <div className={`flex flex-col items-center justify-center py-10 text-center rounded-2xl border ${theme.card}`}>
+            <Calendar className={`h-8 w-8 mb-2 ${theme.textMuted}`} />
+            <p className={theme.textMuted}>No hay técnicos programados</p>
+            <p className={`text-sm ${theme.textMuted}`}>para {format(currentDate, "MMMM d, yyyy")}</p>
           </div>
         )}
       </div>

@@ -154,6 +154,10 @@ export default function App() {
                           <Route path="/wallboard/:presetSlug?" element={<RequireAuth><Wallboard /></RequireAuth>} />
                           {/* TechnicianSuperApp: full-screen mobile interface for technicians */}
                           <Route path="/tech-app" element={<RequireAuth><ProtectedRoute allowedRoles={['technician', 'house_tech']}><TechnicianSuperApp /></ProtectedRoute></RequireAuth>} />
+
+                          {/* Personal: full-screen interface for house techs/management */}
+                          <Route path="/personal" element={<RequireAuth><ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><Personal /></ProtectedRoute></RequireAuth>} />
+
                           {/* Public Routes */}
                           <Route path="festival">
                             <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
@@ -165,7 +169,6 @@ export default function App() {
                             <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><Dashboard /></ProtectedRoute>} />
                             <Route path="/technician-dashboard" element={<ProtectedRoute allowedRoles={['technician', 'house_tech']}><TechnicianDashboard /></ProtectedRoute>} />
                             <Route path="/dashboard/unavailability" element={<ProtectedRoute allowedRoles={['technician', 'house_tech']}><TechnicianUnavailability /></ProtectedRoute>} />
-                            <Route path="/personal" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><Personal /></ProtectedRoute>} />
                             <Route path="/morning-summary" element={<MorningSummary />} />
                             <Route path="/sound" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Sound /></ProtectedRoute>} />
                             <Route path="/lights" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Lights /></ProtectedRoute>} />

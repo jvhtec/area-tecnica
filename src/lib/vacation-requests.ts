@@ -46,12 +46,16 @@ export const vacationRequestsApi = {
 
   // Get user's own vacation requests
   async getUserRequests() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const { data, error } = await supabase
       .from('vacation_requests')
       .select(`
         *,
         technicians:profiles!technician_id(first_name, last_name, department, email)
       `)
+      .eq('technician_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
