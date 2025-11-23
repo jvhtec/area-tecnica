@@ -9,6 +9,30 @@ import { Button } from '@/components/ui/button';
 import { Theme } from './types';
 import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
 
+interface TourDateLocation {
+    id: string;
+    name: string;
+    formatted_address?: string;
+}
+
+interface TourDate {
+    id: string;
+    date: string;
+    start_date?: string;
+    end_date?: string;
+    location_id?: string;
+    tour_date_type?: string;
+    location?: TourDateLocation | null;
+}
+
+interface TourDocument {
+    id: string;
+    file_name: string;
+    file_path: string;
+    uploaded_at: string;
+    file_type?: string;
+}
+
 interface TourDetailViewProps {
     tourId: string;
     theme: Theme;
@@ -93,10 +117,12 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
         );
     }
 
-    const tourDates = tourData.tour_dates || [];
+    const tourDates: TourDate[] = (tourData.tour_dates as TourDate[]) || [];
     const now = new Date();
-    const completedDates = tourDates.filter((d: any) => new Date(d.date) < now);
-    const upcomingDates = tourDates.filter((d: any) => new Date(d.date) >= now).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const completedDates = tourDates.filter((d) => new Date(d.date) < now);
+    const upcomingDates = tourDates
+        .filter((d) => new Date(d.date) >= now)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const nextShow = upcomingDates[0];
     const progress = tourDates.length > 0 ? (completedDates.length / tourDates.length) * 100 : 0;
     const crewCount = tourData.tour_assignments?.length || 0;
@@ -109,14 +135,14 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
         return start || end;
     };
 
-    const getDateStatus = (dateEntry: any) => {
+    const getDateStatus = (dateEntry: TourDate): 'done' | 'next' | 'upcoming' => {
         const dateObj = new Date(dateEntry.date);
         if (dateObj < now) return 'done';
         if (nextShow && dateEntry.id === nextShow.id) return 'next';
         return 'upcoming';
     };
 
-    const handleDownloadDoc = async (doc: any) => {
+    const handleDownloadDoc = async (doc: TourDocument) => {
         try {
             // Tour documents use the tour-documents bucket, not job-documents
             const { data, error } = await supabase.storage
@@ -225,7 +251,7 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
                             <h3 className={`font-bold text-sm ${theme.textMain}`}>Documentos recientes</h3>
                         </div>
                         <div className="space-y-2">
-                            {tourDocs.map((doc: any) => (
+                            {(tourDocs as TourDocument[]).map((doc) => (
                                 <button
                                     key={doc.id}
                                     onClick={() => handleDownloadDoc(doc)}
@@ -256,8 +282,8 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
                             </div>
                         ) : (
                             [...tourDates]
-                                .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                                .map((dateEntry: any) => {
+                                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                                .map((dateEntry) => {
                                     const status = getDateStatus(dateEntry);
                                     const statusStyles: Record<string, string> = {
                                         done: 'bg-emerald-500/10 text-emerald-500',

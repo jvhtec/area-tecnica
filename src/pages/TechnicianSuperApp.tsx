@@ -23,7 +23,7 @@ import {
   Check, Camera, Palette, Navigation, Utensils, CloudRain,
   Download, Send, RefreshCw, UploadCloud, Play, Sliders,
   Radio, Mic2, Speaker, ListMusic, Save, ArrowLeft, Activity,
-  Search, Filter, Map, Layers, Globe, LayoutList, LayoutGrid,
+  Search, Filter, Map as MapIcon, Layers, Globe, LayoutList, LayoutGrid,
   Loader2, Eye, Briefcase, Shuffle, Lightbulb, Sparkles, Users, Euro
 } from 'lucide-react';
 
@@ -53,6 +53,43 @@ import { ObliqueStrategyModal } from '@/components/technician/ObliqueStrategyMod
 import { TimesheetView } from '@/components/technician/TimesheetView';
 import { DetailsModal } from '@/components/technician/DetailsModal';
 
+// --- TYPE DEFINITIONS ---
+interface TechnicianJobData {
+  id: string;
+  title: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+  timezone?: string;
+  location_id?: string;
+  job_type?: string;
+  color?: string;
+  status?: string;
+  location?: { name: string } | null;
+  job_documents?: Array<{
+    id: string;
+    file_name: string;
+    file_path: string;
+    visible_to_tech?: boolean;
+    uploaded_at?: string;
+    read_only?: boolean;
+    template_type?: string | null;
+  }>;
+}
+
+interface TechnicianAssignment {
+  id: string;
+  job_id: string;
+  technician_id: string;
+  department: string;
+  role: string;
+  category: string;
+  sound_role?: string | null;
+  lights_role?: string | null;
+  video_role?: string | null;
+  jobs: TechnicianJobData;
+}
+
 // --- THEME STYLES (using next-themes compatible approach) ---
 const getThemeStyles = (isDark: boolean) => ({
   bg: isDark ? "bg-[#05070a]" : "bg-slate-50",
@@ -77,8 +114,12 @@ export default function TechnicianSuperApp() {
   const { user, hasSoundVisionAccess } = useOptimizedAuth();
   const queryClient = useQueryClient();
 
-  // Determine if dark mode
-  const isDark = nextTheme === 'dark' || (nextTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  // Determine if dark mode (guard for SSR/test environments)
+  const isDark = nextTheme === 'dark' || (
+    nextTheme === 'system' &&
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
 
   const toggleTheme = () => {
     setTheme(isDark ? 'light' : 'dark');
@@ -86,7 +127,7 @@ export default function TechnicianSuperApp() {
 
   // Modal state
   const [activeModal, setActiveModal] = useState<string | null>(null);
-  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<TechnicianJobData | null>(null);
   const [showObliqueStrategy, setShowObliqueStrategy] = useState(false);
   const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
   const [showRatesModal, setShowRatesModal] = useState(false);
@@ -199,8 +240,9 @@ export default function TechnicianSuperApp() {
 
   const t = getThemeStyles(isDark);
 
-  const handleOpenAction = (action: string, job?: any) => {
-    setSelectedJob(job);
+  const handleOpenAction = (action: string, assignment?: TechnicianAssignment) => {
+    // Pass the nested job data, not the full assignment
+    setSelectedJob(assignment?.jobs || null);
     setActiveModal(action);
   };
 
@@ -332,10 +374,12 @@ export default function TechnicianSuperApp() {
           isDark={isDark}
           onClose={() => setSelectedTourId(null)}
           onOpenJob={(jobId) => {
-            // Find the job in assignments or fetch it
-            const assignment = assignments.find(a => a.job_id === jobId || a.jobs?.id === jobId);
-            if (assignment) {
-              setSelectedJob(assignment);
+            // Find the job in assignments and pass the job data, not the assignment
+            const assignment = (assignments as TechnicianAssignment[]).find(
+              a => a.job_id === jobId || a.jobs?.id === jobId
+            );
+            if (assignment?.jobs) {
+              setSelectedJob(assignment.jobs);
               setActiveModal('details');
             }
           }}
