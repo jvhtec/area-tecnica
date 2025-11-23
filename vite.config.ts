@@ -32,11 +32,11 @@ export default defineConfig(({ mode }) => ({
           // Bundle React + React Query together (React Query depends on React.createContext)
           if (id.includes('node_modules/react') || id.includes('node_modules/@tanstack/react-query')) return 'framework';
           if (id.includes('node_modules/react-router-dom')) return 'router';
-          if (id.includes('node_modules/@radix-ui')) return 'vendor-ui';
-          if (id.includes('node_modules/jspdf') || id.includes('pdf-lib')) return 'vendor-pdf';
-          if (id.includes('node_modules/exceljs') || id.includes('node_modules/xlsx')) return 'vendor-excel';
-          if (id.includes('node_modules/mapbox-gl')) return 'vendor-maps';
-          if (id.includes('node_modules/recharts')) return 'vendor-charts';
+          if (id.includes('node_modules/@radix-ui')) return 'ui-primitives';
+          if (id.includes('node_modules/jspdf') || id.includes('pdf-lib')) return 'pdf-tools';
+          if (id.includes('node_modules/exceljs') || id.includes('node_modules/xlsx')) return 'excel-tools';
+          if (id.includes('node_modules/mapbox-gl')) return 'maps';
+          if (id.includes('node_modules/recharts')) return 'charts';
           if (id.includes('/src/pages/Festival') || id.includes('/src/components/festival')) return 'feature-festival';
           if (id.includes('/src/components/matrix') || id.includes('/src/pages/JobAssignmentMatrix')) return 'feature-matrix';
           if (id.includes('/src/components/tours') || id.includes('/src/pages/Tour')) return 'feature-tours';
