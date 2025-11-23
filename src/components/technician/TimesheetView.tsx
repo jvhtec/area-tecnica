@@ -42,10 +42,22 @@ import { Timesheet, TimesheetFormData } from '@/types/timesheet';
 import SignatureCanvas from 'react-signature-canvas';
 import { Theme } from './types';
 
+interface TimesheetJobLocation {
+  name?: string | null;
+  formatted_address?: string | null;
+}
+
+interface TimesheetJobInfo {
+  id: string;
+  title?: string | null;
+  start_time?: string | null;
+  location?: TimesheetJobLocation | null;
+}
+
 interface TimesheetViewProps {
   theme: Theme;
   isDark: boolean;
-  job: any;
+  job: TimesheetJobInfo | null;
   onClose: () => void;
   userRole: string | null;
   userId: string | null;
@@ -132,7 +144,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
       overtime_hours: timesheet.overtime_hours || 0,
       notes: timesheet.notes || '',
       ends_next_day: timesheet.ends_next_day || false,
-      category: (timesheet.category as any) || undefined,
+      category: timesheet.category ?? undefined,
     });
   };
 
@@ -141,20 +153,30 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
   };
 
   const saveTimesheet = async (timesheetId: string) => {
-    await updateTimesheet(timesheetId, {
-      start_time: formData.start_time,
-      end_time: formData.end_time,
-      break_minutes: formData.break_minutes,
-      overtime_hours: formData.overtime_hours,
-      notes: formData.notes,
-      ends_next_day: formData.ends_next_day,
-      category: formData.category,
-    });
-    setEditingId(null);
+    try {
+      await updateTimesheet(timesheetId, {
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        break_minutes: formData.break_minutes,
+        overtime_hours: formData.overtime_hours,
+        notes: formData.notes,
+        ends_next_day: formData.ends_next_day,
+        category: formData.category,
+      });
+      setEditingId(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      toast.error(`No se pudo guardar el parte: ${message}`);
+    }
   };
 
   const handleSubmit = async (timesheetId: string) => {
-    await submitTimesheet(timesheetId);
+    try {
+      await submitTimesheet(timesheetId);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      toast.error(`No se pudo enviar el parte: ${message}`);
+    }
   };
 
   const openSignatureDialog = (timesheetId: string) => {
@@ -292,12 +314,22 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                     const editableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
                     const canEdit = editableStatuses.includes(timesheet.status);
                     const canSubmit = editableStatuses.includes(timesheet.status);
-                    const workedHours = calculateHours(
-                      isEditing ? formData.start_time : (timesheet.start_time || '09:00'),
-                      isEditing ? formData.end_time : (timesheet.end_time || '17:00'),
-                      isEditing ? formData.break_minutes : (timesheet.break_minutes || 0),
-                      isEditing ? formData.ends_next_day : timesheet.ends_next_day
-                    );
+                    // In edit mode, use form defaults; in display mode, only calculate if both times exist
+                    const workedHours = isEditing
+                      ? calculateHours(
+                          formData.start_time,
+                          formData.end_time,
+                          formData.break_minutes,
+                          formData.ends_next_day
+                        )
+                      : (timesheet.start_time && timesheet.end_time)
+                        ? calculateHours(
+                            timesheet.start_time,
+                            timesheet.end_time,
+                            timesheet.break_minutes || 0,
+                            timesheet.ends_next_day
+                          )
+                        : 0;
 
                     return (
                       <div
@@ -384,7 +416,10 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                               <label className={`text-xs font-bold ${theme.textMuted} mb-1 block`}>Categoría</label>
                               <Select
                                 value={formData.category || ''}
-                                onValueChange={(v) => setFormData({ ...formData, category: v as any })}
+                                onValueChange={(v) => {
+                                  const category = v === 'tecnico' || v === 'especialista' || v === 'responsable' ? v : undefined;
+                                  setFormData({ ...formData, category });
+                                }}
                               >
                                 <SelectTrigger className={theme.input}>
                                   <SelectValue placeholder="Seleccionar categoría" />
