@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => ({
         manualChunks: (id) => {
           if (id.includes('node_modules/react')) return 'vendor-react';
           if (id.includes('node_modules/react-router-dom')) return 'vendor-router';
-          if (id.includes('node_modules/@tanstack/react-query')) return 'vendor-query';
+          if (id.includes('node_modules/@tanstack/react-query')) return 'vendor-rq';
           if (id.includes('node_modules/@radix-ui')) return 'vendor-ui';
           if (id.includes('node_modules/jspdf') || id.includes('pdf-lib')) return 'vendor-pdf';
           if (id.includes('node_modules/exceljs') || id.includes('node_modules/xlsx')) return 'vendor-excel';
