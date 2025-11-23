@@ -72,15 +72,12 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
         let assignmentResults: Assignment[] = [];
 
         if (techIds.length > 0) {
-          const { data: assignmentsData, error: assignmentsError } = await supabase
-            .from('job_assignments')
+          // Query timesheets as source of truth, joined with job_assignments for role info
+          const { data: timesheetData, error: assignmentsError } = await supabase
+            .from('timesheets')
             .select(`
               technician_id,
-              sound_role,
-              lights_role,
-              video_role,
-              single_day,
-              assignment_date,
+              date,
               jobs!inner (
                 id,
                 title,
@@ -89,6 +86,13 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
                 end_time,
                 status,
                 locations ( name )
+              ),
+              job_assignments!inner (
+                sound_role,
+                lights_role,
+                video_role,
+                single_day,
+                assignment_date
               )
             `)
             .in('technician_id', techIds)
@@ -99,24 +103,33 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
             throw assignmentsError;
           }
 
-          assignmentResults = (assignmentsData ?? [])
-            .map((assignment) => {
-              const jobData = Array.isArray(assignment.jobs) ? assignment.jobs[0] : assignment.jobs;
+          // Deduplicate by job_id + technician_id (timesheets have one row per date)
+          const seenKeys = new Set<string>();
+          assignmentResults = (timesheetData ?? [])
+            .filter((row) => {
+              const key = `${row.jobs?.id}-${row.technician_id}`;
+              if (seenKeys.has(key)) return false;
+              seenKeys.add(key);
+              return true;
+            })
+            .map((row) => {
+              const jobData = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs;
               if (!jobData) {
                 return null;
               }
 
+              const assignmentData = Array.isArray(row.job_assignments) ? row.job_assignments[0] : row.job_assignments;
               const locationValue = Array.isArray(jobData.locations)
                 ? jobData.locations[0]
                 : jobData.locations;
 
               return {
-                technician_id: assignment.technician_id,
-                sound_role: assignment.sound_role,
-                lights_role: assignment.lights_role,
-                video_role: assignment.video_role,
-                single_day: assignment.single_day,
-                assignment_date: assignment.assignment_date,
+                technician_id: row.technician_id,
+                sound_role: assignmentData?.sound_role ?? null,
+                lights_role: assignmentData?.lights_role ?? null,
+                video_role: assignmentData?.video_role ?? null,
+                single_day: assignmentData?.single_day ?? false,
+                assignment_date: assignmentData?.assignment_date ?? null,
                 job: {
                   id: jobData.id,
                   title: jobData.title,
@@ -181,18 +194,18 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
     fetchData();
 
-    // Set up real-time subscription for assignment changes
-    const assignmentChannel = supabase
-      .channel('personal-calendar-assignments')
+    // Set up real-time subscription for timesheet changes (source of truth for assignments)
+    const timesheetChannel = supabase
+      .channel('personal-calendar-timesheets')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'job_assignments'
+          table: 'timesheets'
         },
         () => {
-          console.log('PersonalCalendar: Real-time update received from job_assignments, refetching data');
+          console.log('PersonalCalendar: Real-time update received from timesheets, refetching data');
           fetchData();
         }
       )
@@ -217,7 +230,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(assignmentChannel);
+      supabase.removeChannel(timesheetChannel);
       supabase.removeChannel(availabilityChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
