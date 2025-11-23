@@ -7,27 +7,15 @@ import { FileText, PenTool, X, Check, ClipboardList, AlertTriangle, Loader2, Sav
 import SignatureCanvas from "react-signature-canvas";
 import { toast } from "sonner";
 import { generateIncidentReportPDF } from "@/utils/incident-report/pdf-generator";
+import { Job } from "@/types/job";
+import { Theme } from "@/components/technician/types";
 
 interface TechnicianIncidentReportDialogProps {
-  job: any;
+  job: Job;
   techName?: string;
   className?: string;
   labeled?: boolean;
-  theme?: {
-    bg: string;
-    nav: string;
-    card: string;
-    textMain: string;
-    textMuted: string;
-    accent: string;
-    input: string;
-    modalOverlay: string;
-    divider: string;
-    danger: string;
-    success: string;
-    warning: string;
-    cluster: string;
-  };
+  theme?: Theme;
   isDark?: boolean;
 }
 
@@ -61,7 +49,7 @@ export const TechnicianIncidentReportDialog = ({
   const signaturePadRef = useRef<SignatureCanvas>(null);
 
   // Default theme fallback if not provided
-  const t = theme || {
+  const defaultTheme: Theme = {
     bg: isDark ? "bg-[#05070a]" : "bg-slate-50",
     nav: isDark ? "bg-[#0f1219] border-t border-[#1f232e]" : "bg-white border-t border-slate-200",
     card: isDark ? "bg-[#0f1219] border-[#1f232e]" : "bg-white border-slate-200 shadow-sm",
@@ -76,6 +64,7 @@ export const TechnicianIncidentReportDialog = ({
     warning: isDark ? "text-amber-400 bg-amber-500/10 border-amber-500/20" : "text-amber-700 bg-amber-50 border-amber-200",
     cluster: isDark ? "bg-white text-black" : "bg-slate-900 text-white"
   };
+  const t = theme || defaultTheme;
 
   const handleInputChange = (field: keyof IncidentReportData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
