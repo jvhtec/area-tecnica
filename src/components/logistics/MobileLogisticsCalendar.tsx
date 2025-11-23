@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, ChevronLeft, ChevronRight, Plus, Printer } from "lucide-react";
 import { PrintDialog, PrintSettings } from "@/components/dashboard/PrintDialog";
-import { format, addDays, subDays, isToday, isSameDay, isValid } from "date-fns";
+import { format, addDays, subDays, isToday, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -120,90 +119,74 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   };
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-bold">Logistics</CardTitle>
-          <Button
-            onClick={handleAddEvent}
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add Event
-          </Button>
-        </div>
-        
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={navigateToPrevious}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 mr-1" />
-            <span className={cn(
-              "font-medium",
-              isToday(currentDate) && "text-primary"
-                        )}>
-              {format(currentDate, "EEE, MMM d")}
-            </span>
+    <div className="w-full max-w-[520px] mx-auto space-y-4">
+      <div className="rounded-2xl border bg-card shadow-sm px-4 py-3 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">Logistics</p>
+            <h2 className="text-xl font-bold leading-tight">Mobile schedule</h2>
+            <p className="text-xs text-muted-foreground">Manage load and unload runs with quick actions.</p>
           </div>
-          
-          <Button variant="ghost" size="icon" onClick={navigateToNext}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={navigateToPrevious} aria-label="Previous day">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={navigateToNext} aria-label="Next day">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => setShowPrintDialog(true)} aria-label="Export logistics">
+              <Printer className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        
-        {/* Action buttons */}
-        <div className="flex items-center justify-between">
-          <div /> {/* Spacer */}
-          
-          <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)}>
-            <Printer className="h-4 w-4 mr-1" />
-            Print
+
+        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+          <Calendar className="h-4 w-4 text-primary" />
+          <span className={cn(isToday(currentDate) && "text-primary font-bold")}>{format(currentDate, "EEE, MMM d")}</span>
+          <span className="text-muted-foreground">·</span>
+          <button onClick={navigateToToday} className="text-primary underline-offset-2 hover:underline">Today</button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button onClick={handleAddEvent} className="w-full rounded-xl flex items-center justify-center gap-2">
+            <Plus className="h-4 w-4" />
+            Add event
           </Button>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={navigateToToday}
-            className={cn(
-              isToday(currentDate) && "bg-primary text-primary-foreground"
-            )}
+          <Button
+            variant="outline"
+            className="w-full rounded-xl"
+            onClick={() => setShowPrintDialog(true)}
           >
-            <Calendar className="h-4 w-4 mr-1" />
-            Today
+            <Printer className="h-4 w-4 mr-2" /> Export
           </Button>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="flex-1 p-4">
-        <div className="space-y-4">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-muted-foreground">Loading events...</div>
-            </div>
-          ) : currentDateEvents.length > 0 ? (
-            currentDateEvents.map((event) => (
-              <LogisticsEventCard
-                key={event.id}
-                event={event}
-                onClick={(e) => handleEventClick(e, event)}
-                className="w-full"
-              />
-            ))
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Calendar className="h-8 w-8 mb-2" />
-              <p className="text-muted-foreground">No logistics events scheduled</p>
-              <p className="text-sm text-muted-foreground">for {format(currentDate, "MMMM d, yyyy")}</p>
-            </div>
-          )}
-        </div>
-      </CardContent>
+      <div className="space-y-3">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-10 rounded-2xl border bg-card text-muted-foreground">
+            Loading events...
+          </div>
+        ) : currentDateEvents.length > 0 ? (
+          currentDateEvents.map((event) => (
+            <LogisticsEventCard
+              key={event.id}
+              event={event}
+              onClick={(e) => handleEventClick(e, event)}
+              className="w-full rounded-2xl"
+            />
+          ))
+        ) : (
+          <div className="flex flex-col items-center justify-center py-12 text-center rounded-2xl border bg-card">
+            <Calendar className="h-8 w-8 mb-2" />
+            <p className="text-muted-foreground">No logistics events scheduled</p>
+            <p className="text-sm text-muted-foreground">for {format(currentDate, "MMMM d, yyyy")}</p>
+          </div>
+        )}
+      </div>
 
-      <LogisticsEventDialog 
-        open={showEventDialog} 
+      <LogisticsEventDialog
+        open={showEventDialog}
         onOpenChange={setShowEventDialog}
         selectedDate={currentDate}
         selectedEvent={selectedEvent}
@@ -219,6 +202,6 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
         currentMonth={currentDate}
         selectedJobTypes={[]}
       />
-    </Card>
+    </div>
   );
 };

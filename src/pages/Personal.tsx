@@ -79,14 +79,24 @@ const Personal = () => {
   const canEditDates = userRole === 'admin' || userRole === 'management';
 
   return (
-    <div className="w-full mx-auto px-2 sm:px-4 py-6 space-y-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-        <h1 className="text-xl md:text-3xl font-bold">House Technician Calendar</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Track house tech assignments and availability</p>
+    <div className="w-full mx-auto max-w-5xl px-safe pt-safe-3 pb-safe-4 sm:px-6 space-y-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">House Techs</p>
+          <h1 className="text-2xl md:text-3xl font-bold leading-tight">House Technician Calendar</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Track assignments, availability, and vacation requests on mobile.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setDate(new Date())}>
+            Jump to Today
+          </Button>
+        </div>
       </div>
-      
+
       {isMobile ? (
-        <MobilePersonalCalendar 
+        <MobilePersonalCalendar
           date={date}
           onDateSelect={setDate}
           readOnly={!canEditDates}
