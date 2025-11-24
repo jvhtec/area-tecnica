@@ -25,10 +25,7 @@ SELECT
     MAX(video_role)
   ) as video_role,
   MIN(assigned_at) as assigned_at,
-  COALESCE(
-    MIN(assigned_by) FILTER (WHERE assigned_by IS NOT NULL),
-    MIN(assigned_by)
-  ) as assigned_by,
+  (array_agg(assigned_by ORDER BY assigned_at NULLS LAST) FILTER (WHERE assigned_by IS NOT NULL))[1] as assigned_by,
   COALESCE(
     MAX(assignment_source) FILTER (WHERE assignment_source IS NOT NULL),
     MAX(assignment_source)
