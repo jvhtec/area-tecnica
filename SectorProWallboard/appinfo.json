@@ -1,0 +1,11 @@
+{
+  "id": "work.sectorpro.wallboard",
+  "title": "Sector-Pro Wallboards",
+  "type": "web",
+  "main": "index.html",
+  "icon": "icon.png",
+  "largeIcon": "icon.png",
+  "version": "1.0.0",
+  "vendor": "Sector-Pro",
+  "resolution": "1920x1080"
+}
