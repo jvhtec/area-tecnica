@@ -88,7 +88,7 @@ export const LogisticsEventCard = ({
             </Badge>
           </div>
 
-          <h3 className="font-medium mt-2">{event.title || event.job?.title}</h3>
+          <h3 className="font-medium mt-2">{getDisplayName()}</h3>
           <div className="text-sm text-muted-foreground mt-1">
             {format(new Date(`2000-01-01T${event.event_time}`), 'HH:mm')}
           </div>
