@@ -225,8 +225,8 @@ After 1 week of stable operation:
 - ✅ Backward compatible (deprecated fields still exist)
 - ✅ Safe fallbacks for edge cases
 - ✅ Clear rollback plan
+- ✅ p_status RPC mismatch fixed (no remaining issues)
 - ⚠️ Minor cosmetic issues only (date badges)
-- ⚠️ One potential RPC issue (p_status) but likely ignored safely
 - ⚠️ Conservative conflict detection (safer than risky)
 
 **Risk Level**: **LOW**
