@@ -32,6 +32,7 @@
 ---
 
 ## ⚠️ MINOR CONCERNS - Non-Blocking
+**UPDATE**: Only 2 minor concerns remain (down from 4)!
 
 ### 1. Frontend Passes Extra Parameter to toggle_timesheet_day
 **Issue**: `src/services/toggleTimesheetDay.ts` passes `p_status` parameter
@@ -62,9 +63,12 @@ toggle_timesheet_day(
 
 **Recommendation**: If deployment shows RPC errors, remove `p_status` from frontend call.
 
+**UPDATE**: Conflict detection fully optimized - no longer uses deprecated fields!
+
 ---
 
 ### 2. check_technician_conflicts RPC Not Found in Migrations
+**UPDATE**: Now moot - conflict detection optimized to use timesheets directly!
 **Issue**: Frontend calls `check_technician_conflicts` RPC but it's not in our migration files
 **Impact**: Enhanced conflict detection may fail, but has safe fallback
 **Risk Level**: LOW - Frontend handles error gracefully
@@ -96,28 +100,7 @@ if (error) {
 
 ---
 
-### 3. Conservative Conflict Detection Until Optimization
-**Issue**: Conflict detection treats all assignments as "whole job" after migration
-**Impact**: May show false positive conflicts (prevent some valid assignments)
-**Risk Level**: LOW - Prevents double-booking (safe behavior)
-**Why**: `src/utils/technicianAvailability.ts` uses `single_day` field in logic
-
-**Current Behavior**:
-```typescript
-// This check will always return true after migration (since single_day = false)
-if (!assignment.single_day) {
-  return true;  // Treats as whole-job conflict
-}
-```
-
-**Recommendation**:
-- Accept conservative behavior initially
-- After 1 week verification, refactor to query timesheets for precise date conflicts
-- Document in TODO (already done)
-
----
-
-### 4. UI Date Badges Will Disappear
+### 3. UI Date Badges Will Disappear
 **Issue**: Components showing "día 2025-01-15" badges use deprecated fields
 **Impact**: Badges won't render (fields will be false/null)
 **Risk Level**: COSMETIC ONLY - No functional impact
@@ -130,6 +113,8 @@ if (!assignment.single_day) {
 
 **After Migration**: Users see assignments but without date badges
 **Fix**: Remove badge rendering logic incrementally (non-urgent)
+
+**Note**: This is the only remaining cosmetic issue!
 
 ---
 
