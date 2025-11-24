@@ -147,7 +147,7 @@ export const StaffingJobSelectionDialog = ({
                       if (isDeclined) return;
                       handleJobSelect(job.id);
                     }}
-                    title={isDeclined ? 'Technician declined this job' : undefined}
+                    title={isDeclined ? 'El técnico rechazó este trabajo' : undefined}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">

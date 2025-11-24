@@ -11,10 +11,10 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Create New User</DialogTitle>
+          <DialogTitle>Crear Nuevo Usuario</DialogTitle>
         </DialogHeader>
-        <SignUpForm 
-          onBack={() => onOpenChange(false)} 
+        <SignUpForm
+          onBack={() => onOpenChange(false)}
           preventAutoLogin={true}  // Prevent auto-login when creating users from settings
         />
       </DialogContent>

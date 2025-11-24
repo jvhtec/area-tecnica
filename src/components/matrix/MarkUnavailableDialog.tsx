@@ -27,12 +27,12 @@ interface MarkUnavailableDialogProps {
   selectedCells: string[];
 }
 
-export const MarkUnavailableDialog = ({ 
-  open, 
-  onClose, 
-  technicianId, 
+export const MarkUnavailableDialog = ({
+  open,
+  onClose,
+  technicianId,
   selectedDate,
-  selectedCells 
+  selectedCells
 }: MarkUnavailableDialogProps) => {
   // Reason removed; default to day_off
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,13 +95,13 @@ export const MarkUnavailableDialog = ({
       if (upsertError) throw upsertError;
 
       const count = selectedDates.size;
-      toast.success(`Marked ${technician?.first_name} ${technician?.last_name} as unavailable for ${count} day${count > 1 ? 's' : ''}`);
+      toast.success(`Marcado ${technician?.first_name} ${technician?.last_name} como no disponible por ${count} día${count > 1 ? 's' : ''}`);
       // Hint consumers to refresh matrix
       window.dispatchEvent(new CustomEvent('assignment-updated'));
       onClose();
     } catch (error) {
       console.error('Error marking unavailable:', error);
-      toast.error('Failed to mark as unavailable');
+      toast.error('Error al marcar como no disponible');
     } finally {
       setIsSubmitting(false);
     }
@@ -111,17 +111,17 @@ export const MarkUnavailableDialog = ({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Mark as Unavailable</DialogTitle>
+          <DialogTitle>Marcar como No Disponible</DialogTitle>
           <DialogDescription>
-            Mark {technician?.first_name} {technician?.last_name} as unavailable on{' '}
-            {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+            Marcar a {technician?.first_name} {technician?.last_name} como no disponible el{' '}
+            {format(selectedDate, 'EEEE, d MMMM, yyyy')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {technician && (
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Technician:</span>
+              <span className="text-sm font-medium">Técnico:</span>
               <span>{technician.first_name} {technician.last_name}</span>
               <Badge variant="outline">{technician.department}</Badge>
             </div>
@@ -130,14 +130,14 @@ export const MarkUnavailableDialog = ({
           <div className="bg-muted p-3 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="h-4 w-4" />
-              <span className="font-medium">Date</span>
+              <span className="font-medium">Fecha</span>
             </div>
             <div className="text-sm">
-              {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+              {format(selectedDate, 'EEEE, d MMMM, yyyy')}
             </div>
             {selectedCells.length > 1 && (
               <div className="text-xs text-muted-foreground mt-1">
-                {selectedCells.length} dates selected for bulk update
+                {selectedCells.length} fechas seleccionadas para actualización masiva
               </div>
             )}
           </div>
@@ -147,19 +147,19 @@ export const MarkUnavailableDialog = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            Cancelar
           </Button>
-          <Button 
+          <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Marking...
+                Marcando...
               </>
             ) : (
-              'Mark Unavailable'
+              'Marcar No Disponible'
             )}
           </Button>
         </DialogFooter>

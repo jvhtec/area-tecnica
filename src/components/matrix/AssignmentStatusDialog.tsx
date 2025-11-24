@@ -27,11 +27,11 @@ interface AssignmentStatusDialogProps {
   action: 'confirm' | 'decline';
 }
 
-export const AssignmentStatusDialog = ({ 
-  open, 
-  onClose, 
-  technicianId, 
-  date, 
+export const AssignmentStatusDialog = ({
+  open,
+  onClose,
+  technicianId,
+  date,
   assignment,
   action
 }: AssignmentStatusDialogProps) => {
@@ -57,7 +57,7 @@ export const AssignmentStatusDialog = ({
 
   const handleSubmit = async () => {
     if (!assignment?.job_id) {
-      toast.error('No assignment found');
+      toast.error('No se encontró asignación');
       return;
     }
 
@@ -65,7 +65,7 @@ export const AssignmentStatusDialog = ({
 
     try {
       const newStatus = action === 'confirm' ? 'confirmed' : 'declined';
-      
+
       console.log('Updating assignment status:', {
         job_id: assignment.job_id,
         technician_id: technicianId,
@@ -102,7 +102,7 @@ export const AssignmentStatusDialog = ({
         try {
           queryClient.setQueryData(queryKey, (oldData: any) => {
             if (!oldData) return oldData;
-            
+
             if (Array.isArray(oldData)) {
               return oldData.map((item: any) => {
                 if (item.job_id === assignment.job_id && item.technician_id === technicianId) {
@@ -148,15 +148,15 @@ export const AssignmentStatusDialog = ({
 
       const statusText = action === 'confirm' ? 'confirmed' : 'declined';
       toast.success(
-        `Assignment ${statusText} for ${technician?.first_name} ${technician?.last_name}`
+        `Asignación ${statusText === 'confirmed' ? 'confirmada' : 'rechazada'} para ${technician?.first_name} ${technician?.last_name}`
       );
       onClose();
     } catch (error: any) {
       console.error('Error updating assignment status:', error);
-      
+
       // More detailed error message
       const errorMessage = error?.message || 'Unknown database error';
-      toast.error(`Failed to update assignment status: ${errorMessage}`);
+      toast.error(`Error al actualizar el estado de la asignación: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -164,16 +164,16 @@ export const AssignmentStatusDialog = ({
 
   const actionConfig = {
     confirm: {
-      title: 'Confirm Assignment',
-      description: 'Confirm this assignment as final',
-      buttonText: 'Confirm Assignment',
+      title: 'Confirmar Asignación',
+      description: 'Confirmar esta asignación como definitiva',
+      buttonText: 'Confirmar Asignación',
       buttonClass: 'bg-green-600 hover:bg-green-700',
       icon: <Check className="mr-2 h-4 w-4" />
     },
     decline: {
-      title: 'Decline Assignment',
-      description: 'Decline this assignment',
-      buttonText: 'Decline Assignment',
+      title: 'Rechazar Asignación',
+      description: 'Rechazar esta asignación',
+      buttonText: 'Rechazar Asignación',
       buttonClass: 'bg-red-600 hover:bg-red-700',
       icon: <X className="mr-2 h-4 w-4" />
     }
@@ -187,15 +187,15 @@ export const AssignmentStatusDialog = ({
         <DialogHeader>
           <DialogTitle>{config.title}</DialogTitle>
           <DialogDescription>
-            {config.description} for {technician?.first_name} {technician?.last_name} on{' '}
-            {format(date, 'EEEE, MMMM d, yyyy')}
+            {config.description} para {technician?.first_name} {technician?.last_name} el{' '}
+            {format(date, 'EEEE, d MMMM, yyyy')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {technician && (
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Technician:</span>
+              <span className="text-sm font-medium">Técnico:</span>
               <span>{technician.first_name} {technician.last_name}</span>
               <Badge variant="outline">{technician.department}</Badge>
             </div>
@@ -211,15 +211,15 @@ export const AssignmentStatusDialog = ({
                 </Badge>
               </div>
               <div className="text-sm text-muted-foreground">
-                Current status: <Badge variant="secondary">{assignment.status}</Badge>
+                Estado actual: <Badge variant="secondary">{assignment.status}</Badge>
               </div>
             </div>
           )}
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Notes (Optional)</label>
+            <label className="text-sm font-medium">Notas (Opcional)</label>
             <Textarea
-              placeholder={`Add notes about this ${action}...`}
+              placeholder={`Añadir notas sobre esta ${action === 'confirm' ? 'confirmación' : 'cancelación'}...`}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
@@ -229,9 +229,9 @@ export const AssignmentStatusDialog = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            Cancelar
           </Button>
-          <Button 
+          <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
             className={config.buttonClass}
@@ -239,7 +239,7 @@ export const AssignmentStatusDialog = ({
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
+                Procesando...
               </>
             ) : (
               <>

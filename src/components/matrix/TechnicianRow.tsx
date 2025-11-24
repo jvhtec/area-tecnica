@@ -149,10 +149,10 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
       // Invalidate queries to refresh data
       await qc.invalidateQueries({ queryKey: ['optimized-matrix-technicians'] });
 
-      toast({ title: 'User updated', description: 'Changes saved successfully.' });
+      toast({ title: 'Usuario actualizado', description: 'Cambios guardados correctamente.' });
       setIsEditing(false);
     } catch (e: any) {
-      toast({ title: 'Failed to update user', description: e?.message || 'Unknown error', variant: 'destructive' });
+      toast({ title: 'Error al actualizar usuario', description: e?.message || 'Error desconocido', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
@@ -264,385 +264,384 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
 
   return (
     <>
-    <Popover open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
-      <PopoverTrigger asChild>
-        <div
-          className="border-b hover:bg-accent/50 cursor-pointer transition-colors"
-          style={{
-            height,
-            padding: compact ? '0.25rem' : '0.75rem',
-            backgroundColor: technician.bg_color || undefined
-          }}
-          title={compact ? displayName : undefined}
-        >
-          {compact ? (
-            <div className="h-full flex flex-col items-center justify-center">
-              <div className="relative">
+      <Popover open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
+        <PopoverTrigger asChild>
+          <div
+            className="border-b hover:bg-accent/50 cursor-pointer transition-colors"
+            style={{
+              height,
+              padding: compact ? '0.25rem' : '0.75rem',
+              backgroundColor: technician.bg_color || undefined
+            }}
+            title={compact ? displayName : undefined}
+          >
+            {compact ? (
+              <div className="h-full flex flex-col items-center justify-center">
+                <div className="relative">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="text-xs">
+                      {getInitials()}
+                    </AvatarFallback>
+                  </Avatar>
+                  {isFridge && (
+                    <Refrigerator className="absolute -top-1 -right-1 h-3.5 w-3.5 text-sky-600" />
+                  )}
+                </div>
+                <div className="mt-1 text-[10px] leading-none text-muted-foreground">{deptAbbrev}</div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 h-full">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="text-xs">
                     {getInitials()}
                   </AvatarFallback>
                 </Avatar>
-                {isFridge && (
-                  <Refrigerator className="absolute -top-1 -right-1 h-3.5 w-3.5 text-sky-600" />
-                )}
+
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">
+                    {displayName}
+                    {isFridge && (
+                      <Refrigerator className="inline-block h-3.5 w-3.5 ml-1 text-sky-600" />
+                    )}
+                  </div>
+                  <div className="flex gap-1 mt-1 flex-wrap">
+                    <Badge
+                      variant="secondary"
+                      className={`text-xs ${getDepartmentColor(technician.department)}`}
+                    >
+                      {technician.department}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={`text-xs ${getRoleColor(technician.role)}`}
+                    >
+                      {technician.role === 'house_tech' ? 'Técnico de Casa' : 'Técnico'}
+                    </Badge>
+                  </div>
+                </div>
               </div>
-              <div className="mt-1 text-[10px] leading-none text-muted-foreground">{deptAbbrev}</div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 h-full">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="text-xs">
+            )}
+          </div>
+        </PopoverTrigger>
+
+        <PopoverContent className="w-80" side="right">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-12 w-12">
+                <AvatarFallback>
                   {getInitials()}
                 </AvatarFallback>
               </Avatar>
-              
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm truncate">
+              <div className="flex-1">
+                <div className="font-semibold">
                   {displayName}
-                  {isFridge && (
-                    <Refrigerator className="inline-block h-3.5 w-3.5 ml-1 text-sky-600" />
-                  )}
                 </div>
-                <div className="flex gap-1 mt-1 flex-wrap">
-                  <Badge 
-                    variant="secondary" 
-                    className={`text-xs ${getDepartmentColor(technician.department)}`}
-                  >
-                    {technician.department}
-                  </Badge>
-                  <Badge 
-                    variant="outline" 
-                    className={`text-xs ${getRoleColor(technician.role)}`}
-                  >
-                    {technician.role === 'house_tech' ? 'House Tech' : 'Technician'}
-                  </Badge>
+                <div className="text-sm text-muted-foreground">
+                  {technician.role === 'house_tech' ? 'Técnico de Casa' : 'Técnico'}
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      </PopoverTrigger>
-      
-      <PopoverContent className="w-80" side="right">
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-12 w-12">
-              <AvatarFallback>
-                {getInitials()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <div className="font-semibold">
-                {displayName}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {technician.role === 'house_tech' ? 'House Technician' : 'Technician'}
-              </div>
-            </div>
-            {isAdmin && !isEditing && (
-              <Button size="sm" variant="ghost" onClick={handleStartEdit} className="h-8">
-                <Edit className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-
-          {isEditing ? (
-            <div className="space-y-3">
-              <div>
-                <Label htmlFor="first_name" className="text-xs">First Name</Label>
-                <Input
-                  id="first_name"
-                  value={editedData.first_name}
-                  onChange={(e) => setEditedData({ ...editedData, first_name: e.target.value })}
-                  className="h-8"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="nickname" className="text-xs">Nickname</Label>
-                <Input
-                  id="nickname"
-                  value={editedData.nickname}
-                  onChange={(e) => setEditedData({ ...editedData, nickname: e.target.value })}
-                  className="h-8"
-                  placeholder="Optional"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="last_name" className="text-xs">Last Name</Label>
-                <Input
-                  id="last_name"
-                  value={editedData.last_name}
-                  onChange={(e) => setEditedData({ ...editedData, last_name: e.target.value })}
-                  className="h-8"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="email" className="text-xs">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={editedData.email}
-                  onChange={(e) => setEditedData({ ...editedData, email: e.target.value })}
-                  className="h-8"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="phone" className="text-xs">Phone</Label>
-                <Input
-                  id="phone"
-                  value={editedData.phone}
-                  onChange={(e) => setEditedData({ ...editedData, phone: e.target.value })}
-                  className="h-8"
-                  placeholder="Optional"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="dni" className="text-xs">DNI</Label>
-                <Input
-                  id="dni"
-                  value={editedData.dni}
-                  onChange={(e) => setEditedData({ ...editedData, dni: e.target.value })}
-                  className="h-8"
-                  placeholder="Optional"
-                />
-              </div>
-
-              <div>
-                <CityAutocomplete
-                  id="residencia"
-                  value={editedData.residencia}
-                  onChange={(city) => setEditedData(prev => ({ ...prev, residencia: city }))}
-                  placeholder="Enter city"
-                  label="Residencia"
-                  className="space-y-2"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="department" className="text-xs">Department</Label>
-                <Select value={editedData.department} onValueChange={(value) => setEditedData({ ...editedData, department: value })}>
-                  <SelectTrigger className="h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sound">Sound</SelectItem>
-                    <SelectItem value="lights">Lights</SelectItem>
-                    <SelectItem value="video">Video</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="role" className="text-xs">Role</Label>
-                <Select value={editedData.role} onValueChange={(value) => setEditedData({ ...editedData, role: value })}>
-                  <SelectTrigger className="h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="technician">Technician</SelectItem>
-                    <SelectItem value="house_tech">House Tech</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="bg_color" className="text-xs">Row Background Color</Label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { color: '#DC2626', name: 'Red' },
-                    { color: '#2563EB', name: 'Blue' },
-                    { color: '#16A34A', name: 'Green' },
-                    { color: '#CA8A04', name: 'Yellow' },
-                    { color: '#9333EA', name: 'Purple' },
-                    { color: '#EA580C', name: 'Orange' },
-                    { color: '#DB2777', name: 'Pink' },
-                    { color: '#0891B2', name: 'Cyan' },
-                    { color: '#65A30D', name: 'Lime' },
-                    { color: '#7C3AED', name: 'Violet' },
-                    { color: '#0D9488', name: 'Teal' },
-                    { color: '#64748B', name: 'Slate' },
-                  ].map(({ color, name }) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setEditedData(prev => ({ ...prev, bg_color: color }))}
-                      className={`w-8 h-8 rounded border-2 transition-all hover:scale-110 ${
-                        editedData.bg_color === color ? 'border-white ring-2 ring-white' : 'border-gray-300'
-                      }`}
-                      style={{ backgroundColor: color }}
-                      title={name}
-                    />
-                  ))}
-                  {editedData.bg_color && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEditedData(prev => ({ ...prev, bg_color: '' }))}
-                      className="h-8"
-                    >
-                      Clear
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <Button onClick={handleSaveEdit} disabled={isSaving} size="sm" className="flex-1">
-                  <Save className="h-4 w-4 mr-1" /> {isSaving ? 'Saving...' : 'Save'}
+              {isAdmin && !isEditing && (
+                <Button size="sm" variant="ghost" onClick={handleStartEdit} className="h-8">
+                  <Edit className="h-4 w-4" />
                 </Button>
-                <Button onClick={handleCancelEdit} disabled={isSaving} size="sm" variant="outline" className="flex-1">
-                  <X className="h-4 w-4 mr-1" /> Cancel
-                </Button>
-              </div>
+              )}
             </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Building className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Department:</span>
-                <Badge className={getDepartmentColor(technician.department)}>
-                  {technician.department?.charAt(0).toUpperCase() + technician.department?.slice(1)}
-                </Badge>
-              </div>
 
-              {technician.email && (
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm truncate">{technician.email}</span>
+            {isEditing ? (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="first_name" className="text-xs">Nombre</Label>
+                  <Input
+                    id="first_name"
+                    value={editedData.first_name}
+                    onChange={(e) => setEditedData({ ...editedData, first_name: e.target.value })}
+                    className="h-8"
+                  />
                 </div>
-              )}
 
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Residencia:</span>
-                {residenciaLoading ? (
-                  <span className="text-sm text-muted-foreground">Loading…</span>
-                ) : (
-                  <span className="text-sm truncate">{residencia || '—'}</span>
-                )}
-              </div>
-
-              {technician.phone && (
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm truncate">{technician.phone}</span>
+                <div>
+                  <Label htmlFor="nickname" className="text-xs">Apodo</Label>
+                  <Input
+                    id="nickname"
+                    value={editedData.nickname}
+                    onChange={(e) => setEditedData({ ...editedData, nickname: e.target.value })}
+                    className="h-8"
+                    placeholder="Opcional"
+                  />
                 </div>
-              )}
 
-              {technician.dni && (
-                <div className="flex items-center gap-2">
-                  <IdCard className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm truncate">{technician.dni}</span>
+                <div>
+                  <Label htmlFor="last_name" className="text-xs">Apellidos</Label>
+                  <Input
+                    id="last_name"
+                    value={editedData.last_name}
+                    onChange={(e) => setEditedData({ ...editedData, last_name: e.target.value })}
+                    className="h-8"
+                  />
                 </div>
-              )}
 
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Role:</span>
-                <Badge variant="outline" className={getRoleColor(technician.role)}>
-                  {technician.role === 'house_tech' ? 'House Tech' : 'Technician'}
-                </Badge>
-              </div>
-
-              {isManagementUser && (
-                <div className="pt-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="gap-2 h-8 w-full mb-2"
-                    disabled={sendingOnboarding || !technician.email}
-                    onClick={async () => {
-                      if (!technician.email) return;
-                      try {
-                        setSendingOnboarding(true);
-                        const { data, error } = await supabase.functions.invoke('send-onboarding-email', {
-                          body: {
-                            email: technician.email,
-                            firstName: technician.first_name,
-                            lastName: technician.last_name,
-                            department: technician.department,
-                          }
-                        });
-                        if (error) throw error;
-                        if (!data?.success) throw new Error('Failed to send onboarding email');
-                        toast({ title: 'Onboarding enviado', description: `Se envió a ${technician.email}.` });
-                      } catch (e: any) {
-                        toast({ title: 'No se pudo enviar el onboarding', description: e?.message || 'Error desconocido', variant: 'destructive' });
-                      } finally {
-                        setSendingOnboarding(false);
-                      }
-                    }}
-                  >
-                    <Mail className="h-4 w-4" /> {sendingOnboarding ? 'Enviando…' : 'Enviar Onboarding'}
-                  </Button>
-                  <Button variant={isFridge ? 'secondary' : 'destructive'} size="sm" onClick={toggleFridge} className="gap-2 h-8" disabled={togglingFridge}>
-                    <Refrigerator className="h-4 w-4" />
-                    {isFridge ? 'Descongelar' : 'A la nevera'}
-                  </Button>
+                <div>
+                  <Label htmlFor="email" className="text-xs">Correo</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={editedData.email}
+                    onChange={(e) => setEditedData({ ...editedData, email: e.target.value })}
+                    className="h-8"
+                  />
                 </div>
-              )}
 
-              {/* Skills */}
-              {!!(technician.skills && technician.skills.length) && (
-                <div className="pt-2">
-                  <div className="text-sm font-medium mb-1">Skills</div>
-                  <div className="flex flex-wrap gap-1">
-                    {technician.skills
-                      ?.slice(0, 8)
-                      .map((s, i) => (
-                        <Badge key={(s.name || '') + i} variant={s.is_primary ? 'default' : 'secondary'} className="text-xs" title={`${s.name}${s.proficiency != null ? ` (lvl ${s.proficiency})` : ''}`}>
-                          {s.name}
-                        </Badge>
-                      ))}
-                    {technician.skills!.length > 8 && (
-                      <Badge variant="outline" className="text-xs">+{technician.skills!.length - 8} more</Badge>
+                <div>
+                  <Label htmlFor="phone" className="text-xs">Teléfono</Label>
+                  <Input
+                    id="phone"
+                    value={editedData.phone}
+                    onChange={(e) => setEditedData({ ...editedData, phone: e.target.value })}
+                    className="h-8"
+                    placeholder="Optional"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="dni" className="text-xs">DNI</Label>
+                  <Input
+                    id="dni"
+                    value={editedData.dni}
+                    onChange={(e) => setEditedData({ ...editedData, dni: e.target.value })}
+                    className="h-8"
+                    placeholder="Opcional"
+                  />
+                </div>
+
+                <div>
+                  <CityAutocomplete
+                    id="residencia"
+                    value={editedData.residencia}
+                    onChange={(city) => setEditedData(prev => ({ ...prev, residencia: city }))}
+                    placeholder="Ingresa ciudad"
+                    label="Residencia"
+                    className="space-y-2"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="department" className="text-xs">Departamento</Label>
+                  <Select value={editedData.department} onValueChange={(value) => setEditedData({ ...editedData, department: value })}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sound">Sonido</SelectItem>
+                      <SelectItem value="lights">Iluminación</SelectItem>
+                      <SelectItem value="video">Video</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="role" className="text-xs">Rol</Label>
+                  <Select value={editedData.role} onValueChange={(value) => setEditedData({ ...editedData, role: value })}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="technician">Técnico</SelectItem>
+                      <SelectItem value="house_tech">Técnico de Casa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="bg_color" className="text-xs">Color de fondo de fila</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { color: '#DC2626', name: 'Rojo' },
+                      { color: '#2563EB', name: 'Azul' },
+                      { color: '#16A34A', name: 'Verde' },
+                      { color: '#CA8A04', name: 'Amarillo' },
+                      { color: '#9333EA', name: 'Morado' },
+                      { color: '#EA580C', name: 'Naranja' },
+                      { color: '#DB2777', name: 'Rosa' },
+                      { color: '#0891B2', name: 'Cian' },
+                      { color: '#65A30D', name: 'Lima' },
+                      { color: '#7C3AED', name: 'Violeta' },
+                      { color: '#0D9488', name: 'Verde azulado' },
+                      { color: '#64748B', name: 'Pizarra' },
+                    ].map(({ color, name }) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setEditedData(prev => ({ ...prev, bg_color: color }))}
+                        className={`w-8 h-8 rounded border-2 transition-all hover:scale-110 ${editedData.bg_color === color ? 'border-white ring-2 ring-white' : 'border-gray-300'
+                          }`}
+                        style={{ backgroundColor: color }}
+                        title={name}
+                      />
+                    ))}
+                    {editedData.bg_color && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditedData(prev => ({ ...prev, bg_color: '' }))}
+                        className="h-8"
+                      >
+                        Limpiar
+                      </Button>
                     )}
                   </div>
                 </div>
-              )}
 
-              {/* Metrics */}
-              <div className="pt-2 border-t">
-                <div className="text-sm font-medium mb-1">Activity</div>
-                {metricsLoading ? (
-                  <div className="text-xs text-muted-foreground">Loading…</div>
-                ) : (
+                <div className="flex gap-2 pt-2">
+                  <Button onClick={handleSaveEdit} disabled={isSaving} size="sm" className="flex-1">
+                    <Save className="h-4 w-4 mr-1" /> {isSaving ? 'Guardando...' : 'Guardar'}
+                  </Button>
+                  <Button onClick={handleCancelEdit} disabled={isSaving} size="sm" variant="outline" className="flex-1">
+                    <X className="h-4 w-4 mr-1" /> Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Building className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Departamento:</span>
+                  <Badge className={getDepartmentColor(technician.department)}>
+                    {technician.department?.charAt(0).toUpperCase() + technician.department?.slice(1)}
+                  </Badge>
+                </div>
+
+                {technician.email && (
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">Gigs/Month: {metrics.monthConfirmed}</Badge>
-                    <Badge variant="outline" className="text-xs">Gigs/Year: {metrics.yearConfirmed}</Badge>
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm truncate">{technician.email}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Residencia:</span>
+                  {residenciaLoading ? (
+                    <span className="text-sm text-muted-foreground">Cargando...</span>
+                  ) : (
+                    <span className="text-sm truncate">{residencia || '—'}</span>
+                  )}
+                </div>
+
+                {technician.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm truncate">{technician.phone}</span>
+                  </div>
+                )}
+
+                {technician.dni && (
+                  <div className="flex items-center gap-2">
+                    <IdCard className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm truncate">{technician.dni}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Rol:</span>
+                  <Badge variant="outline" className={getRoleColor(technician.role)}>
+                    {technician.role === 'house_tech' ? 'Técnico de Casa' : 'Técnico'}
+                  </Badge>
+                </div>
+
+                {isManagementUser && (
+                  <div className="pt-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="gap-2 h-8 w-full mb-2"
+                      disabled={sendingOnboarding || !technician.email}
+                      onClick={async () => {
+                        if (!technician.email) return;
+                        try {
+                          setSendingOnboarding(true);
+                          const { data, error } = await supabase.functions.invoke('send-onboarding-email', {
+                            body: {
+                              email: technician.email,
+                              firstName: technician.first_name,
+                              lastName: technician.last_name,
+                              department: technician.department,
+                            }
+                          });
+                          if (error) throw error;
+                          if (!data?.success) throw new Error('Failed to send onboarding email');
+                          toast({ title: 'Onboarding enviado', description: `Se envió a ${technician.email}.` });
+                        } catch (e: any) {
+                          toast({ title: 'No se pudo enviar el onboarding', description: e?.message || 'Error desconocido', variant: 'destructive' });
+                        } finally {
+                          setSendingOnboarding(false);
+                        }
+                      }}
+                    >
+                      <Mail className="h-4 w-4" /> {sendingOnboarding ? 'Enviando…' : 'Enviar Onboarding'}
+                    </Button>
+                    <Button variant={isFridge ? 'secondary' : 'destructive'} size="sm" onClick={toggleFridge} className="gap-2 h-8" disabled={togglingFridge}>
+                      <Refrigerator className="h-4 w-4" />
+                      {isFridge ? 'Descongelar' : 'A la nevera'}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Skills */}
+                {!!(technician.skills && technician.skills.length) && (
+                  <div className="pt-2">
+                    <div className="text-sm font-medium mb-1">Habilidades</div>
+                    <div className="flex flex-wrap gap-1">
+                      {technician.skills
+                        ?.slice(0, 8)
+                        .map((s, i) => (
+                          <Badge key={(s.name || '') + i} variant={s.is_primary ? 'default' : 'secondary'} className="text-xs" title={`${s.name}${s.proficiency != null ? ` (lvl ${s.proficiency})` : ''}`}>
+                            {s.name}
+                          </Badge>
+                        ))}
+                      {technician.skills!.length > 8 && (
+                        <Badge variant="outline" className="text-xs">+{technician.skills!.length - 8} más</Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Metrics */}
+                <div className="pt-2 border-t">
+                  <div className="text-sm font-medium mb-1">Actividad</div>
+                  {metricsLoading ? (
+                    <div className="text-xs text-muted-foreground">Cargando...</div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs">Bolos/Mes: {metrics.monthConfirmed}</Badge>
+                      <Badge variant="outline" className="text-xs">Bolos/Año: {metrics.yearConfirmed}</Badge>
+                    </div>
+                  )}
+                </div>
+
+                {isManagementUser && (
+                  <div className="pt-2">
+                    <Button variant="secondary" size="sm" onClick={() => setSkillsOpen(true)} className="gap-2 h-8">
+                      <Plus className="h-4 w-4" /> Añadir habilidad
+                    </Button>
                   </div>
                 )}
               </div>
-
-              {isManagementUser && (
-                <div className="pt-2">
-                  <Button variant="secondary" size="sm" onClick={() => setSkillsOpen(true)} className="gap-2 h-8">
-                    <Plus className="h-4 w-4" /> Add skill
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-    {/* Skills dialog (management only) */}
-    {isManagementUser && (
-      <ManageSkillsDialog
-        profileId={technician.id}
-        fullName={displayName}
-        open={skillsOpen}
-        onOpenChange={handleSkillsOpenChange}
-      />
-    )}
-  </>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+      {/* Skills dialog (management only) */}
+      {isManagementUser && (
+        <ManageSkillsDialog
+          profileId={technician.id}
+          fullName={displayName}
+          open={skillsOpen}
+          onOpenChange={handleSkillsOpenChange}
+        />
+      )}
+    </>
   );
 };
 

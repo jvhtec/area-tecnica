@@ -85,10 +85,10 @@ interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignmentMatr
   mobile?: boolean;
 }
 
-export const OptimizedAssignmentMatrix = ({ 
-  technicians, 
-  dates, 
-  jobs, 
+export const OptimizedAssignmentMatrix = ({
+  technicians,
+  dates,
+  jobs,
   onNearEdgeScroll,
   canExpandBefore = false,
   canExpandAfter = false,
@@ -117,15 +117,15 @@ export const OptimizedAssignmentMatrix = ({
   const [sortJobId, setSortJobId] = useState<string | null>(null);
   // Technician column sorting
   const [techSortMethod, setTechSortMethod] = useState<TechSortMethod>('default');
-  
+
   // Performance monitoring
   const { startRenderTimer, endRenderTimer, incrementCellRender } = usePerformanceMonitor('AssignmentMatrix');
-  
+
   // Staffing functionality
   useStaffingRealtime();
   const { toast } = useToast();
   const { mutate: sendStaffingEmail } = useSendStaffingEmail();
-  
+
   // Cell dimensions (overridable for mobile)
   const CELL_WIDTH = cellWidth ?? 160;
   const CELL_HEIGHT = cellHeight ?? 60;
@@ -300,9 +300,9 @@ export const OptimizedAssignmentMatrix = ({
   // Optimized scroll synchronization
   const syncScrollPositions = useCallback((scrollLeft: number, scrollTop: number, source: string) => {
     if (syncInProgressRef.current) return;
-    
+
     syncInProgressRef.current = true;
-    
+
     requestAnimationFrame(() => {
       try {
         if (source !== 'dateHeaders' && dateHeadersRef.current) {
@@ -537,34 +537,34 @@ export const OptimizedAssignmentMatrix = ({
     }
   }, [cellAction]);
 
-  
+
 
   const handleCellSelect = useCallback((technicianId: string, date: Date, selected: boolean) => {
     const cellKey = `${technicianId}-${format(date, 'yyyy-MM-dd')}`;
     const newSelected = new Set(selectedCells);
-    
+
     if (selected) {
       newSelected.add(cellKey);
     } else {
       newSelected.delete(cellKey);
     }
-    
+
     setSelectedCells(newSelected);
   }, [selectedCells]);
 
   const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
-    console.log('🚀 OptimizedAssignmentMatrix: handleStaffingActionSelected called', { 
-      jobId, 
-      action, 
+    console.log('🚀 OptimizedAssignmentMatrix: handleStaffingActionSelected called', {
+      jobId,
+      action,
       cellAction,
-      technicianId: cellAction?.technicianId 
+      technicianId: cellAction?.technicianId
     });
-    
+
     if (cellAction?.type === 'select-job-for-staffing') {
       // If the technician already declined this job, block staffing for this job only
       const declinedSet = declinedJobsByTech.get(cellAction.technicianId);
       if (declinedSet?.has(jobId)) {
-        toast({ title: 'Job already declined', description: 'Choose another job for this technician on this date.', variant: 'destructive' });
+        toast({ title: 'Trabajo ya rechazado', description: 'Elige otro trabajo para este técnico en esta fecha.', variant: 'destructive' });
         return;
       }
       if (action === 'offer') {
@@ -630,28 +630,28 @@ export const OptimizedAssignmentMatrix = ({
 
     const today = new Date();
     const todayIndex = dates.findIndex(date => isSameDay(date, today));
-    
+
     if (todayIndex === -1) {
       return false;
     }
 
     const container = mainScrollRef.current;
     const containerWidth = container.clientWidth;
-    
+
     if (containerWidth === 0) {
       return false;
     }
-    
+
     let scrollPosition = (todayIndex * CELL_WIDTH) - (containerWidth / 2) + (CELL_WIDTH / 2);
     const maxScroll = matrixWidth - containerWidth;
     scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
-    
-    
+
+
     container.scrollLeft = scrollPosition;
-    
+
     // Verify the scroll actually happened
     requestAnimationFrame(() => { /* verify next frame (no-op) */ });
-    
+
     return true;
   }, [dates, CELL_WIDTH, matrixWidth]);
 
@@ -964,7 +964,7 @@ export const OptimizedAssignmentMatrix = ({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2" />
-          <p className="text-muted-foreground">Loading assignment matrix...</p>
+          <p className="text-muted-foreground">Cargando matriz...</p>
         </div>
       </div>
     );
@@ -975,7 +975,7 @@ export const OptimizedAssignmentMatrix = ({
       {isFetching && !isInitialLoading && (
         <div className="pointer-events-none absolute top-2 right-4 flex items-center gap-2 text-xs text-muted-foreground bg-background/80 backdrop-blur rounded-full px-3 py-1 shadow-sm border border-border/60">
           <span className="h-2 w-2 rounded-full bg-primary animate-pulse" aria-hidden="true" />
-          <span>Refreshing…</span>
+          <span>Actualizando...</span>
         </div>
       )}
       {/* Fixed Corner Header */}
@@ -996,7 +996,7 @@ export const OptimizedAssignmentMatrix = ({
               {mobile ? (
                 <span className="text-sm">Techs</span>
               ) : (
-                <span>Technicians</span>
+                <span>Técnicos</span>
               )}
               <ArrowUpDown className="h-3.5 w-3.5 opacity-50 group-hover:opacity-100" />
             </button>
@@ -1007,7 +1007,7 @@ export const OptimizedAssignmentMatrix = ({
                 </Button>
               ) : (
                 <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setCreateUserOpen(true)}>
-                  <UserPlus className="h-3.5 w-3.5 mr-1" /> Add
+                  <UserPlus className="h-3.5 w-3.5 mr-1" /> Añadir
                 </Button>
               )
             )}
@@ -1023,10 +1023,10 @@ export const OptimizedAssignmentMatrix = ({
       </div>
 
       {/* Date Headers */}
-      <div 
+      <div
         ref={dateHeadersRef}
         className="matrix-date-headers"
-        style={{ 
+        style={{
           left: TECHNICIAN_WIDTH,
           height: HEADER_HEIGHT,
           width: `calc(100% - ${TECHNICIAN_WIDTH}px)`
@@ -1041,7 +1041,7 @@ export const OptimizedAssignmentMatrix = ({
               onClick={(e) => { e.stopPropagation(); handleMobileNav('left'); }}
               disabled={!canNavLeft}
             >
-              <span className="sr-only">Previous</span>
+              <span className="sr-only">Anterior</span>
               {'<'}
             </button>
             <button
@@ -1050,7 +1050,7 @@ export const OptimizedAssignmentMatrix = ({
               onClick={(e) => { e.stopPropagation(); handleMobileNav('right'); }}
               disabled={!canNavRight}
             >
-              <span className="sr-only">Next</span>
+              <span className="sr-only">Siguiente</span>
               {'>'}
             </button>
           </div>
@@ -1076,16 +1076,16 @@ export const OptimizedAssignmentMatrix = ({
       </div>
 
       {/* Fixed Technician Names Column */}
-      <div 
+      <div
         className="matrix-technician-column"
-        style={{ 
-          width: TECHNICIAN_WIDTH, 
+        style={{
+          width: TECHNICIAN_WIDTH,
           top: HEADER_HEIGHT,
           height: `calc(100% - ${HEADER_HEIGHT}px)`
         }}
       >
-        <div 
-          ref={technicianScrollRef} 
+        <div
+          ref={technicianScrollRef}
           className="matrix-technician-scroll"
           onScroll={handleTechnicianScroll}
         >
@@ -1107,89 +1107,90 @@ export const OptimizedAssignmentMatrix = ({
       </div>
 
       {/* Main Scrollable Matrix Area */}
-      <div 
+      <div
         className="matrix-main-area"
-        style={{ 
-          left: TECHNICIAN_WIDTH, 
+        style={{
+          left: TECHNICIAN_WIDTH,
           top: HEADER_HEIGHT,
           width: `calc(100% - ${TECHNICIAN_WIDTH}px)`,
           height: `calc(100% - ${HEADER_HEIGHT}px)`
         }}
       >
         <TooltipProvider>
-        <div 
-          ref={mainScrollRef}
-          className="matrix-main-scroll"
-          onScroll={handleMainScroll}
-        >
-          <div 
-            className="matrix-grid"
-            style={{ 
-              width: matrixWidth,
-              height: matrixHeight
-            }}
+          <div
+            ref={mainScrollRef}
+            className="matrix-main-scroll"
+            onScroll={handleMainScroll}
           >
-            {orderedTechnicians.slice(visibleRows.start, visibleRows.end + 1).map((technician, idx) => {
-              const techIndex = visibleRows.start + idx;
-              return (
-              <div 
-                key={technician.id} 
-                className="matrix-row"
-                style={{ 
-                  transform: `translate3d(0, ${techIndex * CELL_HEIGHT}px, 0)`,
-                  height: CELL_HEIGHT
-                }}
-              >
-                {dates.slice(visibleCols.start, visibleCols.end + 1).map((date, jdx) => {
-                  const dateIndex = visibleCols.start + jdx;
-                  const assignment = getAssignmentForCell(technician.id, date);
-                  const availability = getAvailabilityForCell(technician.id, date);
-                  const cellKey = `${technician.id}-${format(date, 'yyyy-MM-dd')}`;
-                  const isSelected = selectedCells.has(cellKey);
-                  const jobId = assignment?.job_id;
-                  const byJobKey = jobId ? `${jobId}-${technician.id}` : '';
-                  const byDateKey = `${technician.id}-${format(date, 'yyyy-MM-dd')}`;
-                  const providedByJob = jobId && staffingMaps?.byJob.get(byJobKey) ? (staffingMaps?.byJob.get(byJobKey) as any) : null;
-                  const providedByDate = staffingMaps?.byDate.get(byDateKey) ? (staffingMaps?.byDate.get(byDateKey) as any) : null;
-                  
-                  return (
-                    <div
-                      key={dateIndex}
-                      className="matrix-cell-wrapper"
-                      style={{
-                        transform: `translate3d(${dateIndex * CELL_WIDTH}px, 0, 0)`,
-                        width: CELL_WIDTH,
-                        height: CELL_HEIGHT
-                      }}
-                    >
-                      <OptimizedMatrixCell
-                        technician={technician}
-                        date={date}
-                        assignment={assignment}
-                        availability={availability}
-                        width={CELL_WIDTH}
-                        height={CELL_HEIGHT}
-                        isSelected={isSelected}
-                        onSelect={(selected) => handleCellSelect(technician.id, date, selected)}
-                        onClick={(action, selectedJobId) => handleCellClick(technician.id, date, action, selectedJobId)}
-                        onPrefetch={() => handleCellPrefetch(technician.id)}
-                        onOptimisticUpdate={(status) => assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)}
-                        onRender={() => incrementCellRender()}
-                        jobId={jobId}
-                        declinedJobIdsSet={declinedJobsByTech.get(technician.id) || new Set<string>()}
-                        allowDirectAssign={allowDirectAssign}
-                        staffingStatusProvided={providedByJob}
-                        staffingStatusByDateProvided={providedByDate}
-                        isFridge={fridgeSet?.has(technician.id) || false}
-                        mobile={mobile}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )})}
+            <div
+              className="matrix-grid"
+              style={{
+                width: matrixWidth,
+                height: matrixHeight
+              }}
+            >
+              {orderedTechnicians.slice(visibleRows.start, visibleRows.end + 1).map((technician, idx) => {
+                const techIndex = visibleRows.start + idx;
+                return (
+                  <div
+                    key={technician.id}
+                    className="matrix-row"
+                    style={{
+                      transform: `translate3d(0, ${techIndex * CELL_HEIGHT}px, 0)`,
+                      height: CELL_HEIGHT
+                    }}
+                  >
+                    {dates.slice(visibleCols.start, visibleCols.end + 1).map((date, jdx) => {
+                      const dateIndex = visibleCols.start + jdx;
+                      const assignment = getAssignmentForCell(technician.id, date);
+                      const availability = getAvailabilityForCell(technician.id, date);
+                      const cellKey = `${technician.id}-${format(date, 'yyyy-MM-dd')}`;
+                      const isSelected = selectedCells.has(cellKey);
+                      const jobId = assignment?.job_id;
+                      const byJobKey = jobId ? `${jobId}-${technician.id}` : '';
+                      const byDateKey = `${technician.id}-${format(date, 'yyyy-MM-dd')}`;
+                      const providedByJob = jobId && staffingMaps?.byJob.get(byJobKey) ? (staffingMaps?.byJob.get(byJobKey) as any) : null;
+                      const providedByDate = staffingMaps?.byDate.get(byDateKey) ? (staffingMaps?.byDate.get(byDateKey) as any) : null;
+
+                      return (
+                        <div
+                          key={dateIndex}
+                          className="matrix-cell-wrapper"
+                          style={{
+                            transform: `translate3d(${dateIndex * CELL_WIDTH}px, 0, 0)`,
+                            width: CELL_WIDTH,
+                            height: CELL_HEIGHT
+                          }}
+                        >
+                          <OptimizedMatrixCell
+                            technician={technician}
+                            date={date}
+                            assignment={assignment}
+                            availability={availability}
+                            width={CELL_WIDTH}
+                            height={CELL_HEIGHT}
+                            isSelected={isSelected}
+                            onSelect={(selected) => handleCellSelect(technician.id, date, selected)}
+                            onClick={(action, selectedJobId) => handleCellClick(technician.id, date, action, selectedJobId)}
+                            onPrefetch={() => handleCellPrefetch(technician.id)}
+                            onOptimisticUpdate={(status) => assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)}
+                            onRender={() => incrementCellRender()}
+                            jobId={jobId}
+                            declinedJobIdsSet={declinedJobsByTech.get(technician.id) || new Set<string>()}
+                            allowDirectAssign={allowDirectAssign}
+                            staffingStatusProvided={providedByJob}
+                            staffingStatusByDateProvided={providedByDate}
+                            isFridge={fridgeSet?.has(technician.id) || false}
+                            mobile={mobile}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </div>
         </TooltipProvider>
       </div>
 
@@ -1282,7 +1283,7 @@ export const OptimizedAssignmentMatrix = ({
                 sendStaffingEmail(payload, {
                   onSuccess: (data: any) => {
                     const ch = data?.channel || via;
-                    toast({ title: 'Offer sent', description: `${role} offer sent via ${ch} (${selectedDates.length} day${selectedDates.length>1?'s':''}).` });
+                    toast({ title: 'Offer sent', description: `${role} offer sent via ${ch} (${selectedDates.length} day${selectedDates.length > 1 ? 's' : ''}).` });
                     closeDialogs();
                   },
                   onError: (error: any) => {
@@ -1361,11 +1362,11 @@ export const OptimizedAssignmentMatrix = ({
                   const job = jobs.find(j => j.id === availabilityDialog.jobId);
                   const start = job?.start_time ? new Date(job.start_time) : undefined;
                   const end = job?.end_time ? new Date(job.end_time) : start;
-                  if (start) start.setHours(0,0,0,0);
-                  if (end) end.setHours(0,0,0,0);
+                  if (start) start.setHours(0, 0, 0, 0);
+                  if (end) end.setHours(0, 0, 0, 0);
                   const isAllowed = (d: Date) => {
                     if (!start || !end) return true;
-                    const t = new Date(d); t.setHours(0,0,0,0);
+                    const t = new Date(d); t.setHours(0, 0, 0, 0);
                     return t >= start && t <= end;
                   };
                   return (
@@ -1447,7 +1448,7 @@ export const OptimizedAssignmentMatrix = ({
                     onSuccess: (data: any) => {
                       setAvailabilitySending(false);
                       setAvailabilityDialog(null);
-                      toast({ title: 'Request sent', description: `Availability request sent for ${dates.length} day${dates.length>1?'s':''} via ${data?.channel || via}.` });
+                      toast({ title: 'Request sent', description: `Availability request sent for ${dates.length} day${dates.length > 1 ? 's' : ''} via ${data?.channel || via}.` });
                       closeDialogs();
                     },
                     onError: (error: any) => handleEmailError(error, payload)

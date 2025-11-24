@@ -61,7 +61,7 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
         <Calendar className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium">Date Range:</span>
       </div>
-      
+
       {/* Expand Before Button */}
       <Button
         variant="outline"
@@ -80,8 +80,8 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
         <Badge variant="secondary" className="text-xs">
           {rangeInfo.totalWeeks}w ({rangeInfo.totalDays}d)
         </Badge>
-        <span className="text-xs text-muted-foreground">
-          {rangeInfo.startFormatted} → {rangeInfo.endFormatted}
+        <span className="text-sm font-medium text-muted-foreground">
+          Rango: {rangeInfo.startFormatted} - {rangeInfo.endFormatted}
         </span>
       </div>
 
@@ -101,7 +101,7 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
       {/* Quick Jump Selector */}
       <Select onValueChange={handleQuickJump}>
         <SelectTrigger className="w-20 h-8">
-          <SelectValue placeholder="Jump" />
+          <SelectValue placeholder="Ir a..." />
         </SelectTrigger>
         <SelectContent>
           {years.flatMap(year => (
@@ -127,13 +127,8 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
       </Button>
 
       {/* Max Range Indicators */}
-      {(rangeInfo.isAtMaxBefore || rangeInfo.isAtMaxAfter) && (
-        <Badge variant="outline" className="text-xs gap-1">
-          <Maximize2 className="h-3 w-3" />
-          {rangeInfo.isAtMaxBefore && rangeInfo.isAtMaxAfter ? 'Full Year' : 
-           rangeInfo.isAtMaxBefore ? 'Max Past' : 'Max Future'}
-        </Badge>
-      )}
-    </div>
+
+
+    </div >
   );
 };

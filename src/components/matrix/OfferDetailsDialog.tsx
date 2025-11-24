@@ -71,14 +71,14 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
   const jobSpan = useMemo(() => {
     const s = jobStartTimeIso ? new Date(jobStartTimeIso) : null;
     const e = jobEndTimeIso ? new Date(jobEndTimeIso) : s;
-    if (s) s.setHours(0,0,0,0);
-    if (e) e.setHours(0,0,0,0);
+    if (s) s.setHours(0, 0, 0, 0);
+    if (e) e.setHours(0, 0, 0, 0);
     return { start: s, end: e };
   }, [jobStartTimeIso, jobEndTimeIso]);
 
   const isAllowedDate = (d: Date) => {
     if (!jobSpan.start || !jobSpan.end) return true;
-    const t = new Date(d); t.setHours(0,0,0,0);
+    const t = new Date(d); t.setHours(0, 0, 0, 0);
     return t >= jobSpan.start && t <= jobSpan.end;
   };
 
@@ -86,18 +86,18 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Send Offer {jobTitle ? `- ${jobTitle}` : ''}</DialogTitle>
+          <DialogTitle>Enviar Oferta {jobTitle ? `- ${jobTitle}` : ''}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-2">
           <div>
-            <Label>Technician</Label>
+            <Label>Técnico</Label>
             <div className="text-sm text-muted-foreground">{technicianName}</div>
           </div>
           <div>
-            <Label htmlFor="role">Role</Label>
+            <Label htmlFor="role">Rol</Label>
             <Select value={role} onValueChange={setRole}>
               <SelectTrigger id="role">
-                <SelectValue placeholder="Select role" />
+                <SelectValue placeholder="Seleccionar rol" />
               </SelectTrigger>
               <SelectContent>
                 {roleOptions.map((opt) => (
@@ -107,23 +107,23 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
             </Select>
           </div>
           <div>
-            <Label htmlFor="message">Message (optional)</Label>
-            <Textarea id="message" placeholder="Additional details to include in the email" value={message} onChange={(e) => setMessage(e.target.value)} />
+            <Label htmlFor="message">Mensaje (opcional)</Label>
+            <Textarea id="message" placeholder="Detalles adicionales para incluir en el correo" value={message} onChange={(e) => setMessage(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Coverage</Label>
+            <Label>Cobertura</Label>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="offer-coverage" checked={coverageMode === 'full'} onChange={() => setCoverageMode('full')} />
-                <span>Full job span</span>
+                <span>Duración completa del trabajo</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="offer-coverage" checked={coverageMode === 'single'} onChange={() => setCoverageMode('single')} />
-                <span>Single day</span>
+                <span>Día suelto</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="offer-coverage" checked={coverageMode === 'multi'} onChange={() => setCoverageMode('multi')} />
-                <span>Multiple days</span>
+                <span>Varios días</span>
               </label>
             </div>
           </div>
@@ -133,7 +133,7 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="gap-2">
                     <CalendarIcon className="h-4 w-4" />
-                    {singleDate ? format(singleDate, 'PPP') : (defaultDateIso || 'Select date')}
+                    {singleDate ? format(singleDate, 'PPP') : (defaultDateIso || 'Seleccionar fecha')}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -146,7 +146,7 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
                   />
                 </PopoverContent>
               </Popover>
-              <p className="text-xs text-muted-foreground">Creates a single-day offer for the chosen date.</p>
+              <p className="text-xs text-muted-foreground">Crea una oferta de un solo día para la fecha elegida.</p>
             </div>
           )}
           {coverageMode === 'multi' && (
@@ -158,13 +158,13 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
                 disabled={(d) => !isAllowedDate(d)}
                 numberOfMonths={2}
               />
-              <p className="text-xs text-muted-foreground">Creates one single-day offer per selected date.</p>
+              <p className="text-xs text-muted-foreground">Crea una oferta de un solo día por cada fecha seleccionada.</p>
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={!role.trim()}>Send Offer</Button>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSubmit} disabled={!role.trim()}>Enviar Oferta</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

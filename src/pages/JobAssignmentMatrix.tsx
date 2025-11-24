@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Filter, Users, RefreshCw, Refrigerator } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { OptimizedAssignmentMatrix } from '@/components/matrix/OptimizedAssignmentMatrix';
-import { PerformanceIndicator } from '@/components/matrix/PerformanceIndicator';
+
 import { DateRangeExpander } from '@/components/matrix/DateRangeExpander';
 import { useVirtualizedDateRange } from '@/hooks/useVirtualizedDateRange';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -350,10 +350,10 @@ export default function JobAssignmentMatrix() {
   }, []);
   const specialtyOptions = React.useMemo(() => {
     if (selectedDepartment === 'lights') {
-      return ['Operador (MA2)','Operador (MA3)','Operador (HOG)','Operador (AVO)','Dimmer','Rigging','Montador'] as const;
+      return ['Operador (MA2)', 'Operador (MA3)', 'Operador (HOG)', 'Operador (AVO)', 'Dimmer', 'Rigging', 'Montador'] as const;
     }
     if (selectedDepartment === 'sound') {
-      return ['foh','monitores','sistemas','rf','Trabajo en altura','Tecnico de Escenario','Montador'] as const;
+      return ['foh', 'monitores', 'sistemas', 'rf', 'Trabajo en altura', 'Tecnico de Escenario', 'Montador'] as const;
     }
     return [] as const;
   }, [selectedDepartment]);
@@ -490,7 +490,7 @@ export default function JobAssignmentMatrix() {
         qc.invalidateQueries({ queryKey: ['technician-fridge-status'] });
       })
       .subscribe();
-    return () => { try { (supabase as any).removeChannel(ch); } catch {} };
+    return () => { try { (supabase as any).removeChannel(ch); } catch { } };
   }, [qc]);
 
   // Filter technicians based on search term
@@ -880,10 +880,10 @@ export default function JobAssignmentMatrix() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    
+
     // Dispatch the assignment update event to force refresh
     window.dispatchEvent(new CustomEvent('assignment-updated'));
-    
+
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 
@@ -1052,129 +1052,121 @@ export default function JobAssignmentMatrix() {
                 Fetching...
               </Badge>
             )}
-            <div className="hidden lg:block">
-              <PerformanceIndicator
-                assignmentCount={yearJobs.length * filteredTechnicians.length}
-                availabilityCount={filteredTechnicians.length * dateRange.length}
-                cellCount={filteredTechnicians.length * dateRange.length}
-                isInitialLoading={isInitialMatrixLoad}
-                isFetching={isBackgroundFetchingMatrix}
-              />
-            </div>
           </div>
-        </div>
-
-        {/* Mobile quick controls + filter toggle */}
-        <div className="md:hidden mt-2">
-          <div className="flex items-center justify-between gap-2">
-            <button
-              className="text-sm font-medium px-3 py-2 border rounded-md bg-background"
-              onClick={() => setFiltersOpen(v => !v)}
-              aria-expanded={filtersOpen}
-              aria-controls="mobile-filters"
-            >
-              Filters {activeFilterCount > 0 && <span className="ml-2 inline-flex items-center justify-center text-[10px] h-5 min-w-[20px] px-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">{activeFilterCount}</span>}
-            </button>
-            {/* Quick direct assign toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs">Direct</span>
-              <Switch
-                checked={allowDirectAssign}
-                onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))}
-                aria-label="Toggle direct assignment"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <Badge variant="secondary" className="text-xs">
-                {filteredTechnicians.length} techs
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                {yearJobs.length} jobs
-              </Badge>
-              {isBackgroundFetchingMatrix && (
-                <Badge variant="outline" className="text-[10px] flex items-center gap-1">
-                  <RefreshCw className="h-3 w-3 animate-spin" />
-                  Fetching...
-                </Badge>
-              )}
-            </div>
-          </div>
-          {filtersOpen && (
-            <div id="mobile-filters" className="mt-2 max-h-[300px] overflow-y-auto p-2 border rounded-md bg-muted/30 space-y-2">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                <span className="text-sm font-medium">Filters</span>
-                {activeFilterCount > 0 && (
-                  <button
-                    className="ml-auto text-xs underline"
-                    onClick={() => {
-                      resetDepartmentToDefault();
-                      setSearchTerm('');
-                      setSelectedSkills([]);
-                      setHideFridge(false);
-                      setAllowDirectAssign(false);
-                    }}
-                  >
-                    Clear all
-                  </button>
-                )}
-              </div>
-              <Tabs
-                value={selectedDepartment}
-                onValueChange={(value) => handleDepartmentChange(value as Department)}
-                className="w-full"
-              >
-                <TabsList className="flex w-full overflow-x-auto rounded-md bg-muted p-1 gap-1">
-                  {AVAILABLE_DEPARTMENTS.map((dept) => (
-                    <TabsTrigger
-                      key={dept}
-                      value={dept}
-                      className="flex-1 whitespace-nowrap capitalize"
-                    >
-                      {DEPARTMENT_LABELS[dept] || formatLabel(dept)}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-              <Input
-                placeholder="Search technicians..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <SkillsFilter selected={selectedSkills} onChange={setSelectedSkills} department={selectedDepartment} />
-              {specialtyOptions.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {specialtyOptions.map((opt) => (
-                    <Badge
-                      key={opt}
-                      variant={selectedSkills.includes(opt) ? 'default' : 'outline'}
-                      className="cursor-pointer capitalize"
-                      onClick={() => toggleSpecialty(opt)}
-                    >
-                      {opt}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Refrigerator className="h-4 w-4" />
-                  <span className="text-sm font-medium">{hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={hideFridge} onCheckedChange={(v) => setHideFridge(Boolean(v))} aria-label={hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'} />
-                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{fridgeCount}</Badge>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Direct assign</span>
-                <Switch checked={allowDirectAssign} onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))} aria-label="Toggle direct assignment" />
-              </div>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Mobile quick controls + filter toggle */}
+      <div className="md:hidden mt-2">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            className="text-sm font-medium px-3 py-2 border rounded-md bg-background"
+            onClick={() => setFiltersOpen(v => !v)}
+            aria-expanded={filtersOpen}
+            aria-controls="mobile-filters"
+          >
+            Filters {activeFilterCount > 0 && <span className="ml-2 inline-flex items-center justify-center text-[10px] h-5 min-w-[20px] px-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">{activeFilterCount}</span>}
+          </button>
+          {/* Quick direct assign toggle */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs">Direct</span>
+            <Switch
+              checked={allowDirectAssign}
+              onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))}
+              aria-label="Toggle direct assignment"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            <Badge variant="secondary" className="text-xs">
+              {filteredTechnicians.length} techs
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              {yearJobs.length} jobs
+            </Badge>
+            {isBackgroundFetchingMatrix && (
+              <Badge variant="outline" className="text-[10px] flex items-center gap-1">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                Fetching...
+              </Badge>
+            )}
+          </div>
+        </div>
+        {filtersOpen && (
+          <div id="mobile-filters" className="mt-2 max-h-[300px] overflow-y-auto p-2 border rounded-md bg-muted/30 space-y-2">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              <span className="text-sm font-medium">Filters</span>
+              {activeFilterCount > 0 && (
+                <button
+                  className="ml-auto text-xs underline"
+                  onClick={() => {
+                    resetDepartmentToDefault();
+                    setSearchTerm('');
+                    setSelectedSkills([]);
+                    setHideFridge(false);
+                    setAllowDirectAssign(false);
+                  }}
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+            <Tabs
+              value={selectedDepartment}
+              onValueChange={(value) => handleDepartmentChange(value as Department)}
+              className="w-full"
+            >
+              <TabsList className="flex w-full overflow-x-auto rounded-md bg-muted p-1 gap-1">
+                {AVAILABLE_DEPARTMENTS.map((dept) => (
+                  <TabsTrigger
+                    key={dept}
+                    value={dept}
+                    className="flex-1 whitespace-nowrap capitalize"
+                  >
+                    {DEPARTMENT_LABELS[dept] || formatLabel(dept)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            <Input
+              placeholder="Search technicians..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <SkillsFilter selected={selectedSkills} onChange={setSelectedSkills} department={selectedDepartment} />
+            {specialtyOptions.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {specialtyOptions.map((opt) => (
+                  <Badge
+                    key={opt}
+                    variant={selectedSkills.includes(opt) ? 'default' : 'outline'}
+                    className="cursor-pointer capitalize"
+                    onClick={() => toggleSpecialty(opt)}
+                  >
+                    {opt}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Refrigerator className="h-4 w-4" />
+                <span className="text-sm font-medium">{hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={hideFridge} onCheckedChange={(v) => setHideFridge(Boolean(v))} aria-label={hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'} />
+                <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{fridgeCount}</Badge>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Direct assign</span>
+              <Switch checked={allowDirectAssign} onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))} aria-label="Toggle direct assignment" />
+            </div>
+          </div>
+        )}
+      </div>
+
 
       {/* Matrix Content */}
       <div className="flex-1 overflow-hidden">
@@ -1248,6 +1240,6 @@ export default function JobAssignmentMatrix() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }

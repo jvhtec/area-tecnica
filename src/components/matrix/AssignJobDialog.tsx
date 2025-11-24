@@ -635,7 +635,7 @@ export const AssignJobDialog = ({
                   <SelectContent>
                     {filteredJobs.length === 0 ? (
                       <div className="p-2 text-sm text-muted-foreground">
-                        No jobs available for this date
+                        No hay trabajos disponibles para esta fecha
                       </div>
                     ) : (
                       filteredJobs.map((job) => (

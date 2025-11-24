@@ -43,22 +43,22 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
 
     // Validation
     if (!formData.email || !formData.firstName || !formData.lastName) {
-      setError("Please fill in all required fields");
+      setError("Por favor rellena todos los campos obligatorios");
       return;
     }
 
     if (!preventAutoLogin && !formData.password) {
-      setError("Password is required");
+      setError("La contraseña es obligatoria");
       return;
     }
 
     if (!preventAutoLogin && formData.password.length < 6) {
-      setError("Password must be at least 6 characters long");
+      setError("La contraseña debe tener al menos 6 caracteres");
       return;
     }
 
     if (!preventAutoLogin && formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
+      setError("Las contraseñas no coinciden");
       return;
     }
 
@@ -114,9 +114,9 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
   return (
     <form onSubmit={handleSignUp} className="space-y-4">
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold">Create Account</h2>
+        <h2 className="text-2xl font-bold">Crear Cuenta</h2>
         <p className="text-muted-foreground mt-2">
-          Fill in your details to get started
+          Rellena tus datos para comenzar
         </p>
       </div>
 
@@ -128,7 +128,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="firstName">First Name *</Label>
+          <Label htmlFor="firstName">Nombre *</Label>
           <Input
             id="firstName"
             type="text"
@@ -138,17 +138,17 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="nickname">Nickname</Label>
+          <Label htmlFor="nickname">Apodo</Label>
           <Input
             id="nickname"
             type="text"
             value={formData.nickname}
             onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
-            placeholder="Optional"
+            placeholder="Opcional"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="lastName">Last Name *</Label>
+          <Label htmlFor="lastName">Apellidos *</Label>
           <Input
             id="lastName"
             type="text"
@@ -160,7 +160,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="signup-email">Email *</Label>
+        <Label htmlFor="signup-email">Correo *</Label>
         <Input
           id="signup-email"
           type="email"
@@ -173,7 +173,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
       {!preventAutoLogin && (
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="signup-password">Password *</Label>
+            <Label htmlFor="signup-password">Contraseña *</Label>
             <Input
               id="signup-password"
               type="password"
@@ -184,7 +184,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password *</Label>
+            <Label htmlFor="confirmPassword">Confirmar Contraseña *</Label>
             <Input
               id="confirmPassword"
               type="password"
@@ -198,7 +198,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="phone">Phone</Label>
+        <Label htmlFor="phone">Teléfono</Label>
         <Input
           id="phone"
           type="tel"
@@ -208,17 +208,17 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="department">Department</Label>
+        <Label htmlFor="department">Departamento</Label>
         <Select value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
           <SelectTrigger>
-            <SelectValue placeholder="Select department" />
+            <SelectValue placeholder="Seleccionar departamento" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="sound">Sound</SelectItem>
-            <SelectItem value="lights">Lights</SelectItem>
+            <SelectItem value="sound">Sonido</SelectItem>
+            <SelectItem value="lights">Iluminación</SelectItem>
             <SelectItem value="video">Video</SelectItem>
-            <SelectItem value="logistics">Logistics</SelectItem>
-            <SelectItem value="management">Management</SelectItem>
+            <SelectItem value="logistics">Logística</SelectItem>
+            <SelectItem value="management">Gestión</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -247,7 +247,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
       {preventAutoLogin && (
         <div className="space-y-3 border rounded-md p-3">
           <div className="space-y-2">
-            <Label htmlFor="flexResourceId">Flex Resource ID (optional)</Label>
+            <Label htmlFor="flexResourceId">ID de Recurso Flex (opcional)</Label>
             <Input
               id="flexResourceId"
               type="text"
@@ -257,7 +257,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="flexUrl">Flex Contact URL (paste then Extract)</Label>
+            <Label htmlFor="flexUrl">URL de Contacto Flex (pegar y extraer)</Label>
             <div className="flex gap-2">
               <Input
                 id="flexUrl"
@@ -275,7 +275,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
                   if (m) setFormData({ ...formData, flexResourceId: m });
                 }}
               >
-                Extract
+                Extraer
               </Button>
               <Button
                 type="button"
@@ -291,7 +291,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
                   }
                 }}
               >
-                Paste URL
+                Pegar URL
               </Button>
               <Button
                 type="button"
@@ -319,9 +319,9 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
                       department: m.department || prev.department,
                       flexResourceId: data?.contact_id || prev.flexResourceId,
                     }));
-                    toast({ title: 'Fetched from Flex', description: 'Fields have been autofilled.' });
+                    toast({ title: 'Obtenido de Flex', description: 'Los campos se han autocompletado.' });
                   } catch (e: any) {
-                    toast({ title: 'Flex fetch failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+                    toast({ title: 'Fallo al obtener de Flex', description: e?.message || 'Error desconocido', variant: 'destructive' });
                   } finally {
                     setIsFetchingFlex(false);
                   }
@@ -330,15 +330,15 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
                 {isFetchingFlex ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Fetching…
+                    Obteniendo…
                   </>
                 ) : (
-                  'Fetch from Flex'
+                  'Obtener de Flex'
                 )}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Example: https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact/4b0d98e0-e700-11ea-97d0-2a0a4490a7fb/phone
+              Ejemplo: https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact/4b0d98e0-e700-11ea-97d0-2a0a4490a7fb/phone
             </p>
           </div>
           <div className="flex items-center gap-2 pt-1">
@@ -353,17 +353,17 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creating Account...
+              Creando Cuenta...
             </>
           ) : (
-            preventAutoLogin ? 'Create User' : 'Create Account'
+            preventAutoLogin ? 'Crear Usuario' : 'Crear Cuenta'
           )}
         </Button>
 
         {onBack && (
           <Button type="button" variant="ghost" onClick={onBack}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Login
+            Volver al Inicio de Sesión
           </Button>
         )}
       </div>
