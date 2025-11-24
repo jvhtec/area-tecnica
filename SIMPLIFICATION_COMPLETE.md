@@ -35,6 +35,15 @@ Successfully refactored the job_assignments architecture back to the original si
 - One assignment per job+tech, multiple timesheets for confirmed days
 - Handles both single-day and batch confirmations cleanly
 
+✅ **supabase/functions/tech-calendar-ics/index.ts** - CRITICAL FIX
+- **MAJOR REFACTOR**: Generates ICS calendar files for technicians
+- **Problem**: Was using single_day/assignment_date to determine event dates
+- **Impact**: After migration would show ALL assignments as full-job spans (WRONG!)
+- **Solution**: Now queries timesheets directly for actual work dates
+- Each timesheet record = one calendar event with correct date
+- Maintains all functionality using simplified architecture
+- **THIS WAS CRITICAL** - would have broken calendar subscriptions
+
 ### Phase 6: Frontend
 ✅ **src/types/assignment.ts**
 - Marked single_day and assignment_date as deprecated
@@ -45,6 +54,20 @@ Successfully refactored the job_assignments architecture back to the original si
 
 ✅ **src/hooks/useOptimizedMatrixData.ts**
 - Added deprecation notes for backward compatibility
+
+✅ **Frontend Components (27 files with references)**
+- Most only use deprecated fields for display (badges/labels showing "día 2025-01-15")
+- After migration: badges won't show (fields will be false/null)
+- **No functional impact** - matrix is driven by timesheets anyway
+- Components: AssignJobDialog, OptimizedMatrixCell, PersonalCalendar, JobAssignments, etc.
+- Cleanup can be done incrementally without affecting functionality
+
+### Phase 7: Future Column Removal
+✅ **supabase/migrations/20251201000000_drop_deprecated_columns.sql**
+- Migration to permanently drop single_day and assignment_date columns
+- **Intentionally dated in future** (Dec 1) to prevent accidental premature execution
+- Includes verification checks before dropping
+- **Run ONLY after 1+ week of production verification**
 
 ## Key Improvements
 
@@ -107,6 +130,7 @@ await supabase
 - [ ] Tour assignments: assign to tour → verify in job matrix
 - [ ] Batch staffing requests with multiple dates
 - [ ] Whole-job vs single-day confirmations
+- [ ] **ICS Calendar subscriptions** - CRITICAL: verify shows correct per-day events
 
 ### Expected Behavior
 ✅ Assignments appear in matrix (via timesheets)
@@ -142,16 +166,20 @@ git revert HEAD~2  # or specific commit
 1. **Deploy to staging/production**
    ```bash
    git push origin claude/fix-staffing-click-confirmation-01RtxW35RAuSYxTAng7G6tkF
-   supabase db push  # runs migrations
+   supabase db push  # runs first 4 migrations only (20251125*)
    supabase functions deploy staffing-click
+   supabase functions deploy tech-calendar-ics  # CRITICAL - calendar fix
    ```
 
 2. **Verify in production** (use testing checklist above)
+   - **IMPORTANT**: Test ICS calendar subscriptions work correctly
+   - Verify calendar shows correct per-day events, not full-job spans
+   - Check that technician calendars update properly
 
 3. **After 1 week of stable operation**
-   - Create migration to DROP deprecated columns
-   - Optimize conflict detection to use timesheets
-   - Clean up remaining UI references
+   - Run final migration: `supabase migration up 20251201000000_drop_deprecated_columns.sql`
+   - Optimize conflict detection to use timesheets (src/utils/technicianAvailability.ts)
+   - Clean up remaining UI references incrementally (27 files, non-critical)
 
 ## Files Changed
 
@@ -160,14 +188,17 @@ git revert HEAD~2  # or specific commit
 - supabase/migrations/20251125000001_consolidate_assignments.sql (new)
 - supabase/migrations/20251125000002_simplify_schema.sql (new)
 - supabase/migrations/20251125000003_update_functions.sql (new)
+- supabase/migrations/20251201000000_drop_deprecated_columns.sql (new - future)
 
 ### Edge Functions
 - supabase/functions/staffing-click/index.ts (major refactor)
+- supabase/functions/tech-calendar-ics/index.ts (CRITICAL refactor)
 
 ### Frontend
 - src/types/assignment.ts (deprecation comments)
 - src/utils/technicianAvailability.ts (TODO + deprecation notes)
 - src/hooks/useOptimizedMatrixData.ts (deprecation comments)
+- 27 display components (backward compatible, non-critical)
 
 ## Conclusion
 
