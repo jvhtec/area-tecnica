@@ -10,6 +10,7 @@ import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 export interface AssignmentInsertOptions {
   singleDay?: boolean;
   singleDayDate?: string | null;
+  addAsConfirmed?: boolean;
 }
 
 export const buildAssignmentInsertPayload = (
@@ -23,6 +24,7 @@ export const buildAssignmentInsertPayload = (
   const normalizedSound = soundRole !== "none" ? soundRole : null;
   const normalizedLights = lightsRole !== "none" ? lightsRole : null;
   const shouldFlagSingleDay = !!options?.singleDay && !!options?.singleDayDate;
+  const isConfirmed = !!options?.addAsConfirmed;
 
   return {
     job_id: jobId,
@@ -31,6 +33,8 @@ export const buildAssignmentInsertPayload = (
     lights_role: normalizedLights,
     assigned_by: assignedBy,
     assigned_at: new Date().toISOString(),
+    status: isConfirmed ? 'confirmed' : 'invited',
+    response_time: isConfirmed ? new Date().toISOString() : null,
     single_day: shouldFlagSingleDay,
     // Standardized: use only assignment_date
     assignment_date: shouldFlagSingleDay ? options?.singleDayDate ?? null : null,
@@ -200,7 +204,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
             job_id: jobId,
             recipient_id: technicianId,
             recipient_name: recipientName || undefined,
-            assignment_status: 'confirmed',
+            assignment_status: options?.addAsConfirmed ? 'confirmed' : 'invited',
             target_date: options?.singleDayDate ? `${options.singleDayDate}T00:00:00Z` : undefined,
             single_day: options?.singleDay || false
           }
