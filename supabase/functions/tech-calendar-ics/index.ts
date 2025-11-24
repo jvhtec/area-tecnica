@@ -6,9 +6,6 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 type AssignmentRow = {
   job_id: string;
-  status: string | null;
-  single_day: boolean | null;
-  assignment_date: string | null; // yyyy-mm-dd
   sound_role?: string | null;
   lights_role?: string | null;
   video_role?: string | null;
@@ -115,25 +112,34 @@ serve(async (req) => {
   const startWindow = new Date(now.getTime() - daysBack * 24 * 3600 * 1000);
   const endWindow = new Date(now.getTime() + daysFwd * 24 * 3600 * 1000);
 
-  // 1) Fetch assignments for technician (confirmed/direct only)
-  const { data: assigns, error: aErr } = await supabase
-    .from('job_assignments')
-    .select('job_id,status,single_day,assignment_date,sound_role,lights_role,video_role')
-    .eq('technician_id', tid)
-    .eq('status', 'confirmed');
+  // SIMPLIFIED: After architecture simplification, we query timesheets to get actual work dates
+  // Each timesheet represents a day the technician is scheduled to work
 
-  if (aErr) {
-    return new Response('Failed to load assignments', { status: 500 });
+  const startDate = startWindow.toISOString().split('T')[0];
+  const endDate = endWindow.toISOString().split('T')[0];
+
+  // 1) Fetch timesheets for technician in date window
+  const { data: timesheets, error: tsErr } = await supabase
+    .from('timesheets')
+    .select('job_id, date')
+    .eq('technician_id', tid)
+    .gte('date', startDate)
+    .lte('date', endDate);
+
+  if (tsErr) {
+    return new Response('Failed to load timesheets', { status: 500 });
   }
 
-  const jobIds = Array.from(new Set((assigns ?? []).map((a: AssignmentRow) => a.job_id)));
-  if (jobIds.length === 0) {
+  if (!timesheets || timesheets.length === 0) {
     const ics = buildCalendar(profile, []);
     const etag = await sha1(ics);
     return new Response(ics, { status: 200, headers: { 'Content-Type': 'text/calendar; charset=UTF-8', 'Cache-Control': 'public, max-age=900', 'ETag': `W/"${etag}"` } });
   }
 
-  // 2) Fetch jobs referenced by assignments
+  // Get unique job IDs from timesheets
+  const jobIds = Array.from(new Set(timesheets.map(ts => ts.job_id)));
+
+  // 2) Fetch job metadata
   const { data: jobs, error: jErr } = await supabase
     .from('jobs')
     .select('id,title,start_time,end_time,timezone')
@@ -146,12 +152,27 @@ serve(async (req) => {
   const jobMap = new Map<string, JobRow>();
   for (const j of (jobs ?? []) as JobRow[]) jobMap.set(j.id, j);
 
-  // 3) Build events
+  // 3) Fetch assignment metadata for roles
+  const { data: assigns, error: aErr } = await supabase
+    .from('job_assignments')
+    .select('job_id,sound_role,lights_role,video_role')
+    .eq('technician_id', tid)
+    .in('job_id', jobIds);
+
+  const assignMap = new Map<string, AssignmentRow>();
+  for (const a of (assigns ?? [])) {
+    assignMap.set(a.job_id, a as AssignmentRow);
+  }
+
+  // 4) Build events - one per timesheet (per day worked)
   const events: Array<{ uid: string; summary: string; description: string; dtStart: Date; dtEnd: Date } > = [];
 
-  for (const a of (assigns ?? []) as AssignmentRow[]) {
-    const j = jobMap.get(a.job_id);
+  for (const ts of timesheets) {
+    const j = jobMap.get(ts.job_id);
     if (!j) continue;
+
+    const a = assignMap.get(ts.job_id);
+    const workDate = ts.date; // yyyy-mm-dd
 
     const baseStartIso = j.start_time ?? '';
     const baseEndIso = j.end_time ?? '';
@@ -159,55 +180,42 @@ serve(async (req) => {
     let evStart: Date | null = null;
     let evEnd: Date | null = null;
 
-    if (a.single_day && a.assignment_date) {
-      if (baseStartIso && baseEndIso) {
-        const sIso = replaceIsoDateKeepingTimeAndOffset(baseStartIso, a.assignment_date);
-        const eIso = replaceIsoDateKeepingTimeAndOffset(baseEndIso, a.assignment_date);
-        evStart = new Date(sIso);
-        evEnd = new Date(eIso);
-        // If end <= start (overnight or invalid), push end by 24h
-        if (!(evEnd.getTime() > evStart.getTime())) {
-          evEnd = new Date(evStart.getTime() + 2 * 3600 * 1000); // minimum 2h window
-        }
-      } else if (baseStartIso) {
-        const sIso = replaceIsoDateKeepingTimeAndOffset(baseStartIso, a.assignment_date);
-        evStart = new Date(sIso);
+    // Use the work date with job times
+    if (baseStartIso && baseEndIso) {
+      const sIso = replaceIsoDateKeepingTimeAndOffset(baseStartIso, workDate);
+      const eIso = replaceIsoDateKeepingTimeAndOffset(baseEndIso, workDate);
+      evStart = new Date(sIso);
+      evEnd = new Date(eIso);
+      // If end <= start (overnight or invalid), use 2h minimum
+      if (!(evEnd.getTime() > evStart.getTime())) {
         evEnd = new Date(evStart.getTime() + 2 * 3600 * 1000);
-      } else {
-        // All-day fallback on assignment_date
-        evStart = new Date(`${a.assignment_date}T00:00:00Z`);
-        evEnd = new Date(evStart.getTime() + 24 * 3600 * 1000);
       }
+    } else if (baseStartIso) {
+      const sIso = replaceIsoDateKeepingTimeAndOffset(baseStartIso, workDate);
+      evStart = new Date(sIso);
+      evEnd = new Date(evStart.getTime() + 2 * 3600 * 1000);
     } else {
-      // Whole-job assignment: use job window as-is
-      if (baseStartIso && baseEndIso) {
-        evStart = new Date(baseStartIso);
-        evEnd = new Date(baseEndIso);
-        if (!(evEnd.getTime() > evStart.getTime())) {
-          evEnd = new Date(evStart.getTime() + 2 * 3600 * 1000);
-        }
-      } else if (baseStartIso) {
-        evStart = new Date(baseStartIso);
-        evEnd = new Date(evStart.getTime() + 2 * 3600 * 1000);
-      }
+      // All-day fallback
+      evStart = new Date(`${workDate}T00:00:00Z`);
+      evEnd = new Date(evStart.getTime() + 24 * 3600 * 1000);
     }
 
     if (!evStart || !evEnd) continue;
 
-    // Filter by window overlap
+    // Filter by window overlap (should already be filtered by date query, but double-check)
     if (evEnd < startWindow || evStart > endWindow) continue;
 
-    const role = a.sound_role || a.lights_role || a.video_role || null;
+    const role = a?.sound_role || a?.lights_role || a?.video_role || null;
     const roleText = role ? `[${role}] ` : '';
-    const dayHint = a.single_day && a.assignment_date ? ` (día ${a.assignment_date})` : '';
+    const dayHint = ` (día ${workDate})`;
     const summary = `${roleText}${j.title || 'Trabajo'}${dayHint}`;
-    const description = `Job: ${j.id}\nEstado: ${a.status || 'confirmed'}\nAsignación: ${a.single_day ? 'por día' : 'completa'}`;
-    const uid = `${j.id}-${tid}-${a.assignment_date || 'whole'}@area-tecnica-ics`;
+    const description = `Job: ${j.id}\nFecha: ${workDate}`;
+    const uid = `${j.id}-${tid}-${workDate}@area-tecnica-ics`;
 
     events.push({ uid, summary, description, dtStart: evStart, dtEnd: evEnd });
   }
 
-  // 4) Render ICS
+  // 5) Render ICS
   const ics = buildCalendar(profile, events);
   const etag = await sha1(ics);
   return new Response(ics, {
