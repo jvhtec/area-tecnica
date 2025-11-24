@@ -379,12 +379,38 @@ serve(async (req) => {
           else if (prof.department === 'lights') rolePatch['lights_role'] = chosenRole;
           else if (prof.department === 'video') rolePatch['video_role'] = chosenRole;
 
-          // Create or update the single assignment record (simple upsert now!)
-          console.log('🧾 Creating/updating assignment', {
-            job_id: row.job_id,
-            technician_id: row.profile_id,
-            batch_id: (row as any)?.batch_id || null,
+          // 5) Check for conflicts before auto-assigning
+          const targetDate = (row as any).target_date ?? null;
+          const conflictCheck = detectConflictForAssignment({
+            targetDate,
+            existingAssignmentWindows,
+            jobInfo: job ? {
+              title: job.title ?? null,
+              start: job.start_time ? new Date(job.start_time) : null,
+              end: job.end_time ? new Date(job.end_time) : null,
+              rawStart: job.start_time ?? null,
+              rawEnd: job.end_time ?? null,
+            } : undefined,
+            jobId: row.job_id,
+            jobStartTime: job?.start_time ?? null,
+            jobEndTime: job?.end_time ?? null,
           });
+
+          if (conflictCheck.conflict) {
+            console.warn('⚠️ Auto-assign skipped due to conflict', conflictCheck.meta);
+            await supabase.from('staffing_events').insert({
+              staffing_request_id: rid,
+              event: 'auto_assign_skipped_conflict',
+              meta: conflictCheck.meta
+            });
+            // Skip auto-assignment but don't fail the whole request
+          } else {
+            // Create or update the single assignment record (simple upsert now!)
+            console.log('🧾 Creating/updating assignment', {
+              job_id: row.job_id,
+              technician_id: row.profile_id,
+              batch_id: (row as any)?.batch_id || null,
+            });
 
           const { error: assignUpsertErr } = await supabase
             .from('job_assignments')
@@ -538,6 +564,7 @@ serve(async (req) => {
               meta: { role: chosenRole, department: prof.department }
             });
           }
+          } // End of conflict check else block
       } catch (autoAssignErr) {
         console.error('Auto-assign error on confirm:', autoAssignErr);
         await supabase.from('staffing_events').insert({
