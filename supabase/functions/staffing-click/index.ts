@@ -373,241 +373,122 @@ serve(async (req) => {
             });
           }
 
-          // 4) Upsert assignment(s): handles single or batch dates
-          async function upsertAssignmentFor(targetDate: string | null) {
-            console.log('🧾 upsertAssignmentFor invoked', {
+          // 4) SIMPLIFIED: Create one assignment per job+tech, then create timesheets for confirmed days
+          const rolePatch: Record<string, string | null> = {};
+          if (prof.department === 'sound') rolePatch['sound_role'] = chosenRole;
+          else if (prof.department === 'lights') rolePatch['lights_role'] = chosenRole;
+          else if (prof.department === 'video') rolePatch['video_role'] = chosenRole;
+
+          // Create or update the single assignment record (simple upsert now!)
+          console.log('🧾 Creating/updating assignment', {
+            job_id: row.job_id,
+            technician_id: row.profile_id,
+            batch_id: (row as any)?.batch_id || null,
+          });
+
+          const { error: assignErr } = await supabase
+            .from('job_assignments')
+            .upsert({
               job_id: row.job_id,
               technician_id: row.profile_id,
-              targetDate,
-              batch_id: (row as any)?.batch_id || null,
+              status: 'confirmed',
+              assigned_at: new Date().toISOString(),
+              assignment_source: 'staffing',
+              response_time: new Date().toISOString(),
+              ...rolePatch
+            }, { onConflict: 'job_id,technician_id' });
+
+          if (assignErr) {
+            console.error('❌ job_assignments upsert failed', assignErr);
+            await supabase.from('staffing_events').insert({
+              staffing_request_id: rid,
+              event: 'auto_assign_upsert_error',
+              meta: { message: assignErr.message }
             });
-              const rolePatch: Record<string, string | null> = {};
-              if (prof.department === 'sound') rolePatch['sound_role'] = chosenRole;
-              else if (prof.department === 'lights') rolePatch['lights_role'] = chosenRole;
-              else if (prof.department === 'video') rolePatch['video_role'] = chosenRole;
-              const upsertPayload: any = {
-                job_id: row.job_id,
-                technician_id: row.profile_id,
-                status: 'confirmed',
-                assigned_at: new Date().toISOString(),
-                assignment_source: 'staffing',
-                response_time: new Date().toISOString(),
-                ...rolePatch
-              };
-              if (targetDate) {
-                upsertPayload.single_day = true;
-                upsertPayload.assignment_date = targetDate;
-              } else {
-                // Be explicit for whole-job rows to satisfy partial-unique predicate
-                upsertPayload.single_day = false;
-                upsertPayload.assignment_date = null;
-              }
-              // Use explicit update-then-insert logic instead of .upsert()
-              // This is necessary because partial unique indexes require WHERE clauses
-              // in ON CONFLICT, which the Supabase JS client doesn't support
-              let upsertErr: any = null;
-              let upsertAttemptSummary: string | null = null;
+          } else {
+            console.log('✅ job_assignment created/updated');
+            await supabase.from('staffing_events').insert({
+              staffing_request_id: rid,
+              event: 'auto_assign_upsert_ok',
+              meta: { role: chosenRole, department: prof.department }
+            });
 
-              try {
-                const updateQuery = supabase
-                  .from('job_assignments')
-                  .update(upsertPayload)
-                  .eq('job_id', row.job_id)
-                  .eq('technician_id', row.profile_id);
-                const updateExec = targetDate
-                  ? updateQuery.eq('single_day', true).eq('assignment_date', targetDate)
-                  : updateQuery.eq('single_day', false).is('assignment_date', null);
-                const { data: updRows, error: updErr } = await updateExec.select('id');
-                if (!updErr && Array.isArray(updRows) && updRows.length > 0) {
-                  upsertErr = null;
-                  upsertAttemptSummary = targetDate ? 'update-per-day' : 'update-whole-job';
-                } else {
-                  const { error: insErr } = await supabase
-                    .from('job_assignments')
-                    .insert(upsertPayload);
-                  if (!insErr) {
-                    upsertErr = null;
-                    upsertAttemptSummary = targetDate ? 'insert-per-day' : 'insert-whole-job';
-                  } else {
-                    upsertAttemptSummary = 'insert-failed';
-                    upsertErr = insErr;
-                  }
-                }
-              } catch (fbErr) {
-                upsertAttemptSummary = 'exception';
-                upsertErr = fbErr;
-              }
+            // Create timesheets for the confirmed days
+            const jobType = (job as any)?.job_type;
+            if (jobType === 'dryhire') {
+              console.log('⏭️ Skipping timesheet creation for dryhire job');
+            } else {
+              const isScheduleOnly = jobType === 'tourdate';
+              const timesheetRows: Array<{ job_id: string; technician_id: string; date: string; is_schedule_only: boolean; source: string }> = [];
 
-              if (upsertErr) {
-                console.error('❌ job_assignments upsert failed', {
-                  job_id: row.job_id,
-                  technician_id: row.profile_id,
-                  targetDate,
-                  attemptSummary: upsertAttemptSummary,
-                  error: upsertErr,
-                });
-                await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_error', meta: { message: upsertErr.message, target_date: targetDate, attempt: upsertAttemptSummary } });
-              } else {
-                const { data: assignmentProbe, error: probeErr } = await supabase
-                  .from('job_assignments')
-                  .select('id,assignment_date,status')
-                  .eq('job_id', row.job_id)
-                  .eq('technician_id', row.profile_id)
-                  .order('assignment_date', { ascending: true });
-                if (probeErr) {
-                  console.warn('⚠️ Unable to verify job_assignments after upsert', { job_id: row.job_id, technician_id: row.profile_id, error: probeErr });
-                } else {
-                  console.log('✅ job_assignments verification', {
-                    job_id: row.job_id,
-                    technician_id: row.profile_id,
-                    targetDate,
-                    attemptSummary: upsertAttemptSummary,
-                    assignmentDates: (assignmentProbe || []).map(a => ({ id: a.id, assignment_date: a.assignment_date, status: a.status })),
-                  });
-                }
-                await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_ok', meta: { role: chosenRole, department: prof.department, target_date: targetDate, attempt: upsertAttemptSummary } });
-
-                // Create timesheet entries for the assignment
-                // Timesheets are the source of truth for the assignment matrix
-                try {
-                  const jobType = (job as any)?.job_type;
-
-                  // Dryhire jobs don't require staff - skip timesheet creation entirely
-                  if (jobType === 'dryhire') {
-                    console.log('⏭️ Skipping timesheet creation for dryhire job');
-                  } else {
-                    // Tourdate jobs are schedule-only (no hours tracking)
-                    const isScheduleOnly = jobType === 'tourdate';
-
-                    if (targetDate) {
-                      // Single-day assignment - create one timesheet
-                      const { error: tsErr } = await supabase
-                        .from('timesheets')
-                        .upsert({
-                          job_id: row.job_id,
-                          technician_id: row.profile_id,
-                          date: targetDate,
-                          is_schedule_only: isScheduleOnly,
-                          source: 'staffing'
-                        }, { onConflict: 'job_id,technician_id,date' });
-                      if (tsErr) {
-                        console.warn('⚠️ Timesheet creation failed for single-day:', { targetDate, error: tsErr });
-                      } else {
-                        console.log('✅ Timesheet created for single-day:', { targetDate, isScheduleOnly });
-                      }
-                    } else if (job?.start_time && job?.end_time) {
-                      // Whole-job assignment - create timesheets for each day of job span
-                      const jobStart = new Date(job.start_time);
-                      const jobEnd = new Date(job.end_time);
-                      const timesheetRows: Array<{ job_id: string; technician_id: string; date: string; is_schedule_only: boolean; source: string }> = [];
-
-                      for (let d = new Date(jobStart); d <= jobEnd; d.setDate(d.getDate() + 1)) {
-                        const dateStr = d.toISOString().split('T')[0];
-                        timesheetRows.push({
-                          job_id: row.job_id,
-                          technician_id: row.profile_id,
-                          date: dateStr,
-                          is_schedule_only: isScheduleOnly,
-                          source: 'staffing'
-                        });
-                      }
-
-                      if (timesheetRows.length > 0) {
-                        const { error: tsErr } = await supabase
-                          .from('timesheets')
-                          .upsert(timesheetRows, { onConflict: 'job_id,technician_id,date' });
-                        if (tsErr) {
-                          console.warn('⚠️ Timesheet creation failed for whole-job:', { dates: timesheetRows.length, error: tsErr });
-                        } else {
-                          console.log('✅ Timesheets created for whole-job:', { dates: timesheetRows.length, isScheduleOnly });
-                        }
-                      }
-                    }
-                  }
-                } catch (tsError) {
-                  console.warn('⚠️ Non-blocking timesheet creation error:', tsError);
-                }
-              }
-            }
-
-            if ((row as any)?.batch_id) {
-              const updatedIds = new Set((updatedBatchRows ?? []).map(r => r.id));
-              let targetRows = updatedBatchRows ?? [];
-
-              if (!targetRows.length) {
+              // Collect all confirmed dates
+              if ((row as any)?.batch_id) {
+                // Batch: get all confirmed dates from batch rows
                 const { data: batchRows } = await supabase
                   .from('staffing_requests')
-                  .select('id,target_date,single_day,status')
+                  .select('target_date,single_day')
                   .eq('batch_id', (row as any).batch_id)
                   .eq('job_id', row.job_id)
                   .eq('profile_id', row.profile_id)
+                  .eq('status', 'confirmed')
                   .eq('phase', row.phase);
-                targetRows = (batchRows || []).filter(r => !updatedIds.size || updatedIds.has(r.id));
-              }
 
-              for (const br of targetRows) {
-                const isSingleDay = !!br.single_day;
-                const hasDate = typeof br.target_date === 'string' && br.target_date.trim().length > 0;
-                if (isSingleDay && !hasDate) {
-                  await supabase.from('staffing_events').insert({
-                    staffing_request_id: rid,
-                    event: 'auto_assign_skipped_no_date',
-                    meta: { request_id: br.id }
-                  });
-                  continue;
+                for (const br of (batchRows || [])) {
+                  if (br.target_date && typeof br.target_date === 'string') {
+                    timesheetRows.push({
+                      job_id: row.job_id,
+                      technician_id: row.profile_id,
+                      date: br.target_date,
+                      is_schedule_only: isScheduleOnly,
+                      source: 'staffing'
+                    });
+                  }
                 }
-
-                const assignmentDate = isSingleDay && hasDate ? br.target_date : null;
-                console.log('📅 Processing batch assignment row', {
-                  request_id: br.id,
-                  job_id: row.job_id,
-                  technician_id: row.profile_id,
-                  batch_id: (row as any).batch_id,
-                  assignmentDate,
-                });
-                const conflictResult = detectConflictForAssignment({
-                  targetDate: assignmentDate,
-                  existingAssignmentWindows,
-                  jobInfo: jobTimeMap.get(row.job_id),
-                  jobId: row.job_id,
-                  jobStartTime: job?.start_time ?? null,
-                  jobEndTime: job?.end_time ?? null,
-                });
-                if (conflictResult.conflict) {
-                  await supabase.from('staffing_events').insert({
-                    staffing_request_id: rid,
-                    event: 'auto_assign_skipped_conflict',
-                    meta: conflictResult.meta,
-                  });
-                  continue;
-                }
-                await upsertAssignmentFor(assignmentDate);
-              }
-            } else {
-              console.log('📅 Processing single assignment row', {
-                job_id: row.job_id,
-                technician_id: row.profile_id,
-                targetDate: (row as any).single_day && (row as any).target_date ? (row as any).target_date : null,
-              });
-              const singleTarget = (row as any).single_day && (row as any).target_date ? (row as any).target_date : null;
-              const conflictResult = detectConflictForAssignment({
-                targetDate: singleTarget,
-                existingAssignmentWindows,
-                jobInfo: jobTimeMap.get(row.job_id),
-                jobId: row.job_id,
-                jobStartTime: job?.start_time ?? null,
-                jobEndTime: job?.end_time ?? null,
-              });
-              if (conflictResult.conflict) {
-                await supabase.from('staffing_events').insert({
-                  staffing_request_id: rid,
-                  event: 'auto_assign_skipped_conflict',
-                  meta: conflictResult.meta,
-                });
               } else {
-                await upsertAssignmentFor(singleTarget);
+                // Single request: check if it's for a specific date or whole job
+                const targetDate = (row as any).target_date;
+                const isSingleDay = (row as any).single_day;
+
+                if (isSingleDay && targetDate) {
+                  // Single day confirmation
+                  timesheetRows.push({
+                    job_id: row.job_id,
+                    technician_id: row.profile_id,
+                    date: targetDate,
+                    is_schedule_only: isScheduleOnly,
+                    source: 'staffing'
+                  });
+                } else if (job?.start_time && job?.end_time) {
+                  // Whole job confirmation - create timesheets for all days
+                  const jobStart = new Date(job.start_time);
+                  const jobEnd = new Date(job.end_time);
+
+                  for (let d = new Date(jobStart); d <= jobEnd; d.setDate(d.getDate() + 1)) {
+                    timesheetRows.push({
+                      job_id: row.job_id,
+                      technician_id: row.profile_id,
+                      date: d.toISOString().split('T')[0],
+                      is_schedule_only: isScheduleOnly,
+                      source: 'staffing'
+                    });
+                  }
+                }
+              }
+
+              // Create all timesheets in one batch
+              if (timesheetRows.length > 0) {
+                const { error: tsErr } = await supabase
+                  .from('timesheets')
+                  .upsert(timesheetRows, { onConflict: 'job_id,technician_id,date' });
+
+                if (tsErr) {
+                  console.warn('⚠️ Timesheet creation failed:', { count: timesheetRows.length, error: tsErr });
+                } else {
+                  console.log('✅ Timesheets created:', { count: timesheetRows.length, isScheduleOnly });
+                }
               }
             }
+          }
 
             try {
               await fetch(`${SUPABASE_URL}/functions/v1/push`, {
