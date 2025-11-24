@@ -26,9 +26,9 @@ export function HouseTechOverridesPanel() {
     <Card>
       <CardHeader>
         <CardTitle className="flex flex-col gap-2 text-base sm:flex-row sm:items-end sm:justify-between">
-          <span>Tarifas internas</span>
+          <span>Tarifas personalizadas</span>
           <Input
-            placeholder="Buscar técnicos en plantilla"
+            placeholder="Buscar técnicos..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="sm:w-64"
@@ -38,7 +38,7 @@ export function HouseTechOverridesPanel() {
       <CardContent>
         {isLoading && <Skeleton className="h-32 w-full" />}
         {!isLoading && filtered.length === 0 && (
-          <p className="text-sm text-muted-foreground">No se encontraron técnicos en plantilla con ese nombre.</p>
+          <p className="text-sm text-muted-foreground">No se encontraron técnicos con ese nombre.</p>
         )}
         {!isLoading && filtered.length > 0 && (
           <Accordion type="single" collapsible className="space-y-2">
@@ -54,7 +54,7 @@ export function HouseTechOverridesPanel() {
                     </div>
                     <div className="flex items-center gap-2">
                       {tech.overrideBaseDay ? (
-                        <Badge variant="secondary">Tarifa interna: {formatCurrency(tech.overrideBaseDay)}</Badge>
+                        <Badge variant="secondary">Tarifa personalizada: {formatCurrency(tech.overrideBaseDay)}</Badge>
                       ) : (
                         <Badge variant="outline">Usando valor por defecto</Badge>
                       )}

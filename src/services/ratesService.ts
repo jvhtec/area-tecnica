@@ -122,7 +122,7 @@ export async function fetchHouseTechOverrides(): Promise<HouseTechOverrideListIt
   const { data: technicians, error: techniciansError } = await supabase
     .from('profiles')
     .select('id, first_name, last_name, default_timesheet_category, role')
-    .eq('role', 'house_tech')
+    .in('role', ['house_tech', 'technician'])
     .order('first_name', { ascending: true });
 
   if (techniciansError) throw techniciansError;
