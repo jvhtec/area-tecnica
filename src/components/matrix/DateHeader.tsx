@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { format, isToday, isWeekend } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar, Clock, Users } from 'lucide-react';
@@ -42,7 +43,7 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
         console.warn('Counts staffing_requests error', reqErr);
       }
 
-      const latestByTechPhase = new Map<string, { phase: 'availability'|'offer'; status: string | null; t: number }>();
+      const latestByTechPhase = new Map<string, { phase: 'availability' | 'offer'; status: string | null; t: number }>();
       (reqRows || []).forEach((r: any) => {
         const key = `${r.profile_id}-${r.phase}`;
         const t = r.updated_at ? new Date(r.updated_at).getTime() : 0;
@@ -89,7 +90,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
 
   const getJobIndicatorColors = () => {
     if (jobs.length === 0) return [];
-    
+
     // Get unique colors from jobs, fallback to default colors
     const colors = jobs.map(job => job.color || '#7E69AB');
     return [...new Set(colors)]; // Remove duplicates
@@ -166,7 +167,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <div 
+        <div
           className={cn(
             'border-r text-center text-xs font-medium bg-card cursor-pointer',
             'flex flex-col justify-center items-center relative transition-colors',
@@ -177,7 +178,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
               'ring-2 ring-blue-500/30 ring-inset': hasJobs,
             }
           )}
-          style={{ 
+          style={{
             width: `${width}px`,
             minWidth: `${width}px`,
             maxWidth: `${width}px`,
@@ -185,7 +186,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
           }}
         >
           <div className="font-semibold text-xs">
-            {format(date, 'EEE')}
+            {format(date, 'EEE', { locale: es })}
           </div>
           <div className={cn('text-base font-bold leading-tight', {
             'text-orange-700 dark:text-orange-300': isTodayHeader
@@ -193,14 +194,14 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
             {format(date, 'd')}
           </div>
           <div className="text-xs text-muted-foreground leading-tight">
-            {format(date, 'MMM')}
+            {format(date, 'MMM', { locale: es })}
           </div>
           {format(date, 'd') === '1' && (
             <div className="text-xs text-muted-foreground mt-0.5 leading-tight">
               {format(date, 'yyyy')}
             </div>
           )}
-          
+
           {/* Job indicators */}
           {hasJobs && (
             <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-1">
@@ -216,42 +217,42 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
               )}
             </div>
           )}
-          
+
           {/* Job count badge */}
           {hasJobs && (
             <div className="absolute top-0.5 right-0.5 flex flex-col items-end gap-0.5">
-              <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 leading-none" title="Jobs on this date">
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 leading-none" title="Trabajos en esta fecha">
                 {jobs.length}
               </Badge>
-              <Badge variant="default" className="text-[10px] px-1 py-0 h-4 leading-none" title="Confirmed technicians on this date">
+              <Badge variant="default" className="text-[10px] px-1 py-0 h-4 leading-none" title="Técnicos confirmados en esta fecha">
                 {confirmedForDate ?? 0}
               </Badge>
               {openSlots && openSlots.required > 0 && (
-                <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 leading-none" title="Open slots across jobs">
-                  {openSlots.open} open
+                <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 leading-none" title="Vacantes en todos los trabajos">
+                  {openSlots.open} libres
                 </Badge>
               )}
             </div>
           )}
         </div>
       </PopoverTrigger>
-      
+
       {hasJobs && (
         <PopoverContent className="w-80" side="bottom" align="center">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               <span className="font-medium">
-                {format(date, 'EEEE, MMMM d, yyyy')}
+                {format(date, 'EEEE, d MMMM, yyyy', { locale: es })}
               </span>
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Users className="h-3 w-3" />
-                <span>{jobs.length} job{jobs.length > 1 ? 's' : ''} scheduled</span>
+                <span>{jobs.length} trabajo{jobs.length !== 1 ? 's' : ''} programado{jobs.length !== 1 ? 's' : ''}</span>
               </div>
-              
+
               {jobs.map((job) => (
                 <JobRowWithCounts
                   key={job.id}
@@ -275,7 +276,7 @@ function JobRowWithCounts({ job, technicianIds, onJobClick }: { job: { id: strin
       className="p-2 border rounded-lg bg-card hover:bg-accent/30 cursor-pointer"
       style={{ borderLeftColor: job.color || '#7E69AB', borderLeftWidth: '3px' }}
       onClick={(e) => { e.stopPropagation(); onJobClick?.(job.id); }}
-      title="Click to sort technicians by engagement for this job"
+      title="Haz clic para ordenar técnicos por compromiso para este trabajo"
     >
       <div className="flex items-center justify-between">
         <div className="flex-1">
@@ -287,7 +288,7 @@ function JobRowWithCounts({ job, technicianIds, onJobClick }: { job: { id: strin
         </div>
         <div className="flex items-center gap-2">
           {job.status === 'Cancelado' && (
-            <Badge variant="destructive" className="text-[10px]">Call these people to cancel</Badge>
+            <Badge variant="destructive" className="text-[10px]">Llamar para cancelar</Badge>
           )}
           <Badge variant="outline" className="text-xs">
             {job.status}
@@ -295,14 +296,14 @@ function JobRowWithCounts({ job, technicianIds, onJobClick }: { job: { id: strin
         </div>
       </div>
       <div className="mt-2 flex gap-1 flex-wrap">
-        <Badge variant="secondary" className="text-[10px] h-5 px-1.5" title="Availability invitations pending">
+        <Badge variant="secondary" className="text-[10px] h-5 px-1.5" title="Invitaciones de disponibilidad pendientes">
           Inv: {counts?.invitations ?? 0}
         </Badge>
-        <Badge variant="secondary" className="text-[10px] h-5 px-1.5" title="Offers pending">
-          Offers: {counts?.offers ?? 0}
+        <Badge variant="secondary" className="text-[10px] h-5 px-1.5" title="Ofertas pendientes">
+          Ofertas: {counts?.offers ?? 0}
         </Badge>
-        <Badge variant="default" className="text-[10px] h-5 px-1.5" title="Confirmed assignments">
-          Confirmed: {counts?.confirmations ?? 0}
+        <Badge variant="default" className="text-[10px] h-5 px-1.5" title="Asignaciones confirmadas">
+          Conf: {counts?.confirmations ?? 0}
         </Badge>
       </div>
     </div>

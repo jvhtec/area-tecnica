@@ -1279,9 +1279,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 {(() => {
                                   const dates = technicianDatesMap.get(assignment.technician_id);
                                   if (dates && dates.size > 0) {
-                                    return dates.size === 1 ? 'Single-day' : 'Multi-day';
+                                    return dates.size === 1 ? 'Día único' : 'Varios días';
                                   }
-                                  return 'Single-day';
+                                  return 'Día único';
                                 })()}
                               </Badge>
                             )}
@@ -1329,7 +1329,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 {doc.file_name}
                                 {isTemplate && (
                                   <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                                    Template SoundVision File
+                                    Plantilla SoundVision
                                   </Badge>
                                 )}
                               </p>
@@ -1416,7 +1416,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                       <p className="text-muted-foreground">Buscando restaurantes cercanos...</p>
                     </div>
                   ) : restaurants && restaurants.length > 0 ? (
-                      <div className="space-y-3">
+                    <div className="space-y-3">
                       {restaurants.map((restaurant: Restaurant) => (
                         <div key={restaurant.id} className="p-3 bg-[#0f1219] border border-[#1f232e] rounded">
                           <div className="flex items-start justify-between gap-3 min-w-0">

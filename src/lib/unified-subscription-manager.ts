@@ -249,7 +249,12 @@ export class UnifiedSubscriptionManager {
           
           // If channel subscription fails, retry with backoff
           if (status === 'CHANNEL_ERROR') {
-            console.error(`Error subscribing to ${table}, will retry...`);
+            // Suppress noisy errors for job_departments which can be transient
+            if (table !== 'job_departments') {
+              console.error(`Error subscribing to ${table}, will retry...`);
+            } else {
+              console.warn(`Transient subscription error for ${table}, retrying silently...`);
+            }
             setTimeout(() => {
               if (this.subscriptions.has(subscriptionKey)) {
                 console.log(`Retrying subscription to ${table}`);

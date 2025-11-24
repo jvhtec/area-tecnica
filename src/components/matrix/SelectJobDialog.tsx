@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock } from 'lucide-react';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface SelectJobDialogProps {
   open: boolean;
@@ -30,9 +31,9 @@ interface SelectJobDialogProps {
   }>;
 }
 
-export const SelectJobDialog = ({ 
-  open, 
-  onClose, 
+export const SelectJobDialog = ({
+  open,
+  onClose,
   onJobSelected,
   technicianName,
   date,
@@ -59,10 +60,10 @@ export const SelectJobDialog = ({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Select Job</DialogTitle>
+          <DialogTitle>Seleccionar Trabajo</DialogTitle>
           <DialogDescription>
-            Select a job to assign {technicianName} to on{' '}
-            {format(date, 'EEEE, MMMM d, yyyy')}
+            Selecciona un trabajo para asignar a {technicianName} el{' '}
+            {format(date, 'EEEE, d MMMM, yyyy', { locale: es })}
           </DialogDescription>
         </DialogHeader>
 
@@ -70,18 +71,17 @@ export const SelectJobDialog = ({
           {availableJobs.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">
-                No jobs available for this date
+                No hay trabajos disponibles para esta fecha
               </p>
             </div>
           ) : (
             availableJobs.map((job) => (
               <div
                 key={job.id}
-                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                  selectedJobId === job.id
+                className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedJobId === job.id
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:bg-accent/50'
-                }`}
+                  }`}
                 onClick={() => handleJobSelect(job.id)}
               >
                 <div className="flex items-center justify-between">
@@ -94,7 +94,7 @@ export const SelectJobDialog = ({
                   </div>
                   <div className="flex items-center gap-2">
                     {job.status === 'Cancelado' && (
-                      <Badge variant="destructive" className="text-[10px]">Call these people to cancel</Badge>
+                      <Badge variant="destructive" className="text-[10px]">Llamar para cancelar</Badge>
                     )}
                     <Badge variant="secondary">{job.status}</Badge>
                   </div>
@@ -106,13 +106,13 @@ export const SelectJobDialog = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose}>
-            Cancel
+            Cancelar
           </Button>
-          <Button 
+          <Button
             onClick={handleContinue}
             disabled={!selectedJobId}
           >
-            Continue
+            Continuar
           </Button>
         </DialogFooter>
       </DialogContent>

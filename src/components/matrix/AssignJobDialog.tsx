@@ -8,6 +8,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -29,7 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { Loader2, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { Loader2, Calendar as CalendarIcon, Clock, CalendarDays, CalendarRange } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -186,12 +192,12 @@ export const AssignJobDialog = ({
 
   const attemptAssign = async (skipConflictCheck = false) => {
     if (!selectedJobId || !selectedRole || !technician) {
-      toast.error('Please select both a job and role');
+      toast.error('Por favor selecciona un trabajo y un rol');
       return;
     }
 
     if (existingAssignment?.status === 'declined' && selectedJobId === existingAssignment.job_id) {
-      toast.error('This technician already declined this job');
+      toast.error('Este técnico ya rechazó este trabajo');
       return;
     }
 
@@ -214,7 +220,7 @@ export const AssignJobDialog = ({
     const timeoutId = window.setTimeout(() => {
       console.error('Assignment timeout after 10 seconds');
       setIsAssigning(false);
-      toast.error('Assignment timed out - please try again');
+      toast.error('La asignación expiró - por favor intenta de nuevo');
     }, 10000);
 
     try {
@@ -449,7 +455,7 @@ export const AssignJobDialog = ({
       console.log('Assignment completed successfully');
       window.clearTimeout(timeoutId);
       toast.success(
-        `${isReassignment ? 'Reassigned' : 'Assigned'} ${technician.first_name} ${technician.last_name} to ${selectedJob?.title} (${statusText})`
+        `${isReassignment ? 'Reasignado' : 'Asignado'} ${technician.first_name} ${technician.last_name} a ${selectedJob?.title} (${statusText})`
       );
 
       const recipientName = `${technician.first_name ?? ''} ${technician.last_name ?? ''}`.trim();
@@ -481,11 +487,11 @@ export const AssignJobDialog = ({
       console.error('Error assigning job:', error);
 
       if (error.code === '23505') {
-        toast.error('This technician is already assigned to this job');
+        toast.error('Este técnico ya está asignado a este trabajo');
       } else if (error.message?.includes('timeout') || error.message?.includes('network')) {
-        toast.error('Network error - please check your connection and try again');
+        toast.error('Error de red - por favor verifica tu conexión e intenta de nuevo');
       } else {
-        toast.error(`Failed to assign job: ${error.message || 'Unknown error'}`);
+        toast.error(`Error al asignar el trabajo: ${error.message || 'Error desconocido'}`);
       }
     } finally {
       window.clearTimeout(timeoutId);
@@ -535,11 +541,11 @@ export const AssignJobDialog = ({
         }));
       }
 
-      toast.success('Assignment removed');
+      toast.success('Asignación eliminada');
       window.dispatchEvent(new CustomEvent('assignment-updated', { detail: { technicianId, jobId: existingAssignment.job_id } }));
       onClose();
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to remove assignment');
+      toast.error(e?.message || 'Error al eliminar la asignación');
     } finally {
       setIsRemoving(false);
     }
@@ -593,17 +599,17 @@ export const AssignJobDialog = ({
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{isReassignment ? 'Reassign Job' : 'Assign Job'}</DialogTitle>
+            <DialogTitle>{isReassignment ? 'Reasignar Trabajo' : 'Asignar Trabajo'}</DialogTitle>
             <DialogDescription>
-              {isReassignment ? 'Reassign' : 'Assign'} {technician?.first_name} {technician?.last_name} to a job on{' '}
-              {format(date, 'EEEE, MMMM d, yyyy')}
+              {isReassignment ? 'Reasignar a' : 'Asignar a'} {technician?.first_name} {technician?.last_name} a un trabajo el{' '}
+              {format(date, 'EEEE, d MMMM, yyyy')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             {technician && (
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Technician:</span>
+                <span className="text-sm font-medium">Técnico:</span>
                 <span>{technician.first_name} {technician.last_name}</span>
                 <Badge variant="outline">{technician.department}</Badge>
               </div>
@@ -611,20 +617,20 @@ export const AssignJobDialog = ({
 
             {isReassignment && existingAssignment?.jobs && (
               <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                <div className="text-sm font-medium text-yellow-800">Current Assignment:</div>
+                <div className="text-sm font-medium text-yellow-800">Asignación Actual:</div>
                 <div className="text-sm text-yellow-700">{existingAssignment.jobs.title}</div>
                 <div className="text-xs text-yellow-600">
-                  Status: <Badge variant="secondary">{existingAssignment.status}</Badge>
+                  Estado: <Badge variant="secondary">{existingAssignment.status}</Badge>
                 </div>
               </div>
             )}
 
             {!preSelectedJobId && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Select Job</label>
+                <label className="text-sm font-medium">Seleccionar Trabajo</label>
                 <Select value={selectedJobId} onValueChange={setSelectedJobId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose a job..." />
+                    <SelectValue placeholder="Elige un trabajo..." />
                   </SelectTrigger>
                   <SelectContent>
                     {filteredJobs.length === 0 ? (
@@ -654,11 +660,11 @@ export const AssignJobDialog = ({
             {selectedJobId && technician && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">
-                  Select Role ({technician.department})
+                  Seleccionar Rol ({technician.department})
                 </label>
                 <Select value={selectedRole} onValueChange={setSelectedRole}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose a role..." />
+                    <SelectValue placeholder="Elige un rol..." />
                   </SelectTrigger>
                   <SelectContent>
                     {roleOptions.map((opt) => (
@@ -672,59 +678,78 @@ export const AssignJobDialog = ({
             )}
 
             {selectedJobId && selectedRole && (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Coverage</label>
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="coverage" checked={coverageMode === 'full'} onChange={() => setCoverageMode('full')} />
-                      <span>Full job span</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="coverage" checked={coverageMode === 'single'} onChange={() => setCoverageMode('single')} />
-                      <span>Single day</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="coverage" checked={coverageMode === 'multi'} onChange={() => setCoverageMode('multi')} />
-                      <span>Multiple days</span>
-                    </label>
-                  </div>
-                </div>
-                {coverageMode === 'single' && (
-                  <div className="flex items-center gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="gap-2">
-                          <CalendarIcon className="h-4 w-4" />
-                          {singleDate ? format(singleDate, 'PPP') : 'Select date'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
+              <div className="space-y-4">
+                <Tabs value={coverageMode} onValueChange={(v) => setCoverageMode(v as any)} className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="full">
+                      <CalendarRange className="h-4 w-4 mr-2" />
+                      Completo
+                    </TabsTrigger>
+                    <TabsTrigger value="single">
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      Día Suelto
+                    </TabsTrigger>
+                    <TabsTrigger value="multi">
+                      <CalendarDays className="h-4 w-4 mr-2" />
+                      Varios Días
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="full" className="mt-4">
+                    <div className="p-4 bg-muted/50 rounded-lg border border-border text-sm text-muted-foreground flex items-center gap-3">
+                      <CalendarRange className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium text-foreground">Asignación Completa</p>
+                        <p>El técnico será asignado a todos los días de este trabajo.</p>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="single" className="mt-4 space-y-4">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium">Seleccionar Fecha</label>
+                      <div className="flex items-center gap-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start text-left font-normal">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {singleDate ? format(singleDate, 'PPP') : <span>Elige una fecha</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarPicker
+                              mode="single"
+                              selected={singleDate ?? undefined}
+                              onSelect={(d) => { if (d && isAllowedDate(d)) setSingleDate(d); }}
+                              disabled={(d) => !isAllowedDate(d)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Crea una asignación de un solo día para la fecha seleccionada.</p>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="multi" className="mt-4 space-y-4">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium">Seleccionar Días</label>
+                      <div className="border rounded-md p-2 flex justify-center">
                         <CalendarPicker
-                          mode="single"
-                          selected={singleDate ?? undefined}
-                          onSelect={(d) => { if (d && isAllowedDate(d)) setSingleDate(d); }}
+                          mode="multiple"
+                          selected={multiDates}
+                          onSelect={(ds) => setMultiDates((ds || []).filter(d => isAllowedDate(d)))}
                           disabled={(d) => !isAllowedDate(d)}
-                          initialFocus
+                          className="rounded-md border-none shadow-none"
+                          numberOfMonths={1}
                         />
-                      </PopoverContent>
-                    </Popover>
-                    <p className="text-xs text-muted-foreground">Creates one single-day assignment.</p>
-                  </div>
-                )}
-                {coverageMode === 'multi' && (
-                  <div className="space-y-2">
-                    <CalendarPicker
-                      mode="multiple"
-                      selected={multiDates}
-                      onSelect={(ds) => setMultiDates((ds || []).filter(d => isAllowedDate(d)))}
-                      disabled={(d) => !isAllowedDate(d)}
-                      numberOfMonths={2}
-                    />
-                    <p className="text-xs text-muted-foreground">Creates one single-day assignment per selected date.</p>
-                  </div>
-                )}
-                <div className="flex items-center space-x-2">
+                      </div>
+                      <p className="text-xs text-muted-foreground">Selecciona varios días para esta asignación.</p>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                <div className="flex items-center space-x-2 pt-2 border-t">
                   <Checkbox
                     id="confirm-assignment"
                     checked={assignAsConfirmed}
@@ -734,7 +759,7 @@ export const AssignJobDialog = ({
                     htmlFor="confirm-assignment"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   >
-                    Assign as confirmed (skip invitation)
+                    Asignar como confirmado (omitir invitación)
                   </label>
                 </div>
               </div>
@@ -760,17 +785,17 @@ export const AssignJobDialog = ({
                 )}
                 {assignAsConfirmed && (
                   <div className="text-xs text-green-600 mt-1 font-medium">
-                    Will be assigned as confirmed
+                    Se asignará como confirmado
                   </div>
                 )}
                 {coverageMode === 'single' && (
                   <div className="text-xs text-muted-foreground mt-1">
-                    Single-day coverage for {singleDate ? format(singleDate, 'PPP') : format(date, 'PPP')}
+                    Cobertura de un solo día para {singleDate ? format(singleDate, 'PPP') : format(date, 'PPP')}
                   </div>
                 )}
                 {coverageMode === 'multi' && (
                   <div className="text-xs text-muted-foreground mt-1">
-                    {multiDates.length} day(s) selected for single-day coverage
+                    {multiDates.length} día(s) seleccionado(s) para cobertura de un solo día
                   </div>
                 )}
               </div>
@@ -788,16 +813,16 @@ export const AssignJobDialog = ({
                   {isRemoving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Removing...
+                      Eliminando...
                     </>
                   ) : (
-                    'Remove Assignment'
+                    'Eliminar Asignación'
                   )}
                 </Button>
               )}
             </div>
             <Button variant="outline" onClick={onClose}>
-              Cancel
+              Cancelar
             </Button>
             <Button
               onClick={handleAssign}
@@ -806,10 +831,10 @@ export const AssignJobDialog = ({
               {isAssigning ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Assigning...
+                  Asignando...
                 </>
               ) : (
-                `${isReassignment ? 'Reassign' : 'Assign'} Job`
+                `${isReassignment ? 'Reasignar' : 'Asignar'} Trabajo`
               )}
             </Button>
           </DialogFooter>
@@ -826,23 +851,23 @@ export const AssignJobDialog = ({
         <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {conflictWarning?.result.hasHardConflict ? '⛔ Scheduling Conflict' : '⚠️ Potential Conflict'}
+              {conflictWarning?.result.hasHardConflict ? '⛔ Conflicto de Horario' : '⚠️ Conflicto Potencial'}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 {conflictWarning && (
                   <>
                     <p className="text-sm">
-                      {technician ? `${technician.first_name} ${technician.last_name}` : 'This technician'} has conflicts
-                      with <strong>{selectedJob?.title}</strong>
+                      {technician ? `${technician.first_name} ${technician.last_name}` : 'Este técnico'} tiene conflictos
+                      con <strong>{selectedJob?.title}</strong>
                       {conflictWarning.mode === 'full' && targetJobRange ? ` (${targetJobRange})` : ''}
-                      {conflictWarning.mode !== 'full' && conflictTargetDateLabel ? ` on ${conflictTargetDateLabel}` : ''}:
+                      {conflictWarning.mode !== 'full' && conflictTargetDateLabel ? ` el ${conflictTargetDateLabel}` : ''}:
                     </p>
 
                     {/* Hard Conflicts */}
                     {conflictWarning.result.hardConflicts.length > 0 && (
                       <div className="bg-red-50 border border-red-200 rounded p-3">
-                        <div className="font-semibold text-red-900 mb-2">Confirmed Assignments:</div>
+                        <div className="font-semibold text-red-900 mb-2">Asignaciones Confirmadas:</div>
                         <ul className="list-disc list-inside space-y-1">
                           {conflictWarning.result.hardConflicts.map((conflict, idx) => (
                             <li key={idx} className="text-red-800 text-sm">
@@ -857,7 +882,7 @@ export const AssignJobDialog = ({
                     {/* Soft Conflicts */}
                     {conflictWarning.result.softConflicts.length > 0 && (
                       <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-                        <div className="font-semibold text-yellow-900 mb-2">Pending Invitations:</div>
+                        <div className="font-semibold text-yellow-900 mb-2">Invitaciones Pendientes:</div>
                         <ul className="list-disc list-inside space-y-1">
                           {conflictWarning.result.softConflicts.map((conflict, idx) => (
                             <li key={idx} className="text-yellow-800 text-sm">
@@ -867,7 +892,7 @@ export const AssignJobDialog = ({
                           ))}
                         </ul>
                         <p className="text-xs text-yellow-700 mt-2">
-                          Technician has not yet responded to these invitations.
+                          El técnico aún no ha respondido a estas invitaciones.
                         </p>
                       </div>
                     )}
@@ -875,7 +900,7 @@ export const AssignJobDialog = ({
                     {/* Unavailability */}
                     {conflictWarning.result.unavailabilityConflicts.length > 0 && (
                       <div className="bg-red-50 border border-red-200 rounded p-3">
-                        <div className="font-semibold text-red-900 mb-2">Unavailable Dates:</div>
+                        <div className="font-semibold text-red-900 mb-2">Fechas No Disponibles:</div>
                         <ul className="list-disc list-inside space-y-1">
                           {conflictWarning.result.unavailabilityConflicts.map((unav, idx) => (
                             <li key={idx} className="text-red-800 text-sm">
@@ -889,8 +914,8 @@ export const AssignJobDialog = ({
 
                     <div className="text-sm text-gray-600 mt-3">
                       {conflictWarning.result.hasHardConflict
-                        ? 'Proceeding will create a double-booking. Are you sure?'
-                        : 'Technician may not be available. Do you want to proceed anyway?'}
+                        ? 'Continuar creará una doble reserva. ¿Estás seguro?'
+                        : 'El técnico podría no estar disponible. ¿Quieres continuar de todos modos?'}
                     </div>
                   </>
                 )}
@@ -898,7 +923,7 @@ export const AssignJobDialog = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConflictWarning(null)}>Go back</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setConflictWarning(null)}>Volver</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setConflictWarning(null);
@@ -906,7 +931,7 @@ export const AssignJobDialog = ({
               }}
               className={conflictWarning?.result.hasHardConflict ? 'bg-red-600 hover:bg-red-700' : ''}
             >
-              {conflictWarning?.result.hasHardConflict ? 'Force assign anyway' : 'Proceed anyway'}
+              {conflictWarning?.result.hasHardConflict ? 'Forzar asignación de todos modos' : 'Continuar de todos modos'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
