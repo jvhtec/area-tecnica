@@ -96,7 +96,7 @@ export const SkillsFilter: React.FC<SkillsFilterProps> = ({ selected, onChange, 
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <Filter className="h-4 w-4" />
-          Skills
+          Habilidades
           {selectedCount > 0 && (
             <Badge variant="secondary" className="ml-1">{selectedCount}</Badge>
           )}
@@ -106,7 +106,7 @@ export const SkillsFilter: React.FC<SkillsFilterProps> = ({ selected, onChange, 
         {open && (
           <Command>
             <CommandList>
-              <CommandEmpty>No skills found.</CommandEmpty>
+              <CommandEmpty>No se encontraron habilidades.</CommandEmpty>
               {grouped.map(([category, list]) => (
                 <CommandGroup key={category} heading={category}>
                   {list.map(s => {

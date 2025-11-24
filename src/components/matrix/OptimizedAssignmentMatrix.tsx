@@ -239,8 +239,9 @@ export const OptimizedAssignmentMatrix = ({
   // Visible window state for virtualization
   const [visibleRows, setVisibleRows] = useState({ start: 0, end: Math.min(technicians.length - 1, 20) });
   const [visibleCols, setVisibleCols] = useState({ start: 0, end: Math.min(dates.length - 1, 14) });
-  const OVERSCAN_ROWS = 2;
-  const OVERSCAN_COLS = 2;
+  // Higher overscan to keep cells rendered during fast vertical/horizontal scrolls
+  const OVERSCAN_ROWS = mobile ? 6 : 10;
+  const OVERSCAN_COLS = mobile ? 4 : 6;
 
   // Mobile date navigation state
   const [canNavLeft, setCanNavLeft] = useState(false);
@@ -274,9 +275,17 @@ export const OptimizedAssignmentMatrix = ({
     setVisibleCols(prev => (prev.start !== colStart || prev.end !== colEnd ? { start: colStart, end: colEnd } : prev));
   }, [technicians.length, dates.length]);
 
+  // Avoid the first-scroll "snap": run a direct window update on the very first scroll event
+  const hasHandledFirstScrollRef = useRef(false);
+
   // Throttle visible window updates with rAF
   const updateScheduledRef = useRef(false);
   const scheduleVisibleWindowUpdate = useCallback(() => {
+    if (!hasHandledFirstScrollRef.current) {
+      hasHandledFirstScrollRef.current = true;
+      updateVisibleWindow();
+      return;
+    }
     if (updateScheduledRef.current) return;
     updateScheduledRef.current = true;
     requestAnimationFrame(() => {
@@ -390,28 +399,26 @@ export const OptimizedAssignmentMatrix = ({
     const scrollTop = e.currentTarget.scrollTop;
     syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, 'technician');
     lastKnownScrollRef.current.top = scrollTop;
-  }, [syncScrollPositions]);
+    // Ensure virtualization window follows when scrolling the technician column
+    scheduleVisibleWindowUpdate();
+  }, [syncScrollPositions, scheduleVisibleWindowUpdate]);
 
-  const handleMainScroll = useMemo(
-    () => throttle(handleMainScrollCore, 16),
-    [handleMainScrollCore]
-  );
+  // Keep main scroll handler unthrottled for tighter sync between grid and header/technician column
+  const handleMainScroll = handleMainScrollCore;
 
   const handleDateHeadersScroll = useMemo(
-    () => throttle(handleDateHeadersScrollCore, 16),
+    () => throttle(handleDateHeadersScrollCore, 12),
     [handleDateHeadersScrollCore]
   );
 
-  const handleTechnicianScroll = useMemo(
-    () => throttle(handleTechnicianScrollCore, 16),
-    [handleTechnicianScrollCore]
-  );
+  // Keep technician column scroll unthrottled to stay locked with main grid vertically
+  const handleTechnicianScroll = handleTechnicianScrollCore;
 
   useEffect(() => {
     return () => {
-      handleMainScroll.cancel();
-      handleDateHeadersScroll.cancel();
-      handleTechnicianScroll.cancel();
+      if ((handleMainScroll as any)?.cancel) (handleMainScroll as any).cancel();
+      if ((handleDateHeadersScroll as any)?.cancel) handleDateHeadersScroll.cancel();
+      if ((handleTechnicianScroll as any)?.cancel) handleTechnicianScroll.cancel();
     };
   }, [handleDateHeadersScroll, handleMainScroll, handleTechnicianScroll]);
 
@@ -680,6 +687,7 @@ export const OptimizedAssignmentMatrix = ({
   // Initialize visible window after mount and when sizes change
   useEffect(() => {
     updateVisibleWindow();
+    hasHandledFirstScrollRef.current = false;
   }, [technicians.length, dates.length, scheduleVisibleWindowUpdate]);
 
   // Keep scroll position stable when dates expand before/after
@@ -917,8 +925,8 @@ export const OptimizedAssignmentMatrix = ({
     } else {
       // Show regular error toast
       toast({
-        title: 'Send failed',
-        description: error.message || 'Failed to send staffing request',
+        title: 'Error al enviar',
+        description: error.message || 'No se pudo enviar la solicitud de staffing',
         variant: 'destructive'
       });
     }
@@ -949,11 +957,11 @@ export const OptimizedAssignmentMatrix = ({
   // Get label for current sorting method
   const getSortLabel = useCallback(() => {
     switch (techSortMethod) {
-      case 'location': return mobile ? '📍 Loc' : '📍 Location';
-      case 'name-asc': return mobile ? 'A→Z' : 'A→Z Name';
-      case 'name-desc': return mobile ? 'Z→A' : 'Z→A Name';
-      case 'surname-asc': return mobile ? 'A→Z Sur' : 'A→Z Surname';
-      case 'surname-desc': return mobile ? 'Z→A Sur' : 'Z→A Surname';
+      case 'location': return mobile ? '📍 Ubic.' : '📍 Ubicación';
+      case 'name-asc': return mobile ? 'A→Z' : 'A→Z Nombre';
+      case 'name-desc': return mobile ? 'Z→A' : 'Z→A Nombre';
+      case 'surname-asc': return mobile ? 'A→Z Ape.' : 'A→Z Apellido';
+      case 'surname-desc': return mobile ? 'Z→A Ape.' : 'Z→A Apellido';
       case 'default': return '';
       default: return '';
     }
@@ -991,10 +999,10 @@ export const OptimizedAssignmentMatrix = ({
             <button
               className="flex items-center gap-1 font-semibold hover:text-primary transition-colors cursor-pointer group"
               onClick={cycleTechSort}
-              title="Click to cycle through sorting methods"
+              title="Cambia el orden de técnicos"
             >
               {mobile ? (
-                <span className="text-sm">Techs</span>
+                <span className="text-sm">Técnicos</span>
               ) : (
                 <span>Técnicos</span>
               )}
@@ -1002,7 +1010,7 @@ export const OptimizedAssignmentMatrix = ({
             </button>
             {isManagementUser && (
               mobile ? (
-                <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => setCreateUserOpen(true)} aria-label="Add user">
+                <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => setCreateUserOpen(true)} aria-label="Añadir usuario">
                   <UserPlus className="h-3.5 w-3.5" />
                 </Button>
               ) : (
@@ -1036,7 +1044,7 @@ export const OptimizedAssignmentMatrix = ({
         {mobile && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-1">
             <button
-              aria-label="Previous dates"
+              aria-label="Fechas anteriores"
               className={`pointer-events-auto rounded-full bg-background/80 border shadow h-8 w-8 flex items-center justify-center ${canNavLeft ? 'opacity-100' : 'opacity-40'}`}
               onClick={(e) => { e.stopPropagation(); handleMobileNav('left'); }}
               disabled={!canNavLeft}
@@ -1045,7 +1053,7 @@ export const OptimizedAssignmentMatrix = ({
               {'<'}
             </button>
             <button
-              aria-label="Next dates"
+              aria-label="Fechas siguientes"
               className={`pointer-events-auto rounded-full bg-background/80 border shadow h-8 w-8 flex items-center justify-center ${canNavRight ? 'opacity-100' : 'opacity-40'}`}
               onClick={(e) => { e.stopPropagation(); handleMobileNav('right'); }}
               disabled={!canNavRight}
@@ -1283,11 +1291,11 @@ export const OptimizedAssignmentMatrix = ({
                 sendStaffingEmail(payload, {
                   onSuccess: (data: any) => {
                     const ch = data?.channel || via;
-                    toast({ title: 'Offer sent', description: `${role} offer sent via ${ch} (${selectedDates.length} day${selectedDates.length > 1 ? 's' : ''}).` });
+                    toast({ title: 'Oferta enviada', description: `Oferta de ${role} enviada por ${ch} (${selectedDates.length} día${selectedDates.length > 1 ? 's' : ''}).` });
                     closeDialogs();
                   },
                   onError: (error: any) => {
-                    toast({ title: 'Failed to send offer', description: error.message, variant: 'destructive' });
+                    toast({ title: 'No se pudo enviar la oferta', description: error.message, variant: 'destructive' });
                   }
                 });
                 return;
@@ -1304,11 +1312,11 @@ export const OptimizedAssignmentMatrix = ({
               sendStaffingEmail(({ job_id: jobId, profile_id: profileId, phase: 'offer', role, message, channel: via, single_day: false } as any), {
                 onSuccess: (data: any) => {
                   const ch = data?.channel || via;
-                  toast({ title: 'Offer sent', description: `${role} offer sent via ${ch}.` });
+                  toast({ title: 'Oferta enviada', description: `Oferta de ${role} enviada por ${ch}.` });
                   closeDialogs();
                 },
                 onError: (error: any) => {
-                  toast({ title: 'Failed to send offer', description: error.message, variant: 'destructive' });
+                  toast({ title: 'No se pudo enviar la oferta', description: error.message, variant: 'destructive' });
                 }
               });
             })();
@@ -1320,15 +1328,15 @@ export const OptimizedAssignmentMatrix = ({
         <Dialog open={true} onOpenChange={(v) => { if (!v) setAvailabilityDialog(null) }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Send availability request</DialogTitle>
+              <DialogTitle>Enviar solicitud de disponibilidad</DialogTitle>
               <DialogDescription>
-                Request availability from {currentTechnician?.first_name} {currentTechnician?.last_name} via {availabilityDialog.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}.
+                Pide disponibilidad a {currentTechnician?.first_name} {currentTechnician?.last_name} vía {availabilityDialog.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}.
               </DialogDescription>
             </DialogHeader>
             <div className="py-2">
               {/* Coverage selection */}
               <div className="space-y-3">
-                <label className="font-medium text-sm text-foreground">Coverage</label>
+                <label className="font-medium text-sm text-foreground">Cobertura</label>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1337,7 +1345,7 @@ export const OptimizedAssignmentMatrix = ({
                       checked={availabilityCoverage === 'full'}
                       onChange={() => setAvailabilityCoverage('full')}
                     />
-                    <span>Full job span</span>
+                    <span>Todo el trabajo</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1346,7 +1354,7 @@ export const OptimizedAssignmentMatrix = ({
                       checked={availabilityCoverage === 'single'}
                       onChange={() => setAvailabilityCoverage('single')}
                     />
-                    <span>Single day</span>
+                    <span>Un día</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1355,7 +1363,7 @@ export const OptimizedAssignmentMatrix = ({
                       checked={availabilityCoverage === 'multi'}
                       onChange={() => setAvailabilityCoverage('multi')}
                     />
-                    <span>Multiple days</span>
+                    <span>Varios días</span>
                   </label>
                 </div>
                 {(() => {
@@ -1390,7 +1398,7 @@ export const OptimizedAssignmentMatrix = ({
                               />
                             </PopoverContent>
                           </Popover>
-                          <p className="text-xs text-muted-foreground">Send for the selected date only.</p>
+                          <p className="text-xs text-muted-foreground">Enviar solo para la fecha seleccionada.</p>
                         </div>
                       )}
                       {availabilityCoverage === 'multi' && (
@@ -1402,7 +1410,7 @@ export const OptimizedAssignmentMatrix = ({
                             disabled={(d) => !isAllowed(d)}
                             numberOfMonths={2}
                           />
-                          <p className="text-xs text-muted-foreground">Creates one single-day request per selected date.</p>
+                          <p className="text-xs text-muted-foreground">Crea una solicitud de un solo día por cada fecha seleccionada.</p>
                         </div>
                       )}
                     </>
@@ -1411,7 +1419,7 @@ export const OptimizedAssignmentMatrix = ({
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAvailabilityDialog(null)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setAvailabilityDialog(null)}>Cancelar</Button>
               <Button
                 onClick={() => {
                   if (!availabilityDialog) return;
@@ -1425,7 +1433,7 @@ export const OptimizedAssignmentMatrix = ({
                       onSuccess: (data: any) => {
                         setAvailabilitySending(false);
                         setAvailabilityDialog(null);
-                        toast({ title: 'Request sent', description: `Availability request sent via ${data?.channel || via}.` });
+                        toast({ title: 'Solicitud enviada', description: `Solicitud de disponibilidad enviada por ${data?.channel || via}.` });
                         closeDialogs();
                       },
                       onError: (error: any) => handleEmailError(error, payload)
@@ -1437,7 +1445,7 @@ export const OptimizedAssignmentMatrix = ({
                     : Array.from(new Set((availabilityMultiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
                   if (dates.length === 0) {
                     setAvailabilitySending(false);
-                    toast({ title: 'Select date(s)', description: 'Choose at least one date within the job span.', variant: 'destructive' });
+                    toast({ title: 'Selecciona fecha(s)', description: 'Elige al menos una fecha dentro del rango del trabajo.', variant: 'destructive' });
                     return;
                   }
                   const payload: any = { job_id: jobId, profile_id: profileId, phase: 'availability', channel: via, single_day: true, dates };
@@ -1448,7 +1456,7 @@ export const OptimizedAssignmentMatrix = ({
                     onSuccess: (data: any) => {
                       setAvailabilitySending(false);
                       setAvailabilityDialog(null);
-                      toast({ title: 'Request sent', description: `Availability request sent for ${dates.length} day${dates.length > 1 ? 's' : ''} via ${data?.channel || via}.` });
+                      toast({ title: 'Solicitud enviada', description: `Solicitud de disponibilidad enviada para ${dates.length} día${dates.length > 1 ? 's' : ''} por ${data?.channel || via}.` });
                       closeDialogs();
                     },
                     onError: (error: any) => handleEmailError(error, payload)
@@ -1456,7 +1464,7 @@ export const OptimizedAssignmentMatrix = ({
                 }}
                 disabled={availabilitySending}
               >
-                {availabilitySending ? 'Sending…' : 'Send'}
+                {availabilitySending ? 'Enviando…' : 'Enviar'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1490,21 +1498,21 @@ export const OptimizedAssignmentMatrix = ({
         <Dialog open={true} onOpenChange={(v) => { if (!v) setConflictDialog(null) }}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Scheduling Conflict Detected</DialogTitle>
+              <DialogTitle>Conflicto de agenda detectado</DialogTitle>
               <DialogDescription>
-                The technician has conflicts or unavailability during this job period.
+                El técnico tiene conflictos o no está disponible durante este periodo.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 max-h-[400px] overflow-y-auto">
               {/* Overlapping Job Assignments - Red */}
               {conflictDialog.details?.conflicts && conflictDialog.details.conflicts.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-red-600 dark:text-red-400">Overlapping Job Assignments:</h4>
+                  <h4 className="font-semibold text-red-600 dark:text-red-400">Trabajos solapados:</h4>
                   <div className="space-y-1">
                     {conflictDialog.details.conflicts.map((conflict: any, idx: number) => (
                       <div key={idx} className="text-sm p-2 rounded bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900">
                         <div className="font-medium text-red-900 dark:text-red-100">
-                          {conflict.job_name || 'Unnamed Job'}
+                          {conflict.job_name || 'Trabajo sin nombre'}
                         </div>
                         <div className="text-red-700 dark:text-red-300">
                           {conflict.job_type && <span className="capitalize">{conflict.job_type}</span>}
@@ -1516,7 +1524,7 @@ export const OptimizedAssignmentMatrix = ({
                         </div>
                         {conflict.role && (
                           <div className="text-xs text-red-600 dark:text-red-400 mt-1">
-                            Role: {conflict.role}
+                            Rol: {conflict.role}
                           </div>
                         )}
                       </div>
@@ -1528,7 +1536,7 @@ export const OptimizedAssignmentMatrix = ({
               {/* Unavailability Periods - Orange */}
               {conflictDialog.details?.unavailability && conflictDialog.details.unavailability.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-orange-600 dark:text-orange-400">Unavailable Dates:</h4>
+                  <h4 className="font-semibold text-orange-600 dark:text-orange-400">Fechas no disponibles:</h4>
                   <div className="space-y-1">
                     {conflictDialog.details.unavailability.map((unavail: any, idx: number) => (
                       <div key={idx} className="text-sm p-2 rounded bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900">
@@ -1540,7 +1548,7 @@ export const OptimizedAssignmentMatrix = ({
                           ) : unavail.date ? (
                             new Date(unavail.date).toLocaleDateString()
                           ) : (
-                            'Date not specified'
+                            'Fecha no especificada'
                           )}
                         </div>
                         {unavail.reason && (
@@ -1556,7 +1564,7 @@ export const OptimizedAssignmentMatrix = ({
             </div>
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setConflictDialog(null)}>
-                Cancel
+                Cancelar
               </Button>
               <Button
                 variant="destructive"
@@ -1571,22 +1579,22 @@ export const OptimizedAssignmentMatrix = ({
                       setAvailabilityDialog(null);
                       setAvailabilitySending(false);
                       toast({
-                        title: 'Request sent',
-                        description: 'Staffing request sent successfully (conflicts overridden)',
+                        title: 'Solicitud enviada',
+                        description: 'Solicitud de staffing enviada (conflictos ignorados)',
                       });
                     },
                     onError: (error: any) => {
                       setAvailabilitySending(false);
                       toast({
-                        title: 'Send failed',
-                        description: error.message || 'Failed to send staffing request',
+                        title: 'Error al enviar',
+                        description: error.message || 'No se pudo enviar la solicitud de staffing',
                         variant: 'destructive'
                       });
                     }
                   });
                 }}
               >
-                Send Anyway
+                Enviar igualmente
               </Button>
             </DialogFooter>
           </DialogContent>

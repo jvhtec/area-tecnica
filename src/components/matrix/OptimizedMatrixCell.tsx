@@ -77,7 +77,7 @@ export const OptimizedMatrixCell = memo(({
   const confirmedBg = hasAssignment && assignment.status === 'confirmed' ? (assignment?.job?.color || null) : null;
   const confirmedTextColor = confirmedBg ? pickTextColor(confirmedBg) : undefined;
   const confirmedSubTextColor = confirmedTextColor ? (rgbaFromHex(confirmedTextColor, 0.9) || confirmedTextColor) : undefined;
-  const displayName = formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Technician';
+  const displayName = formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Técnico';
 
   // Staffing status: use provided batched data exclusively for performance
   const staffingStatusByJob = staffingStatusProvided;
@@ -114,7 +114,7 @@ export const OptimizedMatrixCell = memo(({
       }
       // Block staffing for jobs previously declined by this technician
       if (declinedJobIdsSet.has(targetJobId)) {
-        toast.error('This job was already declined; choose a different job.');
+        toast.error('Este trabajo ya fue rechazado; elige otro para este técnico.');
         return;
       }
       // Open offer details dialog with email channel intent
@@ -257,7 +257,7 @@ export const OptimizedMatrixCell = memo(({
                     onClick('select-job-for-staffing');
                   }
                 }}
-                title="Retry availability request"
+                title="Reintentar solicitud de disponibilidad"
                 className="focus:outline-none"
               >
                 <Badge 
@@ -278,7 +278,7 @@ export const OptimizedMatrixCell = memo(({
                   const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id || null;
                   setPendingCancel({ phase: 'availability', jobId: targetJobId });
                 }}
-                title="Cancel availability request"
+                title="Cancelar solicitud de disponibilidad"
                 className="focus:outline-none"
               >
                 <Badge variant="outline" className="text-[10px] px-1 py-0 h-3">×</Badge>
@@ -299,7 +299,7 @@ export const OptimizedMatrixCell = memo(({
                     onClick('select-job-for-staffing');
                   }
                 }}
-                title="Retry offer email"
+                title="Reintentar oferta"
                 className="focus:outline-none"
               >
                 <Badge 
@@ -321,7 +321,7 @@ export const OptimizedMatrixCell = memo(({
                   const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id || null;
                   setPendingCancel({ phase: 'offer', jobId: targetJobId });
                 }}
-                title="Cancel offer"
+                title="Cancelar oferta"
                 className="focus:outline-none"
               >
                 <Badge variant="outline" className="text-[10px] px-1 py-0 h-3">×</Badge>
@@ -333,7 +333,7 @@ export const OptimizedMatrixCell = memo(({
 
       {/* Declined lock indicator for the job to prevent re-assigning to the same job */}
       {isDeclinedAssignment && (
-        <div className="absolute top-1 left-1 z-10" title="Declined: cannot reassign to this job">
+        <div className="absolute top-1 left-1 z-10" title="Rechazado: no se puede reasignar a este trabajo">
           <Ban className="h-3.5 w-3.5 text-rose-600" />
         </div>
       )}
@@ -349,7 +349,7 @@ export const OptimizedMatrixCell = memo(({
                 className={`${actionBtnSize} p-0 hover:bg-blue-100`}
                 onClick={(e) => handleStaffingEmail(e, 'availability')}
                 disabled={isSendingEmail}
-                title="Ask availability"
+                title="Solicitar disponibilidad"
               >
                 <Mail className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-blue-600`} />
               </Button>
@@ -362,7 +362,7 @@ export const OptimizedMatrixCell = memo(({
                   onClick('availability-wa');
                 }}
                 disabled={isSendingEmail}
-                title="Ask availability via WhatsApp"
+                title="Solicitar disponibilidad por WhatsApp"
               >
                 <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-emerald-600`} />
               </Button>
@@ -376,7 +376,7 @@ export const OptimizedMatrixCell = memo(({
                 className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-green-100' : 'opacity-80 hover:bg-muted'}`}
                 onClick={(e) => handleStaffingEmail(e, 'offer')}
                 disabled={isSendingEmail}
-                title={canSendOffer ? 'Send offer' : 'Send offer (manual progress)'}
+                title={canSendOffer ? 'Enviar oferta' : 'Enviar oferta (progreso manual)'}
               >
                 <CheckCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-green-600' : 'text-muted-foreground'}`} />
               </Button>
@@ -389,7 +389,7 @@ export const OptimizedMatrixCell = memo(({
                   onClick('offer-details-wa', jobId || assignment?.job_id || undefined);
                 }}
                 disabled={isSendingEmail}
-                title={canSendOffer ? 'Send offer via WhatsApp' : 'Send offer via WhatsApp (manual progress)'}
+                title={canSendOffer ? 'Enviar oferta por WhatsApp' : 'Enviar oferta por WhatsApp (progreso manual)'}
               >
                 <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-emerald-600' : 'text-muted-foreground'}`} />
               </Button>
@@ -404,7 +404,7 @@ export const OptimizedMatrixCell = memo(({
             className={cn('font-medium truncate text-xs', assignment.status !== 'confirmed' ? '' : '')}
             style={{ color: assignment.status === 'confirmed' ? confirmedTextColor : undefined }}
           >
-            {assignment.job?.title || 'Assignment'}
+            {assignment.job?.title || 'Asignación'}
           </div>
           <div
             className={cn('text-xs truncate', assignment.status === 'confirmed' ? '' : 'text-muted-foreground')}
@@ -414,7 +414,7 @@ export const OptimizedMatrixCell = memo(({
           </div>
           {assignment.single_day && assignment.assignment_date && (
             <div className="text-[10px] text-muted-foreground truncate">
-              Single-day: {format(new Date(`${assignment.assignment_date}T00:00:00`), 'MMM d')}
+              Día único: {format(new Date(`${assignment.assignment_date}T00:00:00`), 'MMM d')}
             </div>
           )}
 
@@ -426,7 +426,7 @@ export const OptimizedMatrixCell = memo(({
                 size="sm"
                 className="h-5 w-5 p-0 hover:bg-green-100"
                 onClick={(e) => handleStatusClick(e, 'confirm')}
-                title="Confirm"
+                title="Confirmar"
               >
                 <Check className="h-3 w-3 text-green-600" />
               </Button>
@@ -435,7 +435,7 @@ export const OptimizedMatrixCell = memo(({
                 size="sm"
                 className="h-5 w-5 p-0 hover:bg-red-100"
                 onClick={(e) => handleStatusClick(e, 'decline')}
-                title="Decline"
+                title="Rechazar"
               >
                 <X className="h-3 w-3 text-red-600" />
               </Button>
@@ -450,7 +450,7 @@ export const OptimizedMatrixCell = memo(({
                 className="text-xs px-1 py-0 h-4"
               >
                 {assignment.status === 'confirmed' ? 'C' : 
-                 assignment.status === 'declined' ? 'D' : 'P'}
+                 assignment.status === 'declined' ? 'R' : 'P'}
               </Badge>
             </div>
           )}
@@ -459,7 +459,7 @@ export const OptimizedMatrixCell = memo(({
               variant="ghost"
               size="sm"
               className="h-5 w-5 p-0 hover:bg-red-100"
-              title="Remove assignment"
+              title="Eliminar asignación"
               onClick={(e) => { e.stopPropagation(); setPendingRemoveAssignment(true); }}
             >
               <X className="h-3 w-3 text-red-600" />
@@ -474,7 +474,7 @@ export const OptimizedMatrixCell = memo(({
           <div className="text-center">
             <UserX className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
             <div className="text-xs text-muted-foreground truncate">
-              {availability.reason || 'Unavailable'}
+              {availability.reason || 'No disponible'}
             </div>
           </div>
         </div>
@@ -496,12 +496,12 @@ export const OptimizedMatrixCell = memo(({
         <Dialog open={true} onOpenChange={(v) => !v && setPendingRetry(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Resend availability request</DialogTitle>
-              <DialogDescription>Choose channel and resend the availability request.</DialogDescription>
+              <DialogTitle>Reenviar solicitud de disponibilidad</DialogTitle>
+              <DialogDescription>Elige el canal y reenvía la solicitud de disponibilidad.</DialogDescription>
             </DialogHeader>
             <div className="py-2">
               <div className="space-y-3">
-                <label className="font-medium text-sm text-foreground">Channel</label>
+                <label className="font-medium text-sm text-foreground">Canal</label>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -525,7 +525,7 @@ export const OptimizedMatrixCell = memo(({
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setPendingRetry(null)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setPendingRetry(null)}>Cancelar</Button>
               <Button onClick={() => {
                 if (!pendingRetry) return;
                 setAvailabilityRetrying(true);
@@ -535,17 +535,17 @@ export const OptimizedMatrixCell = memo(({
                     onSuccess: () => {
                       setAvailabilityRetrying(false);
                       setPendingRetry(null);
-                      toast.success('Availability request resent');
+                      toast.success('Solicitud de disponibilidad reenviada');
                     },
                     onError: (error) => {
                       setAvailabilityRetrying(false);
                       setPendingRetry(null);
-                      toast.error(`Failed to resend availability request: ${error.message}`);
+                      toast.error(`No se pudo reenviar la solicitud de disponibilidad: ${error.message}`);
                     }
                   }
                 );
               }} disabled={availabilityRetrying}>
-                {availabilityRetrying ? 'Resending…' : 'Resend'}
+                {availabilityRetrying ? 'Reenviando…' : 'Reenviar'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -556,13 +556,13 @@ export const OptimizedMatrixCell = memo(({
         <Dialog open={true} onOpenChange={(v) => !v && setPendingCancel(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{pendingCancel.phase === 'availability' ? 'Cancel availability request?' : 'Cancel offer?'}</DialogTitle>
+              <DialogTitle>{pendingCancel.phase === 'availability' ? '¿Cancelar solicitud de disponibilidad?' : '¿Cancelar oferta?'}</DialogTitle>
               <DialogDescription>
-                This will mark the {pendingCancel.phase} as cancelled (expired) for {displayName}.
+                Esto marcará la fase de {pendingCancel.phase === 'availability' ? 'disponibilidad' : 'oferta'} como cancelada para {displayName}.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setPendingCancel(null)}>Keep</Button>
+              <Button variant="outline" onClick={() => setPendingCancel(null)}>Mantener</Button>
               <Button onClick={() => {
                 if (!pendingCancel.jobId) { setPendingCancel(null); return; }
                 cancelStaffing(
@@ -570,15 +570,15 @@ export const OptimizedMatrixCell = memo(({
                   {
                     onSuccess: () => {
                       setPendingCancel(null);
-                      toast.success(`${pendingCancel.phase === 'availability' ? 'Availability' : 'Offer'} cancelled`)
+                      toast.success(`${pendingCancel.phase === 'availability' ? 'Disponibilidad' : 'Oferta'} cancelada`)
                     },
                     onError: (e: any) => {
-                      toast.error(e?.message || 'Failed to cancel')
+                      toast.error(e?.message || 'No se pudo cancelar')
                     }
                   }
                 )
               }} disabled={isCancelling}>
-                {isCancelling ? 'Cancelling…' : 'Cancel'}
+                {isCancelling ? 'Cancelando…' : 'Cancelar'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -589,13 +589,13 @@ export const OptimizedMatrixCell = memo(({
         <Dialog open={true} onOpenChange={(v) => !v && setPendingRemoveAssignment(false)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Remove assignment?</DialogTitle>
+              <DialogTitle>¿Eliminar asignación?</DialogTitle>
               <DialogDescription>
-                This will remove the assignment of {displayName} from this job.
+                Se eliminará la asignación de {displayName} en este trabajo.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setPendingRemoveAssignment(false)}>Keep</Button>
+              <Button variant="outline" onClick={() => setPendingRemoveAssignment(false)}>Mantener</Button>
               <Button
                 variant="destructive"
                 onClick={async () => {
@@ -641,14 +641,14 @@ export const OptimizedMatrixCell = memo(({
                     }
 
                     setPendingRemoveAssignment(false)
-                    toast.success('Assignment removed')
+                    toast.success('Asignación eliminada')
                     window.dispatchEvent(new CustomEvent('assignment-updated'))
                   } catch (e: any) {
-                    toast.error(e?.message || 'Failed to remove assignment')
+                    toast.error(e?.message || 'No se pudo eliminar la asignación')
                   }
                 }}
               >
-                Remove
+                Eliminar
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -675,7 +675,7 @@ export const OptimizedMatrixCell = memo(({
               </div>
               {assignment.single_day && assignment.assignment_date && (
                 <div className="text-muted-foreground">
-                  Single-day: {format(new Date(`${assignment.assignment_date}T00:00:00`), 'MMM d')}
+                  Día único: {format(new Date(`${assignment.assignment_date}T00:00:00`), 'MMM d')}
                 </div>
               )}
               <div className={`capitalize ${assignment.status === 'confirmed' ? 'text-green-600' : assignment.status === 'declined' ? 'text-red-600' : 'text-yellow-600'}`}>
@@ -685,7 +685,7 @@ export const OptimizedMatrixCell = memo(({
           )}
           {isUnavailable && !hasAssignment && (
             <div className="text-xs text-muted-foreground">
-              Unavailable{availability.notes ? `: ${availability.notes}` : ''}
+              No disponible{availability.notes ? `: ${availability.notes}` : ''}
             </div>
           )}
         </div>

@@ -353,7 +353,7 @@ export default function JobAssignmentMatrix() {
       return ['Operador (MA2)', 'Operador (MA3)', 'Operador (HOG)', 'Operador (AVO)', 'Dimmer', 'Rigging', 'Montador'] as const;
     }
     if (selectedDepartment === 'sound') {
-      return ['foh', 'monitores', 'sistemas', 'rf', 'Trabajo en altura', 'Tecnico de Escenario', 'Montador'] as const;
+      return ['foh', 'monitores', 'sistemas', 'rf', 'Trabajo en altura', 'Técnico de escenario', 'Montador'] as const;
     }
     return [] as const;
   }, [selectedDepartment]);
@@ -909,10 +909,10 @@ export default function JobAssignmentMatrix() {
   const outstandingJobsCount = staffingReminderQuery.isSuccess ? outstandingJobs.length : null;
   const outstandingJobsDescription =
     outstandingJobsCount === null
-      ? 'Loading outstanding staffing data'
+      ? 'Cargando información de dotaciones pendientes'
       : outstandingJobsCount === 0
-        ? 'No outstanding jobs'
-        : `${outstandingJobsCount} outstanding ${outstandingJobsCount === 1 ? 'job' : 'jobs'}`;
+        ? 'Sin trabajos pendientes'
+        : `${outstandingJobsCount} trabajo${outstandingJobsCount === 1 ? '' : 's'} pendiente${outstandingJobsCount === 1 ? '' : 's'}`;
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -921,7 +921,7 @@ export default function JobAssignmentMatrix() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
             <Calendar className="h-5 w-5 md:h-6 md:w-6" />
-            <h1 className="text-lg md:text-2xl font-bold">Job Assignment Matrix</h1>
+            <h1 className="text-lg md:text-2xl font-bold">Matriz de asignación de trabajos</h1>
           </div>
           <div className="flex items-center gap-2 self-stretch sm:self-auto">
             <Button
@@ -933,9 +933,9 @@ export default function JobAssignmentMatrix() {
                 handleReminderOpenChange(true);
               }}
               className="shrink-0 flex items-center gap-2"
-              aria-label={`View staffing reminder. ${outstandingJobsDescription}.`}
+              aria-label={`Ver recordatorio de staffing. ${outstandingJobsDescription}.`}
             >
-              View staffing reminder
+              Ver recordatorio de staffing
               {outstandingJobsCount !== null && (
                 <Badge variant="outline" className="text-xs" aria-hidden="true">
                   {outstandingJobsCount}
@@ -951,7 +951,7 @@ export default function JobAssignmentMatrix() {
               className="shrink-0"
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
+              <span className="hidden sm:inline">Refrescar</span>
             </Button>
           </div>
         </div>
@@ -973,7 +973,7 @@ export default function JobAssignmentMatrix() {
         <div className="hidden md:flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4" />
-            <span className="text-sm font-medium">Filters:</span>
+            <span className="text-sm font-medium">Filtros:</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
@@ -996,7 +996,7 @@ export default function JobAssignmentMatrix() {
             </Tabs>
 
             <Input
-              placeholder="Search technicians..."
+              placeholder="Buscar técnicos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-48 min-w-0 flex-1 sm:flex-none"
@@ -1032,24 +1032,24 @@ export default function JobAssignmentMatrix() {
               <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{fridgeCount}</Badge>
             </div>
             <div className="flex items-center gap-2 pr-2 border-r">
-              <span className="text-sm font-medium">Direct assign</span>
+              <span className="text-sm font-medium">Asignación directa</span>
               <Switch
                 checked={allowDirectAssign}
                 onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))}
-                aria-label="Toggle direct assignment"
+                aria-label="Alternar asignación directa"
               />
             </div>
             <Users className="h-4 w-4" />
             <Badge variant="secondary" className="text-xs">
-              {filteredTechnicians.length} techs
+              {filteredTechnicians.length} técnicos
             </Badge>
             <Badge variant="outline" className="text-xs">
-              {yearJobs.length} jobs
+              {yearJobs.length} trabajos
             </Badge>
             {isBackgroundFetchingMatrix && (
               <Badge variant="outline" className="text-xs flex items-center gap-1">
                 <RefreshCw className="h-3 w-3 animate-spin" />
-                Fetching...
+                Actualizando...
               </Badge>
             )}
           </div>
@@ -1065,29 +1065,29 @@ export default function JobAssignmentMatrix() {
             aria-expanded={filtersOpen}
             aria-controls="mobile-filters"
           >
-            Filters {activeFilterCount > 0 && <span className="ml-2 inline-flex items-center justify-center text-[10px] h-5 min-w-[20px] px-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">{activeFilterCount}</span>}
+            Filtros {activeFilterCount > 0 && <span className="ml-2 inline-flex items-center justify-center text-[10px] h-5 min-w-[20px] px-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">{activeFilterCount}</span>}
           </button>
           {/* Quick direct assign toggle */}
           <div className="flex items-center gap-2">
-            <span className="text-xs">Direct</span>
+            <span className="text-xs">Directa</span>
             <Switch
               checked={allowDirectAssign}
               onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))}
-              aria-label="Toggle direct assignment"
+              aria-label="Alternar asignación directa"
             />
           </div>
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <Badge variant="secondary" className="text-xs">
-              {filteredTechnicians.length} techs
+              {filteredTechnicians.length} técnicos
             </Badge>
             <Badge variant="outline" className="text-xs">
-              {yearJobs.length} jobs
+              {yearJobs.length} trabajos
             </Badge>
             {isBackgroundFetchingMatrix && (
               <Badge variant="outline" className="text-[10px] flex items-center gap-1">
                 <RefreshCw className="h-3 w-3 animate-spin" />
-                Fetching...
+                Actualizando...
               </Badge>
             )}
           </div>
@@ -1096,7 +1096,7 @@ export default function JobAssignmentMatrix() {
           <div id="mobile-filters" className="mt-2 max-h-[300px] overflow-y-auto p-2 border rounded-md bg-muted/30 space-y-2">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
-              <span className="text-sm font-medium">Filters</span>
+              <span className="text-sm font-medium">Filtros</span>
               {activeFilterCount > 0 && (
                 <button
                   className="ml-auto text-xs underline"
@@ -1108,7 +1108,7 @@ export default function JobAssignmentMatrix() {
                     setAllowDirectAssign(false);
                   }}
                 >
-                  Clear all
+                  Limpiar
                 </button>
               )}
             </div>
@@ -1130,7 +1130,7 @@ export default function JobAssignmentMatrix() {
               </TabsList>
             </Tabs>
             <Input
-              placeholder="Search technicians..."
+              placeholder="Buscar técnicos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -1160,8 +1160,8 @@ export default function JobAssignmentMatrix() {
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Direct assign</span>
-              <Switch checked={allowDirectAssign} onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))} aria-label="Toggle direct assignment" />
+              <span className="text-sm font-medium">Asignación directa</span>
+              <Switch checked={allowDirectAssign} onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))} aria-label="Alternar asignación directa" />
             </div>
           </div>
         )}
@@ -1174,7 +1174,7 @@ export default function JobAssignmentMatrix() {
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2" />
-              <p className="text-muted-foreground">Loading assignment matrix...</p>
+              <p className="text-muted-foreground">Cargando la matriz de asignaciones...</p>
             </div>
           </div>
         ) : (

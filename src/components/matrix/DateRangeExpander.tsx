@@ -36,18 +36,18 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
   const currentYear = new Date().getFullYear();
   const years = [currentYear - 1, currentYear, currentYear + 1];
   const months = [
-    { value: 1, label: 'Jan' },
+    { value: 1, label: 'Ene' },
     { value: 2, label: 'Feb' },
     { value: 3, label: 'Mar' },
-    { value: 4, label: 'Apr' },
+    { value: 4, label: 'Abr' },
     { value: 5, label: 'May' },
     { value: 6, label: 'Jun' },
     { value: 7, label: 'Jul' },
-    { value: 8, label: 'Aug' },
+    { value: 8, label: 'Ago' },
     { value: 9, label: 'Sep' },
     { value: 10, label: 'Oct' },
     { value: 11, label: 'Nov' },
-    { value: 12, label: 'Dec' }
+    { value: 12, label: 'Dic' }
   ];
 
   const handleQuickJump = (value: string) => {
@@ -59,7 +59,7 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
     <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
       <div className="flex items-center gap-1">
         <Calendar className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Date Range:</span>
+        <span className="text-sm font-medium">Rango de fechas:</span>
       </div>
 
       {/* Expand Before Button */}
@@ -69,16 +69,16 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
         onClick={onExpandBefore}
         disabled={!canExpandBefore}
         className="gap-1"
-        title={canExpandBefore ? 'Load 4 weeks earlier' : 'Cannot expand further back'}
+        title={canExpandBefore ? 'Cargar 4 semanas antes' : 'No se puede ampliar más hacia atrás'}
       >
         <ChevronLeft className="h-3 w-3" />
-        {canExpandBefore ? '+4w' : 'Max'}
+        {canExpandBefore ? '+4s' : 'Máx'}
       </Button>
 
       {/* Range Info */}
       <div className="flex items-center gap-2">
         <Badge variant="secondary" className="text-xs">
-          {rangeInfo.totalWeeks}w ({rangeInfo.totalDays}d)
+          {rangeInfo.totalWeeks} s ({rangeInfo.totalDays} d)
         </Badge>
         <span className="text-sm font-medium text-muted-foreground">
           Rango: {rangeInfo.startFormatted} - {rangeInfo.endFormatted}
@@ -92,9 +92,9 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
         onClick={onExpandAfter}
         disabled={!canExpandAfter}
         className="gap-1"
-        title={canExpandAfter ? 'Load 4 weeks later' : 'Cannot expand further forward'}
+        title={canExpandAfter ? 'Cargar 4 semanas después' : 'No se puede ampliar más hacia adelante'}
       >
-        {canExpandAfter ? '+4w' : 'Max'}
+        {canExpandAfter ? '+4s' : 'Máx'}
         <ChevronRight className="h-3 w-3" />
       </Button>
 
@@ -120,10 +120,10 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
         size="sm"
         onClick={onReset}
         className="gap-1"
-        title="Reset to current date with default range"
+        title="Volver a la fecha actual con el rango predeterminado"
       >
         <RotateCcw className="h-3 w-3" />
-        Reset
+        Reiniciar
       </Button>
 
       {/* Max Range Indicators */}

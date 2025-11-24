@@ -363,7 +363,7 @@ export const AssignJobDialog = ({
         if (coverageMode === 'multi') {
           const uniqueKeys = Array.from(new Set((multiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
           if (uniqueKeys.length === 0) {
-            throw new Error('Select at least one date');
+            throw new Error('Selecciona al menos una fecha');
           }
           return uniqueKeys;
         }
@@ -412,7 +412,7 @@ export const AssignJobDialog = ({
       const { data: verifyData, error: verifyErr } = await verifyQuery;
       if (verifyErr) throw verifyErr;
       if (!verifyData || verifyData.length === 0) {
-        throw new Error('Assignment not persisted');
+        throw new Error('La asignación no se guardó');
       }
 
       console.log('Assignment created successfully, now handling Flex crew assignments...');
