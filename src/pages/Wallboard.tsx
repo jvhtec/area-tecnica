@@ -1179,11 +1179,16 @@ function WallboardDisplay({
       // For API mode (public wallboards), fetch config via API
       if (isApiMode) {
         try {
+          console.log('📋 Loading preset config via API...', { effectiveSlug, wallboardApiToken: wallboardApiToken?.slice(0, 20) + '...' });
           const api = new WallboardApi(wallboardApiToken);
           const response = await api.presetConfig();
+          console.log('📋 Preset config response:', response);
           data = response.config;
+          if (!data) {
+            console.warn('📋 No config in response, will use defaults');
+          }
         } catch (err) {
-          console.error('Failed to load preset config via API:', err);
+          console.error('❌ Failed to load preset config via API:', err);
           // Fall through to use defaults
           error = err;
         }
@@ -1205,6 +1210,7 @@ function WallboardDisplay({
       }
 
       if (error || !data) {
+        console.warn('⚠️ No preset data, using defaults', { error, data, effectiveSlug, isApiMode });
         if (isProduccionPreset) {
           // Stub for /produccion: calendar-only layout with slower rotation
           setPanelOrder(['calendar']);

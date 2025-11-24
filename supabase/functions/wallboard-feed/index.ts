@@ -438,15 +438,28 @@ serve(async (req) => {
       // Return preset configuration for the given slug, with fallback to "default"
       const requestedSlug = presetSlug || "default";
 
+      console.log("📋 preset-config request:", {
+        presetSlugFromJwt: presetSlug || "(none)",
+        requestedSlug,
+        authMethod: auth.method,
+      });
+
       let { data, error } = await sb
         .from("wallboard_presets")
         .select("panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds")
         .eq("slug", requestedSlug)
         .maybeSingle();
 
+      console.log("📋 DB query result:", {
+        hasData: !!data,
+        hasError: !!error,
+        errorMsg: error?.message || "(none)",
+        panelOrder: data?.panel_order || "(null)",
+      });
+
       // If preset not found and we weren't already looking for "default", try "default"
       if (!data && !error && requestedSlug !== "default") {
-        console.log(`Preset "${requestedSlug}" not found, falling back to "default"`);
+        console.log(`⚠️ Preset "${requestedSlug}" not found, falling back to "default"`);
         const fallbackResult = await sb
           .from("wallboard_presets")
           .select("panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds")
@@ -454,9 +467,15 @@ serve(async (req) => {
           .maybeSingle();
         data = fallbackResult.data;
         error = fallbackResult.error;
+        console.log("📋 Fallback query result:", {
+          hasData: !!data,
+          hasError: !!error,
+          panelOrder: data?.panel_order || "(null)",
+        });
       }
 
       if (error) {
+        console.error("❌ preset-config error:", error.message);
         return new Response(JSON.stringify({ error: error.message }), {
           status: 500,
           headers: { "Content-Type": "application/json", ...corsHeaders() },
@@ -464,6 +483,7 @@ serve(async (req) => {
       }
 
       if (!data) {
+        console.log("⚠️ No preset found, returning hardcoded defaults");
         // Return sensible defaults if no preset exists at all
         return new Response(JSON.stringify({
           config: {
@@ -479,6 +499,11 @@ serve(async (req) => {
           headers: { "Content-Type": "application/json", ...corsHeaders() },
         });
       }
+
+      console.log("✅ Returning preset config:", {
+        slug: requestedSlug,
+        panelOrder: data.panel_order,
+      });
 
       return new Response(JSON.stringify({ config: data, slug: requestedSlug }), {
         headers: { "Content-Type": "application/json", ...corsHeaders() },

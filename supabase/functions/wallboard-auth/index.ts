@@ -46,10 +46,23 @@ serve(async (req) => {
     const url = new URL(req.url);
     let presetFromReq = (url.searchParams.get("presetSlug") ?? url.searchParams.get("preset") ?? "").trim().toLowerCase();
     let token = url.searchParams.get("wallboardToken");
+
+    console.log("🔐 wallboard-auth request:", {
+      method: req.method,
+      presetFromUrl: presetFromReq || "(none)",
+      hasTokenInUrl: !!token,
+    });
+
     if (!token) {
       const contentType = req.headers.get("content-type") || "";
       if (contentType.includes("application/json")) {
         const body = await req.json().catch(() => null);
+        console.log("📦 Request body:", {
+          hasWallboardToken: !!body?.wallboardToken,
+          hasToken: !!body?.token,
+          presetSlugFromBody: body?.presetSlug || "(none)",
+          presetFromBody: body?.preset || "(none)",
+        });
         token = body?.wallboardToken || body?.token || null;
         if (!presetFromReq) {
           const rawPreset = body?.presetSlug || body?.preset || "";
@@ -64,11 +77,19 @@ serve(async (req) => {
       if (raw) token = raw;
     }
     if (!token || token !== WALLBOARD_SHARED_TOKEN) {
+      console.warn("❌ Token mismatch or missing");
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: cors() });
     }
     const now = Math.floor(Date.now() / 1000);
     const ttl = Math.max(MIN_TTL_SECONDS, DEFAULT_TTL_SECONDS);
     const preset = presetFromReq || WALLBOARD_PRESET_SLUG || "default";
+
+    console.log("✅ Generating JWT with preset:", {
+      presetFromReq: presetFromReq || "(none)",
+      fallbackEnv: WALLBOARD_PRESET_SLUG,
+      finalPreset: preset,
+    });
+
     const jwt = await sign({
       iss: "wallboard-auth",
       iat: now,
@@ -80,6 +101,7 @@ serve(async (req) => {
       headers: { "Content-Type": "application/json", ...cors() },
     });
   } catch (e: any) {
+    console.error("🔥 wallboard-auth error:", e);
     return new Response(JSON.stringify({ error: e?.message ?? String(e) }), {
       status: 500,
       headers: { "Content-Type": "application/json", ...cors() },
