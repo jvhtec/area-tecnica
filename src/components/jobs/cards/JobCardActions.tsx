@@ -304,7 +304,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     }
   };
 
-  const canViewCalculators = isProjectManagementPage && (userRole === 'management');
+  const canViewCalculators = isProjectManagementPage && (userRole === 'management' || userRole === 'admin');
 
   const allowedJobType = ['single', 'festival', 'tourdate'].includes(job?.job_type);
 

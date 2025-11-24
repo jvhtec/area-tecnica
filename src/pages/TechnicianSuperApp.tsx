@@ -258,9 +258,9 @@ export default function TechnicianSuperApp() {
 
   const t = getThemeStyles(isDark);
 
-  const handleOpenAction = (action: string, assignment?: TechnicianAssignment) => {
-    // Pass the nested job data, not the full assignment
-    setSelectedJob(assignment?.jobs || null);
+  const handleOpenAction = (action: string, jobData?: TechnicianJobData) => {
+    // TechJobCard already extracts job data before calling onAction
+    setSelectedJob(jobData || null);
     setActiveModal(action);
   };
 
