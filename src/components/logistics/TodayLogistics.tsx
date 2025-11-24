@@ -25,6 +25,7 @@ export const TodayLogistics = ({ selectedDate }: TodayLogisticsProps) => {
         .from('logistics_events')
         .select(`
           id,
+          title,
           job_id,
           event_type,
           transport_type,
