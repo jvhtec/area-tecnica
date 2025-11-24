@@ -12,17 +12,17 @@ interface LogisticsEventCardProps {
   className?: string;
 }
 
-export const LogisticsEventCard = ({ 
-  event, 
-  onClick, 
+export const LogisticsEventCard = ({
+  event,
+  onClick,
   variant = "detailed",
   compact = false,
-  className 
+  className
 }: LogisticsEventCardProps) => {
   // Default colors based on event type
   const defaultColor = event.event_type === 'load' ? 'rgb(191, 219, 254)' : 'rgb(187, 247, 208)';
   const borderColor = event.color || defaultColor;
-  
+
   // Create a slightly transparent version of the color for the background
   const getBgColor = () => {
     if (!event.color) return '';
@@ -41,6 +41,17 @@ export const LogisticsEventCard = ({
     }
   };
 
+  // Helper to get display name with fallback
+  const getDisplayName = () => {
+    const title = event.title || event.job?.title;
+    if (title) return title;
+
+    // Fallback: show event type + transport type
+    const typeLabel = event.event_type === 'load' ? 'Carga' : 'Descarga';
+    const transportLabel = event.transport_type ? ` - ${event.transport_type}` : '';
+    return `${typeLabel}${transportLabel}`;
+  };
+
   return (
     <div
       onClick={onClick}
@@ -55,7 +66,7 @@ export const LogisticsEventCard = ({
     >
       {variant === "calendar" ? (
         <div className="flex items-center gap-2">
-          <span className="text-xs">{event.title || event.job?.title}</span>
+          <span className="text-xs">{getDisplayName()}</span>
         </div>
       ) : (
         <>
@@ -76,7 +87,7 @@ export const LogisticsEventCard = ({
               <span className="capitalize">{event.transport_type}</span>
             </Badge>
           </div>
-          
+
           <h3 className="font-medium mt-2">{event.title || event.job?.title}</h3>
           <div className="text-sm text-muted-foreground mt-1">
             {format(new Date(`2000-01-01T${event.event_time}`), 'HH:mm')}
