@@ -18,7 +18,7 @@ function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-wallboard-jwt, x-wallboard-token, x-wallboard-shared-token, x-wallboard-shared",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   } as Record<string, string>;
 }
 
@@ -120,7 +120,27 @@ serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/\/+$/, "");
+  let path = url.pathname.replace(/\/+$/, "");
+
+  // Support path from body (when invoked via supabase.functions.invoke)
+  // Check if the path doesn't contain an endpoint and try to get it from body
+  const knownEndpoints = ['/jobs-overview', '/crew-assignments', '/doc-progress', '/pending-actions', '/announcements', '/preset-config'];
+  const hasEndpointInUrl = knownEndpoints.some(ep => path.endsWith(ep));
+
+  if (!hasEndpointInUrl && req.method === "POST") {
+    try {
+      const contentType = req.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const body = await req.clone().json();
+        if (body?.path && typeof body.path === "string") {
+          // Append the path from body to our base path
+          path = path + body.path.replace(/^\/+/, '/');
+        }
+      }
+    } catch {
+      // Ignore body parsing errors
+    }
+  }
 
   try {
     const auth = await authenticate(req, url);

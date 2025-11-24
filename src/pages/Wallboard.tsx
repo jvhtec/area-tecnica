@@ -67,9 +67,21 @@ const PanelContainer: React.FC<{ children: React.ReactNode; theme?: 'light' | 'd
   </div>
 );
 
-const StatusDot: React.FC<{ color: 'green'|'yellow'|'red' }>=({ color }) => (
-  <span className={`inline-block w-3 h-3 rounded-full mr-2 ${color==='green'?'bg-green-500':color==='yellow'?'bg-yellow-400':'bg-red-500'}`} />
-);
+const StatusDot: React.FC<{ color: 'green'|'yellow'|'red' }>=({ color }) => {
+  const statusLabels = {
+    green: 'Estado: bueno',
+    yellow: 'Estado: atención necesaria',
+    red: 'Estado: crítico'
+  };
+  return (
+    <span
+      className={`inline-block w-3 h-3 rounded-full mr-2 ${color==='green'?'bg-green-500':color==='yellow'?'bg-yellow-400':'bg-red-500'}`}
+      role="img"
+      aria-label={statusLabels[color]}
+      title={statusLabels[color]}
+    />
+  );
+};
 
 function translateTimesheetStatus(status: TimesheetStatus): string {
   switch (status) {
@@ -81,6 +93,22 @@ function translateTimesheetStatus(status: TimesheetStatus): string {
     default: return status;
   }
 }
+
+// Accessible department icon component with proper ARIA labels
+const DeptIcon: React.FC<{ dept: Dept | null; className?: string }> = ({ dept, className = 'text-38' }) => {
+  const icons: Record<Dept | 'default', { emoji: string; label: string }> = {
+    sound: { emoji: '🎧', label: 'Sonido' },
+    lights: { emoji: '💡', label: 'Iluminación' },
+    video: { emoji: '📹', label: 'Video' },
+    default: { emoji: '👤', label: 'Técnico' }
+  };
+  const { emoji, label } = dept && icons[dept] ? icons[dept] : icons.default;
+  return (
+    <span className={className} role="img" aria-label={label} title={label}>
+      {emoji}
+    </span>
+  );
+};
 
 function formatJobTypeLabel(jobType?: string | null): string | null {
   const jt = (jobType || '').toLowerCase();
@@ -559,7 +587,7 @@ const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?
             <div className="mt-3 flex gap-6 text-30">
               {j.departments.map(d => (
                 <div key={d} className="flex items-center gap-2">
-                  <span className="text-38">{d==='sound'?'🎧':d==='lights'?'💡':'📹'}</span>
+                  <DeptIcon dept={d} />
                   <span className="tabular-nums">{(j.crewAssigned as any)[d] || 0}/{(j.crewNeeded as any)[d] ?? 0}</span>
                 </div>
               ))}
@@ -638,7 +666,7 @@ const CrewAssignmentsPanel: React.FC<{ data: CrewAssignmentsFeed | null; page?: 
               {job.crew.map((c, i) => (
                 <div key={i} className={`flex items-center justify-between rounded-md px-3 py-2 ${theme === 'light' ? 'bg-zinc-100' : 'bg-zinc-800/50'}`}>
                   <div className="flex items-center gap-3 truncate">
-                    <span className="text-38">{c.dept==='sound'?'🎧':c.dept==='lights'?'💡':c.dept==='video'?'📹':'👤'}</span>
+                    <DeptIcon dept={c.dept} />
                     <div className="truncate">
                       <div className="text-32 truncate">{c.name || '—'}</div>
                       <div className={`text-xl truncate ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>{c.role}</div>
@@ -714,7 +742,7 @@ const DocProgressPanel: React.FC<{ data: DocProgressFeed | null; page?: number; 
                   <div key={dep.dept} className={`rounded-md p-3 ${theme === 'light' ? 'bg-zinc-100' : 'bg-zinc-800/50'}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-32 flex items-center gap-2">
-                        <span className="text-38">{dep.dept==='sound'?'🎧':dep.dept==='lights'?'💡':'📹'}</span>
+                        <DeptIcon dept={dep.dept} />
                         <span className="capitalize">{dep.dept}</span>
                       </div>
                       <div className={`text-2xl ${theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}`}>{dep.have}/{dep.need}</div>
@@ -904,16 +932,28 @@ const Ticker: React.FC<{ messages: TickerMessage[]; bottomOffset?: number; theme
   }, [onMeasureHeight]);
 
   return (
-    <div ref={containerRef} className={`fixed bottom-0 left-0 right-0 border-t py-2 text-xl overflow-hidden ${theme === 'light' ? 'bg-zinc-100/95 border-zinc-200' : 'bg-zinc-900/95 border-zinc-800'}`} style={{ bottom: bottomOffset }}>
+    <aside
+      ref={containerRef}
+      className={`fixed bottom-0 left-0 right-0 border-t py-2 text-xl overflow-hidden ${theme === 'light' ? 'bg-zinc-100/95 border-zinc-200' : 'bg-zinc-900/95 border-zinc-800'}`}
+      style={{ bottom: bottomOffset }}
+      role="marquee"
+      aria-label="Anuncios"
+      aria-live="polite"
+      aria-atomic="false"
+    >
+      {/* Screen reader only content for accessibility */}
+      <div className="sr-only" aria-live="assertive">
+        {hasMessages ? messages.map(m => m.message).join('. ') : 'Sin anuncios'}
+      </div>
       {hasMessages ? (
-        <div className="whitespace-nowrap will-change-transform" style={{ transform: `translateX(${posX}px)` }}>
+        <div className="whitespace-nowrap will-change-transform" aria-hidden="true" style={{ transform: `translateX(${posX}px)` }}>
           {renderCopy({ ref: node => { textRef.current = node; } })}
           {renderCopy({ paddingLeft: gap })}
         </div>
       ) : (
-        <div>—</div>
+        <div aria-hidden="true">—</div>
       )}
-    </div>
+    </aside>
   );
 };
 
@@ -1850,13 +1890,17 @@ function WallboardDisplay({
   }
 
   return (
-    <div className={`min-h-screen ${isAlien ? 'bg-black text-[var(--alien-amber)] alien-scanlines alien-vignette' : (theme === 'light' ? 'bg-zinc-100 text-zinc-900' : 'bg-black text-white')}`}>
+    <main
+      className={`min-h-screen ${isAlien ? 'bg-black text-[var(--alien-amber)] alien-scanlines alien-vignette' : (theme === 'light' ? 'bg-zinc-100 text-zinc-900' : 'bg-black text-white')}`}
+      role="main"
+      aria-label="Panel de control Wallboard"
+    >
       {presetMessage && (
-        <div className="bg-amber-500/20 text-amber-200 text-sm text-center py-2">
+        <div className="bg-amber-500/20 text-amber-200 text-sm text-center py-2" role="status" aria-live="polite">
           {presetMessage}
         </div>
       )}
-      <div className="overflow-hidden" style={{ height: `calc(100vh - ${footerH + tickerH}px)` }}>{/* Subtract measured ticker + footer height */}
+      <section className="overflow-hidden" style={{ height: `calc(100vh - ${footerH + tickerH}px)` }} aria-label={`Panel actual: ${current}`}>{/* Subtract measured ticker + footer height */}
         {current==='overview' && (isAlien ? <AlienJobsPanel data={overview} highlightIds={new Set(highlightJobs.keys())} /> : <JobsOverviewPanel data={overview} highlightIds={new Set(highlightJobs.keys())} page={panelPages.overview} theme={theme} />)}
         {current==='crew' && (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} page={panelPages.crew} theme={theme} />)}
         {current==='logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} page={panelPages.logistics} theme={theme} />)}
@@ -1871,10 +1915,10 @@ function WallboardDisplay({
             scrollSpeed={isProduccionPreset ? 20 : 50}
           />
         ))}
-      </div>
+      </section>
       <Ticker messages={tickerMsgs} bottomOffset={footerH} theme={theme} onMeasureHeight={setTickerH} />
       <FooterLogo onToggle={() => setIsAlien(v => !v)} onMeasure={setFooterH} theme={theme} />
-    </div>
+    </main>
   );
 }
 

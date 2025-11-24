@@ -76,25 +76,44 @@ export class WallboardApi {
 
   // Prefer Supabase invoke to avoid dev-server rewrites returning HTML
   private async request<T>(path: string): Promise<T> {
+    // Try supabase.functions.invoke first
     try {
       const { supabase } = await import('@/integrations/supabase/client');
-      const headers = this.token ? { "x-wallboard-jwt": this.token } : {};
+      const headers: Record<string, string> = {};
+      if (this.token) {
+        headers["x-wallboard-jwt"] = this.token;
+      }
       const { data, error } = await supabase.functions.invoke('wallboard-feed', {
         body: { path },
         headers,
-        responseType: 'json'
-      } as any);
-      if (error) throw error;
+      });
+      if (error) {
+        console.warn('wallboard-feed invoke error, falling back to fetch:', error);
+        throw error;
+      }
       return data as T;
     } catch (err) {
+      // Fallback to direct fetch
+      console.log('wallboard-feed fallback fetch for path:', path);
       const anon =
         (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY ||
         (import.meta as any)?.env?.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const headers: Record<string, string> = this.token ? { "x-wallboard-jwt": this.token } : {};
+      const headers: Record<string, string> = {};
+      // Always set x-wallboard-jwt if we have a token
+      if (this.token) {
+        headers["x-wallboard-jwt"] = this.token;
+      }
+      // Add anon key for Supabase routing (required for edge function access)
       if (anon) {
-        headers["Authorization"] = `Bearer ${anon}`;
+        headers["apikey"] = anon;
+        // Only set Authorization if we don't have a wallboard token
+        // to avoid confusion in the edge function authentication
+        if (!this.token) {
+          headers["Authorization"] = `Bearer ${anon}`;
+        }
       }
       const res = await fetch(`/functions/v1/wallboard-feed${path}`, {
+        method: 'GET',
         headers,
         cache: 'no-store'
       });
@@ -134,20 +153,54 @@ export async function exchangeWallboardToken(shared: string, presetSlug?: string
   try {
     const mod = await import('@/integrations/supabase/client');
     const supabase = mod.supabase;
+    console.log('🔐 Attempting wallboard-auth via Supabase invoke...');
     const { data, error } = await supabase.functions.invoke('wallboard-auth', {
       body: { wallboardToken: shared, preset: presetSlug, presetSlug },
     });
-    if (error) throw error;
-    if (data?.token) return data as { token: string; expiresIn: number };
+    if (error) {
+      console.warn('wallboard-auth invoke error:', error);
+      throw error;
+    }
+    if (data?.token) {
+      console.log('✅ wallboard-auth invoke successful');
+      return data as { token: string; expiresIn: number; preset?: string };
+    }
+    // If no token in response, throw to trigger fallback
+    throw new Error('No token in response');
   } catch (err) {
     console.warn('wallboard-auth invoke fallback to fetch:', err);
   }
+
+  // Fallback to direct fetch
+  console.log('🔄 Trying wallboard-auth via direct fetch...');
+  const anon =
+    (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY ||
+    (import.meta as any)?.env?.VITE_SUPABASE_PUBLISHABLE_KEY;
 
   let url = `/functions/v1/wallboard-auth?wallboardToken=${encodeURIComponent(shared)}`;
   if (presetSlug) {
     url += `&preset=${encodeURIComponent(presetSlug)}`;
   }
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`wallboard-auth failed: ${res.status}`);
-  return res.json();
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (anon) {
+    headers['apikey'] = anon;
+    headers['Authorization'] = `Bearer ${anon}`;
+  }
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    throw new Error(`wallboard-auth failed: ${res.status} ${errorText}`);
+  }
+
+  const result = await res.json();
+  if (!result?.token) {
+    throw new Error('wallboard-auth returned no token');
+  }
+
+  console.log('✅ wallboard-auth fetch successful');
+  return result;
 }
