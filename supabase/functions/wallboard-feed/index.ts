@@ -18,7 +18,7 @@ function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-wallboard-jwt, x-wallboard-token, x-wallboard-shared-token, x-wallboard-shared",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   } as Record<string, string>;
 }
 
@@ -120,7 +120,27 @@ serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/\/+$/, "");
+  let path = url.pathname.replace(/\/+$/, "");
+
+  // Support path from body (when invoked via supabase.functions.invoke)
+  // Check if the path doesn't contain an endpoint and try to get it from body
+  const knownEndpoints = ['/jobs-overview', '/crew-assignments', '/doc-progress', '/pending-actions', '/announcements', '/preset-config'];
+  const hasEndpointInUrl = knownEndpoints.some(ep => path.endsWith(ep));
+
+  if (!hasEndpointInUrl && req.method === "POST") {
+    try {
+      const contentType = req.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const body = await req.clone().json();
+        if (body?.path && typeof body.path === "string") {
+          // Append the path from body to our base path
+          path = path + body.path.replace(/^\/+/, '/');
+        }
+      }
+    } catch {
+      // Ignore body parsing errors
+    }
+  }
 
   try {
     const auth = await authenticate(req, url);
@@ -128,10 +148,10 @@ serve(async (req) => {
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     if (path.endsWith("/jobs-overview")) {
-      // Today + tomorrow window
+      // 7-day window to match authenticated wallboard behavior
       const now = new Date();
       const todayStart = startOfDay(now);
-      const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+      const weekEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6));
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -140,13 +160,16 @@ serve(async (req) => {
           title,
           start_time,
           end_time,
+          job_type,
+          color,
           locations(id, name),
           job_departments(department),
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString())
+        .in("job_type", ["single", "festival", "tourdate", "dryhire"])
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lte("start_time", weekEnd.toISOString())
+        .gte("end_time", todayStart.toISOString())
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -184,6 +207,8 @@ serve(async (req) => {
             title: j.title,
             start_time: j.start_time,
             end_time: j.end_time,
+            job_type: j.job_type,
+            color: j.color,
             location: { name: j.locations?.[0]?.name ?? j.locations?.name ?? null },
             departments: depts,
             crewAssigned: { ...crewAssigned },
@@ -202,7 +227,7 @@ serve(async (req) => {
     if (path.endsWith("/crew-assignments")) {
       const now = new Date();
       const todayStart = startOfDay(now);
-      const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+      const weekEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6));
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -211,6 +236,8 @@ serve(async (req) => {
           title,
           start_time,
           end_time,
+          job_type,
+          color,
           job_assignments(
             technician_id,
             sound_role,
@@ -219,9 +246,10 @@ serve(async (req) => {
             profiles(id, first_name, last_name)
           )
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString())
+        .in("job_type", ["single", "festival", "tourdate", "dryhire"])
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lte("start_time", weekEnd.toISOString())
+        .gte("end_time", todayStart.toISOString())
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -259,6 +287,10 @@ serve(async (req) => {
         jobs: jobsArr.map((j: any) => ({
           id: j.id,
           title: j.title,
+          start_time: j.start_time,
+          end_time: j.end_time,
+          jobType: j.job_type,
+          color: j.color,
           crew: (j.job_assignments ?? []).map((a: any) => {
             const dept: Dept | null = a.sound_role ? "sound" : a.lights_role ? "lights" : a.video_role ? "video" : null;
             const role = a.sound_role || a.lights_role || a.video_role || "assigned";
@@ -275,21 +307,23 @@ serve(async (req) => {
     }
 
     if (path.endsWith("/doc-progress")) {
-      // Skeleton: return jobs with departments present; zeroed counts
+      // Return jobs with departments and doc progress
       const now = new Date();
       const todayStart = startOfDay(now);
-      const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+      const weekEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6));
 
       const { data: jobs, error } = await sb
         .from("jobs")
         .select(`
           id,
           title,
+          color,
           job_departments(department)
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString())
+        .in("job_type", ["single", "festival", "tourdate", "dryhire"])
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lte("start_time", weekEnd.toISOString())
+        .gte("end_time", todayStart.toISOString())
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -298,6 +332,7 @@ serve(async (req) => {
         jobs: (jobs ?? []).map((j: any) => ({
           id: j.id,
           title: j.title,
+          color: j.color,
           departments: Array.from(new Set((j.job_departments ?? []).map((d: any) => d.department))).map((dept: Dept) => ({
             dept,
             have: 0,
@@ -313,10 +348,10 @@ serve(async (req) => {
     }
 
     if (path.endsWith("/pending-actions")) {
-      // Simple triage: missing crew per dept today+tomorrow, and overdue timesheets for jobs ended >24h ago
+      // Simple triage: missing crew per dept, and overdue timesheets for jobs ended >24h ago
       const now = new Date();
       const todayStart = startOfDay(now);
-      const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+      const weekEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6));
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -327,9 +362,10 @@ serve(async (req) => {
           job_departments(department),
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString());
+        .in("job_type", ["single", "festival", "tourdate", "dryhire"])
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lte("start_time", weekEnd.toISOString())
+        .gte("end_time", todayStart.toISOString());
 
       if (error) throw error;
 
@@ -399,21 +435,47 @@ serve(async (req) => {
     }
 
     if (path.endsWith("/preset-config")) {
-      // Return preset configuration for the given slug
-      if (!presetSlug) {
-        return new Response(JSON.stringify({ error: "No preset slug provided" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders() },
+      // Return preset configuration for the given slug, with fallback to "default"
+      const requestedSlug = presetSlug || "default";
+
+      console.log("📋 preset-config request:", {
+        presetSlugFromJwt: presetSlug || "(none)",
+        requestedSlug,
+        authMethod: auth.method,
+      });
+
+      let { data, error } = await sb
+        .from("wallboard_presets")
+        .select("panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds")
+        .eq("slug", requestedSlug)
+        .maybeSingle();
+
+      console.log("📋 DB query result:", {
+        hasData: !!data,
+        hasError: !!error,
+        errorMsg: error?.message || "(none)",
+        panelOrder: data?.panel_order || "(null)",
+      });
+
+      // If preset not found and we weren't already looking for "default", try "default"
+      if (!data && !error && requestedSlug !== "default") {
+        console.log(`⚠️ Preset "${requestedSlug}" not found, falling back to "default"`);
+        const fallbackResult = await sb
+          .from("wallboard_presets")
+          .select("panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds")
+          .eq("slug", "default")
+          .maybeSingle();
+        data = fallbackResult.data;
+        error = fallbackResult.error;
+        console.log("📋 Fallback query result:", {
+          hasData: !!data,
+          hasError: !!error,
+          panelOrder: data?.panel_order || "(null)",
         });
       }
 
-      const { data, error } = await sb
-        .from("wallboard_presets")
-        .select("panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds")
-        .eq("slug", presetSlug)
-        .maybeSingle();
-
       if (error) {
+        console.error("❌ preset-config error:", error.message);
         return new Response(JSON.stringify({ error: error.message }), {
           status: 500,
           headers: { "Content-Type": "application/json", ...corsHeaders() },
@@ -421,13 +483,29 @@ serve(async (req) => {
       }
 
       if (!data) {
-        return new Response(JSON.stringify({ error: "Preset not found", slug: presetSlug }), {
-          status: 404,
+        console.log("⚠️ No preset found, returning hardcoded defaults");
+        // Return sensible defaults if no preset exists at all
+        return new Response(JSON.stringify({
+          config: {
+            panel_order: ["overview", "crew", "logistics", "pending", "calendar"],
+            panel_durations: { overview: 12, crew: 12, logistics: 12, pending: 12, calendar: 12 },
+            rotation_fallback_seconds: 12,
+            highlight_ttl_seconds: 300,
+            ticker_poll_interval_seconds: 20,
+          },
+          slug: requestedSlug,
+          fallback: true,
+        }), {
           headers: { "Content-Type": "application/json", ...corsHeaders() },
         });
       }
 
-      return new Response(JSON.stringify({ config: data, slug: presetSlug }), {
+      console.log("✅ Returning preset config:", {
+        slug: requestedSlug,
+        panelOrder: data.panel_order,
+      });
+
+      return new Response(JSON.stringify({ config: data, slug: requestedSlug }), {
         headers: { "Content-Type": "application/json", ...corsHeaders() },
       });
     }

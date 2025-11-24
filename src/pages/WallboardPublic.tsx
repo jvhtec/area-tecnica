@@ -49,12 +49,20 @@ export default function WallboardPublic() {
         return;
       }
 
-      console.log('🔐 Attempting token exchange...', { tokenLength: token.length });
+      console.log('🔐 Attempting token exchange...', {
+        tokenLength: token.length,
+        presetSlug,
+        urlPath: window.location.pathname
+      });
 
       // Step 1: Exchange the shared token for a short-lived JWT
       try {
         const result = await exchangeWallboardToken(token, presetSlug);
-        console.log('✅ Token exchange successful', { jwtLength: result.token.length, expiresIn: result.expiresIn });
+        console.log('✅ Token exchange successful', {
+          jwtLength: result.token.length,
+          expiresIn: result.expiresIn,
+          presetFromResponse: result.preset
+        });
         setWallboardToken(result.token);
         setIsValid(true);
         setIsValidating(false);
@@ -74,7 +82,7 @@ export default function WallboardPublic() {
     };
 
     validateTokenAndAuthenticate();
-  }, [token]);
+  }, [token, presetSlug]);
 
   const handleWallboardFatalError = (message?: string) => {
     setError(message || 'Access token expired or invalid. Please request a new wallboard link.');
