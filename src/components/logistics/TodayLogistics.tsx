@@ -18,22 +18,13 @@ export const TodayLogistics = ({ selectedDate }: TodayLogisticsProps) => {
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
   const { data: events, isLoading } = useQuery({
-    queryKey: ['logistics-events', formattedDate],
+    queryKey: ['today-logistics', formattedDate],
     queryFn: async () => {
       console.log('Fetching logistics events for:', formattedDate);
       const { data, error } = await supabase
         .from('logistics_events')
         .select(`
-          id,
-          title,
-          job_id,
-          event_type,
-          transport_type,
-          event_date,
-          event_time,
-          loading_bay,
-          notes,
-          license_plate,
+          *,
           job:jobs(id, title),
           departments:logistics_event_departments(department)
         `)

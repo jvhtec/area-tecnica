@@ -43,7 +43,12 @@ export const LogisticsEventCard = ({
 
   // Helper to get display name with fallback
   const getDisplayName = () => {
-    const title = event.title || event.job?.title;
+    const title =
+      event.title ||
+      event.custom_title ||
+      event.manual_title ||
+      event.request_title ||
+      event.job?.title;
     if (title) return title;
 
     // Fallback: show event type + transport type
