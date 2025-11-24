@@ -8,7 +8,7 @@ BEGIN;
 CREATE TEMP TABLE consolidated_assignments AS
 SELECT
   -- Use the first assignment's ID (earliest by assigned_at)
-  (array_agg(id ORDER BY assigned_at))[1] as keep_id,
+  (array_agg(id ORDER BY assigned_at NULLS LAST))[1] as keep_id,
   job_id,
   technician_id,
   -- Keep the most specific role assignments (prefer non-null)
@@ -49,7 +49,7 @@ SELECT
     MAX(use_tour_multipliers) FILTER (WHERE use_tour_multipliers IS NOT NULL),
     MAX(use_tour_multipliers)
   ) as use_tour_multipliers,
-  array_agg(id ORDER BY assigned_at) as all_ids,
+  array_agg(id ORDER BY assigned_at NULLS LAST) as all_ids,
   COUNT(*) as original_count
 FROM job_assignments
 GROUP BY job_id, technician_id

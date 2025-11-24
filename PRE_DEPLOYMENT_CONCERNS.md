@@ -34,21 +34,20 @@
 ## ⚠️ MINOR CONCERNS - Non-Blocking
 **UPDATE**: Only 2 minor concerns remain (down from 4)!
 
-### 1. Frontend Passes Extra Parameter to toggle_timesheet_day
-**Issue**: `src/services/toggleTimesheetDay.ts` passes `p_status` parameter
-**Impact**: Parameter is ignored by PostgreSQL (safe)
-**Risk Level**: LOW - Extra parameters are silently ignored
-**Action**: Monitor for errors in first deployment, fix if issues arise
+### 1. ✅ RESOLVED - Frontend Parameter Mismatch Fixed
+**Issue**: `src/services/toggleTimesheetDay.ts` was passing `p_status` parameter
+**Resolution**: Parameter removed from frontend code - now matches PostgreSQL function signature
+**Action**: ✅ Fixed in previous session
 
 ```typescript
-// Current frontend call:
+// Fixed frontend call:
 supabase.rpc('toggle_timesheet_day', {
   p_job_id: jobId,
   p_technician_id: technicianId,
   p_date: dateIso,
   p_present: present,
-  p_source: source,
-  p_status: status  // ← Not in function signature but should be ignored
+  p_source: source
+  // p_status removed ✅
 });
 
 // Function signature:
@@ -60,8 +59,6 @@ toggle_timesheet_day(
   p_source text DEFAULT 'matrix'
 )
 ```
-
-**Recommendation**: If deployment shows RPC errors, remove `p_status` from frontend call.
 
 **UPDATE**: Conflict detection fully optimized - no longer uses deprecated fields!
 
