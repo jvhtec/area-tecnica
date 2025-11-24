@@ -1,2 +1,0 @@
--- Filter technician tour rate view to logged-in user only
--- superseded by migration 20250920171200_fix_tour_rate_view.sql

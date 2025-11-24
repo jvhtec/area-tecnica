@@ -10,6 +10,7 @@ import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 export interface AssignmentInsertOptions {
   singleDay?: boolean;
   singleDayDate?: string | null;
+  addAsConfirmed?: boolean;
 }
 
 export const buildAssignmentInsertPayload = (
@@ -23,6 +24,7 @@ export const buildAssignmentInsertPayload = (
   const normalizedSound = soundRole !== "none" ? soundRole : null;
   const normalizedLights = lightsRole !== "none" ? lightsRole : null;
   const shouldFlagSingleDay = !!options?.singleDay && !!options?.singleDayDate;
+  const isConfirmed = !!options?.addAsConfirmed;
 
   return {
     job_id: jobId,
@@ -31,6 +33,8 @@ export const buildAssignmentInsertPayload = (
     lights_role: normalizedLights,
     assigned_by: assignedBy,
     assigned_at: new Date().toISOString(),
+    status: isConfirmed ? 'confirmed' : 'invited',
+    response_time: isConfirmed ? new Date().toISOString() : null,
     single_day: shouldFlagSingleDay,
     // Standardized: use only assignment_date
     assignment_date: shouldFlagSingleDay ? options?.singleDayDate ?? null : null,
@@ -178,6 +182,36 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
         console.error('Error adding assignment:', error);
         toast.error("Failed to add assignment");
         return;
+      }
+
+      // Send push notification for direct assignment
+      try {
+        // Fetch technician name for notification
+        const { data: techProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', technicianId)
+          .single();
+
+        const recipientName = techProfile
+          ? `${techProfile.first_name ?? ''} ${techProfile.last_name ?? ''}`.trim()
+          : undefined;
+
+        void supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'job.assignment.direct',
+            job_id: jobId,
+            recipient_id: technicianId,
+            recipient_name: recipientName || undefined,
+            assignment_status: options?.addAsConfirmed ? 'confirmed' : 'invited',
+            target_date: options?.singleDayDate ? `${options.singleDayDate}T00:00:00Z` : undefined,
+            single_day: options?.singleDay || false
+          }
+        });
+      } catch (pushError) {
+        // Non-blocking: if push fails, assignment still succeeded
+        console.warn('Push notification failed:', pushError);
       }
 
       // Add to Flex crew calls if applicable

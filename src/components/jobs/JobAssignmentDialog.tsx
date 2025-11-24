@@ -99,6 +99,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const [soundRole, setSoundRole] = useState<string>("none");
   const [lightsRole, setLightsRole] = useState<string>("none");
   const [singleDay, setSingleDay] = useState(false);
+  const [addAsConfirmed, setAddAsConfirmed] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -148,16 +149,16 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
     const typedDates = Array.isArray((jobData as any).job_date_types)
       ? (jobData as any).job_date_types
-          .filter((dt: any) => dt?.date)
-          .filter((dt: any) => {
-            const type = (dt?.type || '').toLowerCase();
-            return type !== 'off' && type !== 'travel';
-          })
-          .map((dt: any) => {
-            const d = new Date(`${dt.date}T00:00:00`);
-            d.setHours(0, 0, 0, 0);
-            return d;
-          })
+        .filter((dt: any) => dt?.date)
+        .filter((dt: any) => {
+          const type = (dt?.type || '').toLowerCase();
+          return type !== 'off' && type !== 'travel';
+        })
+        .map((dt: any) => {
+          const d = new Date(`${dt.date}T00:00:00`);
+          d.setHours(0, 0, 0, 0);
+          return d;
+        })
       : [];
 
     if (typedDates.length > 0) {
@@ -201,7 +202,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       setSelectedJobDate(jobDates[0]);
     }
   }, [jobDates, singleDay, allowedJobDateSet, selectedJobDate]);
- 
+
 
   useEffect(() => {
     if (!isOpen) {
@@ -258,7 +259,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     try {
       // Guard against over-assignment when requirements exist and no override
       const selectedCode = currentDepartment === 'sound' ? soundRole : currentDepartment === 'lights' ? lightsRole : 'none';
-      if (reqForDept && selectedCode && selectedCode !== 'none' && !['admin','management'].includes(userRole || '')) {
+      if (reqForDept && selectedCode && selectedCode !== 'none' && !['admin', 'management'].includes(userRole || '')) {
         const left = remainingByRole.get(selectedCode) ?? 0;
         if (left <= 0) {
           toast({ title: 'Role full', description: 'No remaining slots for this role', variant: 'destructive' });
@@ -272,10 +273,13 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
         lightsRole,
         singleDay
           ? {
-              singleDay: true,
-              singleDayDate: singleDayDateKey,
-            }
-          : undefined
+            singleDay: true,
+            singleDayDate: singleDayDateKey,
+            addAsConfirmed: addAsConfirmed,
+          }
+          : {
+            addAsConfirmed: addAsConfirmed,
+          }
       );
 
       toast({
@@ -287,6 +291,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       setSoundRole("none");
       setLightsRole("none");
       setSingleDay(false);
+      setAddAsConfirmed(false);
       setSelectedJobDate(null);
       onAssignmentChange();
     } catch (error: any) {
@@ -328,12 +333,12 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       // Process assignments for Flex integration
       for (const assignment of assignmentsToProcess) {
         const technicianId = assignment.technician_id;
-        
+
         // Add to Flex crew calls for sound and lights departments
         if (assignment.sound_role && assignment.sound_role !== 'none') {
           await manageFlexCrewAssignment(jobId, technicianId, 'sound', 'add');
         }
-        
+
         if (assignment.lights_role && assignment.lights_role !== 'none') {
           await manageFlexCrewAssignment(jobId, technicianId, 'lights', 'add');
         }
@@ -368,7 +373,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   const handleSyncFlex = async () => {
     const dept = (currentDepartment || '').toLowerCase();
-    if (!['sound','lights','video'].includes(dept)) {
+    if (!['sound', 'lights', 'video'].includes(dept)) {
       toast({ title: 'Not supported', description: 'Sync is available for Sound, Lights, or Video' });
       return;
     }
@@ -407,7 +412,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   const getDepartmentRoleOptions = () => {
     const all = roleOptionsForDiscipline(currentDepartment);
-    if (reqForDept && !['admin','management'].includes(userRole || '')) {
+    if (reqForDept && !['admin', 'management'].includes(userRole || '')) {
       const remainingSet = new Set(
         Array.from(remainingByRole.entries())
           .filter(([, left]) => left > 0)
@@ -436,7 +441,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                   View Crew Call in Flex
                 </Button>
               )}
-              {['sound','lights','video'].includes((currentDepartment || '').toLowerCase()) && (
+              {['sound', 'lights', 'video'].includes((currentDepartment || '').toLowerCase()) && (
                 <Button
                   variant="secondary"
                   size="sm"
@@ -459,7 +464,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
             )}
             {reqForDept && (
               <span className="block text-xs md:text-sm text-muted-foreground mt-1">
-                Coverage: {(Array.from(assignedByRole.values()).reduce((a,b)=>a+b,0))}/{reqForDept.total_required} required
+                Coverage: {(Array.from(assignedByRole.values()).reduce((a, b) => a + b, 0))}/{reqForDept.total_required} required
               </span>
             )}
           </DialogDescription>
@@ -471,244 +476,254 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
               <Label htmlFor="technician" className="md:text-right text-xs md:text-sm">
                 Technician
               </Label>
-            <Select
-              onValueChange={setSelectedTechnician}
-              value={selectedTechnician || ""}
-              disabled={isLoadingTechnicians || isLoadingJob}
-            >
-              <SelectTrigger className="md:col-span-3">
-                <SelectValue placeholder={
-                  isLoadingTechnicians || isLoadingJob 
-                    ? "Loading available technicians..." 
-                    : "Select a technician"
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredTechnicians.map((technician) => (
-                  <SelectItem key={technician.id} value={technician.id}>
-                    {formatAvailableTechnicianName(technician)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {currentDepartment === "sound" && (
-            <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
-              <Label htmlFor="sound-role" className="md:text-right text-xs md:text-sm">
-                Sound Role
-              </Label>
-              <Select onValueChange={setSoundRole} value={soundRole}>
+              <Select
+                onValueChange={setSelectedTechnician}
+                value={selectedTechnician || ""}
+                disabled={isLoadingTechnicians || isLoadingJob}
+              >
                 <SelectTrigger className="md:col-span-3">
-                  <SelectValue placeholder="Select a role" />
+                  <SelectValue placeholder={
+                    isLoadingTechnicians || isLoadingJob
+                      ? "Loading available technicians..."
+                      : "Select a technician"
+                  } />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {getDepartmentRoleOptions().map((opt) => {
-                    const left = remainingByRole.get(opt.code);
-                    const descr = reqForDept ? `${opt.label}${typeof left === 'number' ? ` (${Math.max(left,0)} left)` : ''}` : opt.label;
-                    const disabled = reqForDept && typeof left === 'number' && left <= 0 && !['admin','management'].includes(userRole || '');
-                    return (
-                      <SelectItem key={opt.code} value={opt.code} disabled={disabled}>
-                        {descr}
-                      </SelectItem>
-                    );
-                  })}
+                  {filteredTechnicians.map((technician) => (
+                    <SelectItem key={technician.id} value={technician.id}>
+                      {formatAvailableTechnicianName(technician)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          {currentDepartment === "lights" && (
-            <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
-              <Label htmlFor="lights-role" className="md:text-right text-xs md:text-sm">
-                Lights Role
-              </Label>
-              <Select onValueChange={setLightsRole} value={lightsRole}>
-                <SelectTrigger className="md:col-span-3">
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {getDepartmentRoleOptions().map((opt) => {
-                    const left = remainingByRole.get(opt.code);
-                    const descr = reqForDept ? `${opt.label}${typeof left === 'number' ? ` (${Math.max(left,0)} left)` : ''}` : opt.label;
-                    const disabled = reqForDept && typeof left === 'number' && left <= 0 && !['admin','management'].includes(userRole || '');
-                    return (
-                      <SelectItem key={opt.code} value={opt.code} disabled={disabled}>
-                        {descr}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
-            <Label htmlFor="single-day-toggle" className="md:text-right text-xs md:text-sm">
-              Coverage
-            </Label>
-            <div className="md:col-span-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="single-day-toggle"
-                  checked={singleDay}
-                  onCheckedChange={(checked) => {
-                    setSingleDay(checked);
-                    if (checked) {
-                      if (jobDates.length > 0) {
-                        setSelectedJobDate((current) => {
-                          if (current) {
-                            const key = format(current, "yyyy-MM-dd");
-                            if (allowedJobDateSet.has(key)) {
-                              const normalized = new Date(current);
-                              normalized.setHours(0, 0, 0, 0);
-                              return normalized;
-                            }
-                          }
-                          const fallback = new Date(jobDates[0]);
-                          fallback.setHours(0, 0, 0, 0);
-                          return fallback;
-                        });
-                      }
-                    } else {
-                      setSelectedJobDate(null);
-                    }
-                  }}
-                  disabled={jobDates.length === 0}
-                />
-                <Label htmlFor="single-day-toggle" className="text-sm font-medium">
-                  Single-day assignment
+            {currentDepartment === "sound" && (
+              <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
+                <Label htmlFor="sound-role" className="md:text-right text-xs md:text-sm">
+                  Sound Role
                 </Label>
+                <Select onValueChange={setSoundRole} value={soundRole}>
+                  <SelectTrigger className="md:col-span-3">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {getDepartmentRoleOptions().map((opt) => {
+                      const left = remainingByRole.get(opt.code);
+                      const descr = reqForDept ? `${opt.label}${typeof left === 'number' ? ` (${Math.max(left, 0)} left)` : ''}` : opt.label;
+                      const disabled = reqForDept && typeof left === 'number' && left <= 0 && !['admin', 'management'].includes(userRole || '');
+                      return (
+                        <SelectItem key={opt.code} value={opt.code} disabled={disabled}>
+                          {descr}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="justify-start w-full sm:w-auto"
-                      disabled={!singleDay || jobDates.length === 0}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedJobDate ? format(selectedJobDate, "PPP") : "Select job date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedJobDate ?? undefined}
-                      onSelect={(date) => {
-                        if (!date) return;
-                        const key = format(date, "yyyy-MM-dd");
-                        if (!allowedJobDateSet.has(key)) return;
-                        const normalized = new Date(date);
-                        normalized.setHours(0, 0, 0, 0);
-                        setSelectedJobDate(normalized);
-                      }}
-                      disabled={(date) => !allowedJobDateSet.has(format(date, "yyyy-MM-dd"))}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <p className="text-xs text-muted-foreground">
-                  {jobDates.length === 0
-                    ? 'No job dates available'
-                    : singleDay
-                      ? 'Only covers the selected day.'
-                      : 'Toggle to limit this assignment to a single day.'}
-                </p>
-              </div>
-            </div>
-          </div>
-          <Button
-            onClick={handleAddTechnician}
-            disabled={isAdding || !selectedTechnician || isLoadingTechnicians || isLoadingJob}
-            size="sm"
-            className="w-full"
-          >
-            {isAdding ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Please wait
-              </>
-            ) : (
-              "Add Technician"
             )}
-          </Button>
-        </div>
 
-        <div className="py-3 md:py-4 border-t">
-          <h3 className="text-base md:text-lg font-semibold mb-2">Current Assignments</h3>
-          {assignments.length === 0 ? (
-            <p className="text-xs md:text-sm text-muted-foreground">No technicians assigned yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {assignments.map((assignment) => (
-                <div
-                  key={assignment.technician_id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border rounded-md p-2 md:p-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm md:text-base font-medium truncate">
-                      {formatAssignmentTechnicianName(assignment)}
-                    </div>
-                    <div className="text-xs md:text-sm text-muted-foreground flex flex-col gap-0.5">
-                      {assignment.single_day && assignment.assignment_date && (
-                        <span>
-                          Single-day: {formatJobDateLabel(assignment.assignment_date)}
-                        </span>
-                      )}
-                      {currentDepartment === "sound" && (
-                        <span>Sound: {labelForCode(assignment.sound_role) || "None"}</span>
-                      )}
-                      {currentDepartment === "lights" && (
-                        <span>Lights: {labelForCode(assignment.lights_role) || "None"}</span>
-                      )}
-                    </div>
-                  </div>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={isRemoving[assignment.technician_id]}
-                        className="w-full sm:w-auto"
-                      >
-                        {isRemoving[assignment.technician_id] ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Removing...
-                          </>
-                        ) : (
-                          "Remove"
-                        )}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently
-                          remove the technician from this job.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => removeAssignment(assignment.technician_id)}
-                        >
-                          Continue
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+            {currentDepartment === "lights" && (
+              <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
+                <Label htmlFor="lights-role" className="md:text-right text-xs md:text-sm">
+                  Lights Role
+                </Label>
+                <Select onValueChange={setLightsRole} value={lightsRole}>
+                  <SelectTrigger className="md:col-span-3">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {getDepartmentRoleOptions().map((opt) => {
+                      const left = remainingByRole.get(opt.code);
+                      const descr = reqForDept ? `${opt.label}${typeof left === 'number' ? ` (${Math.max(left, 0)} left)` : ''}` : opt.label;
+                      const disabled = reqForDept && typeof left === 'number' && left <= 0 && !['admin', 'management'].includes(userRole || '');
+                      return (
+                        <SelectItem key={opt.code} value={opt.code} disabled={disabled}>
+                          {descr}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
+              <Label htmlFor="single-day-toggle" className="md:text-right text-xs md:text-sm">
+                Coverage
+              </Label>
+              <div className="md:col-span-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="single-day-toggle"
+                    checked={singleDay}
+                    onCheckedChange={(checked) => {
+                      setSingleDay(checked);
+                      if (checked) {
+                        if (jobDates.length > 0) {
+                          setSelectedJobDate((current) => {
+                            if (current) {
+                              const key = format(current, "yyyy-MM-dd");
+                              if (allowedJobDateSet.has(key)) {
+                                const normalized = new Date(current);
+                                normalized.setHours(0, 0, 0, 0);
+                                return normalized;
+                              }
+                            }
+                            const fallback = new Date(jobDates[0]);
+                            fallback.setHours(0, 0, 0, 0);
+                            return fallback;
+                          });
+                        }
+                      } else {
+                        setSelectedJobDate(null);
+                      }
+                    }}
+                    disabled={jobDates.length === 0}
+                  />
+                  <Label htmlFor="single-day-toggle" className="text-sm font-medium">
+                    Single-day assignment
+                  </Label>
                 </div>
-              ))}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start w-full sm:w-auto"
+                        disabled={!singleDay || jobDates.length === 0}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedJobDate ? format(selectedJobDate, "PPP") : "Select job date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={selectedJobDate ?? undefined}
+                        onSelect={(date) => {
+                          if (!date) return;
+                          const key = format(date, "yyyy-MM-dd");
+                          if (!allowedJobDateSet.has(key)) return;
+                          const normalized = new Date(date);
+                          normalized.setHours(0, 0, 0, 0);
+                          setSelectedJobDate(normalized);
+                        }}
+                        disabled={(date) => !allowedJobDateSet.has(format(date, "yyyy-MM-dd"))}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground">
+                    {jobDates.length === 0
+                      ? 'No job dates available'
+                      : singleDay
+                        ? 'Only covers the selected day.'
+                        : 'Toggle to limit this assignment to a single day.'}
+                  </p>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="add-as-confirmed"
+                checked={addAsConfirmed}
+                onCheckedChange={setAddAsConfirmed}
+              />
+              <Label htmlFor="add-as-confirmed" className="text-sm font-medium">
+                Add as confirmed (skip invitation)
+              </Label>
+            </div>
+            <Button
+              onClick={handleAddTechnician}
+              disabled={isAdding || !selectedTechnician || isLoadingTechnicians || isLoadingJob}
+              size="sm"
+              className="w-full"
+            >
+              {isAdding ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Please wait
+                </>
+              ) : (
+                "Add Technician"
+              )}
+            </Button>
+          </div>
+
+          <div className="py-3 md:py-4 border-t">
+            <h3 className="text-base md:text-lg font-semibold mb-2">Current Assignments</h3>
+            {assignments.length === 0 ? (
+              <p className="text-xs md:text-sm text-muted-foreground">No technicians assigned yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {assignments.map((assignment) => (
+                  <div
+                    key={assignment.technician_id}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border rounded-md p-2 md:p-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm md:text-base font-medium truncate">
+                        {formatAssignmentTechnicianName(assignment)}
+                      </div>
+                      <div className="text-xs md:text-sm text-muted-foreground flex flex-col gap-0.5">
+                        {assignment.single_day && assignment.assignment_date && (
+                          <span>
+                            Single-day: {formatJobDateLabel(assignment.assignment_date)}
+                          </span>
+                        )}
+                        {currentDepartment === "sound" && (
+                          <span>Sound: {labelForCode(assignment.sound_role) || "None"}</span>
+                        )}
+                        {currentDepartment === "lights" && (
+                          <span>Lights: {labelForCode(assignment.lights_role) || "None"}</span>
+                        )}
+                      </div>
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={isRemoving[assignment.technician_id]}
+                          className="w-full sm:w-auto"
+                        >
+                          {isRemoving[assignment.technician_id] ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Removing...
+                            </>
+                          ) : (
+                            "Remove"
+                          )}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently
+                            remove the technician from this job.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => removeAssignment(assignment.technician_id)}
+                          >
+                            Continue
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <DialogFooter className="flex-shrink-0">
