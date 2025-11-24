@@ -148,10 +148,10 @@ serve(async (req) => {
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     if (path.endsWith("/jobs-overview")) {
-      // Today + tomorrow window
+      // 7-day window to match authenticated wallboard behavior
       const now = new Date();
       const todayStart = startOfDay(now);
-      const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+      const weekEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6));
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -160,13 +160,16 @@ serve(async (req) => {
           title,
           start_time,
           end_time,
+          job_type,
+          color,
           locations(id, name),
           job_departments(department),
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString())
+        .in("job_type", ["single", "festival", "tourdate", "dryhire"])
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lte("start_time", weekEnd.toISOString())
+        .gte("end_time", todayStart.toISOString())
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -204,6 +207,8 @@ serve(async (req) => {
             title: j.title,
             start_time: j.start_time,
             end_time: j.end_time,
+            job_type: j.job_type,
+            color: j.color,
             location: { name: j.locations?.[0]?.name ?? j.locations?.name ?? null },
             departments: depts,
             crewAssigned: { ...crewAssigned },
@@ -222,7 +227,7 @@ serve(async (req) => {
     if (path.endsWith("/crew-assignments")) {
       const now = new Date();
       const todayStart = startOfDay(now);
-      const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+      const weekEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6));
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -231,6 +236,8 @@ serve(async (req) => {
           title,
           start_time,
           end_time,
+          job_type,
+          color,
           job_assignments(
             technician_id,
             sound_role,
@@ -239,9 +246,10 @@ serve(async (req) => {
             profiles(id, first_name, last_name)
           )
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString())
+        .in("job_type", ["single", "festival", "tourdate", "dryhire"])
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lte("start_time", weekEnd.toISOString())
+        .gte("end_time", todayStart.toISOString())
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -279,6 +287,10 @@ serve(async (req) => {
         jobs: jobsArr.map((j: any) => ({
           id: j.id,
           title: j.title,
+          start_time: j.start_time,
+          end_time: j.end_time,
+          jobType: j.job_type,
+          color: j.color,
           crew: (j.job_assignments ?? []).map((a: any) => {
             const dept: Dept | null = a.sound_role ? "sound" : a.lights_role ? "lights" : a.video_role ? "video" : null;
             const role = a.sound_role || a.lights_role || a.video_role || "assigned";
@@ -295,21 +307,23 @@ serve(async (req) => {
     }
 
     if (path.endsWith("/doc-progress")) {
-      // Skeleton: return jobs with departments present; zeroed counts
+      // Return jobs with departments and doc progress
       const now = new Date();
       const todayStart = startOfDay(now);
-      const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+      const weekEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6));
 
       const { data: jobs, error } = await sb
         .from("jobs")
         .select(`
           id,
           title,
+          color,
           job_departments(department)
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString())
+        .in("job_type", ["single", "festival", "tourdate", "dryhire"])
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lte("start_time", weekEnd.toISOString())
+        .gte("end_time", todayStart.toISOString())
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -318,6 +332,7 @@ serve(async (req) => {
         jobs: (jobs ?? []).map((j: any) => ({
           id: j.id,
           title: j.title,
+          color: j.color,
           departments: Array.from(new Set((j.job_departments ?? []).map((d: any) => d.department))).map((dept: Dept) => ({
             dept,
             have: 0,
@@ -333,10 +348,10 @@ serve(async (req) => {
     }
 
     if (path.endsWith("/pending-actions")) {
-      // Simple triage: missing crew per dept today+tomorrow, and overdue timesheets for jobs ended >24h ago
+      // Simple triage: missing crew per dept, and overdue timesheets for jobs ended >24h ago
       const now = new Date();
       const todayStart = startOfDay(now);
-      const tomorrowEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+      const weekEnd = endOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6));
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -347,9 +362,10 @@ serve(async (req) => {
           job_departments(department),
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString());
+        .in("job_type", ["single", "festival", "tourdate", "dryhire"])
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lte("start_time", weekEnd.toISOString())
+        .gte("end_time", todayStart.toISOString());
 
       if (error) throw error;
 
