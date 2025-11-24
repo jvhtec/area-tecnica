@@ -162,7 +162,26 @@ export default function TechnicianSuperApp() {
       const startDate = addMonths(new Date(), -3);
       const endDate = addMonths(new Date(), 3);
 
-      // Query timesheets as source of truth, joined with job_assignments for role/status
+      // First, fetch job_assignments for this technician to get roles and status
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('job_assignments')
+        .select('job_id, sound_role, lights_role, video_role, status, assigned_at')
+        .eq('technician_id', user.id)
+        .eq('status', 'confirmed');
+
+      if (assignmentsError) {
+        console.error('Error fetching assignments:', assignmentsError);
+        return [];
+      }
+
+      if (!assignmentsData || assignmentsData.length === 0) {
+        return [];
+      }
+
+      // Get unique job IDs from assignments
+      const jobIds = assignmentsData.map(a => a.job_id);
+
+      // Then fetch timesheets and jobs for those job IDs
       const { data: timesheetData, error } = await supabase
         .from('timesheets')
         .select(`
@@ -190,17 +209,10 @@ export default function TechnicianSuperApp() {
               read_only,
               template_type
             )
-          ),
-          job_assignments!inner (
-            sound_role,
-            lights_role,
-            video_role,
-            assigned_at,
-            status
           )
         `)
         .eq('technician_id', user.id)
-        .eq('job_assignments.status', 'confirmed')
+        .in('job_id', jobIds)
         .gte('jobs.start_time', startDate.toISOString())
         .lte('jobs.start_time', endDate.toISOString())
         .order('start_time', { referencedTable: 'jobs' });
@@ -209,6 +221,11 @@ export default function TechnicianSuperApp() {
         console.error('Error fetching assignments:', error);
         return [];
       }
+
+      // Create a map of job_id to assignment for quick lookup
+      const assignmentsByJobId = new Map(
+        assignmentsData.map(a => [a.job_id, a])
+      );
 
       // Deduplicate by job_id (timesheets have one row per date, we want one per job)
       const seenJobIds = new Set<string>();
@@ -222,7 +239,7 @@ export default function TechnicianSuperApp() {
         .filter(row => row.jobs)
         .map(row => {
           let department = "unknown";
-          const assignment = row.job_assignments;
+          const assignment = assignmentsByJobId.get(row.job_id);
           if (assignment?.sound_role) department = "sound";
           else if (assignment?.lights_role) department = "lights";
           else if (assignment?.video_role) department = "video";

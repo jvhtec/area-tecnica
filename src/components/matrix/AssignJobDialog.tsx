@@ -57,11 +57,11 @@ interface AssignJobDialogProps {
   preSelectedJobId?: string;
 }
 
-export const AssignJobDialog = ({ 
-  open, 
-  onClose, 
-  technicianId, 
-  date, 
+export const AssignJobDialog = ({
+  open,
+  onClose,
+  technicianId,
+  date,
   availableJobs,
   existingAssignment,
   preSelectedJobId
@@ -115,8 +115,8 @@ export const AssignJobDialog = ({
   React.useEffect(() => {
     if (existingAssignment && technician) {
       const currentRole = existingAssignment.sound_role ||
-                         existingAssignment.lights_role ||
-                         existingAssignment.video_role;
+        existingAssignment.lights_role ||
+        existingAssignment.video_role;
       if (currentRole) {
         if (isRoleCode(currentRole)) {
           setSelectedRole(currentRole);
@@ -130,7 +130,7 @@ export const AssignJobDialog = ({
 
   React.useEffect(() => {
     if (existingAssignment?.single_day && existingAssignment?.assignment_date) {
-      try { setSingleDate(new Date(`${existingAssignment.assignment_date}T00:00:00`)); } catch {}
+      try { setSingleDate(new Date(`${existingAssignment.assignment_date}T00:00:00`)); } catch { }
     }
   }, [existingAssignment?.single_day, existingAssignment?.assignment_date]);
 
@@ -225,7 +225,7 @@ export const AssignJobDialog = ({
       console.log('Role assignments:', { soundRole, lightsRole, videoRole, department: technician.department });
 
       if (isReassignment) {
-        const { deleted_assignment } = await removeTimesheetAssignment(existingAssignment.job_id, technicianId);
+        const { deleted_assignment } = await removeTimesheetAssignment({ jobId: existingAssignment.job_id, technicianId });
 
         if (!deleted_assignment) {
           const { error: deleteError } = await supabase
@@ -289,8 +289,8 @@ export const AssignJobDialog = ({
       const desiredAssignmentDate = coverageMode === 'single'
         ? assignmentDate
         : coverageMode === 'multi' && multiDates && multiDates.length > 0
-        ? format(multiDates[0], 'yyyy-MM-dd')
-        : null;
+          ? format(multiDates[0], 'yyyy-MM-dd')
+          : null;
 
       if (existingRow) {
         // Update the existing base row (whole job or single) to align with the requested coverage
@@ -393,6 +393,7 @@ export const AssignJobDialog = ({
           dateIso,
           present: true,
           source: 'assignment-dialog',
+          status: assignAsConfirmed ? 'confirmed' : 'invited',
         });
       }
 
@@ -502,7 +503,7 @@ export const AssignJobDialog = ({
     if (isRemoving) return;
     setIsRemoving(true);
     try {
-      const { deleted_assignment } = await removeTimesheetAssignment(existingAssignment.job_id, technicianId);
+      const { deleted_assignment } = await removeTimesheetAssignment({ jobId: existingAssignment.job_id, technicianId });
 
       if (!deleted_assignment) {
         const { error } = await supabase
@@ -556,14 +557,14 @@ export const AssignJobDialog = ({
     if (!j) return null as null | { start?: Date; end?: Date };
     const s = j.start_time ? new Date(j.start_time) : undefined;
     const e = j.end_time ? new Date(j.end_time) : s;
-    if (s) s.setHours(0,0,0,0);
-    if (e) e.setHours(0,0,0,0);
+    if (s) s.setHours(0, 0, 0, 0);
+    if (e) e.setHours(0, 0, 0, 0);
     return { start: s, end: e };
   }, [selectedJob]);
 
   const isAllowedDate = (d: Date) => {
     if (!selectedJobMeta?.start || !selectedJobMeta?.end) return true;
-    const t = new Date(d); t.setHours(0,0,0,0);
+    const t = new Date(d); t.setHours(0, 0, 0, 0);
     return t >= selectedJobMeta.start && t <= selectedJobMeta.end;
   };
 
@@ -596,224 +597,224 @@ export const AssignJobDialog = ({
             <DialogTitle>{isReassignment ? 'Reassign Job' : 'Assign Job'}</DialogTitle>
             <DialogDescription>
               {isReassignment ? 'Reassign' : 'Assign'} {technician?.first_name} {technician?.last_name} to a job on{' '}
-            {format(date, 'EEEE, MMMM d, yyyy')}
-          </DialogDescription>
-        </DialogHeader>
+              {format(date, 'EEEE, MMMM d, yyyy')}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          {technician && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Technician:</span>
-              <span>{technician.first_name} {technician.last_name}</span>
-              <Badge variant="outline">{technician.department}</Badge>
-            </div>
-          )}
-
-          {isReassignment && existingAssignment?.jobs && (
-            <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-              <div className="text-sm font-medium text-yellow-800">Current Assignment:</div>
-              <div className="text-sm text-yellow-700">{existingAssignment.jobs.title}</div>
-              <div className="text-xs text-yellow-600">
-                Status: <Badge variant="secondary">{existingAssignment.status}</Badge>
+          <div className="space-y-4">
+            {technician && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Technician:</span>
+                <span>{technician.first_name} {technician.last_name}</span>
+                <Badge variant="outline">{technician.department}</Badge>
               </div>
-            </div>
-          )}
+            )}
 
-          {!preSelectedJobId && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Select Job</label>
-              <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a job..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredJobs.length === 0 ? (
-                    <div className="p-2 text-sm text-muted-foreground">
-                      No jobs available for this date
-                    </div>
-                  ) : (
-                    filteredJobs.map((job) => (
-                      <SelectItem key={job.id} value={job.id}>
-                        <div className="flex items-center gap-2">
-                          <div>
-                            <div className="font-medium">{job.title}</div>
-                            <div className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+            {isReassignment && existingAssignment?.jobs && (
+              <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <div className="text-sm font-medium text-yellow-800">Current Assignment:</div>
+                <div className="text-sm text-yellow-700">{existingAssignment.jobs.title}</div>
+                <div className="text-xs text-yellow-600">
+                  Status: <Badge variant="secondary">{existingAssignment.status}</Badge>
+                </div>
+              </div>
+            )}
+
+            {!preSelectedJobId && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Job</label>
+                <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a job..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredJobs.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">
+                        No jobs available for this date
+                      </div>
+                    ) : (
+                      filteredJobs.map((job) => (
+                        <SelectItem key={job.id} value={job.id}>
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <div className="font-medium">{job.title}</div>
+                              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-          {selectedJobId && technician && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Select Role ({technician.department})
-              </label>
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a role..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {roleOptions.map((opt) => (
-                    <SelectItem key={opt.code} value={opt.code}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {selectedJobId && selectedRole && (
-            <div className="space-y-3">
+            {selectedJobId && technician && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Coverage</label>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="coverage" checked={coverageMode === 'full'} onChange={() => setCoverageMode('full')} />
-                    <span>Full job span</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="coverage" checked={coverageMode === 'single'} onChange={() => setCoverageMode('single')} />
-                    <span>Single day</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="coverage" checked={coverageMode === 'multi'} onChange={() => setCoverageMode('multi')} />
-                    <span>Multiple days</span>
-                  </label>
-                </div>
-              </div>
-              {coverageMode === 'single' && (
-                <div className="flex items-center gap-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="gap-2">
-                        <CalendarIcon className="h-4 w-4" />
-                        {singleDate ? format(singleDate, 'PPP') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarPicker
-                        mode="single"
-                        selected={singleDate ?? undefined}
-                        onSelect={(d) => { if (d && isAllowedDate(d)) setSingleDate(d); }}
-                        disabled={(d) => !isAllowedDate(d)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <p className="text-xs text-muted-foreground">Creates one single-day assignment.</p>
-                </div>
-              )}
-              {coverageMode === 'multi' && (
-                <div className="space-y-2">
-                  <CalendarPicker
-                    mode="multiple"
-                    selected={multiDates}
-                    onSelect={(ds) => setMultiDates((ds || []).filter(d => isAllowedDate(d)))}
-                    disabled={(d) => !isAllowedDate(d)}
-                    numberOfMonths={2}
-                  />
-                  <p className="text-xs text-muted-foreground">Creates one single-day assignment per selected date.</p>
-                </div>
-              )}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="confirm-assignment"
-                  checked={assignAsConfirmed}
-                  onCheckedChange={handleCheckboxChange}
-                />
-                <label
-                  htmlFor="confirm-assignment"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Assign as confirmed (skip invitation)
+                <label className="text-sm font-medium">
+                  Select Role ({technician.department})
                 </label>
+                <Select value={selectedRole} onValueChange={setSelectedRole}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a role..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roleOptions.map((opt) => (
+                      <SelectItem key={opt.code} value={opt.code}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-          )}
+            )}
 
-          {selectedJob && (
-            <div className="bg-muted p-3 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <CalendarIcon className="h-4 w-4" />
-                <span className="font-medium">{selectedJob.title}</span>
-                <Badge variant="secondary">{selectedJob.status}</Badge>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {format(new Date(selectedJob.start_time), 'HH:mm')} - {format(new Date(selectedJob.end_time), 'HH:mm')}
+            {selectedJobId && selectedRole && (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Coverage</label>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="coverage" checked={coverageMode === 'full'} onChange={() => setCoverageMode('full')} />
+                      <span>Full job span</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="coverage" checked={coverageMode === 'single'} onChange={() => setCoverageMode('single')} />
+                      <span>Single day</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="coverage" checked={coverageMode === 'multi'} onChange={() => setCoverageMode('multi')} />
+                      <span>Multiple days</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
-              {selectedRole && (
-                <div className="text-xs text-muted-foreground mt-1">
-                  Role: {labelForCode(selectedRole)}
-                </div>
-              )}
-              {assignAsConfirmed && (
-                <div className="text-xs text-green-600 mt-1 font-medium">
-                  Will be assigned as confirmed
-                </div>
-              )}
-              {coverageMode === 'single' && (
-                <div className="text-xs text-muted-foreground mt-1">
-                  Single-day coverage for {singleDate ? format(singleDate, 'PPP') : format(date, 'PPP')}
-                </div>
-              )}
-              {coverageMode === 'multi' && (
-                <div className="text-xs text-muted-foreground mt-1">
-                  {multiDates.length} day(s) selected for single-day coverage
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <DialogFooter className="flex items-center justify-between gap-2">
-          <div className="mr-auto">
-            {isReassignment && (
-              <Button 
-                variant="destructive" 
-                onClick={handleRemoveAssignment}
-                disabled={isRemoving}
-              >
-                {isRemoving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Removing...
-                  </>
-                ) : (
-                  'Remove Assignment'
+                {coverageMode === 'single' && (
+                  <div className="flex items-center gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="gap-2">
+                          <CalendarIcon className="h-4 w-4" />
+                          {singleDate ? format(singleDate, 'PPP') : 'Select date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarPicker
+                          mode="single"
+                          selected={singleDate ?? undefined}
+                          onSelect={(d) => { if (d && isAllowedDate(d)) setSingleDate(d); }}
+                          disabled={(d) => !isAllowedDate(d)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <p className="text-xs text-muted-foreground">Creates one single-day assignment.</p>
+                  </div>
                 )}
-              </Button>
+                {coverageMode === 'multi' && (
+                  <div className="space-y-2">
+                    <CalendarPicker
+                      mode="multiple"
+                      selected={multiDates}
+                      onSelect={(ds) => setMultiDates((ds || []).filter(d => isAllowedDate(d)))}
+                      disabled={(d) => !isAllowedDate(d)}
+                      numberOfMonths={2}
+                    />
+                    <p className="text-xs text-muted-foreground">Creates one single-day assignment per selected date.</p>
+                  </div>
+                )}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="confirm-assignment"
+                    checked={assignAsConfirmed}
+                    onCheckedChange={handleCheckboxChange}
+                  />
+                  <label
+                    htmlFor="confirm-assignment"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Assign as confirmed (skip invitation)
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {selectedJob && (
+              <div className="bg-muted p-3 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  <span className="font-medium">{selectedJob.title}</span>
+                  <Badge variant="secondary">{selectedJob.status}</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {format(new Date(selectedJob.start_time), 'HH:mm')} - {format(new Date(selectedJob.end_time), 'HH:mm')}
+                  </div>
+                </div>
+                {selectedRole && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Role: {labelForCode(selectedRole)}
+                  </div>
+                )}
+                {assignAsConfirmed && (
+                  <div className="text-xs text-green-600 mt-1 font-medium">
+                    Will be assigned as confirmed
+                  </div>
+                )}
+                {coverageMode === 'single' && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Single-day coverage for {singleDate ? format(singleDate, 'PPP') : format(date, 'PPP')}
+                  </div>
+                )}
+                {coverageMode === 'multi' && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {multiDates.length} day(s) selected for single-day coverage
+                  </div>
+                )}
+              </div>
             )}
           </div>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleAssign}
-            disabled={!selectedJobId || !selectedRole || isAssigning}
-          >
-            {isAssigning ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Assigning...
-              </>
-            ) : (
-              `${isReassignment ? 'Reassign' : 'Assign'} Job`
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+
+          <DialogFooter className="flex items-center justify-between gap-2">
+            <div className="mr-auto">
+              {isReassignment && (
+                <Button
+                  variant="destructive"
+                  onClick={handleRemoveAssignment}
+                  disabled={isRemoving}
+                >
+                  {isRemoving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Removing...
+                    </>
+                  ) : (
+                    'Remove Assignment'
+                  )}
+                </Button>
+              )}
+            </div>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAssign}
+              disabled={!selectedJobId || !selectedRole || isAssigning}
+            >
+              {isAssigning ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Assigning...
+                </>
+              ) : (
+                `${isReassignment ? 'Reassign' : 'Assign'} Job`
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
       <AlertDialog
         open={!!conflictWarning}
