@@ -110,6 +110,8 @@ export const fetchMatrixTimesheetAssignments = async ({
     assignmentPromises.push(
       supabase
         .from('job_assignments')
+        // NOTE: single_day and assignment_date are deprecated after simplification migration
+        // They're kept in the query for backwards compatibility but should eventually be removed
         .select('job_id, technician_id, sound_role, lights_role, video_role, single_day, assignment_date, status, assigned_at')
         .in('job_id', jobBatch)
         .in('technician_id', technicianIds)

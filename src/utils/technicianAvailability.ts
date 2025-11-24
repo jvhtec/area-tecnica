@@ -1,6 +1,24 @@
 
 import { supabase } from "@/lib/supabase";
 
+/**
+ * TODO: REFACTOR NEEDED AFTER SIMPLIFICATION MIGRATION
+ *
+ * This file uses single_day and assignment_date fields which are now deprecated.
+ * After the simplification migration, all assignments have single_day=false and assignment_date=null.
+ *
+ * Current behavior (TEMPORARY):
+ * - All assignments are treated as "whole job" assignments
+ * - Conflict detection is conservative (may show conflicts even for non-overlapping days)
+ *
+ * Proper fix:
+ * - Query timesheets table instead of job_assignments for date-specific conflicts
+ * - For specific date checks: query timesheets.date
+ * - For job range checks: query timesheets where date overlaps with job range
+ *
+ * This refactor should be done after verifying the migrations work correctly.
+ */
+
 export interface TechnicianJobConflict {
   id: string;
   title: string;
@@ -79,8 +97,11 @@ export async function getAvailableTechnicians(
     }
 
     // Get all job assignments for these technicians with job date information
+    // NOTE: After simplification migration, single_day/assignment_date are deprecated
+    // We should query timesheets instead for date-specific conflicts
+    // TODO: Refactor to use timesheets table for conflict detection
     const technicianIds = eligibleTechnicians.map((tech: any) => tech.id);
-    
+
     const { data: conflictingAssignments, error: assignmentError } = await supabase
       .from("job_assignments")
       .select(`
