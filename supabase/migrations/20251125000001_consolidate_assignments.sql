@@ -42,10 +42,7 @@ SELECT
     MAX(external_technician_name) FILTER (WHERE external_technician_name IS NOT NULL),
     MAX(external_technician_name)
   ) as external_technician_name,
-  COALESCE(
-    MAX(use_tour_multipliers) FILTER (WHERE use_tour_multipliers IS NOT NULL),
-    MAX(use_tour_multipliers)
-  ) as use_tour_multipliers,
+  bool_or(use_tour_multipliers) as use_tour_multipliers,
   array_agg(id ORDER BY assigned_at NULLS LAST) as all_ids,
   COUNT(*) as original_count
 FROM job_assignments
