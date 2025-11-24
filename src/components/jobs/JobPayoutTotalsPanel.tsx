@@ -27,6 +27,11 @@ interface JobPayoutTotalsPanelProps {
   technicianId?: string;
 }
 
+const cardBase = "bg-[#0f1219] border-[#1f232e] text-white overflow-hidden";
+const surface = "bg-[#151820] border-[#2a2e3b]";
+const subtleText = "text-slate-300";
+const controlButton = "bg-white/5 border-white/10 text-white hover:bg-white/10";
+
 export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPanelProps) {
   const {
     data: jobMeta,
@@ -452,15 +457,15 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className={`${cardBase} w-full`}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
+          <CardTitle className="flex items-center gap-2 text-lg text-white">
             <Euro className="h-5 w-5" />
-            Job Payout Totals
+            Pagos del trabajo
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-muted-foreground">Loading payout information...</div>
+          <div className={subtleText}>Cargando información de pagos...</div>
         </CardContent>
       </Card>
     );
@@ -468,15 +473,15 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
 
   if (error) {
     return (
-      <Card>
+      <Card className={`${cardBase} w-full`}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
+          <CardTitle className="flex items-center gap-2 text-lg text-white">
             <Euro className="h-5 w-5" />
-            Job Payout Totals
+            Pagos del trabajo
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-destructive">Error loading payout totals</div>
+          <div className="text-red-400">Error al cargar los pagos</div>
         </CardContent>
       </Card>
     );
@@ -484,34 +489,35 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
 
   if (payoutTotals.length === 0) {
     return (
-      <Card>
+      <Card className={`${cardBase} w-full`}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
+          <CardTitle className="flex items-center gap-2 text-lg text-white">
             <Euro className="h-5 w-5" />
-            Job Payout Totals
+            Pagos del trabajo
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-muted-foreground">No payout information available for this job.</div>
+          <div className={subtleText}>No hay información de pagos para este trabajo.</div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className={`${cardBase} w-full`}>
       <CardHeader>
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2 text-lg text-white">
             <Euro className="h-5 w-5" />
-            Job Payout Totals
+            Pagos del trabajo
           </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
               size="sm"
               onClick={handleExport}
               disabled={isExporting || payoutTotals.length === 0}
+              className={controlButton}
             >
               <FileDown className="h-4 w-4 mr-1" />
               {isExporting ? 'Generando…' : 'Exportar PDF'}
@@ -526,6 +532,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                   ? 'Enviar los resúmenes por correo'
                   : 'Aprueba las tarifas para habilitar el envío'
               }
+              className={jobRatesApproved ? "bg-blue-600 hover:bg-blue-500 text-white" : undefined}
             >
               <Send className="h-4 w-4 mr-1" />
               {isSendingEmails ? 'Enviando…' : 'Enviar por correo'}
@@ -533,21 +540,22 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 text-white w-full overflow-hidden">
         {payoutTotals.map((payout) => (
           <div
             key={payout.technician_id}
             className={cn(
-              'border rounded-lg p-4 space-y-3 transition-colors',
+              'border rounded-lg p-4 space-y-3 transition-colors w-full min-w-0',
+              surface,
               (!profileMap.get(payout.technician_id)?.email ||
                 missingEmailTechIds.includes(payout.technician_id)) &&
-                'border-amber-400/70 bg-amber-50/80 dark:border-amber-400/60 dark:bg-amber-500/10'
+                'border-amber-400/70 bg-amber-500/10'
             )}
           >
-            <div className="flex items-start justify-between">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+              <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h4 className="font-medium text-base">{getTechName(payout.technician_id)}</h4>
+                  <h4 className="font-medium text-base text-white">{getTechName(payout.technician_id)}</h4>
                   {(() => {
                     const label = getAutonomoBadgeLabel(autonomoMap.get(payout.technician_id));
                     if (!label) return null;
@@ -562,27 +570,27 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                     );
                   })()}
                 </div>
-                <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                  <span>Job: {payout.job_id}</span>
+                <div className="flex flex-col gap-1 text-xs text-slate-300 break-words">
+                  <span>Trabajo: {payout.job_id}</span>
                   <span>
                     Correo:{' '}
                     {profileMap.get(payout.technician_id)?.email ? (
                       profileMap.get(payout.technician_id)?.email
                     ) : (
-                      <span className="text-amber-700 dark:text-amber-400 font-medium">Sin correo configurado</span>
+                      <span className="text-amber-300 font-medium">Sin correo configurado</span>
                     )}
                   </span>
                 </div>
                 {!profileMap.get(payout.technician_id)?.email && (
                   <Badge
                     variant="outline"
-                    className="mt-2 text-amber-700 border-amber-300 bg-amber-100/60 dark:border-amber-500/50 dark:text-amber-200 dark:bg-amber-500/10"
+                    className="mt-2 text-amber-300 border-amber-500/40 bg-amber-500/10"
                   >
                     Sin correo
                   </Badge>
                 )}
                 {lpoMap.has(payout.technician_id) && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  <div className="text-xs text-slate-300 flex items-center gap-2">
                     <span>LPO Nº: {lpoMap.get(payout.technician_id) || '—'}</span>
                     {(() => {
                       const elId = flexElementMap.get(payout.technician_id) || null;
@@ -603,8 +611,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                   </div>
                 )}
               </div>
-              <div className="text-right flex flex-col items-end gap-2">
-                <div className="text-xl font-bold text-primary">
+              <div className="text-right flex flex-col items-end gap-2 sm:min-w-[140px]">
+                <div className="text-xl font-bold text-white leading-tight">
                   {formatCurrency(payout.total_eur)}
                 </div>
                 <Button
@@ -621,6 +629,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                       ? (profileMap.get(payout.technician_id)?.email ? 'Enviar sólo a este técnico' : 'Sin correo configurado')
                       : 'Aprueba las tarifas para habilitar el envío'
                   }
+                  className={controlButton}
                 >
                   <Send className="h-3.5 w-3.5 mr-1" />
                   {sendingByTech[payout.technician_id] ? 'Enviando…' : 'Enviar a este técnico'}
@@ -632,8 +641,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span>Approved Timesheets:</span>
+                  <Clock className="h-4 w-4 text-slate-400" />
+                  <span>Partes aprobados:</span>
                 </div>
                 <Badge variant={payout.timesheets_total_eur > 0 ? 'default' : 'secondary'}>
                   {formatCurrency(payout.timesheets_total_eur)}
@@ -645,8 +654,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                 <>
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                      <span>Job Extras:</span>
+                      <CheckCircle className="h-4 w-4 text-slate-400" />
+                      <span>Extras del trabajo:</span>
                     </div>
                     <Badge variant="outline">
                       {formatCurrency(payout.extras_total_eur)}
@@ -657,7 +666,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                   {payout.extras_breakdown?.items && payout.extras_breakdown.items.length > 0 && (
                     <div className="ml-6 space-y-1">
                       {payout.extras_breakdown.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-xs text-muted-foreground">
+                        <div key={idx} className="flex justify-between text-xs text-slate-300">
                           <span>
                             {item.extra_type.replace('_', ' ')} × {item.quantity}
                           </span>
@@ -673,19 +682,23 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             {/* Vehicle disclaimer */}
             {payout.vehicle_disclaimer && payout.vehicle_disclaimer_text && (
               <>
-                <Separator />
-                <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span>{payout.vehicle_disclaimer_text}</span>
+                <Separator className="border-white/10" />
+                <div className="flex items-start gap-2 text-sm text-amber-200 bg-amber-500/10 p-3 rounded border border-amber-500/30 w-full">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-300" />
+                  <span className="break-words whitespace-pre-wrap leading-snug w-full">
+                    {payout.vehicle_disclaimer_text.includes('Fuel/drive compensation')
+                      ? 'Puede aplicarse compensación de combustible/conducción al usar vehículo propio. Coordina con RR. HH. por cada trabajo.'
+                      : payout.vehicle_disclaimer_text}
+                  </span>
                 </div>
               </>
             )}
 
-            <Separator />
+            <Separator className="border-white/10" />
 
             {/* Final total */}
-            <div className="flex items-center justify-between font-medium">
-              <span>Final Total:</span>
+            <div className="flex items-center justify-between font-medium text-white">
+              <span>Total final:</span>
               <Badge variant="default" className="text-base px-3 py-1">
                 {formatCurrency(payout.total_eur)}
               </Badge>
@@ -695,18 +708,18 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
 
         {/* Grand total if multiple technicians */}
         {payoutTotals.length > 1 && (
-          <div className="mt-6 p-4 bg-primary/10 rounded-lg border-2 border-primary/20">
+          <div className="mt-6 p-4 bg-white/5 rounded-lg border border-white/10 text-white">
             <div className="flex justify-between items-center text-lg font-bold">
-              <span>Job Grand Total:</span>
-              <span className="text-primary">
+              <span>Total global del trabajo:</span>
+              <span className="text-blue-300">
                 {formatCurrency(
                   payoutTotals.reduce((sum, payout) => sum + payout.total_eur, 0)
                 )}
               </span>
             </div>
-            <div className="text-sm text-muted-foreground mt-2 space-y-1">
+            <div className="text-sm text-slate-300 mt-2 space-y-1">
               <div className="flex justify-between">
-                <span>Total Timesheets:</span>
+                <span>Total partes:</span>
                 <span>
                   {formatCurrency(
                     payoutTotals.reduce((sum, payout) => sum + payout.timesheets_total_eur, 0)
@@ -714,7 +727,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Total Extras:</span>
+                <span>Total extras:</span>
                 <span>
                   {formatCurrency(
                     payoutTotals.reduce((sum, payout) => sum + payout.extras_total_eur, 0)

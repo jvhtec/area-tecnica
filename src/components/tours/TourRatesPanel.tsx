@@ -322,9 +322,13 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
 
                   {/* Vehicle disclaimer */}
                   {quote.vehicle_disclaimer && quote.vehicle_disclaimer_text && (
-                    <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                    <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-200 w-full">
                       <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                      <span>{quote.vehicle_disclaimer_text}</span>
+                      <span className="break-words whitespace-pre-wrap leading-snug w-full">
+                        {quote.vehicle_disclaimer_text.includes('Fuel/drive compensation')
+                          ? 'Puede aplicarse compensación de combustible/conducción al usar vehículo propio. Coordina con RR. HH. por cada trabajo.'
+                          : quote.vehicle_disclaimer_text}
+                      </span>
                     </div>
                   )}
 

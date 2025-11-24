@@ -81,7 +81,16 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
     const key = assignment.technician_id ? `tech:${assignment.technician_id}` : `ext:${name}`;
     const roleLabel = roleCode ? labelForCode(roleCode) : null;
     const isFromTour = assignment.assignment_source === 'tour';
-    const date = assignment.single_day && assignment.assignment_date ? assignment.assignment_date : null;
+    // Use timesheet dates if available (from useOptimizedJobCard), otherwise fall back to assignment date
+    const timesheetDates = assignment._timesheet_dates;
+    const assignmentDate = assignment.single_day && assignment.assignment_date ? assignment.assignment_date : null;
+
+    const datesToAdd = new Set<string>();
+    if (Array.isArray(timesheetDates) && timesheetDates.length > 0) {
+      timesheetDates.forEach(d => datesToAdd.add(d));
+    } else if (assignmentDate) {
+      datesToAdd.add(assignmentDate);
+    }
 
     if (!grouped.has(key)) {
       grouped.set(key, {
@@ -90,14 +99,14 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
         role: roleLabel,
         isFromTour,
         isExternal,
-        dates: new Set(date ? [date] : [])
+        dates: datesToAdd
       });
     } else {
       const g = grouped.get(key)!;
       // Preserve first non-null role label; otherwise keep existing
       if (!g.role && roleLabel) g.role = roleLabel;
       if (isFromTour) g.isFromTour = true;
-      if (date) g.dates.add(date);
+      datesToAdd.forEach(d => g.dates.add(d));
     }
   }
 
@@ -119,17 +128,17 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
             try { dateSuffix = ` • ${format(new Date(`${dateList[0]}T00:00:00`), 'MMM d')}`; } catch { dateSuffix = ` • ${dateList[0]}`; }
           } else if (dateList.length > 1) {
             // Detect contiguous range; otherwise show count
-            const ds = dateList.map(d => new Date(`${d}T00:00:00`)).sort((a,b)=>a.getTime()-b.getTime());
+            const ds = dateList.map(d => new Date(`${d}T00:00:00`)).sort((a, b) => a.getTime() - b.getTime());
             let contiguous = true;
-            for (let i=1;i<ds.length;i++) {
-              const diff = (ds[i].getTime()-ds[i-1].getTime())/(24*3600*1000);
+            for (let i = 1; i < ds.length; i++) {
+              const diff = (ds[i].getTime() - ds[i - 1].getTime()) / (24 * 3600 * 1000);
               if (diff !== 1) { contiguous = false; break; }
             }
             if (contiguous) {
               const first = ds[0];
-              const last = ds[ds.length-1];
+              const last = ds[ds.length - 1];
               const sameMonth = first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear();
-              dateSuffix = ` • ${format(first,'MMM d')}${sameMonth ? '–'+format(last,'d') : '–'+format(last,'MMM d')}`;
+              dateSuffix = ` • ${format(first, 'MMM d')}${sameMonth ? '–' + format(last, 'd') : '–' + format(last, 'MMM d')}`;
             } else {
               dateSuffix = ` • ${dateList.length}d`;
             }

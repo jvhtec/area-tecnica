@@ -281,7 +281,7 @@ serve(async (req) => {
 
         // 2) Fetch target job and technician profile (for department)
         const [{ data: job, error: jobErr }, { data: prof, error: profErr }] = await Promise.all([
-          supabase.from('jobs').select('id,title,start_time,end_time').eq('id', row.job_id).maybeSingle(),
+          supabase.from('jobs').select('id,title,start_time,end_time,job_type').eq('id', row.job_id).maybeSingle(),
           supabase.from('profiles').select('id,department').eq('id', row.profile_id).maybeSingle()
         ]);
 
@@ -481,6 +481,67 @@ serve(async (req) => {
                   });
                 }
                 await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_ok', meta: { role: chosenRole, department: prof.department, target_date: targetDate, attempt: upsertAttemptSummary } });
+
+                // Create timesheet entries for the assignment
+                // Timesheets are the source of truth for the assignment matrix
+                try {
+                  const jobType = (job as any)?.job_type;
+
+                  // Dryhire jobs don't require staff - skip timesheet creation entirely
+                  if (jobType === 'dryhire') {
+                    console.log('⏭️ Skipping timesheet creation for dryhire job');
+                  } else {
+                    // Tourdate jobs are schedule-only (no hours tracking)
+                    const isScheduleOnly = jobType === 'tourdate';
+
+                    if (targetDate) {
+                      // Single-day assignment - create one timesheet
+                      const { error: tsErr } = await supabase
+                        .from('timesheets')
+                        .upsert({
+                          job_id: row.job_id,
+                          technician_id: row.profile_id,
+                          date: targetDate,
+                          is_schedule_only: isScheduleOnly,
+                          source: 'staffing'
+                        }, { onConflict: 'job_id,technician_id,date' });
+                      if (tsErr) {
+                        console.warn('⚠️ Timesheet creation failed for single-day:', { targetDate, error: tsErr });
+                      } else {
+                        console.log('✅ Timesheet created for single-day:', { targetDate, isScheduleOnly });
+                      }
+                    } else if (job?.start_time && job?.end_time) {
+                      // Whole-job assignment - create timesheets for each day of job span
+                      const jobStart = new Date(job.start_time);
+                      const jobEnd = new Date(job.end_time);
+                      const timesheetRows: Array<{ job_id: string; technician_id: string; date: string; is_schedule_only: boolean; source: string }> = [];
+
+                      for (let d = new Date(jobStart); d <= jobEnd; d.setDate(d.getDate() + 1)) {
+                        const dateStr = d.toISOString().split('T')[0];
+                        timesheetRows.push({
+                          job_id: row.job_id,
+                          technician_id: row.profile_id,
+                          date: dateStr,
+                          is_schedule_only: isScheduleOnly,
+                          source: 'staffing'
+                        });
+                      }
+
+                      if (timesheetRows.length > 0) {
+                        const { error: tsErr } = await supabase
+                          .from('timesheets')
+                          .upsert(timesheetRows, { onConflict: 'job_id,technician_id,date' });
+                        if (tsErr) {
+                          console.warn('⚠️ Timesheet creation failed for whole-job:', { dates: timesheetRows.length, error: tsErr });
+                        } else {
+                          console.log('✅ Timesheets created for whole-job:', { dates: timesheetRows.length, isScheduleOnly });
+                        }
+                      }
+                    }
+                  }
+                } catch (tsError) {
+                  console.warn('⚠️ Non-blocking timesheet creation error:', tsError);
+                }
               }
             }
 

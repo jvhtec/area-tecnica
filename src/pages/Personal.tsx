@@ -8,8 +8,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, LayoutDashboard, Briefcase, Calendar as CalendarIcon, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
 
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -48,7 +49,7 @@ const Personal = () => {
       return (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">Please log in to access vacation requests.</p>
+            <p className="text-muted-foreground">Inicia sesión para gestionar solicitudes de vacaciones.</p>
           </CardContent>
         </Card>
       );
@@ -60,6 +61,8 @@ const Personal = () => {
           userRole={userRole}
           onVacationRequestSubmit={handleVacationRequestSubmit}
           isSubmitting={isSubmitting}
+          theme={theme}
+          isDark={isDark}
         />
       );
     }
@@ -68,7 +71,7 @@ const Personal = () => {
       <Card>
         <CardContent className="text-center py-8">
           <p className="text-muted-foreground">
-            Vacation request features are available for house technicians, admins, and management only.
+            Las solicitudes de vacaciones solo están disponibles para técnicos de planta, administración y managers.
           </p>
         </CardContent>
       </Card>
@@ -78,50 +81,93 @@ const Personal = () => {
   // House techs have read-only access (can't mark dates)
   const canEditDates = userRole === 'admin' || userRole === 'management';
 
-  return (
-    <div className="w-full mx-auto px-2 sm:px-4 py-6 space-y-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-        <h1 className="text-xl md:text-3xl font-bold">House Technician Calendar</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Track house tech assignments and availability</p>
-      </div>
-      
-      {isMobile ? (
-        <MobilePersonalCalendar 
-          date={date}
-          onDateSelect={setDate}
-          readOnly={!canEditDates}
-        />
-      ) : (
-        <PersonalCalendar 
-          date={date}
-          onDateSelect={setDate}
-          readOnly={!canEditDates}
-        />
-      )}
+  // Use technician theme
+  const { theme, isDark } = useTechnicianTheme();
 
-      {/* Vacation Management Section */}
-      <Collapsible 
-        open={isVacationSectionOpen}
-        onOpenChange={setIsVacationSectionOpen}
-        className="space-y-4"
-      >
-        <CollapsibleTrigger asChild>
-          <Button 
-            variant="ghost" 
-            className="flex items-center gap-2 text-2xl font-semibold p-0 h-auto hover:bg-transparent"
+  return (
+    <div className={`min-h-screen flex flex-col ${theme.bg} transition-colors duration-300 font-sans`}>
+      <div className="flex-1 overflow-y-auto p-4 pb-24 sm:px-6">
+        <div className="w-full mx-auto max-w-5xl space-y-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-500">Técnicos de la casa</p>
+              <h1 className={`text-2xl md:text-3xl font-bold leading-tight ${theme.textMain}`}>Agenda de técnicos de la casa</h1>
+              <p className={`text-sm md:text-base ${theme.textMuted}`}>
+                Controla asignaciones, disponibilidad y solicitudes de vacaciones en móvil.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDate(new Date())}
+                className={`${theme.card} ${theme.textMain}`}
+              >
+                Ir a hoy
+              </Button>
+            </div>
+          </div>
+
+          {isMobile ? (
+            <MobilePersonalCalendar
+              date={date}
+              onDateSelect={setDate}
+              readOnly={!canEditDates}
+              theme={theme}
+              isDark={isDark}
+            />
+          ) : (
+            <PersonalCalendar
+              date={date}
+              onDateSelect={setDate}
+              readOnly={!canEditDates}
+            />
+          )}
+
+          {/* Vacation Management Section */}
+          <Collapsible
+            open={isVacationSectionOpen}
+            onOpenChange={setIsVacationSectionOpen}
+            className="space-y-4"
           >
-            {isVacationSectionOpen ? (
-              <ChevronDown className="h-5 w-5" />
-            ) : (
-              <ChevronRight className="h-5 w-5" />
-            )}
-            Vacation Requests
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-4">
-          {renderVacationContent()}
-        </CollapsibleContent>
-      </Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className={`flex items-center gap-2 text-2xl font-semibold p-0 h-auto hover:bg-transparent ${theme.textMain}`}
+              >
+                {isVacationSectionOpen ? (
+                  <ChevronDown className="h-5 w-5" />
+                ) : (
+                  <ChevronRight className="h-5 w-5" />
+                )}
+                Solicitudes de vacaciones
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4">
+              {renderVacationContent()}
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className={`h-20 ${theme.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-4`}>
+        {[
+          { id: 'dashboard', icon: LayoutDashboard, label: 'Panel' },
+          { id: 'jobs', icon: Briefcase, label: 'Trabajos' },
+          { id: 'availability', icon: CalendarIcon, label: 'Disponib.' },
+          { id: 'profile', icon: User, label: 'Perfil' }
+        ].map(item => (
+          <button
+            key={item.id}
+            onClick={() => navigate('/technician-dashboard')}
+            className={`flex flex-col items-center justify-center gap-1 ${isDark ? 'text-gray-500' : 'text-slate-400'}`}
+          >
+            <item.icon size={22} strokeWidth={2} />
+            <span className="text-[10px] font-medium">{item.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 };

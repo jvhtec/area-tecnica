@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { startOfMonth, endOfMonth, subDays, addDays } from 'date-fns';
@@ -72,15 +71,13 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
         let assignmentResults: Assignment[] = [];
 
         if (techIds.length > 0) {
-          const { data: assignmentsData, error: assignmentsError } = await supabase
-            .from('job_assignments')
+          // Query timesheets as source of truth, joined with jobs for timeline info
+          const { data: timesheetData, error: timesheetsError } = await supabase
+            .from('timesheets')
             .select(`
               technician_id,
-              sound_role,
-              lights_role,
-              video_role,
-              single_day,
-              assignment_date,
+              job_id,
+              date,
               jobs!inner (
                 id,
                 title,
@@ -95,13 +92,21 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
             .lte('jobs.start_time', endDate.toISOString())
             .gte('jobs.end_time', startDate.toISOString());
 
-          if (assignmentsError) {
-            throw assignmentsError;
+          if (timesheetsError) {
+            throw timesheetsError;
           }
 
-          assignmentResults = (assignmentsData ?? [])
-            .map((assignment) => {
-              const jobData = Array.isArray(assignment.jobs) ? assignment.jobs[0] : assignment.jobs;
+          // Deduplicate by job_id + technician_id (timesheets have one row per date)
+          const seenKeys = new Set<string>();
+          const baseAssignments: Assignment[] = (timesheetData ?? [])
+            .filter((row) => {
+              const key = `${row.job_id}-${row.technician_id}`;
+              if (seenKeys.has(key)) return false;
+              seenKeys.add(key);
+              return true;
+            })
+            .map((row) => {
+              const jobData = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs;
               if (!jobData) {
                 return null;
               }
@@ -111,12 +116,12 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
                 : jobData.locations;
 
               return {
-                technician_id: assignment.technician_id,
-                sound_role: assignment.sound_role,
-                lights_role: assignment.lights_role,
-                video_role: assignment.video_role,
-                single_day: assignment.single_day,
-                assignment_date: assignment.assignment_date,
+                technician_id: row.technician_id,
+                sound_role: null,
+                lights_role: null,
+                video_role: null,
+                single_day: false,
+                assignment_date: null,
                 job: {
                   id: jobData.id,
                   title: jobData.title,
@@ -129,6 +134,63 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
               };
             })
             .filter(Boolean) as Assignment[];
+
+          assignmentResults = baseAssignments;
+
+          if (baseAssignments.length > 0) {
+            const jobIds = Array.from(new Set(baseAssignments.map((assignment) => assignment.job.id)));
+            if (jobIds.length > 0) {
+              const { data: jobAssignmentData, error: jobAssignmentsError } = await supabase
+                .from('job_assignments')
+                .select(`
+                  technician_id,
+                  job_id,
+                  sound_role,
+                  lights_role,
+                  video_role,
+                  single_day,
+                  assignment_date
+                `)
+                .in('job_id', jobIds)
+                .in('technician_id', techIds);
+
+              if (jobAssignmentsError) {
+                throw jobAssignmentsError;
+              }
+
+              const assignmentLookup = new Map<string, {
+                sound_role: string | null;
+                lights_role: string | null;
+                video_role: string | null;
+                single_day: boolean;
+                assignment_date: string | null;
+              }>();
+
+              (jobAssignmentData ?? []).forEach((row) => {
+                const key = `${row.job_id}-${row.technician_id}`;
+                assignmentLookup.set(key, {
+                  sound_role: row.sound_role ?? null,
+                  lights_role: row.lights_role ?? null,
+                  video_role: row.video_role ?? null,
+                  single_day: row.single_day ?? false,
+                  assignment_date: row.assignment_date ?? null,
+                });
+              });
+
+              assignmentResults = baseAssignments.map((assignment) => {
+                const key = `${assignment.job.id}-${assignment.technician_id}`;
+                const assignmentData = assignmentLookup.get(key);
+                return {
+                  ...assignment,
+                  sound_role: assignmentData?.sound_role ?? null,
+                  lights_role: assignmentData?.lights_role ?? null,
+                  video_role: assignmentData?.video_role ?? null,
+                  single_day: assignmentData?.single_day ?? false,
+                  assignment_date: assignmentData?.assignment_date ?? null,
+                };
+              });
+            }
+          }
         }
 
         let vacationResults: VacationPeriod[] = [];
@@ -181,9 +243,24 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
     fetchData();
 
-    // Set up real-time subscription for assignment changes
+    const timesheetChannel = supabase
+      .channel('personal-calendar-timesheets')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'timesheets'
+        },
+        () => {
+          console.log('PersonalCalendar: Real-time update received from timesheets, refetching data');
+          fetchData();
+        }
+      )
+      .subscribe();
+
     const assignmentChannel = supabase
-      .channel('personal-calendar-assignments')
+      .channel('personal-calendar-job-assignments')
       .on(
         'postgres_changes',
         {
@@ -198,7 +275,6 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
       )
       .subscribe();
 
-    // Set up real-time subscription for availability/vacation changes
     const availabilityChannel = supabase
       .channel('personal-calendar-availability')
       .on(
@@ -217,6 +293,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
     return () => {
       isMounted = false;
+      supabase.removeChannel(timesheetChannel);
       supabase.removeChannel(assignmentChannel);
       supabase.removeChannel(availabilityChannel);
     };

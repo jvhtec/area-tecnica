@@ -155,8 +155,8 @@ export const LogisticsEventDialog = ({
       if (eventError) throw eventError;
 
       toast({
-        title: "Success",
-        description: "Logistics event deleted successfully.",
+        title: "Éxito",
+        description: "Evento de logística eliminado correctamente.",
       });
 
       queryClient.invalidateQueries({ queryKey: ["logistics-events"] });
@@ -201,7 +201,7 @@ export const LogisticsEventDialog = ({
     if (!date || !time || (!selectedJob && !customTitle)) {
       toast({
         title: "Error",
-        description: "Date, time, and title (if no job) are required.",
+        description: "Fecha, hora y título (si no hay trabajo) son obligatorios.",
         variant: "destructive",
       });
       return;
@@ -333,7 +333,7 @@ export const LogisticsEventDialog = ({
 
         toast({
           title: "Success",
-          description: "Logistics event updated successfully.",
+          description: "Evento de logística actualizado correctamente.",
         });
       } else {
         const { data: newEvent, error } = await supabase
@@ -401,10 +401,10 @@ export const LogisticsEventDialog = ({
           await broadcastLogisticsEvent(newEvent);
         }
 
-        toast({
-          title: "Success",
-          description: "Logistics event created successfully.",
-        });
+      toast({
+        title: "Éxito",
+        description: "Evento de logística creado correctamente.",
+      });
       }
 
       queryClient.invalidateQueries({ queryKey: ["logistics-events"] });
@@ -425,14 +425,14 @@ export const LogisticsEventDialog = ({
         <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
           <DialogHeader>
             <DialogTitle>
-              {selectedEvent ? "Edit Logistics Event" : "Create Logistics Event"}
+              {selectedEvent ? "Editar evento de logística" : "Crear evento de logística"}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
           {/* Job Selection or locked job display */}
             {(!selectedEvent && !initialJobId) ? (
               <div className="space-y-2">
-                <Label>Job</Label>
+                <Label>Trabajo</Label>
                 <Select
                   value={selectedJob || "no-job"}
                   onValueChange={(value) => {
@@ -440,10 +440,10 @@ export const LogisticsEventDialog = ({
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a job" />
+                    <SelectValue placeholder="Selecciona un trabajo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="no-job">No Job</SelectItem>
+                    <SelectItem value="no-job">Sin trabajo</SelectItem>
                     {jobs?.map((job) => (
                       <SelectItem key={job.id} value={job.id}>
                         {job.title}
@@ -454,11 +454,11 @@ export const LogisticsEventDialog = ({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label>Job</Label>
+                <Label>Trabajo</Label>
                 <div className="px-3 py-2 border rounded bg-muted text-sm">
                   {(() => {
                     const jt = jobs?.find(j => j.id === (selectedEvent?.job_id || initialJobId))?.title;
-                    return jt || 'Selected Job';
+                    return jt || 'Trabajo seleccionado';
                   })()}
                 </div>
               </div>
@@ -466,7 +466,7 @@ export const LogisticsEventDialog = ({
 
             {/* Color Picker */}
             <div className="space-y-2">
-              <Label>Event Color</Label>
+              <Label>Color del evento</Label>
               <SimplifiedJobColorPicker
                 color={color}
                 onChange={setColor}
@@ -476,11 +476,11 @@ export const LogisticsEventDialog = ({
             {/* Custom Title (only required if no job is selected) */}
             {selectedJob === null && (
               <div className="space-y-2">
-                <Label>Title</Label>
+                <Label>Título</Label>
                 <Input
                   value={customTitle}
                   onChange={(e) => setCustomTitle(e.target.value)}
-                  placeholder="Enter event title"
+                  placeholder="Introduce el título del evento"
                   required
                 />
               </div>
@@ -488,7 +488,7 @@ export const LogisticsEventDialog = ({
 
             {/* Event Type */}
             <div className="space-y-2">
-              <Label>Event Type</Label>
+              <Label>Tipo de evento</Label>
               <Select
                 value={eventType}
                 onValueChange={(value: "load" | "unload") => setEventType(value)}
@@ -497,15 +497,15 @@ export const LogisticsEventDialog = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="load">Load</SelectItem>
-                  <SelectItem value="unload">Unload</SelectItem>
+                  <SelectItem value="load">Carga</SelectItem>
+                  <SelectItem value="unload">Descarga</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Date */}
             <div className="space-y-2">
-              <Label>Date</Label>
+              <Label>Fecha</Label>
               <Input
                 type="date"
                 value={date}
@@ -516,7 +516,7 @@ export const LogisticsEventDialog = ({
 
             {/* Time */}
             <div className="space-y-2">
-              <Label>Time</Label>
+              <Label>Hora</Label>
               <Input
                 type="time"
                 value={time}
@@ -527,7 +527,7 @@ export const LogisticsEventDialog = ({
 
             {/* Transport Type */}
             <div className="space-y-2">
-              <Label>Transport Type</Label>
+              <Label>Tipo de vehículo</Label>
               <Select value={transportType} onValueChange={setTransportType}>
                 <SelectTrigger>
                   <SelectValue />
@@ -544,17 +544,17 @@ export const LogisticsEventDialog = ({
 
             {/* License Plate */}
             <div className="space-y-2">
-              <Label>License Plate</Label>
+              <Label>Matrícula</Label>
               <Input
                 value={licensePlate}
                 onChange={(e) => setLicensePlate(e.target.value)}
-                placeholder="Enter license plate"
+                placeholder="Introduce matrícula (opcional)"
               />
             </div>
 
             {/* Departments */}
             <div className="space-y-2">
-              <Label>Departments</Label>
+              <Label>Departamentos</Label>
               <div className="flex flex-wrap gap-2">
                 {departments.map((dept) => (
                   <Button
@@ -577,11 +577,11 @@ export const LogisticsEventDialog = ({
 
             {/* Loading Bay */}
             <div className="space-y-2">
-              <Label>Loading Bay</Label>
+              <Label>Muelle de carga</Label>
               <Input
                 value={loadingBay}
                 onChange={(e) => setLoadingBay(e.target.value)}
-                placeholder="Optional"
+                placeholder="Opcional"
               />
             </div>
 
@@ -594,17 +594,17 @@ export const LogisticsEventDialog = ({
                   onClick={() => setShowDeleteDialog(true)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  Eliminar
                 </Button>
               )}
               {!selectedEvent && eventType === 'load' && (
                 <div className="flex items-center gap-2">
                   <Checkbox id="alsoCreateUnload" checked={alsoCreateUnload} onCheckedChange={(v) => setAlsoCreateUnload(!!v)} />
-                  <Label htmlFor="alsoCreateUnload" className="text-sm">Also create unload event</Label>
+                  <Label htmlFor="alsoCreateUnload" className="text-sm">Crear también descarga</Label>
                 </div>
               )}
               <Button type="submit">
-                {selectedEvent ? "Update" : "Create"} Event
+                {selectedEvent ? "Actualizar" : "Crear"} evento
               </Button>
             </div>
           </form>
@@ -615,15 +615,15 @@ export const LogisticsEventDialog = ({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete This Event?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar este evento?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the event.
+              Esta acción no se puede deshacer y eliminará el evento permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>
-              Delete
+              Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

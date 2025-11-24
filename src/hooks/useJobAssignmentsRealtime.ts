@@ -47,20 +47,74 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
   const queryClient = useQueryClient();
   
   // Use our enhanced real-time query hook for better reliability
-  const { 
-    data: assignments = [], 
-    isLoading, 
+  // Timesheets are the source of truth for display; join with job_assignments for role metadata
+  const {
+    data: assignments = [],
+    isLoading,
     manualRefresh,
     isRefreshing: isQueryRefreshing
   } = useRealtimeQuery<Assignment[]>(
     ["job-assignments", jobId],
     async () => {
-      console.log("Fetching assignments for job:", jobId);
-      
+      console.log("Fetching assignments (from timesheets) for job:", jobId);
+
       // Add retry logic
-      const fetchWithRetry = async (retries = 3) => {
+      const fetchWithRetry = async (retries = 3): Promise<Assignment[]> => {
         try {
-          const { data, error } = await supabase
+          // Query timesheets first (source of truth for display)
+          const { data: timesheetData, error: tsError } = await supabase
+            .from("timesheets")
+            .select(`
+              job_id,
+              technician_id,
+              date,
+              profiles!fk_timesheets_technician_id (
+                first_name,
+                last_name,
+                email,
+                department
+              )
+            `)
+            .eq("job_id", jobId);
+
+          // RLS-safe fallback mirroring JobDetailsDialog to avoid gaps for non-manager roles
+          let visibleTimesheets: any[] = [];
+          if (tsError?.code === 'PGRST200' || tsError?.code === 'PGRST301' || tsError?.code === '42501') {
+            try {
+              const { data: vis, error: visErr } = await supabase
+                .rpc('get_timesheet_amounts_visible')
+                .eq('job_id', jobId);
+              if (!visErr && Array.isArray(vis)) {
+                visibleTimesheets = vis;
+              }
+            } catch (err) {
+              console.warn('Visible timesheets fallback failed', err);
+            }
+          }
+
+          const combinedTimesheets = [
+            ...(timesheetData || []),
+            ...visibleTimesheets
+          ];
+
+          if (tsError) {
+            console.error("Error fetching timesheets:", tsError);
+            // If we recovered via visibleTimesheets, continue; otherwise throw
+            if (!visibleTimesheets.length) {
+              throw tsError;
+            }
+          }
+
+          // Get unique technician IDs from timesheets
+          const techIds = [...new Set(combinedTimesheets.map((t: any) => t.technician_id))];
+
+          if (techIds.length === 0) {
+            console.log(`No timesheets found for job ${jobId}`);
+            return [];
+          }
+
+          // Fetch job_assignments for role/status metadata
+          const { data: assignmentData, error: assignError } = await supabase
             .from("job_assignments")
             .select(`
               *,
@@ -71,15 +125,40 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
                 department
               )
             `)
-            .eq("job_id", jobId);
+            .eq("job_id", jobId)
+            .in("technician_id", techIds);
 
-          if (error) {
-            console.error("Error fetching assignments:", error);
-            throw error;
+          if (assignError) {
+            console.warn("Error fetching job_assignments metadata:", assignError);
           }
 
-          console.log(`Successfully fetched ${data?.length || 0} assignments for job ${jobId}`);
-          return data as unknown as Assignment[];
+          // Merge: timesheets for presence, job_assignments for roles
+          const assignmentMap = new Map((assignmentData || []).map((a: any) => [a.technician_id, a]));
+          const mergedAssignments = techIds.map(techId => {
+            const assignment = assignmentMap.get(techId);
+            const tsRow = combinedTimesheets.find((t: any) => t.technician_id === techId);
+            const tsDates = combinedTimesheets
+              .filter((t: any) => t.technician_id === techId)
+              .map((t: any) => t.date);
+            return {
+              job_id: jobId,
+              technician_id: techId,
+              profiles: assignment?.profiles || tsRow?.profiles,
+              sound_role: assignment?.sound_role,
+              lights_role: assignment?.lights_role,
+              video_role: assignment?.video_role,
+              status: assignment?.status,
+              single_day: assignment?.single_day,
+              assignment_date: assignment?.assignment_date,
+              assigned_at: assignment?.assigned_at,
+              assigned_by: assignment?.assigned_by,
+              // Include dates from timesheets for per-day info
+              _timesheet_dates: Array.from(new Set(tsDates)).sort(),
+            } as unknown as Assignment;
+          });
+
+          console.log(`Successfully fetched ${mergedAssignments.length} assignments for job ${jobId}`);
+          return mergedAssignments;
         } catch (error) {
           if (retries > 0) {
             console.log(`Retrying assignments fetch... ${retries} attempts remaining`);
@@ -89,10 +168,10 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           throw error;
         }
       };
-      
+
       return fetchWithRetry();
     },
-    "job_assignments",
+    "timesheets", // Subscribe to timesheets (source of truth)
     {
       staleTime: 1000 * 60 * 2, // Consider data fresh for 2 minutes
       refetchOnWindowFocus: true,
@@ -102,13 +181,30 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
   );
 
   // Additional real-time subscription specifically for this job
+  // Listen to both timesheets (source of truth) and job_assignments (for role/status updates)
   useEffect(() => {
     if (!jobId) return;
 
-    console.log(`Setting up job-specific assignment subscription for job ${jobId}`);
+    console.log(`Setting up job-specific timesheet/assignment subscription for job ${jobId}`);
 
     const channel = supabase
       .channel(`assignments-${jobId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'timesheets',
+          filter: `job_id=eq.${jobId}`
+        },
+        (payload) => {
+          console.log(`Timesheet change detected for job ${jobId}:`, payload);
+          // Force immediate refresh
+          manualRefresh();
+          // Also invalidate jobs to update JobCard lists that depend on job relations
+          queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        }
+      )
       .on(
         'postgres_changes',
         {
@@ -118,20 +214,19 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           filter: `job_id=eq.${jobId}`
         },
         (payload) => {
-          console.log(`Assignment change detected for job ${jobId}:`, payload);
-          // Force immediate refresh
+          console.log(`Assignment metadata change detected for job ${jobId}:`, payload);
+          // Force immediate refresh (for role/status updates)
           manualRefresh();
-          // Also invalidate jobs to update JobCard lists that depend on job relations
           queryClient.invalidateQueries({ queryKey: ["jobs"] });
         }
       )
       .subscribe();
 
     return () => {
-      console.log(`Cleaning up job assignment subscription for job ${jobId}`);
+      console.log(`Cleaning up job timesheet/assignment subscription for job ${jobId}`);
       supabase.removeChannel(channel);
     };
-  }, [jobId, manualRefresh]);
+  }, [jobId, manualRefresh, queryClient]);
 
   const { manageFlexCrewAssignment } = useFlexCrewAssignments();
 

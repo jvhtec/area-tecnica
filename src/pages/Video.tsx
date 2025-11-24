@@ -13,10 +13,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { Link } from "react-router-dom";
-import { Scale, Zap, File, Plus } from "lucide-react";
+import { Scale, Zap, File, Plus, Video as VideoIcon } from "lucide-react";
 import type { JobType } from "@/types/job";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
+import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
 
 const Video = () => {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
@@ -29,6 +30,12 @@ const Video = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [userRole, setUserRole] = useState<string | null>(null);
   const currentDepartment = "video";
+
+  const mobileTools = [
+    { label: "Pesos", to: "/video-pesos-tool", icon: Scale },
+    { label: "Consumos", to: "/video-consumos-tool", icon: Zap },
+    { label: "Memoria técnica", to: "/video-memoria-tecnica", icon: File },
+  ];
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -152,7 +159,13 @@ const Video = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <LightsHeader 
+      <DepartmentMobileHub
+        department={currentDepartment}
+        title="Departamento de vídeo"
+        icon={VideoIcon}
+        tools={mobileTools}
+      />
+      <LightsHeader
         onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
         department="Video"
         canCreate={userRole ? ["admin","management"].includes(userRole) : true}

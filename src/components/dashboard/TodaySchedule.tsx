@@ -1,6 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { JobCardNew } from "./JobCardNew";
+import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
 
 interface TodayScheduleProps {
   jobs: any[];
@@ -70,7 +70,7 @@ export const TodaySchedule = ({
             console.log("Rendering job in TodaySchedule:", job);
             const jobData = job.jobs || job;
             const jobId = job.id || job.job_id || (jobData && (jobData.id || job.job_id));
-            
+
             if (!jobId) {
               console.warn("Job is missing ID:", job);
               return null;
@@ -78,19 +78,19 @@ export const TodaySchedule = ({
 
             // Check if this is a festival job
             let isFestivalJob = false;
-            
+
             if (typeof jobData === 'object') {
               if ('job_type' in jobData) {
                 isFestivalJob = jobData.job_type === 'festival';
               }
             }
-            
-            console.log("Is festival job check for:", { 
+
+            console.log("Is festival job check for:", {
               jobId,
-              isFestivalJob, 
+              isFestivalJob,
               jobType: jobData?.job_type
             });
-            
+
             return (
               <JobCardNew
                 key={jobId}

@@ -36,6 +36,7 @@ interface EditJobDialogProps {
 }
 
 export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) => {
+  const fieldClass = "bg-[#0a0c10] border-[#1f232e] text-white placeholder:text-slate-500";
   const [title, setTitle] = useState(job.title);
   const [description, setDescription] = useState(job.description || "");
   const [startTime, setStartTime] = useState("");
@@ -47,7 +48,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const [isVenueBusy, setIsVenueBusy] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
-  
+
   // Venue-related state
   const [venueName, setVenueName] = useState("");
   const [venueAddress, setVenueAddress] = useState("");
@@ -285,7 +286,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
+      <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible bg-[#05070a] text-white border-[#1f232e]">
         <DialogHeader>
           <DialogTitle>Edit Job</DialogTitle>
         </DialogHeader>
@@ -297,6 +298,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
+              className={fieldClass}
             />
           </div>
           <div>
@@ -306,11 +308,12 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
+              className={fieldClass}
             />
           </div>
           
           {/* Venue Section */}
-          <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+          <div className="space-y-4 p-4 border rounded-lg bg-[#0f1219] border-[#1f232e]">
             <Label className="text-base font-semibold">Venue Information</Label>
             <div className="grid gap-4">
               <PlaceAutocomplete
@@ -328,6 +331,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                   value={venueAddress}
                   onChange={(e) => setVenueAddress(e.target.value)}
                   placeholder="Venue address (auto-filled from venue selection)"
+                  className={fieldClass}
                 />
               </div>
             </div>
@@ -339,10 +343,10 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               value={timezone}
               onValueChange={setTimezone}
             >
-              <SelectTrigger>
+              <SelectTrigger className={fieldClass}>
                 <SelectValue placeholder="Select timezone" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
                 <SelectItem value="Europe/Madrid">Europe/Madrid</SelectItem>
                 <SelectItem value="Europe/London">Europe/London</SelectItem>
                 <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
@@ -360,6 +364,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
                 required
+                className={fieldClass}
               />
             </div>
             <div>
@@ -370,6 +375,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
                 required
+                className={fieldClass}
               />
             </div>
           </div>
@@ -413,7 +419,12 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             </div>
             {jobType !== 'dryhire' && (
               <div className="pt-2">
-                <Button type="button" variant="outline" onClick={() => setRequirementsOpen(true)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRequirementsOpen(true)}
+                  className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                >
                   Manage Requirements
                 </Button>
               </div>
@@ -424,10 +435,11 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              className="bg-white/5 border-white/10 text-white hover:bg-white/10"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || isVenueBusy}>
+            <Button type="submit" disabled={isLoading || isVenueBusy} className="bg-blue-600 hover:bg-blue-500 text-white">
               {isLoading ? "Saving..." : "Save Changes"}
             </Button>
           </div>

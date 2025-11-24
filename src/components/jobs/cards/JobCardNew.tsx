@@ -56,6 +56,7 @@ export interface JobCardNewProps {
   showManageArtists?: boolean;
   isProjectManagementPage?: boolean;
   hideTasks?: boolean;
+  detailsOnlyMode?: boolean;
 }
 
 export function JobCardNew({
@@ -70,7 +71,8 @@ export function JobCardNew({
   showUpload = false,
   showManageArtists = false,
   isProjectManagementPage = false,
-  hideTasks = false
+  hideTasks = false,
+  detailsOnlyMode = false
 }: JobCardNewProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -78,7 +80,7 @@ export function JobCardNew({
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
   const [routeSheetOpen, setRouteSheetOpen] = useState(false);
   const [taskManagerOpen, setTaskManagerOpen] = useState(false);
-  
+
   // Add folder creation loading state
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
   const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
@@ -151,7 +153,7 @@ export function JobCardNew({
   const [selectedTransportRequest, setSelectedTransportRequest] = useState<any | null>(null);
   const [logisticsInitialEventType, setLogisticsInitialEventType] = useState<'load' | 'unload' | undefined>(undefined);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
-  
+
   const {
     appliedBorderColor,
     appliedBgColor,
@@ -187,11 +189,11 @@ export function JobCardNew({
 
   // Check folder existence with proper loading state handling
   const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
-  
+
   // Updated logic: prioritize actual folder existence over database flags
   const actualFoldersExist = foldersExist === true;
   const systemThinksFoldersExist = job.flex_folders_created || job.flex_folders_exist;
-  
+
   // Detect inconsistency for logging/debugging
   const hasInconsistency = systemThinksFoldersExist && !actualFoldersExist;
   if (hasInconsistency) {
@@ -202,7 +204,7 @@ export function JobCardNew({
       flexFoldersExist: job.flex_folders_exist
     });
   }
-  
+
   // Final decision: only consider folders created if they actually exist
   const foldersAreCreated = actualFoldersExist;
 
@@ -218,7 +220,7 @@ export function JobCardNew({
           .eq('id', user.id)
           .single();
         if (!error) setUserDepartment(data?.department || null);
-      } catch {}
+      } catch { }
     })();
   }, []);
 
@@ -226,7 +228,7 @@ export function JobCardNew({
   const { data: myTransportRequest } = useQuery({
     queryKey: ['transport-request', job.id, userDepartment],
     queryFn: async () => {
-      if (!userDepartment || !['sound','lights','video'].includes(userDepartment)) return null;
+      if (!userDepartment || !['sound', 'lights', 'video'].includes(userDepartment)) return null;
       const { data, error } = await supabase
         .from('transport_requests')
         .select('id, department, status, note, description, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
@@ -253,7 +255,7 @@ export function JobCardNew({
       if (error) return [];
       return data || [];
     },
-    enabled: !!job?.id && ((userDepartment === 'logistics') || ['admin','management'].includes(userRole || '')),
+    enabled: !!job?.id && ((userDepartment === 'logistics') || ['admin', 'management'].includes(userRole || '')),
   });
 
   const { data: jobEvents = [] } = useQuery({
@@ -271,7 +273,7 @@ export function JobCardNew({
 
   const isScheduled = (jobEvents?.length || 0) > 0;
   const hasRequest = Boolean(myTransportRequest) || (Array.isArray(allRequests) && allRequests.length > 0);
-  const isTechDept = userDepartment && ['sound','lights','video'].includes(userDepartment);
+  const isTechDept = userDepartment && ['sound', 'lights', 'video'].includes(userDepartment);
 
   const transportButtonLabel = (() => {
     if (isScheduled) return 'Transport Scheduled';
@@ -382,7 +384,7 @@ export function JobCardNew({
         return;
       }
       if (missing.length > 0) {
-        const proceed = window.confirm(`Faltan teléfonos para ${missing.length} técnico(s):\n- ${missing.slice(0,5).join('\n- ')}${missing.length>5 ? '\n...' : ''}\n\n¿Crear el grupo igualmente?`);
+        const proceed = window.confirm(`Faltan teléfonos para ${missing.length} técnico(s):\n- ${missing.slice(0, 5).join('\n- ')}${missing.length > 5 ? '\n...' : ''}\n\n¿Crear el grupo igualmente?`);
         if (!proceed) return;
       }
 
@@ -398,7 +400,7 @@ export function JobCardNew({
           title: (data as any)?.wa_group_id ? 'Grupo creado' : 'Grupo solicitado',
           description: warnings && (warnings.missing?.length || warnings.invalid?.length)
             ? `Avisos: sin teléfono ${warnings.missing?.length || 0}, inválidos ${warnings.invalid?.length || 0}`
-            : ((data as any)?.note || 'Operación realizada.' )
+            : ((data as any)?.note || 'Operación realizada.')
         });
       }
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
@@ -424,7 +426,7 @@ export function JobCardNew({
         queryClient.invalidateQueries({ queryKey: ['transport-request', job.id, departmentForReq] });
         queryClient.invalidateQueries({ queryKey: ['transport-requests-all', job.id] });
       }
-    } catch {}
+    } catch { }
   };
 
   // Manual Flex sync handler
@@ -459,7 +461,7 @@ export function JobCardNew({
       // Prefer the department subfolder's parent as master, using department column
       const deptLc = (department || '').toLowerCase();
       const sub = folders.find((f: any) => (f.department || '').toLowerCase() === deptLc)
-                  || folders.find((f: any) => ['sound','lights','video'].includes((f.department || f.folder_type || '').toLowerCase()));
+        || folders.find((f: any) => ['sound', 'lights', 'video'].includes((f.department || f.folder_type || '').toLowerCase()));
       const master = sub?.parent_id ? folders.find((f: any) => f.id === sub.parent_id) : null;
       const targetFolderId = master?.id || sub?.parent_id || sub?.id; // fallback to any available id
       const { data: res, error } = await supabase.functions.invoke('apply-flex-status', {
@@ -478,12 +480,12 @@ export function JobCardNew({
   // Optimistic delete handler with instant UI feedback
   const handleDeleteClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (isJobBeingDeleted) {
       console.log("JobCardNew: Job deletion already in progress");
       return;
     }
-    
+
     if (!["admin", "management"].includes(userRole || "")) {
       toast({
         title: "Permission denied",
@@ -499,19 +501,19 @@ export function JobCardNew({
 
     try {
       console.log("JobCardNew: Starting optimistic job deletion for:", job.id);
-      
+
       addDeletingJob(job.id);
-      
+
       const result = await deleteJobOptimistically(job.id);
-      
+
       if (result.success) {
         toast({
           title: "Job deleted",
           description: result.details || "The job has been removed and cleanup is running in background."
         });
-        
+
         onDeleteClick(job.id);
-        
+
         await queryClient.invalidateQueries({ queryKey: ["jobs"] });
         await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
       } else {
@@ -531,7 +533,7 @@ export function JobCardNew({
 
   const createFlexFoldersHandler = (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (isCreatingFolders) {
       console.log("JobCardNew: Folder creation already in progress");
       return;
@@ -658,10 +660,10 @@ export function JobCardNew({
       // Format the start date as yymmdd
       const startDate = new Date(job.start_time);
       const formattedDate = format(startDate, "yyMMdd");
-      
+
       // Create safe folder name
       const { name: rootFolderName, wasSanitized } = createSafeFolderName(job.title, formattedDate);
-      
+
       if (wasSanitized) {
         console.log('JobCardNew: Folder name was sanitized for safety:', { original: `${formattedDate} - ${job.title}`, sanitized: rootFolderName });
       }
@@ -672,25 +674,25 @@ export function JobCardNew({
       // Get current user's custom folder structure or use default
       const { data: { user } } = await supabase.auth.getUser();
       let folderStructure = null;
-      
+
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('custom_folder_structure, role')
           .eq('id', user.id)
           .single();
-        
+
         // Only use custom structure for management users
         if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_folder_structure) {
           folderStructure = profile.custom_folder_structure;
         }
       }
-      
+
       // Default structure if no custom one exists
       if (!folderStructure) {
         folderStructure = [
           "CAD",
-          "QT", 
+          "QT",
           "Material",
           "Documentación",
           "Rentals",
@@ -699,7 +701,7 @@ export function JobCardNew({
           "Predicciones"
         ];
       }
-      
+
       // Create folders based on structure
       if (Array.isArray(folderStructure)) {
         for (const folder of folderStructure) {
@@ -712,7 +714,7 @@ export function JobCardNew({
             // Object structure with subfolders
             const safeFolderName = sanitizeFolderName(folder.name);
             const subDirHandle = await rootDirHandle.getDirectoryHandle(safeFolderName, { create: true });
-            
+
             // Create subfolders if they exist
             if (folder.subfolders && Array.isArray(folder.subfolders)) {
               for (const subfolder of folder.subfolders) {
@@ -795,7 +797,7 @@ export function JobCardNew({
           </div>
         )}
 
-        <JobCardHeader 
+        <JobCardHeader
           job={job}
           collapsed={collapsed}
           onToggleCollapse={toggleCollapse}
@@ -855,7 +857,7 @@ export function JobCardNew({
             handleFileUpload={handleFileUpload}
             onJobDetailsClick={() => setJobDetailsDialogOpen(true)}
             onOpenTasks={(e) => { e.stopPropagation(); setTaskManagerOpen(true); }}
-            canSyncFlex={['admin','management','logistics'].includes(userRole || '')}
+            canSyncFlex={['admin', 'management', 'logistics'].includes(userRole || '')}
             onSyncFlex={syncStatusToFlex}
             onOpenFlexLogs={(e) => { e.stopPropagation(); setFlexLogDialogOpen(true); }}
             transportButtonLabel={job.job_type === 'dryhire' ? undefined : transportButtonLabel}
@@ -871,7 +873,7 @@ export function JobCardNew({
           <div className="px-6 mt-2 flex items-center justify-between">
             <div className="flex gap-3 flex-wrap text-sm">
               {job.job_departments.map((d: any) => {
-                const dept = d.department as 'sound'|'lights'|'video'
+                const dept = d.department as 'sound' | 'lights' | 'video'
                 const stats = (requiredVsAssigned as any)[dept] || { required: 0, assigned: 0 }
                 const need = stats.required || 0
                 const have = stats.assigned || 0
@@ -883,7 +885,7 @@ export function JobCardNew({
                 )
               })}
             </div>
-            {['admin','management','logistics'].includes(userRole || '') && (
+            {['admin', 'management', 'logistics'].includes(userRole || '') && (
               <button
                 type="button"
                 className="text-xs px-2 py-1 border rounded-md hover:bg-secondary"
@@ -906,7 +908,7 @@ export function JobCardNew({
                     jobTimesheets={jobTimesheets || []}
                   />
                 )}
-                
+
                 {documents.length > 0 && (
                   <div className="mt-2">
                     <button
@@ -919,8 +921,8 @@ export function JobCardNew({
                     </button>
                     {!docsCollapsed && (
                       <div className="mt-1">
-                        <JobCardDocuments 
-                          documents={documents} 
+                        <JobCardDocuments
+                          documents={documents}
                           userRole={userRole}
                           onDeleteDocument={handleDeleteDocument}
                           showTitle={false}
@@ -967,8 +969,8 @@ export function JobCardNew({
           </div>
 
           {!collapsed && job.job_type !== "dryhire" && !hideTasks && (
-            <JobCardProgress 
-              soundTasks={soundTasks} 
+            <JobCardProgress
+              soundTasks={soundTasks}
               roleSummary={reqSummary}
             />
           )}
@@ -1017,12 +1019,12 @@ export function JobCardNew({
             <JobAssignmentDialog
               isOpen={assignmentDialogOpen}
               onClose={() => setAssignmentDialogOpen(false)}
-              onAssignmentChange={() => {}}
+              onAssignmentChange={() => { }}
               jobId={job.id}
               department={department as Department}
             />
           )}
-          
+
           {/* Job Details Dialog */}
           <JobDetailsDialog
             open={jobDetailsDialogOpen}
@@ -1094,7 +1096,7 @@ export function JobCardNew({
                             {(req.items || []).map((it: any) => (
                               <div key={it.id} className="flex items-center justify-between pl-2">
                                 <div className="text-sm text-muted-foreground">
-                                  {it.transport_type.replace('_',' ')}
+                                  {it.transport_type.replace('_', ' ')}
                                   {typeof it.leftover_space_meters === 'number' && (
                                     <span className="ml-2">· Leftover: {it.leftover_space_meters} m</span>
                                   )}
@@ -1103,14 +1105,14 @@ export function JobCardNew({
                                   className="px-3 py-1 text-sm rounded border hover:bg-accent"
                                   onClick={(ev) => {
                                     ev.stopPropagation();
-                                setSelectedTransportRequest({ ...req, selectedItem: it });
-                                setLogisticsInitialEventType('load');
-                                setTransportDialogOpen(false);
-                                setLogisticsDialogOpen(true);
-                              }}
-                            >
-                              Create Event
-                            </button>
+                                    setSelectedTransportRequest({ ...req, selectedItem: it });
+                                    setLogisticsInitialEventType('load');
+                                    setTransportDialogOpen(false);
+                                    setLogisticsDialogOpen(true);
+                                  }}
+                                >
+                                  Create Event
+                                </button>
                               </div>
                             ))}
                           </div>

@@ -45,7 +45,7 @@ export const MobileNavBar = ({
     <nav
       role="navigation"
       aria-label="Navegación principal"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-background/95 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_rgba(2,6,23,0.18)] backdrop-blur supports-[backdrop-filter]:backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 bg-[#05070a]/95 backdrop-blur-xl border-t border-[#1f232e] px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_rgba(0,0,0,0.5)] md:hidden"
     >
       <div className="mx-auto flex w-full max-w-3xl items-stretch justify-evenly gap-1">
         {primaryItems.map((item) => {
@@ -59,13 +59,13 @@ export const MobileNavBar = ({
               aria-label={item.label}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#05070a]",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-blue-600/20 text-blue-400"
+                  : "text-[#94a3b8] hover:text-white hover:bg-[#151820]",
               )}
             >
-              <Icon className={cn("h-5 w-5", isActive && "text-primary")} aria-hidden="true" />
+              <Icon className={cn("h-5 w-5", isActive && "text-blue-400")} aria-hidden="true" />
               <span className="max-w-[5rem] truncate">{item.mobileLabel}</span>
             </Link>
           )
@@ -83,8 +83,8 @@ export const MobileNavBar = ({
                 type="button"
                 aria-label="Más opciones"
                 className={cn(
-                  "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  (open || activeInTray) && "bg-primary/10 text-primary",
+                  "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold text-[#94a3b8] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#05070a] hover:text-white hover:bg-[#151820]",
+                  (open || activeInTray) && "bg-blue-600/20 text-blue-400",
                 )}
               >
                 <MoreHorizontal className="h-5 w-5" aria-hidden="true" />

@@ -41,37 +41,132 @@ export const useOptimizedJobCard = (
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
 
   // Keep local state in sync with incoming job prop updates for instant UI
-  useEffect(() => {
-    setAssignments(job.job_assignments || []);
-  }, [job.job_assignments]);
+
 
   useEffect(() => {
     setDocuments(job.job_documents || []);
   }, [job.job_documents]);
 
+  const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
+
   // Helper to fetch and update assignments for this job
+  // job_assignments are the base; timesheets add per-day date info (with RLS-safe fallback)
   const refreshAssignments = useCallback(async () => {
     if (!job?.id) return;
     try {
-      const { data, error } = await supabase
-        .from('job_assignments')
-        .select(`*, profiles(first_name, nickname, last_name)`) 
-        .eq('job_id', job.id);
-      if (!error) setAssignments(data || []);
-    } catch {}
+      const [{ data: assignmentData, error: assignError }, { data: directTimesheets, error: tsError }] = await Promise.all([
+        supabase
+          .from('job_assignments')
+          .select(`*, profiles!job_assignments_technician_id_fkey(first_name, nickname, last_name, department)`)
+          .eq('job_id', job.id),
+        supabase
+          .from('timesheets')
+          .select(`
+            job_id,
+            technician_id,
+            date,
+            profiles!fk_timesheets_technician_id (first_name, nickname, last_name, department)
+          `)
+          .eq('job_id', job.id)
+      ]);
+
+      if (tsError) {
+        console.warn('Error fetching timesheets for job card:', tsError);
+      }
+      if (assignError) {
+        console.warn('Error fetching job_assignments metadata:', assignError);
+      }
+
+      // Fallback to visibility function to avoid RLS gaps (mirrors JobDetailsDialog)
+      let visibleTimesheets: any[] = [];
+      try {
+        const { data: visible, error: visErr } = await supabase
+          .rpc('get_timesheet_amounts_visible')
+          .eq('job_id', job.id);
+        if (!visErr && Array.isArray(visible)) {
+          visibleTimesheets = visible;
+        }
+      } catch (err) {
+        console.warn('Error fetching visible timesheets for job card:', err);
+      }
+
+      // Merge direct + visible and de-duplicate per technician
+      const timesheetsByTech = new Map<string, string[]>();
+      const timesheetProfileByTech = new Map<string, any>();
+      const addTimesheetRow = (t: any) => {
+        if (!t?.technician_id || !t?.date) return;
+        const existing = timesheetsByTech.get(t.technician_id) || [];
+        existing.push(t.date);
+        timesheetsByTech.set(t.technician_id, existing);
+        if (t.profiles) {
+          timesheetProfileByTech.set(t.technician_id, normalizeProfile(t.profiles));
+        }
+      };
+
+      (directTimesheets || []).forEach(addTimesheetRow);
+      visibleTimesheets.forEach(addTimesheetRow);
+
+      // Deduplicate and sort dates per technician
+      const normalizedTimesheetsByTech = new Map<string, string[]>();
+      timesheetsByTech.forEach((dates, techId) => {
+        const uniqueSorted = Array.from(new Set(dates)).sort();
+        normalizedTimesheetsByTech.set(techId, uniqueSorted);
+      });
+
+      const mergedAssignments: any[] = (assignmentData || []).map((a: any) => ({
+        ...a,
+        profiles: normalizeProfile(a.profiles),
+        _timesheet_dates: normalizedTimesheetsByTech.get(a.technician_id) || [],
+      }));
+
+      // If timesheets exist for technicians not in job_assignments (edge cases), include them so badges still appear
+      const assignmentTechIds = new Set((assignmentData || []).map((a: any) => a.technician_id));
+      normalizedTimesheetsByTech.forEach((dates, techId) => {
+        if (assignmentTechIds.has(techId)) return;
+        mergedAssignments.push({
+          job_id: job.id,
+          technician_id: techId,
+          profiles: timesheetProfileByTech.get(techId) || null,
+          sound_role: null,
+          lights_role: null,
+          video_role: null,
+          status: null,
+          single_day: null,
+          assignment_date: null,
+          assigned_at: null,
+          _timesheet_dates: dates,
+        });
+      });
+
+      setAssignments(mergedAssignments);
+    } catch (err) {
+      console.warn('Error refreshing assignments', err);
+    }
   }, [job?.id]);
 
-  // Realtime: subscribe to assignment changes for this job and refresh local state instantly
+  // Keep local state in sync with incoming job prop updates for instant UI
+  useEffect(() => {
+    setAssignments(job.job_assignments || []);
+    refreshAssignments();
+  }, [job.job_assignments, refreshAssignments]);
+
+  // Realtime: subscribe to timesheet changes for this job (source of truth) and refresh local state instantly
   useEffect(() => {
     if (!job?.id) return;
     const channel = supabase
-      .channel(`job-card-assignments-${job.id}`)
+      .channel(`job-card-timesheets-${job.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'timesheets',
+        filter: `job_id=eq.${job.id}`,
+      }, async () => { await refreshAssignments(); })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'job_assignments',
         filter: `job_id=eq.${job.id}`,
-      }, async () => { await refreshAssignments(); })
+      }, async () => { await refreshAssignments(); }) // Also listen to job_assignments for role/status updates
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

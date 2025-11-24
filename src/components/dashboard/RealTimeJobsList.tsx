@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, Filter, CalendarIcon } from "lucide-react";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
-import { JobCardNew } from "./JobCardNew";
+import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -24,16 +24,16 @@ interface RealTimeJobsListProps {
   userRole?: string | null;
 }
 
-export function RealTimeJobsList({ 
-  title, 
-  department, 
+export function RealTimeJobsList({
+  title,
+  department,
   filterByDepartment = true,
   limit,
   showAllButton = false,
   onJobClick,
   onEditClick,
   onDeleteClick,
-  userRole 
+  userRole
 }: RealTimeJobsListProps) {
   const { jobs, isLoading, isRefreshing, refetch, realtimeStatus } = useJobsRealtime();
   const [timeFilter, setTimeFilter] = useState<"upcoming" | "past" | "all">("upcoming");
@@ -74,15 +74,15 @@ export function RealTimeJobsList({
 
   // Group jobs by month for better organization
   const groupedJobs: Record<string, any[]> = {};
-  
+
   displayedJobs.forEach(job => {
     const date = new Date(job.start_time);
     const monthYear = format(date, 'MMMM yyyy', { locale: es });
-    
+
     if (!groupedJobs[monthYear]) {
       groupedJobs[monthYear] = [];
     }
-    
+
     groupedJobs[monthYear].push(job);
   });
 
@@ -98,8 +98,8 @@ export function RealTimeJobsList({
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-xl">{title}</CardTitle>
           <div className="flex items-center gap-2">
-            <SubscriptionIndicator 
-              tables={['jobs', 'job_assignments', 'job_departments']} 
+            <SubscriptionIndicator
+              tables={['jobs', 'job_assignments', 'job_departments']}
               variant="compact"
               showRefreshButton
               onRefresh={refetch}
@@ -116,7 +116,7 @@ export function RealTimeJobsList({
             </Button>
           </div>
         </CardHeader>
-        
+
         <div className="px-6 pb-2">
           <Tabs value={timeFilter} onValueChange={(v) => setTimeFilter(v as "upcoming" | "past" | "all")}>
             <TabsList className="grid w-full grid-cols-3">
@@ -126,7 +126,7 @@ export function RealTimeJobsList({
             </TabsList>
           </Tabs>
         </div>
-        
+
         <CardContent>
           {isLoading ? (
             <div className="space-y-4">
@@ -151,7 +151,7 @@ export function RealTimeJobsList({
                   </h3>
                   <div className="space-y-3">
                     {monthJobs.map(job => (
-                      <JobCardNew 
+                      <JobCardNew
                         key={job.id}
                         job={job}
                         onJobClick={() => onJobClick && onJobClick(job.id)}
@@ -163,7 +163,7 @@ export function RealTimeJobsList({
                   </div>
                 </div>
               ))}
-              
+
               {limit && totalMatchingJobs > limit && showAllButton && (
                 <div className="flex justify-center pt-2">
                   <Button variant="outline" size="sm">View All Jobs</Button>
