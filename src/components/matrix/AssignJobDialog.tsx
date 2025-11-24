@@ -392,8 +392,7 @@ export const AssignJobDialog = ({
           technicianId,
           dateIso,
           present: true,
-          source: 'assignment-dialog',
-          status: assignAsConfirmed ? 'confirmed' : 'invited',
+          source: 'assignment-dialog'
         });
       }
 
