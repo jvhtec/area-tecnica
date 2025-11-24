@@ -402,53 +402,40 @@ serve(async (req) => {
                 upsertPayload.single_day = false;
                 upsertPayload.assignment_date = null;
               }
-              const onConflictKeys = targetDate ? 'job_id,technician_id,assignment_date' : 'job_id,technician_id';
+              // Use explicit update-then-insert logic instead of .upsert()
+              // This is necessary because partial unique indexes require WHERE clauses
+              // in ON CONFLICT, which the Supabase JS client doesn't support
               let upsertErr: any = null;
               let upsertAttemptSummary: string | null = null;
 
-              const attemptUpsert = async () => {
-                const { error } = await supabase
+              try {
+                const updateQuery = supabase
                   .from('job_assignments')
-                  .upsert(upsertPayload, { onConflict: onConflictKeys });
-                return error;
-              };
-
-              // Attempt upsert using the appropriate unique index
-              upsertErr = await attemptUpsert();
-              if (!upsertErr) {
-                upsertAttemptSummary = targetDate ? 'direct-upsert-per-day' : 'direct-upsert-whole-job';
-              } else if (upsertErr?.code === '42P10') {
-                // Fallback for environments where partial-unique indexes aren't applied yet.
-                // Emulate upsert with update-then-insert to avoid hard failure.
-                try {
-                  const updateQuery = supabase
+                  .update(upsertPayload)
+                  .eq('job_id', row.job_id)
+                  .eq('technician_id', row.profile_id);
+                const updateExec = targetDate
+                  ? updateQuery.eq('single_day', true).eq('assignment_date', targetDate)
+                  : updateQuery.eq('single_day', false).is('assignment_date', null);
+                const { data: updRows, error: updErr } = await updateExec.select('id');
+                if (!updErr && Array.isArray(updRows) && updRows.length > 0) {
+                  upsertErr = null;
+                  upsertAttemptSummary = targetDate ? 'update-per-day' : 'update-whole-job';
+                } else {
+                  const { error: insErr } = await supabase
                     .from('job_assignments')
-                    .update(upsertPayload)
-                    .eq('job_id', row.job_id)
-                    .eq('technician_id', row.profile_id);
-                  const updateExec = targetDate
-                    ? updateQuery.eq('single_day', true).eq('assignment_date', targetDate)
-                    : updateQuery.eq('single_day', false).is('assignment_date', null);
-                  const { data: updRows, error: updErr } = await updateExec.select('id');
-                  if (!updErr && Array.isArray(updRows) && updRows.length > 0) {
+                    .insert(upsertPayload);
+                  if (!insErr) {
                     upsertErr = null;
-                    upsertAttemptSummary = targetDate ? 'fallback-update-per-day' : 'fallback-update-whole-job';
+                    upsertAttemptSummary = targetDate ? 'insert-per-day' : 'insert-whole-job';
                   } else {
-                    const { error: insErr } = await supabase
-                      .from('job_assignments')
-                      .insert(upsertPayload);
-                    if (!insErr) {
-                      upsertErr = null;
-                      upsertAttemptSummary = targetDate ? 'fallback-insert-per-day' : 'fallback-insert-whole-job';
-                    } else {
-                      upsertAttemptSummary = 'fallback-insert-failed';
-                      upsertErr = insErr;
-                    }
+                    upsertAttemptSummary = 'insert-failed';
+                    upsertErr = insErr;
                   }
-                } catch (fbErr) {
-                  upsertAttemptSummary = 'fallback-exception';
-                  upsertErr = fbErr;
                 }
+              } catch (fbErr) {
+                upsertAttemptSummary = 'exception';
+                upsertErr = fbErr;
               }
 
               if (upsertErr) {
@@ -456,11 +443,10 @@ serve(async (req) => {
                   job_id: row.job_id,
                   technician_id: row.profile_id,
                   targetDate,
-                  onConflictKeys,
                   attemptSummary: upsertAttemptSummary,
                   error: upsertErr,
                 });
-                await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_error', meta: { message: upsertErr.message, target_date: targetDate, on_conflict: onConflictKeys, attempt: upsertAttemptSummary } });
+                await supabase.from('staffing_events').insert({ staffing_request_id: rid, event: 'auto_assign_upsert_error', meta: { message: upsertErr.message, target_date: targetDate, attempt: upsertAttemptSummary } });
               } else {
                 const { data: assignmentProbe, error: probeErr } = await supabase
                   .from('job_assignments')
@@ -471,11 +457,10 @@ serve(async (req) => {
                 if (probeErr) {
                   console.warn('⚠️ Unable to verify job_assignments after upsert', { job_id: row.job_id, technician_id: row.profile_id, error: probeErr });
                 } else {
-                  console.log('✅ job_assignments per-day verification', {
+                  console.log('✅ job_assignments verification', {
                     job_id: row.job_id,
                     technician_id: row.profile_id,
                     targetDate,
-                    onConflictKeys,
                     attemptSummary: upsertAttemptSummary,
                     assignmentDates: (assignmentProbe || []).map(a => ({ id: a.id, assignment_date: a.assignment_date, status: a.status })),
                   });
