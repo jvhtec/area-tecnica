@@ -435,19 +435,26 @@ serve(async (req) => {
     }
 
     if (path.endsWith("/preset-config")) {
-      // Return preset configuration for the given slug
-      if (!presetSlug) {
-        return new Response(JSON.stringify({ error: "No preset slug provided" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders() },
-        });
-      }
+      // Return preset configuration for the given slug, with fallback to "default"
+      const requestedSlug = presetSlug || "default";
 
-      const { data, error } = await sb
+      let { data, error } = await sb
         .from("wallboard_presets")
         .select("panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds")
-        .eq("slug", presetSlug)
+        .eq("slug", requestedSlug)
         .maybeSingle();
+
+      // If preset not found and we weren't already looking for "default", try "default"
+      if (!data && !error && requestedSlug !== "default") {
+        console.log(`Preset "${requestedSlug}" not found, falling back to "default"`);
+        const fallbackResult = await sb
+          .from("wallboard_presets")
+          .select("panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds")
+          .eq("slug", "default")
+          .maybeSingle();
+        data = fallbackResult.data;
+        error = fallbackResult.error;
+      }
 
       if (error) {
         return new Response(JSON.stringify({ error: error.message }), {
@@ -457,13 +464,23 @@ serve(async (req) => {
       }
 
       if (!data) {
-        return new Response(JSON.stringify({ error: "Preset not found", slug: presetSlug }), {
-          status: 404,
+        // Return sensible defaults if no preset exists at all
+        return new Response(JSON.stringify({
+          config: {
+            panel_order: ["overview", "crew", "logistics", "pending", "calendar"],
+            panel_durations: { overview: 12, crew: 12, logistics: 12, pending: 12, calendar: 12 },
+            rotation_fallback_seconds: 12,
+            highlight_ttl_seconds: 300,
+            ticker_poll_interval_seconds: 20,
+          },
+          slug: requestedSlug,
+          fallback: true,
+        }), {
           headers: { "Content-Type": "application/json", ...corsHeaders() },
         });
       }
 
-      return new Response(JSON.stringify({ config: data, slug: presetSlug }), {
+      return new Response(JSON.stringify({ config: data, slug: requestedSlug }), {
         headers: { "Content-Type": "application/json", ...corsHeaders() },
       });
     }
