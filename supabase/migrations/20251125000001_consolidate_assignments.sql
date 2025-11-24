@@ -3,6 +3,10 @@
 
 BEGIN;
 
+-- Drop partial unique indexes first to avoid conflicts during consolidation
+DROP INDEX IF EXISTS job_assignments_whole_job_unique;
+DROP INDEX IF EXISTS job_assignments_single_day_unique;
+
 -- For each job+technician pair with multiple assignments,
 -- keep one record with the best metadata and clear single_day/assignment_date
 CREATE TEMP TABLE consolidated_assignments AS
