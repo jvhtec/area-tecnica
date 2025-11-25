@@ -76,7 +76,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
             if (error) throw error;
         },
         onSuccess: () => {
-            toast.success('Fechas marcadas como no disponible');
+            toast.success('Fechas marcadas como no disponibles');
             queryClient.invalidateQueries({ queryKey: ['my-unavailability'] });
             setShowAddSheet(false);
             setStartDate('');
@@ -230,7 +230,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
             <Sheet open={showAddSheet} onOpenChange={setShowAddSheet}>
                 <SheetContent side="bottom" className={`rounded-t-2xl ${isDark ? 'bg-[#0f1219]' : 'bg-white'}`}>
                     <SheetHeader className="mb-6">
-                        <SheetTitle className={theme.textMain}>Marcar no disponibilidad</SheetTitle>
+                        <SheetTitle className={theme.textMain}>Marcar no disponible</SheetTitle>
                     </SheetHeader>
                     <div className="space-y-4">
                         <div>
