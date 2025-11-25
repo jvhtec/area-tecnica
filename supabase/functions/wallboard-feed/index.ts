@@ -493,7 +493,7 @@ serve(async (req) => {
       // Fetch logistics events
       const { data: events, error: eventsError } = await sb
         .from("logistics_events")
-        .select("id, event_date, event_time, title, transport_type, license_plate, job_id, event_type, loading_bay, color, logistics_event_departments(department)")
+        .select("id, event_date, event_time, title, transport_type, transport_provider, license_plate, job_id, event_type, loading_bay, color, notes, logistics_event_departments(department)")
         .gte("event_date", startDate)
         .lte("event_date", endDate)
         .order("event_date", { ascending: true })
@@ -525,12 +525,14 @@ serve(async (req) => {
           time: e.event_time,
           title: e.title || titlesByJob.get(e.job_id) || "Logistics",
           transport_type: e.transport_type ?? null,
+          transport_provider: e.transport_provider ?? null,
           plate: e.license_plate ?? null,
           job_title: titlesByJob.get(e.job_id) || null,
           procedure: e.event_type ?? null,
           loadingBay: e.loading_bay ?? null,
           departments,
           color: e.color ?? null,
+          notes: e.notes ?? null,
         };
       });
 
@@ -584,12 +586,14 @@ serve(async (req) => {
             time: pickupParts.time,
             title: j.title || "Dry Hire",
             transport_type: "recogida cliente",
+            transport_provider: null,
             plate: null,
             job_title: j.title || null,
             procedure: "load",
             loadingBay: null,
             departments: [],
             color: null,
+            notes: null,
           });
         }
 
@@ -602,12 +606,14 @@ serve(async (req) => {
               time: returnParts.time,
               title: j.title || "Dry Hire",
               transport_type: "devolución cliente",
+              transport_provider: null,
               plate: null,
               job_title: j.title || null,
               procedure: "unload",
               loadingBay: null,
               departments: [],
               color: null,
+              notes: null,
             });
           }
         }
