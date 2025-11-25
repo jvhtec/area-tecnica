@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Package, PackageCheck, Truck } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
 
 interface LogisticsEventCardProps {
   event: any;
@@ -91,6 +92,21 @@ export const LogisticsEventCard = ({
               <Truck className="h-3 w-3" />
               <span className="capitalize">{event.transport_type}</span>
             </Badge>
+            {event.transport_provider && TRANSPORT_PROVIDERS[event.transport_provider] && (
+              <Badge variant="outline" className="flex items-center gap-2">
+                {TRANSPORT_PROVIDERS[event.transport_provider].icon && (
+                  <img
+                    src={TRANSPORT_PROVIDERS[event.transport_provider].icon}
+                    alt=""
+                    className="w-6 h-6 object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                )}
+                <span>{TRANSPORT_PROVIDERS[event.transport_provider].label}</span>
+              </Badge>
+            )}
           </div>
 
           <h3 className="font-medium mt-2">{getDisplayName()}</h3>
