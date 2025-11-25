@@ -7,5 +7,6 @@
   "largeIcon": "icon.png",
   "version": "1.0.0",
   "vendor": "Sector-Pro",
-  "resolution": "1920x1080"
+  "resolution": "1920x1080",
+  "bootLaunch": true
 }

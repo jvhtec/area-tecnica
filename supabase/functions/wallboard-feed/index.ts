@@ -400,13 +400,17 @@ serve(async (req) => {
 
     if (path.endsWith("/preset-config")) {
       // Return preset configuration for the given slug
+      console.log("📋 [preset-config] Request received", { presetSlug, authMethod: auth.method });
+      
       if (!presetSlug) {
+        console.error("❌ [preset-config] No preset slug provided");
         return new Response(JSON.stringify({ error: "No preset slug provided" }), {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders() },
         });
       }
 
+      console.log("🔍 [preset-config] Querying database for slug:", presetSlug);
       const { data, error } = await sb
         .from("wallboard_presets")
         .select("panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds")
@@ -414,6 +418,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (error) {
+        console.error("❌ [preset-config] Database error:", error);
         return new Response(JSON.stringify({ error: error.message }), {
           status: 500,
           headers: { "Content-Type": "application/json", ...corsHeaders() },
@@ -421,12 +426,14 @@ serve(async (req) => {
       }
 
       if (!data) {
+        console.error("❌ [preset-config] Preset not found in database:", presetSlug);
         return new Response(JSON.stringify({ error: "Preset not found", slug: presetSlug }), {
           status: 404,
           headers: { "Content-Type": "application/json", ...corsHeaders() },
         });
       }
 
+      console.log("✅ [preset-config] Preset found and returning:", { slug: presetSlug, panelOrder: data.panel_order });
       return new Response(JSON.stringify({ config: data, slug: presetSlug }), {
         headers: { "Content-Type": "application/json", ...corsHeaders() },
       });
