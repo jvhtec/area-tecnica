@@ -30,6 +30,7 @@ import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
+import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
 
 // Available departments
 const departments: Department[] = [
@@ -82,6 +83,7 @@ export const LogisticsEventDialog = ({
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [customTitle, setCustomTitle] = useState("");
   const [licensePlate, setLicensePlate] = useState("");
+  const [transportProvider, setTransportProvider] = useState<string | null>(null);
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [color, setColor] = useState("#7E69AB");
@@ -107,6 +109,7 @@ export const LogisticsEventDialog = ({
       setSelectedJob(selectedEvent.job_id || null);
       setCustomTitle(selectedEvent.title || "");
       setLicensePlate(selectedEvent.license_plate || "");
+      setTransportProvider((selectedEvent as any).transport_provider || null);
       setSelectedDepartments((selectedEvent.departments || []).map((d) => d.department));
       setColor(selectedEvent.color || "#7E69AB");
     } else {
@@ -118,6 +121,7 @@ export const LogisticsEventDialog = ({
       setSelectedJob(initialJobId || null);
       setCustomTitle("");
       setLicensePlate("");
+      setTransportProvider(null);
       setSelectedDepartments(initialDepartments || []);
       setColor("#7E69AB");
     }
@@ -257,6 +261,7 @@ export const LogisticsEventDialog = ({
       const eventData = {
         event_type: eventType,
         transport_type: transportType,
+        transport_provider: transportProvider || null,
         event_date: date,
         event_time: time,
         loading_bay: loadingBay || null,
@@ -550,6 +555,26 @@ export const LogisticsEventDialog = ({
                 onChange={(e) => setLicensePlate(e.target.value)}
                 placeholder="Introduce matrícula (opcional)"
               />
+            </div>
+
+            {/* Transport Provider */}
+            <div className="space-y-2">
+              <Label>Transport Provider</Label>
+              <Select
+                value={transportProvider || ""}
+                onValueChange={(value) => setTransportProvider(value || null)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select provider..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(TRANSPORT_PROVIDERS).map(([key, { label }]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Departments */}
