@@ -1,6 +1,6 @@
 
 import { Badge } from "@/components/ui/badge";
-import { Package, PackageCheck, Truck } from "lucide-react";
+import { Package, PackageCheck, Truck, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
@@ -131,6 +131,13 @@ export const LogisticsEventCard = ({
           {event.loading_bay && (
             <div className="text-sm text-muted-foreground mt-2">
               Muelle: {event.loading_bay}
+            </div>
+          )}
+
+          {event.notes && (
+            <div className="text-sm text-muted-foreground flex items-start gap-1.5 mt-2">
+              <MessageSquare className="w-4 h-4 shrink-0 mt-0.5" />
+              <span className="line-clamp-2">{event.notes}</span>
             </div>
           )}
         </>
