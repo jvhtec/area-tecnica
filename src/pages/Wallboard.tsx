@@ -1137,6 +1137,26 @@ function WallboardDisplay({
         hasApiToken: !!wallboardApiToken
       });
 
+      // HARDCODED: For produccion preset in API mode, skip fetch and use calendar-only config
+      if (isApiMode && isProduccionPreset) {
+        console.log('🎯 [Wallboard] Using hardcoded produccion config (calendar-only)');
+        setPanelOrder(['calendar']);
+        setPanelDurations({
+          overview: 12,
+          crew: 12,
+          logistics: 12,
+          pending: 12,
+          calendar: 600,
+        });
+        setRotationFallbackSeconds(600);
+        setHighlightTtlMs(300 * 1000);
+        setTickerIntervalMs(20 * 1000);
+        setPresetMessage(null);
+        setHighlightJobs(new Map());
+        setIdx(0);
+        return;
+      }
+
       // For API mode (public wallboards), fetch config via API
       if (isApiMode) {
         try {
