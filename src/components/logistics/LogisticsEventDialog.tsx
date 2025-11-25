@@ -427,7 +427,7 @@ export const LogisticsEventDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {selectedEvent ? "Editar evento de logística" : "Crear evento de logística"}
