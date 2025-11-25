@@ -56,8 +56,19 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
             const s = new Date(payload.startDate + 'T00:00');
             const e = new Date(payload.endDate + 'T00:00');
             if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) throw new Error('Invalid date range');
+
+            // Use Spain timezone to avoid date shifting bugs
+            // E.g., selecting 2025-01-15 should store as 2025-01-15, not shift to 2025-01-14
+            const spanishDateFormatter = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Europe/Madrid',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+
             for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
-                rows.push({ technician_id: user.id, date: d.toISOString().slice(0, 10), status: 'day_off' });
+                const dateStr = spanishDateFormatter.format(d);
+                rows.push({ technician_id: user.id, date: dateStr, status: 'day_off' });
             }
             const { error } = await supabase
                 .from('technician_availability')
@@ -99,8 +110,10 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
     // Check if a day has unavailability
+    // Use string comparison to avoid timezone issues when comparing dates
     const getUnavailabilityForDay = (day: Date) => {
-        return blocks.find(b => isSameDay(new Date(b.date), day));
+        const dayStr = format(day, 'yyyy-MM-dd');
+        return blocks.find(b => b.date === dayStr);
     };
 
     const statusStyles: Record<string, string> = {
