@@ -57,12 +57,14 @@ export interface LogisticsItem {
   time: string;
   title: string;
   transport_type: string | null;
+  transport_provider: string | null; // NEW
   plate: string | null;
   job_title?: string | null;
   procedure: string | null;
   loadingBay: string | null;
   departments: string[];
   color?: string | null;
+  notes?: string | null; // NEW
 }
 
 export interface LogisticsFeed {
