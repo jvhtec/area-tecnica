@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/lib/supabase";
@@ -84,6 +85,7 @@ export const LogisticsEventDialog = ({
   const [customTitle, setCustomTitle] = useState("");
   const [licensePlate, setLicensePlate] = useState("");
   const [transportProvider, setTransportProvider] = useState<string | null>(null);
+  const [notes, setNotes] = useState<string>("");
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [color, setColor] = useState("#7E69AB");
@@ -110,6 +112,7 @@ export const LogisticsEventDialog = ({
       setCustomTitle(selectedEvent.title || "");
       setLicensePlate(selectedEvent.license_plate || "");
       setTransportProvider((selectedEvent as any).transport_provider || null);
+      setNotes((selectedEvent as any).notes || "");
       setSelectedDepartments((selectedEvent.departments || []).map((d) => d.department));
       setColor(selectedEvent.color || "#7E69AB");
     } else {
@@ -122,6 +125,7 @@ export const LogisticsEventDialog = ({
       setCustomTitle("");
       setLicensePlate("");
       setTransportProvider(null);
+      setNotes("");
       setSelectedDepartments(initialDepartments || []);
       setColor("#7E69AB");
     }
@@ -262,6 +266,7 @@ export const LogisticsEventDialog = ({
         event_type: eventType,
         transport_type: transportType,
         transport_provider: transportProvider || null,
+        notes: notes || null,
         event_date: date,
         event_time: time,
         loading_bay: loadingBay || null,
@@ -608,6 +613,21 @@ export const LogisticsEventDialog = ({
                 onChange={(e) => setLoadingBay(e.target.value)}
                 placeholder="Opcional"
               />
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Additional notes or instructions..."
+                className="resize-none"
+                maxLength={500}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+              <div className="text-xs text-muted-foreground">
+                {notes.length} / 500 characters
+              </div>
             </div>
 
             {/* Submit & Delete Buttons */}
