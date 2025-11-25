@@ -7,6 +7,7 @@ import { Plane, Wrench, Star, Moon, Mic } from 'lucide-react';
 import SplashScreen from '@/components/SplashScreen';
 import { WallboardApi, WallboardApiError } from '@/lib/wallboard-api';
 import { useLgScreensaverBlock } from '@/hooks/useLgScreensaverBlock';
+import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -53,12 +54,14 @@ interface LogisticsItem {
   time: string;
   title: string;
   transport_type: string | null;
+  transport_provider?: string | null;
   plate: string | null;
   job_title?: string | null;
   procedure: string | null;
   loadingBay: string | null;
   departments: string[];
   color?: string | null;
+  notes?: string | null;
 }
 
 const PanelContainer: React.FC<{ children: React.ReactNode; theme?: 'light' | 'dark' }> = ({ children, theme = 'light' }) => (
@@ -2175,6 +2178,23 @@ const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null; page?: number; pa
                     {ev.loadingBay && <span className={theme === 'light' ? 'text-zinc-600' : 'text-zinc-300'}>Bay {ev.loadingBay}</span>}
                     {ev.plate && <span className={theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}>Plate {ev.plate}</span>}
                   </div>
+                  {ev.transport_provider && TRANSPORT_PROVIDERS[ev.transport_provider] && (
+                    <div className="flex items-center gap-2 mt-2">
+                      {TRANSPORT_PROVIDERS[ev.transport_provider].icon && (
+                        <img
+                          src={TRANSPORT_PROVIDERS[ev.transport_provider].icon}
+                          alt=""
+                          className="w-8 h-8 object-contain"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      )}
+                      <span className="text-sm font-medium">
+                        {TRANSPORT_PROVIDERS[ev.transport_provider].label}
+                      </span>
+                    </div>
+                  )}
                   {ev.departments.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {ev.departments.map(dep => (
@@ -2182,6 +2202,11 @@ const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null; page?: number; pa
                           {dep}
                         </span>
                       ))}
+                    </div>
+                  )}
+                  {ev.notes && (
+                    <div className="text-sm opacity-80 line-clamp-1 mt-1">
+                      {ev.notes}
                     </div>
                   )}
                 </div>
