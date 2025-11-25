@@ -381,6 +381,7 @@ serve(async (req) => {
 
           // 5) Check for conflicts before auto-assigning
           const targetDate = (row as any).target_date ?? null;
+          const isSingleDay = (row as any).single_day ?? false;
           const conflictCheck = detectConflictForAssignment({
             targetDate,
             existingAssignmentWindows,
@@ -410,19 +411,28 @@ serve(async (req) => {
               job_id: row.job_id,
               technician_id: row.profile_id,
               batch_id: (row as any)?.batch_id || null,
+              single_day: isSingleDay,
+              assignment_date: targetDate,
             });
 
-          const { error: assignUpsertErr } = await supabase
-            .from('job_assignments')
-            .upsert({
+            // Prepare assignment upsert object
+            // NOTE: single_day and assignment_date are deprecated but still included for backwards compatibility
+            // as the matrix still reads these fields. They should eventually be removed once matrix is fully migrated.
+            const assignmentData: any = {
               job_id: row.job_id,
               technician_id: row.profile_id,
               status: 'confirmed',
               assigned_at: new Date().toISOString(),
               assignment_source: 'staffing',
               response_time: new Date().toISOString(),
+              single_day: isSingleDay,
+              assignment_date: isSingleDay && targetDate ? targetDate : null,
               ...rolePatch
-            }, { onConflict: 'job_id,technician_id' });
+            };
+
+          const { error: assignUpsertErr } = await supabase
+            .from('job_assignments')
+            .upsert(assignmentData, { onConflict: 'job_id,technician_id' });
 
           if (assignUpsertErr) {
             console.error('❌ job_assignments upsert failed', assignUpsertErr);
@@ -504,11 +514,22 @@ serve(async (req) => {
                   const jobStart = new Date(job.start_time);
                   const jobEnd = new Date(job.end_time);
 
+                  // Use Spain timezone (Europe/Madrid) to avoid timezone bugs
+                  // E.g., a job at 00:00 CET should create a timesheet for that day, not the previous day
+                  const spanishDateFormatter = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'Europe/Madrid',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                  });
+
                   for (let d = new Date(jobStart); d <= jobEnd; d.setDate(d.getDate() + 1)) {
+                    // Format date in Spanish timezone (en-CA gives YYYY-MM-DD format)
+                    const dateStr = spanishDateFormatter.format(d);
                     timesheetRows.push({
                       job_id: row.job_id,
                       technician_id: row.profile_id,
-                      date: d.toISOString().split('T')[0],
+                      date: dateStr,
                       is_schedule_only: isScheduleOnly,
                       source: 'staffing'
                     });

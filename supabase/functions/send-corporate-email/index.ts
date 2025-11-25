@@ -595,9 +595,10 @@ serve(async (req) => {
       subject: body.subject,
     });
 
-    // Step 9 & 10: Send via Brevo in batches so invalid batches don't block others
+    // Step 9 & 10: Send via Brevo in batches using BCC to hide recipient emails from each other
+    // IMPORTANT: Using BCC ensures privacy - recipients cannot see other recipients' email addresses
     console.log(
-      `[send-corporate-email] Sending ${validRecipients.length} recipients via Brevo in batches of ${BREVO_MAX_BATCH_SIZE}...`
+      `[send-corporate-email] Sending ${validRecipients.length} recipients via Brevo in batches of ${BREVO_MAX_BATCH_SIZE} using BCC for privacy...`
     );
     const recipientStatuses: RecipientStatus[] = [...invalidRecipientStatuses];
     const deliveredRecipients: string[] = [];
@@ -610,7 +611,10 @@ serve(async (req) => {
     for (const batch of recipientBatches) {
       const emailPayload: Record<string, unknown> = {
         sender: { email: BREVO_FROM, name: senderName },
-        to: batch.map((email) => ({ email })),
+        // Use sender as the visible "to" recipient and put all actual recipients in BCC
+        // This hides all recipient emails from each other for privacy
+        to: [{ email: BREVO_FROM }],
+        bcc: batch.map((email) => ({ email })),
         subject: body.subject,
         htmlContent,
       };

@@ -56,8 +56,19 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
             const s = new Date(payload.startDate + 'T00:00');
             const e = new Date(payload.endDate + 'T00:00');
             if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) throw new Error('Invalid date range');
+
+            // Use Spain timezone to avoid date shifting bugs
+            // E.g., selecting 2025-01-15 should store as 2025-01-15, not shift to 2025-01-14
+            const spanishDateFormatter = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Europe/Madrid',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+
             for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
-                rows.push({ technician_id: user.id, date: d.toISOString().slice(0, 10), status: 'day_off' });
+                const dateStr = spanishDateFormatter.format(d);
+                rows.push({ technician_id: user.id, date: dateStr, status: 'day_off' });
             }
             const { error } = await supabase
                 .from('technician_availability')
@@ -65,7 +76,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
             if (error) throw error;
         },
         onSuccess: () => {
-            toast.success('Bloqueo creado');
+            toast.success('Fechas marcadas como no disponibles');
             queryClient.invalidateQueries({ queryKey: ['my-unavailability'] });
             setShowAddSheet(false);
             setStartDate('');
@@ -84,7 +95,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
             if (error) throw error;
         },
         onSuccess: () => {
-            toast.success('Bloqueo eliminado');
+            toast.success('Disponibilidad restaurada');
             queryClient.invalidateQueries({ queryKey: ['my-unavailability'] });
         },
         onError: (e: unknown) => {
@@ -99,8 +110,10 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
     // Check if a day has unavailability
+    // Use string comparison to avoid timezone issues when comparing dates
     const getUnavailabilityForDay = (day: Date) => {
-        return blocks.find(b => isSameDay(new Date(b.date), day));
+        const dayStr = format(day, 'yyyy-MM-dd');
+        return blocks.find(b => b.date === dayStr);
     };
 
     const statusStyles: Record<string, string> = {
@@ -117,6 +130,16 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
                 <Button size="sm" onClick={() => setShowAddSheet(true)}>
                     <Plus size={14} className="mr-1" /> Añadir
                 </Button>
+            </div>
+
+            {/* Explanation text */}
+            <div className={`p-4 rounded-xl border ${theme.card} ${theme.textMuted} text-sm`}>
+                <p className="leading-relaxed">
+                    <strong className={theme.textMain}>¿Cómo funciona?</strong><br />
+                    Marca aquí los días en los que <strong>no estás disponible</strong> para trabajar con nosotros.
+                    Esto puede ser por vacaciones, compromisos con otros clientes, o cualquier otro motivo.
+                    Así evitamos enviarte ofertas para fechas en las que no puedes trabajar.
+                </p>
             </div>
 
             {/* Calendar */}
@@ -179,7 +202,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
                                     <div className={`text-sm font-bold ${theme.textMain}`}>
                                         {b.status === 'vacation' ? 'Vacaciones' :
                                             b.status === 'travel' ? 'Viaje' :
-                                                b.status === 'sick' ? 'Baja médica' : 'Día libre'}
+                                                b.status === 'sick' ? 'Baja médica' : 'No disponible'}
                                     </div>
                                     <div className={`text-xs ${theme.textMuted}`}>
                                         {format(new Date(b.date), 'PPP', { locale: es })}
@@ -207,7 +230,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
             <Sheet open={showAddSheet} onOpenChange={setShowAddSheet}>
                 <SheetContent side="bottom" className={`rounded-t-2xl ${isDark ? 'bg-[#0f1219]' : 'bg-white'}`}>
                     <SheetHeader className="mb-6">
-                        <SheetTitle className={theme.textMain}>Añadir bloqueo</SheetTitle>
+                        <SheetTitle className={theme.textMain}>Marcar no disponible</SheetTitle>
                     </SheetHeader>
                     <div className="space-y-4">
                         <div>
@@ -239,7 +262,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
                                     Guardando...
                                 </>
                             ) : (
-                                'Crear bloqueo'
+                                'Marcar no disponible'
                             )}
                         </Button>
                     </div>
