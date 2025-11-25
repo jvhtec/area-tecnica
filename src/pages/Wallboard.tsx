@@ -1760,16 +1760,17 @@ function WallboardDisplay({
 
     const fetchAll = async () => {
       try {
-        const [overviewData, crewData, docData, pendingData, logisticsData] = await Promise.all([
+        const [overviewData, crewData, docData, pendingData, logisticsData, calendarData] = await Promise.all([
           api.jobsOverview(),
           api.crewAssignments(),
           api.docProgress(),
           api.pendingActions(),
           api.logistics(),
+          api.calendar(),
         ]);
         if (cancelled) return;
         setOverview(overviewData);
-        setCalendarData(buildCalendarFromJobsList(overviewData.jobs));
+        setCalendarData(buildCalendarFromJobsList(calendarData.jobs));
         setCrew(crewData);
         setDocs(docData);
         setPending(pendingData);

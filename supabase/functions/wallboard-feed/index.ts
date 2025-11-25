@@ -199,6 +199,82 @@ serve(async (req) => {
       });
     }
 
+    if (path.endsWith("/calendar")) {
+      // Calendar grid: fetch jobs for the entire calendar view (current month + padding)
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const offset = (startOfMonth.getDay() + 6) % 7; // Monday-based week
+      const gridStart = new Date(startOfMonth.getTime() - offset * 24 * 60 * 60 * 1000);
+      const gridEnd = new Date(gridStart.getTime() + 42 * 24 * 60 * 60 * 1000 - 1);
+
+      const { data: jobs, error } = await sb
+        .from("jobs")
+        .select(`
+          id,
+          title,
+          start_time,
+          end_time,
+          job_type,
+          color,
+          locations(id, name),
+          job_departments(department),
+          job_assignments(technician_id, sound_role, lights_role, video_role)
+        `)
+        .in("job_type", ["single", "festival", "tourdate"])
+        .gte("start_time", gridStart.toISOString())
+        .lte("start_time", gridEnd.toISOString())
+        .order("start_time", { ascending: true });
+
+      if (error) throw error;
+
+      const result = {
+        jobs: (jobs ?? []).map((j: any) => {
+          const depts = Array.from(
+            new Set((j.job_departments ?? []).map((d: any) => d.department).filter(Boolean))
+          );
+
+          const crewAssigned = { sound: 0, lights: 0, video: 0, total: 0 } as Record<string, number>;
+          (j.job_assignments ?? []).forEach((a: any) => {
+            if (a.sound_role) crewAssigned.sound++;
+            if (a.lights_role) crewAssigned.lights++;
+            if (a.video_role) crewAssigned.video++;
+          });
+          crewAssigned.total = crewAssigned.sound + crewAssigned.lights + crewAssigned.video;
+
+          const crewNeeded = { sound: 0, lights: 0, video: 0, total: 0 } as Record<string, number>;
+
+          const presentCounts = depts.map((d) => crewAssigned[d as any]);
+          const hasAny = presentCounts.some((n) => n > 0);
+          const allHave = depts.length > 0 && presentCounts.every((n) => n > 0);
+          const status = allHave ? "green" : hasAny ? "yellow" : "red";
+
+          const docs = depts.reduce((acc, d) => {
+            (acc as any)[d] = { have: 0, need: 0 };
+            return acc;
+          }, {} as Record<string, { have: number; need: number }>);
+
+          return {
+            id: j.id,
+            title: j.title,
+            start_time: j.start_time,
+            end_time: j.end_time,
+            job_type: j.job_type,
+            color: j.color,
+            location: { name: j.locations?.[0]?.name ?? j.locations?.name ?? null },
+            departments: depts,
+            crewAssigned: { ...crewAssigned },
+            crewNeeded: { ...crewNeeded },
+            docs,
+            status,
+          };
+        }),
+      } as any;
+
+      return new Response(JSON.stringify({ ...result, presetSlug }), {
+        headers: { "Content-Type": "application/json", ...corsHeaders() },
+      });
+    }
+
     if (path.endsWith("/crew-assignments")) {
       const now = new Date();
       const todayStart = startOfDay(now);

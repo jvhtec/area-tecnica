@@ -145,6 +145,9 @@ export class WallboardApi {
   logistics(): Promise<LogisticsFeed> {
     return this.request('/logistics');
   }
+  calendar(): Promise<JobsOverviewFeed> {
+    return this.request('/calendar');
+  }
   presetConfig(): Promise<PresetConfigFeed> {
     return this.request('/preset-config');
   }
