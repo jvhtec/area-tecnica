@@ -76,36 +76,38 @@ export const LogisticsEventCard = ({
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-2">
-            <Badge
-              variant={event.event_type === 'load' ? 'default' : 'secondary'}
-              className="flex items-center gap-1"
-            >
-              {event.event_type === 'load' ? (
-                <Package className="h-3 w-3" />
-              ) : (
-                <PackageCheck className="h-3 w-3" />
-              )}
-              <span className="capitalize">{event.event_type === 'load' ? 'Carga' : 'Descarga'}</span>
-            </Badge>
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Truck className="h-3 w-3" />
-              <span className="capitalize">{event.transport_type}</span>
-            </Badge>
-            {event.transport_provider && TRANSPORT_PROVIDERS[event.transport_provider] && (
-              <Badge variant="outline" className="flex items-center gap-2">
-                {TRANSPORT_PROVIDERS[event.transport_provider].icon && (
-                  <img
-                    src={TRANSPORT_PROVIDERS[event.transport_provider].icon}
-                    alt=""
-                    className="w-6 h-6 object-contain"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                )}
-                <span>{TRANSPORT_PROVIDERS[event.transport_provider].label}</span>
-              </Badge>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-2 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge
+                  variant={event.event_type === 'load' ? 'default' : 'secondary'}
+                  className="flex items-center gap-1"
+                >
+                  {event.event_type === 'load' ? (
+                    <Package className="h-3 w-3" />
+                  ) : (
+                    <PackageCheck className="h-3 w-3" />
+                  )}
+                  <span className="capitalize">{event.event_type === 'load' ? 'Carga' : 'Descarga'}</span>
+                </Badge>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Truck className="h-3 w-3" />
+                  <span className="capitalize">{event.transport_type}</span>
+                </Badge>
+              </div>
+            </div>
+
+            {event.transport_provider && TRANSPORT_PROVIDERS[event.transport_provider] && TRANSPORT_PROVIDERS[event.transport_provider].icon && (
+              <div className="flex-shrink-0">
+                <img
+                  src={TRANSPORT_PROVIDERS[event.transport_provider].icon}
+                  alt={TRANSPORT_PROVIDERS[event.transport_provider].label}
+                  className="w-24 h-24 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
             )}
           </div>
 

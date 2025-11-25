@@ -19,19 +19,19 @@ export const TRANSPORT_PROVIDERS: Record<
 > = {
   camionaje: {
     label: 'Camionaje',
-    icon: '/Logos/Camionaje.png',
+    icon: '/Logos/Logo-Camionaje.png',
   },
   transluminaria: {
     label: 'Transluminaria',
-    icon: '/Logos/Transluminaria.png',
+    icon: '/Logos/logo_transluminaria.png',
   },
   the_wild_tour: {
     label: 'The Wild Tour',
-    icon: '/Logos/The wild tour.png',
+    icon: '/Logos/wild tour.png',
   },
   pantoja: {
     label: 'Pantoja',
-    icon: '/Logos/Paantoja.png',
+    icon: '/Logos/Logo-pantoja.png',
   },
   crespo: {
     label: 'Crespo',
@@ -43,15 +43,15 @@ export const TRANSPORT_PROVIDERS: Record<
   },
   grupo_sese: {
     label: 'Grupo Sesé',
-    icon: '/Logos/Grupo Sese.png',
+    icon: '/Logos/Logo_Sese60_blanco_RGB.png',
   },
   nacex: {
     label: 'Nacex',
-    icon: '/Logos/Nacex.png',
+    icon: '/Logos/logo-nacex-grande-20-aniversario1.png',
   },
   sector_pro: {
     label: 'Sector-Pro',
-    icon: '/Logos/sector pro.png',
+    icon: '/Logos/sector pro logo.png',
   },
   recogida_cliente: {
     label: 'Recogida Cliente',
