@@ -3881,6 +3881,7 @@ export type Database = {
           notes: string | null
           timezone: string | null
           title: string | null
+          transport_provider: Database["public"]["Enums"]["transport_provider_enum"] | null
           transport_type: Database["public"]["Enums"]["transport_type"]
           updated_at: string | null
         }
@@ -3897,6 +3898,7 @@ export type Database = {
           notes?: string | null
           timezone?: string | null
           title?: string | null
+          transport_provider?: Database["public"]["Enums"]["transport_provider_enum"] | null
           transport_type: Database["public"]["Enums"]["transport_type"]
           updated_at?: string | null
         }
@@ -3913,6 +3915,7 @@ export type Database = {
           notes?: string | null
           timezone?: string | null
           title?: string | null
+          transport_provider?: Database["public"]["Enums"]["transport_provider_enum"] | null
           transport_type?: Database["public"]["Enums"]["transport_type"]
           updated_at?: string | null
         }
@@ -8138,6 +8141,7 @@ export type Database = {
       task_status: "not_started" | "in_progress" | "completed"
       timesheet_status: "draft" | "submitted" | "approved"
       tour_date_type: "show" | "rehearsal" | "travel"
+      transport_provider_enum: "camionaje" | "transluminaria" | "the_wild_tour" | "pantoja" | "crespo" | "montabi_dorado" | "grupo_sese" | "nacex" | "sector_pro" | "recogida_cliente"
       transport_type: "trailer" | "9m" | "8m" | "6m" | "4m" | "furgoneta" | "rv"
       transportation_type: "van" | "sleeper_bus" | "train" | "plane" | "rv"
       user_role:
@@ -8355,6 +8359,7 @@ export const Constants = {
       task_status: ["not_started", "in_progress", "completed"],
       timesheet_status: ["draft", "submitted", "approved"],
       tour_date_type: ["show", "rehearsal", "travel"],
+      transport_provider_enum: ["camionaje", "transluminaria", "the_wild_tour", "pantoja", "crespo", "montabi_dorado", "grupo_sese", "nacex", "sector_pro", "recogida_cliente"],
       transport_type: ["trailer", "9m", "8m", "6m", "4m", "furgoneta", "rv"],
       transportation_type: ["van", "sleeper_bus", "train", "plane", "rv"],
       user_role: [
