@@ -15,6 +15,23 @@ function b64uToU8(b64u: string) {
   return new Uint8Array([...bin].map(c => c.charCodeAt(0)));
 }
 
+function normalizeTargetDate(targetDate: string | Date | null | undefined): string | null {
+  if (!targetDate) return null;
+
+  if (typeof targetDate === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) return targetDate;
+    const parsed = new Date(targetDate);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+    return null;
+  }
+
+  if (targetDate instanceof Date && !Number.isNaN(targetDate.getTime())) {
+    return targetDate.toISOString().split('T')[0];
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   // 🔍 EARLY REQUEST LOGGING - Log all incoming requests for debugging
   console.log('📥 INCOMING REQUEST:', {
@@ -380,7 +397,7 @@ serve(async (req) => {
           else if (prof.department === 'video') rolePatch['video_role'] = chosenRole;
 
           // 5) Check for conflicts before auto-assigning
-          const targetDate = (row as any).target_date ?? null;
+          const targetDate = normalizeTargetDate((row as any).target_date) ?? null;
           const conflictCheck = detectConflictForAssignment({
             targetDate,
             existingAssignmentWindows,
@@ -475,19 +492,28 @@ serve(async (req) => {
                 }
 
                 for (const br of (batchRows || [])) {
-                  if (br.target_date && typeof br.target_date === 'string') {
+                  const normalizedDate = normalizeTargetDate(br.target_date as any);
+
+                  if (normalizedDate) {
                     timesheetRows.push({
                       job_id: row.job_id,
                       technician_id: row.profile_id,
-                      date: br.target_date,
+                      date: normalizedDate,
                       is_schedule_only: isScheduleOnly,
                       source: 'staffing'
+                    });
+                  } else {
+                    console.warn('⚠️ Skipping batch timesheet with invalid target_date', {
+                      batch_id: (row as any).batch_id,
+                      job_id: row.job_id,
+                      profile_id: row.profile_id,
+                      target_date: br.target_date
                     });
                   }
                 }
               } else {
                 // Single request: check if it's for a specific date or whole job
-                const targetDate = (row as any).target_date;
+                const targetDate = normalizeTargetDate((row as any).target_date);
                 const isSingleDay = (row as any).single_day;
 
                 if (isSingleDay && targetDate) {
@@ -498,6 +524,12 @@ serve(async (req) => {
                     date: targetDate,
                     is_schedule_only: isScheduleOnly,
                     source: 'staffing'
+                  });
+                } else if (isSingleDay && !targetDate) {
+                  console.warn('⚠️ Missing or invalid target_date for single-day confirmation', {
+                    rid,
+                    job_id: row.job_id,
+                    profile_id: row.profile_id,
                   });
                 } else if (job?.start_time && job?.end_time) {
                   // Whole job confirmation - create timesheets for all days
