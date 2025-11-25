@@ -385,6 +385,148 @@ serve(async (req) => {
       });
     }
 
+    if (path.endsWith("/logistics")) {
+      // Return logistics events for the next 7 days
+      const now = new Date();
+      const todayStart = startOfDay(now);
+      const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const startDate = todayStart.toISOString().slice(0, 10);
+      const endDate = weekEnd.toISOString().slice(0, 10);
+
+      // Fetch logistics events
+      const { data: events, error: eventsError } = await sb
+        .from("logistics_events")
+        .select("id, event_date, event_time, title, transport_type, license_plate, job_id, event_type, loading_bay, color, logistics_event_departments(department)")
+        .gte("event_date", startDate)
+        .lte("event_date", endDate)
+        .order("event_date", { ascending: true })
+        .order("event_time", { ascending: true });
+
+      if (eventsError) throw eventsError;
+
+      const evts = events ?? [];
+      const evtJobIds = Array.from(new Set(evts.map((e: any) => e.job_id).filter(Boolean)));
+      const titlesByJob = new Map<string, string>();
+
+      // Fetch job titles for events that reference jobs
+      if (evtJobIds.length > 0) {
+        const { data: jobs } = await sb
+          .from("jobs")
+          .select("id, title")
+          .in("id", evtJobIds);
+        (jobs ?? []).forEach((j: any) => titlesByJob.set(j.id, j.title));
+      }
+
+      // Map logistics events to the expected format
+      const logisticsItemsBase = evts.map((e: any) => {
+        const departments = Array.isArray(e.logistics_event_departments)
+          ? e.logistics_event_departments.map((dep: any) => dep?.department).filter(Boolean)
+          : [];
+        return {
+          id: e.id,
+          date: e.event_date,
+          time: e.event_time,
+          title: e.title || titlesByJob.get(e.job_id) || "Logistics",
+          transport_type: e.transport_type ?? null,
+          plate: e.license_plate ?? null,
+          job_title: titlesByJob.get(e.job_id) || null,
+          procedure: e.event_type ?? null,
+          loadingBay: e.loading_bay ?? null,
+          departments,
+          color: e.color ?? null,
+        };
+      });
+
+      // Fetch confirmed dry-hire jobs for client pickups/returns
+      const { data: dryHireJobs } = await sb
+        .from("jobs")
+        .select("id, title, start_time, end_time, job_type, status, timezone")
+        .eq("job_type", "dryhire")
+        .eq("status", "Confirmado")
+        .gte("start_time", startDate)
+        .lte("start_time", weekEnd.toISOString());
+
+      const toTZParts = (iso: string, tz?: string): { date: string; time: string } => {
+        try {
+          const d = new Date(iso);
+          const zone = tz || "Europe/Madrid";
+          const dateFmt = new Intl.DateTimeFormat("en-CA", {
+            timeZone: zone,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          });
+          const timeFmt = new Intl.DateTimeFormat("en-GB", {
+            timeZone: zone,
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          });
+          const date = dateFmt.format(d);
+          const time = timeFmt.format(d);
+          return { date, time };
+        } catch {
+          return { date: (iso || "").slice(0, 10), time: (iso || "").slice(11, 16) };
+        }
+      };
+
+      const dryHireItems = (dryHireJobs ?? []).flatMap((j: any) => {
+        const nowParts = toTZParts(new Date().toISOString(), j.timezone);
+        const pickupParts = toTZParts(j.start_time, j.timezone);
+        const returnParts = j.end_time ? toTZParts(j.end_time, j.timezone) : null;
+        const nowKey = `${nowParts.date}${nowParts.time}`;
+        const pickupKey = `${pickupParts.date}${pickupParts.time}`;
+        const weekWindowParts = toTZParts(weekEnd.toISOString(), j.timezone);
+        const weekWindowKey = `${weekWindowParts.date}${weekWindowParts.time}`;
+        const items: any[] = [];
+
+        if (pickupKey >= nowKey && pickupKey <= weekWindowKey) {
+          items.push({
+            id: `dryhire-${j.id}`,
+            date: pickupParts.date,
+            time: pickupParts.time,
+            title: j.title || "Dry Hire",
+            transport_type: "recogida cliente",
+            plate: null,
+            job_title: j.title || null,
+            procedure: "load",
+            loadingBay: null,
+            departments: [],
+            color: null,
+          });
+        }
+
+        if (returnParts) {
+          const returnKey = `${returnParts.date}${returnParts.time}`;
+          if (returnKey >= nowKey && returnKey <= weekWindowKey) {
+            items.push({
+              id: `dryhire-return-${j.id}`,
+              date: returnParts.date,
+              time: returnParts.time,
+              title: j.title || "Dry Hire",
+              transport_type: "devolución cliente",
+              plate: null,
+              job_title: j.title || null,
+              procedure: "unload",
+              loadingBay: null,
+              departments: [],
+              color: null,
+            });
+          }
+        }
+
+        return items;
+      });
+
+      const logisticsItems = [...logisticsItemsBase, ...dryHireItems].sort((a, b) =>
+        (a.date + a.time).localeCompare(b.date + b.time)
+      );
+
+      return new Response(JSON.stringify({ items: logisticsItems, presetSlug }), {
+        headers: { "Content-Type": "application/json", ...corsHeaders() },
+      });
+    }
+
     if (path.endsWith("/announcements")) {
       const { data, error } = await sb
         .from("announcements")

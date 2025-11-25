@@ -1756,16 +1756,16 @@ function WallboardDisplay({
       return;
     }
     let cancelled = false;
-    setLogistics([]);
     const api = new WallboardApi(wallboardApiToken);
 
     const fetchAll = async () => {
       try {
-        const [overviewData, crewData, docData, pendingData] = await Promise.all([
+        const [overviewData, crewData, docData, pendingData, logisticsData] = await Promise.all([
           api.jobsOverview(),
           api.crewAssignments(),
           api.docProgress(),
           api.pendingActions(),
+          api.logistics(),
         ]);
         if (cancelled) return;
         setOverview(overviewData);
@@ -1773,6 +1773,7 @@ function WallboardDisplay({
         setCrew(crewData);
         setDocs(docData);
         setPending(pendingData);
+        setLogistics(logisticsData.items);
         setIsLoading(false);
       } catch (err) {
         if (cancelled) return;

@@ -51,6 +51,24 @@ export interface AnnouncementsFeed {
   announcements: Array<{ id: string; message: string; level: string; created_at: string; active: boolean }>;
 }
 
+export interface LogisticsItem {
+  id: string;
+  date: string;
+  time: string;
+  title: string;
+  transport_type: string | null;
+  plate: string | null;
+  job_title?: string | null;
+  procedure: string | null;
+  loadingBay: string | null;
+  departments: string[];
+  color?: string | null;
+}
+
+export interface LogisticsFeed {
+  items: LogisticsItem[];
+}
+
 export interface PresetConfigFeed {
   config: {
     panel_order: string[] | null;
@@ -123,6 +141,9 @@ export class WallboardApi {
   }
   announcements(): Promise<AnnouncementsFeed> {
     return this.request('/announcements');
+  }
+  logistics(): Promise<LogisticsFeed> {
+    return this.request('/logistics');
   }
   presetConfig(): Promise<PresetConfigFeed> {
     return this.request('/preset-config');
