@@ -1137,24 +1137,60 @@ function WallboardDisplay({
         hasApiToken: !!wallboardApiToken
       });
 
-      // HARDCODED: For produccion preset in API mode, skip fetch and use calendar-only config
-      if (isApiMode && isProduccionPreset) {
-        console.log('🎯 [Wallboard] Using hardcoded produccion config (calendar-only)');
-        setPanelOrder(['calendar']);
-        setPanelDurations({
-          overview: 12,
-          crew: 12,
-          logistics: 12,
-          pending: 12,
-          calendar: 600,
-        });
-        setRotationFallbackSeconds(600);
-        setHighlightTtlMs(300 * 1000);
-        setTickerIntervalMs(20 * 1000);
-        setPresetMessage(null);
-        setHighlightJobs(new Map());
-        setIdx(0);
-        return;
+      // HARDCODED: Presets for API mode (public wallboards)
+      if (isApiMode) {
+        if (effectiveSlug === 'produccion') {
+          console.log('🎯 [Wallboard] Using hardcoded produccion config (calendar-only)');
+          setPanelOrder(['calendar']);
+          setPanelDurations({
+            overview: 12,
+            crew: 12,
+            logistics: 12,
+            pending: 12,
+            calendar: 600,
+          });
+          setRotationFallbackSeconds(600);
+          setHighlightTtlMs(300 * 1000);
+          setTickerIntervalMs(20 * 1000);
+          setPresetMessage(null);
+          setHighlightJobs(new Map());
+          setIdx(0);
+          return;
+        } else if (effectiveSlug === 'almacen') {
+          console.log('🎯 [Wallboard] Using hardcoded almacen config');
+          setPanelOrder(['logistics', 'overview', 'calendar']);
+          setPanelDurations({
+            overview: 15,
+            crew: 12,
+            logistics: 15,
+            pending: 12,
+            calendar: 30,
+          });
+          setRotationFallbackSeconds(15);
+          setHighlightTtlMs(300 * 1000);
+          setTickerIntervalMs(20 * 1000);
+          setPresetMessage(null);
+          setHighlightJobs(new Map());
+          setIdx(0);
+          return;
+        } else if (effectiveSlug === 'oficinas') {
+          console.log('🎯 [Wallboard] Using hardcoded oficinas config');
+          setPanelOrder(['overview', 'crew', 'logistics', 'pending', 'calendar']);
+          setPanelDurations({
+            overview: 15,
+            crew: 15,
+            logistics: 15,
+            pending: 10,
+            calendar: 30,
+          });
+          setRotationFallbackSeconds(15);
+          setHighlightTtlMs(300 * 1000);
+          setTickerIntervalMs(20 * 1000);
+          setPresetMessage(null);
+          setHighlightJobs(new Map());
+          setIdx(0);
+          return;
+        }
       }
 
       // For API mode (public wallboards), fetch config via API

@@ -233,8 +233,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       typeof matchingFolder?.element_id === "string" && matchingFolder.element_id.trim().length > 0
         ? matchingFolder.element_id
         : typeof matchingFolder?.elementId === "string" && matchingFolder.elementId.trim().length > 0
-        ? matchingFolder.elementId
-        : null;
+          ? matchingFolder.elementId
+          : null;
 
     dryHirePresupuestoElementRef.current = storedElementId;
   }, [job]);
@@ -371,29 +371,29 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   // Determine if the Open Flex button should be enabled
   const canOpenFlex = React.useMemo(() => {
     if (folderStateLoading || isCreatingFolders || isFlexLoading) return false;
-    
+
     // For project management page with selector dialog support
     if (isProjectManagementPage) {
       // Main element available - can open selector
       if (mainFlexInfo?.elementId) return true;
-      
+
       // Tourdate job - needs tour folder resolution (check later)
       if (job.job_type === 'tourdate') return true;
-      
+
       // Dry-hire job - check if we have any flex_folders with dryhire type
       if (job.job_type === 'dryhire') {
         const dryHireFolder = job.flex_folders?.find((f: any) => f.folder_type === 'dryhire');
         return !!dryHireFolder?.element_id;
       }
     }
-    
+
     // Otherwise need flexUuid
     return !!flexUuid;
   }, [folderStateLoading, isCreatingFolders, isFlexLoading, isProjectManagementPage, mainFlexInfo, job, flexUuid]);
 
   const handleOpenFlex = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (folderStateLoading || isCreatingFolders || isFlexLoading) {
       console.warn('[JobCardActions] Open Flex clicked while loading:', {
         folderStateLoading,
@@ -421,7 +421,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       try {
         console.log(`[JobCardActions] Resolving tour folder for tourdate job ${job.id}`);
         const tourFolderId = await resolveTourFolderForTourdate(job, department);
-        
+
         if (!tourFolderId) {
           console.error('[JobCardActions] No tour folder found for tourdate job:', job.id);
           toast({
@@ -466,7 +466,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     if (isProjectManagementPage && job.job_type === 'dryhire') {
       const dryHireFolder = job.flex_folders?.find((f: any) => f.folder_type === 'dryhire');
       const savedPresupuesto = job.flex_folders?.find((f: any) => f.folder_type === 'dryhire_presupuesto');
-      
+
       let presupuestoElementId =
         typeof dryHirePresupuestoElementRef.current === 'string'
           ? dryHirePresupuestoElementRef.current
@@ -505,8 +505,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
               typeof node.displayName === 'string'
                 ? node.displayName
                 : typeof node.name === 'string'
-                ? node.name
-                : '';
+                  ? node.name
+                  : '';
 
             if (
               nodeElementId &&
@@ -585,7 +585,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     // Otherwise, use direct flexUuid navigation with shared utility
     if (flexUuid) {
       console.log(`[JobCardActions] Opening Flex folder for job ${job.id}, element: ${flexUuid}, type: ${job.job_type}`);
-      
+
       await openFlexElement({
         elementId: flexUuid,
         context: {
@@ -609,7 +609,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       });
       return;
     }
-    
+
     // No valid element available
     console.error('[JobCardActions] No valid Flex element available:', {
       jobId: job.id,
@@ -620,12 +620,12 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       flexError,
       hasFlexFolders: !!job.flex_folders,
     });
-    
+
     if (flexError) {
       toast({ title: 'Error', description: flexError, variant: 'destructive' });
     } else {
-      toast({ 
-        title: 'Flex folder not available', 
+      toast({
+        title: 'Flex folder not available',
         description: 'No valid Flex element found for this job. Please ensure folders are created.',
         variant: 'destructive',
       });
@@ -664,13 +664,13 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         jobType: job.job_type,
         timestamp: new Date().toISOString(),
       };
-      
+
       console.error('[JobCardActions] Invalid elementId received from selector:', errorDetails);
       console.error('[JobCardActions] Telemetry: Missing element ID detected', errorDetails);
-      
+
       toast({
         title: 'Invalid element',
-        description: node?.displayName 
+        description: node?.displayName
           ? `Cannot open "${node.displayName}" - invalid element ID.`
           : 'Invalid element ID received. Cannot navigate to Flex.',
         variant: 'destructive',
@@ -751,7 +751,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           {transportButtonLabel}
         </Button>
       )}
-      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && job.job_type !== 'tourdate' && job.job_type !== 'dryhire' && (
+      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && job.job_type !== 'dryhire' && (
         <Button
           variant="outline"
           size="sm"
@@ -888,8 +888,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         </>
       )}
       {userRole === 'technician' && job.job_type !== "dryhire" && (
-        <TechnicianIncidentReportDialog 
-          job={job} 
+        <TechnicianIncidentReportDialog
+          job={job}
           techName={techName}
         />
       )}
@@ -937,8 +937,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
               !canOpenFlex
                 ? 'No valid Flex element available'
                 : isFlexLoading || isCreatingFolders || folderStateLoading
-                ? 'Loading…'
-                : 'Open in Flex'
+                  ? 'Loading…'
+                  : 'Open in Flex'
             }
           >
             {(isFlexLoading || isCreatingFolders || folderStateLoading) ? (
@@ -1237,7 +1237,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       {(() => {
         // Determine the main element ID for the selector
         let selectorMainElementId: string | undefined;
-        
+
         if (tourdateSelectorInfo) {
           selectorMainElementId = tourdateSelectorInfo.mainElementId;
         } else if (mainFlexInfo?.elementId) {
@@ -1263,7 +1263,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             onSelect={handleFlexElementSelect}
             defaultElementId={
               // Try to find department-specific folder as default
-              job.flex_folders?.find((f: any) => 
+              job.flex_folders?.find((f: any) =>
                 f.department?.toLowerCase() === department?.toLowerCase()
               )?.element_id || mainFlexInfo?.elementId
             }
