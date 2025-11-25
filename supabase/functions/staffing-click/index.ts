@@ -514,11 +514,22 @@ serve(async (req) => {
                   const jobStart = new Date(job.start_time);
                   const jobEnd = new Date(job.end_time);
 
+                  // Use Spain timezone (Europe/Madrid) to avoid timezone bugs
+                  // E.g., a job at 00:00 CET should create a timesheet for that day, not the previous day
+                  const spanishDateFormatter = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'Europe/Madrid',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                  });
+
                   for (let d = new Date(jobStart); d <= jobEnd; d.setDate(d.getDate() + 1)) {
+                    // Format date in Spanish timezone (en-CA gives YYYY-MM-DD format)
+                    const dateStr = spanishDateFormatter.format(d);
                     timesheetRows.push({
                       job_id: row.job_id,
                       technician_id: row.profile_id,
-                      date: d.toISOString().split('T')[0],
+                      date: dateStr,
                       is_schedule_only: isScheduleOnly,
                       source: 'staffing'
                     });
