@@ -120,7 +120,18 @@ serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/\/+$/, "");
+  
+  // Read path from request body (Supabase client sends it this way)
+  // Clone the request first so we don't consume the body
+  let path = "";
+  try {
+    const clonedReq = req.clone();
+    const body = await clonedReq.json();
+    path = body.path || "";
+  } catch {
+    // Fallback to URL pathname if body parsing fails (for direct HTTP calls)
+    path = url.pathname.replace(/\/+$/, "");
+  }
 
   try {
     const auth = await authenticate(req, url);
