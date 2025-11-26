@@ -1783,6 +1783,8 @@ function WallboardDisplay({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_documents' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'timesheets' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_events' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_event_departments' }, scheduleRefresh)
       .subscribe();
 
     fetchAll();
@@ -1848,6 +1850,8 @@ function WallboardDisplay({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_documents' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'timesheets' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_events' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_event_departments' }, scheduleRefresh)
       .subscribe();
 
     return () => {
