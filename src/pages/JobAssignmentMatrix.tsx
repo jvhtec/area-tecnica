@@ -95,8 +95,6 @@ async function fetchAssignmentsForWindow(jobIds: string[], technicianIds: string
           sound_role,
           lights_role,
           video_role,
-          single_day,
-          assignment_date,
           status,
           assigned_at,
           jobs!job_id (
@@ -129,8 +127,6 @@ async function fetchAssignmentsForWindow(jobIds: string[], technicianIds: string
       sound_role: item.sound_role,
       lights_role: item.lights_role,
       video_role: item.video_role,
-      single_day: item.single_day,
-      assignment_date: item.assignment_date,
       status: item.status,
       assigned_at: item.assigned_at,
       job: jobsById.get(item.job_id) || (Array.isArray(item.jobs) ? item.jobs[0] : item.jobs),

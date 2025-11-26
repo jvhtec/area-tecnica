@@ -75,7 +75,7 @@ export const AssignJobDialog = ({
   const [selectedJobId, setSelectedJobId] = useState<string>(preSelectedJobId || existingAssignment?.job_id || '');
   const [selectedRole, setSelectedRole] = useState<string>('');
   // Coverage mode: full job span, single day, multiple days
-  const [coverageMode, setCoverageMode] = useState<'full' | 'single' | 'multi'>(existingAssignment?.single_day ? 'single' : 'full');
+  const [coverageMode, setCoverageMode] = useState<'full' | 'single' | 'multi'>('full');
   const [singleDate, setSingleDate] = useState<Date | null>(date);
   const [multiDates, setMultiDates] = useState<Date[]>(date ? [date] : []);
   const [assignAsConfirmed, setAssignAsConfirmed] = useState(false);
@@ -134,11 +134,6 @@ export const AssignJobDialog = ({
     }
   }, [existingAssignment, technician]);
 
-  React.useEffect(() => {
-    if (existingAssignment?.single_day && existingAssignment?.assignment_date) {
-      try { setSingleDate(new Date(`${existingAssignment.assignment_date}T00:00:00`)); } catch { }
-    }
-  }, [existingAssignment?.single_day, existingAssignment?.assignment_date]);
 
   // Update selected job when preSelectedJobId changes
   React.useEffect(() => {
@@ -285,21 +280,13 @@ export const AssignJobDialog = ({
       // Before writing, check if an assignment already exists for this job + technician
       const { data: existingRow } = await supabase
         .from('job_assignments')
-        .select('job_id, technician_id, single_day, assignment_date, status')
+        .select('job_id, technician_id, status')
         .eq('job_id', selectedJobId)
         .eq('technician_id', technicianId)
         .maybeSingle();
 
-      // For multi-date selection, mark as single_day=true with first date to avoid assigning full job span
-      const desiredSingleDay = coverageMode !== 'full';
-      const desiredAssignmentDate = coverageMode === 'single'
-        ? assignmentDate
-        : coverageMode === 'multi' && multiDates && multiDates.length > 0
-          ? format(multiDates[0], 'yyyy-MM-dd')
-          : null;
-
       if (existingRow) {
-        // Update the existing base row (whole job or single) to align with the requested coverage
+        // Update the existing base row with role and status information
         const updatePayload: any = {
           sound_role: basePayload.sound_role,
           lights_role: basePayload.lights_role,
@@ -309,8 +296,6 @@ export const AssignJobDialog = ({
           // Do not downgrade a confirmed assignment to invited
           status: existingRow.status === 'confirmed' && basePayload.status !== 'confirmed' ? 'confirmed' : basePayload.status,
           response_time: basePayload.status === 'confirmed' ? basePayload.response_time : existingRow.status === 'confirmed' ? (existingRow as any).response_time ?? null : null,
-          single_day: desiredSingleDay,
-          assignment_date: desiredAssignmentDate,
           assignment_source: basePayload.assignment_source,
         };
 
@@ -322,25 +307,22 @@ export const AssignJobDialog = ({
           .eq('technician_id', technicianId);
         if (error) throw error;
       } else {
-        const row = { ...basePayload, single_day: desiredSingleDay, assignment_date: desiredAssignmentDate };
-        console.log('Inserting assignment row:', row);
-        const { error: insErr } = await supabase.from('job_assignments').insert(row);
+        console.log('Inserting assignment row:', basePayload);
+        const { error: insErr } = await supabase.from('job_assignments').insert(basePayload);
         if (insErr) {
           if (insErr.code === '23505') {
             console.warn('Duplicate on insert. Updating existing base row.');
             const { error: updErr } = await supabase
               .from('job_assignments')
               .update({
-                sound_role: row.sound_role,
-                lights_role: row.lights_role,
-                video_role: row.video_role,
-                assigned_by: row.assigned_by,
-                assigned_at: row.assigned_at,
-                status: row.status,
-                response_time: row.response_time,
-                single_day: row.single_day,
-                assignment_date: row.assignment_date,
-                assignment_source: row.assignment_source,
+                sound_role: basePayload.sound_role,
+                lights_role: basePayload.lights_role,
+                video_role: basePayload.video_role,
+                assigned_by: basePayload.assigned_by,
+                assigned_at: basePayload.assigned_at,
+                status: basePayload.status,
+                response_time: basePayload.response_time,
+                assignment_source: basePayload.assignment_source,
               })
               .eq('job_id', selectedJobId)
               .eq('technician_id', technicianId);
