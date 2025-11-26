@@ -16,6 +16,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AppInit } from "@/components/AppInit";
 import { useActivityPushFallback } from '@/hooks/useActivityPushFallback';
 import { useServiceWorkerUpdate } from '@/hooks/useServiceWorkerUpdate';
+import { usePushSubscriptionRecovery } from '@/hooks/usePushSubscriptionRecovery';
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
 import { ViewportProvider } from '@/hooks/use-mobile';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -86,6 +87,12 @@ function ActivityPushFallbackInit() {
 // Initialize service worker update detection
 function ServiceWorkerUpdateInit() {
   useServiceWorkerUpdate();
+  return null;
+}
+
+// Initialize push subscription recovery detection
+function PushSubscriptionRecoveryInit() {
+  usePushSubscriptionRecovery();
   return null;
 }
 
@@ -179,6 +186,7 @@ export default function App() {
                       <AppInit />
                       <ActivityPushFallbackInit />
                       <ServiceWorkerUpdateInit />
+                      <PushSubscriptionRecoveryInit />
                       <TechnicianRouteGuard />
                       <div className="app">
                         <Suspense fallback={<PageLoader />}>

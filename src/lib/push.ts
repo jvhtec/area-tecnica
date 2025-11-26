@@ -95,6 +95,18 @@ export const enablePush = async (
     throw new Error(error.message || 'Failed to persist push subscription')
   }
 
+  // Track that user has enabled push notifications in their profile
+  // This allows detecting when subscriptions are lost and prompting re-enablement
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await supabase
+      .from('profiles')
+      .update({ push_notifications_enabled: true })
+      .eq('id', user.id)
+      .select()
+      .single()
+  }
+
   return subscription
 }
 
@@ -133,4 +145,13 @@ export const disablePush = async (): Promise<void> => {
   }
 
   await subscription.unsubscribe()
+
+  // Clear the push notifications preference in the user's profile
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await supabase
+      .from('profiles')
+      .update({ push_notifications_enabled: false })
+      .eq('id', user.id)
+  }
 }
