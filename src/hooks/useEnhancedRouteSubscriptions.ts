@@ -7,6 +7,7 @@ import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 
 // Define subscription requirements for each route
 export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
@@ -169,12 +170,14 @@ export function useEnhancedRouteSubscriptions() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { lastRefreshTime, connectionStatus } = useSubscriptionContext();
+  const { userRole } = useOptimizedAuth();
+  const isAdmin = userRole === 'admin';
   const manager = UnifiedSubscriptionManager.getInstance(queryClient);
   const lastActiveTimestamp = useRef<number>(Date.now());
   const wasInactive = useRef<boolean>(false);
   const multiTabCoordinator = MultiTabCoordinator.getInstance(queryClient);
   const [isLeader, setIsLeader] = useState(true);
-  
+
   const [status, setStatus] = useState({
     requiredTables: [] as string[],
     subscribedTables: [] as string[],
@@ -384,7 +387,10 @@ export function useEnhancedRouteSubscriptions() {
         if (isLeader) {
           manager.forceRefreshSubscriptions(status.requiredTables);
           multiTabCoordinator.invalidateQueries();
-          toast.success('Subscriptions refreshed');
+          // Only show toasts to admin users
+          if (isAdmin) {
+            toast.success('Subscriptions refreshed');
+          }
         } else {
           // Followers can request refresh from leader
           multiTabCoordinator.requestSubscriptions(status.requiredTables);

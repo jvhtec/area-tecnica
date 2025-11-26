@@ -7,19 +7,28 @@ import { useState } from "react";
 import { Button } from "./button";
 import { useResetSubscriptions } from "@/hooks/useResetSubscriptions";
 import { toast } from "sonner";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 export function SubscriptionStatus() {
   const { connectionStatus, subscriptionCount, subscriptionsByTable } = useSubscriptionContext();
+  const { userRole } = useOptimizedAuth();
+  const isAdmin = userRole === 'admin';
   const [expanded, setExpanded] = useState(false);
   const { resetAllSubscriptions } = useResetSubscriptions();
-  
+
   const handleReset = () => {
     try {
       resetAllSubscriptions();
-      toast.success("Subscriptions reset successfully");
+      // Only show toasts to admin users
+      if (isAdmin) {
+        toast.success("Subscriptions reset successfully");
+      }
     } catch (error) {
       console.error("Error resetting subscriptions:", error);
-      toast.error("Failed to reset subscriptions");
+      // Only show toasts to admin users
+      if (isAdmin) {
+        toast.error("Failed to reset subscriptions");
+      }
     }
   };
   

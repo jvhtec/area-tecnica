@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { useQueryClient } from '@tanstack/react-query';
 import { OptimizedSubscriptionManager } from '@/lib/optimized-subscription-manager';
 import { toast } from 'sonner';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 
 interface OptimizedSubscriptionContextType {
   connectionStatus: 'connected' | 'disconnected' | 'connecting';
@@ -35,6 +36,9 @@ interface OptimizedSubscriptionProviderProps {
 
 export function OptimizedSubscriptionProvider({ children }: OptimizedSubscriptionProviderProps) {
   const queryClient = useQueryClient();
+  const { userRole } = useOptimizedAuth();
+  const isAdmin = userRole === 'admin';
+
   const [state, setState] = useState<OptimizedSubscriptionContextType>({
     connectionStatus: 'connecting',
     activeSubscriptions: 0,
@@ -47,20 +51,23 @@ export function OptimizedSubscriptionProvider({ children }: OptimizedSubscriptio
   // Initialize the optimized subscription manager
   useEffect(() => {
     const manager = OptimizedSubscriptionManager.getInstance(queryClient);
-    
+
     // Optimized refresh function
     const refreshSubscriptions = useCallback(() => {
       console.log('Refreshing optimized subscriptions...');
       const status = manager.getStatus();
-      setState(prev => ({ 
-        ...prev, 
+      setState(prev => ({
+        ...prev,
         lastRefreshTime: Date.now(),
         connectionStatus: status.connectionStatus,
         activeSubscriptions: status.activeSubscriptions,
         subscribedTables: status.tables
       }));
-      toast.success('Subscriptions refreshed');
-    }, [manager]);
+      // Only show toasts to admin users
+      if (isAdmin) {
+        toast.success('Subscriptions refreshed');
+      }
+    }, [manager, isAdmin]);
 
     // Batch subscribe function
     const batchSubscribe = useCallback((subscriptions: Array<{
