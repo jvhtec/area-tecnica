@@ -138,8 +138,28 @@ self.addEventListener('fetch', (event) => {
           return response
         })
         .catch(() => {
-          // Network failed, try to serve offline fallback
-          return caches.match('/')
+          // Network failed - return appropriate response based on request type
+          const destination = request.destination
+
+          // For navigation/document requests, return cached HTML fallback
+          if (request.mode === 'navigate' || destination === 'document') {
+            return caches.match('/').then(fallback => {
+              return fallback || new Response('Offline', {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: { 'Content-Type': 'text/plain' }
+              })
+            })
+          }
+
+          // For other requests (JS, CSS, images, fonts), return network error
+          // This allows the browser to handle the failure appropriately
+          // (e.g., trigger onerror events, show broken image icons, etc.)
+          console.warn('[sw] Network failed for asset:', request.url)
+          return new Response(null, {
+            status: 408,
+            statusText: 'Request Timeout'
+          })
         })
     })
   )

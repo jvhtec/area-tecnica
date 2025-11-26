@@ -2,6 +2,7 @@ import React from 'react';
 import { RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { isChunkLoadError } from '@/utils/errorUtils';
+import { CHUNK_ERROR_RELOAD_KEY, MAX_CHUNK_ERROR_RELOADS } from '@/utils/chunkErrorConstants';
 
 type ErrorBoundaryProps = {
   children: React.ReactNode;
@@ -12,11 +13,9 @@ type ErrorBoundaryState = {
   error?: Error;
 };
 
-const RELOAD_KEY = 'app-reload-count';
-const MAX_AUTO_RELOADS = 2;
-
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false };
+  private clearTimeoutId?: ReturnType<typeof setTimeout>;
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
@@ -24,7 +23,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   private getReloadCount(): number {
     try {
-      const count = sessionStorage.getItem(RELOAD_KEY);
+      const count = sessionStorage.getItem(CHUNK_ERROR_RELOAD_KEY);
       return count ? parseInt(count, 10) : 0;
     } catch {
       return 0;
@@ -34,7 +33,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   private incrementReloadCount(): void {
     try {
       const count = this.getReloadCount();
-      sessionStorage.setItem(RELOAD_KEY, (count + 1).toString());
+      sessionStorage.setItem(CHUNK_ERROR_RELOAD_KEY, (count + 1).toString());
     } catch {
       // Ignore sessionStorage errors
     }
@@ -42,7 +41,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   private clearReloadCount(): void {
     try {
-      sessionStorage.removeItem(RELOAD_KEY);
+      sessionStorage.removeItem(CHUNK_ERROR_RELOAD_KEY);
     } catch {
       // Ignore sessionStorage errors
     }
@@ -51,12 +50,18 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Unhandled error captured by ErrorBoundary', error, errorInfo);
 
-    // Auto-reload on chunk load errors (up to MAX_AUTO_RELOADS times)
+    // Cancel the reload count clear timeout if error occurs
+    if (this.clearTimeoutId) {
+      clearTimeout(this.clearTimeoutId);
+      this.clearTimeoutId = undefined;
+    }
+
+    // Auto-reload on chunk load errors (up to MAX_CHUNK_ERROR_RELOADS times)
     if (isChunkLoadError(error)) {
       const reloadCount = this.getReloadCount();
 
-      if (reloadCount < MAX_AUTO_RELOADS) {
-        console.log(`[ErrorBoundary] Chunk load error detected. Auto-reloading (${reloadCount + 1}/${MAX_AUTO_RELOADS})...`);
+      if (reloadCount < MAX_CHUNK_ERROR_RELOADS) {
+        console.log(`[ErrorBoundary] Chunk load error detected. Auto-reloading (${reloadCount + 1}/${MAX_CHUNK_ERROR_RELOADS})...`);
         this.incrementReloadCount();
 
         // Brief delay before reload to prevent too-fast reload loops
@@ -83,8 +88,20 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   };
 
   componentDidMount() {
-    // Clear reload count on successful mount - app loaded without errors
-    this.clearReloadCount();
+    // Clear reload count after a short delay to ensure child components have rendered
+    // This prevents clearing the count before initial render errors might occur
+    this.clearTimeoutId = setTimeout(() => {
+      this.clearReloadCount();
+      this.clearTimeoutId = undefined;
+    }, 1000); // 1 second delay after mount
+  }
+
+  componentWillUnmount() {
+    // Clean up timeout if component unmounts before it fires
+    if (this.clearTimeoutId) {
+      clearTimeout(this.clearTimeoutId);
+      this.clearTimeoutId = undefined;
+    }
   }
 
   render() {
