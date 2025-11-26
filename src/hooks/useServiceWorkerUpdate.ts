@@ -2,19 +2,38 @@ import { useEffect, useState, useRef } from 'react';
 import { toast } from 'sonner';
 
 /**
+ * Detect if the app is running as an installed PWA
+ */
+const isPWAMode = (): boolean => {
+  // Check if running in standalone mode (installed PWA)
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    return true;
+  }
+
+  // iOS Safari specific check
+  if ((window.navigator as any).standalone === true) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
  * Hook to handle service worker updates with user-friendly notifications
  *
  * This hook:
  * 1. Detects when a new service worker is available
- * 2. Shows a toast notification to the user
- * 3. Allows the user to trigger the update
- * 4. Reloads the page when the new SW takes control
+ * 2. Shows a toast notification to the user (works for both logged-in and non-logged-in users)
+ * 3. Provides different messaging for PWA vs browser users
+ * 4. Allows the user to trigger the update
+ * 5. Reloads the page when the new SW takes control
  */
 export function useServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const refreshing = useRef(false);
   const toastId = useRef<string | number | undefined>(undefined);
+  const isStandalone = isPWAMode();
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) {
@@ -25,9 +44,18 @@ export function useServiceWorkerUpdate() {
       setWaitingWorker(registration.waiting);
       setUpdateAvailable(true);
 
+      // Customize messaging based on PWA vs browser mode
+      const title = isStandalone
+        ? 'Nueva versión disponible'
+        : 'Actualización disponible';
+
+      const description = isStandalone
+        ? 'Hay una actualización de la aplicación lista. Actualiza ahora para obtener las últimas mejoras.'
+        : 'Hay una actualización disponible. Recarga la página para obtener la última versión.';
+
       // Show toast notification
-      toastId.current = toast.info('Nueva versión disponible', {
-        description: 'Hay una actualización de la aplicación lista para instalar.',
+      toastId.current = toast.info(title, {
+        description,
         duration: Infinity, // Don't auto-dismiss
         action: {
           label: 'Actualizar',
@@ -44,7 +72,7 @@ export function useServiceWorkerUpdate() {
             }
           },
         },
-        cancel: {
+        cancel: isStandalone ? undefined : {
           label: 'Más tarde',
           onClick: () => {
             // User dismissed the notification

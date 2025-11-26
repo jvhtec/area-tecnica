@@ -261,14 +261,38 @@ Our PWA now includes:
 
 ✅ **Phase 2: User-Friendly Updates**
 - Update detection hook (`useServiceWorkerUpdate`)
-- Toast notification with update button
+- Toast notification with update button (works for both authenticated and non-authenticated users)
+- Different messaging for PWA vs browser users:
+  - **PWA users**: "Nueva versión disponible" - Emphasizes updating the app
+  - **Browser users**: "Actualización disponible" - Can dismiss with "Más tarde" button
 - Automatic reload when new SW takes control
-- SKIP_WAITING message handler
+- SKIP_WAITING message handler with error fallback
 
-⚠️ **Phase 3: Server Configuration** (Action Required)
-- Configure your production server using examples above
-- Test the configuration after deployment
-- Monitor that users receive updates promptly
+✅ **Phase 3: Server Configuration**
+- Cloudflare Pages `_headers` file configured
+- Prevents caching of `sw.js` at CDN and browser level
+- Network-first strategy for HTML
+- Cache-first strategy for static assets with content hashes
+
+## User Experience After Deployment
+
+### For PWA Users (Installed App)
+1. When you deploy, they see: **"Nueva versión disponible"**
+2. Message: "Hay una actualización de la aplicación lista. Actualiza ahora para obtener las últimas mejoras."
+3. Button: **[Actualizar]** (no dismiss option - encourages immediate update)
+4. Click → Page reloads → Latest version loaded
+
+### For Browser Users
+1. When you deploy, they see: **"Actualización disponible"**
+2. Message: "Hay una actualización disponible. Recarga la página para obtener la última versión."
+3. Buttons: **[Actualizar]** or **[Más tarde]** (can dismiss)
+4. Click Actualizar → Page reloads → Latest version loaded
+5. Or dismiss and update later
+
+### For Non-Authenticated Users
+- Update notification works on login page (`/auth`)
+- Same PWA vs browser differentiation applies
+- No need to be logged in to receive updates
 
 ---
 
