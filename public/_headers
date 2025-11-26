@@ -1,0 +1,7 @@
+# Cloudflare Pages Headers Configuration
+# https://developers.cloudflare.com/pages/platform/headers/
+
+# Prevent service worker caching to ensure users always get the latest version
+/sw.js
+  Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0
+  Pragma: no-cache
