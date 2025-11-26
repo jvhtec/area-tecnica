@@ -1388,42 +1388,16 @@ function WallboardDisplay({
         deptsByJob.set(r.job_id, list as Dept[]);
       });
 
-      // 3) Fetch assignments from timesheets (source of truth) and join with job_assignments for role info
-      // First, get unique technician assignments from timesheets
-      const { data: timesheetRows, error: timesheetErr } = detailJobIds.length
-        ? await supabase
-          .from('timesheets')
-          .select('job_id,technician_id')
-          .in('job_id', detailJobIds)
-          .eq('is_schedule_only', false)
-        : { data: [], error: null } as any;
-      if (timesheetErr) console.error('Wallboard timesheets error:', timesheetErr);
-
-      // Get unique job+technician pairs from timesheets
-      const uniqueAssignments = new Set<string>();
-      (timesheetRows || []).forEach((t: any) => {
-        uniqueAssignments.add(`${t.job_id}:${t.technician_id}`);
-      });
-
-      // Fetch role information from job_assignments for these technicians
+      // 3) Fetch assignments for crew counts (restrict to detail window)
       const { data: assignRows, error: assignErr } = detailJobIds.length
-        ? await supabase
-          .from('job_assignments')
-          .select('job_id,technician_id,sound_role,lights_role,video_role')
-          .in('job_id', detailJobIds)
+        ? await supabase.from('job_assignments').select('job_id,technician_id,sound_role,lights_role,video_role').in('job_id', detailJobIds)
         : { data: [], error: null } as any;
       if (assignErr) console.error('Wallboard job_assignments error:', assignErr);
-
-      // Build assignments map, only including those confirmed by timesheets
       const assignsByJob = new Map<string, any[]>();
       (assignRows || []).forEach((a: any) => {
-        const key = `${a.job_id}:${a.technician_id}`;
-        // Only include if this technician has timesheet entries for this job
-        if (uniqueAssignments.has(key)) {
-          const list = assignsByJob.get(a.job_id) ?? [];
-          list.push(a);
-          assignsByJob.set(a.job_id, list);
-        }
+        const list = assignsByJob.get(a.job_id) ?? [];
+        list.push(a);
+        assignsByJob.set(a.job_id, list);
       });
 
       // Fetch required-role summaries for these jobs
