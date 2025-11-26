@@ -15,6 +15,7 @@ import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AppInit } from "@/components/AppInit";
 import { useActivityPushFallback } from '@/hooks/useActivityPushFallback';
+import { useServiceWorkerUpdate } from '@/hooks/useServiceWorkerUpdate';
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
 import { ViewportProvider } from '@/hooks/use-mobile';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -79,6 +80,12 @@ const PageLoader = () => (
 // Initialize activity push fallback within auth context
 function ActivityPushFallbackInit() {
   useActivityPushFallback();
+  return null;
+}
+
+// Initialize service worker update detection
+function ServiceWorkerUpdateInit() {
+  useServiceWorkerUpdate();
   return null;
 }
 
@@ -171,6 +178,7 @@ export default function App() {
                     <OptimizedAuthProvider>
                       <AppInit />
                       <ActivityPushFallbackInit />
+                      <ServiceWorkerUpdateInit />
                       <TechnicianRouteGuard />
                       <div className="app">
                         <Suspense fallback={<PageLoader />}>

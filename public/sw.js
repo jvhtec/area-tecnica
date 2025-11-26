@@ -221,7 +221,10 @@ self.addEventListener('notificationclick', (event) => {
 // Allow page to invoke simple test notifications and ping
 self.addEventListener('message', (event) => {
   const { type, data } = event.data || {}
-  if (type === 'sw:show-test') {
+  if (type === 'SKIP_WAITING') {
+    // Allow the page to trigger immediate activation of a waiting service worker
+    self.skipWaiting()
+  } else if (type === 'sw:show-test') {
     event.waitUntil(
       (async () => {
         try {
