@@ -1,6 +1,7 @@
 import React from 'react';
 import { RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { isChunkLoadError } from '@/utils/errorUtils';
 
 type ErrorBoundaryProps = {
   children: React.ReactNode;
@@ -19,20 +20,6 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
-  }
-
-  private isChunkLoadError(error: Error): boolean {
-    const chunkFailurePatterns = [
-      /Loading chunk [\d]+ failed/i,
-      /ChunkLoadError/i,
-      /Failed to fetch dynamically imported module/i,
-      /Importing a module script failed/i,
-      /error loading dynamically imported module/i,
-    ];
-
-    return chunkFailurePatterns.some((pattern) =>
-      pattern.test(error.message) || pattern.test(error.name)
-    );
   }
 
   private getReloadCount(): number {
@@ -65,7 +52,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     console.error('Unhandled error captured by ErrorBoundary', error, errorInfo);
 
     // Auto-reload on chunk load errors (up to MAX_AUTO_RELOADS times)
-    if (this.isChunkLoadError(error)) {
+    if (isChunkLoadError(error)) {
       const reloadCount = this.getReloadCount();
 
       if (reloadCount < MAX_AUTO_RELOADS) {
@@ -102,7 +89,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   render() {
     if (this.state.hasError) {
-      const isChunkError = this.state.error && this.isChunkLoadError(this.state.error);
+      const isChunkError = this.state.error && isChunkLoadError(this.state.error);
 
       return (
         <div className="min-h-screen w-full flex items-center justify-center bg-background text-foreground p-6">

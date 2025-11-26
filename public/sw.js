@@ -91,7 +91,11 @@ self.addEventListener('fetch', (event) => {
           // Clone the response to cache it
           const responseToCache = response.clone()
           caches.open(RUNTIME_CACHE).then((cache) => {
-            cache.put(request, responseToCache)
+            cache.put(request, responseToCache).catch((e) => {
+              console.warn('[sw] Failed to cache HTML response:', e)
+            })
+          }).catch((e) => {
+            console.warn('[sw] Failed to open cache for HTML:', e)
           })
           return response
         })
@@ -124,7 +128,11 @@ self.addEventListener('fetch', (event) => {
           // Clone the response to cache it
           const responseToCache = response.clone()
           caches.open(RUNTIME_CACHE).then((cache) => {
-            cache.put(request, responseToCache)
+            cache.put(request, responseToCache).catch((e) => {
+              console.warn('[sw] Failed to cache asset response:', e)
+            })
+          }).catch((e) => {
+            console.warn('[sw] Failed to open cache for assets:', e)
           })
 
           return response

@@ -33,8 +33,14 @@ export function useServiceWorkerUpdate() {
           label: 'Actualizar',
           onClick: () => {
             if (registration.waiting) {
-              // Send SKIP_WAITING message to the waiting service worker
-              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+              try {
+                // Send SKIP_WAITING message to the waiting service worker
+                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+              } catch (error) {
+                console.error('[SW Update] Failed to send SKIP_WAITING message:', error);
+                // Fallback: just reload the page to get the new version
+                window.location.reload();
+              }
             }
           },
         },

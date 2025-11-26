@@ -1,26 +1,11 @@
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import { isChunkLoadErrorEvent, isChunkLoadPromiseRejection } from '@/utils/errorUtils'
 
 // Global error handler for chunk load errors that happen outside React's error boundary
 const RELOAD_KEY = 'global-chunk-error-reload';
 const MAX_RELOADS = 2;
-
-const isChunkLoadError = (error: ErrorEvent | PromiseRejectionEvent): boolean => {
-  const message = error instanceof ErrorEvent
-    ? error.message || error.error?.message || ''
-    : error.reason?.message || String(error.reason) || '';
-
-  const chunkFailurePatterns = [
-    /Loading chunk [\d]+ failed/i,
-    /ChunkLoadError/i,
-    /Failed to fetch dynamically imported module/i,
-    /Importing a module script failed/i,
-    /error loading dynamically imported module/i,
-  ];
-
-  return chunkFailurePatterns.some((pattern) => pattern.test(message));
-};
 
 const handleChunkLoadError = () => {
   try {
@@ -48,7 +33,7 @@ try {
 
 // Listen for unhandled promise rejections (e.g., dynamic import failures)
 window.addEventListener('unhandledrejection', (event) => {
-  if (isChunkLoadError(event)) {
+  if (isChunkLoadPromiseRejection(event)) {
     event.preventDefault();
     handleChunkLoadError();
   }
@@ -56,7 +41,7 @@ window.addEventListener('unhandledrejection', (event) => {
 
 // Listen for global errors
 window.addEventListener('error', (event) => {
-  if (isChunkLoadError(event)) {
+  if (isChunkLoadErrorEvent(event)) {
     event.preventDefault();
     handleChunkLoadError();
   }
