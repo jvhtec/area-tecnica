@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { Outlet, useLocation, useNavigate } from "react-router-dom"
+import { Outlet, useLocation, useNavigate, Navigate } from "react-router-dom"
 import { LogOut } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -171,6 +171,11 @@ const Layout = () => {
     logout,
   } = useOptimizedAuth()
 
+  // Synchronous redirect for technician users - prevent any Layout rendering
+  if (!isLoading && userRole === 'technician') {
+    return <Navigate to="/tech-app" replace />;
+  }
+
   const { requiredTables } = useRouteSubscriptions()
   const { forceSubscribe } = useSubscriptionContext()
 
@@ -178,9 +183,9 @@ const Layout = () => {
 
   // Fetch pending tasks for eligible roles
   const { data: flatPendingTasks } = useFlatPendingTasks(userId, userRole)
-  
+
   // Track acknowledged tasks
-  const { acknowledgedTaskIds, acknowledgeTask, clearAcknowledgedTasks, isTaskAcknowledged } = 
+  const { acknowledgedTaskIds, acknowledgeTask, clearAcknowledgedTasks, isTaskAcknowledged } =
     useAcknowledgedTasks(userId)
 
   // Filter out acknowledged tasks to get unacknowledged ones

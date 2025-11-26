@@ -196,12 +196,12 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
   const getSessionOnce = useCallback(async () => {
     if (isInitialized) return session;
-    
+
     try {
       const currentSession = await tokenManager.getCachedSession();
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
-      
+
       // Parallelize profile fetch with session setup
       if (currentSession?.user?.id) {
         // Start profile fetch immediately without awaiting
@@ -209,7 +209,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           console.error('Background profile fetch failed:', error);
         });
       }
-      
+
       setIsInitialized(true);
       return currentSession;
     } catch (error) {
@@ -225,12 +225,12 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     try {
       console.log("Starting session refresh");
       setIdleTime(0);
-      
+
       const { session: refreshedSession, error } = await tokenManager.refreshToken();
-      
+
       if (error) {
         console.error("Session refresh error:", error);
-        
+
         if (error.message && error.message.includes('expired')) {
           setSession(null);
           setUser(null);
@@ -246,25 +246,25 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         }
         return null;
       }
-      
+
       if (refreshedSession) {
         console.log("Session refreshed successfully");
         setSession(refreshedSession);
         setUser(refreshedSession.user);
-        
+
         if (!user || user.id !== refreshedSession.user.id) {
           // Parallelize profile fetch and other operations
           fetchUserProfile(refreshedSession.user.id, true).catch(error => {
             console.error('Profile refresh failed:', error);
           });
         }
-        
+
         refreshSubscriptions();
         invalidateQueries();
-        
+
         return refreshedSession;
       }
-      
+
       console.log("No session returned from refresh");
       return null;
     } catch (error) {
@@ -286,7 +286,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         console.log("Auth state changed:", event);
         setSession(newSession);
         setUser(newSession?.user ?? null);
-        
+
         if (newSession?.user?.id) {
           // Background profile fetch without blocking UI
           fetchUserProfile(newSession.user.id, true).catch(error => {
@@ -297,7 +297,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           setUserDepartment(null);
           clearProfileCache();
         }
-        
+
         setIsLoading(false);
       }
     );
@@ -335,7 +335,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase(),
         password,
@@ -354,16 +354,16 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       if (data.user) {
         const profile = await fetchUserProfile(data.user.id, false); // Fresh fetch on login
         let roleForNavigation = null;
-        
+
         if (profile) {
           roleForNavigation = profile.role;
         }
-        
+
         toast({
           title: "Welcome back!",
           description: "You have successfully logged in.",
         });
-        
+
         const dashboardPath = getDashboardPath(roleForNavigation);
         navigate(dashboardPath);
       }
@@ -383,7 +383,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const { data, error } = await supabase.auth.signUp({
         email: userData.email.toLowerCase(),
         password: userData.password,
@@ -416,19 +416,19 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       if (data.user) {
         // Wait a moment for the profile to be created by the trigger
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         const profile = await fetchUserProfile(data.user.id, false); // Fresh fetch on signup
         let roleForNavigation = null;
-        
+
         if (profile) {
           roleForNavigation = profile.role;
         }
-        
+
         toast({
           title: "Welcome!",
           description: "Your account has been created successfully.",
         });
-        
+
         const dashboardPath = getDashboardPath(roleForNavigation);
         navigate(dashboardPath);
       }
@@ -484,20 +484,20 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const logout = async () => {
     try {
       setIsLoading(true);
-      
+
       await tokenManager.signOut();
       clearProfileCache();
-      
+
       setSession(null);
       setUser(null);
       setUserRole(null);
       setUserDepartment(null);
-      
+
       toast({
         title: "Success",
         description: "You have been logged out successfully",
       });
-      
+
       navigate('/auth');
     } catch (error: any) {
       setError(error.message);
@@ -584,15 +584,15 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
   useEffect(() => {
     if (!session) return;
-    
+
     const refreshTime = tokenManager.calculateRefreshTime(session);
-    console.log(`Scheduling token refresh in ${Math.round(refreshTime/1000)} seconds`);
-    
+    console.log(`Scheduling token refresh in ${Math.round(refreshTime / 1000)} seconds`);
+
     const refreshTimer = setTimeout(() => {
       console.log("Executing scheduled token refresh");
       refreshSession();
     }, refreshTime);
-    
+
     return () => clearTimeout(refreshTimer);
   }, [session, refreshSession, tokenManager]);
 
@@ -605,7 +605,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         variant: "default",
       });
     };
-    
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         if (session && tokenManager.checkTokenExpiration(session, 10 * 60 * 1000)) {
@@ -613,12 +613,12 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         }
       }
     };
-    
+
     window.addEventListener('online', handleOnline);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     return () => {
-    window.removeEventListener('online', handleOnline);
+      window.removeEventListener('online', handleOnline);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [refreshSession, session, toast, tokenManager]);
@@ -628,7 +628,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     Boolean(soundVisionAccessFlag) ||
     userRole === 'admin' ||
     userRole === 'management' ||
-    (userRole === 'house_tech' && normalizedDepartment === 'sound');
+    (userRole === 'house_tech' && normalizedDepartment === 'sound') ||
+    (userRole === 'technician' && normalizedDepartment === 'sound');
 
   const value = {
     session,
