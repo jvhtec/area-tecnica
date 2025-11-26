@@ -420,6 +420,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                 <SelectItem value="festival">Festival</SelectItem>
                 <SelectItem value="dryhire">Dry Hire</SelectItem>
                 <SelectItem value="tourdate">Tour Date</SelectItem>
+                <SelectItem value="evento">Evento</SelectItem>
               </SelectContent>
             </Select>
           </div>

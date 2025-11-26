@@ -65,6 +65,8 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
         return <Badge variant="secondary" className={cn("ml-2", isMobile && "text-xs")}>Tour Date</Badge>;
       case "dryhire":
         return <Badge variant="secondary" className={cn("ml-2", isMobile && "text-xs")}>Dry Hire</Badge>;
+      case "evento":
+        return <Badge variant="secondary" className={cn("ml-2", isMobile && "text-xs")}>Evento</Badge>;
       default:
         return null;
     }

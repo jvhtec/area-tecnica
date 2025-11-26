@@ -859,23 +859,23 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                           <div>
                             <p className="text-muted-foreground">Horas Redondeadas</p>
-                            <p className="font-medium">{breakdown.worked_hours_rounded}h</p>
+                            <p className="font-medium">{breakdown.worked_hours_rounded || 0}h</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Cantidad Base</p>
-                            <p className="font-medium">€{breakdown.base_amount_eur.toFixed(2)}</p>
+                            <p className="font-medium">€{(breakdown.base_amount_eur ?? 0).toFixed(2)}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Horas Extra</p>
-                            <p className="font-medium">{breakdown.overtime_hours}h × €{breakdown.overtime_hour_eur}</p>
+                            <p className="font-medium">{breakdown.overtime_hours || 0}h × €{breakdown.overtime_hour_eur || 0}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Cantidad HE</p>
-                            <p className="font-medium">€{breakdown.overtime_amount_eur.toFixed(2)}</p>
+                            <p className="font-medium">€{(breakdown.overtime_amount_eur ?? 0).toFixed(2)}</p>
                           </div>
                            <div>
                              <p className="text-muted-foreground">Total</p>
-                             <p className="font-semibold">€{breakdown.total_eur.toFixed(2)}</p>
+                             <p className="font-semibold">€{(breakdown.total_eur ?? 0).toFixed(2)}</p>
                            </div>
                            {(userRole === 'technician' || userRole === 'house_tech') && (
                              <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">

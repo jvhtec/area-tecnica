@@ -93,7 +93,7 @@ export const useOptimizedJobs = (
         )
       `)
       // Include relevant job types; optionally include dryhire
-      .in('job_type', includeDryhire ? ['single', 'festival', 'tourdate', 'dryhire'] : ['single', 'festival', 'tourdate'])
+      .in('job_type', includeDryhire ? ['single', 'festival', 'tourdate', 'dryhire', 'evento'] : ['single', 'festival', 'tourdate', 'evento'])
       .order('start_time', { ascending: true });
 
     // Apply filters efficiently using indexes

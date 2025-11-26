@@ -563,27 +563,27 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                                   <div className="grid grid-cols-2 gap-2 text-sm">
                                     <div>
                                       <span className={theme.textMuted}>Horas: </span>
-                                      <span className={theme.textMain}>{timesheet.amount_breakdown_visible.worked_hours_rounded}h</span>
+                                      <span className={theme.textMain}>{timesheet.amount_breakdown_visible.worked_hours_rounded || 0}h</span>
                                     </div>
                                     <div>
                                       <span className={theme.textMuted}>Base: </span>
-                                      <span className={theme.textMain}>€{timesheet.amount_breakdown_visible.base_amount_eur?.toFixed(2)}</span>
+                                      <span className={theme.textMain}>€{(timesheet.amount_breakdown_visible.base_amount_eur ?? 0).toFixed(2)}</span>
                                     </div>
                                     {(timesheet.amount_breakdown_visible.overtime_hours || 0) > 0 && (
                                       <>
                                         <div>
                                           <span className={theme.textMuted}>HE: </span>
-                                          <span className={theme.textMain}>{timesheet.amount_breakdown_visible.overtime_hours}h</span>
+                                          <span className={theme.textMain}>{timesheet.amount_breakdown_visible.overtime_hours || 0}h</span>
                                         </div>
                                         <div>
                                           <span className={theme.textMuted}>+HE: </span>
-                                          <span className={theme.textMain}>€{timesheet.amount_breakdown_visible.overtime_amount_eur?.toFixed(2)}</span>
+                                          <span className={theme.textMain}>€{(timesheet.amount_breakdown_visible.overtime_amount_eur ?? 0).toFixed(2)}</span>
                                         </div>
                                       </>
                                     )}
                                   </div>
                                   <div className="mt-2 pt-2 border-t border-emerald-500/20">
-                                    <span className="text-emerald-600 font-bold">Total: €{timesheet.amount_breakdown_visible.total_eur?.toFixed(2)}</span>
+                                    <span className="text-emerald-600 font-bold">Total: €{(timesheet.amount_breakdown_visible.total_eur ?? 0).toFixed(2)}</span>
                                   </div>
                                 </div>
                               )}

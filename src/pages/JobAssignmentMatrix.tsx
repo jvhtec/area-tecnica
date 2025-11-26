@@ -45,7 +45,7 @@ async function fetchJobsForWindow(start: Date, end: Date, department: string) {
     `)
     .lte('start_time', end.toISOString())
     .gte('end_time', start.toISOString())
-    .in('job_type', ['single', 'festival', 'tourdate'])
+    .in('job_type', ['single', 'festival', 'tourdate', 'evento'])
     .limit(500);
 
   if (department) {
@@ -564,7 +564,7 @@ export default function JobAssignmentMatrix() {
         `)
         .lte('start_time', endDate.toISOString())    // Job starts before range ends
         .gte('end_time', startDate.toISOString())    // Job ends after range starts
-        .in('job_type', ['single', 'festival', 'tourdate'])
+        .in('job_type', ['single', 'festival', 'tourdate', 'evento'])
         .limit(500); // Limit for performance
 
       // Add department filter if selected

@@ -1346,7 +1346,7 @@ function WallboardDisplay({
       const { data: jobs, error: jobsError } = await supabase
         .from('jobs')
         .select('id,title,start_time,end_time,status,location_id,job_type,tour_id,timezone,color')
-        .in('job_type', ['single', 'festival', 'tourdate', 'dryhire'])
+        .in('job_type', ['single', 'festival', 'tourdate', 'dryhire', 'evento'])
         .in('status', ['Confirmado', 'Tentativa', 'Completado'])
         .lte('start_time', calendarEndISO)
         .gte('end_time', calendarStartISO)

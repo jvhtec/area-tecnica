@@ -2275,7 +2275,8 @@ async function handleBroadcast(
       'tour': 'Gira',
       'festival': 'Festival',
       'dryhire': 'Alquiler seco',
-      'tourdate': 'Fecha de gira'
+      'tourdate': 'Fecha de gira',
+      'evento': 'Evento'
     };
 
     const oldTypeLabel = jobTypeLabels[oldType] || oldType;
@@ -2296,6 +2297,9 @@ async function handleBroadcast(
     } else if (type === 'job.type.changed.tourdate') {
       title = 'Trabajo cambiado a Fecha de gira';
       text = `${actor} cambió "${jobName}" a Fecha de gira.`;
+    } else if (type === 'job.type.changed.evento') {
+      title = 'Trabajo cambiado a Evento';
+      text = `${actor} cambió "${jobName}" a Evento.`;
     } else {
       // Generic type change
       title = 'Tipo de trabajo cambiado';

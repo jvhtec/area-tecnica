@@ -24,6 +24,7 @@ const TYPE_LABELS: Record<string, string> = {
   tour: "Tour",
   tourdate: "Tour Date",
   dryhire: "Dry Hire",
+  evento: "Evento",
 };
 
 const getTypeLabel = (type: string) => TYPE_LABELS[type?.toLowerCase()] || type;

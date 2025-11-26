@@ -8,7 +8,7 @@ export interface JobDocument {
   template_type?: string | null;
 }
 
-export type JobType = "single" | "multi_day" | "tour" | "tourdate" | "festival" | "dryhire";
+export type JobType = "single" | "multi_day" | "tour" | "tourdate" | "festival" | "dryhire" | "evento";
 
 export interface Location {
   id: string;
