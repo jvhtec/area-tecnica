@@ -182,11 +182,11 @@ export default function App() {
               <AppBadgeProvider>
                 <Router>
                   <OptimizedAuthProvider>
+                    <ServiceWorkerUpdateInit />
+                    <PushSubscriptionRecoveryInit />
                     <SubscriptionProvider>
                       <AppInit />
                       <ActivityPushFallbackInit />
-                      <ServiceWorkerUpdateInit />
-                      <PushSubscriptionRecoveryInit />
                       <TechnicianRouteGuard />
                       <div className="app">
                         <Suspense fallback={<PageLoader />}>
