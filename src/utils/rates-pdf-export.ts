@@ -915,6 +915,68 @@ export async function generateJobPayoutPDF(
     });
   }
 
+  // Expense breakdown section
+  if (payoutsWithExpenses.length > 0) {
+    if (currentY > pageHeight - (FOOTER_RESERVED + 60)) {
+      doc.addPage();
+      currentY = drawCorporateHeader(doc, headerOptions) + 2;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...CORPORATE_RED);
+    doc.text('Desglose de Gastos', 14, currentY);
+    currentY += 7;
+
+    payoutsWithExpenses.forEach((payout) => {
+      if (currentY > pageHeight - (FOOTER_RESERVED + 40)) {
+        doc.addPage();
+        currentY = drawCorporateHeader(doc, headerOptions) + 2;
+      }
+
+      const { name: baseName, autonomo } = getTechName(payout.technician_id);
+      const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false });
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...CORPORATE_RED);
+      doc.text(headingName, 14, currentY);
+      currentY += 5;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...TEXT_MUTED);
+
+      // Get category labels map
+      const categoryLabels: Record<string, string> = {
+        'dietas': 'Dietas',
+        'transporte': 'Transporte',
+        'alojamiento': 'Alojamiento',
+        'material': 'Material',
+        'otros': 'Otros',
+      };
+
+      if (payout.expenses_breakdown && payout.expenses_breakdown.length > 0) {
+        payout.expenses_breakdown.forEach((category) => {
+          const label = categoryLabels[category.category_slug] || category.category_slug;
+          const amount = category.approved_total_eur || 0;
+          const itemText = `• ${label}: ${formatCurrency(amount)}`;
+          doc.text(itemText, 18, currentY);
+          currentY += 5;
+
+          if (currentY > pageHeight - (FOOTER_RESERVED + 20)) {
+            doc.addPage();
+            currentY = drawCorporateHeader(doc, headerOptions) + 2;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(...TEXT_MUTED);
+          }
+        });
+      }
+
+      currentY += 4;
+    });
+  }
+
   if (currentY > pageHeight - (FOOTER_RESERVED + 40)) {
     doc.addPage();
     currentY = drawCorporateHeader(doc, headerOptions) + 4;
@@ -922,13 +984,15 @@ export async function generateJobPayoutPDF(
 
   const totalTimesheets = payouts.reduce((sum, payout) => sum + payout.timesheets_total_eur, 0);
   const totalExtras = payouts.reduce((sum, payout) => sum + payout.extras_total_eur, 0);
+  const totalExpenses = payouts.reduce((sum, payout) => sum + (payout.expenses_total_eur || 0), 0);
   const grandTotal = payouts.reduce((sum, payout) => sum + payout.total_eur, 0);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const summaryWidth = pageWidth - 28;
 
+  const summaryHeight = totalExpenses > 0 ? 40 : 32;
   doc.setFillColor(...SUMMARY_BACKGROUND);
-  doc.roundedRect(14, currentY, summaryWidth, 32, 3, 3, 'F');
+  doc.roundedRect(14, currentY, summaryWidth, summaryHeight, 3, 3, 'F');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
@@ -941,12 +1005,18 @@ export async function generateJobPayoutPDF(
   doc.text(`Total Partes: ${formatCurrency(totalTimesheets)}`, 18, currentY + 18);
   doc.text(`Total Extras: ${formatCurrency(totalExtras)}`, 18, currentY + 26);
 
+  let totalTextY = currentY + 22;
+  if (totalExpenses > 0) {
+    doc.text(`Total Gastos: ${formatCurrency(totalExpenses)}`, 18, currentY + 34);
+    totalTextY = currentY + 30;
+  }
+
   const totalText = `Total General: ${formatCurrency(grandTotal)}`;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor(...CORPORATE_RED);
   const totalWidth = doc.getTextWidth(totalText);
-  doc.text(totalText, 14 + summaryWidth - totalWidth - 6, currentY + 22);
+  doc.text(totalText, 14 + summaryWidth - totalWidth - 6, totalTextY);
 
   const footerLogo = companyLogo ?? headerLogo;
   drawCorporateFooter(doc, footerLogo);
