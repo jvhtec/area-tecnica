@@ -334,9 +334,10 @@ const ProjectManagement = () => {
   );
 
   return (
-    <div className={cn("container mx-auto space-y-4", isMobile ? "px-3 py-4" : "px-4 py-6")}>
-      <Card>
-        <CardHeader className={cn("flex flex-col space-y-4", isMobile ? "p-4 pb-3" : "pb-4")}>
+    <div className="min-h-screen bg-background text-foreground">
+      <div className={cn("w-full max-w-full mx-auto space-y-4", isMobile ? "px-3 py-4" : "px-6 py-6")}>
+        <Card>
+          <CardHeader className={cn("flex flex-col space-y-4", isMobile ? "p-4 pb-3" : "p-6 pb-4")}>
           <div className="flex items-center justify-between">
             <CardTitle className={cn(isMobile ? "text-lg" : "text-xl")}>Project Management</CardTitle>
             {isMobile && (
@@ -378,7 +379,7 @@ const ProjectManagement = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent className={cn(isMobile ? "p-4 pt-2" : "")}>
+        <CardContent className={cn(isMobile ? "p-4 pt-2" : "p-6 pt-2")}>
           <MonthNavigation
             currentDate={currentDate}
             onPreviousMonth={() => setCurrentDate(prev => addMonths(prev, -1))}
@@ -395,6 +396,7 @@ const ProjectManagement = () => {
           />
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 };
