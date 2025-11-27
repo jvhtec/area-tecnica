@@ -324,6 +324,16 @@ export function CorporateEmailComposer() {
     }
 
     // Sanitize HTML to prevent XSS attacks
+    // Add hook to ensure links with target="_blank" have safe rel attribute
+    DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+      if (node.tagName === "A") {
+        const target = node.getAttribute("target");
+        if (target === "_blank") {
+          node.setAttribute("rel", "noopener noreferrer");
+        }
+      }
+    });
+
     const sanitizedBodyHtml = DOMPurify.sanitize(bodyHtml, {
       ALLOWED_TAGS: [
         "p",
@@ -349,18 +359,22 @@ export function CorporateEmailComposer() {
         "span",
         "div",
       ],
-      ALLOWED_ATTR: ["href", "src", "alt", "style", "class", "target", "rel"],
+      ALLOWED_ATTR: ["href", "src", "alt", "style", "class"],
       ALLOWED_STYLES: {
         "*": {
           color: [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/],
           "background-color": [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/],
           "font-size": [/^\d+(?:px|em|rem|%)$/],
           "text-align": [/^(?:left|right|center|justify)$/],
-          "max-width": [/.*/],
-          height: [/.*/],
+          "max-width": [/^\d+(?:px|em|rem|%)$|^auto$/],
+          height: [/^\d+(?:px|em|rem|%)$|^auto$/],
         },
       },
+      SAFE_FOR_TEMPLATES: false,
     });
+
+    // Remove the hook after sanitization to avoid affecting other uses
+    DOMPurify.removeHook("afterSanitizeAttributes");
 
     // Build recipient criteria
     const profileIds: string[] = [];

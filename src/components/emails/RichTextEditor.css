@@ -74,6 +74,9 @@
 .rich-text-editor-wrapper .ql-editor {
   color: hsl(var(--foreground));
   padding: 1rem;
+  min-height: var(--editor-min-height, 250px);
+  font-size: 14px;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 .rich-text-editor-wrapper .ql-editor.ql-blank::before {

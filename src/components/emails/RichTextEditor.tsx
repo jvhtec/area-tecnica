@@ -53,19 +53,17 @@ export function RichTextEditor({
     "link",
   ];
 
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    // Set custom styles for the editor container
-    const editor = quillRef.current?.getEditor();
-    if (editor) {
-      const editorContainer = editor.root;
-      editorContainer.style.minHeight = minHeight;
-      editorContainer.style.fontSize = "14px";
-      editorContainer.style.fontFamily = "Arial, Helvetica, sans-serif";
+    // Set CSS custom properties for dynamic styling
+    if (wrapperRef.current) {
+      wrapperRef.current.style.setProperty('--editor-min-height', minHeight);
     }
   }, [minHeight]);
 
   return (
-    <div className="rich-text-editor-wrapper">
+    <div className="rich-text-editor-wrapper" ref={wrapperRef}>
       <ReactQuill
         ref={quillRef}
         theme="snow"
