@@ -13,6 +13,7 @@ import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { Link } from "react-router-dom";
 import { Scale, Zap, File, Plus } from "lucide-react";
 import type { JobType } from "@/types/job";
+import { Card, CardContent } from "@/components/ui/card";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
@@ -21,7 +22,7 @@ import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 const Operaciones = () => {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
   const [presetJobType, setPresetJobType] = useState<JobType | undefined>(undefined);
-  
+
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -29,10 +30,10 @@ const Operaciones = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [userRole, setUserRole] = useState<string | null>(null);
   const currentDepartment = "video";
-  
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   useTabVisibility(['jobs']);
 
   const { data: jobs, isLoading } = useJobs();
@@ -95,7 +96,7 @@ const Operaciones = () => {
       return [];
     }
     return jobs.filter(job => {
-      const isInDepartment = job.job_departments?.some(dept => 
+      const isInDepartment = job.job_departments?.some(dept =>
         dept.department === currentDepartment
       );
       if (job.tour_date_id) {
@@ -141,16 +142,16 @@ const Operaciones = () => {
 
     try {
       console.log("Operaciones page: Starting optimistic job deletion for:", jobId);
-      
+
       // Call optimistic deletion service
       const result = await deleteJobOptimistically(jobId);
-      
+
       if (result.success) {
         toast({
           title: "Job deleted",
           description: result.details || "The job has been removed and cleanup completed"
         });
-        
+
         // Invalidate queries to refresh the list
         await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       } else {
@@ -168,21 +169,25 @@ const Operaciones = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <LightsHeader 
+      <LightsHeader
         onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
         department="Video"
-        canCreate={userRole ? ["admin","management"].includes(userRole) : true}
+        canCreate={userRole ? ["admin", "management"].includes(userRole) : true}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8">
-          <CalendarSection 
-            date={date} 
-            onDateSelect={setDate}
-            jobs={getDepartmentJobs()}
-            department={currentDepartment}
-            onDateTypeChange={() => {}} // Add empty handler as it's required
-          />
+          <Card>
+            <CardContent className="p-0">
+              <CalendarSection
+                date={date}
+                onDateSelect={setDate}
+                jobs={getDepartmentJobs()}
+                department={currentDepartment}
+                onDateTypeChange={() => { }} // Add empty handler as it's required
+              />
+            </CardContent>
+          </Card>
         </div>
         <div className="lg:col-span-4 hidden md:block">
           <TodaySchedule
@@ -228,7 +233,7 @@ const Operaciones = () => {
           setIsAssignmentDialogOpen(true);
         }}
       />
-      
+
 
       {selectedJob && (
         <EditJobDialog
@@ -241,14 +246,14 @@ const Operaciones = () => {
         <JobAssignmentDialog
           isOpen={isAssignmentDialogOpen}
           onClose={() => setIsAssignmentDialogOpen(false)}
-          onAssignmentChange={() => {}}
+          onAssignmentChange={() => { }}
           jobId={selectedJobId}
           department={currentDepartment}
         />
       )}
 
       {/* Mobile FAB */}
-      <Button 
+      <Button
         className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
         onClick={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
       >

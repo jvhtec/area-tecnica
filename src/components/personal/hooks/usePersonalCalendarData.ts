@@ -17,6 +17,7 @@ interface Assignment {
   video_role: string | null;
   single_day: boolean;
   assignment_date: string | null;
+  dates: string[]; // Added to track specific assigned dates
   job: {
     id: string;
     title: string;
@@ -96,44 +97,58 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
             throw timesheetsError;
           }
 
-          // Deduplicate by job_id + technician_id (timesheets have one row per date)
-          const seenKeys = new Set<string>();
-          const baseAssignments: Assignment[] = (timesheetData ?? [])
-            .filter((row) => {
-              const key = `${row.job_id}-${row.technician_id}`;
-              if (seenKeys.has(key)) return false;
-              seenKeys.add(key);
-              return true;
-            })
-            .map((row) => {
+          // Group by job_id + technician_id and collect dates
+          const assignmentsMap = new Map<string, {
+            technician_id: string;
+            dates: Set<string>;
+            job: any;
+          }>();
+
+          (timesheetData ?? []).forEach((row) => {
+            const key = `${row.job_id}-${row.technician_id}`;
+            
+            if (!assignmentsMap.has(key)) {
               const jobData = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs;
-              if (!jobData) {
-                return null;
+              if (jobData) {
+                assignmentsMap.set(key, {
+                  technician_id: row.technician_id,
+                  dates: new Set(),
+                  job: jobData
+                });
               }
+            }
 
-              const locationValue = Array.isArray(jobData.locations)
-                ? jobData.locations[0]
-                : jobData.locations;
+            const entry = assignmentsMap.get(key);
+            if (entry && row.date) {
+              entry.dates.add(row.date);
+            }
+          });
 
-              return {
-                technician_id: row.technician_id,
-                sound_role: null,
-                lights_role: null,
-                video_role: null,
-                single_day: false,
-                assignment_date: null,
-                job: {
-                  id: jobData.id,
-                  title: jobData.title,
-                  color: jobData.color,
-                  start_time: jobData.start_time,
-                  end_time: jobData.end_time,
-                  status: jobData.status,
-                  location: locationValue?.name ? { name: locationValue.name } : null,
-                },
-              };
-            })
-            .filter(Boolean) as Assignment[];
+          const baseAssignments: Assignment[] = Array.from(assignmentsMap.values()).map((entry) => {
+            const jobData = entry.job;
+            const locationValue = Array.isArray(jobData.locations)
+              ? jobData.locations[0]
+              : jobData.locations;
+
+            return {
+              technician_id: entry.technician_id,
+              sound_role: null,
+              lights_role: null,
+              video_role: null,
+              single_day: false,
+              assignment_date: null,
+              dates: Array.from(entry.dates).sort(),
+              job: {
+                id: jobData.id,
+                title: jobData.title,
+                color: jobData.color,
+                start_time: jobData.start_time,
+                end_time: jobData.end_time,
+                status: jobData.status,
+                location: locationValue?.name ? { name: locationValue.name } : null,
+              },
+            };
+          });
 
           assignmentResults = baseAssignments;
 

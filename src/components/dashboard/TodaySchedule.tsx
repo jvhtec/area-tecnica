@@ -13,6 +13,7 @@ interface TodayScheduleProps {
   hideTasks?: boolean;
   detailsOnlyMode?: boolean;
   department?: string;
+  viewMode?: "grid" | "sidebar";
 }
 
 export const TodaySchedule = ({
@@ -25,11 +26,19 @@ export const TodaySchedule = ({
   isLoading = false,
   hideTasks = false,
   detailsOnlyMode = false,
-  department
+  department,
+  viewMode = "grid"
 }: TodayScheduleProps) => {
   console.log("TodaySchedule received jobs:", jobs);
 
   if (isLoading) {
+    if (viewMode === "sidebar") {
+      return (
+        <div className="flex items-center justify-center p-8 text-slate-500">
+          <p className="text-sm">Cargando asignaciones...</p>
+        </div>
+      );
+    }
     return (
       <Card>
         <CardHeader>
@@ -45,6 +54,13 @@ export const TodaySchedule = ({
   }
 
   if (!jobs || jobs.length === 0) {
+    if (viewMode === "sidebar") {
+      return (
+        <div className="flex flex-col items-center justify-center p-8 text-slate-500 gap-2">
+          <p className="text-sm">No hay asignaciones para hoy</p>
+        </div>
+      );
+    }
     return (
       <Card>
         <CardHeader>
@@ -56,6 +72,39 @@ export const TodaySchedule = ({
           </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  if (viewMode === "sidebar") {
+    return (
+      <div className="flex flex-col gap-3">
+        {jobs.map(job => {
+          const jobData = job.jobs || job;
+          const jobId = job.id || job.job_id || (jobData && (jobData.id || job.job_id));
+
+          if (!jobId) return null;
+
+          let isFestivalJob = false;
+          if (typeof jobData === 'object' && 'job_type' in jobData) {
+            isFestivalJob = jobData.job_type === 'festival';
+          }
+
+          return (
+            <JobCardNew
+              key={jobId}
+              job={jobData}
+              onEditClick={onEditClick}
+              onDeleteClick={onDeleteClick}
+              onJobClick={onJobClick}
+              userRole={userRole}
+              department={department || job.department || jobData.department || "sound"}
+              hideTasks={hideTasks}
+              showManageArtists={isFestivalJob}
+              detailsOnlyMode={detailsOnlyMode}
+            />
+          );
+        })}
+      </div>
     );
   }
 

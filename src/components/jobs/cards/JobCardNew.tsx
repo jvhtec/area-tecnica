@@ -40,6 +40,7 @@ import { TransportRequestDialog } from "@/components/logistics/TransportRequestD
 import { LogisticsEventDialog } from "@/components/logistics/LogisticsEventDialog";
 import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { CreateFoldersOptions } from "@/utils/flex-folders";
 
@@ -773,6 +774,99 @@ export function JobCardNew({
   // Show loading state if job is being deleted
   const cardOpacity = isJobBeingDeleted ? "opacity-50" : "";
   const pointerEvents = isJobBeingDeleted ? "pointer-events-none" : "";
+
+  // Simplified details-only mode for Dashboard, Sound, Light, Video pages
+  if (detailsOnlyMode) {
+    const jobName = job.title || job.name || job.job_name || 'Unnamed Job';
+    const startDate = job.start_time ? format(new Date(job.start_time), 'dd/MM/yyyy HH:mm') : '';
+    const endDate = job.end_time ? format(new Date(job.end_time), 'dd/MM/yyyy HH:mm') : '';
+
+    // Handle location - it can be a string or an object with {id, name, formatted_address}
+    let location = 'No location';
+    if (typeof job.location === 'string') {
+      location = job.location;
+    } else if (job.location && typeof job.location === 'object') {
+      location = job.location.name || job.location.formatted_address || 'No location';
+    } else if (job.location_data) {
+      location = job.location_data.name || job.location_data.formatted_address || 'No location';
+    } else if (job.venue_name) {
+      location = job.venue_name;
+    }
+
+    return (
+      <div className="p-2 bg-gray-50 dark:bg-gray-900">
+        <Card
+          className={cn(
+            "hover:shadow-md transition-all duration-200",
+            cardOpacity,
+            pointerEvents
+          )}
+          style={{
+            borderLeftColor: appliedBorderColor,
+            borderLeftWidth: '4px',
+          }}
+        >
+          {isJobBeingDeleted && (
+            <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 rounded">
+              <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-md shadow-lg">
+                <span className="text-sm font-medium">Deleting job...</span>
+              </div>
+            </div>
+          )}
+
+          <div className="p-4 space-y-3">
+            {/* Job Name */}
+            <h3 className="font-semibold text-lg truncate" title={jobName}>
+              {jobName}
+            </h3>
+
+            {/* Dates */}
+            <div className="text-sm text-muted-foreground">
+              <div className="flex flex-col gap-1">
+                {startDate && (
+                  <div>
+                    <span className="font-medium">Start:</span> {startDate}
+                  </div>
+                )}
+                {endDate && (
+                  <div>
+                    <span className="font-medium">End:</span> {endDate}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Location */}
+            <div className="text-sm">
+              <span className="font-medium">Location:</span>{' '}
+              <span className="text-muted-foreground">{location}</span>
+            </div>
+
+            {/* View Details Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                setJobDetailsDialogOpen(true);
+              }}
+            >
+              View Details
+            </Button>
+          </div>
+        </Card>
+
+        {/* Job Details Dialog */}
+        <JobDetailsDialog
+          job={job}
+          open={jobDetailsDialogOpen}
+          onOpenChange={setJobDetailsDialogOpen}
+          department={department}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900">

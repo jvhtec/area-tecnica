@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { X, Upload, FileText, Image as ImageIcon, Send, Users } from "lucide-react";
+import DOMPurify from "dompurify";
+import { RichTextEditor } from "./RichTextEditor";
 import type {
   SelectedRecipient,
   SendCorporateEmailRequest,
@@ -302,7 +303,9 @@ export function CorporateEmailComposer() {
       return;
     }
 
-    if (!bodyHtml.trim()) {
+    // Strip HTML tags to check if there's actual content
+    const textContent = bodyHtml.replace(/<[^>]*>/g, "").trim();
+    if (!textContent) {
       toast({
         title: "Missing body",
         description: "Please enter email content",
@@ -319,6 +322,67 @@ export function CorporateEmailComposer() {
       });
       return;
     }
+
+    // Sanitize HTML to prevent XSS attacks
+    // Add hook to ensure links with target="_blank" have safe rel attribute
+    DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+      if (node.tagName === "A") {
+        const target = node.getAttribute("target");
+
+        // Only allow safe target values
+        if (target && !["_blank", "_self", "_parent", "_top"].includes(target)) {
+          node.removeAttribute("target");
+          return;
+        }
+
+        // Enforce secure rel attribute on links that open in new window
+        if (target === "_blank") {
+          node.setAttribute("rel", "noopener noreferrer");
+        }
+      }
+    });
+
+    const sanitizedBodyHtml = DOMPurify.sanitize(bodyHtml, {
+      ALLOWED_TAGS: [
+        "p",
+        "br",
+        "strong",
+        "b",
+        "em",
+        "i",
+        "u",
+        "s",
+        "strike",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "ul",
+        "ol",
+        "li",
+        "a",
+        "img",
+        "span",
+        "div",
+      ],
+      ALLOWED_ATTR: ["href", "src", "alt", "style", "class", "target"],
+      ALLOWED_STYLES: {
+        "*": {
+          color: [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/],
+          "background-color": [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/],
+          "font-size": [/^\d+(?:px|em|rem|%)$/],
+          "text-align": [/^(?:left|right|center|justify)$/],
+          "max-width": [/^\d+(?:px|em|rem|%)$|^auto$/],
+          height: [/^\d+(?:px|em|rem|%)$|^auto$/],
+        },
+      },
+      SAFE_FOR_TEMPLATES: false,
+    });
+
+    // Remove the hook after sanitization to avoid affecting other uses
+    DOMPurify.removeHook("afterSanitizeAttributes");
 
     // Build recipient criteria
     const profileIds: string[] = [];
@@ -337,7 +401,7 @@ export function CorporateEmailComposer() {
 
     const request: SendCorporateEmailRequest = {
       subject,
-      bodyHtml,
+      bodyHtml: sanitizedBodyHtml,
       recipients: {
         profileIds: profileIds.length > 0 ? profileIds : undefined,
         departments: departments.length > 0 ? departments : undefined,
@@ -399,15 +463,16 @@ export function CorporateEmailComposer() {
                 Seleccionar destinatarios...
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[400px] p-0" align="start">
+            <PopoverContent className="w-[400px] p-0 max-h-[400px] overflow-hidden" align="start">
               {recipientPopoverOpen && (
-                <Command shouldFilter={false}>
+                <Command shouldFilter={false} className="h-full">
                   <CommandInput
                     placeholder="Buscar por nombre, email o departamento..."
                     value={recipientSearch}
                     onValueChange={setRecipientSearch}
                   />
                   <CommandEmpty>No se encontraron resultados</CommandEmpty>
+                  <div className="max-h-[320px] overflow-y-auto">
 
                   {/* Quick role selection */}
                   <CommandGroup heading="Por rol">
@@ -451,7 +516,7 @@ export function CorporateEmailComposer() {
 
                   {/* Individual profiles */}
                   <CommandGroup heading="Individuales">
-                    {profiles.map((profile) => {
+                    {profiles.slice(0, 20).map((profile) => {
                       const name = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
                       return (
                         <CommandItem
@@ -472,7 +537,13 @@ export function CorporateEmailComposer() {
                         </CommandItem>
                       );
                     })}
+                    {profiles.length > 20 && (
+                      <div className="px-2 py-3 text-xs text-muted-foreground text-center border-t">
+                        Mostrando 20 de {profiles.length} resultados. Usa la búsqueda para filtrar.
+                      </div>
+                    )}
                   </CommandGroup>
+                  </div>
                 </Command>
               )}
             </PopoverContent>
@@ -492,17 +563,16 @@ export function CorporateEmailComposer() {
 
         {/* Body */}
         <div className="space-y-2">
-          <Label htmlFor="body">Mensaje (HTML permitido)</Label>
-          <Textarea
-            id="body"
-            placeholder="Escribe tu mensaje aquí... Puedes usar HTML básico."
+          <Label htmlFor="body">Mensaje</Label>
+          <RichTextEditor
             value={bodyHtml}
-            onChange={(e) => setBodyHtml(e.target.value)}
-            rows={10}
-            className="font-mono text-sm"
+            onChange={setBodyHtml}
+            placeholder="Escribe tu mensaje aquí... Usa la barra de herramientas para darle formato."
+            minHeight="300px"
           />
           <p className="text-xs text-muted-foreground">
             Tu mensaje será envuelto en la plantilla corporativa con logos de Sector Pro y Área Técnica.
+            Usa la barra de herramientas para aplicar negrita, cambiar tamaño de fuente, colores, alineación, etc.
           </p>
         </div>
 

@@ -49,7 +49,7 @@ export const useOptimizedJobs = (
       .from('jobs')
       .select(`
         *,
-        location:locations(
+        location_data:locations(
           id,
           name,
           formatted_address
@@ -164,7 +164,12 @@ export const useOptimizedJobs = (
           throw timesheetError;
         }
         if (timesheetRows) {
-          allTimesheetRows.push(...(timesheetRows as TimesheetRowWithTechnician[]));
+          // Fix: technician comes as an array from Supabase join, need to extract the first item
+          const rows = (timesheetRows as any[]).map(row => ({
+            ...row,
+            technician: Array.isArray(row.technician) ? row.technician[0] : row.technician
+          }));
+          allTimesheetRows.push(...(rows as TimesheetRowWithTechnician[]));
         }
       }
 

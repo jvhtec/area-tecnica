@@ -245,167 +245,228 @@ export const Profile = () => {
   }
 
   return (
-    <div className="container max-w-7xl mx-auto py-6 space-y-6">
-      <div className="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-6">
-        {/* Left Column - Profile Info */}
-        <div className="xl:col-span-1 space-y-6">
-          {needsPasswordChange && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Por favor, cambia tu contraseña antes de seguir utilizando la aplicación.
-              </AlertDescription>
-            </Alert>
+    <div className="min-h-screen bg-background text-foreground">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3 auto-rows-fr">
+          {/* Profile edit - spans two columns to give form breathing room */}
+          <div className="xl:col-span-2 space-y-6">
+            {needsPasswordChange && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Por favor, cambia tu contraseña antes de seguir utilizando la aplicación.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCircle className="h-6 w-6" />
+                  Editar perfil
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">Nombre</Label>
+                      <Input
+                        id="firstName"
+                        value={profile.first_name || ''}
+                        onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="nickname">Apodo</Label>
+                      <Input
+                        id="nickname"
+                        value={profile.nickname || ''}
+                        onChange={(e) => setProfile({ ...profile, nickname: e.target.value })}
+                        placeholder="Opcional"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Apellidos</Label>
+                      <Input
+                        id="lastName"
+                        value={profile.last_name || ''}
+                        onChange={(e) => setProfile({ ...profile, last_name: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Teléfono</Label>
+                    <Input
+                      id="phone"
+                      value={profile.phone || ''}
+                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Departamento</Label>
+                    <Select
+                      value={profile.department || ''}
+                      onValueChange={(value) => setProfile({ ...profile, department: value as Department })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un departamento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sound">Sonido</SelectItem>
+                        <SelectItem value="lights">Luces</SelectItem>
+                        <SelectItem value="video">Vídeo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="dni">DNI/NIE</Label>
+                    <Input
+                      id="dni"
+                      value={profile.dni || ''}
+                      onChange={(e) => setProfile({ ...profile, dni: e.target.value })}
+                    />
+                  </div>
+
+                  <CityAutocomplete
+                    id="residencia"
+                    value={profile.residencia || ''}
+                    onChange={(city) => setProfile({ ...profile, residencia: city })}
+                    placeholder="Enter city"
+                    label="Residencia"
+                    className="space-y-2"
+                  />
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bg_color">Color de fondo de fila</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { color: '#DC2626', name: 'Rojo' },
+                        { color: '#2563EB', name: 'Azul' },
+                        { color: '#16A34A', name: 'Verde' },
+                        { color: '#CA8A04', name: 'Amarillo' },
+                        { color: '#9333EA', name: 'Púrpura' },
+                        { color: '#EA580C', name: 'Naranja' },
+                        { color: '#DB2777', name: 'Rosa' },
+                        { color: '#0891B2', name: 'Cian' },
+                        { color: '#65A30D', name: 'Lima' },
+                        { color: '#7C3AED', name: 'Violeta' },
+                        { color: '#0D9488', name: 'Teal' },
+                        { color: '#64748B', name: 'Pizarra' },
+                      ].map(({ color, name }) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setProfile({ ...profile, bg_color: color })}
+                          className={`w-10 h-10 rounded border-2 transition-all hover:scale-110 ${
+                            profile.bg_color === color ? 'border-white ring-2 ring-white' : 'border-gray-300'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={name}
+                        />
+                      ))}
+                      {profile.bg_color && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setProfile({ ...profile, bg_color: '' })}
+                        >
+                          Limpiar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Rol</Label>
+                    <Input
+                      id="role"
+                      value={profile.role || ''}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Guardar cambios
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Folder structure */}
+          {(profile.role === 'admin' || profile.role === 'management') && (
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>Personalización de estructura de carpetas</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Tabs defaultValue="jobs" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="jobs">Carpetas de trabajos</TabsTrigger>
+                    <TabsTrigger value="tours">Carpetas de giras</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="jobs" className="mt-6">
+                    <div className="max-h-[600px] overflow-y-auto">
+                      <FolderStructureEditor
+                        value={folderStructure}
+                        onChange={setFolderStructure}
+                        title="Estructura personalizada de carpetas para trabajos"
+                        description="Personaliza la estructura de carpetas para trabajos y festivales."
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="tours" className="mt-6">
+                    <div className="max-h-[600px] overflow-y-auto">
+                      <FolderStructureEditor
+                        value={tourFolderStructure}
+                        onChange={setTourFolderStructure}
+                        title="Estructura personalizada de carpetas para giras"
+                        description="Personaliza la estructura de carpetas específicamente para las giras. Usa el elemento 'tourdates' para crear carpetas por cada fecha."
+                      />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                <div className="pt-4 border-t">
+                  <Button
+                    onClick={handleFolderStructureSave}
+                    disabled={loading}
+                    className="w-full"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Guardar estructura de carpetas
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserCircle className="h-6 w-6" />
-                Editar perfil
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">Nombre</Label>
-                    <Input
-                      id="firstName"
-                      value={profile.first_name || ''}
-                      onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="nickname">Apodo</Label>
-                    <Input
-                      id="nickname"
-                      value={profile.nickname || ''}
-                      onChange={(e) => setProfile({ ...profile, nickname: e.target.value })}
-                      placeholder="Opcional"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Apellidos</Label>
-                    <Input
-                      id="lastName"
-                      value={profile.last_name || ''}
-                      onChange={(e) => setProfile({ ...profile, last_name: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Teléfono</Label>
-                  <Input
-                    id="phone"
-                    value={profile.phone || ''}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="department">Departamento</Label>
-                  <Select
-                    value={profile.department || ''}
-                    onValueChange={(value) => setProfile({ ...profile, department: value as Department })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un departamento" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sound">Sonido</SelectItem>
-                      <SelectItem value="lights">Luces</SelectItem>
-                      <SelectItem value="video">Vídeo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="dni">DNI/NIE</Label>
-                  <Input
-                    id="dni"
-                    value={profile.dni || ''}
-                    onChange={(e) => setProfile({ ...profile, dni: e.target.value })}
-                  />
-                </div>
-
-                <CityAutocomplete
-                  id="residencia"
-                  value={profile.residencia || ''}
-                  onChange={(city) => setProfile({ ...profile, residencia: city })}
-                  placeholder="Enter city"
-                  label="Residencia"
-                  className="space-y-2"
-                />
-
-                <div className="space-y-2">
-                  <Label htmlFor="bg_color">Color de fondo de fila</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { color: '#DC2626', name: 'Rojo' },
-                      { color: '#2563EB', name: 'Azul' },
-                      { color: '#16A34A', name: 'Verde' },
-                      { color: '#CA8A04', name: 'Amarillo' },
-                      { color: '#9333EA', name: 'Púrpura' },
-                      { color: '#EA580C', name: 'Naranja' },
-                      { color: '#DB2777', name: 'Rosa' },
-                      { color: '#0891B2', name: 'Cian' },
-                      { color: '#65A30D', name: 'Lima' },
-                      { color: '#7C3AED', name: 'Violeta' },
-                      { color: '#0D9488', name: 'Teal' },
-                      { color: '#64748B', name: 'Pizarra' },
-                    ].map(({ color, name }) => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setProfile({ ...profile, bg_color: color })}
-                        className={`w-10 h-10 rounded border-2 transition-all hover:scale-110 ${
-                          profile.bg_color === color ? 'border-white ring-2 ring-white' : 'border-gray-300'
-                        }`}
-                        style={{ backgroundColor: color }}
-                        title={name}
-                      />
-                    ))}
-                    {profile.bg_color && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setProfile({ ...profile, bg_color: '' })}
-                      >
-                        Limpiar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="role">Rol</Label>
-                  <Input
-                    id="role"
-                    value={profile.role || ''}
-                    disabled
-                    className="bg-muted"
-                  />
-                </div>
-
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Guardar cambios
-                    </>
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
+          {/* Push notifications */}
           {showPushControls && (
             <Card>
               <CardHeader>
@@ -489,6 +550,7 @@ export const Profile = () => {
             </Card>
           )}
 
+          {/* ICS card */}
           {showIcsCard && (
             <Card>
               <CardHeader>
@@ -534,11 +596,12 @@ export const Profile = () => {
             </Card>
           )}
 
-          {/* Morning Summary Subscription - Available to house tech, management, and admin */}
+          {/* Morning summary */}
           {['house_tech', 'management', 'admin'].includes(profile?.role) && (
             <MorningSummarySubscription />
           )}
 
+          {/* Password */}
           <Card>
             <CardHeader>
               <CardTitle>Cambiar contraseña</CardTitle>
@@ -594,67 +657,6 @@ export const Profile = () => {
           </Card>
 
         </div>
-
-        {/* Right Column - Folder Structure */}
-        {(profile.role === 'admin' || profile.role === 'management') && (
-          <div className="xl:col-span-2 lg:col-span-1 space-y-6">
-            <Card className="h-fit">
-              <CardHeader>
-                <CardTitle>Personalización de estructura de carpetas</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Tabs defaultValue="jobs" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="jobs">Carpetas de trabajos</TabsTrigger>
-                    <TabsTrigger value="tours">Carpetas de giras</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="jobs" className="mt-6">
-                    <div className="max-h-[600px] overflow-y-auto">
-                      <FolderStructureEditor
-                        value={folderStructure}
-                        onChange={setFolderStructure}
-                        title="Estructura personalizada de carpetas para trabajos"
-                        description="Personaliza la estructura de carpetas para trabajos y festivales."
-                      />
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="tours" className="mt-6">
-                    <div className="max-h-[600px] overflow-y-auto">
-                      <FolderStructureEditor
-                        value={tourFolderStructure}
-                        onChange={setTourFolderStructure}
-                        title="Estructura personalizada de carpetas para giras"
-                        description="Personaliza la estructura de carpetas específicamente para las giras. Usa el elemento 'tourdates' para crear carpetas por cada fecha."
-                      />
-                    </div>
-                  </TabsContent>
-                </Tabs>
-
-                <div className="pt-4 border-t">
-                  <Button
-                    onClick={handleFolderStructureSave}
-                    disabled={loading}
-                    className="w-full"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Guardar estructura de carpetas
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
     </div>
   );

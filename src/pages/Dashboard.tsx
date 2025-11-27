@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Department } from "@/types/department";
@@ -12,11 +11,8 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Send, ChevronDown } from "lucide-react";
-import { MessagesList } from "@/components/messages/MessagesList";
-import { DirectMessagesList } from "@/components/messages/DirectMessagesList";
+import { MessageSquare, Send, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { isJobOnDate } from "@/utils/timezoneUtils";
@@ -24,14 +20,15 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useOptimizedMessagesSubscriptions } from "@/hooks/useOptimizedSubscriptions";
-import { CorporateEmailComposer } from "@/components/emails/CorporateEmailComposer";
+import { MessagesDialog } from "@/components/dashboard/MessagesDialog";
+import { EmailComposerDialog } from "@/components/dashboard/EmailComposerDialog";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
-  
+
   return jobs.filter(job => {
     if (job.job_type === 'tour') return false;
-    
+
     // Use timezone-aware date comparison
     const jobTimezone = job.timezone || 'Europe/Madrid';
     return isJobOnDate(job.start_time, job.end_time, date, jobTimezone);
@@ -55,19 +52,17 @@ const Dashboard = () => {
   // User data & preferences
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [showMessages, setShowMessages] = useState(false);
 
   // Dashboard state
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [timeSpan, setTimeSpan] = useState<string>("1week");
-  const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
 
   // Modal state
-  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [newMessageDialogOpen, setNewMessageDialogOpen] = useState(false);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<any>(null);
+
+  // New Dialog States
+  const [messagesOpen, setMessagesOpen] = useState(false);
   const [emailComposerOpen, setEmailComposerOpen] = useState(false);
 
   // Data fetching with optimized hook
@@ -76,8 +71,6 @@ const Dashboard = () => {
   const queryClient = useQueryClient();
   // Ensure realtime updates for messages are wired
   useOptimizedMessagesSubscriptions(userId || '');
-
-  // No manual subscriptions needed - useOptimizedJobs handles job-related subscriptions
 
   // Fetch user data
   useEffect(() => {
@@ -101,7 +94,7 @@ const Dashboard = () => {
 
           const params = new URLSearchParams(window.location.search);
           if (params.get("showMessages") === "true") {
-            setShowMessages(true);
+            setMessagesOpen(true);
           }
         }
       }
@@ -150,16 +143,16 @@ const Dashboard = () => {
 
     try {
       console.log("Dashboard: Starting optimistic job deletion for:", jobId);
-      
+
       // Call optimistic deletion service
       const result = await deleteJobOptimistically(jobId);
-      
+
       if (result.success) {
         toast({
           title: "Job deleted",
           description: result.details || "The job has been removed and cleanup is running in background."
         });
-        
+
         // Invalidate queries to refresh the list
         await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       } else {
@@ -183,109 +176,89 @@ const Dashboard = () => {
   const selectedDateJobs = getSelectedDateJobs(date, jobs);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-4 md:space-y-8">
-      <DashboardHeader timeSpan={timeSpan} onTimeSpanChange={setTimeSpan} />
+    <div className="min-h-screen bg-background text-foreground p-4 md:p-8 font-sans">
+      <div className="mx-auto w-full max-w-full space-y-6">
+        <DashboardHeader timeSpan={timeSpan} onTimeSpanChange={setTimeSpan} />
 
-      {userRole && ["admin", "management"].includes(userRole) && (
-        <Card className="w-full">
-          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 md:w-6 md:h-6" />
-              Messages
-            </CardTitle>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setNewMessageDialogOpen(true)}
-                className="gap-2"
-              >
-                <Send className="h-4 w-4" />
-                <span className="hidden sm:inline">New Message</span>
-                <span className="sm:hidden">New</span>
-              </Button>
-              <button
-                onClick={() => setShowMessages(!showMessages)}
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                {showMessages ? "Hide" : "Show"}
-              </button>
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          {/* Main Content Area */}
+          <div className="xl:col-span-8 2xl:col-span-9 space-y-6">
+            <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
+              <CalendarSection
+                date={date}
+                onDateSelect={setDate}
+                jobs={jobs}
+                onDateTypeChange={handleDateTypeChange}
+              />
             </div>
-          </CardHeader>
-          {showMessages && (
-            <CardContent>
-              <div className="space-y-4 md:space-y-6">
-                <MessagesList />
-                <div className="border-t pt-4 md:pt-6">
-                  <h3 className="text-base md:text-lg font-medium mb-4">Direct Messages</h3>
-                  <DirectMessagesList />
-                </div>
+          </div>
+
+          {/* Sidebar Area */}
+          <div className="space-y-6 xl:col-span-4 2xl:col-span-3">
+            {/* Quick Actions */}
+            {userRole && ["admin", "management"].includes(userRole) && (
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  className="bg-card border-border hover:bg-accent hover:text-accent-foreground text-foreground/80 h-auto py-4 flex flex-col gap-2"
+                  onClick={() => setMessagesOpen(true)}
+                >
+                  <MessageSquare className="w-5 h-5 text-blue-500" />
+                  <span className="text-xs font-medium">Mensajes</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-card border-border hover:bg-accent hover:text-accent-foreground text-foreground/80 h-auto py-4 flex flex-col gap-2"
+                  onClick={() => setEmailComposerOpen(true)}
+                >
+                  <Mail className="w-5 h-5 text-emerald-500" />
+                  <span className="text-xs font-medium">Email</span>
+                </Button>
               </div>
-            </CardContent>
-          )}
-        </Card>
-      )}
+            )}
 
-      <div className="space-y-4 md:space-y-8">
-        {/* Calendar section - full width */}
-        <div className="w-full">
-          <CalendarSection 
-            date={date} 
-            onDateSelect={setDate} 
-            jobs={jobs} 
-            onDateTypeChange={handleDateTypeChange}
-          />
+            {/* Today's Schedule Widget */}
+            <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Agenda de Hoy</h3>
+                <span className="text-xs text-muted-foreground">{format(new Date(), 'd MMM')}</span>
+              </div>
+              <div className="p-2">
+                <TodaySchedule
+                  jobs={selectedDateJobs}
+                  onEditClick={handleEditClick}
+                  onDeleteClick={handleDeleteClick}
+                  onJobClick={handleJobClick}
+                  userRole={userRole}
+                  selectedDate={date}
+                  detailsOnlyMode
+                  hideTasks
+                  viewMode="sidebar"
+                />
+              </div>
+            </div>
+          </div>
         </div>
-        
-        {/* Today's Schedule below the calendar - Hidden on mobile */}
-        <div className="w-full hidden md:block">
-          <TodaySchedule
-            jobs={selectedDateJobs}
-            onEditClick={handleEditClick}
-            onDeleteClick={handleDeleteClick}
-            onJobClick={handleJobClick}
-            userRole={userRole}
-            selectedDate={date}
-            detailsOnlyMode
-            hideTasks
+
+        {/* Dialogs */}
+        {selectedJob && (
+          <EditJobDialog
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            job={selectedJob}
           />
-        </div>
-      </div>
+        )}
 
-      {userRole && ["admin", "management"].includes(userRole) && (
-        <Card className="w-full">
-          <CardHeader>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-between p-0 h-auto hover:bg-transparent"
-              onClick={() => setEmailComposerOpen(!emailComposerOpen)}
-            >
-              <CardTitle>Redactar Email Corporativo</CardTitle>
-              <ChevronDown className={`h-5 w-5 transition-transform ${emailComposerOpen ? "rotate-180" : ""}`} />
-            </Button>
-          </CardHeader>
-          {emailComposerOpen && (
-            <CardContent>
-              <CorporateEmailComposer />
-            </CardContent>
-          )}
-        </Card>
-      )}
-
-      {/* Assignment dialog intentionally disabled for dashboard parity */}
-
-      {selectedJob && (
-        <EditJobDialog
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          job={selectedJob}
+        <MessagesDialog
+          open={messagesOpen}
+          onOpenChange={setMessagesOpen}
         />
-      )}
 
-      <DirectMessageDialog
-        open={newMessageDialogOpen}
-        onOpenChange={setNewMessageDialogOpen}
-      />
+        <EmailComposerDialog
+          open={emailComposerOpen}
+          onOpenChange={setEmailComposerOpen}
+        />
+      </div>
     </div>
   );
 };
