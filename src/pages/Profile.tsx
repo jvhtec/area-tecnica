@@ -246,6 +246,7 @@ export const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <div className="w-full max-w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3 auto-rows-fr">
           {/* Profile edit - spans two columns to give form breathing room */}
           <div className="xl:col-span-2 space-y-6">
