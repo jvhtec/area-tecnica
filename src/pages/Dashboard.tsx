@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { Department } from "@/types/department";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { supabase } from "@/lib/supabase";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
+import { Badge } from "@/components/ui/badge";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +20,7 @@ import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { isJobOnDate } from "@/utils/timezoneUtils";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useOptimizedMessagesSubscriptions } from "@/hooks/useOptimizedSubscriptions";
 import { MessagesDialog } from "@/components/dashboard/MessagesDialog";
@@ -76,6 +78,35 @@ const Dashboard = () => {
   const queryClient = useQueryClient();
   // Ensure realtime updates for messages are wired
   useOptimizedMessagesSubscriptions(userId || '');
+
+  const { data: pendingExpensesSummary, isLoading: isLoadingPendingExpenses } = useQuery({
+    queryKey: ['dashboard-expenses-summary'],
+    enabled: !!authUserRole && ['admin', 'management', 'logistics'].includes(authUserRole),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_expenses')
+        .select('amount_eur, job_id')
+        .eq('status', 'submitted');
+      if (error) throw error;
+      const rows = (data || []) as Array<{ amount_eur: number | null; job_id: string }>;
+      const total = rows.reduce((sum, row) => sum + Number(row.amount_eur ?? 0), 0);
+      const jobMap = new Map<string, number>();
+      rows.forEach((row) => {
+        if (!row.job_id) return;
+        jobMap.set(row.job_id, (jobMap.get(row.job_id) || 0) + Number(row.amount_eur ?? 0));
+      });
+      const topJobs = Array.from(jobMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([jobId, amount]) => ({ jobId, amount }));
+      return {
+        count: rows.length,
+        total,
+        jobs: topJobs,
+      };
+    },
+    staleTime: 15_000,
+  });
 
   // Fetch user data
   useEffect(() => {
@@ -270,8 +301,57 @@ const Dashboard = () => {
               </div>
             )}
 
+            {/* Pending expenses summary */}
+            {authUserRole && ["admin", "management", "logistics"].includes(authUserRole) && (
+              <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-border flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Gastos pendientes</h3>
+                    <p className="text-xs text-muted-foreground/70">Aprobaciones antes de continuar con los pagos</p>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {pendingExpensesSummary?.count ?? 0}
+                  </Badge>
+                </div>
+                <div className="p-4 space-y-3 text-sm text-muted-foreground">
+                  {isLoadingPendingExpenses ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Calculando pendientes…
+                    </div>
+                  ) : pendingExpensesSummary && pendingExpensesSummary.count > 0 ? (
+                    <>
+                      <div className="flex items-center justify-between text-base font-semibold text-foreground">
+                        <span>Total por aprobar</span>
+                        <span>{formatCurrency(pendingExpensesSummary.total)}</span>
+                      </div>
+                      {pendingExpensesSummary.jobs.length > 0 && (
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          {pendingExpensesSummary.jobs.map(({ jobId, amount }) => (
+                            <div key={jobId} className="flex items-center justify-between">
+                              <span>Job {jobId.substring(0, 8)}…</span>
+                              <span>{formatCurrency(amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">No hay gastos pendientes de aprobación.</div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => navigate('/gastos')}
+                  >
+                    Ir a Gastos
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Today's Schedule Widget */}
-            <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
+
               <div className="p-4 border-b border-border flex items-center justify-between">
                 <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Agenda de Hoy</h3>
                 <span className="text-xs text-muted-foreground">{format(new Date(), 'd MMM')}</span>
