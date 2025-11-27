@@ -134,7 +134,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
       if (!quotes.length) return [] as Array<{ profile_id: string; base_day_eur: number }>;
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
       const { data, error } = await supabase
-        .from('house_tech_rates')
+        .from('custom_tech_rates')
         .select('profile_id, base_day_eur')
         .in('profile_id', techIds);
       if (error) throw error;

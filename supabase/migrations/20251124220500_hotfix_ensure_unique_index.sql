@@ -30,6 +30,9 @@ END $$;
 CREATE UNIQUE INDEX job_assignments_unique
   ON job_assignments (job_id, technician_id);
 
-RAISE NOTICE '✅ job_assignments_unique index created successfully';
+DO $$
+BEGIN
+  RAISE NOTICE '✅ job_assignments_unique index created successfully';
+END $$;
 
 COMMIT;

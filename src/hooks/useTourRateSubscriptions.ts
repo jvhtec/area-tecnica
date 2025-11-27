@@ -60,7 +60,7 @@ export const useTourRateSubscriptions = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'house_tech_rates'
+          table: 'custom_tech_rates'
         },
         (payload) => {
           console.log('House tech rates change detected:', payload);

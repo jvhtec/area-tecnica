@@ -29,7 +29,7 @@ export function useHouseTechRate(profileId: string) {
     queryKey: RATES_QUERY_KEYS.houseTechRate(profileId),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('house_tech_rates')
+        .from('custom_tech_rates')
         .select('*')
         .eq('profile_id', profileId)
         .maybeSingle();
@@ -50,7 +50,7 @@ export function useSaveHouseTechRate() {
       if (!user.user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
-        .from('house_tech_rates')
+        .from('custom_tech_rates')
         .upsert({
           ...input,
           updated_by: user.user.id,

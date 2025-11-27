@@ -35,6 +35,9 @@ export const FilterBar = ({
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
         className="md:w-1/3"
+        onKeyDown={(e) => e.stopPropagation()}
+        onKeyUp={(e) => e.stopPropagation()}
+        onKeyPress={(e) => e.stopPropagation()}
       />
       <Select value={selectedRole} onValueChange={onRoleChange}>
         <SelectTrigger className="md:w-1/4">

@@ -60,7 +60,7 @@ export async function fetchRatesOverview(): Promise<RatesOverview> {
       .select('*')
       .order('category', { ascending: true }),
     supabase
-      .from('house_tech_rates')
+      .from('custom_tech_rates')
       .select('profile_id, base_day_eur, updated_at', { count: 'exact' })
       .order('updated_at', { ascending: false })
       .limit(5),
@@ -134,7 +134,7 @@ export async function fetchHouseTechOverrides(): Promise<HouseTechOverrideListIt
 
   if (profileIds.length > 0) {
     const { data: overrides, error: overridesError } = await supabase
-      .from('house_tech_rates')
+      .from('custom_tech_rates')
       .select('profile_id, base_day_eur, updated_at')
       .in('profile_id', profileIds);
 

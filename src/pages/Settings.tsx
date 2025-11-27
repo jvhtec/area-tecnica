@@ -31,6 +31,52 @@ import { MorningSummarySubscription } from '@/components/settings/MorningSummary
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown } from "lucide-react"
 
+// Move CollapsibleCard outside to prevent recreation on every render
+const CollapsibleCard = ({
+  id,
+  title,
+  description,
+  children,
+  defaultOpen = false,
+  isOpen,
+  onOpenChange,
+}: {
+  id: string
+  title: string
+  description?: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+}) => {
+  const open = isOpen ?? defaultOpen;
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={onOpenChange}
+      className="border rounded-lg"
+    >
+      <Card className="border-none shadow-none">
+        <CardHeader className="flex flex-row items-start justify-between gap-3">
+          <div className="space-y-1">
+            <CardTitle>{title}</CardTitle>
+            {description && <CardDescription>{description}</CardDescription>}
+          </div>
+          <CollapsibleTrigger asChild>
+            <button className="rounded-md border px-2 py-1 text-sm text-muted-foreground hover:bg-muted flex items-center gap-1">
+              <ChevronDown className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
+              Toggle
+            </button>
+          </CollapsibleTrigger>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="pt-0">{children}</CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+};
+
 const Settings = () => {
   const navigate = useNavigate();
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -153,37 +199,16 @@ const Settings = () => {
     })()
   }, [subscription])
 
-  const CollapsibleCard = ({
-    title,
-    description,
-    children,
-    defaultOpen = false
-  }: {
-    title: string
-    description?: string
-    children: React.ReactNode
-    defaultOpen?: boolean
-  }) => (
-    <Collapsible defaultOpen={defaultOpen} className="border rounded-lg">
-      <Card className="border-none shadow-none">
-        <CardHeader className="flex flex-row items-start justify-between gap-3">
-          <div className="space-y-1">
-            <CardTitle>{title}</CardTitle>
-            {description && <CardDescription>{description}</CardDescription>}
-          </div>
-          <CollapsibleTrigger asChild>
-            <button className="rounded-md border px-2 py-1 text-sm text-muted-foreground hover:bg-muted flex items-center gap-1">
-              <ChevronDown className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
-              Toggle
-            </button>
-          </CollapsibleTrigger>
-        </CardHeader>
-        <CollapsibleContent>
-          <CardContent className="pt-0">{children}</CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
-  )
+  const [collapsibleStates, setCollapsibleStates] = useState<Record<string, boolean>>({
+    'push-notifications': false,
+    'push-diagnostics': false,
+    'push-matrix': false,
+    'push-schedule': false,
+    'morning-summary': false,
+    'users': false,
+    'company-settings': false,
+    'equipment-models': false,
+  });
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -205,8 +230,11 @@ const Settings = () => {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 auto-rows-fr">
           <div className="space-y-4 md:space-y-6">
             <CollapsibleCard
+              id="push-notifications"
               title="Push notifications"
               description="Get real-time updates about jobs, assignments, and documents directly on your device."
+              isOpen={collapsibleStates['push-notifications']}
+              onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-notifications': open }))}
             >
               {!isSupported ? (
                 <Alert variant="info">
@@ -294,8 +322,11 @@ const Settings = () => {
 
             {isSupported && (
               <CollapsibleCard
+                id="push-diagnostics"
                 title="Push diagnostics"
-                description="Useful when you can’t access Safari’s Web Inspector."
+                description="Useful when you can't access Safari's Web Inspector."
+                isOpen={collapsibleStates['push-diagnostics']}
+                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-diagnostics': open }))}
               >
                 <div className="text-sm space-y-1">
                   <p><span className="font-medium">Permission:</span> {permissionLabel}</p>
@@ -330,24 +361,44 @@ const Settings = () => {
             )}
 
             {isManagementUser && (
-              <CollapsibleCard title="Push notification matrix">
+              <CollapsibleCard
+                id="push-matrix"
+                title="Push notification matrix"
+                isOpen={collapsibleStates['push-matrix']}
+                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-matrix': open }))}
+              >
                 <PushNotificationMatrix />
               </CollapsibleCard>
             )}
 
             {isManagementUser && (
-              <CollapsibleCard title="Push notification schedule">
+              <CollapsibleCard
+                id="push-schedule"
+                title="Push notification schedule"
+                isOpen={collapsibleStates['push-schedule']}
+                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'push-schedule': open }))}
+              >
                 <PushNotificationSchedule />
               </CollapsibleCard>
             )}
           </div>
 
           <div className="space-y-4 md:space-y-6">
-            <CollapsibleCard title="Morning summary">
+            <CollapsibleCard
+              id="morning-summary"
+              title="Morning summary"
+              isOpen={collapsibleStates['morning-summary']}
+              onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'morning-summary': open }))}
+            >
               <MorningSummarySubscription />
             </CollapsibleCard>
 
-            <CollapsibleCard title="Users">
+            <CollapsibleCard
+              id="users"
+              title="Users"
+              isOpen={collapsibleStates['users']}
+              onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'users': open }))}
+            >
               <FilterBar
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
@@ -365,7 +416,12 @@ const Settings = () => {
               />
             </CollapsibleCard>
 
-            <CollapsibleCard title="Company settings">
+            <CollapsibleCard
+              id="company-settings"
+              title="Company settings"
+              isOpen={collapsibleStates['company-settings']}
+              onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'company-settings': open }))}
+            >
               <div className="space-y-4">
                 <h3 className="text-sm font-medium">Company Logo</h3>
                 <p className="text-sm text-muted-foreground">
@@ -374,9 +430,14 @@ const Settings = () => {
                 <CompanyLogoUploader />
               </div>
             </CollapsibleCard>
-            
+
             {isManagementUser && (
-              <CollapsibleCard title="Equipment models">
+              <CollapsibleCard
+                id="equipment-models"
+                title="Equipment models"
+                isOpen={collapsibleStates['equipment-models']}
+                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'equipment-models': open }))}
+              >
                 <div className="space-y-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-muted-foreground">

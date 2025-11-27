@@ -70,7 +70,7 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
   '/management/rates': [
     { table: 'rate_cards_tour_2025', priority: 'high' },
     { table: 'rate_extras_2025', priority: 'high' },
-    { table: 'house_tech_rates', priority: 'high' },
+    { table: 'custom_tech_rates', priority: 'high' },
     { table: 'timesheets', priority: 'high' },
     { table: 'tours', priority: 'medium' },
     { table: 'jobs', priority: 'medium' },

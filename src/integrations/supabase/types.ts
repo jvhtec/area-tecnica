@@ -2793,7 +2793,7 @@ export type Database = {
           },
         ]
       }
-      house_tech_rates: {
+      custom_tech_rates: {
         Row: {
           base_day_eur: number
           currency: string
@@ -2832,14 +2832,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "house_tech_rates_profile_id_fkey"
+            foreignKeyName: "custom_tech_rates_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "house_tech_rates_profile_id_fkey"
+            foreignKeyName: "custom_tech_rates_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
             referencedRelation: "wallboard_profiles"

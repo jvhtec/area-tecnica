@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -13,14 +13,9 @@ import { formatCurrency } from '@/lib/utils';
 export function HouseTechOverridesPanel() {
   const { data: technicians = [], isLoading } = useRatesHouseTechList();
   const [search, setSearch] = useState('');
+  const [openAccordionValue, setOpenAccordionValue] = useState<string | undefined>(undefined);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return technicians;
-    return technicians.filter((tech) =>
-      tech.profileName.toLowerCase().includes(term)
-    );
-  }, [technicians, search]);
+  const searchTerm = search.trim().toLowerCase();
 
   return (
     <Card>
@@ -32,18 +27,38 @@ export function HouseTechOverridesPanel() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="sm:w-64"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            onKeyUp={(e) => e.stopPropagation()}
+            onKeyPress={(e) => e.stopPropagation()}
           />
         </CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading && <Skeleton className="h-32 w-full" />}
-        {!isLoading && filtered.length === 0 && (
-          <p className="text-sm text-muted-foreground">No se encontraron técnicos con ese nombre.</p>
+        {!isLoading && technicians.length === 0 && (
+          <p className="text-sm text-muted-foreground">No hay técnicos disponibles.</p>
         )}
-        {!isLoading && filtered.length > 0 && (
-          <Accordion type="single" collapsible className="space-y-2">
-            {filtered.map((tech) => (
-              <AccordionItem key={tech.profileId} value={tech.profileId} className="border rounded-lg">
+        {!isLoading && technicians.length > 0 && (
+          <>
+            {searchTerm && technicians.every(tech => !tech.profileName.toLowerCase().includes(searchTerm)) && (
+              <p className="text-sm text-muted-foreground mb-4">No se encontraron técnicos con ese nombre.</p>
+            )}
+            <Accordion
+              type="single"
+              collapsible
+              className="space-y-2"
+              value={openAccordionValue}
+              onValueChange={setOpenAccordionValue}
+            >
+              {technicians.map((tech) => {
+                const matches = !searchTerm || tech.profileName.toLowerCase().includes(searchTerm);
+                return (
+                  <AccordionItem
+                    key={tech.profileId}
+                    value={tech.profileId}
+                    className={`border rounded-lg ${!matches ? 'hidden' : ''}`}
+                  >
                 <AccordionTrigger className="px-4 py-3 hover:no-underline">
                   <div className="flex flex-col items-start gap-2 text-left sm:flex-row sm:items-center sm:justify-between sm:w-full">
                     <div>
@@ -73,9 +88,11 @@ export function HouseTechOverridesPanel() {
                     category={tech.defaultCategory ?? undefined}
                   />
                 </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          </>
         )}
       </CardContent>
     </Card>
