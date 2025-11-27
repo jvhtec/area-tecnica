@@ -441,15 +441,16 @@ export function CorporateEmailComposer() {
                 Seleccionar destinatarios...
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[400px] p-0" align="start">
+            <PopoverContent className="w-[400px] p-0 max-h-[400px] overflow-hidden" align="start">
               {recipientPopoverOpen && (
-                <Command shouldFilter={false}>
+                <Command shouldFilter={false} className="h-full">
                   <CommandInput
                     placeholder="Buscar por nombre, email o departamento..."
                     value={recipientSearch}
                     onValueChange={setRecipientSearch}
                   />
                   <CommandEmpty>No se encontraron resultados</CommandEmpty>
+                  <div className="max-h-[320px] overflow-y-auto">
 
                   {/* Quick role selection */}
                   <CommandGroup heading="Por rol">
@@ -493,7 +494,7 @@ export function CorporateEmailComposer() {
 
                   {/* Individual profiles */}
                   <CommandGroup heading="Individuales">
-                    {profiles.map((profile) => {
+                    {profiles.slice(0, 20).map((profile) => {
                       const name = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
                       return (
                         <CommandItem
@@ -514,7 +515,13 @@ export function CorporateEmailComposer() {
                         </CommandItem>
                       );
                     })}
+                    {profiles.length > 20 && (
+                      <div className="px-2 py-3 text-xs text-muted-foreground text-center border-t">
+                        Mostrando 20 de {profiles.length} resultados. Usa la búsqueda para filtrar.
+                      </div>
+                    )}
                   </CommandGroup>
+                  </div>
                 </Command>
               )}
             </PopoverContent>
