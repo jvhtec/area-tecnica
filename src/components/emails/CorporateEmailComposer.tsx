@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { X, Upload, FileText, Image as ImageIcon, Send, Users } from "lucide-react";
+import DOMPurify from "dompurify";
+import { RichTextEditor } from "./RichTextEditor";
 import type {
   SelectedRecipient,
   SendCorporateEmailRequest,
@@ -302,7 +303,9 @@ export function CorporateEmailComposer() {
       return;
     }
 
-    if (!bodyHtml.trim()) {
+    // Strip HTML tags to check if there's actual content
+    const textContent = bodyHtml.replace(/<[^>]*>/g, "").trim();
+    if (!textContent) {
       toast({
         title: "Missing body",
         description: "Please enter email content",
@@ -319,6 +322,45 @@ export function CorporateEmailComposer() {
       });
       return;
     }
+
+    // Sanitize HTML to prevent XSS attacks
+    const sanitizedBodyHtml = DOMPurify.sanitize(bodyHtml, {
+      ALLOWED_TAGS: [
+        "p",
+        "br",
+        "strong",
+        "b",
+        "em",
+        "i",
+        "u",
+        "s",
+        "strike",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "ul",
+        "ol",
+        "li",
+        "a",
+        "img",
+        "span",
+        "div",
+      ],
+      ALLOWED_ATTR: ["href", "src", "alt", "style", "class", "target", "rel"],
+      ALLOWED_STYLES: {
+        "*": {
+          color: [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/],
+          "background-color": [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/],
+          "font-size": [/^\d+(?:px|em|rem|%)$/],
+          "text-align": [/^(?:left|right|center|justify)$/],
+          "max-width": [/.*/],
+          height: [/.*/],
+        },
+      },
+    });
 
     // Build recipient criteria
     const profileIds: string[] = [];
@@ -337,7 +379,7 @@ export function CorporateEmailComposer() {
 
     const request: SendCorporateEmailRequest = {
       subject,
-      bodyHtml,
+      bodyHtml: sanitizedBodyHtml,
       recipients: {
         profileIds: profileIds.length > 0 ? profileIds : undefined,
         departments: departments.length > 0 ? departments : undefined,
@@ -492,17 +534,16 @@ export function CorporateEmailComposer() {
 
         {/* Body */}
         <div className="space-y-2">
-          <Label htmlFor="body">Mensaje (HTML permitido)</Label>
-          <Textarea
-            id="body"
-            placeholder="Escribe tu mensaje aquí... Puedes usar HTML básico."
+          <Label htmlFor="body">Mensaje</Label>
+          <RichTextEditor
             value={bodyHtml}
-            onChange={(e) => setBodyHtml(e.target.value)}
-            rows={10}
-            className="font-mono text-sm"
+            onChange={setBodyHtml}
+            placeholder="Escribe tu mensaje aquí... Usa la barra de herramientas para darle formato."
+            minHeight="300px"
           />
           <p className="text-xs text-muted-foreground">
             Tu mensaje será envuelto en la plantilla corporativa con logos de Sector Pro y Área Técnica.
+            Usa la barra de herramientas para aplicar negrita, cambiar tamaño de fuente, colores, alineación, etc.
           </p>
         </div>
 

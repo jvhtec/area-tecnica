@@ -1,0 +1,104 @@
+/* Rich Text Editor Custom Styles */
+
+.rich-text-editor-wrapper {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: hsl(var(--background));
+}
+
+.rich-text-editor-wrapper .quill {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Toolbar styling */
+.rich-text-editor-wrapper .ql-toolbar {
+  background: hsl(var(--muted));
+  border: none;
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 0.5rem;
+}
+
+.rich-text-editor-wrapper .ql-toolbar button {
+  color: hsl(var(--foreground));
+}
+
+.rich-text-editor-wrapper .ql-toolbar button:hover {
+  color: hsl(var(--primary));
+}
+
+.rich-text-editor-wrapper .ql-toolbar button.ql-active {
+  color: hsl(var(--primary));
+}
+
+.rich-text-editor-wrapper .ql-stroke {
+  stroke: hsl(var(--foreground));
+}
+
+.rich-text-editor-wrapper .ql-toolbar button:hover .ql-stroke {
+  stroke: hsl(var(--primary));
+}
+
+.rich-text-editor-wrapper .ql-toolbar button.ql-active .ql-stroke {
+  stroke: hsl(var(--primary));
+}
+
+.rich-text-editor-wrapper .ql-fill {
+  fill: hsl(var(--foreground));
+}
+
+.rich-text-editor-wrapper .ql-toolbar button:hover .ql-fill {
+  fill: hsl(var(--primary));
+}
+
+.rich-text-editor-wrapper .ql-toolbar button.ql-active .ql-fill {
+  fill: hsl(var(--primary));
+}
+
+.rich-text-editor-wrapper .ql-picker-label {
+  color: hsl(var(--foreground));
+}
+
+.rich-text-editor-wrapper .ql-picker-label:hover {
+  color: hsl(var(--primary));
+}
+
+/* Editor content area */
+.rich-text-editor-wrapper .ql-container {
+  border: none;
+  font-family: inherit;
+  flex: 1;
+}
+
+.rich-text-editor-wrapper .ql-editor {
+  color: hsl(var(--foreground));
+  padding: 1rem;
+}
+
+.rich-text-editor-wrapper .ql-editor.ql-blank::before {
+  color: hsl(var(--muted-foreground));
+  font-style: normal;
+}
+
+/* Focus state */
+.rich-text-editor-wrapper:focus-within {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Dropdown menus */
+.rich-text-editor-wrapper .ql-picker-options {
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+  padding: 0.25rem;
+}
+
+.rich-text-editor-wrapper .ql-picker-item {
+  color: hsl(var(--foreground));
+}
+
+.rich-text-editor-wrapper .ql-picker-item:hover {
+  color: hsl(var(--primary));
+}
