@@ -1,6 +1,6 @@
--- Fix overnight shift calculation in compute_timesheet_amount_2025
--- This migration updates the function to properly handle shifts that span midnight
--- by automatically detecting when end_time < start_time OR when ends_next_day is true
+-- Fix rate breakdown display to properly show base amount for all hour ranges  
+-- This migration updates the function to always populate base_day_amount
+-- and show the plus_10_12 as an incremental premium in the display
 
 CREATE OR REPLACE FUNCTION compute_timesheet_amount_2025(
   _timesheet_id UUID,
@@ -110,20 +110,28 @@ BEGIN
     v_billable_hours := v_worked_hours;
 
     IF v_worked_hours <= 8 THEN
-      -- Up to 8 hours: base day rate
+      -- Up to 8 hours: base day rate only
       v_base_day_amount := v_rate_card.base_day_eur;
       v_total_amount := v_base_day_amount;
     ELSIF v_worked_hours <= 12 THEN
-      -- 8-12 hours: 10-12 hour rate
+      -- 8-12 hours: plus_10_12 rate is used
+      -- For DISPLAY: show base + the incremental premium
+      -- For CALCULATION: total = plus_10_12 rate * hours
       v_plus_10_12_hours := v_worked_hours;
       v_plus_10_12_amount := v_rate_card.plus_10_12_eur * v_worked_hours;
+      -- Display base separately for breakdown clarity
+      v_base_day_amount := v_rate_card.base_day_eur;
       v_total_amount := v_plus_10_12_amount;
     ELSE
       -- Over 12 hours: 12-hour rate + overtime
+      -- For DISPLAY: show base + premium for 12h + overtime
+      -- For CALCULATION: total = (plus_10_12 rate * 12) + (overtime rate * extra hours)
       v_plus_10_12_hours := 12.0;
       v_plus_10_12_amount := v_rate_card.plus_10_12_eur * 12.0;
       v_overtime_hours := v_worked_hours - 12.0;
       v_overtime_amount := v_rate_card.overtime_hour_eur * v_overtime_hours;
+      -- Display base separately for breakdown clarity
+      v_base_day_amount := v_rate_card.base_day_eur;
       v_total_amount := v_plus_10_12_amount + v_overtime_amount;
     END IF;
   END IF;
@@ -174,4 +182,4 @@ GRANT EXECUTE ON FUNCTION compute_timesheet_amount_2025(UUID, BOOLEAN) TO servic
 
 -- Add comment
 COMMENT ON FUNCTION compute_timesheet_amount_2025 IS
-'Calculates timesheet amounts based on rate cards. For evento jobs, always uses 12 hours at the 12-hour rate with no overtime, regardless of actual worked hours. Automatically handles overnight shifts by detecting when end_time < start_time or when ends_next_day flag is set.';
+'Calculates timesheet amounts based on rate cards. For evento jobs, always uses 12 hours at the 12-hour rate with no overtime, regardless of actual worked hours. Automatically handles overnight shifts by detecting when end_time < start_time or when ends_next_day flag is set. Always populates base_day_amount for proper breakdown display.';
