@@ -28,6 +28,8 @@ import { usePushDebug } from '@/hooks/usePushDebug'
 import { PushNotificationMatrix } from '@/components/settings/PushNotificationMatrix'
 import { PushNotificationSchedule } from '@/components/settings/PushNotificationSchedule'
 import { MorningSummarySubscription } from '@/components/settings/MorningSummarySubscription'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { ChevronDown } from "lucide-react"
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -151,6 +153,38 @@ const Settings = () => {
     })()
   }, [subscription])
 
+  const CollapsibleCard = ({
+    title,
+    description,
+    children,
+    defaultOpen = false
+  }: {
+    title: string
+    description?: string
+    children: React.ReactNode
+    defaultOpen?: boolean
+  }) => (
+    <Collapsible defaultOpen={defaultOpen} className="border rounded-lg">
+      <Card className="border-none shadow-none">
+        <CardHeader className="flex flex-row items-start justify-between gap-3">
+          <div className="space-y-1">
+            <CardTitle>{title}</CardTitle>
+            {description && <CardDescription>{description}</CardDescription>}
+          </div>
+          <CollapsibleTrigger asChild>
+            <button className="rounded-md border px-2 py-1 text-sm text-muted-foreground hover:bg-muted flex items-center gap-1">
+              <ChevronDown className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
+              Toggle
+            </button>
+          </CollapsibleTrigger>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="pt-0">{children}</CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  )
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto w-full max-w-full px-4 sm:px-6 lg:px-8 py-4 space-y-4 md:space-y-6">
@@ -168,23 +202,17 @@ const Settings = () => {
         </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 md:gap-6">
-          <div className="space-y-4 md:space-y-6 xl:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Push notifications</CardTitle>
-              <CardDescription>
-                Get real-time updates about jobs, assignments, and documents directly on
-                your device.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 auto-rows-fr">
+          <div className="space-y-4 md:space-y-6">
+            <CollapsibleCard
+              title="Push notifications"
+              description="Get real-time updates about jobs, assignments, and documents directly on your device."
+            >
               {!isSupported ? (
                 <Alert variant="info">
                   <AlertTitle>Unsupported browser</AlertTitle>
                   <AlertDescription>
-                    Your current browser does not support web push. Try using the latest
-                    version of Chrome, Edge, or Safari.
+                    Your current browser does not support web push. Try using the latest version of Chrome, Edge, or Safari.
                   </AlertDescription>
                 </Alert>
               ) : (
@@ -216,8 +244,7 @@ const Settings = () => {
                     <Alert variant="info">
                       <AlertTitle>Notifications blocked</AlertTitle>
                       <AlertDescription>
-                        Enable notifications from your browser settings and reload the page to
-                        subscribe.
+                        Enable notifications from your browser settings and reload the page to subscribe.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -242,37 +269,34 @@ const Settings = () => {
                     >
                       {isDisabling ? 'Disabling…' : 'Disable push'}
                     </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={handleTestNotification}
-                    disabled={!hasSubscription || isInitializing}
-                    className="w-full"
-                  >
-                    <Bell className="mr-2 h-4 w-4" />
-                    Send Test
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={handleBackgroundTest}
-                    disabled={!hasSubscription || isInitializing}
-                    title="Schedules a test push in 5s so you can background the app"
-                    className="w-full"
-                  >
-                    Background test (5s)
-                  </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={handleTestNotification}
+                      disabled={!hasSubscription || isInitializing}
+                      className="w-full"
+                    >
+                      <Bell className="mr-2 h-4 w-4" />
+                      Send Test
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={handleBackgroundTest}
+                      disabled={!hasSubscription || isInitializing}
+                      title="Schedules a test push in 5s so you can background the app"
+                      className="w-full"
+                    >
+                      Background test (5s)
+                    </Button>
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
+            </CollapsibleCard>
 
-          {isSupported && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Bug className="h-4 w-4" /> Push diagnostics</CardTitle>
-                <CardDescription>Useful when you can’t access Safari’s Web Inspector.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            {isSupported && (
+              <CollapsibleCard
+                title="Push diagnostics"
+                description="Useful when you can’t access Safari’s Web Inspector."
+              >
                 <div className="text-sm space-y-1">
                   <p><span className="font-medium">Permission:</span> {permissionLabel}</p>
                   <p><span className="font-medium">Has subscription:</span> {hasSubscription ? 'Yes' : 'No'}</p>
@@ -280,7 +304,7 @@ const Settings = () => {
                     <p className="break-words"><span className="font-medium">Endpoint:</span> {String(subInfo.endpoint).slice(0, 64)}…</p>
                   )}
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 mt-3">
                   <Button variant="secondary" onClick={() => void showLocalTest()} disabled={permission !== 'granted'} className="w-full sm:w-auto">
                     Show local SW test
                   </Button>
@@ -288,7 +312,7 @@ const Settings = () => {
                     Refresh subscription info
                   </Button>
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-muted-foreground mt-3">
                   <p className="font-medium mb-1">Recent SW events</p>
                   {events.length === 0 ? (
                     <p>No events yet. Try Send Test or Local SW test.</p>
@@ -302,26 +326,28 @@ const Settings = () => {
                     </ul>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              </CollapsibleCard>
+            )}
 
-          {isManagementUser && (
-            <PushNotificationMatrix />
-          )}
+            {isManagementUser && (
+              <CollapsibleCard title="Push notification matrix">
+                <PushNotificationMatrix />
+              </CollapsibleCard>
+            )}
 
-          {isManagementUser && (
-            <PushNotificationSchedule />
-          )}
+            {isManagementUser && (
+              <CollapsibleCard title="Push notification schedule">
+                <PushNotificationSchedule />
+              </CollapsibleCard>
+            )}
+          </div>
 
-          {/* Available to management, admin, and house_tech */}
-          <MorningSummarySubscription />
+          <div className="space-y-4 md:space-y-6">
+            <CollapsibleCard title="Morning summary">
+              <MorningSummarySubscription />
+            </CollapsibleCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Users</CardTitle>
-            </CardHeader>
-            <CardContent>
+            <CollapsibleCard title="Users">
               <FilterBar
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
@@ -337,16 +363,9 @@ const Settings = () => {
                 departmentFilter={selectedDepartment === "all" ? "" : selectedDepartment}
                 isManagementUser={isManagementUser}
               />
-            </CardContent>
-          </Card>
-        </div>
+            </CollapsibleCard>
 
-          <div className="space-y-4 md:space-y-6 xl:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Company Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
+            <CollapsibleCard title="Company settings">
               <div className="space-y-4">
                 <h3 className="text-sm font-medium">Company Logo</h3>
                 <p className="text-sm text-muted-foreground">
@@ -354,15 +373,10 @@ const Settings = () => {
                 </p>
                 <CompanyLogoUploader />
               </div>
-            </CardContent>
-          </Card>
-          
-          {isManagementUser && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Equipment Models</CardTitle>
-              </CardHeader>
-              <CardContent>
+            </CollapsibleCard>
+            
+            {isManagementUser && (
+              <CollapsibleCard title="Equipment models">
                 <div className="space-y-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-muted-foreground">
@@ -385,11 +399,10 @@ const Settings = () => {
                     <EquipmentModelsList />
                   </DepartmentProvider>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              </CollapsibleCard>
+            )}
+          </div>
         </div>
-      </div>
       <CreateUserDialog
         open={createUserOpen}
         onOpenChange={setCreateUserOpen}
