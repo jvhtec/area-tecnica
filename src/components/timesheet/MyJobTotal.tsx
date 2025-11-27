@@ -94,6 +94,7 @@ export function MyJobTotal({ jobId }: MyJobTotalProps) {
   const row = isTech ? rows[0] : rows.find(r => r.technician_id === selectedTechId) || rows[0];
   const timesheets = row.timesheets_total_eur || 0;
   const extras = row.extras_total_eur || 0;
+  const expenses = row.expenses_total_eur || 0;
   const total = row.total_eur || 0;
 
   return (
@@ -101,14 +102,14 @@ export function MyJobTotal({ jobId }: MyJobTotalProps) {
       <CardHeader>
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Euro className="h-5 w-5" /> {isTech ? 'My Total For This Job' : 'Technician Total For This Job'}
+            <Euro className="h-5 w-5" /> {isTech ? 'Mi Total Para Este Trabajo' : 'Total del Técnico Para Este Trabajo'}
           </CardTitle>
           {!isTech && rows.length > 0 && (
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <Select value={selectedTechId ?? undefined} onValueChange={(v) => setSelectedTechId(v)}>
                 <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="Select technician" />
+                  <SelectValue placeholder="Seleccionar técnico" />
                 </SelectTrigger>
                 <SelectContent>
                   {rows.map(r => (
@@ -124,10 +125,15 @@ export function MyJobTotal({ jobId }: MyJobTotalProps) {
       </CardHeader>
       <CardContent className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          <div>Timesheets: <span className="font-medium text-foreground">{formatCurrency(timesheets)}</span></div>
+          <div>Partes: <span className="font-medium text-foreground">{formatCurrency(timesheets)}</span></div>
           {extras > 0 && (
             <div className="flex items-center gap-1">
               <Plus className="h-3 w-3" /> Extras: <span className="font-medium text-foreground">{formatCurrency(extras)}</span>
+            </div>
+          )}
+          {expenses > 0 && (
+            <div className="flex items-center gap-1">
+              <Plus className="h-3 w-3" /> Gastos: <span className="font-medium text-foreground">{formatCurrency(expenses)}</span>
             </div>
           )}
         </div>

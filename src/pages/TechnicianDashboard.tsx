@@ -20,6 +20,7 @@ import { useTechnicianDashboardSubscriptions } from "@/hooks/useMobileRealtimeSu
 import { TechnicianTourRates } from "@/components/dashboard/TechnicianTourRates";
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 import { getCategoryFromAssignment } from "@/utils/roleCategory";
+import { PendingExpensesSummary } from "@/components/expenses/PendingExpensesSummary";
 
 const TechnicianDashboard = () => {
   const [timeSpan, setTimeSpan] = useState<string>("1week");
@@ -310,6 +311,9 @@ const TechnicianDashboard = () => {
 
       {/* My Tours Section */}
       <MyToursSection />
+
+      {/* Pending Expenses Summary */}
+      <PendingExpensesSummary />
 
       {/* Tour Rates Section */}
       <TechnicianTourRates />
