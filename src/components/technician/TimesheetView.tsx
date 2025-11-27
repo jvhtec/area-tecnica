@@ -150,6 +150,18 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
     });
   };
 
+  // Auto-detect overnight shifts when editing
+  useEffect(() => {
+    if (editingId && formData.start_time && formData.end_time) {
+      const isOvernightShift = formData.end_time < formData.start_time;
+      if (isOvernightShift && !formData.ends_next_day) {
+        setFormData(prev => ({ ...prev, ends_next_day: true }));
+      } else if (!isOvernightShift && formData.ends_next_day) {
+        setFormData(prev => ({ ...prev, ends_next_day: false }));
+      }
+    }
+  }, [formData.start_time, formData.end_time, editingId]);
+
   const cancelEditing = () => {
     setEditingId(null);
   };
@@ -334,18 +346,18 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                     // In edit mode, use form defaults; in display mode, only calculate if both times exist
                     const workedHours = isEditing
                       ? calculateHours(
-                          formData.start_time,
-                          formData.end_time,
-                          formData.break_minutes,
-                          formData.ends_next_day
-                        )
+                        formData.start_time,
+                        formData.end_time,
+                        formData.break_minutes,
+                        formData.ends_next_day
+                      )
                       : (timesheet.start_time && timesheet.end_time)
                         ? calculateHours(
-                            timesheet.start_time,
-                            timesheet.end_time,
-                            timesheet.break_minutes || 0,
-                            timesheet.ends_next_day
-                          )
+                          timesheet.start_time,
+                          timesheet.end_time,
+                          timesheet.break_minutes || 0,
+                          timesheet.ends_next_day
+                        )
                         : 0;
 
                     return (
@@ -424,6 +436,11 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                                     className="w-4 h-4 rounded"
                                   />
                                   <span className={`text-xs ${theme.textMuted}`}>Termina al día siguiente</span>
+                                  {formData.end_time < formData.start_time && (
+                                    <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 text-[9px] px-1.5 py-0.5">
+                                      Auto
+                                    </Badge>
+                                  )}
                                 </label>
                               </div>
                             </div>
@@ -563,27 +580,27 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                                   <div className="grid grid-cols-2 gap-2 text-sm">
                                     <div>
                                       <span className={theme.textMuted}>Horas: </span>
-                                      <span className={theme.textMain}>{timesheet.amount_breakdown_visible.worked_hours_rounded}h</span>
+                                      <span className={theme.textMain}>{timesheet.amount_breakdown_visible.worked_hours_rounded || 0}h</span>
                                     </div>
                                     <div>
                                       <span className={theme.textMuted}>Base: </span>
-                                      <span className={theme.textMain}>€{timesheet.amount_breakdown_visible.base_amount_eur?.toFixed(2)}</span>
+                                      <span className={theme.textMain}>€{(timesheet.amount_breakdown_visible.base_amount_eur ?? 0).toFixed(2)}</span>
                                     </div>
                                     {(timesheet.amount_breakdown_visible.overtime_hours || 0) > 0 && (
                                       <>
                                         <div>
                                           <span className={theme.textMuted}>HE: </span>
-                                          <span className={theme.textMain}>{timesheet.amount_breakdown_visible.overtime_hours}h</span>
+                                          <span className={theme.textMain}>{timesheet.amount_breakdown_visible.overtime_hours || 0}h</span>
                                         </div>
                                         <div>
                                           <span className={theme.textMuted}>+HE: </span>
-                                          <span className={theme.textMain}>€{timesheet.amount_breakdown_visible.overtime_amount_eur?.toFixed(2)}</span>
+                                          <span className={theme.textMain}>€{(timesheet.amount_breakdown_visible.overtime_amount_eur ?? 0).toFixed(2)}</span>
                                         </div>
                                       </>
                                     )}
                                   </div>
                                   <div className="mt-2 pt-2 border-t border-emerald-500/20">
-                                    <span className="text-emerald-600 font-bold">Total: €{timesheet.amount_breakdown_visible.total_eur?.toFixed(2)}</span>
+                                    <span className="text-emerald-600 font-bold">Total: €{(timesheet.amount_breakdown_visible.total_eur ?? 0).toFixed(2)}</span>
                                   </div>
                                 </div>
                               )}

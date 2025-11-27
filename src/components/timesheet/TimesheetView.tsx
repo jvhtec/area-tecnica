@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +53,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     end_time: '',
     break_minutes: undefined,
     overtime_hours: undefined,
-    notes: ''
+    notes: '',
+    ends_next_day: false
   });
   const [formData, setFormData] = useState<TimesheetFormData>({
     date: selectedDate,
@@ -72,12 +73,12 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   // Filter timesheets based on user role
   const filteredTimesheets = useMemo(() => {
     if (!timesheets || !user) return [];
-    
+
     // Technicians and house_tech only see their own timesheets
     if (userRole === 'technician' || userRole === 'house_tech') {
       return timesheets.filter(t => t.technician_id === user.id);
     }
-    
+
     // Management sees all timesheets
     return timesheets;
   }, [timesheets, userRole, user]);
@@ -131,6 +132,32 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     });
   };
 
+  // Auto-detect overnight shifts when editing
+  useEffect(() => {
+    if (editingTimesheet && formData.start_time && formData.end_time) {
+      const isOvernightShift = formData.end_time < formData.start_time;
+      if (isOvernightShift && !formData.ends_next_day) {
+        // Automatically check the ends_next_day checkbox
+        setFormData(prev => ({ ...prev, ends_next_day: true }));
+      } else if (!isOvernightShift && formData.ends_next_day) {
+        // Automatically uncheck if times are corrected
+        setFormData(prev => ({ ...prev, ends_next_day: false }));
+      }
+    }
+  }, [formData.start_time, formData.end_time, editingTimesheet]);
+
+  // Auto-detect overnight shifts when bulk editing
+  useEffect(() => {
+    if (showBulkEditForm && bulkFormData.start_time && bulkFormData.end_time) {
+      const isOvernightShift = bulkFormData.end_time < bulkFormData.start_time;
+      if (isOvernightShift && !bulkFormData.ends_next_day) {
+        setBulkFormData(prev => ({ ...prev, ends_next_day: true }));
+      } else if (!isOvernightShift && bulkFormData.ends_next_day) {
+        setBulkFormData(prev => ({ ...prev, ends_next_day: false }));
+      }
+    }
+  }, [bulkFormData.start_time, bulkFormData.end_time, showBulkEditForm]);
+
   const calculateHours = (startTime: string, endTime: string, breakMinutes: number, endsNextDay?: boolean) => {
     if (!startTime || !endTime) return 0;
 
@@ -142,7 +169,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     }
     const diffHours = diffMs / (1000 * 60 * 60);
     const workingHours = diffHours - (breakMinutes / 60);
-    
+
     return Math.max(0, workingHours);
   };
 
@@ -191,10 +218,10 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
 
   const handleBulkAction = async (action: 'submit' | 'approve' | 'delete') => {
     if (selectedTimesheets.size === 0) return;
-    
+
     setIsBulkUpdating(true);
     const timesheetIds = Array.from(selectedTimesheets);
-    
+
     try {
       if (action === 'delete') {
         await deleteTimesheets(timesheetIds);
@@ -206,13 +233,13 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
             return approveTimesheet(timesheetId);
           }
         });
-        
+
         await Promise.all(promises);
       }
-      
+
       setSelectedTimesheets(new Set());
       setShowBulkActions(false);
-      
+
       // Refetch after bulk operations
       setTimeout(() => {
         refetch();
@@ -225,34 +252,35 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   };
 
   const handleBulkEdit = async () => {
-    console.log('Bulk edit starting with:', { 
-      selectedTimesheets: Array.from(selectedTimesheets), 
-      bulkFormData 
+    console.log('Bulk edit starting with:', {
+      selectedTimesheets: Array.from(selectedTimesheets),
+      bulkFormData
     });
-    
+
     setIsBulkUpdating(true);
-    
+
     try {
       const promises = Array.from(selectedTimesheets).map(timesheetId => {
         const updates: Partial<Timesheet> = {};
-        
+
         if (bulkFormData.start_time) updates.start_time = bulkFormData.start_time;
         if (bulkFormData.end_time) updates.end_time = bulkFormData.end_time;
         if (bulkFormData.break_minutes !== undefined) updates.break_minutes = bulkFormData.break_minutes;
         if (bulkFormData.overtime_hours !== undefined) updates.overtime_hours = bulkFormData.overtime_hours;
         if (bulkFormData.notes) updates.notes = bulkFormData.notes;
-        
+        if (bulkFormData.ends_next_day !== undefined) updates.ends_next_day = bulkFormData.ends_next_day;
+
         console.log('Updating timesheet', timesheetId, 'with:', updates);
         // Skip refetch for bulk operations
         return updateTimesheet(timesheetId, updates, true);
       });
-      
+
       const results = await Promise.all(promises);
       console.log('Bulk edit results:', results);
-      
+
       // Now refetch once to get all updated data
       await refetch();
-      
+
       setSelectedTimesheets(new Set());
       setShowBulkActions(false);
       setShowBulkEditForm(false);
@@ -261,9 +289,10 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
         end_time: '',
         break_minutes: undefined,
         overtime_hours: undefined,
-        notes: ''
+        notes: '',
+        ends_next_day: false
       });
-      
+
       console.log('Bulk edit completed successfully');
     } catch (error) {
       console.error('Error in bulk edit:', error);
@@ -306,11 +335,11 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const isTechnician = userRole === 'technician' || userRole === 'house_tech';
   const isHouseTech = userRole === 'house_tech';
 
-  console.log('TimesheetView Debug:', { 
-    userRole, 
+  console.log('TimesheetView Debug:', {
+    userRole,
     isManagementUser,
     isTechnician,
-    canManage, 
+    canManage,
     filteredTimesheetsLength: filteredTimesheets.length,
     user: user?.email,
     userId: user?.id
@@ -451,6 +480,23 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   disabled={isBulkUpdating}
                 />
               </div>
+              <div className="flex flex-col justify-end gap-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="bulk_ends_next_day"
+                    type="checkbox"
+                    checked={!!bulkFormData.ends_next_day}
+                    onChange={(e) => setBulkFormData({ ...bulkFormData, ends_next_day: e.target.checked })}
+                    disabled={isBulkUpdating}
+                  />
+                  <Label htmlFor="bulk_ends_next_day">Termina al día siguiente</Label>
+                  {bulkFormData.end_time && bulkFormData.start_time && bulkFormData.end_time < bulkFormData.start_time && (
+                    <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800">
+                      Auto-detectado
+                    </Badge>
+                  )}
+                </div>
+              </div>
               <div className="flex items-end">
                 <Button
                   onClick={() => {
@@ -557,7 +603,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
               const canSubmitTimesheet = isTechnician
                 ? (timesheet.technician_id === user?.id && submittableStatuses.includes(timesheet.status))
                 : (isManagementUser && submittableStatuses.includes(timesheet.status));
-              
+
               console.log('Timesheet permission check:', {
                 timesheetId: timesheet.id,
                 technicianId: timesheet.technician_id,
@@ -567,7 +613,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                 canEditTimesheet,
                 canSubmitTimesheet
               });
-              
+
               return (
                 <div key={timesheet.id} className="border rounded-lg p-4 space-y-4">
                   <div className="flex items-center justify-between">
@@ -593,7 +639,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         {timesheet.status}
                       </Badge>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       {/* Edit button */}
                       {canEditTimesheet && (
@@ -667,7 +713,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           Revertir Aprobación
                         </Button>
                       )}
-                      
+
                       {/* Delete button - only for management */}
                       {isManagementUser && (
                         <Button
@@ -697,7 +743,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   )}
 
                   {editingTimesheet === timesheet.id ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
                         <Label htmlFor="start_time">Hora de Inicio</Label>
                         <Input
@@ -733,6 +779,11 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           onChange={(e) => setFormData({ ...formData, ends_next_day: e.target.checked })}
                         />
                         <Label htmlFor="ends_next_day">Termina al día siguiente</Label>
+                        {formData.end_time < formData.start_time && (
+                          <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800">
+                            Auto-detectado
+                          </Badge>
+                        )}
                       </div>
                       <div>
                         <Label htmlFor="category">Categoría</Label>
@@ -824,68 +875,68 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       - Technicians: visible only when amount_breakdown_visible exists
                       - House tech: never visible
                   */}
-                   {(() => {
-                     const breakdownVisible = !!timesheet.amount_breakdown_visible;
-                     const isTechnicianRole = userRole === 'technician';
-                     const isHouseTechRole = userRole === 'house_tech';
-                     const canShowRates = isManagementUser || (isTechnicianRole && breakdownVisible) || (isHouseTechRole && breakdownVisible);
-                     if (!canShowRates) return null;
+                  {(() => {
+                    const breakdownVisible = !!timesheet.amount_breakdown_visible;
+                    const isTechnicianRole = userRole === 'technician';
+                    const isHouseTechRole = userRole === 'house_tech';
+                    const canShowRates = isManagementUser || (isTechnicianRole && breakdownVisible) || (isHouseTechRole && breakdownVisible);
+                    if (!canShowRates) return null;
                     return (
-                  <div className="mt-4 p-3 rounded-md border">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="font-medium">Cálculo de Tarifa</p>
-                      {isManagementUser && (
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => recalcTimesheet(timesheet.id)}>Recalcular</Button>
-                          {!timesheet.category && (
-                            <Badge variant="destructive">Establecer categoría para calcular</Badge>
+                      <div className="mt-4 p-3 rounded-md border">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="font-medium">Cálculo de Tarifa</p>
+                          {isManagementUser && (
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => recalcTimesheet(timesheet.id)}>Recalcular</Button>
+                              {!timesheet.category && (
+                                <Badge variant="destructive">Establecer categoría para calcular</Badge>
+                              )}
+                            </div>
                           )}
                         </div>
-                       )}
-                     </div>
 
-                     {(() => {
-                      const breakdown = isManagementUser
-                        ? timesheet.amount_breakdown
-                        : timesheet.amount_breakdown_visible;
-                      if (!breakdown) {
-                        return (
-                          <p className="text-sm text-muted-foreground">
-                            {userRole === 'technician' ? 'Pendiente de aprobación' : 'No hay cálculo disponible todavía'}
-                          </p>
-                        );
-                      }
-                      return (
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Horas Redondeadas</p>
-                            <p className="font-medium">{breakdown.worked_hours_rounded}h</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Cantidad Base</p>
-                            <p className="font-medium">€{breakdown.base_amount_eur.toFixed(2)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Horas Extra</p>
-                            <p className="font-medium">{breakdown.overtime_hours}h × €{breakdown.overtime_hour_eur}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Cantidad HE</p>
-                            <p className="font-medium">€{breakdown.overtime_amount_eur.toFixed(2)}</p>
-                          </div>
-                           <div>
-                             <p className="text-muted-foreground">Total</p>
-                             <p className="font-semibold">€{breakdown.total_eur.toFixed(2)}</p>
-                           </div>
-                           {(userRole === 'technician' || userRole === 'house_tech') && (
-                             <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
-                               Notas: redondeo después de 30 minutos; pueden aplicarse algunas condiciones como descuentos de 30€ para autónomos según el contrato.
-                             </div>
-                           )}
-                        </div>
-                      );
-                    })()}
-                  </div>
+                        {(() => {
+                          const breakdown = isManagementUser
+                            ? timesheet.amount_breakdown
+                            : timesheet.amount_breakdown_visible;
+                          if (!breakdown) {
+                            return (
+                              <p className="text-sm text-muted-foreground">
+                                {userRole === 'technician' ? 'Pendiente de aprobación' : 'No hay cálculo disponible todavía'}
+                              </p>
+                            );
+                          }
+                          return (
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                              <div>
+                                <p className="text-muted-foreground">Horas Redondeadas</p>
+                                <p className="font-medium">{breakdown.worked_hours_rounded || 0}h</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Cantidad Base</p>
+                                <p className="font-medium">€{(breakdown.base_amount_eur ?? 0).toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Horas Extra</p>
+                                <p className="font-medium">{breakdown.overtime_hours || 0}h × €{breakdown.overtime_hour_eur || 0}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Cantidad HE</p>
+                                <p className="font-medium">€{(breakdown.overtime_amount_eur ?? 0).toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Total</p>
+                                <p className="font-semibold">€{(breakdown.total_eur ?? 0).toFixed(2)}</p>
+                              </div>
+                              {(userRole === 'technician' || userRole === 'house_tech') && (
+                                <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
+                                  Notas: redondeo después de 30 minutos; pueden aplicarse algunas condiciones como descuentos de 30€ para autónomos según el contrato.
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     );
                   })()}
 
