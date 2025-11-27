@@ -48,45 +48,47 @@ export function OptimizedSubscriptionProvider({ children }: OptimizedSubscriptio
     lastRefreshTime: Date.now(),
   });
 
+  // Get manager instance at top level (singleton)
+  const manager = OptimizedSubscriptionManager.getInstance(queryClient);
+
+  // Optimized refresh function at top level
+  const refreshSubscriptions = useCallback(() => {
+    console.log('Refreshing optimized subscriptions...');
+    const status = manager.getStatus();
+    setState(prev => ({
+      ...prev,
+      lastRefreshTime: Date.now(),
+      connectionStatus: status.connectionStatus,
+      activeSubscriptions: status.activeSubscriptions,
+      subscribedTables: status.tables
+    }));
+    // Only show toasts to admin users
+    if (isAdmin) {
+      toast.success('Subscriptions refreshed');
+    }
+  }, [manager, isAdmin]);
+
+  // Batch subscribe function at top level
+  const batchSubscribe = useCallback((subscriptions: Array<{
+    table: string;
+    queryKey: string | string[];
+    filter?: any;
+    priority?: 'high' | 'medium' | 'low';
+  }>) => {
+    manager.batchSubscribe(subscriptions);
+
+    // Update state
+    const status = manager.getStatus();
+    setState(prev => ({
+      ...prev,
+      connectionStatus: status.connectionStatus,
+      activeSubscriptions: status.activeSubscriptions,
+      subscribedTables: status.tables
+    }));
+  }, [manager]);
+
   // Initialize the optimized subscription manager
   useEffect(() => {
-    const manager = OptimizedSubscriptionManager.getInstance(queryClient);
-
-    // Optimized refresh function
-    const refreshSubscriptions = useCallback(() => {
-      console.log('Refreshing optimized subscriptions...');
-      const status = manager.getStatus();
-      setState(prev => ({
-        ...prev,
-        lastRefreshTime: Date.now(),
-        connectionStatus: status.connectionStatus,
-        activeSubscriptions: status.activeSubscriptions,
-        subscribedTables: status.tables
-      }));
-      // Only show toasts to admin users
-      if (isAdmin) {
-        toast.success('Subscriptions refreshed');
-      }
-    }, [manager, isAdmin]);
-
-    // Batch subscribe function
-    const batchSubscribe = useCallback((subscriptions: Array<{
-      table: string;
-      queryKey: string | string[];
-      filter?: any;
-      priority?: 'high' | 'medium' | 'low';
-    }>) => {
-      manager.batchSubscribe(subscriptions);
-      
-      // Update state
-      const status = manager.getStatus();
-      setState(prev => ({ 
-        ...prev,
-        connectionStatus: status.connectionStatus,
-        activeSubscriptions: status.activeSubscriptions,
-        subscribedTables: status.tables
-      }));
-    }, [manager]);
 
     // Update state with functions
     setState(prev => ({
@@ -120,7 +122,7 @@ export function OptimizedSubscriptionProvider({ children }: OptimizedSubscriptio
       clearInterval(statusInterval);
       manager.cleanup();
     };
-  }, [queryClient]);
+  }, [queryClient, manager, refreshSubscriptions, batchSubscribe]);
 
   return (
     <OptimizedSubscriptionContext.Provider value={state}>
