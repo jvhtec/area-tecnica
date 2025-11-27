@@ -29,14 +29,14 @@ interface DashboardMobileHubProps {
 }
 
 const themeTokens = {
-  bg: "bg-[#f8fafc]",
-  card: "bg-white border-slate-200 shadow-sm",
-  textMain: "text-slate-900",
-  textMuted: "text-slate-500",
-  divider: "border-slate-100",
-  toolBg: "bg-white border-slate-200 shadow-sm",
-  accent: "bg-blue-600 text-white",
-  hover: "hover:bg-slate-50",
+  bg: "bg-background",
+  card: "bg-card border-border shadow-sm",
+  textMain: "text-foreground",
+  textMuted: "text-muted-foreground",
+  divider: "border-border",
+  toolBg: "bg-card border-border shadow-sm",
+  accent: "bg-primary text-primary-foreground",
+  hover: "hover:bg-accent",
 };
 
 export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
@@ -132,7 +132,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrevDay}
-              className={cn("p-1 rounded hover:bg-slate-200", themeTokens.textMain)}
+              className={cn("p-1 rounded", themeTokens.hover, themeTokens.textMain)}
             >
               <ChevronLeft size={20} />
             </button>
@@ -146,7 +146,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
             </div>
             <button
               onClick={handleNextDay}
-              className={cn("p-1 rounded hover:bg-slate-200", themeTokens.textMain)}
+              className={cn("p-1 rounded", themeTokens.hover, themeTokens.textMain)}
             >
               <ChevronRight size={20} />
             </button>
@@ -234,7 +234,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                           {departments.map((dept: string) => (
                             <span
                               key={dept}
-                              className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100", themeTokens.textMuted)}
+                              className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-muted", themeTokens.textMuted)}
                             >
                               {dept}
                             </span>

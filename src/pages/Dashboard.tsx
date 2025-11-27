@@ -10,6 +10,7 @@ import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
+import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Send, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ const Dashboard = () => {
 
   // Modal state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<any>(null);
 
   // New Dialog States
@@ -121,8 +123,12 @@ const Dashboard = () => {
   }
 
   // Event handlers
-  const handleJobClick = (_jobId: string) => {
-    // Parity: disable assignment dialog on card click in dashboard
+  const handleJobClick = (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (job) {
+      setSelectedJob(job);
+      setIsDetailsDialogOpen(true);
+    }
   };
 
   const handleEditClick = (job: any) => {
@@ -194,11 +200,18 @@ const Dashboard = () => {
 
         {/* Dialogs */}
         {selectedJob && (
-          <EditJobDialog
-            open={isEditDialogOpen}
-            onOpenChange={setIsEditDialogOpen}
-            job={selectedJob}
-          />
+          <>
+            <EditJobDialog
+              open={isEditDialogOpen}
+              onOpenChange={setIsEditDialogOpen}
+              job={selectedJob}
+            />
+            <JobDetailsDialog
+              open={isDetailsDialogOpen}
+              onOpenChange={setIsDetailsDialogOpen}
+              job={selectedJob}
+            />
+          </>
         )}
 
         <MessagesDialog
