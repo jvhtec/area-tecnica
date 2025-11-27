@@ -370,8 +370,8 @@ export function CorporateEmailComposer() {
       ALLOWED_ATTR: ["href", "src", "alt", "style", "class", "target"],
       ALLOWED_STYLES: {
         "*": {
-          color: [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/],
-          "background-color": [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/],
+          color: [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/],
+          "background-color": [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/],
           "font-size": [/^\d+(?:px|em|rem|%)$/],
           "text-align": [/^(?:left|right|center|justify)$/],
           "max-width": [/^\d+(?:px|em|rem|%)$|^auto$/],
