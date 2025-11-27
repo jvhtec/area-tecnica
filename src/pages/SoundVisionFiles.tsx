@@ -27,7 +27,7 @@ const SoundVisionFiles = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-6 max-w-7xl h-[calc(100vh-6rem)] flex items-center justify-center">
+      <div className="w-full max-w-full px-4 lg:px-8 py-6 h-[calc(100vh-6rem)] flex items-center justify-center bg-background text-foreground">
         <div className="flex items-center gap-2">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
           <span className="text-muted-foreground">Cargando...</span>
@@ -39,7 +39,7 @@ const SoundVisionFiles = () => {
   // Show access request dialog if user doesn't have access
   if (!hasSoundVisionAccess) {
     return (
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
+      <div className="w-full max-w-full px-4 lg:px-8 py-6 space-y-4 bg-background text-foreground">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
@@ -81,7 +81,7 @@ const SoundVisionFiles = () => {
   // Show loading state while files are being fetched
   if (isFilesLoading) {
     return (
-      <div className="container mx-auto px-4 py-6 max-w-7xl h-[calc(100vh-6rem)] flex items-center justify-center">
+      <div className="w-full max-w-full px-4 lg:px-8 py-6 h-[calc(100vh-6rem)] flex items-center justify-center bg-background text-foreground">
         <div className="flex items-center gap-2">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
           <span className="text-muted-foreground">Cargando archivos de SoundVision...</span>
@@ -91,7 +91,7 @@ const SoundVisionFiles = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl h-[calc(100vh-6rem)]">
+    <div className="w-full max-w-full px-4 lg:px-8 py-6 h-[calc(100vh-6rem)] bg-background text-foreground">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
@@ -101,14 +101,14 @@ const SoundVisionFiles = () => {
           <h1 className="text-xl font-semibold">Archivos SoundVision</h1>
         </div>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[calc(100%-2.5rem)]">
-        {/* Map - takes 60% on desktop */}
-        <Card className="lg:col-span-3 p-0 h-full overflow-hidden">
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 h-[calc(100%-2.5rem)]">
+        {/* Map - takes ~60% on desktop/ultrawide */}
+        <Card className="xl:col-span-3 p-0 h-full overflow-hidden">
           <SoundVisionMap files={files} />
         </Card>
 
-        {/* File Database - takes 40% on desktop */}
-        <Card className="lg:col-span-2 p-6 h-full overflow-auto">
+        {/* File Database - takes ~40% on desktop/ultrawide */}
+        <Card className="xl:col-span-2 p-6 h-full overflow-auto">
           <SoundVisionDatabaseDialog />
         </Card>
       </div>
