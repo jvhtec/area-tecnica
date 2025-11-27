@@ -2,8 +2,11 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send, Receipt } from 'lucide-react';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import { cn, formatCurrency } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
@@ -19,7 +22,7 @@ import {
 import { sendTourJobEmails } from '@/lib/tour-payout-email';
 import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-export';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
-import type { JobPayoutTotals } from '@/types/jobExtras';
+import type { JobExpenseBreakdownItem, JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 
 interface JobPayoutTotalsPanelProps {
@@ -185,6 +188,11 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const [isSendingEmails, setIsSendingEmails] = React.useState(false);
   const [sendingByTech, setSendingByTech] = React.useState<Record<string, boolean>>({});
   const [missingEmailTechIds, setMissingEmailTechIds] = React.useState<string[]>([]);
+  const [expenseDialog, setExpenseDialog] = React.useState<{
+    technicianId: string;
+    breakdown: JobExpenseBreakdownItem[];
+    name: string;
+  } | null>(null);
   const lastPreparedContext = React.useRef<JobPayoutEmailContextResult | null>(null);
 
   React.useEffect(() => {
@@ -677,6 +685,37 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                   )}
                 </>
               )}
+
+              {/* Expenses breakdown */}
+              {((payout.expenses_breakdown && payout.expenses_breakdown.length > 0) || payout.expenses_total_eur > 0) && (
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-slate-400" />
+                    <span>Gastos aprobados:</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">
+                      {formatCurrency(payout.expenses_total_eur)}
+                    </Badge>
+                    {payout.expenses_breakdown && payout.expenses_breakdown.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        className="text-blue-300 hover:text-blue-200 hover:bg-white/10"
+                        onClick={() =>
+                          setExpenseDialog({
+                            technicianId: payout.technician_id,
+                            breakdown: payout.expenses_breakdown,
+                            name: getTechName(payout.technician_id),
+                          })
+                        }
+                      >
+                        Ver desglose
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Vehicle disclaimer */}
@@ -706,11 +745,76 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           </div>
         ))}
 
+        <Dialog
+          open={Boolean(expenseDialog)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setExpenseDialog(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-lg bg-[#0f1219] border-[#1f232e] text-white">
+            <DialogHeader>
+              <DialogTitle>
+                Gastos — {expenseDialog?.name ?? ''}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {expenseDialog?.breakdown && expenseDialog.breakdown.length > 0 ? (
+                expenseDialog.breakdown.map((item) => {
+                  const pendingEuros = Number(item.submitted_total_eur ?? 0);
+                  const approvedEuros = Number(item.approved_total_eur ?? 0);
+                  const draftEuros = Number(item.draft_total_eur ?? 0);
+                  const rejectedEuros = Number(item.rejected_total_eur ?? 0);
+                  const statusCounts = item.status_counts || {};
+                  return (
+                    <div
+                      key={`${expenseDialog.technicianId}-${item.category_slug}`}
+                      className="border border-white/10 rounded-lg p-3 bg-white/5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-semibold capitalize">
+                          {item.category_slug.replace(/_/g, ' ')}
+                        </h4>
+                        <Badge variant="outline" className="text-white">
+                          {formatCurrency(approvedEuros)}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-300">
+                        <span>Aprobados: {formatCurrency(approvedEuros)}</span>
+                        <span>Pendientes: {formatCurrency(pendingEuros)}</span>
+                        <span>Borrador: {formatCurrency(draftEuros)}</span>
+                        <span>Rechazados: {formatCurrency(rejectedEuros)}</span>
+                      </div>
+                      {Object.keys(statusCounts).length > 0 && (
+                        <div className="mt-2 text-xs text-slate-400 flex flex-wrap gap-2">
+                          {Object.entries(statusCounts).map(([status, count]) => (
+                            <span key={status} className="px-2 py-1 bg-white/10 rounded">
+                              {status}: {count}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {item.last_receipt_at && (
+                        <div className="mt-2 text-xs text-slate-400">
+                          Último recibo: {format(new Date(item.last_receipt_at), 'PPP HH:mm', { locale: es })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-slate-300">No hay gastos registrados para este técnico.</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Grand total if multiple technicians */}
         {payoutTotals.length > 1 && (
           <div className="mt-6 p-4 bg-white/5 rounded-lg border border-white/10 text-white">
             <div className="flex justify-between items-center text-lg font-bold">
-              <span>Total global del trabajo:</span>
+
               <span className="text-blue-300">
                 {formatCurrency(
                   payoutTotals.reduce((sum, payout) => sum + payout.total_eur, 0)
@@ -731,6 +835,14 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                 <span>
                   {formatCurrency(
                     payoutTotals.reduce((sum, payout) => sum + payout.extras_total_eur, 0)
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total gastos:</span>
+                <span>
+                  {formatCurrency(
+                    payoutTotals.reduce((sum, payout) => sum + payout.expenses_total_eur, 0)
                   )}
                 </span>
               </div>

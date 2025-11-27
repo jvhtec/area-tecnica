@@ -36,6 +36,7 @@ import { labelForCode } from '@/utils/roles';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { TourRatesPanel } from '@/components/tours/TourRatesPanel';
 import { JobExtrasManagement } from '@/components/jobs/JobExtrasManagement';
+import { JobExpensesPanel } from '@/components/jobs/JobExpensesPanel';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
@@ -229,6 +230,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const showTourRatesTab = !isDryhire
     && jobDetails?.job_type === 'tourdate'
     && canSeeRateTabs;
+  const canManageExpenses = ['admin', 'management', 'logistics'].includes(userRole || '');
+  const showExpensesTab = !isDryhire && canManageExpenses;
   const resolvedDocuments = jobDetails?.job_documents || job?.job_documents || [];
   const documentsLoading = isJobLoading;
   const normalizedDepartment = department?.toLowerCase?.() ?? null;
@@ -269,6 +272,29 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     }
     return map;
   }, [jobDetails?.timesheets]);
+
+  const expenseTechnicianOptions = React.useMemo(() => {
+    const map = new Map<string, string>();
+    (jobDetails?.job_assignments ?? []).forEach((assignment: any) => {
+      const techId = assignment.technician_id;
+      if (!techId || map.has(techId)) return;
+      const name = [assignment.profiles?.first_name, assignment.profiles?.last_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      map.set(techId, name || techId);
+    });
+    (jobDetails?.timesheets ?? []).forEach((row: any) => {
+      const techId = row.technician_id;
+      if (!techId || map.has(techId)) return;
+      const name = [row.technician?.first_name, row.technician?.last_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      map.set(techId, name || techId);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name: name || id }));
+  }, [jobDetails?.job_assignments, jobDetails?.timesheets]);
 
   // Flex Work Orders progress (manager-only)
   const [isSyncingWorkOrders, setIsSyncingWorkOrders] = useState(false);
@@ -336,7 +362,10 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     if (!showExtrasTab && selectedTab === 'extras') {
       setSelectedTab('info');
     }
-  }, [showTourRatesTab, showExtrasTab, selectedTab]);
+    if (!showExpensesTab && selectedTab === 'expenses') {
+      setSelectedTab('info');
+    }
+  }, [showTourRatesTab, showExtrasTab, showExpensesTab, selectedTab]);
 
   // Reset selectedTab to 'info' when dialog opens OR when job changes
   // This prevents showing stale/empty tabs when switching between jobs
@@ -374,7 +403,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   // Reset selectedTab if user is on a dryhire-excluded tab when isDryhire is true
   // This runs AFTER the dialog has opened and should handle job type changes
   useEffect(() => {
-    if (open && isDryhire && ['location', 'personnel', 'documents', 'restaurants', 'weather', 'extras'].includes(selectedTab)) {
+    if (open && isDryhire && ['location', 'personnel', 'documents', 'restaurants', 'weather', 'extras', 'expenses'].includes(selectedTab)) {
       console.log('JobDetailsDialog: Dryhire job detected, resetting from', selectedTab, 'to info');
       setSelectedTab('info');
     }
@@ -621,11 +650,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   // Base tabs: Info (1)
   // Conditional tabs: Location, Personnel, Documents, Restaurants, Weather (5) - hidden if dryhire
   // Optional tabs: Tour Rates, Extras
-  const gridColsClass = isDryhire
-    ? 'grid-cols-1' // Only Info tab for dryhire
-    : showExtrasTab
-      ? (showTourRatesTab ? 'grid-cols-2 sm:grid-cols-4 md:grid-cols-8' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-7')
-      : (showTourRatesTab ? 'grid-cols-2 sm:grid-cols-4 md:grid-cols-7' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6');
+  const gridColsClass = isDryhire ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-4 md:grid-cols-8';
 
   const showPendingRatesNotice = !isDryhire
     && jobDetails?.job_type === 'tourdate'
@@ -657,6 +682,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 <TabsTrigger value="tour-rates" className="py-2">Tarifas</TabsTrigger>
               )}
               {!isDryhire && showExtrasTab && <TabsTrigger value="extras" className="py-2">Extras</TabsTrigger>}
+              {showExpensesTab && <TabsTrigger value="expenses" className="py-2">Gastos</TabsTrigger>}
             </TabsList>
 
             <div className="mt-3 md:mt-4 px-1 pr-1 min-w-0 overflow-x-hidden">
@@ -1597,6 +1623,17 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     jobId={resolvedJobId}
                     isManager={isManager}
                     technicianId={isManager ? undefined : (user?.id || undefined)}
+                  />
+                </TabsContent>
+              )}
+
+              {showExpensesTab && (
+                <TabsContent value="expenses" className="space-y-4 min-w-0 overflow-x-hidden">
+                  <JobExpensesPanel
+                    jobId={resolvedJobId || job.id}
+                    jobTitle={jobDetails?.title || job?.title}
+                    technicians={expenseTechnicianOptions}
+                    canManage={canManageExpenses}
                   />
                 </TabsContent>
               )}

@@ -76,6 +76,11 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
     { table: 'jobs', priority: 'medium' },
     { table: 'job_assignments', priority: 'medium' }
   ],
+  '/gastos': [
+    { table: 'job_expenses', priority: 'high' },
+    { table: 'expense_permissions', priority: 'medium' },
+    { table: 'expense_categories', priority: 'low' }
+  ],
   
   // Festival specific routes
   '/festivals': [
