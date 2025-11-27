@@ -328,6 +328,14 @@ export function CorporateEmailComposer() {
     DOMPurify.addHook("afterSanitizeAttributes", (node) => {
       if (node.tagName === "A") {
         const target = node.getAttribute("target");
+
+        // Only allow safe target values
+        if (target && !["_blank", "_self", "_parent", "_top"].includes(target)) {
+          node.removeAttribute("target");
+          return;
+        }
+
+        // Enforce secure rel attribute on links that open in new window
         if (target === "_blank") {
           node.setAttribute("rel", "noopener noreferrer");
         }
@@ -359,7 +367,7 @@ export function CorporateEmailComposer() {
         "span",
         "div",
       ],
-      ALLOWED_ATTR: ["href", "src", "alt", "style", "class"],
+      ALLOWED_ATTR: ["href", "src", "alt", "style", "class", "target"],
       ALLOWED_STYLES: {
         "*": {
           color: [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/],
