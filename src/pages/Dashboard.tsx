@@ -351,7 +351,7 @@ const Dashboard = () => {
             )}
 
             {/* Today's Schedule Widget */}
-
+            <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
               <div className="p-4 border-b border-border flex items-center justify-between">
                 <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Agenda de Hoy</h3>
                 <span className="text-xs text-muted-foreground">{format(new Date(), 'd MMM')}</span>
