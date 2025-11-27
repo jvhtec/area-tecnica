@@ -38,9 +38,13 @@ export const JobTotalAmounts = ({ jobId, jobTitle }: JobTotalAmountsProps) => {
     );
   }
 
-  const categoryEntries = Object.entries(totals.breakdown_by_category || {});
+  const categoryEntries = Object.entries(totals.breakdown_by_category || {}) as Array<[
+    string,
+    { count?: number; total_eur?: number }
+  ]>;
   const hasApprovedAmounts = totals.total_approved_eur > 0;
-  const hasPendingAmounts = totals.total_pending_eur > 0;
+  const hasPendingAmounts =
+    totals.total_pending_eur > 0 || totals.pending_item_count > 0 || totals.expenses_pending_eur > 0;
 
   return (
     <Card>
@@ -57,11 +61,24 @@ export const JobTotalAmounts = ({ jobId, jobTitle }: JobTotalAmountsProps) => {
           <div className="p-4 rounded-lg border bg-green-50 border-green-200">
             <p className="text-sm text-green-700 font-medium">Approved Total</p>
             <p className="text-2xl font-bold text-green-800">€{totals.total_approved_eur.toFixed(2)}</p>
+            {totals.expenses_total_eur > 0 && (
+              <p className="text-xs text-green-700 mt-1">
+                Includes €{totals.expenses_total_eur.toFixed(2)} in approved expenses
+              </p>
+            )}
           </div>
           {hasPendingAmounts && (
             <div className="p-4 rounded-lg border bg-yellow-50 border-yellow-200">
               <p className="text-sm text-yellow-700 font-medium">Pending Submissions</p>
-              <p className="text-2xl font-bold text-yellow-800">{totals.total_pending_eur} timesheets</p>
+              <p className="text-2xl font-bold text-yellow-800">€{totals.total_pending_eur.toFixed(2)}</p>
+              <p className="text-xs text-yellow-700 mt-1">
+                {totals.pending_item_count} item{totals.pending_item_count === 1 ? '' : 's'} awaiting review
+              </p>
+              {totals.expenses_pending_eur > 0 && (
+                <p className="text-xs text-yellow-700">
+                  €{totals.expenses_pending_eur.toFixed(2)} of the pending total comes from expenses
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -81,10 +98,10 @@ export const JobTotalAmounts = ({ jobId, jobTitle }: JobTotalAmountsProps) => {
                       {category}
                     </Badge>
                     <span className="text-sm text-muted-foreground">
-                      {data.count} timesheet{data.count !== 1 ? 's' : ''}
+                      {Number(data.count ?? 0)} timesheet{Number(data.count ?? 0) !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  <p className="text-lg font-bold">€{data.total_eur.toFixed(2)}</p>
+                  <p className="text-lg font-bold">€{Number(data.total_eur ?? 0).toFixed(2)}</p>
                 </div>
               ))}
             </div>

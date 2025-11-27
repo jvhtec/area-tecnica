@@ -815,6 +815,7 @@ export type Database = {
       }
       expense_permissions: {
         Row: {
+          id: string
           job_id: string
           technician_id: string
           category_slug: string
@@ -829,6 +830,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          id?: string
           job_id: string
           technician_id: string
           category_slug: string
@@ -843,6 +845,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          id?: string
           job_id?: string
           technician_id?: string
           category_slug?: string
@@ -3240,6 +3243,7 @@ export type Database = {
           job_id: string
           technician_id: string
           category_slug: string
+          permission_id: string | null
           expense_date: string
           amount_original: number
           currency_code: string
@@ -3248,7 +3252,9 @@ export type Database = {
           description: string | null
           receipt_path: string | null
           status: Database["public"]["Enums"]["expense_status"]
+          status_history: Json
           submitted_at: string | null
+          submitted_by: string | null
           approved_at: string | null
           approved_by: string | null
           rejected_at: string | null
@@ -3264,15 +3270,18 @@ export type Database = {
           job_id: string
           technician_id: string
           category_slug: string
+          permission_id?: string | null
           expense_date: string
           amount_original: number
           currency_code: string
           fx_rate?: number
-          amount_eur: number
+          amount_eur?: number
           description?: string | null
           receipt_path?: string | null
           status?: Database["public"]["Enums"]["expense_status"]
+          status_history?: Json
           submitted_at?: string | null
+          submitted_by?: string | null
           approved_at?: string | null
           approved_by?: string | null
           rejected_at?: string | null
@@ -3288,6 +3297,7 @@ export type Database = {
           job_id?: string
           technician_id?: string
           category_slug?: string
+          permission_id?: string | null
           expense_date?: string
           amount_original?: number
           currency_code?: string
@@ -3296,7 +3306,9 @@ export type Database = {
           description?: string | null
           receipt_path?: string | null
           status?: Database["public"]["Enums"]["expense_status"]
+          status_history?: Json
           submitted_at?: string | null
+          submitted_by?: string | null
           approved_at?: string | null
           approved_by?: string | null
           rejected_at?: string | null
@@ -3351,11 +3363,25 @@ export type Database = {
             referencedColumns: ["slug"]
           },
           {
-            foreignKeyName: "job_expenses_permission_fkey"
-            columns: ["job_id", "technician_id", "category_slug"]
+            foreignKeyName: "job_expenses_permission_id_fkey"
+            columns: ["permission_id"]
             isOneToOne: false
             referencedRelation: "expense_permissions"
-            referencedColumns: ["job_id", "technician_id", "category_slug"]
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_expenses_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_expenses_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_expenses_approved_by_fkey"
@@ -7868,6 +7894,22 @@ export type Database = {
         }
         Relationships: []
       }
+      v_job_expense_summary: {
+        Row: {
+          job_id: string | null
+          technician_id: string | null
+          category_slug: string | null
+          total_count: number | null
+          status_counts: Json | null
+          amount_totals: Json | null
+          approved_total_eur: number | null
+          submitted_total_eur: number | null
+          draft_total_eur: number | null
+          rejected_total_eur: number | null
+          last_receipt_at: string | null
+        }
+        Relationships: []
+      }
       v_job_staffing_summary: {
         Row: {
           approved_cost_eur: number | null
@@ -7884,6 +7926,8 @@ export type Database = {
         Row: {
           extras_breakdown: Json | null
           extras_total_eur: number | null
+          expenses_breakdown: Json | null
+          expenses_total_eur: number | null
           job_id: string | null
           technician_id: string | null
           timesheets_total_eur: number | null
@@ -8113,6 +8157,27 @@ export type Database = {
         Args: { command: string }
         Returns: undefined
       }
+      approve_job_expense: {
+        Args: { p_expense_id: string; p_approved: boolean; p_rejection_reason?: string }
+        Returns: Database["public"]["Tables"]["job_expenses"]["Row"]
+      }
+      can_submit_job_expense: {
+        Args: {
+          p_job_id: string
+          p_technician_id: string
+          p_category_slug: string
+          p_expense_date: string
+          p_amount_original: number
+          p_currency_code: string
+          p_fx_rate?: number
+        }
+        Returns: {
+          allowed: boolean | null
+          permission_id: string | null
+          reason: string | null
+          remaining: number | null
+        }[]
+      }
       extras_total_for_job_tech: {
         Args: { _job_id: string; _tech_id: string }
         Returns: Json
@@ -8134,12 +8199,51 @@ export type Database = {
         Args: { _job_id: string; _user_role?: string }
         Returns: {
           breakdown_by_category: Json
+          expenses_breakdown: Json
+          expenses_pending_eur: number
+          expenses_total_eur: number
           individual_amounts: Json
           job_id: string
+          pending_item_count: number
           total_approved_eur: number
           total_pending_eur: number
           user_can_see_all: boolean
         }[]
+      }
+      replace_job_expense_receipt: {
+        Args: {
+          p_expense_id: string
+          p_new_receipt_path?: string | null
+          p_remove?: boolean
+        }
+        Returns: Database["public"]["Tables"]["job_expenses"]["Row"]
+      }
+      set_expense_permission: {
+        Args: {
+          p_job_id: string
+          p_technician_id: string
+          p_category_slug: string
+          p_valid_from?: string | null
+          p_valid_to?: string | null
+          p_daily_cap_eur?: number | null
+          p_total_cap_eur?: number | null
+          p_notes?: string | null
+        }
+        Returns: Database["public"]["Tables"]["expense_permissions"]["Row"]
+      }
+      submit_job_expense: {
+        Args: {
+          p_job_id: string
+          p_category_slug: string
+          p_expense_date: string
+          p_amount_original: number
+          p_currency_code: string
+          p_fx_rate?: number
+          p_description?: string | null
+          p_receipt_path?: string | null
+          p_technician_id?: string | null
+        }
+        Returns: Database["public"]["Tables"]["job_expenses"]["Row"]
       }
       get_profiles_with_skills: {
         Args: never
