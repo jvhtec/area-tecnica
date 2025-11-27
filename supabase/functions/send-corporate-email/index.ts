@@ -597,9 +597,13 @@ serve(async (req) => {
 
     // Step 9 & 10: Send via Brevo in batches using BCC to hide recipient emails from each other
     // IMPORTANT: Using BCC ensures privacy - recipients cannot see other recipients' email addresses
+    // The sender is also added to BCC for quality control
     console.log(
       `[send-corporate-email] Sending ${validRecipients.length} recipients via Brevo in batches of ${BREVO_MAX_BATCH_SIZE} using BCC for privacy...`
     );
+    if (user.email) {
+      console.log(`[send-corporate-email] Sender (${user.email}) will be BCC'd for quality control`);
+    }
     const recipientStatuses: RecipientStatus[] = [...invalidRecipientStatuses];
     const deliveredRecipients: string[] = [];
     const failedValidRecipients: RecipientStatus[] = [];
@@ -609,12 +613,21 @@ serve(async (req) => {
 
     const recipientBatches = chunkArray(validRecipients, BREVO_MAX_BATCH_SIZE);
     for (const batch of recipientBatches) {
+      // Build BCC list: include batch recipients + sender for quality control
+      const bccList = batch.map((email) => ({ email }));
+      if (user.email) {
+        // Add sender as BCC for quality control (avoid duplicates)
+        if (!batch.includes(user.email)) {
+          bccList.push({ email: user.email });
+        }
+      }
+
       const emailPayload: Record<string, unknown> = {
         sender: { email: BREVO_FROM, name: senderName },
         // Use sender as the visible "to" recipient and put all actual recipients in BCC
         // This hides all recipient emails from each other for privacy
         to: [{ email: BREVO_FROM }],
-        bcc: batch.map((email) => ({ email })),
+        bcc: bccList,
         subject: body.subject,
         htmlContent,
       };
