@@ -390,19 +390,17 @@ const Settings = () => {
           )}
         </div>
       </div>
-
-      <CreateUserDialog 
-        open={createUserOpen} 
-        onOpenChange={setCreateUserOpen} 
+      <CreateUserDialog
+        open={createUserOpen}
+        onOpenChange={setCreateUserOpen}
       />
-      
+
       <ImportUsersDialog
         open={importUsersOpen}
         onOpenChange={setImportUsersOpen}
       />
-        </div>
-      </div>
     </div>
+  </div>
   );
 };
 
