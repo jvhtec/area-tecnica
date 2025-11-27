@@ -179,10 +179,10 @@ export default function App() {
         <ViewportProvider>
           <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme">
             <TooltipProvider>
-              <SubscriptionProvider>
-                <AppBadgeProvider>
-                  <Router>
-                    <OptimizedAuthProvider>
+              <AppBadgeProvider>
+                <Router>
+                  <OptimizedAuthProvider>
+                    <SubscriptionProvider>
                       <AppInit />
                       <ActivityPushFallbackInit />
                       <ServiceWorkerUpdateInit />
@@ -285,10 +285,10 @@ export default function App() {
                         <Toaster />
                         <SonnerToaster richColors position="top-right" />
                       </div>
-                    </OptimizedAuthProvider>
-                  </Router>
-                </AppBadgeProvider>
-              </SubscriptionProvider>
+                    </SubscriptionProvider>
+                  </OptimizedAuthProvider>
+                </Router>
+              </AppBadgeProvider>
             </TooltipProvider>
           </ThemeProvider>
         </ViewportProvider>
