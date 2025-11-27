@@ -15,6 +15,8 @@ import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AppInit } from "@/components/AppInit";
 import { useActivityPushFallback } from '@/hooks/useActivityPushFallback';
+import { useServiceWorkerUpdate } from '@/hooks/useServiceWorkerUpdate';
+import { usePushSubscriptionRecovery } from '@/hooks/usePushSubscriptionRecovery';
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
 import { ViewportProvider } from '@/hooks/use-mobile';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -79,6 +81,18 @@ const PageLoader = () => (
 // Initialize activity push fallback within auth context
 function ActivityPushFallbackInit() {
   useActivityPushFallback();
+  return null;
+}
+
+// Initialize service worker update detection
+function ServiceWorkerUpdateInit() {
+  useServiceWorkerUpdate();
+  return null;
+}
+
+// Initialize push subscription recovery detection
+function PushSubscriptionRecoveryInit() {
+  usePushSubscriptionRecovery();
   return null;
 }
 
@@ -165,10 +179,12 @@ export default function App() {
         <ViewportProvider>
           <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme">
             <TooltipProvider>
-              <SubscriptionProvider>
-                <AppBadgeProvider>
-                  <Router>
-                    <OptimizedAuthProvider>
+              <AppBadgeProvider>
+                <Router>
+                  <OptimizedAuthProvider>
+                    <ServiceWorkerUpdateInit />
+                    <PushSubscriptionRecoveryInit />
+                    <SubscriptionProvider>
                       <AppInit />
                       <ActivityPushFallbackInit />
                       <TechnicianRouteGuard />
@@ -269,10 +285,10 @@ export default function App() {
                         <Toaster />
                         <SonnerToaster richColors position="top-right" />
                       </div>
-                    </OptimizedAuthProvider>
-                  </Router>
-                </AppBadgeProvider>
-              </SubscriptionProvider>
+                    </SubscriptionProvider>
+                  </OptimizedAuthProvider>
+                </Router>
+              </AppBadgeProvider>
             </TooltipProvider>
           </ThemeProvider>
         </ViewportProvider>

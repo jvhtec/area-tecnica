@@ -5,6 +5,7 @@ import { PerformanceOptimizedSubscriptionManager } from '@/lib/performance-optim
 import { toast } from 'sonner';
 import { TokenManager } from '@/lib/token-manager';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 
 // Context for providing subscription manager state
 interface SubscriptionContextType {
@@ -39,6 +40,9 @@ interface SubscriptionProviderProps {
 
 export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   const queryClient = useQueryClient();
+  const { userRole } = useOptimizedAuth();
+  const isAdmin = userRole === 'admin';
+
   const [state, setState] = useState<SubscriptionContextType>({
     connectionStatus: 'connecting',
     activeSubscriptions: [],
@@ -50,7 +54,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     forceRefresh: () => {},
     forceSubscribe: () => {}
   });
-  
+
   // Track last connection status to notify on changes
   const lastConnectionStatusRef = React.useRef<string>(state.connectionStatus);
   const tokenManager = TokenManager.getInstance();
@@ -90,11 +94,14 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     // Define refresh function with performance optimization
     const refreshSubscriptions = () => {
       console.log("Manually refreshing subscriptions...");
-      
+
       manager.forceRefresh();
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
-      
-      toast.success("Subscriptions refreshed");
+
+      // Only show toasts to admin users
+      if (isAdmin) {
+        toast.success("Subscriptions refreshed");
+      }
     };
     
     // Define invalidate function with optional specific query key
@@ -111,13 +118,16 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     // Define force refresh function - simplified for performance
     const forceRefresh = (tables?: string[]) => {
       manager.forceRefresh();
-      
-      if (tables && tables.length > 0) {
-        toast.success(`Refreshed ${tables.join(', ')} tables`);
-      } else {
-        toast.success('All subscriptions refreshed');
+
+      // Only show toasts to admin users
+      if (isAdmin) {
+        if (tables && tables.length > 0) {
+          toast.success(`Refreshed ${tables.join(', ')} tables`);
+        } else {
+          toast.success('All subscriptions refreshed');
+        }
       }
-      
+
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     };
     
@@ -163,14 +173,14 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     connectionCheckIntervalRef.current = window.setInterval(() => {
       const stats = manager.getStats();
       
-      // Only notify users of critical issues if we're the leader
-      if (isLeader && stats.circuitBreakerOpen && !lastConnectionStatusRef.current.includes('circuit')) {
+      // Only notify admin users of critical issues if we're the leader
+      if (isLeader && isAdmin && stats.circuitBreakerOpen && !lastConnectionStatusRef.current.includes('circuit')) {
         toast.error('Database connection issues detected', {
           description: 'Performance may be degraded. We\'re working to resolve this.',
           duration: 8000,
         });
         lastConnectionStatusRef.current = 'circuit-open';
-      } else if (isLeader && !stats.circuitBreakerOpen && lastConnectionStatusRef.current.includes('circuit')) {
+      } else if (isLeader && isAdmin && !stats.circuitBreakerOpen && lastConnectionStatusRef.current.includes('circuit')) {
         toast.success('Database performance restored', {
           description: 'All systems are operating normally.'
         });
@@ -198,7 +208,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       }
       unsubscribe();
     };
-  }, [queryClient, isLeader]);
+  }, [queryClient, isLeader, isAdmin]);
 
   // Setup core tables subscription with performance optimization
   useEffect(() => {

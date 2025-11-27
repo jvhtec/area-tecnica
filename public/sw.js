@@ -1,7 +1,10 @@
-const APP_SHELL_CACHE = 'app-shell-v1'
+// Dynamic cache version that changes with each SW update
+// This ensures old caches are cleared when deploying new versions
+const CACHE_VERSION = 'v2-' + self.registration.scope
+const APP_SHELL_CACHE = `app-shell-${CACHE_VERSION}`
+const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`
+
 const APP_SHELL_FILES = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png'
 ]
@@ -45,15 +48,23 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       if (!isDevHost) {
+        // Clear ALL old caches to prevent stale asset issues after deployment
         const keys = await caches.keys()
+        const currentCaches = [APP_SHELL_CACHE, RUNTIME_CACHE]
         await Promise.all(
           keys
-            .filter((key) => key !== APP_SHELL_CACHE)
-            .map((key) => caches.delete(key))
+            .filter((key) => !currentCaches.includes(key))
+            .map((key) => {
+              console.log('[sw] Deleting old cache:', key)
+              return caches.delete(key)
+            })
         )
       }
 
       await self.clients.claim()
+
+      // Notify clients that a new SW has activated
+      await self.broadcastToClients('sw-activated', { cacheVersion: CACHE_VERSION })
     })()
   )
 })
@@ -63,13 +74,93 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  const { request } = event
+  const url = new URL(request.url)
+
+  // Skip cross-origin requests
+  if (url.origin !== self.location.origin) {
+    return
+  }
+
+  // Network-first strategy for HTML/navigation requests
+  // This ensures users always get the latest HTML after deployment
+  if (request.mode === 'navigate' || request.destination === 'document' || url.pathname.endsWith('.html')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Clone the response to cache it
+          const responseToCache = response.clone()
+          caches.open(RUNTIME_CACHE).then((cache) => {
+            cache.put(request, responseToCache).catch((e) => {
+              console.warn('[sw] Failed to cache HTML response:', e)
+            })
+          }).catch((e) => {
+            console.warn('[sw] Failed to open cache for HTML:', e)
+          })
+          return response
+        })
+        .catch(() => {
+          // Offline fallback: serve cached HTML if available
+          return caches.match(request).then((cached) => {
+            return cached || caches.match('/')
+          })
+        })
+    )
+    return
+  }
+
+  // Cache-first strategy for static assets (JS, CSS, images, fonts)
+  // These have content hashes in their filenames, so safe to cache aggressively
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+    caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse
       }
 
-      return fetch(event.request).catch(() => caches.match('/'))
+      // Not in cache, fetch from network and cache it
+      return fetch(request)
+        .then((response) => {
+          // Only cache successful responses
+          if (!response || response.status !== 200 || response.type !== 'basic') {
+            return response
+          }
+
+          // Clone the response to cache it
+          const responseToCache = response.clone()
+          caches.open(RUNTIME_CACHE).then((cache) => {
+            cache.put(request, responseToCache).catch((e) => {
+              console.warn('[sw] Failed to cache asset response:', e)
+            })
+          }).catch((e) => {
+            console.warn('[sw] Failed to open cache for assets:', e)
+          })
+
+          return response
+        })
+        .catch(() => {
+          // Network failed - return appropriate response based on request type
+          const destination = request.destination
+
+          // For navigation/document requests, return cached HTML fallback
+          if (request.mode === 'navigate' || destination === 'document') {
+            return caches.match('/').then(fallback => {
+              return fallback || new Response('Offline', {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: { 'Content-Type': 'text/plain' }
+              })
+            })
+          }
+
+          // For other requests (JS, CSS, images, fonts), return network error
+          // This allows the browser to handle the failure appropriately
+          // (e.g., trigger onerror events, show broken image icons, etc.)
+          console.warn('[sw] Network failed for asset:', request.url)
+          return new Response(null, {
+            status: 408,
+            statusText: 'Request Timeout'
+          })
+        })
     })
   )
 })
@@ -221,7 +312,10 @@ self.addEventListener('notificationclick', (event) => {
 // Allow page to invoke simple test notifications and ping
 self.addEventListener('message', (event) => {
   const { type, data } = event.data || {}
-  if (type === 'sw:show-test') {
+  if (type === 'SKIP_WAITING') {
+    // Allow the page to trigger immediate activation of a waiting service worker
+    self.skipWaiting()
+  } else if (type === 'sw:show-test') {
     event.waitUntil(
       (async () => {
         try {
