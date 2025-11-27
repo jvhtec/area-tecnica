@@ -158,63 +158,71 @@ const Video = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <DepartmentMobileHub
-        department={currentDepartment}
-        title="Departamento de vídeo"
-        icon={VideoIcon}
-        tools={mobileTools}
-      />
-      <LightsHeader
-        onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
-        department="Video"
-        canCreate={userRole ? ["admin","management"].includes(userRole) : true}
-      />
+    <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
+      <div className="mx-auto w-full max-w-full space-y-6">
+        <DepartmentMobileHub
+          department={currentDepartment}
+          title="Departamento de vídeo"
+          icon={VideoIcon}
+          tools={mobileTools}
+        />
+        <LightsHeader
+          onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
+          department="Video"
+          canCreate={userRole ? ["admin","management"].includes(userRole) : true}
+        />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-12">
-          <CalendarSection 
-            date={date} 
-            onDateSelect={setDate}
-            jobs={getDepartmentJobs()}
-            department={currentDepartment}
-            onDateTypeChange={() => {}} // Add empty handler as it's required
-          />
+        <div className="bg-card border border-border rounded-xl p-3 sm:p-4 shadow-sm">
+          <div className="flex flex-wrap gap-3 sm:gap-4 items-center justify-end">
+            <Link to="/video-pesos-tool">
+              <Button variant="outline" className="gap-2">
+                <Scale className="h-4 w-4" />
+                Weight Calculator
+              </Button>
+            </Link>
+            <Link to="/video-consumos-tool">
+              <Button variant="outline" className="gap-2">
+                <Zap className="h-4 w-4" />
+                Power Calculator
+              </Button>
+            </Link>
+            <Link to="/video-memoria-tecnica">
+              <Button variant="outline" className="gap-2">
+                <File className="h-4 w-4" />
+                Memoria Técnica
+              </Button>
+            </Link>
+          </div>
         </div>
-        <div className="lg:col-span-12 hidden md:block">
-          <TodaySchedule
-            jobs={getSelectedDateJobs()}
-            onEditClick={handleEditClick}
-            onDeleteClick={handleDeleteClick}
-            onJobClick={handleJobClick}
-            userRole={userRole}
-            selectedDate={date}
-          />
+
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          <div className="xl:col-span-8 2xl:col-span-9">
+            <div className="bg-card rounded-xl border border-border shadow-sm">
+              <CalendarSection 
+                date={date} 
+                onDateSelect={setDate}
+                jobs={getDepartmentJobs()}
+                department={currentDepartment}
+                onDateTypeChange={() => {}} // Add empty handler as it's required
+              />
+            </div>
+          </div>
+          <div className="xl:col-span-4 2xl:col-span-3 hidden md:block">
+            <div className="bg-card rounded-xl border border-border shadow-sm">
+              <TodaySchedule
+                jobs={getSelectedDateJobs()}
+                onEditClick={handleEditClick}
+                onDeleteClick={handleDeleteClick}
+                onJobClick={handleJobClick}
+                userRole={userRole}
+                selectedDate={date}
+                detailsOnlyMode
+                viewMode="sidebar"
+              />
+            </div>
+          </div>
         </div>
       </div>
-
-      <div className="flex gap-4 justify-end mt-4">
-        <Link to="/video-pesos-tool">
-          <Button variant="outline" className="gap-2">
-            <Scale className="h-4 w-4" />
-            Weight Calculator
-          </Button>
-        </Link>
-        <Link to="/video-consumos-tool">
-          <Button variant="outline" className="gap-2">
-            <Zap className="h-4 w-4" />
-            Power Calculator
-          </Button>
-        </Link>
-<Link to="/video-memoria-tecnica">
-  <Button variant="outline" className="gap-2">
-    <File className="h-4 w-4" />
-    Memoria Técnica
-  </Button>
-</Link>
-
-      </div>
-
 
       <CreateJobDialog
         open={isJobDialogOpen}

@@ -777,10 +777,21 @@ export function JobCardNew({
 
   // Simplified details-only mode for Dashboard, Sound, Light, Video pages
   if (detailsOnlyMode) {
-    const jobName = job.name || job.job_name || 'Unnamed Job';
+    const jobName = job.title || job.name || job.job_name || 'Unnamed Job';
     const startDate = job.start_time ? format(new Date(job.start_time), 'dd/MM/yyyy HH:mm') : '';
     const endDate = job.end_time ? format(new Date(job.end_time), 'dd/MM/yyyy HH:mm') : '';
-    const location = job.location || job.venue_name || 'No location';
+
+    // Handle location - it can be a string or an object with {id, name, formatted_address}
+    let location = 'No location';
+    if (typeof job.location === 'string') {
+      location = job.location;
+    } else if (job.location && typeof job.location === 'object') {
+      location = job.location.name || job.location.formatted_address || 'No location';
+    } else if (job.location_data) {
+      location = job.location_data.name || job.location_data.formatted_address || 'No location';
+    } else if (job.venue_name) {
+      location = job.venue_name;
+    }
 
     return (
       <div className="p-2 bg-gray-50 dark:bg-gray-900">

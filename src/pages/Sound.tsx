@@ -12,7 +12,7 @@ import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { Calculator, PieChart, FileText, Zap, FileStack, AlertTriangle, Plus, Database, Lock, Music, Box } from 'lucide-react';
 import type { JobType } from "@/types/job";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ReportGenerator } from "../components/sound/ReportGenerator";
@@ -215,10 +215,10 @@ const Sound = () => {
   };
 
   return (
-    <>
+    <div className="min-h-screen bg-background text-foreground">
       {/* Mobile View - Full Screen Hub */}
       {isMobile && (
-        <>
+        <div className="p-4 pb-24 space-y-4">
           <DepartmentMobileHub
             department={currentDepartment}
             title="Departamento de sonido"
@@ -247,143 +247,144 @@ const Sound = () => {
             onSignOut={handleSignOut}
             isLoggingOut={isLoggingOut}
           />
-        </>
+        </div>
       )}
 
-      {/* Desktop View - Traditional Layout */}
+      {/* Desktop View - Wide Layout */}
       {!isMobile && (
-        <div className="space-y-4 md:space-y-8 w-full max-w-full">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="p-4 md:p-8">
+          <div className="mx-auto w-full max-w-full space-y-6">
             <LightsHeader
               onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
               department="Sound"
               canCreate={userRole ? ["admin", "management"].includes(userRole) : true}
             />
-          </div>
 
-          <div className="space-y-4 md:space-y-8">
-            <div className="w-full">
-              <CalendarSection
-                date={date}
-                onDateSelect={setDate}
-                jobs={getDepartmentJobs()}
-                department={currentDepartment}
-                onDateTypeChange={() => { }}
-              />
+            <div className="bg-card border border-border rounded-xl p-3 sm:p-4 shadow-sm">
+              <div className="flex flex-wrap gap-3 sm:gap-4 items-center justify-end">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-auto py-2 sm:py-3"
+                  onClick={() => navigate('/pesos-tool')}
+                >
+                  <Calculator className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  Weight Calculator
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-auto py-2 sm:py-3"
+                  onClick={() => navigate('/consumos-tool')}
+                >
+                  <PieChart className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  Power Calculator
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-auto py-2 sm:py-3"
+                  onClick={() => setShowReportGenerator(true)}
+                >
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  SV Report
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-auto py-2 sm:py-3"
+                  onClick={() => setShowAmplifierTool(true)}
+                >
+                  <Zap className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  Amplifier
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-auto py-2 sm:py-3"
+                  onClick={() => setShowMemoriaTecnica(true)}
+                >
+                  <FileStack className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  Memoria Técnica
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-auto py-2 sm:py-3"
+                  onClick={() => setShowIncidentReport(true)}
+                >
+                  <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  Incident Report
+                </Button>
+
+                {hasSoundVisionAccess ? (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="h-auto py-2 sm:py-3"
+                    onClick={() => navigate('/soundvision-files')}
+                  >
+                    <Database className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    SoundVision
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="h-auto py-2 sm:py-3"
+                    onClick={() => setShowAccessRequestDialog(true)}
+                  >
+                    <Lock className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                    Request Access
+                  </Button>
+                )}
+              </div>
             </div>
-            <div className="w-full px-4 sm:px-6 lg:px-8">
-              <TodaySchedule
-                jobs={getSelectedDateJobs()}
-                onEditClick={handleEditClick}
-                onDeleteClick={handleDeleteClick}
-                onJobClick={handleJobClick}
-                userRole={userRole}
-                selectedDate={date}
-                detailsOnlyMode={userRole ? ["admin", "management", "house_tech"].includes(userRole) : false}
-                department={currentDepartment}
-              />
-            </div>
-          </div>
 
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <Card className="mt-4 sm:mt-8">
-              <div className="p-4 sm:p-6">
-                <h2 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4">Tools</h2>
-                <Separator className="mb-4 sm:mb-6" />
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                    onClick={() => navigate('/pesos-tool')}
-                  >
-                    <Calculator className="h-4 w-4 sm:h-6 sm:w-6" />
-                    <span className="text-center leading-tight">Weight Calculator</span>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                    onClick={() => navigate('/consumos-tool')}
-                  >
-                    <PieChart className="h-4 w-4 sm:h-6 sm:w-6" />
-                    <span className="text-center leading-tight">Power Calculator</span>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                    onClick={() => setShowReportGenerator(true)}
-                  >
-                    <FileText className="h-4 w-4 sm:h-6 sm:w-6" />
-                    <span className="text-center leading-tight">SV Report Generator</span>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                    onClick={() => setShowAmplifierTool(true)}
-                  >
-                    <Zap className="h-4 w-4 sm:h-6 sm:w-6" />
-                    <span className="text-center leading-tight">Amplifier Calculator</span>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                    onClick={() => setShowMemoriaTecnica(true)}
-                  >
-                    <FileStack className="h-4 w-4 sm:h-6 sm:w-6" />
-                    <span className="text-center leading-tight">Memoria Técnica</span>
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                    onClick={() => setShowIncidentReport(true)}
-                  >
-                    <AlertTriangle className="h-4 w-4 sm:h-6 sm:w-6" />
-                    <span className="text-center leading-tight">Incident Report</span>
-                  </Button>
-
-                  {hasSoundVisionAccess ? (
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                      onClick={() => navigate('/soundvision-files')}
-                    >
-                      <Database className="h-4 w-4 sm:h-6 sm:w-6" />
-                      <span className="text-center leading-tight">Archivos SoundVision</span>
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                      onClick={() => setShowAccessRequestDialog(true)}
-                    >
-                      <Lock className="h-4 w-4 sm:h-6 sm:w-6" />
-                      <span className="text-center leading-tight">Request SoundVision Access</span>
-                    </Button>
-                  )}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              <div className="xl:col-span-8 2xl:col-span-9">
+                <Card className="bg-card border-border text-foreground">
+                  <CardContent className="p-0">
+                    <CalendarSection
+                      date={date}
+                      onDateSelect={setDate}
+                      jobs={getDepartmentJobs()}
+                      department={currentDepartment}
+                      onDateTypeChange={() => { }}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="xl:col-span-4 2xl:col-span-3">
+                <div className="bg-card rounded-xl border border-border shadow-sm">
+                  <TodaySchedule
+                    jobs={getSelectedDateJobs()}
+                    onEditClick={handleEditClick}
+                    onDeleteClick={handleDeleteClick}
+                    onJobClick={handleJobClick}
+                    userRole={userRole}
+                    selectedDate={date}
+                    detailsOnlyMode={userRole ? ["admin", "management", "house_tech"].includes(userRole) : false}
+                    department={currentDepartment}
+                    viewMode="sidebar"
+                  />
                 </div>
               </div>
-            </Card>
-          </div>
+            </div>
 
-          {/* Desktop FAB */}
-          <Button
-            className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
-            onClick={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
-          >
-            <Plus className="h-6 w-6" />
-          </Button>
+            {/* Desktop FAB */}
+            <Button
+              className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
+              onClick={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
+            >
+              <Plus className="h-6 w-6" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -502,7 +503,7 @@ const Sound = () => {
           userRole={userRole}
         />
       )}
-    </>
+    </div>
   );
 };
 

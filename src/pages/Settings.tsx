@@ -152,23 +152,24 @@ const Settings = () => {
   }, [subscription])
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-4 md:space-y-6">
-      <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button onClick={() => setImportUsersOpen(true)} variant="outline" className="w-full sm:w-auto">
-            <Upload className="mr-2 h-4 w-4" />
-            Import Users
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto w-full max-w-full px-4 sm:px-6 lg:px-8 py-4 space-y-4 md:space-y-6">
+        <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
+          <h1 className="text-2xl font-semibold">Settings</h1>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button onClick={() => setImportUsersOpen(true)} variant="outline" className="w-full sm:w-auto">
+              <Upload className="mr-2 h-4 w-4" />
+              Import Users
           </Button>
           <Button onClick={() => setCreateUserOpen(true)} className="w-full sm:w-auto">
             <UserPlus className="mr-2 h-4 w-4" />
             Add User
           </Button>
         </div>
-      </div>
+        </div>
 
-      <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-        <div className="space-y-4 md:space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 md:gap-6">
+          <div className="space-y-4 md:space-y-6 xl:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Push notifications</CardTitle>
@@ -340,7 +341,7 @@ const Settings = () => {
           </Card>
         </div>
 
-        <div className="space-y-4 md:space-y-6">
+          <div className="space-y-4 md:space-y-6 xl:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Company Settings</CardTitle>
@@ -399,6 +400,8 @@ const Settings = () => {
         open={importUsersOpen}
         onOpenChange={setImportUsersOpen}
       />
+        </div>
+      </div>
     </div>
   );
 };

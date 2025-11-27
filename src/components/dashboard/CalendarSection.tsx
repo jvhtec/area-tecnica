@@ -107,7 +107,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   const lastDayOfMonth = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: firstDayOfMonth, end: lastDayOfMonth });
   const startDay = firstDayOfMonth.getDay();
-  
+
   // Adjust startDay for Monday as first day (0=Sunday, 1=Monday -> 0=Monday, 6=Sunday)
   const paddingDays = startDay === 0 ? 6 : startDay - 1;
   const prefixDays = Array.from({ length: paddingDays }).map((_, i) => {
@@ -157,11 +157,11 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user?.id) return;
-      
-      const updateData = statuses !== undefined 
+
+      const updateData = statuses !== undefined
         ? { selected_job_types: types, selected_job_statuses: statuses }
         : { selected_job_types: types };
-      
+
       const { error } = await supabase
         .from("profiles")
         .update(updateData)
@@ -224,16 +224,16 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   }, [jobs, department, selectedJobTypes, selectedJobStatuses]); // Dependencies for getJobsForDate
 
   // Simplified date type fetching optimization
-  const jobIdsInView = useMemo(() => 
+  const jobIdsInView = useMemo(() =>
     Array.from(new Set(allDays.flatMap(day => getJobsForDate(day).map(job => job.id)))),
     [allDays, getJobsForDate]
   );
-  
-  const formattedDatesInView = useMemo(() => 
+
+  const formattedDatesInView = useMemo(() =>
     Array.from(new Set(allDays.map(d => format(d, 'yyyy-MM-dd')))),
     [allDays]
   );
-  
+
   const { data: dateTypes = {} } = useOptimizedDateTypes(jobIdsInView, formattedDatesInView);
 
   // Early return for mobile view after all hooks are initialized
@@ -783,8 +783,8 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   );
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardContent className="flex-grow p-4">
+    <div className="h-full flex flex-col bg-transparent">
+      <div className="flex-grow p-4">
         <CalendarHeader
           currentMonth={currentMonth}
           onPreviousMonth={handlePreviousMonth}
@@ -825,8 +825,8 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             onDateSelect={onDateSelect}
           />
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 
@@ -1003,52 +1003,52 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
     <div className="flex gap-4 mb-4">
       <div className="relative">
         <button
-        className="border border-gray-300 rounded-md py-1 px-2 text-sm w-full flex items-center justify-between"
-        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-      >
-        {selectedJobTypes.length > 0 ? selectedJobTypes.join(", ") : "Select Job Types"}
-        <ChevronDown className="h-4 w-4 ml-2" />
-      </button>
-      {isDropdownOpen && (
-        <div className="absolute z-10 mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md">
-          {distinctJobTypes.map((type) => (
-            <div
-              key={type}
-              className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-              onClick={() => onJobTypeSelection(type)}
-            >
-              <span className="text-sm text-black dark:text-white">{type}</span>
-              {selectedJobTypes.includes(type) && <Check className="h-4 w-4 text-blue-500" />}
-            </div>
-          ))}
-        </div>
-      )}
+          className="border border-gray-300 rounded-md py-1 px-2 text-sm w-full flex items-center justify-between"
+          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+        >
+          {selectedJobTypes.length > 0 ? selectedJobTypes.join(", ") : "Select Job Types"}
+          <ChevronDown className="h-4 w-4 ml-2" />
+        </button>
+        {isDropdownOpen && (
+          <div className="absolute z-10 mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md">
+            {distinctJobTypes.map((type) => (
+              <div
+                key={type}
+                className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                onClick={() => onJobTypeSelection(type)}
+              >
+                <span className="text-sm text-black dark:text-white">{type}</span>
+                {selectedJobTypes.includes(type) && <Check className="h-4 w-4 text-blue-500" />}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="relative">
+        <button
+          className="border border-gray-300 rounded-md py-1 px-2 text-sm w-full flex items-center justify-between"
+          onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+        >
+          {selectedJobStatuses.length > 0 ? selectedJobStatuses.join(", ") : "Select Job Status"}
+          <ChevronDown className="h-4 w-4 ml-2" />
+        </button>
+        {isStatusDropdownOpen && (
+          <div className="absolute z-10 mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md">
+            {distinctJobStatuses.map((status) => (
+              <div
+                key={status}
+                className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                onClick={() => onJobStatusSelection(status)}
+              >
+                <span className="text-sm text-black dark:text-white">{status}</span>
+                {selectedJobStatuses.includes(status) && <Check className="h-4 w-4 text-blue-500" />}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
-    
-    <div className="relative">
-      <button
-        className="border border-gray-300 rounded-md py-1 px-2 text-sm w-full flex items-center justify-between"
-        onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-      >
-        {selectedJobStatuses.length > 0 ? selectedJobStatuses.join(", ") : "Select Job Status"}
-        <ChevronDown className="h-4 w-4 ml-2" />
-      </button>
-      {isStatusDropdownOpen && (
-        <div className="absolute z-10 mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md">
-          {distinctJobStatuses.map((status) => (
-            <div
-              key={status}
-              className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-              onClick={() => onJobStatusSelection(status)}
-            >
-              <span className="text-sm text-black dark:text-white">{status}</span>
-              {selectedJobStatuses.includes(status) && <Check className="h-4 w-4 text-blue-500" />}
-            </div>
-          ))}
-        </div>
-      )}
-     </div>
-  </div>
   );
 };
 
@@ -1083,16 +1083,16 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
             <div
               key={i}
               className={cn(
-                "bg-background p-2 min-h-[200px] border-t relative cursor-pointer hover:bg-accent/50 transition-colors calendar-cell",
+                "bg-background p-1 min-h-[120px] border-t relative cursor-pointer hover:bg-accent/50 transition-colors calendar-cell",
                 !isCurrentMonth && "text-muted-foreground/50"
               )}
               onClick={() => onDateSelect(day)}
             >
-              <span className="text-sm">{format(day, "d")}</span>
+              <span className="text-sm font-medium ml-1">{format(day, "d")}</span>
               <div className="space-y-1 mt-1 calendar-job-list">
                 {dayJobs.slice(0, maxVisibleJobs).map((job: any) => renderJobCard(job, day))}
                 {dayJobs.length > maxVisibleJobs && (
-                  <div className="text-xs text-muted-foreground mt-1 bg-accent/30 p-1 rounded text-center">
+                  <div className="text-xs text-muted-foreground mt-1 bg-accent/30 p-0.5 rounded text-center">
                     + {dayJobs.length - maxVisibleJobs} more
                   </div>
                 )}

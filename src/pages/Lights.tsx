@@ -160,76 +160,85 @@ const Lights = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-3 py-4 sm:px-6 sm:py-6 space-y-6">
-      <DepartmentMobileHub
-        department={currentDepartment}
-        title="Departamento de iluminación"
-        icon={Lightbulb}
-        tools={mobileTools}
-      />
-      <LightsHeader
-        onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
-        department="Luces"
-        canCreate={userRole ? ["admin","management"].includes(userRole) : true}
-      />
+    <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
+      <div className="mx-auto w-full max-w-full space-y-6">
+        <DepartmentMobileHub
+          department={currentDepartment}
+          title="Departamento de iluminación"
+          icon={Lightbulb}
+          tools={mobileTools}
+        />
+        <LightsHeader
+          onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
+          department="Luces"
+          canCreate={userRole ? ["admin","management"].includes(userRole) : true}
+        />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-12">
-          <CalendarSection 
-            date={date} 
-            onDateSelect={setDate}
-            jobs={getDepartmentJobs()}
-            department={currentDepartment}
-            onDateTypeChange={() => {}} // Add empty handler as it's required
-          />
+        <div className="bg-card border border-border rounded-xl p-3 sm:p-4 shadow-sm">
+          <div className="flex flex-wrap gap-3 sm:gap-4 items-center justify-end">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/lights-disponibilidad')}
+              className="flex items-center gap-2"
+            >
+              <Calendar className="h-4 w-4" />
+              Disponibilidad
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/lights-pesos-tool')}
+              className="flex items-center gap-2"
+            >
+              <Scale className="h-4 w-4" />
+              Calculadora de Peso
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/lights-consumos-tool')}
+              className="flex items-center gap-2"
+            >
+              <Zap className="h-4 w-4" />
+              Calculadora de Potencia
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/lights-memoria-tecnica')}
+              className="flex items-center gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              Memoria Técnica
+            </Button>
+          </div>
         </div>
-        <div className="lg:col-span-12 hidden md:block">
-          <TodaySchedule
-            jobs={getSelectedDateJobs()}
-            onEditClick={handleEditClick}
-            onDeleteClick={handleDeleteClick}
-            onJobClick={handleJobClick}
-            userRole={userRole}
-            selectedDate={date}
-            detailsOnlyMode
-            department={currentDepartment}
-          />
-        </div>
-      </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center sm:justify-end mt-4">
-        <Button
-          variant="outline"
-          onClick={() => navigate('/lights-disponibilidad')}
-          className="w-full sm:w-auto flex items-center gap-2"
-        >
-          <Calendar className="h-4 w-4" />
-          Disponibilidad
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => navigate('/lights-pesos-tool')}
-          className="w-full sm:w-auto flex items-center gap-2"
-        >
-          <Scale className="h-4 w-4" />
-          Calculadora de Peso
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => navigate('/lights-consumos-tool')}
-          className="w-full sm:w-auto flex items-center gap-2"
-        >
-          <Zap className="h-4 w-4" />
-          Calculadora de Potencia
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => navigate('/lights-memoria-tecnica')}
-          className="w-full sm:w-auto flex items-center gap-2"
-        >
-          <FileText className="h-4 w-4" />
-          Memoria Técnica
-        </Button>
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          <div className="xl:col-span-8 2xl:col-span-9">
+            <div className="bg-card rounded-xl border border-border shadow-sm">
+              <CalendarSection 
+                date={date} 
+                onDateSelect={setDate}
+                jobs={getDepartmentJobs()}
+                department={currentDepartment}
+                onDateTypeChange={() => {}} // Add empty handler as it's required
+              />
+            </div>
+          </div>
+          <div className="xl:col-span-4 2xl:col-span-3 hidden md:block">
+            <div className="bg-card rounded-xl border border-border shadow-sm">
+              <TodaySchedule
+                jobs={getSelectedDateJobs()}
+                onEditClick={handleEditClick}
+                onDeleteClick={handleDeleteClick}
+                onJobClick={handleJobClick}
+                userRole={userRole}
+                selectedDate={date}
+                detailsOnlyMode
+                department={currentDepartment}
+                viewMode="sidebar"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       <CreateJobDialog

@@ -101,13 +101,19 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 
   const getAssignmentsForDate = (day: Date) => {
     return assignments.filter(assignment => {
-      // Check if this is a single-day assignment
+      // Check if this is a single-day assignment (legacy/fallback)
       if (assignment.single_day && assignment.assignment_date) {
         const assignmentDate = parse(assignment.assignment_date, "yyyy-MM-dd", new Date());
         return isSameDay(day, assignmentDate);
       }
-      
-      // Otherwise, use the job's full date range
+
+      // Check specific dates from timesheets if available
+      if (assignment.dates && assignment.dates.length > 0) {
+        const dayString = format(day, 'yyyy-MM-dd');
+        return assignment.dates.includes(dayString);
+      }
+
+      // Fallback to job's full date range if no specific dates (shouldn't happen with new logic)
       const startDate = new Date(assignment.job.start_time);
       const endDate = new Date(assignment.job.end_time);
       return isSameDay(day, startDate) || isWithinInterval(day, { start: startDate, end: endDate });
