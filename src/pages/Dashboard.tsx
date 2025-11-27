@@ -22,6 +22,8 @@ import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService
 import { useOptimizedMessagesSubscriptions } from "@/hooks/useOptimizedSubscriptions";
 import { MessagesDialog } from "@/components/dashboard/MessagesDialog";
 import { EmailComposerDialog } from "@/components/dashboard/EmailComposerDialog";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { DashboardMobileHub } from "@/components/dashboard/DashboardMobileHub";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -37,6 +39,7 @@ const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { userRole: authUserRole, isLoading: authLoading } = useOptimizedAuth();
 
   // Early security check: Only allow admin, management, logistics
@@ -175,6 +178,43 @@ const Dashboard = () => {
 
   const selectedDateJobs = getSelectedDateJobs(date, jobs);
 
+  // Mobile view - use DashboardMobileHub
+  if (isMobile) {
+    return (
+      <>
+        <DashboardMobileHub
+          jobs={jobs}
+          userRole={userRole}
+          onEditClick={handleEditClick}
+          onDeleteClick={handleDeleteClick}
+          onJobClick={handleJobClick}
+          onMessagesClick={userRole && ["admin", "management"].includes(userRole) ? () => setMessagesOpen(true) : undefined}
+          onEmailClick={userRole && ["admin", "management"].includes(userRole) ? () => setEmailComposerOpen(true) : undefined}
+        />
+
+        {/* Dialogs */}
+        {selectedJob && (
+          <EditJobDialog
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            job={selectedJob}
+          />
+        )}
+
+        <MessagesDialog
+          open={messagesOpen}
+          onOpenChange={setMessagesOpen}
+        />
+
+        <EmailComposerDialog
+          open={emailComposerOpen}
+          onOpenChange={setEmailComposerOpen}
+        />
+      </>
+    );
+  }
+
+  // Desktop view - existing layout
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8 font-sans">
       <div className="mx-auto w-full max-w-full space-y-6">
