@@ -150,6 +150,18 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
     });
   };
 
+  // Auto-detect overnight shifts when editing
+  useEffect(() => {
+    if (editingId && formData.start_time && formData.end_time) {
+      const isOvernightShift = formData.end_time < formData.start_time;
+      if (isOvernightShift && !formData.ends_next_day) {
+        setFormData(prev => ({ ...prev, ends_next_day: true }));
+      } else if (!isOvernightShift && formData.ends_next_day) {
+        setFormData(prev => ({ ...prev, ends_next_day: false }));
+      }
+    }
+  }, [formData.start_time, formData.end_time, editingId]);
+
   const cancelEditing = () => {
     setEditingId(null);
   };
@@ -334,18 +346,18 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                     // In edit mode, use form defaults; in display mode, only calculate if both times exist
                     const workedHours = isEditing
                       ? calculateHours(
-                          formData.start_time,
-                          formData.end_time,
-                          formData.break_minutes,
-                          formData.ends_next_day
-                        )
+                        formData.start_time,
+                        formData.end_time,
+                        formData.break_minutes,
+                        formData.ends_next_day
+                      )
                       : (timesheet.start_time && timesheet.end_time)
                         ? calculateHours(
-                            timesheet.start_time,
-                            timesheet.end_time,
-                            timesheet.break_minutes || 0,
-                            timesheet.ends_next_day
-                          )
+                          timesheet.start_time,
+                          timesheet.end_time,
+                          timesheet.break_minutes || 0,
+                          timesheet.ends_next_day
+                        )
                         : 0;
 
                     return (
@@ -424,6 +436,11 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                                     className="w-4 h-4 rounded"
                                   />
                                   <span className={`text-xs ${theme.textMuted}`}>Termina al día siguiente</span>
+                                  {formData.end_time < formData.start_time && (
+                                    <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 text-[9px] px-1.5 py-0.5">
+                                      Auto
+                                    </Badge>
+                                  )}
                                 </label>
                               </div>
                             </div>
