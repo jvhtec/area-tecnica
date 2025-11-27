@@ -1,6 +1,6 @@
--- Fix overnight shift calculation in compute_timesheet_amount_2025
--- This migration updates the function to properly handle shifts that span midnight
--- by automatically detecting when end_time < start_time OR when ends_next_day is true
+-- Fix rate breakdown display to properly show base amount for all hour ranges  
+-- This migration updates the function to always populate base_day_amount
+-- and show the plus_10_12 as an incremental premium in the display
 
 CREATE OR REPLACE FUNCTION compute_timesheet_amount_2025(
   _timesheet_id UUID,
@@ -107,26 +107,42 @@ BEGIN
     v_total_amount := v_base_day_amount + v_plus_10_12_amount;
   ELSE
     -- Standard calculation for non-evento jobs
+    -- CORRECTED TIER LOGIC:
+    -- Tier 1 (0-10.5h): Base day rate only
+    -- Tier 2 (10.5-12.5h): Base day + FIXED €30 premium
+    -- Tier 3 (>12.5h): Base day + FIXED €30 premium + overtime (rounded to whole hours, .5 rounds down)
+    
     v_billable_hours := v_worked_hours;
+    v_base_day_amount := v_rate_card.base_day_eur;
 
-    IF v_worked_hours <= 8 THEN
-      -- Up to 8 hours: base day rate
-      v_base_day_amount := v_rate_card.base_day_eur;
+    IF v_worked_hours <= 10.5 THEN
+      -- Tier 1: Up to 10.5 hours (10:30) - base day rate only
       v_total_amount := v_base_day_amount;
-    ELSIF v_worked_hours <= 12 THEN
-      -- 8-12 hours: 10-12 hour rate
-      v_plus_10_12_hours := v_worked_hours;
-      v_plus_10_12_amount := v_rate_card.plus_10_12_eur * v_worked_hours;
-      v_total_amount := v_plus_10_12_amount;
+    ELSIF v_worked_hours <= 12.5 THEN
+      -- Tier 2: 10.5-12.5 hours (10:31-12:30) - base + FIXED €30 premium
+      v_plus_10_12_hours := 0; -- Not per hour, just a marker that the premium applies
+      v_plus_10_12_amount := 30.0; -- FIXED €30 premium
+      v_total_amount := v_base_day_amount + v_plus_10_12_amount;
     ELSE
-      -- Over 12 hours: 12-hour rate + overtime
-      v_plus_10_12_hours := 12.0;
-      v_plus_10_12_amount := v_rate_card.plus_10_12_eur * 12.0;
-      v_overtime_hours := v_worked_hours - 12.0;
+      -- Tier 3: Over 12.5 hours (12:31+) - base + €30 premium + overtime
+      v_plus_10_12_hours := 0; -- Not per hour
+      v_plus_10_12_amount := 30.0; -- FIXED €30 premium
+      
+      -- Calculate overtime hours (hours beyond 12.5)
+      v_overtime_hours := v_worked_hours - 12.5;
+      
+      -- Round to whole hours with special rule: .5 rounds DOWN
+      -- Use CASE to handle .5 specifically
+      v_overtime_hours := CASE 
+        WHEN (v_overtime_hours % 1) = 0.5 THEN FLOOR(v_overtime_hours)
+        ELSE ROUND(v_overtime_hours)
+      END;
+      
       v_overtime_amount := v_rate_card.overtime_hour_eur * v_overtime_hours;
-      v_total_amount := v_plus_10_12_amount + v_overtime_amount;
+      v_total_amount := v_base_day_amount + v_plus_10_12_amount + v_overtime_amount;
     END IF;
   END IF;
+
 
   -- Build breakdown JSON
   v_breakdown := jsonb_build_object(
@@ -174,4 +190,4 @@ GRANT EXECUTE ON FUNCTION compute_timesheet_amount_2025(UUID, BOOLEAN) TO servic
 
 -- Add comment
 COMMENT ON FUNCTION compute_timesheet_amount_2025 IS
-'Calculates timesheet amounts based on rate cards. For evento jobs, always uses 12 hours at the 12-hour rate with no overtime, regardless of actual worked hours. Automatically handles overnight shifts by detecting when end_time < start_time or when ends_next_day flag is set.';
+'Calculates timesheet amounts based on rate cards. Rate tiers: (1) 0-10.5h: base only, (2) 10.5-12.5h: base + fixed €30 premium, (3) >12.5h: base + €30 + overtime (rounded to whole hours, .5 rounds down). For evento jobs, always uses fixed base + premium regardless of hours. Automatically handles overnight shifts by detecting when end_time < start_time or when ends_next_day flag is set.';
