@@ -78,16 +78,21 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
   const getAssignmentsForDate = useCallback((targetDate: Date) => {
     return assignments.filter(assignment => {
-      // Check if this is a single-day assignment
+      // Check if this is a single-day assignment (legacy/fallback)
       if (assignment.single_day && assignment.assignment_date) {
         const assignmentDate = new Date(assignment.assignment_date);
         return isSameDay(targetDate, assignmentDate);
       }
 
-      // Otherwise, use the job's full date range
-      const startDate = new Date(assignment.job.start_time);
-      const endDate = new Date(assignment.job.end_time);
-      return isSameDay(targetDate, startDate) || isWithinInterval(targetDate, { start: startDate, end: endDate });
+      // Check specific dates from timesheets if available
+      if (assignment.dates && assignment.dates.length > 0) {
+        const dayString = format(targetDate, 'yyyy-MM-dd');
+        return assignment.dates.includes(dayString);
+      }
+
+      // No fallback - if there are no specific timesheet dates, don't show the assignment
+      // This prevents showing techs assigned to the whole job span when they only worked specific days
+      return false;
     });
   }, [assignments]);
 
