@@ -19,7 +19,8 @@ export default defineConfig(({ mode }) => ({
     },
   },
   define: {
-    'import.meta.env.VITE_APP_VERSION': JSON.stringify('1.0RTM'),
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(new Date().toISOString()),
+    'import.meta.env.VITE_BUILD_TIMESTAMP': JSON.stringify(Date.now()),
   },
   build: {
     // Only disable sourcemaps and drop console/debugger in production

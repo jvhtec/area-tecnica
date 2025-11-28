@@ -100,6 +100,34 @@ if (shouldRegisterServiceWorker) {
           console.warn('Service worker update check failed', updateError)
         }
       }
+
+      // iOS PWA: Add visibility change listener for update checking
+      // iOS doesn't always check for updates on app launch, but does better with visibility changes
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator as any).standalone === true;
+
+      if (isIOS) {
+        let lastCheckTime = Date.now();
+
+        const handleVisibilityChange = async () => {
+          // Only check if app became visible and it's been at least 10 seconds since last check
+          if (!document.hidden && Date.now() - lastCheckTime > 10000) {
+            lastCheckTime = Date.now();
+            console.log('[Main] iOS: Visibility changed, checking for SW updates');
+
+            try {
+              const reg = await navigator.serviceWorker.getRegistration('/');
+              if (reg) {
+                await reg.update();
+              }
+            } catch (err) {
+              console.debug('[Main] iOS: Update check failed', err);
+            }
+          }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+      }
     } catch (error) {
       console.error('Service worker registration failed', error)
     }
