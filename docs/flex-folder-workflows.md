@@ -3,6 +3,8 @@
 ## Overview
 This document summarizes how Flex folders are provisioned for jobs, tours, and tour dates in the application. It captures entry points, supporting utilities, Supabase functions, and database side effects so future updates can maintain parity across workflows.
 
+> **Note**: For a comprehensive architectural overview including all flex-related frontend modules, data flow diagrams, and comparison of creation pipelines, see [flex-frontend-architecture.md](./flex-frontend-architecture.md).
+
 ## Job Flex Folder Creation
 
 ### Entry Points in the UI
