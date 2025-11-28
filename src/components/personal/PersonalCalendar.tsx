@@ -113,10 +113,9 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
         return assignment.dates.includes(dayString);
       }
 
-      // Fallback to job's full date range if no specific dates (shouldn't happen with new logic)
-      const startDate = new Date(assignment.job.start_time);
-      const endDate = new Date(assignment.job.end_time);
-      return isSameDay(day, startDate) || isWithinInterval(day, { start: startDate, end: endDate });
+      // No fallback - if there are no specific timesheet dates, don't show the assignment
+      // This prevents showing techs assigned to the whole job span when they only worked specific days
+      return false;
     });
   };
 
