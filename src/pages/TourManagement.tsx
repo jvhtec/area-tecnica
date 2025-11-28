@@ -371,7 +371,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
 
   if (isTechnicianView) {
     return (
-      <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
+      <div className="max-w-[1920px] mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col md:flex-row items-start gap-4">
             <div className="flex-shrink-0 mx-auto md:mx-0">
@@ -520,7 +520,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   }
 
   return (
-    <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
+    <div className="max-w-[1920px] mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header Section */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col md:flex-row items-start gap-4">
@@ -680,7 +680,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 px-1">
           {isTechnicianView ? 'Información de Gira' : 'Áreas de Gestión'}
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-4">
           {quickActions.map((action, index) => (
             <Card
               key={index}
@@ -760,7 +760,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       {upcomingDates.length > 0 && (
         <div>
           <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 px-1">Próximas Fechas de Gira</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
             {upcomingDates.map((date: any) => (
               <Card key={date.id}>
                 <CardHeader className="pb-3 px-3 md:px-6 pt-3 md:pt-6">

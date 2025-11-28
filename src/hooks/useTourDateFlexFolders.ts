@@ -46,6 +46,15 @@ export const useTourDateFlexFolders = (tourId: string) => {
         throw updateError;
       }
 
+      // Broadcast push notification: Flex folders created for job
+      try {
+        void supabase.functions.invoke('push', {
+          body: { action: 'broadcast', type: 'flex.folders.created', job_id: job.id }
+        });
+      } catch (pushError) {
+        console.error('Error sending push notification:', pushError);
+      }
+
       return { job, tourDate };
     },
     onSuccess: (data) => {

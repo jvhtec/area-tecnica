@@ -92,6 +92,15 @@ const formatJobDateLabel = (date: string | null | undefined) => {
   }
 };
 
+const formatDepartmentName = (department: string) => {
+  const names: Record<string, string> = {
+    'sound': 'Sonido',
+    'lights': 'Luces',
+    'video': 'Video'
+  };
+  return names[department.toLowerCase()] || department;
+};
+
 export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
   const { user, userRole } = useOptimizedAuth();
@@ -109,6 +118,20 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   // Get current user's department or use the passed department
   const currentDepartment = department || user?.department || "sound";
+
+  // Filter assignments to only show those for the current department
+  const departmentAssignments = useMemo(() => {
+    return (assignments || []).filter((assignment: any) => {
+      if (currentDepartment === 'sound') {
+        return assignment.sound_role && assignment.sound_role !== 'none';
+      } else if (currentDepartment === 'lights') {
+        return assignment.lights_role && assignment.lights_role !== 'none';
+      } else if (currentDepartment === 'video') {
+        return assignment.video_role && assignment.video_role !== 'none';
+      }
+      return false;
+    });
+  }, [assignments, currentDepartment]);
 
   // Fetch job data to get start/end times for availability checking
   const { data: jobData, isLoading: isLoadingJob } = useQuery({
@@ -428,7 +451,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       <DialogContent className="w-[95vw] max-w-[625px] max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <span className="text-base md:text-lg">Manage {currentDepartment} Assignments</span>
+            <span className="text-base md:text-lg">Gestión de Personal - {formatDepartmentName(currentDepartment)}</span>
             <div className="flex flex-wrap items-center gap-2">
               {crewCallData?.flex_element_id && (
                 <Button
@@ -456,269 +479,222 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
             </div>
           </DialogTitle>
           <DialogDescription className="text-xs md:text-sm">
-            Assign available {currentDepartment} technicians to this job.
+            Gestiona las asignaciones existentes para {formatDepartmentName(currentDepartment)}. Puedes modificar roles/categorías o eliminar personal. Para nuevas asignaciones, usa la Matriz de Asignaciones.
             {crewCallData?.flex_element_id && (
               <span className="block text-xs md:text-sm text-muted-foreground mt-1">
-                Crew call available for {currentDepartment} department.
+                Crew call disponible para el departamento de {formatDepartmentName(currentDepartment)}.
               </span>
             )}
             {reqForDept && (
               <span className="block text-xs md:text-sm text-muted-foreground mt-1">
-                Coverage: {(Array.from(assignedByRole.values()).reduce((a, b) => a + b, 0))}/{reqForDept.total_required} required
+                Cobertura: {(Array.from(assignedByRole.values()).reduce((a, b) => a + b, 0))}/{reqForDept.total_required} requeridos
               </span>
             )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-1">
-          <div className="grid gap-3 md:gap-4 py-3 md:py-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
-              <Label htmlFor="technician" className="md:text-right text-xs md:text-sm">
-                Technician
-              </Label>
-              <Select
-                onValueChange={setSelectedTechnician}
-                value={selectedTechnician || ""}
-                disabled={isLoadingTechnicians || isLoadingJob}
-              >
-                <SelectTrigger className="md:col-span-3">
-                  <SelectValue placeholder={
-                    isLoadingTechnicians || isLoadingJob
-                      ? "Loading available technicians..."
-                      : "Select a technician"
-                  } />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredTechnicians.map((technician) => (
-                    <SelectItem key={technician.id} value={technician.id}>
-                      {formatAvailableTechnicianName(technician)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {currentDepartment === "sound" && (
-              <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
-                <Label htmlFor="sound-role" className="md:text-right text-xs md:text-sm">
-                  Sound Role
-                </Label>
-                <Select onValueChange={setSoundRole} value={soundRole}>
-                  <SelectTrigger className="md:col-span-3">
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {getDepartmentRoleOptions().map((opt) => {
-                      const left = remainingByRole.get(opt.code);
-                      const descr = reqForDept ? `${opt.label}${typeof left === 'number' ? ` (${Math.max(left, 0)} left)` : ''}` : opt.label;
-                      const disabled = reqForDept && typeof left === 'number' && left <= 0 && !['admin', 'management'].includes(userRole || '');
-                      return (
-                        <SelectItem key={opt.code} value={opt.code} disabled={disabled}>
-                          {descr}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {currentDepartment === "lights" && (
-              <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
-                <Label htmlFor="lights-role" className="md:text-right text-xs md:text-sm">
-                  Lights Role
-                </Label>
-                <Select onValueChange={setLightsRole} value={lightsRole}>
-                  <SelectTrigger className="md:col-span-3">
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {getDepartmentRoleOptions().map((opt) => {
-                      const left = remainingByRole.get(opt.code);
-                      const descr = reqForDept ? `${opt.label}${typeof left === 'number' ? ` (${Math.max(left, 0)} left)` : ''}` : opt.label;
-                      const disabled = reqForDept && typeof left === 'number' && left <= 0 && !['admin', 'management'].includes(userRole || '');
-                      return (
-                        <SelectItem key={opt.code} value={opt.code} disabled={disabled}>
-                          {descr}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
-              <Label htmlFor="single-day-toggle" className="md:text-right text-xs md:text-sm">
-                Coverage
-              </Label>
-              <div className="md:col-span-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="single-day-toggle"
-                    checked={singleDay}
-                    onCheckedChange={(checked) => {
-                      setSingleDay(checked);
-                      if (checked) {
-                        if (jobDates.length > 0) {
-                          setSelectedJobDate((current) => {
-                            if (current) {
-                              const key = format(current, "yyyy-MM-dd");
-                              if (allowedJobDateSet.has(key)) {
-                                const normalized = new Date(current);
-                                normalized.setHours(0, 0, 0, 0);
-                                return normalized;
-                              }
-                            }
-                            const fallback = new Date(jobDates[0]);
-                            fallback.setHours(0, 0, 0, 0);
-                            return fallback;
-                          });
-                        }
-                      } else {
-                        setSelectedJobDate(null);
-                      }
-                    }}
-                    disabled={jobDates.length === 0}
-                  />
-                  <Label htmlFor="single-day-toggle" className="text-sm font-medium">
-                    Single-day assignment
-                  </Label>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="justify-start w-full sm:w-auto"
-                        disabled={!singleDay || jobDates.length === 0}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {selectedJobDate ? format(selectedJobDate, "PPP") : "Select job date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={selectedJobDate ?? undefined}
-                        onSelect={(date) => {
-                          if (!date) return;
-                          const key = format(date, "yyyy-MM-dd");
-                          if (!allowedJobDateSet.has(key)) return;
-                          const normalized = new Date(date);
-                          normalized.setHours(0, 0, 0, 0);
-                          setSelectedJobDate(normalized);
-                        }}
-                        disabled={(date) => !allowedJobDateSet.has(format(date, "yyyy-MM-dd"))}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <p className="text-xs text-muted-foreground">
-                    {jobDates.length === 0
-                      ? 'No job dates available'
-                      : singleDay
-                        ? 'Only covers the selected day.'
-                        : 'Toggle to limit this assignment to a single day.'}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="add-as-confirmed"
-                checked={addAsConfirmed}
-                onCheckedChange={setAddAsConfirmed}
-              />
-              <Label htmlFor="add-as-confirmed" className="text-sm font-medium">
-                Add as confirmed (skip invitation)
-              </Label>
-            </div>
-            <Button
-              onClick={handleAddTechnician}
-              disabled={isAdding || !selectedTechnician || isLoadingTechnicians || isLoadingJob}
-              size="sm"
-              className="w-full"
-            >
-              {isAdding ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Please wait
-                </>
-              ) : (
-                "Add Technician"
-              )}
-            </Button>
-          </div>
-
-          <div className="py-3 md:py-4 border-t">
-            <h3 className="text-base md:text-lg font-semibold mb-2">Current Assignments</h3>
-            {assignments.length === 0 ? (
-              <p className="text-xs md:text-sm text-muted-foreground">No technicians assigned yet.</p>
+          <div className="py-3 md:py-4">
+            <h3 className="text-base md:text-lg font-semibold mb-2">Asignaciones Actuales de {formatDepartmentName(currentDepartment)}</h3>
+            {departmentAssignments.length === 0 ? (
+              <p className="text-xs md:text-sm text-muted-foreground">No hay técnicos asignados a {formatDepartmentName(currentDepartment)} aún.</p>
             ) : (
-              <div className="space-y-2">
-                {assignments.map((assignment) => (
+              <div className="space-y-3">
+                {departmentAssignments.map((assignment) => (
                   <div
                     key={assignment.technician_id}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border rounded-md p-2 md:p-3"
+                    className="border rounded-md p-3 md:p-4 space-y-3"
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm md:text-base font-medium truncate">
-                        {formatAssignmentTechnicianName(assignment)}
-                      </div>
-                      <div className="text-xs md:text-sm text-muted-foreground flex flex-col gap-0.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm md:text-base font-medium truncate">
+                          {formatAssignmentTechnicianName(assignment)}
+                        </div>
                         {assignment.single_day && assignment.assignment_date && (
-                          <span>
-                            Single-day: {formatJobDateLabel(assignment.assignment_date)}
-                          </span>
-                        )}
-                        {currentDepartment === "sound" && (
-                          <span>Sound: {labelForCode(assignment.sound_role) || "None"}</span>
-                        )}
-                        {currentDepartment === "lights" && (
-                          <span>Lights: {labelForCode(assignment.lights_role) || "None"}</span>
+                          <div className="text-xs md:text-sm text-muted-foreground mt-1">
+                            Día único: {formatJobDateLabel(assignment.assignment_date)}
+                          </div>
                         )}
                       </div>
-                    </div>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          disabled={isRemoving[assignment.technician_id]}
-                          className="w-full sm:w-auto"
-                        >
-                          {isRemoving[assignment.technician_id] ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Removing...
-                            </>
-                          ) : (
-                            "Remove"
-                          )}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently
-                            remove the technician from this job.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => removeAssignment(assignment.technician_id)}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={isRemoving[assignment.technician_id]}
+                            className="w-full sm:w-auto"
                           >
-                            Continue
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                            {isRemoving[assignment.technician_id] ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Eliminando...
+                              </>
+                            ) : (
+                              "Eliminar"
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Estás completamente seguro?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción no se puede deshacer. Esto eliminará permanentemente al técnico de este trabajo.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => removeAssignment(assignment.technician_id)}
+                            >
+                              Continuar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {currentDepartment === "sound" && (
+                        <div>
+                          <Label htmlFor={`sound-role-${assignment.technician_id}`} className="text-xs md:text-sm mb-1">
+                            Rol de Sonido
+                          </Label>
+                          <Select
+                            value={assignment.sound_role || "none"}
+                            onValueChange={async (newRole) => {
+                              try {
+                                const { error } = await supabase
+                                  .from('job_assignments')
+                                  .update({ sound_role: newRole === 'none' ? null : newRole })
+                                  .eq('job_id', jobId)
+                                  .eq('technician_id', assignment.technician_id);
+
+                                if (error) throw error;
+
+                                toast({
+                                  title: "Rol actualizado",
+                                  description: "El rol de sonido se ha actualizado exitosamente",
+                                });
+                                onAssignmentChange();
+                              } catch (error: any) {
+                                console.error("Error updating role:", error);
+                                toast({
+                                  title: "Error",
+                                  description: error.message || "No se pudo actualizar el rol",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          >
+                            <SelectTrigger id={`sound-role-${assignment.technician_id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Ninguno</SelectItem>
+                              {roleOptionsForDiscipline('sound').map((opt) => (
+                                <SelectItem key={opt.code} value={opt.code}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {currentDepartment === "lights" && (
+                        <div>
+                          <Label htmlFor={`lights-role-${assignment.technician_id}`} className="text-xs md:text-sm mb-1">
+                            Rol de Luces
+                          </Label>
+                          <Select
+                            value={assignment.lights_role || "none"}
+                            onValueChange={async (newRole) => {
+                              try {
+                                const { error } = await supabase
+                                  .from('job_assignments')
+                                  .update({ lights_role: newRole === 'none' ? null : newRole })
+                                  .eq('job_id', jobId)
+                                  .eq('technician_id', assignment.technician_id);
+
+                                if (error) throw error;
+
+                                toast({
+                                  title: "Rol actualizado",
+                                  description: "El rol de luces se ha actualizado exitosamente",
+                                });
+                                onAssignmentChange();
+                              } catch (error: any) {
+                                console.error("Error updating role:", error);
+                                toast({
+                                  title: "Error",
+                                  description: error.message || "No se pudo actualizar el rol",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          >
+                            <SelectTrigger id={`lights-role-${assignment.technician_id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Ninguno</SelectItem>
+                              {roleOptionsForDiscipline('lights').map((opt) => (
+                                <SelectItem key={opt.code} value={opt.code}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {currentDepartment === "video" && (
+                        <div>
+                          <Label htmlFor={`video-role-${assignment.technician_id}`} className="text-xs md:text-sm mb-1">
+                            Rol de Video
+                          </Label>
+                          <Select
+                            value={assignment.video_role || "none"}
+                            onValueChange={async (newRole) => {
+                              try {
+                                const { error } = await supabase
+                                  .from('job_assignments')
+                                  .update({ video_role: newRole === 'none' ? null : newRole })
+                                  .eq('job_id', jobId)
+                                  .eq('technician_id', assignment.technician_id);
+
+                                if (error) throw error;
+
+                                toast({
+                                  title: "Rol actualizado",
+                                  description: "El rol de video se ha actualizado exitosamente",
+                                });
+                                onAssignmentChange();
+                              } catch (error: any) {
+                                console.error("Error updating role:", error);
+                                toast({
+                                  title: "Error",
+                                  description: error.message || "No se pudo actualizar el rol",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          >
+                            <SelectTrigger id={`video-role-${assignment.technician_id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Ninguno</SelectItem>
+                              {roleOptionsForDiscipline('video').map((opt) => (
+                                <SelectItem key={opt.code} value={opt.code}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -727,15 +703,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
         </div>
 
         <DialogFooter className="flex-shrink-0">
-          <Button type="submit" onClick={handleSaveAssignments} disabled={isLoading} size="sm" className="w-full sm:w-auto">
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Please wait
-              </>
-            ) : (
-              "Save Assignments"
-            )}
+          <Button type="button" onClick={onClose} size="sm" className="w-full sm:w-auto">
+            Cerrar
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -113,93 +113,105 @@ export const IncidentReportsManagement = () => {
             </div>
           </div>
 
-          <div className="grid gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredReports.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="col-span-full text-center py-8 text-muted-foreground">
                 <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>No se encontraron reportes de incidencias</p>
                 {searchTerm && <p className="text-sm">Intenta con otros términos de búsqueda</p>}
               </div>
             ) : (
               filteredReports.map((report) => (
-                <Card key={report.id} className="hover:bg-muted/50 transition-colors">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="h-4 w-4" />
-                          <h3 className="font-medium">{report.file_name}</h3>
-                          <Badge variant="secondary" className="text-xs">
-                            PDF
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
-                          <div>
-                            <strong>Trabajo:</strong> {report.job?.title || "N/A"}
-                          </div>
-                          <div>
-                            <strong>Técnico:</strong> {
-                              report.uploaded_by_profile 
-                                ? `${report.uploaded_by_profile.first_name} ${report.uploaded_by_profile.last_name}`
-                                : "N/A"
-                            }
-                          </div>
-                          <div>
-                            <strong>Fecha:</strong> {
-                              format(new Date(report.uploaded_at), "dd/MM/yyyy HH:mm", { locale: es })
-                            }
-                          </div>
-                        </div>
+                <Card key={report.id} className="hover:bg-muted/50 transition-colors flex flex-col">
+                  <CardContent className="pt-6 flex flex-col h-full">
+                    <div className="flex items-start gap-2 mb-3">
+                      <FileText className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm truncate" title={report.file_name}>
+                          {report.file_name}
+                        </h3>
+                        <Badge variant="secondary" className="text-xs mt-1">
+                          PDF
+                        </Badge>
+                      </div>
+                    </div>
 
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span>Tamaño: {formatFileSize(report.file_size)}</span>
-                          {report.job && (
-                            <span>
-                              Trabajo: {format(new Date(report.job.start_time), "dd/MM/yyyy", { locale: es })}
-                            </span>
-                          )}
+                    <div className="space-y-2 text-sm text-muted-foreground mb-3 flex-1">
+                      <div>
+                        <strong className="text-foreground">Trabajo:</strong>
+                        <div className="truncate" title={report.job?.title}>
+                          {report.job?.title || "N/A"}
                         </div>
                       </div>
+                      <div>
+                        <strong className="text-foreground">Técnico:</strong>
+                        <div className="truncate" title={
+                          report.uploaded_by_profile
+                            ? `${report.uploaded_by_profile.first_name} ${report.uploaded_by_profile.last_name}`
+                            : "N/A"
+                        }>
+                          {report.uploaded_by_profile
+                            ? `${report.uploaded_by_profile.first_name} ${report.uploaded_by_profile.last_name}`
+                            : "N/A"
+                          }
+                        </div>
+                      </div>
+                      <div>
+                        <strong className="text-foreground">Fecha:</strong>
+                        <div>
+                          {format(new Date(report.uploaded_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                        </div>
+                      </div>
+                    </div>
 
-                      <div className="flex items-center gap-2 ml-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => downloadReport(report)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={isDeleting}
+                    <div className="space-y-1 text-xs text-muted-foreground border-t pt-3 mb-3">
+                      <div>Tamaño: {formatFileSize(report.file_size)}</div>
+                      {report.job && (
+                        <div>
+                          Trabajo: {format(new Date(report.job.start_time), "dd/MM/yyyy", { locale: es })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadReport(report)}
+                        className="flex-1"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Descargar
+                      </Button>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isDeleting}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Eliminar reporte?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción no se puede deshacer. El reporte "{report.file_name}" será eliminado permanentemente del sistema.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteReport(report.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Eliminar reporte?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta acción no se puede deshacer. El reporte "{report.file_name}" será eliminado permanentemente del sistema.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteReport(report.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Eliminar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </CardContent>
                 </Card>

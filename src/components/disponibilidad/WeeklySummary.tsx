@@ -52,7 +52,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     }
   }, [selectedDate]);
   const [isOpen, setIsOpen] = useState(() => safeGetJSON('weeklySummaryOpen', true));
-  
+
   const departmentCategories = getCategoriesForDepartment(department);
   // Filters disabled by default: show all categories until user opts in
   const [filtersEnabled, setFiltersEnabled] = useState(false);
@@ -155,7 +155,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     queryKey: ['week-preset-assignments', department, currentWeekStart],
     queryFn: async () => {
       const assignments = [];
-      
+
       for (const date of weekDates) {
         const { data, error } = await supabase
           .from('day_preset_assignments')
@@ -197,11 +197,11 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
   const getUsedQuantity = (equipmentId: string, date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const dayAssignments = weekAssignments?.filter(a => a.date === dateStr);
-    
+
     if (!dayAssignments?.length) return 0;
 
     return dayAssignments.reduce((total, assignment) => {
-      const item = assignment.preset.items.find(item => 
+      const item = assignment.preset.items.find(item =>
         item.equipment_id === equipmentId
       );
       return total + (item?.quantity || 0);
@@ -325,7 +325,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
             </CollapsibleTrigger>
           )}
         </div>
-        
+
         {/* Category Filters */}
         <div className={cn("flex items-center gap-2", isMobile && "w-full")}>
           {isMobile ? (
@@ -361,9 +361,9 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => { 
-                        setFiltersEnabled(false); 
-                        setSelectedCategories([]); 
+                      onClick={() => {
+                        setFiltersEnabled(false);
+                        setSelectedCategories([]);
                         setCategorySheetOpen(false);
                       }}
                       className="w-full"
@@ -401,7 +401,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
             </>
           )}
         </div>
-        
+
         {/* Week Navigation and Actions */}
         <div className={cn("flex items-center gap-2 flex-wrap", isMobile && "w-full")}>
           <div className="flex items-center gap-2">
@@ -417,8 +417,8 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
             </Button>
           </div>
           <ReloadButton onReload={handleReload} />
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={handleExportPDF}
             className={cn(isMobile && "flex-1")}
@@ -440,127 +440,131 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
         <Card className={cn(isMobile ? "p-3" : "p-3 sm:p-4")}>
           <div className="overflow-x-auto">
             <div className="min-w-[768px] md:min-w-[960px] lg:min-w-[1120px]">
-              <Table>
+              <Table className="table-fixed w-full">
                 <TableHeader className="bg-background">
                   <TableRow>
-                    <TableHead className={cn(isMobile && "text-xs")}>Equipo</TableHead>
-                    <TableHead className={cn(isMobile && "text-xs")}>Categoría</TableHead>
-                    <TableHead className={cn(isMobile && "text-xs")}>Stock Total</TableHead>
+                    <TableHead className={cn("w-[200px]", isMobile && "text-xs w-[120px]")}>Equipo</TableHead>
+                    <TableHead className={cn("w-[120px]", isMobile && "text-xs w-[80px]")}>Categoría</TableHead>
+                    <TableHead className={cn("w-[80px]", isMobile && "text-xs w-[60px]")}>Stock Total</TableHead>
                     {weekDates.map((date) => (
-                      <TableHead key={date.toISOString()} className={cn("text-center", isMobile && "text-xs")}>
+                      <TableHead key={date.toISOString()} className={cn("text-center w-[100px]", isMobile && "text-xs w-[60px]")}>
                         {format(date, 'EEE d', { locale: es })}
                       </TableHead>
                     ))}
-                    <TableHead className={cn("text-right", isMobile && "text-xs")}>
+                    <TableHead className={cn("text-right w-[100px]", isMobile && "text-xs w-[60px]")}>
                       Disponible
-                      <span className="ml-2 text-xs text-muted-foreground">
+                      <span className="ml-2 text-xs text-muted-foreground block sm:inline">
                         ({format(selectedDate || currentWeekStart, 'EEE d', { locale: es })})
                       </span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
               </Table>
-              <div className="overflow-y-auto max-h-[500px]">
-                <Table>
+              <div className="overflow-y-auto h-[calc(100vh-280px)]">
+                <Table className="table-fixed w-full">
                   <TableBody>
-                {filteredEquipment?.map((item) => {
-                  const remainingEachDay = weekDates.map(date => {
-                    const used = getUsedQuantity(item.id, date);
-                    const boost = getBoostForDate(item.id, date);
-                    return item.base_quantity + boost - used;
-                  });
-                  // Disponible should reflect the currently selected date value
-                  const selected = selectedDate || currentWeekStart;
-                  const usedSel = getUsedQuantity(item.id, selected);
-                  const boostSel = getBoostForDate(item.id, selected);
-                  const available = item.base_quantity + boostSel - usedSel;
-
-                  return (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.name}</TableCell>
-                      <TableCell>{allCategoryLabels[item.category]}</TableCell>
-                      <TableCell>{item.current_quantity}</TableCell>
-                      {weekDates.map((date) => {
+                    {filteredEquipment?.map((item) => {
+                      const remainingEachDay = weekDates.map(date => {
                         const used = getUsedQuantity(item.id, date);
                         const boost = getBoostForDate(item.id, date);
-                        const remaining = item.base_quantity + boost - used;
-                        // Show clearer copy: remaining as restan X, shortage as faltan X
-                        const remainingText = remaining >= 0
-                          ? `(restan ${remaining})`
-                          : `(faltan ${Math.abs(remaining)})`;
-                        const remainingClass = remaining >= 0 ? 'text-green-600' : 'text-red-600 font-bold';
-                        const cellBgClass = remaining < 0 ? 'bg-destructive/20' : '';
+                        return item.base_quantity + boost - used;
+                      });
+                      // Disponible should reflect the currently selected date value
+                      const selected = selectedDate || currentWeekStart;
+                      const usedSel = getUsedQuantity(item.id, selected);
+                      const boostSel = getBoostForDate(item.id, selected);
+                      const available = item.base_quantity + boostSel - usedSel;
 
-                        const presetBreakdown = getPresetBreakdown(item.id, date);
-                        const rentalBreakdown = getSubRentalBreakdown(item.id, date);
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell className={cn("w-[200px] font-medium", isMobile && "w-[120px]")}>
+                            <div className="truncate" title={item.name}>{item.name}</div>
+                          </TableCell>
+                          <TableCell className={cn("w-[120px]", isMobile && "w-[80px]")}>
+                            <div className="truncate" title={allCategoryLabels[item.category]}>{allCategoryLabels[item.category]}</div>
+                          </TableCell>
+                          <TableCell className={cn("w-[80px]", isMobile && "w-[60px]")}>{item.current_quantity}</TableCell>
+                          {weekDates.map((date) => {
+                            const used = getUsedQuantity(item.id, date);
+                            const boost = getBoostForDate(item.id, date);
+                            const remaining = item.base_quantity + boost - used;
+                            // Show clearer copy: remaining as restan X, shortage as faltan X
+                            const remainingText = remaining >= 0
+                              ? `(restan ${remaining})`
+                              : `(faltan ${Math.abs(remaining)})`;
+                            const remainingClass = remaining >= 0 ? 'text-green-600' : 'text-red-600 font-bold';
+                            const cellBgClass = remaining < 0 ? 'bg-destructive/20' : '';
 
-                        const content = (
-                          <div className="flex justify-center items-center">
-                            <span className={remainingClass}>{used > 0 ? used : '-'}</span>
-                          </div>
-                        );
+                            const presetBreakdown = getPresetBreakdown(item.id, date);
+                            const rentalBreakdown = getSubRentalBreakdown(item.id, date);
 
-                        return (
-                          <TableCell key={date.toISOString()} className={`text-center ${cellBgClass}`}>
+                            const content = (
+                              <div className="flex justify-center items-center">
+                                <span className={remainingClass}>{used > 0 ? used : '-'}</span>
+                              </div>
+                            );
+
+                            return (
+                              <TableCell key={date.toISOString()} className={`text-center w-[100px] ${cellBgClass} ${isMobile ? 'w-[60px]' : ''}`}>
+                                <TooltipProvider>
+                                  <Tooltip delayDuration={200}>
+                                    <TooltipTrigger asChild>
+                                      <div>{content}</div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" align="center" className="w-72">
+                                      <div className="space-y-2">
+                                        <div className="text-sm font-medium">{item.name} · {format(date, 'PPP')}</div>
+                                        <div className="text-xs text-muted-foreground">Breakdown</div>
+                                        {presetBreakdown.length > 0 ? (
+                                          <div className="text-sm">
+                                            {presetBreakdown.map((p, idx) => (
+                                              <div key={idx} className="flex justify-between"><span>{p.name}</span><span>−{p.qty}</span></div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div className="text-sm text-muted-foreground">No presets</div>
+                                        )}
+                                        {rentalBreakdown.length > 0 && (
+                                          <div className="text-sm pt-1 border-t">
+                                            <div className="text-xs text-muted-foreground mb-1">Sub‑rentals</div>
+                                            {rentalBreakdown.map((r, idx) => (
+                                              <div key={idx} className="flex justify-between"><span>+{r.qty}</span><span className="text-xs italic">{r.notes || ''}</span></div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell className={cn("text-right w-[100px]", isMobile && "w-[60px]", available < 0 ? 'text-red-500 font-bold' : '')}>
                             <TooltipProvider>
                               <Tooltip delayDuration={200}>
                                 <TooltipTrigger asChild>
-                                  <div>{content}</div>
+                                  <span className="cursor-default">{available}</span>
                                 </TooltipTrigger>
-                                <TooltipContent side="top" align="center" className="w-72">
+                                <TooltipContent side="left" align="center" className="w-72">
                                   <div className="space-y-2">
-                                    <div className="text-sm font-medium">{item.name} · {format(date, 'PPP')}</div>
-                                    <div className="text-xs text-muted-foreground">Breakdown</div>
-                                    {presetBreakdown.length > 0 ? (
-                                      <div className="text-sm">
-                                        {presetBreakdown.map((p, idx) => (
-                                          <div key={idx} className="flex justify-between"><span>{p.name}</span><span>−{p.qty}</span></div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <div className="text-sm text-muted-foreground">No presets</div>
-                                    )}
-                                    {rentalBreakdown.length > 0 && (
-                                      <div className="text-sm pt-1 border-t">
-                                        <div className="text-xs text-muted-foreground mb-1">Sub‑rentals</div>
-                                        {rentalBreakdown.map((r, idx) => (
-                                          <div key={idx} className="flex justify-between"><span>+{r.qty}</span><span className="text-xs italic">{r.notes || ''}</span></div>
-                                        ))}
-                                      </div>
-                                    )}
+                                    <div className="text-sm font-medium">
+                                      {item.name} · {format(selected, 'PPP')}
+                                    </div>
+                                    <div className="text-sm">
+                                      <div className="flex justify-between"><span>Base</span><span>{item.base_quantity}</span></div>
+                                      <div className="flex justify-between"><span>Sub‑rentals</span><span>+{boostSel}</span></div>
+                                      <div className="flex justify-between"><span>Usado</span><span>−{usedSel}</span></div>
+                                      <div className="flex justify-between font-medium border-t pt-1"><span>Disponible</span><span>{available}</span></div>
+                                    </div>
                                   </div>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
                           </TableCell>
-                        );
-                      })}
-                      <TableCell className={`text-right ${available < 0 ? 'text-red-500 font-bold' : ''}`}>
-                        <TooltipProvider>
-                          <Tooltip delayDuration={200}>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-default">{available}</span>
-                            </TooltipTrigger>
-                            <TooltipContent side="left" align="center" className="w-72">
-                              <div className="space-y-2">
-                                <div className="text-sm font-medium">
-                                  {item.name} · {format(selected, 'PPP')}
-                                </div>
-                                <div className="text-sm">
-                                  <div className="flex justify-between"><span>Base</span><span>{item.base_quantity}</span></div>
-                                  <div className="flex justify-between"><span>Sub‑rentals</span><span>+{boostSel}</span></div>
-                                  <div className="flex justify-between"><span>Usado</span><span>−{usedSel}</span></div>
-                                  <div className="flex justify-between font-medium border-t pt-1"><span>Disponible</span><span>{available}</span></div>
-                                </div>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                  </TableRow>
-                  );
-                })}
-                </TableBody>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
                 </Table>
               </div>
             </div>

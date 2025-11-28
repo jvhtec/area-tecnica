@@ -355,9 +355,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   });
   const getFlexButtonTitle = () => {
     if (isCreatingFolders) {
-      return "Creating folders...";
+      return "Creando carpetas...";
     }
-    return foldersAreCreated ? "Folders already exist" : "Create Flex folders";
+    return foldersAreCreated ? "Las carpetas ya existen" : "Crear carpetas Flex";
   };
 
   // Compute the main Flex element ID from the job's flex_folders
@@ -734,10 +734,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={onOpenTasks}
           className="gap-2"
-          title="Tasks"
+          title="Tareas"
         >
           <ListChecks className="h-4 w-4" />
-          <span className="hidden sm:inline">Tasks</span>
+          <span className="hidden sm:inline">Tareas</span>
         </Button>
       )}
       {transportButtonLabel && onTransportClick && (
@@ -789,7 +789,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           className="gap-2"
         >
           <Info className="h-4 w-4" />
-          <span className="hidden sm:inline">View Details</span>
+          <span className="hidden sm:inline">Ver Detalles</span>
         </Button>
       )}
 
@@ -799,10 +799,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={onFestivalArtistsClick}
           className="hover:bg-accent/50"
-          title={userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
+          title={userRole === 'technician' || userRole === 'house_tech' ? 'Ver Festival' : 'Gestionar Festival'}
         >
           <Users className="h-4 w-4 mr-1" />
-          <span className="hidden sm:inline">{userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}</span>
+          <span className="hidden sm:inline">{userRole === 'technician' || userRole === 'house_tech' ? 'Ver Festival' : 'Gestionar Festival'}</span>
         </Button>
       )}
       {job.job_type !== "festival" && job.job_type !== "dryhire" && isProjectManagementPage && canManageArtists && (
@@ -811,10 +811,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={handleManageJob}
           className="hover:bg-accent/50"
-          title={userRole === 'technician' || userRole === 'house_tech' ? 'View Job' : 'Manage Job'}
+          title={userRole === 'technician' || userRole === 'house_tech' ? 'Ver Trabajo' : 'Gestionar Trabajo'}
         >
           <Settings className="h-4 w-4 mr-1" />
-          <span className="hidden sm:inline">{userRole === 'technician' || userRole === 'house_tech' ? 'View Job' : 'Manage Job'}</span>
+          <span className="hidden sm:inline">{userRole === 'technician' || userRole === 'house_tech' ? 'Ver Trabajo' : 'Gestionar Trabajo'}</span>
         </Button>
       )}
       {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
@@ -823,17 +823,17 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={onAssignmentDialogOpen}
           className="hover:bg-accent/50"
-          title="Assign"
+          title="Asignar"
         >
           <Users className="h-4 w-4 mr-1" />
-          <span className="hidden sm:inline">Assign</span>
+          <span className="hidden sm:inline">Asignar</span>
         </Button>
       )}
       <Button
         variant="ghost"
         size="icon"
         onClick={onRefreshData}
-        title="Refresh"
+        title="Actualizar"
         className="hover:bg-accent/50"
       >
         <RefreshCw className="h-4 w-4" />
@@ -843,7 +843,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           variant="ghost"
           size="icon"
           onClick={onSyncFlex}
-          title="Sync status to Flex"
+          title="Sincronizar estado con Flex"
           className="hover:bg-accent/50"
         >
           <RefreshCw className="h-4 w-4" />
@@ -854,7 +854,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           variant="ghost"
           size="icon"
           onClick={handleTimesheetClick}
-          title="Manage Timesheets"
+          title="Gestionar Hojas de Tiempo"
           className="hover:bg-accent/50"
         >
           <Clock className="h-4 w-4" />
@@ -867,23 +867,23 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             variant="outline"
             size="sm"
             className="gap-2"
-            title="Weights (Pesos) Calculator"
+            title="Calculadora de Pesos"
             onClick={(e) => navigateToCalculator(e, 'pesos')}
           >
             <Scale className="h-4 w-4" />
             <span className="hidden sm:inline">Pesos</span>
-            {defaultsInfo?.weight && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-green-500" title="Tour defaults exist" />}
+            {defaultsInfo?.weight && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-green-500" title="Existen valores predeterminados de gira" />}
           </Button>
           <Button
             variant="outline"
             size="sm"
             className="gap-2"
-            title="Power (Consumos) Calculator"
+            title="Calculadora de Consumos"
             onClick={(e) => navigateToCalculator(e, 'consumos')}
           >
             <Zap className="h-4 w-4" />
             <span className="hidden sm:inline">Consumos</span>
-            {defaultsInfo?.power && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-green-500" title="Tour defaults exist" />}
+            {defaultsInfo?.power && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-green-500" title="Existen valores predeterminados de gira" />}
           </Button>
         </>
       )}
@@ -899,7 +899,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             variant="ghost"
             size="icon"
             onClick={onEditButtonClick}
-            title="Edit job details"
+            title="Editar detalles del trabajo"
             className="hover:bg-accent/50"
           >
             <Edit className="h-4 w-4" />
@@ -908,6 +908,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             variant="ghost"
             size="icon"
             onClick={onDeleteClick}
+            title="Eliminar trabajo"
             className="hover:bg-accent/50"
           >
             <Trash2 className="h-4 w-4" />
@@ -923,8 +924,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
               if (!canOpenFlex) {
                 e.stopPropagation();
                 toast({
-                  title: 'Cannot open Flex',
-                  description: 'No valid Flex element available for this job.',
+                  title: 'No se puede abrir Flex',
+                  description: 'No hay un elemento Flex válido disponible para este trabajo.',
                   variant: 'destructive',
                 });
                 return;
@@ -935,10 +936,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             className="gap-2"
             title={
               !canOpenFlex
-                ? 'No valid Flex element available'
+                ? 'No hay un elemento Flex válido disponible'
                 : isFlexLoading || isCreatingFolders || folderStateLoading
-                  ? 'Loading…'
-                  : 'Open in Flex'
+                  ? 'Cargando…'
+                  : 'Abrir en Flex'
             }
           >
             {(isFlexLoading || isCreatingFolders || folderStateLoading) ? (
@@ -946,7 +947,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             ) : (
               <ExternalLink className="h-4 w-4" />
             )}
-            <span className="hidden sm:inline">Open Flex</span>
+            <span className="hidden sm:inline">Abrir Flex</span>
           </Button>
         ) : (
           <Button
@@ -964,7 +965,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             {isCreatingFolders ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
+              <img src={createFolderIcon} alt="Crear carpetas Flex" className="h-4 w-4" />
             )}
           </Button>
         )
@@ -974,7 +975,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         size="icon"
         onClick={onCreateLocalFolders}
         disabled={isCreatingLocalFolders}
-        title={isCreatingLocalFolders ? "Creating local folders..." : "Create local folder structure"}
+        title={isCreatingLocalFolders ? "Creando carpetas locales..." : "Crear estructura de carpetas locales"}
         className={
           isCreatingLocalFolders
             ? "opacity-50 cursor-not-allowed"
@@ -994,10 +995,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={(e) => { e.stopPropagation(); setArchiveOpen(true); }}
           className="gap-2"
-          title="Archive documents to Flex"
+          title="Archivar documentos en Flex"
         >
           <Archive className="h-4 w-4" />
-          <span className="hidden sm:inline">Archive</span>
+          <span className="hidden sm:inline">Archivar</span>
         </Button>
       )}
       {/* Backfill Doc Técnica */}
@@ -1006,7 +1007,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         size="icon"
         onClick={(e) => { e.stopPropagation(); setBackfillOpen(true); }}
         disabled={backfilling}
-        title={backfilling ? 'Backfilling…' : 'Backfill Doc Técnica'}
+        title={backfilling ? 'Rellenando…' : 'Rellenar Doc Técnica'}
         className={backfilling ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/50'}
       >
         {backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
@@ -1090,10 +1091,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
               )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={archiving}>Close</Button>
+              <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={archiving}>Cerrar</Button>
               <Button onClick={handleArchiveToFlex} disabled={archiving}>
                 {archiving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {archiveDryRun ? 'Run Dry' : 'Start'}
+                {archiveDryRun ? 'Prueba' : 'Iniciar'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1105,10 +1106,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={onOpenFlexLogs}
           className="gap-2"
-          title="Sync Logs"
+          title="Registros de Sincronización"
         >
           <ScrollText className="h-4 w-4" />
-          <span className="hidden sm:inline">Sync Logs</span>
+          <span className="hidden sm:inline">Registros</span>
         </Button>
       )}
 
@@ -1176,10 +1177,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
               )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setBackfillOpen(false)} disabled={backfilling}>Close</Button>
+              <Button variant="outline" onClick={() => setBackfillOpen(false)} disabled={backfilling}>Cerrar</Button>
               <Button onClick={runBackfill} disabled={backfilling}>
                 {backfilling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Start
+                Iniciar
               </Button>
             </DialogFooter>
           </DialogContent>

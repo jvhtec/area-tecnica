@@ -610,6 +610,15 @@ export function JobCardNew({
         console.error("Error updating job record:", updateError);
       }
 
+      // Broadcast push notification: Flex folders created for job
+      try {
+        void supabase.functions.invoke('push', {
+          body: { action: 'broadcast', type: 'flex.folders.created', job_id: job.id }
+        });
+      } catch (pushError) {
+        console.error('Error sending push notification:', pushError);
+      }
+
       toast({
         title: "Success!",
         description: "Flex folders have been created successfully."
@@ -869,7 +878,7 @@ export function JobCardNew({
   }
 
   return (
-    <div className="p-4 bg-gray-50 dark:bg-gray-900">
+    <div>
       <Card
         className={cn(
           "mb-4 hover:shadow-md transition-all duration-200",
@@ -880,6 +889,7 @@ export function JobCardNew({
         onClick={handleJobCardClick}
         style={{
           borderLeftColor: appliedBorderColor,
+          borderLeftWidth: '4px',
           backgroundColor: appliedBgColor
         }}
       >
