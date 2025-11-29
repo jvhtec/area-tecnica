@@ -85,89 +85,65 @@ const Personal = () => {
   const { theme, isDark } = useTechnicianTheme();
 
   return (
-    <div className={`min-h-screen flex flex-col ${theme.bg} transition-colors duration-300 font-sans`}>
-      <div className="flex-1 overflow-y-auto p-4 pb-24 sm:px-6">
-        <div className="w-full mx-auto max-w-5xl space-y-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-500">Técnicos de la casa</p>
-              <h1 className={`text-2xl md:text-3xl font-bold leading-tight ${theme.textMain}`}>Agenda de técnicos de la casa</h1>
-              <p className={`text-sm md:text-base ${theme.textMuted}`}>
-                Controla asignaciones, disponibilidad y solicitudes de vacaciones en móvil.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setDate(new Date())}
-                className={`${theme.card} ${theme.textMain}`}
-              >
-                Ir a hoy
-              </Button>
-            </div>
-          </div>
-
-          {isMobile ? (
-            <MobilePersonalCalendar
-              date={date}
-              onDateSelect={setDate}
-              readOnly={!canEditDates}
-              theme={theme}
-              isDark={isDark}
-            />
-          ) : (
-            <PersonalCalendar
-              date={date}
-              onDateSelect={setDate}
-              readOnly={!canEditDates}
-            />
-          )}
-
-          {/* Vacation Management Section */}
-          <Collapsible
-            open={isVacationSectionOpen}
-            onOpenChange={setIsVacationSectionOpen}
-            className="space-y-4"
+    <div className="w-full mx-auto max-w-5xl space-y-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-500">Técnicos de la casa</p>
+          <h1 className="text-2xl md:text-3xl font-bold leading-tight">Agenda de técnicos de la casa</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Controla asignaciones, disponibilidad y solicitudes de vacaciones en móvil.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDate(new Date())}
           >
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                className={`flex items-center gap-2 text-2xl font-semibold p-0 h-auto hover:bg-transparent ${theme.textMain}`}
-              >
-                {isVacationSectionOpen ? (
-                  <ChevronDown className="h-5 w-5" />
-                ) : (
-                  <ChevronRight className="h-5 w-5" />
-                )}
-                Solicitudes de vacaciones
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-4">
-              {renderVacationContent()}
-            </CollapsibleContent>
-          </Collapsible>
+            Ir a hoy
+          </Button>
         </div>
       </div>
 
-      {/* Navigation */}
-      <div className={`h-20 ${theme.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-4`}>
-        {[
-          { id: 'dashboard', icon: LayoutDashboard, label: 'Panel' },
-          { id: 'jobs', icon: Briefcase, label: 'Trabajos' },
-          { id: 'availability', icon: CalendarIcon, label: 'Disponib.' },
-          { id: 'profile', icon: User, label: 'Perfil' }
-        ].map(item => (
-          <button
-            key={item.id}
-            onClick={() => navigate('/tech-app')}
-            className={`flex flex-col items-center justify-center gap-1 ${isDark ? 'text-gray-500' : 'text-slate-400'}`}
+      {isMobile ? (
+        <MobilePersonalCalendar
+          date={date}
+          onDateSelect={setDate}
+          readOnly={!canEditDates}
+          theme={theme}
+          isDark={isDark}
+        />
+      ) : (
+        <PersonalCalendar
+          date={date}
+          onDateSelect={setDate}
+          readOnly={!canEditDates}
+        />
+      )}
+
+      {/* Vacation Management Section */}
+      <Collapsible
+        open={isVacationSectionOpen}
+        onOpenChange={setIsVacationSectionOpen}
+        className="space-y-4"
+      >
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="flex items-center gap-2 text-2xl font-semibold p-0 h-auto hover:bg-transparent"
           >
-            <item.icon size={22} strokeWidth={2} />
-            <span className="text-[10px] font-medium">{item.label}</span>
-          </button>
-        ))}
-      </div>
+            {isVacationSectionOpen ? (
+              <ChevronDown className="h-5 w-5" />
+            ) : (
+              <ChevronRight className="h-5 w-5" />
+            )}
+            Solicitudes de vacaciones
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4">
+          {renderVacationContent()}
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 };
