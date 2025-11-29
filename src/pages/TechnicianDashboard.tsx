@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -73,8 +73,13 @@ const TechnicianDashboard = () => {
     fetchUserDepartment();
   }, []);
 
+  const assignmentsQueryKey = useMemo(
+    () => ['assignments', timeSpan, viewMode],
+    [timeSpan, viewMode]
+  );
+
   // Set up comprehensive real-time subscriptions for mobile dashboard
-  useTechnicianDashboardSubscriptions();
+  useTechnicianDashboardSubscriptions({ queryKey: assignmentsQueryKey });
   
   // Set up tour rates subscriptions
   useTourRateSubscriptions();
@@ -97,7 +102,7 @@ const TechnicianDashboard = () => {
 
   // Use our new real-time query hook for fetching assignments
   const { data: assignments = [], isLoading, refetch } = useRealtimeQuery(
-    ['assignments', timeSpan, viewMode],
+    assignmentsQueryKey,
     async () => {
       try {
         console.log("Fetching assignments with timeSpan:", timeSpan);
@@ -123,7 +128,7 @@ const TechnicianDashboard = () => {
 
         if (assignmentsError) {
           console.error("Error fetching job assignments:", assignmentsError);
-          toast.error("Error loading assignments");
+          toast.error("Error loading assignment roles");
           return [];
         }
 
@@ -184,7 +189,7 @@ const TechnicianDashboard = () => {
 
         if (timesheetError) {
           console.error("Error fetching assignments:", timesheetError);
-          toast.error("Error loading assignments");
+          toast.error("Error loading timesheet data");
           return [];
         }
 
@@ -198,7 +203,7 @@ const TechnicianDashboard = () => {
 
         // Step 3: Fetch remaining jobs without timesheet rows so they still show up
         const missingJobIds = jobIds.filter((id) => !seenJobIds.has(id));
-        let jobsWithoutTimesheets: Array<{ job_id: string; technician_id: string; jobs: any }> = [];
+        let jobsWithoutTimesheets: Array<{ job_id: string; technician_id: string; jobs: typeof timesheetAssignments[number]['jobs'] }> = [];
 
         if (missingJobIds.length > 0) {
           let jobsQuery = supabase
@@ -240,7 +245,7 @@ const TechnicianDashboard = () => {
 
           if (jobsError) {
             console.error("Error fetching jobs without timesheets:", jobsError);
-            toast.error("Error loading assignments");
+            toast.error("Error loading job details");
             return [];
           }
 

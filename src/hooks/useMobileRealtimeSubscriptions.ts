@@ -63,13 +63,16 @@ export const useMobileRealtimeSubscriptions = (options: {
 /**
  * Hook for technician dashboard with all required subscriptions
  */
-export const useTechnicianDashboardSubscriptions = () => {
+export const useTechnicianDashboardSubscriptions = (options?: {
+  queryKey?: string | string[];
+  priority?: 'high' | 'medium' | 'low';
+}) => {
   return useMobileRealtimeSubscriptions({
     includeJobs: true,
     includeAssignments: true,
     includeDepartments: true,
-    queryKey: ['assignments'],
-    priority: 'high'
+    queryKey: options?.queryKey ?? ['assignments'],
+    priority: options?.priority ?? 'high'
   });
 };
 
