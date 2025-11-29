@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
+import type { LucideIcon } from 'lucide-react';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useMyTours } from '@/hooks/useMyTours';
 import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
@@ -14,8 +15,8 @@ import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { labelForCode } from '@/utils/roles';
 
 import {
-  LayoutDashboard, Calendar as CalendarIcon, User, Menu,
-  MapPin, Clock, ChevronRight, FileText, CheckCircle2,
+  LayoutDashboard, Calendar as CalendarIcon, Calendar as CalendarLarge, User, Menu,
+  MapPin, Clock, ChevronRight, FileText, CheckCircle2, Tent,
   AlertTriangle, X, ArrowRight, Sun, Moon,
   Gamepad2, MessageSquare, Ban, Wallet, ChevronLeft,
   MoreVertical, Plus, Trash2, Palmtree, Coffee, LogOut,
@@ -24,7 +25,7 @@ import {
   Download, Send, RefreshCw, UploadCloud, Play, Sliders,
   Radio, Mic2, Speaker, ListMusic, Save, ArrowLeft, Activity,
   Search, Filter, Map as MapIcon, Layers, Globe, LayoutList, LayoutGrid,
-  Loader2, Eye, Briefcase, Shuffle, Lightbulb, Sparkles, Users, Euro
+  Loader2, Eye, Briefcase, Shuffle, Lightbulb, Sparkles, Users, Euro, Database, Music2
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -107,12 +108,19 @@ const getThemeStyles = (isDark: boolean) => ({
   cluster: isDark ? "bg-white text-black" : "bg-slate-900 text-white"
 });
 
+type TabId = 'dashboard' | 'jobs' | 'availability' | 'profile';
+
+type NavItem =
+  | { id: TabId; icon: LucideIcon; label: string; type: 'tab' }
+  | { id: string; icon: LucideIcon; label: string; type: 'link'; to: string };
+
 // --- MAIN APP SHELL ---
 export default function TechnicianSuperApp() {
-  const [tab, setTab] = useState('dashboard');
+  const [tab, setTab] = useState<TabId>('dashboard');
   const { theme: nextTheme, setTheme } = useTheme();
   const { user, hasSoundVisionAccess } = useOptimizedAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Determine if dark mode (guard for SSR/test environments)
   const isDark = nextTheme === 'dark' || (
@@ -275,6 +283,43 @@ export default function TechnicianSuperApp() {
 
   const t = getThemeStyles(isDark);
 
+  const userRole = userProfile?.role || null;
+  const userDepartment = userProfile?.department?.toLowerCase?.() || null;
+  const isHouseTech = userRole === 'house_tech';
+
+  const navItems = useMemo<NavItem[]>(() => {
+    const items: NavItem[] = [
+      { id: 'dashboard', icon: LayoutDashboard, label: 'Panel', type: 'tab' },
+      { id: 'jobs', icon: Briefcase, label: 'Trabajos', type: 'tab' },
+      { id: 'availability', icon: CalendarIcon, label: 'Disponib.', type: 'tab' },
+      { id: 'profile', icon: User, label: 'Perfil', type: 'tab' },
+    ];
+
+    if (isHouseTech) {
+      items.push(
+        { id: 'tours', icon: MapPin, label: 'Giras', type: 'link', to: '/tours' },
+        { id: 'sound', icon: Music2, label: 'Sonido', type: 'link', to: '/sound' },
+        { id: 'soundvision-files', icon: Database, label: 'SoundVision', type: 'link', to: '/soundvision-files' },
+        { id: 'personal', icon: CalendarLarge, label: 'Agenda', type: 'link', to: '/personal' },
+      );
+
+      if (userDepartment === 'sound') {
+        items.push({ id: 'festivals', icon: Tent, label: 'Festivales', type: 'link', to: '/festivals' });
+      }
+    }
+
+    return items;
+  }, [isHouseTech, userDepartment]);
+
+  const handleNavClick = (item: NavItem) => {
+    if (item.type === 'tab') {
+      setTab(item.id);
+      return;
+    }
+
+    navigate(item.to);
+  };
+
   const handleOpenAction = (action: string, jobData?: TechnicianJobData) => {
     // TechJobCard already extracts job data before calling onAction
     setSelectedJob(jobData || null);
@@ -333,23 +378,25 @@ export default function TechnicianSuperApp() {
       </div>
 
       {/* Navigation */}
-      <div className={`h-20 ${t.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-4`}>
-        {[
-          { id: 'dashboard', icon: LayoutDashboard, label: 'Panel' },
-          { id: 'jobs', icon: Briefcase, label: 'Trabajos' },
-          { id: 'availability', icon: CalendarIcon, label: 'Disponib.' },
-          { id: 'profile', icon: User, label: 'Perfil' }
-        ].map(item => (
-          <button
-            key={item.id}
-            onClick={() => setTab(item.id)}
-            className={`flex flex-col items-center justify-center gap-1 ${tab === item.id ? 'text-blue-500' : isDark ? 'text-gray-500' : 'text-slate-400'
-              }`}
-          >
-            <item.icon size={22} strokeWidth={tab === item.id ? 2.5 : 2} />
-            <span className="text-[10px] font-medium">{item.label}</span>
-          </button>
-        ))}
+      <div
+        className={`h-20 ${t.nav} fixed bottom-0 w-full grid auto-cols-fr grid-flow-col px-2 z-40 pb-4 overflow-x-auto`}
+      >
+        {navItems.map(item => {
+          const isActive = item.type === 'tab' && tab === item.id;
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleNavClick(item)}
+              className={`flex flex-col items-center justify-center gap-1 ${isActive ? 'text-blue-500' : isDark ? 'text-gray-500' : 'text-slate-400'
+                }`}
+            >
+              <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Modals */}
