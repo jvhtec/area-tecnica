@@ -1,7 +1,6 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
-import TechnicianDashboard from "@/pages/TechnicianDashboard";
 import Personal from "@/pages/Personal";
 import VacationManagement from "@/pages/VacationManagement";
 import Tours from "@/pages/Tours";
@@ -45,11 +44,7 @@ const router = createBrowserRouter([
       },
       {
         path: "/technician-dashboard",
-        element: (
-          <ProtectedRoute allowedRoles={['technician', 'house_tech']}>
-            <TechnicianDashboard />
-          </ProtectedRoute>
-        )
+        element: <Navigate to="/tech-app" replace />
       },
       {
         path: "/personal",
