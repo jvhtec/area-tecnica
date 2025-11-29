@@ -137,7 +137,7 @@ const DisponibilidadAccessGuard = () => {
   return <Disponibilidad />;
 };
 
-// Global guard that redirects 'technician' role to tech-app (house_tech can access Layout routes)
+// Global guard that redirects technician users to tech-app and sends house techs to tech-app from their default landings
 const TechnicianRouteGuard = () => {
   const { userRole, isLoading } = useOptimizedAuth();
   const location = useLocation();
@@ -147,15 +147,28 @@ const TechnicianRouteGuard = () => {
     // Don't redirect while still loading auth
     if (isLoading) return;
 
-    // Only redirect 'technician' role users (NOT house_tech - they need Layout access)
-    if (userRole !== 'technician') return;
+    const isTechAppOrAuth =
+      location.pathname === '/tech-app' ||
+      location.pathname === '/auth' ||
+      location.pathname.startsWith('/auth');
 
-    // Don't redirect if already on tech-app or auth page
-    if (location.pathname === '/tech-app' || location.pathname === '/auth' || location.pathname.startsWith('/auth')) return;
+    if (isTechAppOrAuth) return;
 
-    // Redirect to tech-app
-    console.log(`Technician detected on ${location.pathname}, redirecting to /tech-app`);
-    navigate('/tech-app', { replace: true });
+    if (userRole === 'technician') {
+      console.log(`Technician detected on ${location.pathname}, redirecting to /tech-app`);
+      navigate('/tech-app', { replace: true });
+      return;
+    }
+
+    const isHouseTechLanding =
+      userRole === 'house_tech' &&
+      (location.pathname === '/' ||
+        location.pathname === '/dashboard' ||
+        location.pathname === '/technician-dashboard');
+
+    if (isHouseTechLanding) {
+      navigate('/tech-app', { replace: true });
+    }
   }, [userRole, isLoading, location.pathname, navigate]);
 
   return null;
@@ -197,8 +210,8 @@ export default function App() {
                             <Route path="/wallboard/public/:token/:presetSlug?" element={<WallboardPublic />} />
                             {/* Wallboard: protected, full-screen (no Layout) */}
                             <Route path="/wallboard/:presetSlug?" element={<RequireAuth><Wallboard /></RequireAuth>} />
-                            {/* TechnicianSuperApp: full-screen mobile interface for technicians only */}
-                            <Route path="/tech-app" element={<RequireAuth><ProtectedRoute allowedRoles={['technician']}><TechnicianSuperApp /></ProtectedRoute></RequireAuth>} />
+                            {/* TechnicianSuperApp: full-screen mobile interface for technicians and house techs */}
+                            <Route path="/tech-app" element={<RequireAuth><ProtectedRoute allowedRoles={['technician', 'house_tech']}><TechnicianSuperApp /></ProtectedRoute></RequireAuth>} />
 
                             {/* Public Routes */}
                             <Route path="festival">
