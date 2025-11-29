@@ -99,6 +99,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     getPath: () => "/technician-dashboard",
     isVisible: ({ userRole }) =>
       userRole === "technician" || userRole === "house_tech",
+    match: (pathname, _context, to) =>
+      pathname === to || pathname.startsWith("/tech-app"),
   },
   {
     id: "technician-unavailability",
@@ -110,6 +112,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     getPath: () => "/dashboard/unavailability",
     isVisible: ({ userRole }) =>
       userRole === "technician" || userRole === "house_tech",
+    match: (pathname, _context, to) => pathname.startsWith(to),
   },
   {
     id: "soundvision-files",
@@ -200,14 +203,30 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     isVisible: ({ userRole }) => userRole === "admin",
   },
   {
-    id: "admin-sound",
+    id: "sound",
     label: "Sonido",
     mobileLabel: "Sonido",
     icon: Music2,
     mobilePriority: 6,
     mobileSlot: "secondary",
     getPath: () => "/sound",
-    isVisible: ({ userRole }) => userRole === "admin",
+    isVisible: ({ userRole }) =>
+      userRole === "admin" || userRole === "management" || userRole === "house_tech",
+    match: (pathname, _context, to) => {
+      if (pathname === to || pathname.startsWith(`${to}/`)) {
+        return true
+      }
+
+      const soundToolPrefixes = [
+        "/pesos-tool",
+        "/consumos-tool",
+        "/excel-tool",
+        "/hoja-de-ruta",
+        "/labor-po-form",
+      ]
+
+      return soundToolPrefixes.some((prefix) => pathname.startsWith(prefix))
+    },
   },
   {
     id: "house-department",
@@ -242,6 +261,11 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     getPath: () => "/tours",
     isVisible: ({ userRole }) =>
       userRole === "management" || userRole === "house_tech",
+    match: (pathname, _context, to) =>
+      pathname === to ||
+      pathname.startsWith("/tour-management") ||
+      pathname.startsWith("/tours/") ||
+      pathname.startsWith("/tour-dates"),
   },
   {
     id: "festivals",
@@ -251,8 +275,13 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 6,
     mobileSlot: "secondary",
     getPath: () => "/festivals",
-    isVisible: ({ userDepartment }) =>
-      userDepartment?.toLowerCase() === "sound",
+    isVisible: ({ userRole, userDepartment }) => {
+      const normalizedDepartment = userDepartment?.toLowerCase()
+      const allowedRoles = ["admin", "management", "house_tech"]
+      return allowedRoles.includes(userRole ?? "") && normalizedDepartment === "sound"
+    },
+    match: (pathname, _context, to) =>
+      pathname === to || pathname.startsWith("/festival-management"),
   },
   {
     id: "disponibilidad",

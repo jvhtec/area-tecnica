@@ -170,6 +170,7 @@ describe("buildNavigationItems - admin visibility", () => {
     ).toBeUndefined()
     expect(items.find((item) => item.id === "admin-lights")).toBeDefined()
     expect(items.find((item) => item.id === "admin-video")).toBeDefined()
+    expect(items.find((item) => item.id === "sound")).toBeDefined()
     expect(items.find((item) => item.id === "logistics")).toBeDefined()
     expect(items.find((item) => item.id === "soundvision-files")).toBeDefined()
   })
@@ -208,5 +209,31 @@ describe("buildNavigationItems - admin visibility", () => {
     expect(isVisible).toHaveBeenCalledTimes(1)
     expect(adminItems.map((item) => item.id)).toContain("guarded-route")
     expect(managerItems.map((item) => item.id)).not.toContain("guarded-route")
+  })
+})
+
+describe("buildNavigationItems - house tech visibility", () => {
+  it("includes the core navigation for house tech users", () => {
+    const context = buildContext({ userRole: "house_tech", userDepartment: "sound" })
+    const items = buildNavigationItems(context)
+
+    expect(items.map((item) => item.id)).toEqual(
+      expect.arrayContaining([
+        "technician-dashboard",
+        "technician-unavailability",
+        "tours",
+        "festivals",
+        "sound",
+        "soundvision-files",
+        "personal",
+      ]),
+    )
+  })
+
+  it("hides festivals when the house tech is outside the sound department", () => {
+    const context = buildContext({ userRole: "house_tech", userDepartment: "lights" })
+    const items = buildNavigationItems(context)
+
+    expect(items.find((item) => item.id === "festivals")).toBeUndefined()
   })
 })
