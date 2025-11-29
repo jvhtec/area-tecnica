@@ -26,7 +26,11 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { SoundVisionAccessRequestDialog } from "@/components/soundvision/SoundVisionAccessRequestDialog";
 import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
-import { buildNavigationItems } from "@/components/layout/SidebarNavigation";
+import {
+  buildNavigationItems,
+  type NavigationItem,
+} from "@/components/layout/SidebarNavigation";
+import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
 import { supabase } from "@/integrations/supabase/client";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDetailsModal";
@@ -60,7 +64,7 @@ const Sound = () => {
   const queryClient = useQueryClient();
   const { userRole, hasSoundVisionAccess, userDepartment } = useOptimizedAuth();
 
-  // Generate navigation items for mobile nav bar
+  // Generate navigation items for mobile nav bar matching Layout selection logic
   const navigationItems = useMemo(() => {
     return buildNavigationItems({
       userRole,
@@ -69,8 +73,27 @@ const Sound = () => {
     });
   }, [userRole, userDepartment, hasSoundVisionAccess]);
 
-  const primaryItems = navigationItems.filter(item => item.mobileSlot === "primary");
-  const trayItems = navigationItems.filter(item => item.mobileSlot === "secondary");
+  const sortedMobileItems = useMemo(() => {
+    return [...navigationItems].sort(
+      (a: NavigationItem, b: NavigationItem) =>
+        (a.mobilePriority ?? 99) - (b.mobilePriority ?? 99),
+    );
+  }, [navigationItems]);
+
+  const primaryItems = useMemo(
+    () =>
+      selectPrimaryNavigationItems({
+        items: sortedMobileItems,
+        userDepartment,
+        userRole,
+      }),
+    [sortedMobileItems, userDepartment, userRole],
+  );
+
+  const trayItems = useMemo(() => {
+    const used = new Set(primaryItems.map((item) => item.id));
+    return sortedMobileItems.filter((item) => !used.has(item.id));
+  }, [sortedMobileItems, primaryItems]);
   const mobileTheme = useMemo(() => ({
     bg: "bg-[#05070a]",
     card: "bg-[#0f1219] border-[#1f232e]",
