@@ -44,12 +44,7 @@ import { ThemeToggle } from "./ThemeToggle"
 import { UserInfo } from "./UserInfo"
 
 const PRIMARY_NAVIGATION_PROFILE_MAP: Record<string, readonly string[]> = {
-  house_tech: [
-    "technician-dashboard",
-    "technician-unavailability",
-    "house-department",
-    "tours",
-  ],
+  house_tech: ["tech-app", "personal", "logistics", "house-department"],
   sound: [
     "management-department",
     "project-management",
