@@ -32,7 +32,6 @@ const Video = lazy(() => import('@/pages/Video'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const ProjectManagement = lazy(() => import('@/pages/ProjectManagement'));
-const TechnicianDashboard = lazy(() => import('@/pages/TechnicianDashboard'));
 const TechnicianUnavailability = lazy(() => import('@/pages/TechnicianUnavailability'));
 const TechnicianSuperApp = lazy(() => import('@/pages/TechnicianSuperApp'));
 const Personal = lazy(() => import('@/pages/Personal'));
@@ -137,7 +136,7 @@ const DisponibilidadAccessGuard = () => {
   return <Disponibilidad />;
 };
 
-// Global guard that redirects 'technician' role to tech-app (house_tech can access Layout routes)
+// Global guard that redirects technician-facing roles to tech-app
 const TechnicianRouteGuard = () => {
   const { userRole, isLoading } = useOptimizedAuth();
   const location = useLocation();
@@ -147,11 +146,44 @@ const TechnicianRouteGuard = () => {
     // Don't redirect while still loading auth
     if (isLoading) return;
 
-    // Only redirect 'technician' role users (NOT house_tech - they need Layout access)
-    if (userRole !== 'technician') return;
+    const technicianRoles = ['technician', 'house_tech'];
+
+    // Only redirect tech-facing roles
+    if (!technicianRoles.includes(userRole ?? '')) return;
 
     // Don't redirect if already on tech-app or auth page
-    if (location.pathname === '/tech-app' || location.pathname === '/auth' || location.pathname.startsWith('/auth')) return;
+    const allowedPrefixes = ['/tech-app', '/auth'];
+    const houseTechAllowed = [
+      '/sound',
+      '/personal',
+      '/tours',
+      '/logistics',
+      '/lights',
+      '/video',
+      '/morning-summary',
+      '/dashboard/unavailability',
+      '/timesheets',
+      '/festivals',
+      '/tour-management',
+      '/hoja-de-ruta',
+      '/labor-po-form',
+      '/pesos-tool',
+      '/consumos-tool',
+      '/lights-pesos-tool',
+      '/video-pesos-tool',
+      '/lights-consumos-tool',
+      '/video-consumos-tool',
+      '/excel-tool',
+      '/equipment-management',
+    ];
+
+    const isAllowedPrefix = (prefixes: string[]) =>
+      prefixes.some(prefix => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`));
+
+    if (isAllowedPrefix(allowedPrefixes)) return;
+
+    // House techs can still reach their other Layout pages without being forced back to tech-app
+    if (userRole === 'house_tech' && isAllowedPrefix(houseTechAllowed)) return;
 
     // Redirect to tech-app
     console.log(`Technician detected on ${location.pathname}, redirecting to /tech-app`);
@@ -197,8 +229,8 @@ export default function App() {
                             <Route path="/wallboard/public/:token/:presetSlug?" element={<WallboardPublic />} />
                             {/* Wallboard: protected, full-screen (no Layout) */}
                             <Route path="/wallboard/:presetSlug?" element={<RequireAuth><Wallboard /></RequireAuth>} />
-                            {/* TechnicianSuperApp: full-screen mobile interface for technicians only */}
-                            <Route path="/tech-app" element={<RequireAuth><ProtectedRoute allowedRoles={['technician']}><TechnicianSuperApp /></ProtectedRoute></RequireAuth>} />
+                            {/* TechnicianSuperApp: full-screen mobile interface for technicians and house techs */}
+                            <Route path="/tech-app" element={<RequireAuth><ProtectedRoute allowedRoles={['technician', 'house_tech']}><TechnicianSuperApp /></ProtectedRoute></RequireAuth>} />
 
                             {/* Public Routes */}
                             <Route path="festival">
@@ -211,8 +243,8 @@ export default function App() {
                               <Route path="/sound" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Sound /></ProtectedRoute>} />
                               <Route path="/personal" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><Personal /></ProtectedRoute>} />
                               <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><Dashboard /></ProtectedRoute>} />
-                              {/* House tech dashboard routes (regular technicians use /tech-app) */}
-                              <Route path="/technician-dashboard" element={<ProtectedRoute allowedRoles={['house_tech']}><TechnicianDashboard /></ProtectedRoute>} />
+                              {/* Legacy dashboard path now redirects to tech-app */}
+                              <Route path="/technician-dashboard" element={<Navigate to="/tech-app" replace />} />
                               <Route path="/dashboard/unavailability" element={<ProtectedRoute allowedRoles={['house_tech']}><TechnicianUnavailability /></ProtectedRoute>} />
                               <Route path="/morning-summary" element={<MorningSummary />} />
                               <Route path="/lights" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Lights /></ProtectedRoute>} />
