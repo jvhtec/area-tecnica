@@ -9,7 +9,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, LayoutDashboard, Briefcase, Calendar as CalendarIcon, User } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
 
 const Personal = () => {
@@ -19,6 +19,7 @@ const Personal = () => {
   const { submitRequest, isSubmitting } = useVacationRequests();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const location = useLocation();
 
   console.log('Personal page: Rendering with date:', date);
 
@@ -84,67 +85,97 @@ const Personal = () => {
   // Use technician theme
   const { theme, isDark } = useTechnicianTheme();
 
+  // House techs get the HouseTechBottomNav from Layout, management/admin get the MobileNavBar from Layout
+  // But since Personal is in mobileFullscreenRoutes, we need to provide our own nav
+  const isHouseTech = userRole === 'house_tech';
+
   return (
-    <div className="w-full mx-auto max-w-5xl space-y-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-500">Técnicos de la casa</p>
-          <h1 className="text-2xl md:text-3xl font-bold leading-tight">Agenda de técnicos de la casa</h1>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Controla asignaciones, disponibilidad y solicitudes de vacaciones en móvil.
-          </p>
+    <>
+      <div className="w-full mx-auto max-w-5xl space-y-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-500">Técnicos de la casa</p>
+            <h1 className="text-2xl md:text-3xl font-bold leading-tight">Agenda de técnicos de la casa</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
+              Controla asignaciones, disponibilidad y solicitudes de vacaciones en móvil.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDate(new Date())}
+            >
+              Ir a hoy
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDate(new Date())}
-          >
-            Ir a hoy
-          </Button>
-        </div>
+
+        {isMobile ? (
+          <MobilePersonalCalendar
+            date={date}
+            onDateSelect={setDate}
+            readOnly={!canEditDates}
+            theme={theme}
+            isDark={isDark}
+          />
+        ) : (
+          <PersonalCalendar
+            date={date}
+            onDateSelect={setDate}
+            readOnly={!canEditDates}
+          />
+        )}
+
+        {/* Vacation Management Section */}
+        <Collapsible
+          open={isVacationSectionOpen}
+          onOpenChange={setIsVacationSectionOpen}
+          className="space-y-4"
+        >
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className="flex items-center gap-2 text-2xl font-semibold p-0 h-auto hover:bg-transparent"
+            >
+              {isVacationSectionOpen ? (
+                <ChevronDown className="h-5 w-5" />
+              ) : (
+                <ChevronRight className="h-5 w-5" />
+              )}
+              Solicitudes de vacaciones
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-4">
+            {renderVacationContent()}
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
-      {isMobile ? (
-        <MobilePersonalCalendar
-          date={date}
-          onDateSelect={setDate}
-          readOnly={!canEditDates}
-          theme={theme}
-          isDark={isDark}
-        />
-      ) : (
-        <PersonalCalendar
-          date={date}
-          onDateSelect={setDate}
-          readOnly={!canEditDates}
-        />
+      {/* Bottom navigation - only for non-house_tech users on mobile */}
+      {/* House techs get HouseTechBottomNav from Layout component */}
+      {!isHouseTech && isMobile && (
+        <div className={`h-20 ${theme.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-4`}>
+          {[
+            { id: 'dashboard', icon: LayoutDashboard, label: 'Panel', path: '/dashboard' },
+            { id: 'personal', icon: CalendarIcon, label: 'Personal', path: '/personal' },
+            { id: 'projects', icon: Briefcase, label: 'Proyectos', path: '/project-management' },
+            { id: 'profile', icon: User, label: 'Perfil', path: '/profile' }
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => navigate(item.path)}
+              className={`flex flex-col items-center justify-center gap-1 ${
+                location.pathname === item.path ? 'text-blue-500' : isDark ? 'text-gray-500' : 'text-slate-400'
+              }`}
+            >
+              <item.icon size={22} strokeWidth={location.pathname === item.path ? 2.5 : 2} />
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </button>
+          ))}
+        </div>
       )}
-
-      {/* Vacation Management Section */}
-      <Collapsible
-        open={isVacationSectionOpen}
-        onOpenChange={setIsVacationSectionOpen}
-        className="space-y-4"
-      >
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            className="flex items-center gap-2 text-2xl font-semibold p-0 h-auto hover:bg-transparent"
-          >
-            {isVacationSectionOpen ? (
-              <ChevronDown className="h-5 w-5" />
-            ) : (
-              <ChevronRight className="h-5 w-5" />
-            )}
-            Solicitudes de vacaciones
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-4">
-          {renderVacationContent()}
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
+    </>
   );
 };
 
