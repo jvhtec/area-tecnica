@@ -111,8 +111,9 @@ const getThemeStyles = (isDark: boolean) => ({
 export default function TechnicianSuperApp() {
   const [tab, setTab] = useState('dashboard');
   const { theme: nextTheme, setTheme } = useTheme();
-  const { user, hasSoundVisionAccess } = useOptimizedAuth();
+  const { user, hasSoundVisionAccess, userRole } = useOptimizedAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Determine if dark mode (guard for SSR/test environments)
   const isDark = nextTheme === 'dark' || (
@@ -285,6 +286,34 @@ export default function TechnicianSuperApp() {
     ? `${userProfile.first_name} ${userProfile.last_name}`
     : user?.email || 'Técnico';
 
+  // Check if user is house tech for extended navigation
+  const isHouseTech = userRole === 'house_tech';
+
+  // All possible routes for house techs
+  const allHouseTechRoutes = [
+    { path: '/personal', label: 'Personal', icon: CalendarIcon, department: null },
+    { path: '/sound', label: 'Sonido', icon: Speaker, department: 'sound' },
+    { path: '/lights', label: 'Luces', icon: Lightbulb, department: 'lights' },
+    { path: '/video', label: 'Video', icon: Camera, department: 'video' },
+    { path: '/logistics', label: 'Logística', icon: MapIcon, department: null },
+    { path: '/tours', label: 'Tours', icon: Navigation, department: null },
+    { path: '/festivals', label: 'Festivales', icon: Users, department: 'sound' },
+  ];
+
+  // Filter routes based on user's department
+  const houseTechRoutes = React.useMemo(() => {
+    const normalizedDept = userProfile?.department?.toLowerCase();
+    
+    return allHouseTechRoutes.filter(route => {
+      // Routes without a department restriction are available to all
+      if (route.department === null) {
+        return true;
+      }
+      // Otherwise, only show if it matches the user's department
+      return route.department === normalizedDept;
+    });
+  }, [userProfile?.department]);
+
   return (
     <div className={`min-h-screen flex flex-col ${t.bg} transition-colors duration-300 font-sans`}>
 
@@ -330,15 +359,40 @@ export default function TechnicianSuperApp() {
             toggleTheme={toggleTheme}
           />
         )}
+        {tab === 'menu' && isHouseTech && (
+          <div className="space-y-6">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-500 mb-1">Técnico de planta</p>
+              <h1 className={`text-2xl md:text-3xl font-bold ${t.textMain}`}>Menú de navegación</h1>
+              <p className={`text-sm ${t.textMuted} mt-1`}>Accede a todas las secciones disponibles para técnicos de planta</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {houseTechRoutes.map((route) => (
+                <button
+                  key={route.path}
+                  onClick={() => navigate(route.path)}
+                  className={`${t.card} border rounded-xl p-4 flex flex-col items-center gap-3 hover:border-blue-500 transition-all active:scale-95`}
+                >
+                  <div className="p-3 rounded-full bg-blue-500/10">
+                    <route.icon size={24} className="text-blue-500" />
+                  </div>
+                  <span className={`text-sm font-medium ${t.textMain}`}>{route.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
-      <div className={`h-20 ${t.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-4`}>
+      <div className={`h-20 ${t.nav} fixed bottom-0 w-full ${isHouseTech ? 'grid-cols-5' : 'grid-cols-4'} grid px-2 z-40 pb-4`}>
         {[
           { id: 'dashboard', icon: LayoutDashboard, label: 'Panel' },
           { id: 'jobs', icon: Briefcase, label: 'Trabajos' },
           { id: 'availability', icon: CalendarIcon, label: 'Disponib.' },
-          { id: 'profile', icon: User, label: 'Perfil' }
+          { id: 'profile', icon: User, label: 'Perfil' },
+          ...(isHouseTech ? [{ id: 'menu', icon: Menu, label: 'Menú' }] : [])
         ].map(item => (
           <button
             key={item.id}

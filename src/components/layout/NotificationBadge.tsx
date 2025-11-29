@@ -155,8 +155,8 @@ export const NotificationBadge = ({
   const handleMessageNotificationClick = () => {
     if (userRole === "management") {
       navigate("/dashboard?showMessages=true")
-    } else if (userRole === "technician") {
-      navigate("/technician-dashboard?showMessages=true")
+    } else if (userRole === "technician" || userRole === "house_tech") {
+      navigate("/tech-app?showMessages=true")
     }
   }
 

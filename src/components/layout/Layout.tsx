@@ -42,6 +42,7 @@ import {
 } from "./SidebarNavigation"
 import { ThemeToggle } from "./ThemeToggle"
 import { UserInfo } from "./UserInfo"
+import { HouseTechBottomNav } from "./HouseTechBottomNav"
 
 const PRIMARY_NAVIGATION_PROFILE_MAP: Record<string, readonly string[]> = {
   sound: [
@@ -479,16 +480,18 @@ const Layout = () => {
               "flex-1 overflow-y-auto px-3 pt-4 sm:px-6 sm:pt-6",
               suppressChrome || mobileFullscreenRoutes
                 ? "pb-6"
-                : isMobile
-                  ? "pb-[calc(4.5rem+env(safe-area-inset-bottom))]"
-                  : "pb-10",
+                : userRole === 'house_tech'
+                  ? "pb-24"
+                  : isMobile
+                    ? "pb-[calc(4.5rem+env(safe-area-inset-bottom))]"
+                    : "pb-10",
             )}
           >
             <Outlet />
           </main>
         </div>
       </div>
-      {showMobileNav && (
+      {showMobileNav && userRole !== 'house_tech' && (
         <MobileNavBar
           primaryItems={primaryItems}
           trayItems={trayItems}
@@ -499,6 +502,7 @@ const Layout = () => {
           userEmail={session.user?.email ?? undefined}
         />
       )}
+      {userRole === 'house_tech' && <HouseTechBottomNav />}
       <PendingTasksModal
         open={showPendingTasksModal}
         onOpenChange={setShowPendingTasksModal}
