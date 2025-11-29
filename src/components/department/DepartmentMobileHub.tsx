@@ -134,7 +134,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   if (!isMobile) return null;
 
   return (
-    <div className={cn("min-h-screen", t.bg, "font-sans p-6 transition-colors duration-300")}>
+    <div className={cn("min-h-screen", t.bg, "font-sans p-1 transition-colors duration-300")}>
       <div className="max-w-md mx-auto space-y-6">
         {/* Header */}
         <div>
@@ -278,7 +278,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                 <Card
                   key={job.id}
                   className={cn(
-                    "p-4 rounded-xl border-l-4 transition-all",
+                    "p-3 rounded-xl border-l-4 transition-all",
                     t.card
                   )}
                   style={{ borderLeftColor: jobColor }}

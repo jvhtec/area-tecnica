@@ -69,7 +69,6 @@ const WallboardPublic = lazy(() => import('@/pages/WallboardPublic'));
 const Announcements = lazy(() => import('@/pages/Announcements'));
 const WallboardPresets = lazy(() => import('@/pages/WallboardPresets'));
 const RatesCenterPage = lazy(() => import('@/pages/RatesCenterPage'));
-const SoundVisionFiles = lazy(() => import('@/pages/SoundVisionFiles'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -269,9 +268,6 @@ export default function App() {
 
                               {/* Disponibilidad Route */}
                               <Route path="/disponibilidad" element={<ProtectedRoute allowedRoles={['admin', 'management']}><DisponibilidadAccessGuard /></ProtectedRoute>} />
-
-                              {/* SoundVision Files Route */}
-                              <Route path="/soundvision-files" element={<SoundVisionFiles />} />
 
                               {/* Festival Management Routes */}
                               <Route path="/festival-management/:jobId" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><FestivalManagement /></ProtectedRoute>} />

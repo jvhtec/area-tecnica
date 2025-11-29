@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDetailsModal";
 import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
+import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -69,8 +70,32 @@ const Sound = () => {
     });
   }, [userRole, userDepartment, hasSoundVisionAccess]);
 
-  const primaryItems = navigationItems.filter(item => item.mobileSlot === "primary");
-  const trayItems = navigationItems.filter(item => item.mobileSlot === "secondary");
+  const sortedMobileItems = useMemo(() => {
+    if (navigationItems.length <= 1) {
+      return navigationItems;
+    }
+    return [...navigationItems].sort(
+      (a, b) => (a.mobilePriority ?? 99) - (b.mobilePriority ?? 99),
+    );
+  }, [navigationItems]);
+
+  const primaryItems = useMemo(
+    () =>
+      selectPrimaryNavigationItems({
+        items: sortedMobileItems,
+        userDepartment,
+        userRole,
+      }),
+    [sortedMobileItems, userDepartment, userRole],
+  );
+
+  const trayItems = useMemo(() => {
+    if (!sortedMobileItems.length) {
+      return [];
+    }
+    const used = new Set(primaryItems.map((item) => item.id));
+    return sortedMobileItems.filter((item) => !used.has(item.id));
+  }, [sortedMobileItems, primaryItems]);
   const mobileTheme = useMemo(() => ({
     bg: "bg-[#05070a]",
     card: "bg-[#0f1219] border-[#1f232e]",

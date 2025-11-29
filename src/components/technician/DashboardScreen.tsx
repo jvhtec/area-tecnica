@@ -73,16 +73,16 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-3">
-                <div className={`p-3 rounded-xl border ${theme.card}`}>
+            <div className="grid grid-cols-3 gap-2">
+                <div className={`p-2 rounded-xl border ${theme.card}`}>
                     <div className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1`}>Próximo turno</div>
                     <div className={`text-lg font-bold ${theme.textMain}`}>{nextShift}</div>
                 </div>
-                <div className={`p-3 rounded-xl border ${theme.card}`}>
+                <div className={`p-2 rounded-xl border ${theme.card}`}>
                     <div className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1`}>Esta semana</div>
                     <div className={`text-lg font-bold ${theme.textMain}`}>{assignments.length} trabajos</div>
                 </div>
-                <div className={`p-3 rounded-xl border ${theme.card} relative overflow-hidden`}>
+                <div className={`p-2 rounded-xl border ${theme.card} relative overflow-hidden`}>
                     <div className="absolute inset-0 bg-blue-600/10" />
                     <div className="text-[10px] font-bold uppercase text-blue-400 mb-1">Tours</div>
                     <div className="text-lg font-bold text-blue-400">{activeTours.length}</div>
