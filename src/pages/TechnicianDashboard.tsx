@@ -101,7 +101,7 @@ const TechnicianDashboard = () => {
     async () => {
       try {
         console.log("Fetching assignments with timeSpan:", timeSpan);
-        
+
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           console.error("No user found");
@@ -109,13 +109,35 @@ const TechnicianDashboard = () => {
         }
 
         console.log("Fetching assignments for user:", user.id);
-        
+
         const endDate = getTimeSpanEndDate();
+        const now = new Date();
         console.log("Fetching assignments until:", endDate, "viewMode:", viewMode);
-        
-        // Query timesheets as source of truth, joined with job_assignments for role/status
-        // This ensures we only show assignments that have actual timesheet entries
-        let query = supabase
+
+        // First fetch confirmed job assignments for the technician (roles + status)
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('job_assignments')
+          .select('job_id, technician_id, sound_role, lights_role, video_role, status, assigned_at')
+          .eq('technician_id', user.id)
+          .eq('status', 'confirmed');
+
+        if (assignmentsError) {
+          console.error("Error fetching job assignments:", assignmentsError);
+          toast.error("Error loading assignments");
+          throw assignmentsError;
+        }
+
+        if (!assignmentsData || assignmentsData.length === 0) {
+          return [];
+        }
+
+        const jobIds = assignmentsData.map((assignment) => assignment.job_id);
+        const assignmentsByJobId = new Map(
+          assignmentsData.map((assignment) => [assignment.job_id, assignment])
+        );
+
+        // Next, fetch timesheets with job data for those job IDs (mirrors TechnicianSuperApp)
+        let timesheetQuery = supabase
           .from('timesheets')
           .select(`
             job_id,
@@ -142,56 +164,117 @@ const TechnicianDashboard = () => {
                 read_only,
                 template_type
               )
-            ),
-            job_assignments!inner (
-              sound_role,
-              lights_role,
-              video_role,
-              assigned_at,
-              status
             )
           `)
           .eq('technician_id', user.id)
-          .eq('job_assignments.status', 'confirmed');
+          .in('job_id', jobIds);
 
         if (viewMode === 'upcoming') {
-          // Show upcoming and ongoing jobs
-          query = query
+          timesheetQuery = timesheetQuery
             .lte('jobs.start_time', endDate.toISOString())
-            .gte('jobs.end_time', new Date().toISOString());
+            .gte('jobs.end_time', now.toISOString());
         } else {
-          // Show past jobs - jobs that have already ended
-          query = query
-            .lte('jobs.end_time', new Date().toISOString());
+          timesheetQuery = timesheetQuery
+            .lte('jobs.end_time', now.toISOString());
         }
 
-        const { data: timesheetData, error: jobAssignmentsError } = await query
+        const { data: timesheetData, error: timesheetError } = await timesheetQuery
           .order('start_time', { referencedTable: 'jobs' });
 
-        // Deduplicate by job_id (timesheets have one row per date, we want one per job)
+        if (timesheetError) {
+          console.error("Error fetching timesheet data:", timesheetError);
+          toast.error("Error loading assignments");
+          throw timesheetError;
+        }
+
+        // Build assignment list from timesheets (dedupe by job_id)
         const seenJobIds = new Set<string>();
-        const jobAssignments = (timesheetData || []).filter(row => {
+        const assignmentsFromTimesheets = (timesheetData || []).filter((row) => {
           if (seenJobIds.has(row.job_id)) return false;
           seenJobIds.add(row.job_id);
           return true;
-        }).map(row => ({
-          job_id: row.job_id,
-          technician_id: row.technician_id,
-          sound_role: row.job_assignments?.sound_role,
-          lights_role: row.job_assignments?.lights_role,
-          video_role: row.job_assignments?.video_role,
-          assigned_at: row.job_assignments?.assigned_at,
-          jobs: row.jobs
-        }));
+        }).map((row) => {
+          const assignment = assignmentsByJobId.get(row.job_id);
+          return {
+            job_id: row.job_id,
+            technician_id: row.technician_id,
+            sound_role: assignment?.sound_role,
+            lights_role: assignment?.lights_role,
+            video_role: assignment?.video_role,
+            status: assignment?.status,
+            assigned_at: assignment?.assigned_at,
+            jobs: row.jobs,
+          };
+        });
 
-        if (jobAssignmentsError) {
-          console.error("Error fetching job assignments:", jobAssignmentsError);
-          toast.error("Error loading assignments");
-          throw jobAssignmentsError;
+        // Fetch jobs for any assignments that don't yet have timesheet rows so they still appear
+        const remainingJobIds = jobIds.filter((id) => !seenJobIds.has(id));
+        let jobsWithoutTimesheets: typeof assignmentsFromTimesheets = [];
+
+        if (remainingJobIds.length > 0) {
+          let jobsQuery = supabase
+            .from('jobs')
+            .select(`
+              id,
+              title,
+              description,
+              start_time,
+              end_time,
+              timezone,
+              location_id,
+              job_type,
+              color,
+              status,
+              location:locations(name),
+              job_documents(
+                id,
+                file_name,
+                file_path,
+                visible_to_tech,
+                uploaded_at,
+                read_only,
+                template_type
+              ),
+              timesheets(technician_id, date)
+            `)
+            .in('id', remainingJobIds);
+
+          if (viewMode === 'upcoming') {
+            jobsQuery = jobsQuery
+              .lte('start_time', endDate.toISOString())
+              .gte('end_time', now.toISOString());
+          } else {
+            jobsQuery = jobsQuery
+              .lte('end_time', now.toISOString());
+          }
+
+          const { data: jobsData, error: jobsError } = await jobsQuery.order('start_time');
+
+          if (jobsError) {
+            console.error("Error fetching jobs without timesheets:", jobsError);
+            toast.error("Error loading assignments");
+            throw jobsError;
+          }
+
+          jobsWithoutTimesheets = (jobsData || []).map((job) => {
+            const assignment = assignmentsByJobId.get(job.id);
+            return {
+              job_id: job.id,
+              technician_id: assignment?.technician_id,
+              sound_role: assignment?.sound_role,
+              lights_role: assignment?.lights_role,
+              video_role: assignment?.video_role,
+              status: assignment?.status,
+              assigned_at: assignment?.assigned_at,
+              jobs: job,
+            };
+          });
         }
 
+        const jobAssignments = [...assignmentsFromTimesheets, ...jobsWithoutTimesheets];
+
         console.log("Fetched job assignments:", jobAssignments || []);
-        
+
         const transformedJobs = jobAssignments
           .filter(assignment => assignment.jobs)
           .map(assignment => {
@@ -199,10 +282,14 @@ const TechnicianDashboard = () => {
             if (assignment.sound_role) department = "sound";
             else if (assignment.lights_role) department = "lights";
             else if (assignment.video_role) department = "video";
-            
+
             // Determine category from the role code
-            const category = getCategoryFromAssignment(assignment);
-            
+            const category = getCategoryFromAssignment({
+              sound_role: assignment.sound_role,
+              lights_role: assignment.lights_role,
+              video_role: assignment.video_role,
+            });
+
             return {
               id: `job-${assignment.job_id}`,
               job_id: assignment.job_id,
@@ -213,7 +300,7 @@ const TechnicianDashboard = () => {
               jobs: assignment.jobs
             };
           });
-        
+
         console.log("Final transformed assignments:", transformedJobs);
         return transformedJobs || [];
       } catch (error) {
