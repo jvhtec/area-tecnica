@@ -343,7 +343,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   });
 
   const handleBackToTechnicianDashboard = () => {
-    navigate('/technician-dashboard');
+    navigate('/tech-app');
   };
 
   const handleFlexClick = async () => {

@@ -96,7 +96,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     icon: LayoutDashboard,
     mobilePriority: 1,
     mobileSlot: "primary",
-    getPath: () => "/technician-dashboard",
+    getPath: () => "/tech-app",
     isVisible: ({ userRole }) =>
       userRole === "technician" || userRole === "house_tech",
   },
@@ -106,7 +106,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobileLabel: "Bloqueos",
     icon: Clock,
     mobilePriority: 3,
-    mobileSlot: "primary",
+    mobileSlot: "secondary",
     getPath: () => "/dashboard/unavailability",
     isVisible: ({ userRole }) =>
       userRole === "technician" || userRole === "house_tech",

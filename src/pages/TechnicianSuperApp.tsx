@@ -302,28 +302,6 @@ export default function TechnicianSuperApp() {
 
   return (
     <div className={`min-h-screen flex flex-col ${t.bg} transition-colors duration-300 font-sans`}>
-      
-      {/* Extended Header for House Techs */}
-      {isHouseTech && (
-        <div className={`${t.nav} border-b ${t.divider} sticky top-0 z-50`}>
-          <ScrollArea className="w-full">
-            <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto">
-              {houseTechRoutes.map((route) => (
-                <Button
-                  key={route.path}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate(route.path)}
-                  className={`flex items-center gap-2 shrink-0 ${isDark ? 'hover:bg-[#1f232e]' : 'hover:bg-slate-100'}`}
-                >
-                  <route.icon size={16} />
-                  <span className="text-xs font-medium">{route.label}</span>
-                </Button>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 pb-24">
@@ -367,15 +345,40 @@ export default function TechnicianSuperApp() {
             toggleTheme={toggleTheme}
           />
         )}
+        {tab === 'menu' && isHouseTech && (
+          <div className="space-y-6">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-500 mb-1">Técnico de planta</p>
+              <h1 className={`text-2xl md:text-3xl font-bold ${t.textMain}`}>Menú de navegación</h1>
+              <p className={`text-sm ${t.textMuted} mt-1`}>Accede a todas las secciones disponibles para técnicos de planta</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {houseTechRoutes.map((route) => (
+                <button
+                  key={route.path}
+                  onClick={() => navigate(route.path)}
+                  className={`${t.card} border rounded-xl p-4 flex flex-col items-center gap-3 hover:border-blue-500 transition-all active:scale-95`}
+                >
+                  <div className="p-3 rounded-full bg-blue-500/10">
+                    <route.icon size={24} className="text-blue-500" />
+                  </div>
+                  <span className={`text-sm font-medium ${t.textMain}`}>{route.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
-      <div className={`h-20 ${t.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-4`}>
+      <div className={`h-20 ${t.nav} fixed bottom-0 w-full ${isHouseTech ? 'grid-cols-5' : 'grid-cols-4'} grid px-2 z-40 pb-4`}>
         {[
           { id: 'dashboard', icon: LayoutDashboard, label: 'Panel' },
           { id: 'jobs', icon: Briefcase, label: 'Trabajos' },
           { id: 'availability', icon: CalendarIcon, label: 'Disponib.' },
-          { id: 'profile', icon: User, label: 'Perfil' }
+          { id: 'profile', icon: User, label: 'Perfil' },
+          ...(isHouseTech ? [{ id: 'menu', icon: Menu, label: 'Menú' }] : [])
         ].map(item => (
           <button
             key={item.id}
