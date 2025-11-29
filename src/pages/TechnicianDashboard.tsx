@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -73,8 +73,13 @@ const TechnicianDashboard = () => {
     fetchUserDepartment();
   }, []);
 
+  const assignmentsQueryKey = useMemo(
+    () => ['assignments', timeSpan, viewMode],
+    [timeSpan, viewMode]
+  );
+
   // Set up comprehensive real-time subscriptions for mobile dashboard
-  useTechnicianDashboardSubscriptions();
+  useTechnicianDashboardSubscriptions({ queryKey: assignmentsQueryKey });
   
   // Set up tour rates subscriptions
   useTourRateSubscriptions();
@@ -97,11 +102,11 @@ const TechnicianDashboard = () => {
 
   // Use our new real-time query hook for fetching assignments
   const { data: assignments = [], isLoading, refetch } = useRealtimeQuery(
-    ['assignments', timeSpan, viewMode],
+    assignmentsQueryKey,
     async () => {
       try {
         console.log("Fetching assignments with timeSpan:", timeSpan);
-        
+
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           console.error("No user found");
@@ -109,13 +114,36 @@ const TechnicianDashboard = () => {
         }
 
         console.log("Fetching assignments for user:", user.id);
-        
+
         const endDate = getTimeSpanEndDate();
+        const now = new Date();
         console.log("Fetching assignments until:", endDate, "viewMode:", viewMode);
-        
-        // Query timesheets as source of truth, joined with job_assignments for role/status
-        // This ensures we only show assignments that have actual timesheet entries
-        let query = supabase
+
+        // Step 1: Fetch confirmed job assignments to get role/status info
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('job_assignments')
+          .select('job_id, sound_role, lights_role, video_role, status, assigned_at')
+          .eq('technician_id', user.id)
+          .eq('status', 'confirmed');
+
+        if (assignmentsError) {
+          console.error("Error fetching job assignments:", assignmentsError);
+          toast.error("Error loading assignment roles");
+          return [];
+        }
+
+        if (!assignmentsData || assignmentsData.length === 0) {
+          return [];
+        }
+
+        // Create a map for quick role lookup and a list of job IDs to fetch
+        const assignmentsByJobId = new Map(
+          assignmentsData.map((assignment) => [assignment.job_id, assignment])
+        );
+        const jobIds = Array.from(new Set(assignmentsData.map((assignment) => assignment.job_id)));
+
+        // Step 2: Fetch timesheets (with jobs) for those assignments to leverage real-time updates
+        let timesheetsQuery = supabase
           .from('timesheets')
           .select(`
             job_id,
@@ -142,78 +170,122 @@ const TechnicianDashboard = () => {
                 read_only,
                 template_type
               )
-            ),
-            job_assignments!inner (
-              sound_role,
-              lights_role,
-              video_role,
-              assigned_at,
-              status
             )
           `)
           .eq('technician_id', user.id)
-          .eq('job_assignments.status', 'confirmed');
+          .in('job_id', jobIds);
 
         if (viewMode === 'upcoming') {
-          // Show upcoming and ongoing jobs
-          query = query
+          timesheetsQuery = timesheetsQuery
             .lte('jobs.start_time', endDate.toISOString())
-            .gte('jobs.end_time', new Date().toISOString());
+            .gte('jobs.end_time', now.toISOString());
         } else {
-          // Show past jobs - jobs that have already ended
-          query = query
-            .lte('jobs.end_time', new Date().toISOString());
+          timesheetsQuery = timesheetsQuery
+            .lte('jobs.end_time', now.toISOString());
         }
 
-        const { data: timesheetData, error: jobAssignmentsError } = await query
+        const { data: timesheetData, error: timesheetError } = await timesheetsQuery
           .order('start_time', { referencedTable: 'jobs' });
 
-        // Deduplicate by job_id (timesheets have one row per date, we want one per job)
+        if (timesheetError) {
+          console.error("Error fetching assignments:", timesheetError);
+          toast.error("Error loading timesheet data");
+          return [];
+        }
+
+        // Track which jobs we already have via timesheets
         const seenJobIds = new Set<string>();
-        const jobAssignments = (timesheetData || []).filter(row => {
+        const timesheetAssignments = (timesheetData || []).filter(row => {
           if (seenJobIds.has(row.job_id)) return false;
           seenJobIds.add(row.job_id);
           return true;
-        }).map(row => ({
-          job_id: row.job_id,
-          technician_id: row.technician_id,
-          sound_role: row.job_assignments?.sound_role,
-          lights_role: row.job_assignments?.lights_role,
-          video_role: row.job_assignments?.video_role,
-          assigned_at: row.job_assignments?.assigned_at,
-          jobs: row.jobs
-        }));
+        });
 
-        if (jobAssignmentsError) {
-          console.error("Error fetching job assignments:", jobAssignmentsError);
-          toast.error("Error loading assignments");
-          throw jobAssignmentsError;
+        // Step 3: Fetch remaining jobs without timesheet rows so they still show up
+        const missingJobIds = jobIds.filter((id) => !seenJobIds.has(id));
+        let jobsWithoutTimesheets: Array<{ job_id: string; technician_id: string; jobs: typeof timesheetAssignments[number]['jobs'] }> = [];
+
+        if (missingJobIds.length > 0) {
+          let jobsQuery = supabase
+            .from('jobs')
+            .select(`
+              id,
+              title,
+              description,
+              start_time,
+              end_time,
+              timezone,
+              location_id,
+              job_type,
+              color,
+              status,
+              location:locations(name),
+              job_documents(
+                id,
+                file_name,
+                file_path,
+                visible_to_tech,
+                uploaded_at,
+                read_only,
+                template_type
+              )
+            `)
+            .in('id', missingJobIds);
+
+          if (viewMode === 'upcoming') {
+            jobsQuery = jobsQuery
+              .lte('start_time', endDate.toISOString())
+              .gte('end_time', now.toISOString());
+          } else {
+            jobsQuery = jobsQuery
+              .lte('end_time', now.toISOString());
+          }
+
+          const { data: jobsData, error: jobsError } = await jobsQuery.order('start_time');
+
+          if (jobsError) {
+            console.error("Error fetching jobs without timesheets:", jobsError);
+            toast.error("Error loading job details");
+            return [];
+          }
+
+          jobsWithoutTimesheets = (jobsData || []).map((job) => ({
+            job_id: job.id,
+            technician_id: user.id,
+            jobs: job,
+          }));
         }
 
-        console.log("Fetched job assignments:", jobAssignments || []);
-        
-        const transformedJobs = jobAssignments
+        // Combine timesheet-backed and job-only assignments
+        const combinedAssignments = [...timesheetAssignments, ...jobsWithoutTimesheets];
+
+        const transformedJobs = combinedAssignments
           .filter(assignment => assignment.jobs)
-          .map(assignment => {
+          .map((assignment) => {
+            const assignmentInfo = assignmentsByJobId.get(assignment.job_id);
             let department = "unknown";
-            if (assignment.sound_role) department = "sound";
-            else if (assignment.lights_role) department = "lights";
-            else if (assignment.video_role) department = "video";
-            
+            if (assignmentInfo?.sound_role) department = "sound";
+            else if (assignmentInfo?.lights_role) department = "lights";
+            else if (assignmentInfo?.video_role) department = "video";
+
             // Determine category from the role code
-            const category = getCategoryFromAssignment(assignment);
-            
+            const category = getCategoryFromAssignment({
+              sound_role: assignmentInfo?.sound_role,
+              lights_role: assignmentInfo?.lights_role,
+              video_role: assignmentInfo?.video_role
+            });
+
             return {
               id: `job-${assignment.job_id}`,
               job_id: assignment.job_id,
               technician_id: assignment.technician_id,
               department,
-              role: assignment.sound_role || assignment.lights_role || assignment.video_role || "Assigned",
-              category: category,
+              role: assignmentInfo?.sound_role || assignmentInfo?.lights_role || assignmentInfo?.video_role || "Assigned",
+              category,
               jobs: assignment.jobs
             };
           });
-        
+
         console.log("Final transformed assignments:", transformedJobs);
         return transformedJobs || [];
       } catch (error) {

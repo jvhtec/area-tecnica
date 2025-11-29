@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { PersonalCalendar } from '@/components/personal/PersonalCalendar';
 import { MobilePersonalCalendar } from '@/components/personal/MobilePersonalCalendar';
 import { VacationRequestsTabs } from '@/components/personal/VacationRequestsTabs';
@@ -7,18 +7,21 @@ import { useVacationRequests } from '@/hooks/useVacationRequests';
 import { Card, CardContent } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight, LayoutDashboard, Briefcase, Calendar as CalendarIcon, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { MobileNavBar } from '@/components/layout/MobileNavBar';
+import { buildNavigationItems } from '@/components/layout/SidebarNavigation';
+import { selectPrimaryNavigationItems } from '@/components/layout/Layout';
 
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [isVacationSectionOpen, setIsVacationSectionOpen] = useState(false);
-  const { user, userRole } = useOptimizedAuth();
+  const { user, userRole, userDepartment, hasSoundVisionAccess, logout } = useOptimizedAuth();
   const { submitRequest, isSubmitting } = useVacationRequests();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   console.log('Personal page: Rendering with date:', date);
 
@@ -83,6 +86,48 @@ const Personal = () => {
 
   // Use technician theme
   const { theme, isDark } = useTechnicianTheme();
+
+  // Navigation parity with Layout for fullscreen mobile views
+  const navigationItems = useMemo(() => {
+    return buildNavigationItems({
+      userRole,
+      userDepartment,
+      hasSoundVisionAccess,
+    });
+  }, [userRole, userDepartment, hasSoundVisionAccess]);
+
+  const sortedMobileItems = useMemo(() => {
+    return [...navigationItems].sort(
+      (a, b) => (a.mobilePriority ?? 99) - (b.mobilePriority ?? 99),
+    );
+  }, [navigationItems]);
+
+  const primaryItems = useMemo(
+    () =>
+      selectPrimaryNavigationItems({
+        items: sortedMobileItems,
+        userDepartment,
+        userRole,
+      }),
+    [sortedMobileItems, userDepartment, userRole],
+  );
+
+  const trayItems = useMemo(() => {
+    const used = new Set(primaryItems.map((item) => item.id));
+    return sortedMobileItems.filter((item) => !used.has(item.id));
+  }, [sortedMobileItems, primaryItems]);
+
+  const handleSignOut = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Error during sign out:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <div className={`min-h-screen flex flex-col ${theme.bg} transition-colors duration-300 font-sans`}>
@@ -161,23 +206,14 @@ const Personal = () => {
 
       {/* Navigation - only show on mobile */}
       {isMobile && (
-        <div className={`h-20 ${theme.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-4`}>
-          {[
-            { id: 'dashboard', icon: LayoutDashboard, label: 'Panel' },
-            { id: 'jobs', icon: Briefcase, label: 'Trabajos' },
-            { id: 'availability', icon: CalendarIcon, label: 'Disponib.' },
-            { id: 'profile', icon: User, label: 'Perfil' }
-          ].map(item => (
-            <button
-              key={item.id}
-              onClick={() => navigate('/technician-dashboard')}
-              className={`flex flex-col items-center justify-center gap-1 ${isDark ? 'text-gray-500' : 'text-slate-400'}`}
-            >
-              <item.icon size={22} strokeWidth={2} />
-              <span className="text-[10px] font-medium">{item.label}</span>
-            </button>
-          ))}
-        </div>
+        <MobileNavBar
+          primaryItems={primaryItems}
+          trayItems={trayItems}
+          onSignOut={handleSignOut}
+          isLoggingOut={isLoggingOut}
+          userRole={userRole ?? undefined}
+          userEmail={user?.email ?? undefined}
+        />
       )}
     </div>
   );
