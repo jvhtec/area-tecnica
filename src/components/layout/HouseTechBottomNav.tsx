@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -17,6 +17,7 @@ import {
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 
 interface HouseTechBottomNavProps {
   className?: string;
@@ -33,6 +34,7 @@ export const HouseTechBottomNav: React.FC<HouseTechBottomNavProps> = ({ classNam
   const navigate = useNavigate();
   const location = useLocation();
   const { theme: nextTheme } = useTheme();
+  const { userDepartment } = useOptimizedAuth();
   const [showMenu, setShowMenu] = useState(false);
 
   const isDark = nextTheme === 'dark' || (
@@ -43,15 +45,30 @@ export const HouseTechBottomNav: React.FC<HouseTechBottomNavProps> = ({ classNam
 
   const t = getThemeStyles(isDark);
 
-  const houseTechRoutes = [
-    { path: '/personal', label: 'Personal', icon: CalendarIcon },
-    { path: '/sound', label: 'Sonido', icon: Speaker },
-    { path: '/lights', label: 'Luces', icon: Lightbulb },
-    { path: '/video', label: 'Video', icon: Camera },
-    { path: '/logistics', label: 'Logística', icon: MapIcon },
-    { path: '/tours', label: 'Tours', icon: Navigation },
-    { path: '/festivals', label: 'Festivales', icon: Users },
+  // All possible routes for house techs
+  const allHouseTechRoutes = [
+    { path: '/personal', label: 'Personal', icon: CalendarIcon, department: null },
+    { path: '/sound', label: 'Sonido', icon: Speaker, department: 'sound' },
+    { path: '/lights', label: 'Luces', icon: Lightbulb, department: 'lights' },
+    { path: '/video', label: 'Video', icon: Camera, department: 'video' },
+    { path: '/logistics', label: 'Logística', icon: MapIcon, department: null },
+    { path: '/tours', label: 'Tours', icon: Navigation, department: null },
+    { path: '/festivals', label: 'Festivales', icon: Users, department: 'sound' },
   ];
+
+  // Filter routes based on user's department
+  const houseTechRoutes = useMemo(() => {
+    const normalizedDept = userDepartment?.toLowerCase();
+    
+    return allHouseTechRoutes.filter(route => {
+      // Routes without a department restriction are available to all
+      if (route.department === null) {
+        return true;
+      }
+      // Otherwise, only show if it matches the user's department
+      return route.department === normalizedDept;
+    });
+  }, [userDepartment]);
 
   const isActive = (path: string) => {
     if (path === '/tech-app') {

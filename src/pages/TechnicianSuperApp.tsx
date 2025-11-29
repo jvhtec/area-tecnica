@@ -289,16 +289,30 @@ export default function TechnicianSuperApp() {
   // Check if user is house tech for extended navigation
   const isHouseTech = userRole === 'house_tech';
 
-  // House tech navigation routes
-  const houseTechRoutes = [
-    { path: '/personal', label: 'Personal', icon: CalendarIcon },
-    { path: '/sound', label: 'Sonido', icon: Speaker },
-    { path: '/lights', label: 'Luces', icon: Lightbulb },
-    { path: '/video', label: 'Video', icon: Camera },
-    { path: '/logistics', label: 'Logística', icon: MapIcon },
-    { path: '/tours', label: 'Tours', icon: Navigation },
-    { path: '/festivals', label: 'Festivales', icon: Users },
+  // All possible routes for house techs
+  const allHouseTechRoutes = [
+    { path: '/personal', label: 'Personal', icon: CalendarIcon, department: null },
+    { path: '/sound', label: 'Sonido', icon: Speaker, department: 'sound' },
+    { path: '/lights', label: 'Luces', icon: Lightbulb, department: 'lights' },
+    { path: '/video', label: 'Video', icon: Camera, department: 'video' },
+    { path: '/logistics', label: 'Logística', icon: MapIcon, department: null },
+    { path: '/tours', label: 'Tours', icon: Navigation, department: null },
+    { path: '/festivals', label: 'Festivales', icon: Users, department: 'sound' },
   ];
+
+  // Filter routes based on user's department
+  const houseTechRoutes = React.useMemo(() => {
+    const normalizedDept = userProfile?.department?.toLowerCase();
+    
+    return allHouseTechRoutes.filter(route => {
+      // Routes without a department restriction are available to all
+      if (route.department === null) {
+        return true;
+      }
+      // Otherwise, only show if it matches the user's department
+      return route.department === normalizedDept;
+    });
+  }, [userProfile?.department]);
 
   return (
     <div className={`min-h-screen flex flex-col ${t.bg} transition-colors duration-300 font-sans`}>
