@@ -385,9 +385,13 @@ const Layout = () => {
 
   // Routes that should be full-screen on mobile but have Layout on desktop
   const mobileFullscreenRoutes = useMemo(() => {
-    const routes = ["/sound", "/personal"]
+    const routes = ["/sound"]
+    // Only add /personal for house_tech users (they have their own bottom nav)
+    if (userRole === 'house_tech') {
+      routes.push("/personal")
+    }
     return isMobile && routes.some((route) => location.pathname.startsWith(route))
-  }, [isMobile, location.pathname])
+  }, [isMobile, location.pathname, userRole])
 
   const showSidebar = !isMobile || suppressChrome
 
