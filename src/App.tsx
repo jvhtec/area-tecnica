@@ -136,7 +136,7 @@ const DisponibilidadAccessGuard = () => {
   return <Disponibilidad />;
 };
 
-// Global guard that redirects technician-facing roles to tech-app
+// Global guard that redirects technicians to tech-app
 const TechnicianRouteGuard = () => {
   const { userRole, isLoading } = useOptimizedAuth();
   const location = useLocation();
@@ -146,44 +146,16 @@ const TechnicianRouteGuard = () => {
     // Don't redirect while still loading auth
     if (isLoading) return;
 
-    const technicianRoles = ['technician', 'house_tech'];
-
-    // Only redirect tech-facing roles
-    if (!technicianRoles.includes(userRole ?? '')) return;
+    // Only redirect technicians (house techs keep access to the full nav)
+    if (userRole !== 'technician') return;
 
     // Don't redirect if already on tech-app or auth page
     const allowedPrefixes = ['/tech-app', '/auth'];
-    const houseTechAllowed = [
-      '/sound',
-      '/personal',
-      '/tours',
-      '/logistics',
-      '/lights',
-      '/video',
-      '/morning-summary',
-      '/dashboard/unavailability',
-      '/timesheets',
-      '/festivals',
-      '/tour-management',
-      '/hoja-de-ruta',
-      '/labor-po-form',
-      '/pesos-tool',
-      '/consumos-tool',
-      '/lights-pesos-tool',
-      '/video-pesos-tool',
-      '/lights-consumos-tool',
-      '/video-consumos-tool',
-      '/excel-tool',
-      '/equipment-management',
-    ];
 
     const isAllowedPrefix = (prefixes: string[]) =>
       prefixes.some(prefix => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`));
 
     if (isAllowedPrefix(allowedPrefixes)) return;
-
-    // House techs can still reach their other Layout pages without being forced back to tech-app
-    if (userRole === 'house_tech' && isAllowedPrefix(houseTechAllowed)) return;
 
     // Redirect to tech-app
     console.log(`Technician detected on ${location.pathname}, redirecting to /tech-app`);
