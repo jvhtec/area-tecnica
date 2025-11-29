@@ -114,6 +114,8 @@ const TechnicianDashboard = () => {
         const now = new Date();
         console.log("Fetching assignments until:", endDate, "viewMode:", viewMode);
 
+        const startWindow = viewMode === 'upcoming' ? now : endDate;
+
         // First fetch confirmed job assignments for the technician (roles + status)
         const { data: assignmentsData, error: assignmentsError } = await supabase
           .from('job_assignments')
@@ -131,7 +133,7 @@ const TechnicianDashboard = () => {
           return [];
         }
 
-        const jobIds = assignmentsData.map((assignment) => assignment.job_id);
+        const jobIds = Array.from(new Set(assignmentsData.map((assignment) => assignment.job_id)));
         const assignmentsByJobId = new Map(
           assignmentsData.map((assignment) => [assignment.job_id, assignment])
         );
@@ -170,12 +172,13 @@ const TechnicianDashboard = () => {
           .in('job_id', jobIds);
 
         if (viewMode === 'upcoming') {
-          timesheetQuery = timesheetQuery
+            timesheetQuery = timesheetQuery
             .lte('jobs.start_time', endDate.toISOString())
             .gte('jobs.end_time', now.toISOString());
         } else {
           timesheetQuery = timesheetQuery
-            .lte('jobs.end_time', now.toISOString());
+            .lte('jobs.end_time', now.toISOString())
+            .gte('jobs.start_time', startWindow.toISOString());
         }
 
         const { data: timesheetData, error: timesheetError } = await timesheetQuery
@@ -245,7 +248,8 @@ const TechnicianDashboard = () => {
               .gte('end_time', now.toISOString());
           } else {
             jobsQuery = jobsQuery
-              .lte('end_time', now.toISOString());
+              .lte('end_time', now.toISOString())
+              .gte('start_time', startWindow.toISOString());
           }
 
           const { data: jobsData, error: jobsError } = await jobsQuery.order('start_time');
