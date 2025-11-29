@@ -158,8 +158,8 @@ const Personal = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Navigation - only show on mobile for non-house_tech users */}
-      {/* House techs get HouseTechBottomNav from Layout */}
+      {/* Navigation - only show on mobile */}
+      {/* House techs get HouseTechBottomNav from Layout, so exclude them */}
       {isMobile && userRole !== 'house_tech' && (
         <div className={`h-20 ${theme.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-4`}>
           {[
@@ -170,7 +170,7 @@ const Personal = () => {
           ].map(item => (
             <button
               key={item.id}
-              onClick={() => navigate('/tech-app')}
+              onClick={() => navigate('/technician-dashboard')}
               className={`flex flex-col items-center justify-center gap-1 ${isDark ? 'text-gray-500' : 'text-slate-400'}`}
             >
               <item.icon size={22} strokeWidth={2} />
