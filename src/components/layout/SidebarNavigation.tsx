@@ -91,16 +91,15 @@ const baseNavigationConfig: NavigationItemConfig[] = [
   },
   {
     id: "technician-dashboard",
-    label: "Panel técnico",
-    mobileLabel: "Panel",
+    label: "Tech App",
+    mobileLabel: "Tech App",
     icon: LayoutDashboard,
     mobilePriority: 1,
     mobileSlot: "primary",
-    getPath: () => "/technician-dashboard",
+    getPath: () => "/tech-app",
     isVisible: ({ userRole }) =>
       userRole === "technician" || userRole === "house_tech",
-    match: (pathname, _context, to) =>
-      pathname === to || pathname.startsWith("/tech-app"),
+    match: (pathname) => pathname === "/technician-dashboard" || pathname.startsWith("/tech-app"),
   },
   {
     id: "technician-unavailability",
