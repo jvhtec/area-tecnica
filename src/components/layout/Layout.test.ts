@@ -94,6 +94,27 @@ describe("selectPrimaryNavigationItems", () => {
       "job-assignment-matrix",
     ])
   })
+
+  it("uses the house tech profile order instead of the department default", () => {
+    const context = buildContext({
+      userDepartment: "sound",
+      userRole: "house_tech",
+    })
+    const items = sortNavigationItems(buildNavigationItems(context))
+
+    const primary = selectPrimaryNavigationItems({
+      items,
+      userDepartment: context.userDepartment,
+      userRole: context.userRole,
+    })
+
+    expect(primary.map((item) => item.id)).toEqual([
+      "technician-dashboard",
+      "technician-unavailability",
+      "house-department",
+      "tours",
+    ])
+  })
 })
 
 describe("buildNavigationItems - management department navigation", () => {

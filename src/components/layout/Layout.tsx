@@ -44,6 +44,12 @@ import { ThemeToggle } from "./ThemeToggle"
 import { UserInfo } from "./UserInfo"
 
 const PRIMARY_NAVIGATION_PROFILE_MAP: Record<string, readonly string[]> = {
+  house_tech: [
+    "technician-dashboard",
+    "technician-unavailability",
+    "house-department",
+    "tours",
+  ],
   sound: [
     "management-department",
     "project-management",
@@ -84,7 +90,13 @@ export const selectPrimaryNavigationItems = ({
   const normalizedDepartment = userDepartment?.toLowerCase() ?? null
   const normalizedRole = userRole?.toLowerCase() ?? null
 
+  const rolePreferredMap =
+    normalizedRole === "house_tech"
+      ? PRIMARY_NAVIGATION_PROFILE_MAP[normalizedRole]
+      : null
+
   const customProfileIds =
+    rolePreferredMap ||
     (normalizedDepartment && PRIMARY_NAVIGATION_PROFILE_MAP[normalizedDepartment]) ||
     (normalizedRole && PRIMARY_NAVIGATION_PROFILE_MAP[normalizedRole]) ||
     null
