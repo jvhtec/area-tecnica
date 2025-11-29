@@ -111,8 +111,9 @@ const getThemeStyles = (isDark: boolean) => ({
 export default function TechnicianSuperApp() {
   const [tab, setTab] = useState('dashboard');
   const { theme: nextTheme, setTheme } = useTheme();
-  const { user, hasSoundVisionAccess } = useOptimizedAuth();
+  const { user, hasSoundVisionAccess, userRole } = useOptimizedAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Determine if dark mode (guard for SSR/test environments)
   const isDark = nextTheme === 'dark' || (
@@ -285,8 +286,44 @@ export default function TechnicianSuperApp() {
     ? `${userProfile.first_name} ${userProfile.last_name}`
     : user?.email || 'Técnico';
 
+  // Check if user is house tech for extended navigation
+  const isHouseTech = userRole === 'house_tech';
+
+  // House tech navigation routes
+  const houseTechRoutes = [
+    { path: '/personal', label: 'Personal', icon: CalendarIcon },
+    { path: '/sound', label: 'Sonido', icon: Speaker },
+    { path: '/lights', label: 'Luces', icon: Lightbulb },
+    { path: '/video', label: 'Video', icon: Camera },
+    { path: '/logistics', label: 'Logística', icon: MapIcon },
+    { path: '/tours', label: 'Tours', icon: Navigation },
+    { path: '/festivals', label: 'Festivales', icon: Users },
+  ];
+
   return (
     <div className={`min-h-screen flex flex-col ${t.bg} transition-colors duration-300 font-sans`}>
+      
+      {/* Extended Header for House Techs */}
+      {isHouseTech && (
+        <div className={`${t.nav} border-b ${t.divider} sticky top-0 z-50`}>
+          <ScrollArea className="w-full">
+            <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto">
+              {houseTechRoutes.map((route) => (
+                <Button
+                  key={route.path}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(route.path)}
+                  className={`flex items-center gap-2 shrink-0 ${isDark ? 'hover:bg-[#1f232e]' : 'hover:bg-slate-100'}`}
+                >
+                  <route.icon size={16} />
+                  <span className="text-xs font-medium">{route.label}</span>
+                </Button>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 pb-24">

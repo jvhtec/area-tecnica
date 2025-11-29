@@ -22,11 +22,11 @@ const Personal = () => {
 
   console.log('Personal page: Rendering with date:', date);
 
-  // Redirect technicians to technician dashboard - they shouldn't access personal calendar
+  // Redirect technicians to tech app - they shouldn't access personal calendar
   useEffect(() => {
     if (userRole === 'technician') {
-      console.log('Technician trying to access personal calendar, redirecting to technician dashboard');
-      navigate('/technician-dashboard');
+      console.log('Technician trying to access personal calendar, redirecting to tech app');
+      navigate('/tech-app');
     }
   }, [userRole, navigate]);
 
@@ -160,7 +160,7 @@ const Personal = () => {
         ].map(item => (
           <button
             key={item.id}
-            onClick={() => navigate('/technician-dashboard')}
+            onClick={() => navigate('/tech-app')}
             className={`flex flex-col items-center justify-center gap-1 ${isDark ? 'text-gray-500' : 'text-slate-400'}`}
           >
             <item.icon size={22} strokeWidth={2} />
