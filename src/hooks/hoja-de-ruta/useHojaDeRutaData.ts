@@ -189,7 +189,9 @@ const saveTravelArrangements = async (hojaId: string, arrangements: TravelArrang
         driver_name: arr.driver_name,
         driver_phone: arr.driver_phone,
         license_plate: arr.plate_number,
-        date_time: arr.pickup_time ? new Date(`2000-01-01T${arr.pickup_time}`).toISOString() : null,
+        // pickup_time is now an ISO datetime string, use it directly
+        date_time: arr.pickup_time || null,
+        // departure_time is still time-only, construct full datetime
         return_date_time: arr.departure_time ? new Date(`2000-01-01T${arr.departure_time}`).toISOString() : null,
         has_return: !!arr.departure_time
       }));
