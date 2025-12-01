@@ -10,12 +10,15 @@ import { Truck, Plus, Trash2, Download } from "lucide-react";
 import { Transport } from "@/types/hoja-de-ruta";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { toZonedTime } from "date-fns-tz";
+import { format } from "date-fns";
 
 interface ModernTransportSectionProps {
   transport: Transport[];
   onUpdateTransport: (index: number, field: keyof Transport, value: any) => void;
   onAddTransport: () => void;
   onRemoveTransport: (index: number) => void;
+  onImportTransports: (transports: Transport[]) => void;
   jobId?: string;  // Add jobId prop to fetch logistics events
 }
 
@@ -24,6 +27,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
   onUpdateTransport,
   onAddTransport,
   onRemoveTransport,
+  onImportTransports,
   jobId,
 }) => {
   const { toast } = useToast();
@@ -33,10 +37,11 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
   const validTransport = Array.isArray(transport) ? transport : [];
 
   // Map transport_provider enum to company values (1:1 mapping)
-  const mapProviderToCompany = (provider: string | null): Transport['company'] => {
+  const mapProviderToCompany = (provider: string | null): Transport['company'] | undefined => {
     const mapping: Record<string, Transport['company']> = {
       'pantoja': 'pantoja',
       'transluminaria': 'transluminaria',
+      'transcamarena': 'transcamarena',
       'the_wild_tour': 'wild tour',
       'camionaje': 'camionaje',
       'sector_pro': 'sector-pro',
@@ -80,19 +85,20 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       }
 
       // Map logistics events to Transport objects
-      const importedTransports: Transport[] = logisticsEvents.map((event, index) => {
-        // Combine event_date and event_time into ISO datetime
-        // Parse as Spain time and convert to ISO
+      const importedTransports: Transport[] = logisticsEvents.map((event) => {
+        // Combine event_date and event_time and parse as Spain time
         const dateTimeStr = `${event.event_date}T${event.event_time}`;
-        const date = new Date(dateTimeStr);
-        const isoDateTime = date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm format for datetime-local
+        // Parse the datetime string as a date in Europe/Madrid timezone
+        const spainDate = toZonedTime(dateTimeStr, 'Europe/Madrid');
+        // Format to YYYY-MM-DDTHH:mm for datetime-local input
+        const formattedDateTime = format(spainDate, "yyyy-MM-dd'T'HH:mm");
 
         return {
-          id: `imported-${event.id}`,
+          id: crypto.randomUUID(),
           transport_type: event.transport_type as Transport['transport_type'],
           license_plate: event.license_plate || undefined,
           company: mapProviderToCompany(event.transport_provider),
-          date_time: isoDateTime,
+          date_time: formattedDateTime,
           driver_name: undefined,
           driver_phone: undefined,
           has_return: false,
@@ -100,26 +106,13 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
         };
       });
 
-      // Add imported transports to existing ones
-      importedTransports.forEach(() => onAddTransport());
+      // Use bulk import to avoid stale state issues
+      onImportTransports(importedTransports);
 
-      // Update each imported transport
-      setTimeout(() => {
-        const startIndex = validTransport.length;
-        importedTransports.forEach((importedTransport, idx) => {
-          const transportIndex = startIndex + idx;
-          Object.entries(importedTransport).forEach(([key, value]) => {
-            if (key !== 'id' && value !== undefined) {
-              onUpdateTransport(transportIndex, key as keyof Transport, value);
-            }
-          });
-        });
-
-        toast({
-          title: "Importación exitosa",
-          description: `Se importaron ${importedTransports.length} evento(s) logístico(s)`,
-        });
-      }, 100);
+      toast({
+        title: "Importación exitosa",
+        description: `Se importaron ${importedTransports.length} evento(s) logístico(s)`,
+      });
 
     } catch (error) {
       console.error('Error importing logistics:', error);

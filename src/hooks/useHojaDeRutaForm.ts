@@ -326,6 +326,16 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
     }));
   }, [setEventData]);
 
+  const importTransports = useCallback((transports: Transport[]) => {
+    setEventData(prev => ({
+      ...prev,
+      logistics: {
+        ...prev.logistics,
+        transport: [...prev.logistics.transport, ...transports]
+      }
+    }));
+  }, [setEventData]);
+
   return {
     // State
     eventData,
@@ -379,7 +389,8 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
     updateTransport,
     addTransport,
     removeTransport,
-    
+    importTransports,
+
     // Alert system
     showAlert,
     setShowAlert,
