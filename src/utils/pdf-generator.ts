@@ -3,18 +3,20 @@ import autoTable from "jspdf-autotable";
 import { supabase } from "@/lib/supabase";
 import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
 import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 interface AutoTableJsPDF extends jsPDF {
   lastAutoTable: { finalY: number };
 }
 
-// Helper function to format datetime for display
+// Helper function to format datetime for display in Spain time
 const formatPickupDateTime = (datetime: string | undefined): string => {
   if (!datetime) return '';
   try {
     const date = new Date(datetime);
     if (isNaN(date.getTime())) return datetime;
-    return format(date, 'dd/MM/yyyy HH:mm');
+    // Display in Spain time (Europe/Madrid)
+    return formatInTimeZone(date, 'Europe/Madrid', 'dd/MM/yyyy HH:mm');
   } catch {
     return datetime || '';
   }

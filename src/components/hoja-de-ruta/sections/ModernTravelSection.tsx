@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Car, Plus, Trash2, Plane, Bus, Train, MapPin, Clock, User, Phone, Hash } from "lucide-react";
 import { TravelArrangement } from "@/types/hoja-de-ruta";
 import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 interface ModernTravelSectionProps {
   travelArrangements: TravelArrangement[];
@@ -34,25 +35,27 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
     }
   };
 
-  // Convert ISO datetime string to datetime-local format (YYYY-MM-DDTHH:mm)
+  // Convert ISO datetime string to datetime-local format (YYYY-MM-DDTHH:mm) in Spain time
   const toLocalDateTime = useCallback((isoString: string | undefined): string => {
     if (!isoString) return '';
     try {
       const date = new Date(isoString);
       if (isNaN(date.getTime())) return '';
-      // Adjust for local timezone
-      const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-      return localDate.toISOString().slice(0, 16);
+      // Convert UTC timestamp to Spain time (Europe/Madrid) for display
+      return formatInTimeZone(date, 'Europe/Madrid', "yyyy-MM-dd'T'HH:mm");
     } catch {
       return '';
     }
   }, []);
 
-  // Convert datetime-local format to ISO string
+  // Convert datetime-local format to ISO string, interpreting input as Spain time
   const toISODateTime = useCallback((localValue: string): string | undefined => {
     if (!localValue) return undefined;
     try {
-      return new Date(localValue).toISOString();
+      // Parse the datetime-local value as if it's in Spain time (Europe/Madrid)
+      // Then convert to UTC ISO string for storage
+      const spainDate = toZonedTime(localValue, 'Europe/Madrid');
+      return spainDate.toISOString();
     } catch {
       return undefined;
     }

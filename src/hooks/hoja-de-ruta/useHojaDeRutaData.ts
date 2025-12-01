@@ -177,7 +177,15 @@ const saveStaff = async (hojaId: string, staff: any[]) => {
 
 const saveTravelArrangements = async (hojaId: string, arrangements: TravelArrangement[]) => {
   // Delete existing arrangements
-  await supabase.from('hoja_de_ruta_travel_arrangements').delete().eq('hoja_de_ruta_id', hojaId);
+  const { error: deleteError } = await supabase
+    .from('hoja_de_ruta_travel_arrangements')
+    .delete()
+    .eq('hoja_de_ruta_id', hojaId);
+
+  if (deleteError) {
+    console.error('Error deleting travel arrangements:', deleteError);
+    throw deleteError;
+  }
 
   // Insert new arrangements
   if (arrangements.length > 0) {
@@ -199,7 +207,14 @@ const saveTravelArrangements = async (hojaId: string, arrangements: TravelArrang
       }));
 
     if (arrangementsData.length > 0) {
-      await supabase.from('hoja_de_ruta_travel_arrangements').insert(arrangementsData);
+      const { error: insertError } = await supabase
+        .from('hoja_de_ruta_travel_arrangements')
+        .insert(arrangementsData);
+
+      if (insertError) {
+        console.error('Error inserting travel arrangements:', insertError);
+        throw insertError;
+      }
     }
   }
 };

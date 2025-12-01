@@ -1,5 +1,15 @@
 -- Migration: Change departure_time and arrival_time from time to timestamptz
 -- This completes the migration to full datetime for all travel time fields
+--
+-- IMPORTANT: This migration preserves existing time-of-day values by attaching
+-- CURRENT_DATE during conversion. The resulting timestamp will be in the database
+-- server's timezone (should be Europe/Madrid for this application).
+--
+-- TIMEZONE DEPENDENCY: This migration assumes the PostgreSQL server/session is
+-- configured with timezone = 'Europe/Madrid'. Verify with:
+--   SHOW timezone;
+-- If needed, set explicitly before running:
+--   SET timezone = 'Europe/Madrid';
 
 -- Update hoja_de_ruta_travel_arrangements table
 DO $$
@@ -10,6 +20,7 @@ BEGIN
     AND table_name = 'hoja_de_ruta_travel_arrangements'
   ) THEN
     -- Change departure_time column from time to timestamptz
+    -- Preserves existing time-of-day values by attaching CURRENT_DATE
     ALTER TABLE hoja_de_ruta_travel_arrangements
     ALTER COLUMN departure_time TYPE timestamptz
     USING CASE
@@ -18,6 +29,7 @@ BEGIN
     END;
 
     -- Change arrival_time column from time to timestamptz
+    -- Preserves existing time-of-day values by attaching CURRENT_DATE
     ALTER TABLE hoja_de_ruta_travel_arrangements
     ALTER COLUMN arrival_time TYPE timestamptz
     USING CASE
@@ -40,6 +52,7 @@ BEGIN
     AND table_name = 'hoja_de_ruta_travel'
   ) THEN
     -- Change departure_time column from time to timestamptz
+    -- Preserves existing time-of-day values by attaching CURRENT_DATE
     ALTER TABLE hoja_de_ruta_travel
     ALTER COLUMN departure_time TYPE timestamptz
     USING CASE
@@ -48,6 +61,7 @@ BEGIN
     END;
 
     -- Change arrival_time column from time to timestamptz
+    -- Preserves existing time-of-day values by attaching CURRENT_DATE
     ALTER TABLE hoja_de_ruta_travel
     ALTER COLUMN arrival_time TYPE timestamptz
     USING CASE
