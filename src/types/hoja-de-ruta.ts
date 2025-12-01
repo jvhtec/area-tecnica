@@ -25,7 +25,7 @@ export interface HojaDeRutaMetadata {
 export interface TravelArrangement {
   transportation_type?: string;
   pickup_address?: string;
-  pickup_time?: string;
+  pickup_time?: string; // ISO datetime string (e.g., "2025-02-26T14:30:00+00:00")
   departure_time?: string;
   arrival_time?: string;
   flight_train_number?: string;

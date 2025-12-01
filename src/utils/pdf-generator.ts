@@ -2,10 +2,23 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "@/lib/supabase";
 import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
+import { format } from "date-fns";
 
 interface AutoTableJsPDF extends jsPDF {
   lastAutoTable: { finalY: number };
 }
+
+// Helper function to format datetime for display
+const formatPickupDateTime = (datetime: string | undefined): string => {
+  if (!datetime) return '';
+  try {
+    const date = new Date(datetime);
+    if (isNaN(date.getTime())) return datetime;
+    return format(date, 'dd/MM/yyyy HH:mm');
+  } catch {
+    return datetime || '';
+  }
+};
 
 export const uploadPdfToJob = async (
   jobId: string,
@@ -225,7 +238,7 @@ export const generatePDF = (
     yPosition += 10;
     const travelTableData = travelArrangements.map((arr) => [
       arr.transportation_type,
-      `${arr.pickup_address || ""} ${arr.pickup_time || ""}`.trim(),
+      `${arr.pickup_address || ""} ${formatPickupDateTime(arr.pickup_time)}`.trim(),
       arr.departure_time || "",
       arr.arrival_time || "",
       arr.flight_train_number || "",

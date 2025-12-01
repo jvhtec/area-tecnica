@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +33,36 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
       default: return Car;
     }
   };
+
+  // Convert ISO datetime string to datetime-local format (YYYY-MM-DDTHH:mm)
+  const toLocalDateTime = useCallback((isoString: string | undefined): string => {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return '';
+      // Adjust for local timezone
+      const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+      return localDate.toISOString().slice(0, 16);
+    } catch {
+      return '';
+    }
+  }, []);
+
+  // Convert datetime-local format to ISO string
+  const toISODateTime = useCallback((localValue: string): string | undefined => {
+    if (!localValue) return undefined;
+    try {
+      return new Date(localValue).toISOString();
+    } catch {
+      return undefined;
+    }
+  }, []);
+
+  // Handle pickup_time change with conversion
+  const handlePickupTimeChange = useCallback((index: number, value: string) => {
+    const isoValue = toISODateTime(value);
+    onUpdate(index, 'pickup_time', isoValue);
+  }, [onUpdate, toISODateTime]);
 
   return (
     <motion.div
@@ -158,12 +188,12 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                           <div className="space-y-2">
                             <Label className="text-sm font-medium flex items-center gap-2">
                               <Clock className="w-4 h-4" />
-                              Hora de Recogida
+                              Fecha y Hora de Recogida
                             </Label>
                             <Input
-                              type="time"
-                              value={arrangement.pickup_time || ''}
-                              onChange={(e) => onUpdate(index, 'pickup_time', e.target.value)}
+                              type="datetime-local"
+                              value={toLocalDateTime(arrangement.pickup_time)}
+                              onChange={(e) => handlePickupTimeChange(index, e.target.value)}
                               className="border-2 focus:border-cyan-300"
                             />
                           </div>
