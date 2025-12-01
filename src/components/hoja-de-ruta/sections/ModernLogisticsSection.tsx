@@ -13,6 +13,7 @@ interface ModernLogisticsSectionProps {
   onUpdateTransport: (index: number, field: keyof Transport, value: any) => void;
   onAddTransport: () => void;
   onRemoveTransport: (index: number) => void;
+  jobId?: string;  // Add jobId prop
 }
 
 export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
@@ -21,6 +22,7 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
   onUpdateTransport,
   onAddTransport,
   onRemoveTransport,
+  jobId,
 }) => {
   return (
     <motion.div
@@ -33,6 +35,7 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
         onUpdateTransport={onUpdateTransport}
         onAddTransport={onAddTransport}
         onRemoveTransport={onRemoveTransport}
+        jobId={jobId}
       />
       <Card className="border-2">
         <CardHeader>

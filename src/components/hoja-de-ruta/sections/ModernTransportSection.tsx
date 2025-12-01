@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,14 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion, AnimatePresence } from "framer-motion";
-import { Truck, Plus, Trash2 } from "lucide-react";
+import { Truck, Plus, Trash2, Download } from "lucide-react";
 import { Transport } from "@/types/hoja-de-ruta";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 interface ModernTransportSectionProps {
   transport: Transport[];
   onUpdateTransport: (index: number, field: keyof Transport, value: any) => void;
   onAddTransport: () => void;
   onRemoveTransport: (index: number) => void;
+  jobId?: string;  // Add jobId prop to fetch logistics events
 }
 
 export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
@@ -21,9 +24,114 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
   onUpdateTransport,
   onAddTransport,
   onRemoveTransport,
+  jobId,
 }) => {
+  const { toast } = useToast();
+  const [isImporting, setIsImporting] = useState(false);
+
   // Ensure transport is always an array
   const validTransport = Array.isArray(transport) ? transport : [];
+
+  // Map transport_provider enum to company values
+  const mapProviderToCompany = (provider: string | null): Transport['company'] => {
+    const mapping: Record<string, Transport['company']> = {
+      'pantoja': 'pantoja',
+      'transluminaria': 'transluminaria',
+      'the_wild_tour': 'wild tour',
+      'camionaje': 'camionaje',
+      'sector_pro': 'sector-pro',
+      'crespo': 'other',
+      'montabi_dorado': 'other',
+      'grupo_sese': 'other',
+      'nacex': 'other',
+      'recogida_cliente': 'other',
+    };
+    return provider ? mapping[provider] || 'other' : undefined;
+  };
+
+  // Import logistics events from database
+  const handleImportFromLogistics = async () => {
+    if (!jobId) {
+      toast({
+        title: "Error",
+        description: "No hay un trabajo seleccionado",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const { data: logisticsEvents, error } = await supabase
+        .from('logistics_events')
+        .select('*')
+        .eq('job_id', jobId)
+        .order('event_date', { ascending: true })
+        .order('event_time', { ascending: true });
+
+      if (error) throw error;
+
+      if (!logisticsEvents || logisticsEvents.length === 0) {
+        toast({
+          title: "Sin datos",
+          description: "No se encontraron eventos logísticos para este trabajo",
+        });
+        return;
+      }
+
+      // Map logistics events to Transport objects
+      const importedTransports: Transport[] = logisticsEvents.map((event, index) => {
+        // Combine event_date and event_time into ISO datetime
+        // Parse as Spain time and convert to ISO
+        const dateTimeStr = `${event.event_date}T${event.event_time}`;
+        const date = new Date(dateTimeStr);
+        const isoDateTime = date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm format for datetime-local
+
+        return {
+          id: `imported-${event.id}`,
+          transport_type: event.transport_type as Transport['transport_type'],
+          license_plate: event.license_plate || undefined,
+          company: mapProviderToCompany(event.transport_provider),
+          date_time: isoDateTime,
+          driver_name: undefined,
+          driver_phone: undefined,
+          has_return: false,
+          return_date_time: undefined,
+        };
+      });
+
+      // Add imported transports to existing ones
+      importedTransports.forEach(() => onAddTransport());
+
+      // Update each imported transport
+      setTimeout(() => {
+        const startIndex = validTransport.length;
+        importedTransports.forEach((importedTransport, idx) => {
+          const transportIndex = startIndex + idx;
+          Object.entries(importedTransport).forEach(([key, value]) => {
+            if (key !== 'id' && value !== undefined) {
+              onUpdateTransport(transportIndex, key as keyof Transport, value);
+            }
+          });
+        });
+
+        toast({
+          title: "Importación exitosa",
+          description: `Se importaron ${importedTransports.length} evento(s) logístico(s)`,
+        });
+      }, 100);
+
+    } catch (error) {
+      console.error('Error importing logistics:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron importar los eventos logísticos",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   return (
     <Card className="border-2">
@@ -33,15 +141,29 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
             <Truck className="w-5 h-5 text-indigo-600" />
             Transporte
           </CardTitle>
-          <Button
-            onClick={onAddTransport}
-            size="sm"
-            variant="outline"
-            className="gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Añadir Transporte
-          </Button>
+          <div className="flex gap-2">
+            {jobId && (
+              <Button
+                onClick={handleImportFromLogistics}
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                disabled={isImporting}
+              >
+                <Download className="w-4 h-4" />
+                {isImporting ? 'Importando...' : 'Importar desde Logística'}
+              </Button>
+            )}
+            <Button
+              onClick={onAddTransport}
+              size="sm"
+              variant="outline"
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Añadir Transporte
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
