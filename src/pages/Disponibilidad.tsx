@@ -39,7 +39,8 @@ export default function Disponibilidad() {
   const isAdmin = userRole === 'admin';
   const isManagement = userRole === 'management';
   const hasManagementDepartmentAccess =
-    normalizedDepartment === 'sound' || normalizedDepartment === 'lights';
+    userRole === 'management' &&
+    (normalizedDepartment === 'sound' || normalizedDepartment === 'lights');
 
   const [adminDepartment, setAdminDepartment] = useState<DisponibilidadDepartment>('sound');
 
