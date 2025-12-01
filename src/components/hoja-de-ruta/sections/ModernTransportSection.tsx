@@ -32,7 +32,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
   // Ensure transport is always an array
   const validTransport = Array.isArray(transport) ? transport : [];
 
-  // Map transport_provider enum to company values
+  // Map transport_provider enum to company values (1:1 mapping)
   const mapProviderToCompany = (provider: string | null): Transport['company'] => {
     const mapping: Record<string, Transport['company']> = {
       'pantoja': 'pantoja',
@@ -40,11 +40,11 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       'the_wild_tour': 'wild tour',
       'camionaje': 'camionaje',
       'sector_pro': 'sector-pro',
-      'crespo': 'other',
-      'montabi_dorado': 'other',
-      'grupo_sese': 'other',
-      'nacex': 'other',
-      'recogida_cliente': 'other',
+      'crespo': 'crespo',
+      'montabi_dorado': 'montabi_dorado',
+      'grupo_sese': 'grupo_sese',
+      'nacex': 'nacex',
+      'recogida_cliente': 'recogida_cliente',
     };
     return provider ? mapping[provider] || 'other' : undefined;
   };
@@ -247,6 +247,11 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
                         <SelectItem value="wild tour">Wild Tour</SelectItem>
                         <SelectItem value="camionaje">Camionaje</SelectItem>
                         <SelectItem value="sector-pro">Sector-Pro</SelectItem>
+                        <SelectItem value="crespo">Crespo</SelectItem>
+                        <SelectItem value="montabi_dorado">Montabi Dorado</SelectItem>
+                        <SelectItem value="grupo_sese">Grupo Sese</SelectItem>
+                        <SelectItem value="nacex">Nacex</SelectItem>
+                        <SelectItem value="recogida_cliente">Recogida Cliente</SelectItem>
                         <SelectItem value="other">Otro</SelectItem>
                       </SelectContent>
                     </Select>
