@@ -10,8 +10,6 @@ import { Truck, Plus, Trash2, Download } from "lucide-react";
 import { Transport } from "@/types/hoja-de-ruta";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { toZonedTime } from "date-fns-tz";
-import { format } from "date-fns";
 
 interface ModernTransportSectionProps {
   transport: Transport[];
@@ -35,6 +33,13 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
 
   // Ensure transport is always an array
   const validTransport = Array.isArray(transport) ? transport : [];
+
+  // Valid transport type values
+  const VALID_TRANSPORT_TYPES = ['trailer', '9m', '8m', '6m', '4m', 'furgoneta'] as const;
+
+  const isValidTransportType = (type: any): type is Transport['transport_type'] => {
+    return VALID_TRANSPORT_TYPES.includes(type);
+  };
 
   // Map transport_provider enum to company values (1:1 mapping)
   const mapProviderToCompany = (provider: string | null): Transport['company'] | undefined => {
@@ -86,19 +91,22 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
 
       // Map logistics events to Transport objects
       const importedTransports: Transport[] = logisticsEvents.map((event) => {
-        // Combine event_date and event_time and parse as Spain time
-        const dateTimeStr = `${event.event_date}T${event.event_time}`;
-        // Parse the datetime string as a date in Europe/Madrid timezone
-        const spainDate = toZonedTime(dateTimeStr, 'Europe/Madrid');
-        // Format to YYYY-MM-DDTHH:mm for datetime-local input
-        const formattedDateTime = format(spainDate, "yyyy-MM-dd'T'HH:mm");
+        // Combine event_date and event_time for datetime-local (no timezone conversion)
+        const time = event.event_time ? String(event.event_time).slice(0, 5) : "00:00";
+        const dateTime = `${event.event_date}T${time}`; // YYYY-MM-DDTHH:mm
+
+        // Validate transport_type
+        const transportType = event.transport_type;
+        if (!isValidTransportType(transportType)) {
+          console.warn(`Invalid transport_type: ${transportType}, defaulting to 'trailer'`);
+        }
 
         return {
           id: crypto.randomUUID(),
-          transport_type: event.transport_type as Transport['transport_type'],
+          transport_type: isValidTransportType(transportType) ? transportType : 'trailer',
           license_plate: event.license_plate || undefined,
           company: mapProviderToCompany(event.transport_provider),
-          date_time: formattedDateTime,
+          date_time: dateTime,
           driver_name: undefined,
           driver_phone: undefined,
           has_return: false,
