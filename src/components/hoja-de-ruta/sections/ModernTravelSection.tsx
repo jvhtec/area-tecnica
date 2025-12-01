@@ -64,6 +64,18 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
     onUpdate(index, 'pickup_time', isoValue);
   }, [onUpdate, toISODateTime]);
 
+  // Handle departure_time change with conversion
+  const handleDepartureTimeChange = useCallback((index: number, value: string) => {
+    const isoValue = toISODateTime(value);
+    onUpdate(index, 'departure_time', isoValue);
+  }, [onUpdate, toISODateTime]);
+
+  // Handle arrival_time change with conversion
+  const handleArrivalTimeChange = useCallback((index: number, value: string) => {
+    const isoValue = toISODateTime(value);
+    onUpdate(index, 'arrival_time', isoValue);
+  }, [onUpdate, toISODateTime]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -216,24 +228,24 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
 
                           <div className="space-y-2">
                             <Label className="text-sm font-medium">
-                              Hora de Salida
+                              Fecha y Hora de Salida
                             </Label>
                             <Input
-                              type="time"
-                              value={arrangement.departure_time || ''}
-                              onChange={(e) => onUpdate(index, 'departure_time', e.target.value)}
+                              type="datetime-local"
+                              value={toLocalDateTime(arrangement.departure_time)}
+                              onChange={(e) => handleDepartureTimeChange(index, e.target.value)}
                               className="border-2 focus:border-cyan-300"
                             />
                           </div>
 
                           <div className="space-y-2">
                             <Label className="text-sm font-medium">
-                              Hora de Llegada
+                              Fecha y Hora de Llegada
                             </Label>
                             <Input
-                              type="time"
-                              value={arrangement.arrival_time || ''}
-                              onChange={(e) => onUpdate(index, 'arrival_time', e.target.value)}
+                              type="datetime-local"
+                              value={toLocalDateTime(arrangement.arrival_time)}
+                              onChange={(e) => handleArrivalTimeChange(index, e.target.value)}
                               className="border-2 focus:border-cyan-300"
                             />
                           </div>

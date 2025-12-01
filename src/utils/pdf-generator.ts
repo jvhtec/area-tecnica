@@ -239,8 +239,8 @@ export const generatePDF = (
     const travelTableData = travelArrangements.map((arr) => [
       arr.transportation_type,
       `${arr.pickup_address || ""} ${formatPickupDateTime(arr.pickup_time)}`.trim(),
-      arr.departure_time || "",
-      arr.arrival_time || "",
+      formatPickupDateTime(arr.departure_time),
+      formatPickupDateTime(arr.arrival_time),
       arr.flight_train_number || "",
       arr.notes || "",
     ]);
