@@ -177,27 +177,29 @@ const saveStaff = async (hojaId: string, staff: any[]) => {
 
 const saveTravelArrangements = async (hojaId: string, arrangements: TravelArrangement[]) => {
   // Delete existing arrangements
-  await supabase.from('hoja_de_ruta_transport').delete().eq('hoja_de_ruta_id', hojaId);
-  
+  await supabase.from('hoja_de_ruta_travel_arrangements').delete().eq('hoja_de_ruta_id', hojaId);
+
   // Insert new arrangements
   if (arrangements.length > 0) {
     const arrangementsData = arrangements
       .filter(arr => arr.transportation_type?.trim() || arr.pickup_address?.trim())
       .map(arr => ({
         hoja_de_ruta_id: hojaId,
-        transport_type: arr.transportation_type,
-        driver_name: arr.driver_name,
-        driver_phone: arr.driver_phone,
-        license_plate: arr.plate_number,
+        transportation_type: arr.transportation_type,
+        pickup_address: arr.pickup_address || null,
         // pickup_time is now an ISO datetime string, use it directly
-        date_time: arr.pickup_time || null,
-        // departure_time is still time-only, construct full datetime
-        return_date_time: arr.departure_time ? new Date(`2000-01-01T${arr.departure_time}`).toISOString() : null,
-        has_return: !!arr.departure_time
+        pickup_time: arr.pickup_time || null,
+        departure_time: arr.departure_time || null,
+        arrival_time: arr.arrival_time || null,
+        flight_train_number: arr.flight_train_number || null,
+        driver_name: arr.driver_name || null,
+        driver_phone: arr.driver_phone || null,
+        plate_number: arr.plate_number || null,
+        notes: arr.notes || null
       }));
-    
+
     if (arrangementsData.length > 0) {
-      await supabase.from('hoja_de_ruta_transport').insert(arrangementsData);
+      await supabase.from('hoja_de_ruta_travel_arrangements').insert(arrangementsData);
     }
   }
 };
