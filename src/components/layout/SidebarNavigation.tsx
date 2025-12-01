@@ -398,6 +398,9 @@ const resolveIcon = (
 
 const adminExcludedIds = new Set([
   "technician-dashboard",
+  "technician-jobs",
+  "technician-availability",
+  "technician-profile",
   "technician-unavailability",
   "management-department",
   "house-department",
