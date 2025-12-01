@@ -31,9 +31,9 @@ export class TravelSection {
       // Travel details table
       const travelData = [
         ['Recogida', arrangement.pickup_address],
-        ['Hora Recogida', Formatters.formatTime(arrangement.pickup_time || '')],
-        ['Hora Salida', Formatters.formatTime(arrangement.departure_time || '')],
-        ['Hora Llegada', Formatters.formatTime(arrangement.arrival_time || '')],
+        ['Fecha/Hora Recogida', Formatters.formatDateTime(arrangement.pickup_time || '')],
+        ['Fecha/Hora Salida', Formatters.formatDateTime(arrangement.departure_time || '')],
+        ['Fecha/Hora Llegada', Formatters.formatDateTime(arrangement.arrival_time || '')],
         ['Vuelo/Tren', arrangement.flight_train_number],
         ['Compañía', Formatters.translateCompany(arrangement.company)],
         ['Conductor', arrangement.driver_name],

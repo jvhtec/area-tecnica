@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,14 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion, AnimatePresence } from "framer-motion";
-import { Truck, Plus, Trash2 } from "lucide-react";
+import { Truck, Plus, Trash2, Download } from "lucide-react";
 import { Transport } from "@/types/hoja-de-ruta";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 interface ModernTransportSectionProps {
   transport: Transport[];
   onUpdateTransport: (index: number, field: keyof Transport, value: any) => void;
   onAddTransport: () => void;
   onRemoveTransport: (index: number) => void;
+  onImportTransports: (transports: Transport[]) => void;
+  jobId?: string;  // Add jobId prop to fetch logistics events
 }
 
 export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
@@ -21,9 +25,114 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
   onUpdateTransport,
   onAddTransport,
   onRemoveTransport,
+  onImportTransports,
+  jobId,
 }) => {
+  const { toast } = useToast();
+  const [isImporting, setIsImporting] = useState(false);
+
   // Ensure transport is always an array
   const validTransport = Array.isArray(transport) ? transport : [];
+
+  // Valid transport type values
+  const VALID_TRANSPORT_TYPES = ['trailer', '9m', '8m', '6m', '4m', 'furgoneta'] as const;
+
+  const isValidTransportType = (type: any): type is Transport['transport_type'] => {
+    return VALID_TRANSPORT_TYPES.includes(type);
+  };
+
+  // Map transport_provider enum to company values (1:1 mapping)
+  const mapProviderToCompany = (provider: string | null): Transport['company'] | undefined => {
+    const mapping: Record<string, Transport['company']> = {
+      'pantoja': 'pantoja',
+      'transluminaria': 'transluminaria',
+      'transcamarena': 'transcamarena',
+      'the_wild_tour': 'wild tour',
+      'camionaje': 'camionaje',
+      'sector_pro': 'sector-pro',
+      'crespo': 'crespo',
+      'montabi_dorado': 'montabi_dorado',
+      'grupo_sese': 'grupo_sese',
+      'nacex': 'nacex',
+      'recogida_cliente': 'recogida_cliente',
+    };
+    return provider ? mapping[provider] || 'other' : undefined;
+  };
+
+  // Import logistics events from database
+  const handleImportFromLogistics = async () => {
+    if (!jobId) {
+      toast({
+        title: "Error",
+        description: "No hay un trabajo seleccionado",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const { data: logisticsEvents, error } = await supabase
+        .from('logistics_events')
+        .select('*')
+        .eq('job_id', jobId)
+        .order('event_date', { ascending: true })
+        .order('event_time', { ascending: true });
+
+      if (error) throw error;
+
+      if (!logisticsEvents || logisticsEvents.length === 0) {
+        toast({
+          title: "Sin datos",
+          description: "No se encontraron eventos logísticos para este trabajo",
+        });
+        return;
+      }
+
+      // Map logistics events to Transport objects
+      const importedTransports: Transport[] = logisticsEvents.map((event) => {
+        // Combine event_date and event_time for datetime-local (no timezone conversion)
+        const time = event.event_time ? String(event.event_time).slice(0, 5) : "00:00";
+        const dateTime = `${event.event_date}T${time}`; // YYYY-MM-DDTHH:mm
+
+        // Validate transport_type
+        const transportType = event.transport_type;
+        if (!isValidTransportType(transportType)) {
+          console.warn(`Invalid transport_type: ${transportType}, defaulting to 'trailer'`);
+        }
+
+        return {
+          id: crypto.randomUUID(),
+          transport_type: isValidTransportType(transportType) ? transportType : 'trailer',
+          license_plate: event.license_plate || undefined,
+          company: mapProviderToCompany(event.transport_provider),
+          date_time: dateTime,
+          driver_name: undefined,
+          driver_phone: undefined,
+          has_return: false,
+          return_date_time: undefined,
+        };
+      });
+
+      // Use bulk import to avoid stale state issues
+      onImportTransports(importedTransports);
+
+      toast({
+        title: "Importación exitosa",
+        description: `Se importaron ${importedTransports.length} evento(s) logístico(s)`,
+      });
+
+    } catch (error) {
+      console.error('Error importing logistics:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron importar los eventos logísticos",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   return (
     <Card className="border-2">
@@ -33,15 +142,29 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
             <Truck className="w-5 h-5 text-indigo-600" />
             Transporte
           </CardTitle>
-          <Button
-            onClick={onAddTransport}
-            size="sm"
-            variant="outline"
-            className="gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Añadir Transporte
-          </Button>
+          <div className="flex gap-2">
+            {jobId && (
+              <Button
+                onClick={handleImportFromLogistics}
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                disabled={isImporting}
+              >
+                <Download className="w-4 h-4" />
+                {isImporting ? 'Importando...' : 'Importar desde Logística'}
+              </Button>
+            )}
+            <Button
+              onClick={onAddTransport}
+              size="sm"
+              variant="outline"
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Añadir Transporte
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -125,6 +248,11 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
                         <SelectItem value="wild tour">Wild Tour</SelectItem>
                         <SelectItem value="camionaje">Camionaje</SelectItem>
                         <SelectItem value="sector-pro">Sector-Pro</SelectItem>
+                        <SelectItem value="crespo">Crespo</SelectItem>
+                        <SelectItem value="montabi_dorado">Montabi Dorado</SelectItem>
+                        <SelectItem value="grupo_sese">Grupo Sese</SelectItem>
+                        <SelectItem value="nacex">Nacex</SelectItem>
+                        <SelectItem value="recogida_cliente">Recogida Cliente</SelectItem>
                         <SelectItem value="other">Otro</SelectItem>
                       </SelectContent>
                     </Select>

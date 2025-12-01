@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Car, Plus, Trash2, Plane, Bus, Train, MapPin, Clock, User, Phone, Hash } from "lucide-react";
 import { TravelArrangement } from "@/types/hoja-de-ruta";
 import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 interface ModernTravelSectionProps {
   travelArrangements: TravelArrangement[];
@@ -33,6 +34,50 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
       default: return Car;
     }
   };
+
+  // Convert ISO datetime string to datetime-local format (YYYY-MM-DDTHH:mm) in Spain time
+  const toLocalDateTime = useCallback((isoString: string | undefined): string => {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return '';
+      // Convert UTC timestamp to Spain time (Europe/Madrid) for display
+      return formatInTimeZone(date, 'Europe/Madrid', "yyyy-MM-dd'T'HH:mm");
+    } catch {
+      return '';
+    }
+  }, []);
+
+  // Convert datetime-local format to ISO string, interpreting input as Spain time
+  const toISODateTime = useCallback((localValue: string): string | undefined => {
+    if (!localValue) return undefined;
+    try {
+      // Parse the datetime-local value as if it's in Spain time (Europe/Madrid)
+      // Then convert to UTC ISO string for storage
+      const spainDate = toZonedTime(localValue, 'Europe/Madrid');
+      return spainDate.toISOString();
+    } catch {
+      return undefined;
+    }
+  }, []);
+
+  // Handle pickup_time change with conversion
+  const handlePickupTimeChange = useCallback((index: number, value: string) => {
+    const isoValue = toISODateTime(value);
+    onUpdate(index, 'pickup_time', isoValue);
+  }, [onUpdate, toISODateTime]);
+
+  // Handle departure_time change with conversion
+  const handleDepartureTimeChange = useCallback((index: number, value: string) => {
+    const isoValue = toISODateTime(value);
+    onUpdate(index, 'departure_time', isoValue);
+  }, [onUpdate, toISODateTime]);
+
+  // Handle arrival_time change with conversion
+  const handleArrivalTimeChange = useCallback((index: number, value: string) => {
+    const isoValue = toISODateTime(value);
+    onUpdate(index, 'arrival_time', isoValue);
+  }, [onUpdate, toISODateTime]);
 
   return (
     <motion.div
@@ -158,12 +203,12 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                           <div className="space-y-2">
                             <Label className="text-sm font-medium flex items-center gap-2">
                               <Clock className="w-4 h-4" />
-                              Hora de Recogida
+                              Fecha y Hora de Recogida
                             </Label>
                             <Input
-                              type="time"
-                              value={arrangement.pickup_time || ''}
-                              onChange={(e) => onUpdate(index, 'pickup_time', e.target.value)}
+                              type="datetime-local"
+                              value={toLocalDateTime(arrangement.pickup_time)}
+                              onChange={(e) => handlePickupTimeChange(index, e.target.value)}
                               className="border-2 focus:border-cyan-300"
                             />
                           </div>
@@ -186,24 +231,24 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
 
                           <div className="space-y-2">
                             <Label className="text-sm font-medium">
-                              Hora de Salida
+                              Fecha y Hora de Salida
                             </Label>
                             <Input
-                              type="time"
-                              value={arrangement.departure_time || ''}
-                              onChange={(e) => onUpdate(index, 'departure_time', e.target.value)}
+                              type="datetime-local"
+                              value={toLocalDateTime(arrangement.departure_time)}
+                              onChange={(e) => handleDepartureTimeChange(index, e.target.value)}
                               className="border-2 focus:border-cyan-300"
                             />
                           </div>
 
                           <div className="space-y-2">
                             <Label className="text-sm font-medium">
-                              Hora de Llegada
+                              Fecha y Hora de Llegada
                             </Label>
                             <Input
-                              type="time"
-                              value={arrangement.arrival_time || ''}
-                              onChange={(e) => onUpdate(index, 'arrival_time', e.target.value)}
+                              type="datetime-local"
+                              value={toLocalDateTime(arrangement.arrival_time)}
+                              onChange={(e) => handleArrivalTimeChange(index, e.target.value)}
                               className="border-2 focus:border-cyan-300"
                             />
                           </div>

@@ -238,14 +238,7 @@ const ConsumosTool: React.FC = () => {
           current_per_phase: table.currentPerPhase || 0,
           pdu_type: table.customPduType || table.pduType || '',
           custom_pdu_type: table.customPduType,
-          includes_hoist: table.includesHoist,
-          // Optional: store context for reproducibility
-          metadata: {
-            pf,
-            phaseMode,
-            voltage,
-            safetyMargin
-          }
+          includes_hoist: table.includesHoist
         });
 
       if (error) throw error;
