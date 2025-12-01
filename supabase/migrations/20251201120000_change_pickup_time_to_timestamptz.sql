@@ -13,22 +13,34 @@
 
 -- Check if hoja_de_ruta_travel_arrangements table exists
 DO $$
+DECLARE
+  col_type TEXT;
 BEGIN
   IF EXISTS (
     SELECT FROM information_schema.tables
     WHERE table_schema = 'public'
     AND table_name = 'hoja_de_ruta_travel_arrangements'
   ) THEN
-    -- Change pickup_time column from time to timestamptz
-    -- Preserves existing time-of-day values by attaching CURRENT_DATE
-    ALTER TABLE hoja_de_ruta_travel_arrangements
-    ALTER COLUMN pickup_time TYPE timestamptz
-    USING CASE
-      WHEN pickup_time IS NOT NULL THEN (CURRENT_DATE + pickup_time)::timestamptz
-      ELSE NULL
-    END;
+    -- Check current column type
+    SELECT data_type INTO col_type
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'hoja_de_ruta_travel_arrangements'
+      AND column_name = 'pickup_time';
 
-    RAISE NOTICE 'Successfully changed pickup_time to timestamptz in hoja_de_ruta_travel_arrangements';
+    -- Only convert if column is still 'time without time zone'
+    IF col_type = 'time without time zone' THEN
+      ALTER TABLE hoja_de_ruta_travel_arrangements
+      ALTER COLUMN pickup_time TYPE timestamptz
+      USING CASE
+        WHEN pickup_time IS NOT NULL THEN (CURRENT_DATE + pickup_time)::timestamptz
+        ELSE NULL
+      END;
+
+      RAISE NOTICE 'Successfully changed pickup_time to timestamptz in hoja_de_ruta_travel_arrangements';
+    ELSE
+      RAISE NOTICE 'pickup_time is already timestamptz or has different type (%), skipping', col_type;
+    END IF;
   ELSE
     RAISE NOTICE 'Table hoja_de_ruta_travel_arrangements does not exist, skipping migration';
   END IF;
@@ -36,22 +48,34 @@ END $$;
 
 -- Also check for the older table name hoja_de_ruta_travel if it exists
 DO $$
+DECLARE
+  col_type TEXT;
 BEGIN
   IF EXISTS (
     SELECT FROM information_schema.tables
     WHERE table_schema = 'public'
     AND table_name = 'hoja_de_ruta_travel'
   ) THEN
-    -- Change pickup_time column from time to timestamptz
-    -- Preserves existing time-of-day values by attaching CURRENT_DATE
-    ALTER TABLE hoja_de_ruta_travel
-    ALTER COLUMN pickup_time TYPE timestamptz
-    USING CASE
-      WHEN pickup_time IS NOT NULL THEN (CURRENT_DATE + pickup_time)::timestamptz
-      ELSE NULL
-    END;
+    -- Check current column type
+    SELECT data_type INTO col_type
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'hoja_de_ruta_travel'
+      AND column_name = 'pickup_time';
 
-    RAISE NOTICE 'Successfully changed pickup_time to timestamptz in hoja_de_ruta_travel';
+    -- Only convert if column is still 'time without time zone'
+    IF col_type = 'time without time zone' THEN
+      ALTER TABLE hoja_de_ruta_travel
+      ALTER COLUMN pickup_time TYPE timestamptz
+      USING CASE
+        WHEN pickup_time IS NOT NULL THEN (CURRENT_DATE + pickup_time)::timestamptz
+        ELSE NULL
+      END;
+
+      RAISE NOTICE 'Successfully changed pickup_time to timestamptz in hoja_de_ruta_travel';
+    ELSE
+      RAISE NOTICE 'pickup_time is already timestamptz or has different type (%), skipping', col_type;
+    END IF;
   ELSE
     RAISE NOTICE 'Table hoja_de_ruta_travel does not exist, skipping';
   END IF;
