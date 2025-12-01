@@ -12,6 +12,7 @@ import Auth from "@/pages/Auth";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import RatesCenterPage from "@/pages/RatesCenterPage";
+import ExpensesPage from "@/pages/Expenses";
 
 // Create a placeholder for missing pages
 const Placeholder = () => (
@@ -92,6 +93,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['admin', 'management']}>
             <RatesCenterPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: "/gastos",
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}>
+            <ExpensesPage />
           </ProtectedRoute>
         )
       },

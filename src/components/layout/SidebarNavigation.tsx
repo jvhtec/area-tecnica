@@ -16,6 +16,7 @@ import {
   MapPin,
   Megaphone,
   Music2,
+  Receipt,
   Settings,
   SlidersHorizontal,
   Tent,
@@ -154,17 +155,28 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     isVisible: ({ userRole }) => userRole === "management",
   },
   {
-    id: "management-rates",
-    label: "Tarifas y extras",
-    mobileLabel: "Tarifas",
-    icon: Euro,
-    mobilePriority: 10,
-    mobileSlot: "secondary",
-    getPath: () => "/management/rates",
-    isVisible: ({ userRole }) => userRole === "management",
-  },
-  {
-    id: "management-department",
+     id: "management-rates",
+     label: "Tarifas y extras",
+     mobileLabel: "Tarifas",
+     icon: Euro,
+     mobilePriority: 10,
+     mobileSlot: "secondary",
+     getPath: () => "/management/rates",
+     isVisible: ({ userRole }) => userRole === "management",
+   },
+   {
+     id: "expenses",
+     label: "Gastos",
+     mobileLabel: "Gastos",
+     icon: Receipt,
+     mobilePriority: 9,
+     mobileSlot: "secondary",
+     getPath: () => "/gastos",
+     isVisible: ({ userRole }) =>
+       userRole === "admin" || userRole === "management" || userRole === "logistics",
+   },
+   {
+
     label: ({ userDepartment }) => {
       const normalized = userDepartment?.toLowerCase() ?? ""
       return departmentLabelMap[normalized] || userDepartment || null

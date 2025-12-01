@@ -41,6 +41,7 @@ interface PayoutData {
   technician_id: string;
   timesheets_total_eur: number;
   extras_total_eur: number;
+  expenses_total_eur: number;
   total_eur: number;
   extras_breakdown?: {
     items?: Array<{
@@ -50,6 +51,13 @@ interface PayoutData {
       amount_eur: number;
     }>;
   };
+  expenses_breakdown?: Array<{
+    category_slug: string;
+    approved_total_eur?: number;
+    submitted_total_eur?: number;
+    draft_total_eur?: number;
+    rejected_total_eur?: number;
+  }>;
   vehicle_disclaimer?: boolean;
   vehicle_disclaimer_text?: string;
 }
@@ -749,13 +757,14 @@ export async function generateJobPayoutPDF(
       withLpo(nameWithStatus, lpo),
       formatCurrency(payout.timesheets_total_eur),
       formatCurrency(payout.extras_total_eur),
+      formatCurrency(payout.expenses_total_eur),
       formatCurrency(payout.total_eur),
     ];
   });
 
   autoTable(doc, {
     startY: yPos,
-    head: [['Técnico', 'Partes', 'Extras', 'Total']],
+    head: [['Técnico', 'Partes', 'Extras', 'Gastos', 'Total']],
     body: tableData,
     theme: 'grid',
     headStyles: { fillColor: CORPORATE_RED, textColor: 255, fontStyle: 'bold' },
@@ -764,7 +773,8 @@ export async function generateJobPayoutPDF(
     columnStyles: {
       1: { halign: 'right' },
       2: { halign: 'right' },
-      3: { halign: 'right', fontStyle: 'bold' },
+      3: { halign: 'right' },
+      4: { halign: 'right', fontStyle: 'bold' },
     },
     margin: { left: 14, right: 14, top: contentTop, bottom: FOOTER_RESERVED },
     didDrawPage: (data) => {
@@ -779,6 +789,9 @@ export async function generateJobPayoutPDF(
 
   const payoutsWithExtras = payouts.filter(
     (payout) => payout.extras_breakdown?.items && payout.extras_breakdown.items.length > 0
+  );
+  const payoutsWithExpenses = payouts.filter(
+    (payout) => (payout.expenses_total_eur ?? 0) > 0 || (payout.expenses_breakdown?.length ?? 0) > 0
   );
 
   // Detailed timesheets breakdown section
