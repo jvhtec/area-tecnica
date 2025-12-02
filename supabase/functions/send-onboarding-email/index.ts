@@ -16,6 +16,7 @@ interface OnboardingRequestBody {
 // Helper to pick a base URL for links in the email
 function pickEnvBase(): string | undefined {
   const candidates = [
+    'https://sector-pro.work',
     Deno.env.get('PUBLIC_APP_URL'),
     Deno.env.get('PUBLIC_SITE_URL'),
     Deno.env.get('NEXT_PUBLIC_SITE_URL'),

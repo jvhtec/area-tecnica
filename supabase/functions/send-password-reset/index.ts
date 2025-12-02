@@ -44,6 +44,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Prefer explicit env base over Origin/Referer to avoid localhost in prod
     const pickEnvBase = () => {
       const candidates = [
+        'https://sector-pro.work',
         Deno.env.get('PUBLIC_APP_URL'),
         Deno.env.get('PUBLIC_SITE_URL'),
         Deno.env.get('NEXT_PUBLIC_SITE_URL'),
@@ -168,7 +169,7 @@ const handler = async (req: Request): Promise<Response> => {
                     </div>
                     <div>
                       Sector Pro · <a href="https://www.sector-pro.com" style="color:#6b7280;text-decoration:underline;">www.sector-pro.com</a>
-                      &nbsp;|&nbsp; Área Técnica · <a href="https://area-tecnica.lovable.app" style="color:#6b7280;text-decoration:underline;">area-tecnica.lovable.app</a>
+                      &nbsp;|&nbsp; Área Técnica · <a href="https://sector-pro.work" style="color:#6b7280;text-decoration:underline;">sector-pro.work</a>
                     </div>
                   </td>
                 </tr>
