@@ -151,6 +151,9 @@ export default function Disponibilidad() {
           jobs={jobsToday}
           assignedPresets={assignedPresets || []}
           logoMap={logoMap}
+          isAdmin={isAdmin}
+          department={department}
+          onDepartmentChange={setAdminDepartment}
         />
       </DepartmentProvider>
     );

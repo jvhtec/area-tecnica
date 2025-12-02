@@ -1,12 +1,23 @@
-import { useState, useEffect, useRef } from 'react';
-import { format, addDays, startOfWeek, isSameDay, subDays } from 'date-fns';
+import { useState, useRef } from 'react';
+import { format, addDays, isSameDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Settings, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { QuickPresetAssignment } from '@/components/disponibilidad/QuickPresetAssignment';
+import { WeeklySummary } from '@/components/disponibilidad/WeeklySummary';
+import { InventoryManagementDialog } from '@/components/equipment/InventoryManagementDialog';
+import { PresetManagementDialog } from '@/components/equipment/PresetManagementDialog';
+import { SubRentalDialog } from '@/components/equipment/SubRentalDialog';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+
+type DisponibilidadDepartment = 'sound' | 'lights';
+
+const DEPARTMENT_LABELS: Record<DisponibilidadDepartment, string> = {
+  sound: 'Sonido',
+  lights: 'Luces'
+};
 
 interface MobileAvailabilityViewProps {
     selectedDate: Date;
@@ -14,6 +25,9 @@ interface MobileAvailabilityViewProps {
     jobs: any[];
     assignedPresets: any[];
     logoMap: Record<string, string | undefined>;
+    isAdmin: boolean;
+    department: DisponibilidadDepartment;
+    onDepartmentChange: (dept: DisponibilidadDepartment) => void;
 }
 
 export function MobileAvailabilityView({
@@ -21,10 +35,14 @@ export function MobileAvailabilityView({
     onDateSelect,
     jobs,
     assignedPresets,
-    logoMap
+    logoMap,
+    isAdmin,
+    department,
+    onDepartmentChange
 }: MobileAvailabilityViewProps) {
-    const [weekStart, setWeekStart] = useState(startOfWeek(selectedDate, { weekStartsOn: 1 }));
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [showActionsMenu, setShowActionsMenu] = useState(false);
+    const [showPresetDialog, setShowPresetDialog] = useState(false);
 
     // Generate 2 weeks of dates centered around selected date for the strip
     const days = Array.from({ length: 14 }, (_, i) => {
@@ -42,8 +60,81 @@ export function MobileAvailabilityView({
 
     return (
         <div className="flex flex-col h-[calc(100vh-140px)]">
+            {/* Header */}
+            <div className="bg-[#0f1219] border-b border-[#1f232e] p-4 sticky top-0 z-20">
+                <div className="flex items-center justify-between mb-3">
+                    <h1 className="text-lg font-bold text-white">
+                        Disponibilidad · {DEPARTMENT_LABELS[department]}
+                    </h1>
+                    <Sheet open={showActionsMenu} onOpenChange={setShowActionsMenu}>
+                        <SheetTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9">
+                                <Menu className="h-5 w-5" />
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent side="right" className="w-[300px] bg-[#0f1219] border-l border-[#1f232e]">
+                            <SheetHeader className="mb-6">
+                                <SheetTitle className="text-white">Acciones</SheetTitle>
+                            </SheetHeader>
+                            <div className="space-y-3">
+                                {isAdmin && (
+                                    <div className="space-y-2 pb-4 border-b border-[#1f232e]">
+                                        <p className="text-xs text-slate-400 font-medium uppercase">Departamento</p>
+                                        <div className="flex gap-2">
+                                            {Object.entries(DEPARTMENT_LABELS).map(([value, label]) => (
+                                                <Button
+                                                    key={value}
+                                                    variant={department === value ? 'default' : 'outline'}
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        onDepartmentChange(value as DisponibilidadDepartment);
+                                                        setShowActionsMenu(false);
+                                                    }}
+                                                    className="flex-1"
+                                                >
+                                                    {label}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="space-y-2">
+                                    <p className="text-xs text-slate-400 font-medium uppercase mb-3">Gestión</p>
+                                    <div onClick={() => setShowActionsMenu(false)}>
+                                        <InventoryManagementDialog />
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full justify-start gap-2"
+                                        onClick={() => {
+                                            setShowPresetDialog(true);
+                                            setShowActionsMenu(false);
+                                        }}
+                                    >
+                                        <Settings className="h-4 w-4" />
+                                        Gestionar Presets
+                                    </Button>
+                                    <div onClick={() => setShowActionsMenu(false)}>
+                                        <SubRentalDialog />
+                                    </div>
+                                </div>
+                            </div>
+                        </SheetContent>
+                    </Sheet>
+                </div>
+            </div>
+
+            {/* Weekly Summary */}
+            <div className="p-4 bg-[#0f1219]">
+                <WeeklySummary
+                    selectedDate={selectedDate}
+                    onDateChange={onDateSelect}
+                />
+            </div>
+
             {/* Date Strip */}
-            <div className="bg-[#0f1219] border-b border-[#1f232e] p-2 sticky top-0 z-10">
+            <div className="bg-[#0f1219] border-b border-[#1f232e] p-2 sticky top-[72px] z-10">
                 <div className="flex items-center justify-between mb-2 px-2">
                     <Button variant="ghost" size="icon" onClick={handlePrevDay} className="h-8 w-8">
                         <ChevronLeft className="h-4 w-4" />
@@ -210,6 +301,13 @@ export function MobileAvailabilityView({
                     </SheetContent>
                 </Sheet>
             </div>
+
+            {/* Preset Management Dialog */}
+            <PresetManagementDialog
+                open={showPresetDialog}
+                onOpenChange={setShowPresetDialog}
+                selectedDate={selectedDate}
+            />
         </div>
     );
 }
