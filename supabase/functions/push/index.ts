@@ -517,6 +517,57 @@ async function getAdminUserIds(client: ReturnType<typeof createClient>): Promise
   return data.map((r: any) => r.id).filter(Boolean);
 }
 
+/**
+ * Get admin users filtered by their staffing notification scope preference.
+ * Returns admins who want all departments OR admins who want only their own department (if it matches).
+ */
+async function getAdminUserIdsForStaffingNotifications(
+  client: ReturnType<typeof createClient>,
+  jobDepartment?: string | null
+): Promise<string[]> {
+  try {
+    // Get all admin users with their department and notification preferences
+    const { data: admins, error } = await client
+      .from('profiles')
+      .select(`
+        id,
+        department,
+        notification_preferences!inner(staffing_scope)
+      `)
+      .eq('role', 'admin');
+
+    if (error || !admins) {
+      console.error('Failed to fetch admin notification preferences:', error);
+      // Fallback: return all admins if query fails
+      return await getAdminUserIds(client);
+    }
+
+    const relevantAdmins = admins.filter((admin: any) => {
+      const prefs = admin.notification_preferences;
+      // If no preferences set, default to all_departments
+      if (!prefs || !prefs.length) return true;
+
+      const staffingScope = prefs[0]?.staffing_scope;
+
+      // If preference is all_departments or not set, include this admin
+      if (!staffingScope || staffingScope === 'all_departments') return true;
+
+      // If preference is own_department, only include if job department matches admin's department
+      if (staffingScope === 'own_department') {
+        return jobDepartment && admin.department === jobDepartment;
+      }
+
+      return false;
+    });
+
+    return relevantAdmins.map((admin: any) => admin.id).filter(Boolean);
+  } catch (err) {
+    console.error('Exception in getAdminUserIdsForStaffingNotifications:', err);
+    // Fallback: return all admins if something goes wrong
+    return await getAdminUserIds(client);
+  }
+}
+
 async function getManagementByDepartmentUserIds(client: ReturnType<typeof createClient>, department: string): Promise<string[]> {
   if (!department) return [];
   const { data, error } = await client
@@ -688,6 +739,21 @@ async function getJobTitle(client: ReturnType<typeof createClient>, jobId?: stri
     return data?.title ?? null;
   } catch (err) {
     console.error('⚠️ Exception fetching job title:', { jobId, err });
+    return null;
+  }
+}
+
+async function getJobDepartment(client: ReturnType<typeof createClient>, jobId?: string): Promise<string | null> {
+  if (!jobId) return null;
+  try {
+    const { data, error } = await client.from('jobs').select('department').eq('id', jobId).maybeSingle();
+    if (error) {
+      console.error('⚠️ Failed to fetch job department:', { jobId, error });
+      return null;
+    }
+    return data?.department ?? null;
+  } catch (err) {
+    console.error('⚠️ Exception fetching job department:', { jobId, err });
     return null;
   }
 }
@@ -1407,6 +1473,7 @@ async function handleBroadcast(
     } catch (_) { /* ignore */ }
   }
   const jobTitle = await getJobTitle(client, jobId);
+  const jobDepartment = await getJobDepartment(client, jobId);
   const tourId = body.tour_id;
   const tourName = body.tour_name || (await getTourName(client, tourId)) || null;
 
@@ -1417,6 +1484,7 @@ async function handleBroadcast(
   const naturalRecipients = new Set<string>();
   const management = new Set(await getManagementUserIds(client));
   const soundDept = new Set(await getSoundDepartmentUserIds(client));
+  const admin = new Set(await getAdminUserIds(client));
   // Management audience should not include department-specific users by default
   const mgmt = new Set<string>(management);
   const participants = new Set(await getJobParticipantUserIds(client, jobId || ''));
@@ -1649,39 +1717,63 @@ async function handleBroadcast(
   } else if (type === 'staffing.availability.sent') {
     title = 'Solicitud de disponibilidad enviada';
     text = `${actor} envió solicitud a ${recipName || 'técnico'} (${ch}).`;
-    addNaturalRecipients(Array.from(mgmt));
+    // Department-aware: only notify management from job's department + admins based on their preference
+    const deptMgmt = jobDepartment ? await getManagementByDepartmentUserIds(client, jobDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, jobDepartment);
+    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
     addRecipients([body.recipient_id]);
   } else if (type === 'staffing.offer.sent') {
     title = 'Oferta enviada';
     text = `${actor} envió oferta a ${recipName || 'técnico'} (${ch}).`;
-    addNaturalRecipients(Array.from(mgmt));
+    // Department-aware: only notify management from job's department + admins based on their preference
+    const deptMgmt = jobDepartment ? await getManagementByDepartmentUserIds(client, jobDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, jobDepartment);
+    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
     addRecipients([body.recipient_id]);
   } else if (type === 'staffing.availability.confirmed') {
     title = 'Disponibilidad confirmada';
     text = `${recipName || 'Técnico'} confirmó disponibilidad para "${jobTitle || 'Trabajo'}".`;
-    addNaturalRecipients(Array.from(mgmt));
+    // Department-aware: only notify management from job's department + admins based on their preference
+    const deptMgmt = jobDepartment ? await getManagementByDepartmentUserIds(client, jobDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, jobDepartment);
+    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
   } else if (type === 'staffing.availability.declined') {
     title = 'Disponibilidad rechazada';
     text = `${recipName || 'Técnico'} rechazó disponibilidad para "${jobTitle || 'Trabajo'}".`;
-    addNaturalRecipients(Array.from(mgmt));
+    // Department-aware: only notify management from job's department + admins based on their preference
+    const deptMgmt = jobDepartment ? await getManagementByDepartmentUserIds(client, jobDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, jobDepartment);
+    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
   } else if (type === 'staffing.offer.confirmed') {
     title = 'Oferta aceptada';
     text = `${recipName || 'Técnico'} aceptó oferta para "${jobTitle || 'Trabajo'}".`;
-    addNaturalRecipients(Array.from(mgmt));
+    // Department-aware: only notify management from job's department + admins based on their preference
+    const deptMgmt = jobDepartment ? await getManagementByDepartmentUserIds(client, jobDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, jobDepartment);
+    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
     // No need to notify all participants here; keep it to management
   } else if (type === 'staffing.offer.declined') {
     title = 'Oferta rechazada';
     text = `${recipName || 'Técnico'} rechazó oferta para "${jobTitle || 'Trabajo'}".`;
-    addNaturalRecipients(Array.from(mgmt));
+    // Department-aware: only notify management from job's department + admins based on their preference
+    const deptMgmt = jobDepartment ? await getManagementByDepartmentUserIds(client, jobDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, jobDepartment);
+    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
   } else if (type === 'staffing.availability.cancelled') {
     title = 'Disponibilidad cancelada';
     text = `Solicitud de disponibilidad cancelada para "${jobTitle || 'Trabajo'}".`;
-    addNaturalRecipients(Array.from(mgmt));
+    // Department-aware: only notify management from job's department + admins based on their preference
+    const deptMgmt = jobDepartment ? await getManagementByDepartmentUserIds(client, jobDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, jobDepartment);
+    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
     addRecipients([body.recipient_id]);
   } else if (type === 'staffing.offer.cancelled') {
     title = 'Oferta cancelada';
     text = `Oferta cancelada para "${jobTitle || 'Trabajo'}".`;
-    addNaturalRecipients(Array.from(mgmt));
+    // Department-aware: only notify management from job's department + admins based on their preference
+    const deptMgmt = jobDepartment ? await getManagementByDepartmentUserIds(client, jobDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, jobDepartment);
+    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
     addRecipients([body.recipient_id]);
   } else if (type === 'job.status.confirmed') {
     title = 'Trabajo confirmado';

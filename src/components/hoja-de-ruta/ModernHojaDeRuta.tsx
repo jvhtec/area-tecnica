@@ -663,7 +663,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                          onAddTransport={addTransport}
                          onRemoveTransport={removeTransport}
                          onImportTransports={importTransports}
-                         jobId={jobId}
+                         jobId={jobId || selectedJobId}
                        />
                      </TabsContent>
 
