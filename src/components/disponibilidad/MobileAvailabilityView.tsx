@@ -134,6 +134,7 @@ export function MobileAvailabilityView({
                     </Sheet>
                 </div>
             </div>
+            </div>
 
             {/* Date Strip */}
             <div className="bg-[#0f1219] border-b border-[#1f232e] p-2 sticky top-[64px] z-10">
