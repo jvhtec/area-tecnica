@@ -26,7 +26,7 @@ export const FilterBar = ({
   onClearFilters,
 }: FilterBarProps) => {
   const roles: UserRole[] = ['admin', 'management', 'logistics', 'technician', 'house_tech'];
-  const departments: Department[] = ['sound', 'lights', 'video'];
+  const departments: Department[] = ['sound', 'lights', 'video', 'production'];
 
   return (
     <div className="flex flex-col md:flex-row gap-4 mb-4">

@@ -237,6 +237,7 @@ const DEPARTMENT_LABELS: Record<string, string> = {
   sound: 'Sonido',
   lights: 'Luces',
   video: 'Video',
+  production: 'Producción',
   rigging: 'Rigging',
   staging: 'Escenario',
   backline: 'Backline',
@@ -260,6 +261,7 @@ type StaffingAssignmentRow = {
   sound_role: string | null;
   lights_role: string | null;
   video_role: string | null;
+  production_role: string | null;
   status: string | null;
 };
 
@@ -284,7 +286,7 @@ type OutstandingJobInfo = {
   departments: OutstandingDepartmentInfo[];
 };
 
-const AVAILABLE_DEPARTMENTS = ['sound', 'lights', 'video'] as const;
+const AVAILABLE_DEPARTMENTS = ['sound', 'lights', 'video', 'production'] as const;
 type Department = (typeof AVAILABLE_DEPARTMENTS)[number];
 const FALLBACK_DEPARTMENT: Department = 'sound';
 const OUTSTANDING_STORAGE_KEY = 'job-assignment-matrix:last-outstanding-hash';
@@ -429,9 +431,18 @@ export default function JobAssignmentMatrix() {
 
       const filtered = (data || []).filter((tech: any) => {
         const techDepartment = typeof tech.department === 'string' ? tech.department.toLowerCase() : '';
-        if (techDepartment !== selectedDepartment) {
-          return false;
+
+        // Production tab includes both production and logistics departments
+        if (selectedDepartment === 'production') {
+          if (techDepartment !== 'production' && techDepartment !== 'logistics') {
+            return false;
+          }
+        } else {
+          if (techDepartment !== selectedDepartment) {
+            return false;
+          }
         }
+
         if (tech.role === 'technician' || tech.role === 'house_tech') {
           return true;
         }
@@ -710,7 +721,7 @@ export default function JobAssignmentMatrix() {
           .in('job_id', jobIds),
         supabase
           .from('job_assignments')
-          .select('job_id, sound_role, lights_role, video_role, status')
+          .select('job_id, sound_role, lights_role, video_role, production_role, status')
           .in('job_id', jobIds),
       ]);
 
