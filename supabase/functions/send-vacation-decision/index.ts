@@ -287,10 +287,14 @@ function buildEmailHtml(reqRow: VacationRequestRow, baseUrl: string, logos: { co
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                     <tr>
                       <td align="left" style="vertical-align:middle;">
-                        <img src="${logos.companyLogo}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
+                        <a href="https://www.sector-pro.com" target="_blank" rel="noopener noreferrer">
+                          <img src="${logos.companyLogo}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
+                        </a>
                       </td>
                       <td align="right" style="vertical-align:middle;">
-                        <img src="${logos.atLogo}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
+                        <a href="https://sector-pro.work" target="_blank" rel="noopener noreferrer">
+                          <img src="${logos.atLogo}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
+                        </a>
                       </td>
                     </tr>
                   </table>

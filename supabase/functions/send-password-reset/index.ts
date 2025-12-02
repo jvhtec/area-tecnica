@@ -120,10 +120,14 @@ const handler = async (req: Request): Promise<Response> => {
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                       <tr>
                         <td align="left" style="vertical-align:middle;">
-                          <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
+                          <a href="https://www.sector-pro.com" target="_blank" rel="noopener noreferrer">
+                            <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
+                          </a>
                         </td>
                         <td align="right" style="vertical-align:middle;">
-                          <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
+                          <a href="https://sector-pro.work" target="_blank" rel="noopener noreferrer">
+                            <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
+                          </a>
                         </td>
                       </tr>
                     </table>
