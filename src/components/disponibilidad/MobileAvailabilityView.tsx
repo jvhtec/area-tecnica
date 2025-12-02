@@ -43,6 +43,7 @@ export function MobileAvailabilityView({
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showActionsMenu, setShowActionsMenu] = useState(false);
     const [showPresetDialog, setShowPresetDialog] = useState(false);
+    const [showWeeklySummary, setShowWeeklySummary] = useState(false);
 
     // Generate 2 weeks of dates centered around selected date for the strip
     const days = Array.from({ length: 14 }, (_, i) => {
@@ -66,17 +67,26 @@ export function MobileAvailabilityView({
                     <h1 className="text-lg font-bold text-white">
                         Disponibilidad · {DEPARTMENT_LABELS[department]}
                     </h1>
-                    <Sheet open={showActionsMenu} onOpenChange={setShowActionsMenu}>
-                        <SheetTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-9 w-9">
-                                <Menu className="h-5 w-5" />
-                            </Button>
-                        </SheetTrigger>
-                        <SheetContent side="right" className="w-[300px] bg-[#0f1219] border-l border-[#1f232e]">
-                            <SheetHeader className="mb-6">
-                                <SheetTitle className="text-white">Acciones</SheetTitle>
-                            </SheetHeader>
-                            <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowWeeklySummary(true)}
+                            className="text-xs"
+                        >
+                            Tabla Semanal
+                        </Button>
+                        <Sheet open={showActionsMenu} onOpenChange={setShowActionsMenu}>
+                            <SheetTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-9 w-9">
+                                    <Menu className="h-5 w-5" />
+                                </Button>
+                            </SheetTrigger>
+                            <SheetContent side="right" className="w-[300px] bg-[#0f1219] border-l border-[#1f232e]">
+                                <SheetHeader className="mb-6">
+                                    <SheetTitle className="text-white">Acciones</SheetTitle>
+                                </SheetHeader>
+                                <div className="space-y-3">
                                 {isAdmin && (
                                     <div className="space-y-2 pb-4 border-b border-[#1f232e]">
                                         <p className="text-xs text-slate-400 font-medium uppercase">Departamento</p>
@@ -125,16 +135,8 @@ export function MobileAvailabilityView({
                 </div>
             </div>
 
-            {/* Weekly Summary */}
-            <div className="p-4 bg-[#0f1219]">
-                <WeeklySummary
-                    selectedDate={selectedDate}
-                    onDateChange={onDateSelect}
-                />
-            </div>
-
             {/* Date Strip */}
-            <div className="bg-[#0f1219] border-b border-[#1f232e] p-2 sticky top-[72px] z-10">
+            <div className="bg-[#0f1219] border-b border-[#1f232e] p-2 sticky top-[64px] z-10">
                 <div className="flex items-center justify-between mb-2 px-2">
                     <Button variant="ghost" size="icon" onClick={handlePrevDay} className="h-8 w-8">
                         <ChevronLeft className="h-4 w-4" />
@@ -308,6 +310,24 @@ export function MobileAvailabilityView({
                 onOpenChange={setShowPresetDialog}
                 selectedDate={selectedDate}
             />
+
+            {/* Weekly Summary Sheet */}
+            <Sheet open={showWeeklySummary} onOpenChange={setShowWeeklySummary}>
+                <SheetContent
+                    side="bottom"
+                    className="h-[90vh] bg-[#0f1219] border-t border-[#1f232e] rounded-t-2xl overflow-y-auto"
+                >
+                    <SheetHeader className="mb-4">
+                        <SheetTitle className="text-white">Resumen Semanal</SheetTitle>
+                    </SheetHeader>
+                    <div className="pb-6">
+                        <WeeklySummary
+                            selectedDate={selectedDate}
+                            onDateChange={onDateSelect}
+                        />
+                    </div>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }
