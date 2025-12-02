@@ -43,16 +43,17 @@ export const DepartmentTabs = ({
   return (
     <Tabs value={selectedDepartment} onValueChange={onDepartmentChange} className={cn(isMobile ? "mt-3" : "mt-4")}>
       <TabsList className={cn(
-        isMobile 
-          ? "w-full grid grid-cols-3" 
-          : "grid w-full grid-cols-3 lg:w-[400px]"
+        isMobile
+          ? "w-full grid grid-cols-4"
+          : "grid w-full grid-cols-4 lg:w-[500px]"
       )}>
-        <TabsTrigger value="sound" className={cn(isMobile && "text-xs sm:text-sm")}>Sound</TabsTrigger>
-        <TabsTrigger value="lights" className={cn(isMobile && "text-xs sm:text-sm")}>Lights</TabsTrigger>
+        <TabsTrigger value="sound" className={cn(isMobile && "text-xs sm:text-sm")}>Sonido</TabsTrigger>
+        <TabsTrigger value="lights" className={cn(isMobile && "text-xs sm:text-sm")}>Luces</TabsTrigger>
         <TabsTrigger value="video" className={cn(isMobile && "text-xs sm:text-sm")}>Video</TabsTrigger>
+        <TabsTrigger value="production" className={cn(isMobile && "text-xs sm:text-sm")}>Producción</TabsTrigger>
       </TabsList>
 
-      {["sound", "lights", "video"].map((dept) => (
+      {["sound", "lights", "video", "production"].map((dept) => (
         <TabsContent key={dept} value={dept} className={cn(isMobile && "mt-3")}>
           {jobsLoading ? (
             <div className="flex justify-center py-8">

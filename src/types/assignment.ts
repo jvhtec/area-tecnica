@@ -9,6 +9,7 @@ export interface Assignment {
   sound_role: string | null;
   lights_role: string | null;
   video_role: string | null;
+  production_role: string | null;
   // DEPRECATED: Use timesheets to determine which days a technician works
   single_day?: boolean | null;
   profiles: {

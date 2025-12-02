@@ -2857,6 +2857,7 @@ export type Database = {
           id: string
           job_id: string
           lights_role: string | null
+          production_role: string | null
           response_time: string | null
           single_day: boolean
           sound_role: string | null
@@ -2874,6 +2875,7 @@ export type Database = {
           id?: string
           job_id: string
           lights_role?: string | null
+          production_role?: string | null
           response_time?: string | null
           single_day?: boolean
           sound_role?: string | null
@@ -2891,6 +2893,7 @@ export type Database = {
           id?: string
           job_id?: string
           lights_role?: string | null
+          production_role?: string | null
           response_time?: string | null
           single_day?: boolean
           sound_role?: string | null
