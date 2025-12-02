@@ -73,23 +73,98 @@ export const AssignmentStatusDialog = ({
         new_status: newStatus
       });
 
-      // Use the composite primary key (job_id, technician_id) to update the assignment
-      const { data, error } = await supabase
-        .from('job_assignments')
-        .update({
-          status: newStatus,
-          response_time: new Date().toISOString(),
-        })
-        .eq('job_id', assignment.job_id)
-        .eq('technician_id', technicianId)
-        .select();
+      if (newStatus === 'declined') {
+        // Check if this is a tour assignment by querying the job_assignment record
+        const { data: jobAssignment } = await supabase
+          .from('job_assignments')
+          .select('assignment_source')
+          .eq('job_id', assignment.job_id)
+          .eq('technician_id', technicianId)
+          .single();
 
-      if (error) {
-        console.error('Database error details:', error);
-        throw error;
+        const isTourAssignment = jobAssignment?.assignment_source === 'tour';
+
+        // If declining a tour assignment, delete it completely (job_assignments + timesheets)
+        // This makes it disappear from everywhere (matrix, job cards, job details)
+        if (isTourAssignment) {
+          console.log('Declining tour assignment - deleting completely');
+
+          // Delete timesheets first
+          const { error: timesheetError } = await supabase
+            .from('timesheets')
+            .delete()
+            .eq('job_id', assignment.job_id)
+            .eq('technician_id', technicianId);
+
+          if (timesheetError) {
+            console.error('Error deleting timesheets:', timesheetError);
+            throw timesheetError;
+          }
+
+          // Then delete the job_assignment
+          const { error: assignmentError } = await supabase
+            .from('job_assignments')
+            .delete()
+            .eq('job_id', assignment.job_id)
+            .eq('technician_id', technicianId);
+
+          if (assignmentError) {
+            console.error('Error deleting assignment:', assignmentError);
+            throw assignmentError;
+          }
+
+          console.log('Tour assignment and timesheets deleted');
+        } else {
+          // For non-tour assignments, just mark as declined (keep for audit trail)
+          const { data, error } = await supabase
+            .from('job_assignments')
+            .update({
+              status: newStatus,
+              response_time: new Date().toISOString(),
+            })
+            .eq('job_id', assignment.job_id)
+            .eq('technician_id', technicianId)
+            .select();
+
+          if (error) {
+            console.error('Database error details:', error);
+            throw error;
+          }
+
+          console.log('Update successful:', data);
+
+          // Delete timesheets so it disappears from matrix
+          const { error: timesheetError } = await supabase
+            .from('timesheets')
+            .delete()
+            .eq('job_id', assignment.job_id)
+            .eq('technician_id', technicianId);
+
+          if (timesheetError) {
+            console.error('Error deleting timesheets:', timesheetError);
+          } else {
+            console.log('Timesheets deleted for declined assignment');
+          }
+        }
+      } else {
+        // Confirming - just update the status
+        const { data, error } = await supabase
+          .from('job_assignments')
+          .update({
+            status: newStatus,
+            response_time: new Date().toISOString(),
+          })
+          .eq('job_id', assignment.job_id)
+          .eq('technician_id', technicianId)
+          .select();
+
+        if (error) {
+          console.error('Database error details:', error);
+          throw error;
+        }
+
+        console.log('Update successful:', data);
       }
-
-      console.log('Update successful:', data);
 
       // Immediately update the query cache with the new status
       const assignmentQueries = [
@@ -126,7 +201,10 @@ export const AssignmentStatusDialog = ({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] }),
         queryClient.invalidateQueries({ queryKey: ['matrix-assignments'] }),
-        queryClient.invalidateQueries({ queryKey: ['job-assignments', assignment.job_id] })
+        queryClient.invalidateQueries({ queryKey: ['job-assignments', assignment.job_id] }),
+        queryClient.invalidateQueries({ queryKey: ['job-details', assignment.job_id] }),
+        queryClient.invalidateQueries({ queryKey: ['jobs'] }),
+        queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] })
       ]);
 
       if (newStatus === 'confirmed') {
