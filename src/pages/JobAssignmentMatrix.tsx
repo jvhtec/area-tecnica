@@ -95,6 +95,7 @@ async function fetchAssignmentsForWindow(jobIds: string[], technicianIds: string
           sound_role,
           lights_role,
           video_role,
+          production_role,
           single_day,
           assignment_date,
           status,
@@ -129,6 +130,7 @@ async function fetchAssignmentsForWindow(jobIds: string[], technicianIds: string
       sound_role: item.sound_role,
       lights_role: item.lights_role,
       video_role: item.video_role,
+      production_role: item.production_role,
       single_day: item.single_day,
       assignment_date: item.assignment_date,
       status: item.status,
@@ -775,6 +777,7 @@ export default function JobAssignmentMatrix() {
       addAssignment(row.job_id, 'sound', row.sound_role ? row.sound_role.trim() : null);
       addAssignment(row.job_id, 'lights', row.lights_role ? row.lights_role.trim() : null);
       addAssignment(row.job_id, 'video', row.video_role ? row.video_role.trim() : null);
+      addAssignment(row.job_id, 'production', row.production_role ? row.production_role.trim() : null);
     });
 
     const jobMap = new Map<string, OutstandingJobInfo>();
