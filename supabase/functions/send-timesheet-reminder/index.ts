@@ -269,7 +269,7 @@ serve(async (req) => {
 
               <!-- CTA Button -->
               <div style="text-align:center;margin:24px 0;">
-                <a href="https://area-tecnica.lovable.app/timesheets"
+                <a href="https://sector-pro.work/timesheets"
                    style="display:inline-block;background:#6366f1;color:#ffffff;text-decoration:none;padding:12px 32px;border-radius:6px;font-weight:600;font-size:15px;">
                   Completar Parte de Horas
                 </a>
@@ -289,7 +289,7 @@ serve(async (req) => {
               </div>
               <div>
                 Sector Pro · <a href="https://www.sector-pro.com" style="color:#6366f1;text-decoration:none;">www.sector-pro.com</a>
-                &nbsp;|&nbsp; Área Técnica · <a href="https://area-tecnica.lovable.app" style="color:#6366f1;text-decoration:none;">area-tecnica.lovable.app</a>
+                &nbsp;|&nbsp; Área Técnica · <a href="https://sector-pro.work" style="color:#6366f1;text-decoration:none;">sector-pro.work</a>
               </div>
             </td>
           </tr>

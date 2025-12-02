@@ -511,7 +511,7 @@ serve(async (req) => {
 
       const roleLabel = labelForRoleCode(role) || null;
       const subject = phase === "availability"
-        ? `Disponibilidad para ${job.title}`
+        ? `Consulta de disponibilidad`
         : `Oferta: ${job.title}${roleLabel ? ` — ${roleLabel}` : ''}`;
 
       // Spanish date/time formatting
@@ -558,7 +558,7 @@ serve(async (req) => {
                           </a>
                         </td>
                         <td align="right" style="vertical-align:middle;">
-                          <a href="https://area-tecnica.lovable.app" target="_blank" rel="noopener noreferrer">
+                          <a href="https://sector-pro.work" target="_blank" rel="noopener noreferrer">
                             <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
                           </a>
                         </td>
@@ -571,11 +571,13 @@ serve(async (req) => {
                     <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${fullName || ''},</h2>
                     <p style="margin:0;color:#374151;line-height:1.55;">
                       ${phase === 'availability'
-                        ? `¿Puedes confirmar tu disponibilidad para <b>${job.title}</b>?`
+                        ? `¿Tendrías disponibilidad para la fecha indicada mas abajo?`
                         : `Tienes una oferta para <b>${job.title}</b>. Por favor, confirma:`}
                     </p>
-                    
-                    ${phase === 'offer' && role ? `<p style="margin:8px 0 0 0;color:#111827;"><b>Puesto:</b> ${role}</p>` : ''}
+                    ${phase === 'availability'
+                      ? `<p style="margin:12px 0 0 0;color:#374151;line-height:1.55;"><b>ATENCION:</b> Este email SOLO confirma disponibilidad, no te cierra el evento.<br/>Si confirmas, recibirás un segundo email con la oferta de trabajo detallada.</p>`
+                      : ''}
+                    ${phase === 'offer' && roleLabel ? `<p style="margin:8px 0 0 0;color:#111827;"><b>Puesto:</b> ${roleLabel}</p>` : ''}
                     ${phase === 'offer' && message ? `<p style="margin:12px 0 0 0;color:#374151;">${safeMessage}</p>` : ''}
                   </td>
                 </tr>
@@ -626,7 +628,7 @@ serve(async (req) => {
                     </div>
                     <div>
                       Sector Pro · <a href="https://www.sector-pro.com" style="color:#6b7280;text-decoration:underline;">www.sector-pro.com</a>
-                      &nbsp;|&nbsp; Área Técnica · <a href="https://area-tecnica.lovable.app" style="color:#6b7280;text-decoration:underline;">area-tecnica.lovable.app</a>
+                      &nbsp;|&nbsp; Área Técnica · <a href="https://sector-pro.work" style="color:#6b7280;text-decoration:underline;">sector-pro.work</a>
                     </div>
                   </td>
                 </tr>
@@ -643,8 +645,15 @@ serve(async (req) => {
         // Build WhatsApp text (plain)
         const lines: string[] = [];
         lines.push(`Hola ${fullName || ''},`);
-        lines.push(phase === 'availability' ? `¿Puedes confirmar tu disponibilidad para ${job.title}?` : `Tienes una oferta para ${job.title}.`);
-        if (phase === 'offer' && roleLabel) lines.push(`Puesto: ${roleLabel}`);
+        if (phase === 'availability') {
+          lines.push(`¿Tendrías disponibilidad para la fecha indicada mas abajo?`);
+          lines.push('');
+          lines.push('ATENCION: Este email SOLO confirma disponibilidad, no te cierra el evento.');
+          lines.push('Si confirmas, recibirás un segundo email con la oferta de trabajo detallada.');
+        } else {
+          lines.push(`Tienes una oferta para ${job.title}.`);
+          if (roleLabel) lines.push(`Puesto: ${roleLabel}`);
+        }
         lines.push('');
         lines.push('Detalles del trabajo:');
         if (normalizedDates.length > 1) {

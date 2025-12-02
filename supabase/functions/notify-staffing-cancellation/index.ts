@@ -191,7 +191,7 @@ serve(async (req) => {
                           </a>
                         </td>
                         <td align="right" style="vertical-align:middle;">
-                          <a href="https://area-tecnica.lovable.app" target="_blank" rel="noopener noreferrer">
+                          <a href="https://sector-pro.work" target="_blank" rel="noopener noreferrer">
                             <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
                           </a>
                         </td>
@@ -235,7 +235,7 @@ serve(async (req) => {
                     </div>
                     <div>
                       Sector Pro · <a href="https://www.sector-pro.com" style="color:#6b7280;text-decoration:underline;">www.sector-pro.com</a>
-                      &nbsp;|&nbsp; Área Técnica · <a href="https://area-tecnica.lovable.app" style="color:#6b7280;text-decoration:underline;">area-tecnica.lovable.app</a>
+                      &nbsp;|&nbsp; Área Técnica · <a href="https://sector-pro.work" style="color:#6b7280;text-decoration:underline;">sector-pro.work</a>
                     </div>
                   </td>
                 </tr>
