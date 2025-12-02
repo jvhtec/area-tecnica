@@ -168,7 +168,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
     try {
       console.log("CreateJobDialog: Starting job creation process");
-      
+
       // Validate location data before processing
       if (!values.location.name || !values.location.address) {
         toast({
@@ -233,7 +233,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
       // Insert required roles if provided and not a dryhire
       if (values.job_type !== 'dryhire') {
-        const rows: Array<{ job_id: string; department: string; role_code: string; quantity: number }>= [];
+        const rows: Array<{ job_id: string; department: string; role_code: string; quantity: number }> = [];
         for (const dept of Object.keys(requirements)) {
           for (const r of requirements[dept] || []) {
             if (r.role_code && r.quantity > 0) rows.push({ job_id: job.id, department: dept, role_code: r.role_code, quantity: r.quantity });
@@ -263,7 +263,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         void supabase.functions.invoke('push', {
           body: { action: 'broadcast', type: 'job.created', job_id: job.id }
         });
-      } catch {}
+      } catch { }
 
       // Redirect to management page
       try {
@@ -271,7 +271,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           ? `/festival-management/${job.id}`
           : `/festival-management/${job.id}?singleJob=true`;
         navigate(dest);
-      } catch {}
+      } catch { }
 
       // We navigate to management; skip parent callbacks to avoid state updates on unmounted pages
 
@@ -290,7 +290,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
     }
   }, [isSubmitting, getOrCreateLocationWithDetails, queryClient, toast, reset, onOpenChange, onCreated, navigate]);
 
-  const departments: Department[] = ["sound", "lights", "video"];
+  const departments: Department[] = ["sound", "lights", "video", "production"];
   const selectedDepartments = watch("departments") || [];
 
   const toggleDepartment = useCallback((department: Department) => {
