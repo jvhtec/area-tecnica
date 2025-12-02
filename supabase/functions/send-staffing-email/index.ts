@@ -535,6 +535,10 @@ serve(async (req) => {
       const multiDatesHtml = normalizedDates.length > 1
         ? `<div><b>Fechas seleccionadas:</b></div><ul style="margin:8px 0 0 16px;padding:0;">${normalizedDates.map(d => `<li>${fmtDate(`${d}T00:00:00Z`)}</li>`).join('')}</ul>`
         : '';
+
+      // Determine singular vs plural for availability message
+      const isMultipleDates = normalizedDates.length > 1;
+      const datePhrasing = isMultipleDates ? 'las fechas indicadas más abajo' : 'la fecha indicada más abajo';
       const html = `
       <!doctype html>
       <html>
@@ -571,11 +575,11 @@ serve(async (req) => {
                     <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${fullName || ''},</h2>
                     <p style="margin:0;color:#374151;line-height:1.55;">
                       ${phase === 'availability'
-                        ? `¿Tendrías disponibilidad para la fecha indicada mas abajo?`
+                        ? `¿Tendrías disponibilidad para ${datePhrasing}?`
                         : `Tienes una oferta para <b>${job.title}</b>. Por favor, confirma:`}
                     </p>
                     ${phase === 'availability'
-                      ? `<p style="margin:12px 0 0 0;color:#374151;line-height:1.55;"><b>ATENCION:</b> Este email SOLO confirma disponibilidad, no te cierra el evento.<br/>Si confirmas, recibirás un segundo email con la oferta de trabajo detallada.</p>`
+                      ? `<p style="margin:12px 0 0 0;color:#374151;line-height:1.55;"><b>ATENCIÓN:</b> Este email SOLO confirma disponibilidad, no te cierra el evento.<br/>Si confirmas, recibirás un segundo email con la oferta de trabajo detallada.</p>`
                       : ''}
                     ${phase === 'offer' && roleLabel ? `<p style="margin:8px 0 0 0;color:#111827;"><b>Puesto:</b> ${roleLabel}</p>` : ''}
                     ${phase === 'offer' && message ? `<p style="margin:12px 0 0 0;color:#374151;">${safeMessage}</p>` : ''}
@@ -646,9 +650,9 @@ serve(async (req) => {
         const lines: string[] = [];
         lines.push(`Hola ${fullName || ''},`);
         if (phase === 'availability') {
-          lines.push(`¿Tendrías disponibilidad para la fecha indicada mas abajo?`);
+          lines.push(`¿Tendrías disponibilidad para ${datePhrasing}?`);
           lines.push('');
-          lines.push('ATENCION: Este email SOLO confirma disponibilidad, no te cierra el evento.');
+          lines.push('ATENCIÓN: Este email SOLO confirma disponibilidad, no te cierra el evento.');
           lines.push('Si confirmas, recibirás un segundo email con la oferta de trabajo detallada.');
         } else {
           lines.push(`Tienes una oferta para ${job.title}.`);
