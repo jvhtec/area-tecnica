@@ -159,8 +159,8 @@ serve(async (req) => {
         `)
         .in("job_type", ["single", "festival", "tourdate"])
         .in("status", ["Confirmado", "Tentativa", "Completado"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", weekEnd.toISOString())
+        .lt("start_time", weekEnd.toISOString()) // Job starts before window ends
+        .gte("end_time", todayStart.toISOString()) // Job ends after window starts (ongoing or future)
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -238,8 +238,8 @@ serve(async (req) => {
         `)
         .in("job_type", ["single", "festival", "tourdate"])
         .in("status", ["Confirmado", "Tentativa", "Completado"])
-        .gte("start_time", gridStart.toISOString())
-        .lte("start_time", gridEnd.toISOString())
+        .lt("start_time", gridEnd.toISOString()) // Job starts before calendar ends
+        .gte("end_time", gridStart.toISOString()) // Job ends after calendar starts (ongoing)
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -316,8 +316,8 @@ serve(async (req) => {
         `)
         .in("job_type", ["single", "festival", "tourdate"])
         .in("status", ["Confirmado", "Tentativa", "Completado"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", weekEnd.toISOString())
+        .lt("start_time", weekEnd.toISOString()) // Job starts before window ends
+        .gte("end_time", todayStart.toISOString()) // Job ends after window starts (ongoing)
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -388,8 +388,8 @@ serve(async (req) => {
         `)
         .in("job_type", ["single", "festival", "tourdate"])
         .in("status", ["Confirmado", "Tentativa", "Completado"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString())
+        .lt("start_time", tomorrowEnd.toISOString()) // Job starts before tomorrow ends
+        .gte("end_time", todayStart.toISOString()) // Job ends after today starts (ongoing)
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -429,8 +429,8 @@ serve(async (req) => {
         `)
         .in("job_type", ["single", "festival", "tourdate"])
         .in("status", ["Confirmado", "Tentativa", "Completado"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString());
+        .lt("start_time", tomorrowEnd.toISOString()) // Job starts before tomorrow ends
+        .gte("end_time", todayStart.toISOString()); // Job ends after today starts (ongoing)
 
       if (error) throw error;
 
