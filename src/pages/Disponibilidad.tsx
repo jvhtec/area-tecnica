@@ -45,10 +45,10 @@ export default function Disponibilidad() {
   const [adminDepartment, setAdminDepartment] = useState<DisponibilidadDepartment>('sound');
 
   useEffect(() => {
-    if (isAdmin && hasManagementDepartmentAccess && normalizedDepartment) {
+    if (isAdmin && normalizedDepartment && (normalizedDepartment === 'sound' || normalizedDepartment === 'lights')) {
       setAdminDepartment(normalizedDepartment as DisponibilidadDepartment);
     }
-  }, [isAdmin, hasManagementDepartmentAccess, normalizedDepartment]);
+  }, [isAdmin, normalizedDepartment]);
 
   const department: DisponibilidadDepartment | null = isAdmin
     ? adminDepartment
