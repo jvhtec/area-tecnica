@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { format, addDays, isSameDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Settings, Menu } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Settings, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { QuickPresetAssignment } from '@/components/disponibilidad/QuickPresetAssignment';
@@ -137,8 +137,8 @@ export function MobileAvailabilityView({
             </div>
 
             {/* Date Strip */}
-            <div className="bg-[#0f1219] border-b border-[#1f232e] p-2 sticky top-[64px] z-10">
-                <div className="flex items-center justify-between mb-2 px-2">
+            <div className="bg-[#0f1219] border-b border-[#1f232e] px-2 py-3 sticky top-[64px] z-10">
+                <div className="flex items-center justify-between mb-3 px-2">
                     <Button variant="ghost" size="icon" onClick={handlePrevDay} className="h-8 w-8">
                         <ChevronLeft className="h-4 w-4" />
                     </Button>
@@ -152,7 +152,7 @@ export function MobileAvailabilityView({
 
                 <div
                     ref={scrollRef}
-                    className="flex overflow-x-auto gap-2 pb-2 hide-scrollbar snap-x"
+                    className="flex overflow-x-auto gap-2 pb-2 hide-scrollbar snap-x px-1"
                 >
                     {days.map((date) => {
                         const isSelected = isSameDay(date, selectedDate);
@@ -318,8 +318,26 @@ export function MobileAvailabilityView({
                     side="bottom"
                     className="h-[90vh] bg-[#0f1219] border-t border-[#1f232e] rounded-t-2xl overflow-y-auto"
                 >
-                    <SheetHeader className="mb-4">
-                        <SheetTitle className="text-white">Resumen Semanal</SheetTitle>
+                    <SheetHeader className="mb-4 flex flex-row items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setShowWeeklySummary(false)}
+                                className="h-8 w-8"
+                            >
+                                <ChevronLeft className="h-5 w-5" />
+                            </Button>
+                            <SheetTitle className="text-white">Resumen Semanal</SheetTitle>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setShowWeeklySummary(false)}
+                            className="h-8 w-8"
+                        >
+                            <X className="h-5 w-5" />
+                        </Button>
                     </SheetHeader>
                     <div className="pb-6">
                         <WeeklySummary
