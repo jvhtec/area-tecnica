@@ -11,7 +11,8 @@ const CODE_TO_LABEL: Record<string, string> = {
   'SND-MON-E': 'Monitores — Especialista',
   'SND-RF-E':  'RF — Especialista',
   'SND-SYS-E': 'Sistemas — Especialista',
-  'SND-PA-T':  'PA — Técnico',
+  'SND-PA-T':  'Tecnico de Escenario — Técnico',
+  'SND-MNT-T': 'Montador — Técnico',
   // Lights
   'LGT-BRD-R': 'Mesa — Responsable',
   'LGT-SYS-R': 'Sistema/Rig — Responsable',
@@ -19,6 +20,12 @@ const CODE_TO_LABEL: Record<string, string> = {
   'LGT-SYS-E': 'Sistema/Rig — Especialista',
   'LGT-FOLO-E': 'Follow Spot — Especialista',
   'LGT-PA-T':  'PA — Técnico',
+  'LGT-ASST-R': 'Asistente — Responsable',
+  'LGT-ASST-E': 'Asistente — Especialista',
+  'LGT-DIM-R': 'Dimmer — Responsable',
+  'LGT-DIM-E': 'Dimmer — Especialista',
+  'LGT-CAN-T': 'Cañón — Técnico',
+  'LGT-MON-T': 'Montador — Técnico',
   // Video
   'VID-SW-R':  'Switcher/TD — Responsable',
   'VID-DIR-E': 'Director — Especialista',
@@ -26,6 +33,10 @@ const CODE_TO_LABEL: Record<string, string> = {
   'VID-LED-E': 'LED — Especialista',
   'VID-PROJ-E': 'Proyección — Especialista',
   'VID-PA-T':  'PA — Técnico',
+  // Production
+  'PROD-RESP-R': 'Responsable de Producción — Responsable',
+  'PROD-AYUD-T': 'Ayudante de Producción — Técnico',
+  'PROD-COND-T': 'Conductor — Técnico',
 }
 
 function labelForRoleCode(value?: string | null): string | null {
