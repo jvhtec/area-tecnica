@@ -39,15 +39,16 @@ export default function Disponibilidad() {
   const isAdmin = userRole === 'admin';
   const isManagement = userRole === 'management';
   const hasManagementDepartmentAccess =
-    normalizedDepartment === 'sound' || normalizedDepartment === 'lights';
+    userRole === 'management' &&
+    (normalizedDepartment === 'sound' || normalizedDepartment === 'lights');
 
   const [adminDepartment, setAdminDepartment] = useState<DisponibilidadDepartment>('sound');
 
   useEffect(() => {
-    if (isAdmin && hasManagementDepartmentAccess && normalizedDepartment) {
+    if (isAdmin && normalizedDepartment && (normalizedDepartment === 'sound' || normalizedDepartment === 'lights')) {
       setAdminDepartment(normalizedDepartment as DisponibilidadDepartment);
     }
-  }, [isAdmin, hasManagementDepartmentAccess, normalizedDepartment]);
+  }, [isAdmin, normalizedDepartment]);
 
   const department: DisponibilidadDepartment | null = isAdmin
     ? adminDepartment
@@ -150,6 +151,9 @@ export default function Disponibilidad() {
           jobs={jobsToday}
           assignedPresets={assignedPresets || []}
           logoMap={logoMap}
+          isAdmin={isAdmin}
+          department={department}
+          onDepartmentChange={setAdminDepartment}
         />
       </DepartmentProvider>
     );
