@@ -202,6 +202,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
             job_type: values.job_type,
             color: values.color,
             timezone: values.timezone,
+            status: 'Tentativa',
           },
         ])
         .select()
