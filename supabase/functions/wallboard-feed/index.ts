@@ -139,10 +139,10 @@ serve(async (req) => {
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     if (path.endsWith("/jobs-overview")) {
-      // Next 7 days window
+      // Next 7 days window (inclusive of the 7th day)
       const now = new Date();
       const todayStart = startOfDay(now);
-      const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const weekEnd = new Date(todayStart.getTime() + 8 * 24 * 60 * 60 * 1000); // +8 days to include all of day 7
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -295,7 +295,7 @@ serve(async (req) => {
     if (path.endsWith("/crew-assignments")) {
       const now = new Date();
       const todayStart = startOfDay(now);
-      const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const weekEnd = new Date(todayStart.getTime() + 8 * 24 * 60 * 60 * 1000); // +8 days to include all of day 7
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -488,10 +488,10 @@ serve(async (req) => {
     }
 
     if (path.endsWith("/logistics")) {
-      // Return logistics events for the next 7 days
+      // Return logistics events for the next 7 days (inclusive)
       const now = new Date();
       const todayStart = startOfDay(now);
-      const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const weekEnd = new Date(todayStart.getTime() + 8 * 24 * 60 * 60 * 1000); // +8 days to include all of day 7
       const startDate = todayStart.toISOString().slice(0, 10);
       const endDate = weekEnd.toISOString().slice(0, 10);
 
