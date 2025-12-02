@@ -180,16 +180,14 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
               >
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold">Transporte {index + 1}</h3>
-                  {index > 0 && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onRemoveTransport(index)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onRemoveTransport(index)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
