@@ -7,6 +7,24 @@ import { Loader2, Calendar, ArrowLeft, Users, Briefcase, Home, Plane, Heart, Sun
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+type TimesheetWithRelations = {
+  technician_id: string;
+  job_id: string;
+  date: string;
+  jobs: {
+    id: string;
+    title: string;
+    start_time: string;
+  };
+  profiles: {
+    first_name: string;
+    last_name: string;
+    nickname: string | null;
+    department: string;
+    role: string;
+  };
+};
+
 type MorningSummaryData = {
   department: string;
   assignments: Array<{
@@ -63,19 +81,21 @@ export default function MorningSummary() {
       const summaries: MorningSummaryData[] = [];
 
       for (const dept of departments) {
-        // Get assignments
-      const { data: assignments } = await supabase
-        .from('job_assignments')
-        .select(`
-          technician_id,
-          job:jobs!inner(title, start_time),
-          profile:profiles!job_assignments_technician_id_fkey!inner(first_name, last_name, nickname, department, role)
-        `)
-        .eq('status', 'confirmed')
-        .eq('profile.department', dept)
-        .eq('profile.role', 'house_tech')
-        .gte('job.start_time', date)
-        .lt('job.start_time', tomorrowDate);
+        // Get assignments from timesheets (source of truth)
+        const { data: timesheetData } = await supabase
+          .from('timesheets')
+          .select(`
+            technician_id,
+            job_id,
+            date,
+            jobs!inner(id, title, start_time),
+            profiles!fk_timesheets_technician_id!inner(first_name, last_name, nickname, department, role)
+          `)
+          .eq('date', date)
+          .eq('profiles.department', dept)
+          .eq('profiles.role', 'house_tech')
+          .gte('jobs.start_time', date)
+          .lt('jobs.start_time', tomorrowDate) as { data: TimesheetWithRelations[] | null };
 
         // Get unavailable
       const { data: unavailable } = await supabase
@@ -140,16 +160,16 @@ export default function MorningSummary() {
 
         // Process data
         const jobGroups: Record<string, string[]> = {};
-        for (const assignment of assignments || []) {
-          const jobTitle = (assignment as any).job.title;
-          const techName = (assignment as any).profile.nickname || (assignment as any).profile.first_name;
+        for (const timesheet of timesheetData || []) {
+          const jobTitle = timesheet.jobs?.title ?? 'Unknown';
+          const techName = timesheet.profiles?.nickname || timesheet.profiles?.first_name || 'Unknown';
           if (!jobGroups[jobTitle]) {
             jobGroups[jobTitle] = [];
           }
           jobGroups[jobTitle].push(techName);
         }
 
-        const assignedIds = new Set((assignments || []).map((a: any) => a.technician_id));
+        const assignedIds = new Set((timesheetData || []).map((t: TimesheetWithRelations) => t.technician_id));
         const unavailableIds = new Set((unavailableMerged || []).map((u: any) => u.user_id));
         const warehouse = (allTechs || [])
           .filter(t => !assignedIds.has(t.id) && !unavailableIds.has(t.id))
