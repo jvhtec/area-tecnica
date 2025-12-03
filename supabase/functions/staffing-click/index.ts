@@ -459,32 +459,24 @@ serve(async (req) => {
 
               // Collect all confirmed dates
               if ((row as any)?.batch_id) {
-                // Batch: get all confirmed dates from batch rows
-                const { data: batchRows, error: batchErr } = await supabase
-                  .from('staffing_requests')
-                  .select('target_date,single_day')
-                  .eq('batch_id', (row as any).batch_id)
-                  .eq('job_id', row.job_id)
-                  .eq('profile_id', row.profile_id)
-                  .eq('status', 'confirmed')
-                  .eq('phase', row.phase);
+                // Batch: use already-updated batch rows from the status update above
+                // (updatedBatchRows was populated at line 173 with all updated rows)
+                const batchRows = updatedBatchRows || [];
 
-                if (batchErr) {
-                  console.error('❌ Batch rows fetch failed', {
+                if (!updatedBatchRows || updatedBatchRows.length === 0) {
+                  console.warn('⚠️ No batch rows available for timesheet creation', {
                     batch_id: (row as any).batch_id,
                     job_id: row.job_id,
-                    profile_id: row.profile_id,
-                    error: batchErr
+                    profile_id: row.profile_id
                   });
                   await supabase.from('staffing_events').insert({
                     staffing_request_id: rid,
-                    event: 'batch_timesheet_fetch_error',
-                    meta: { message: batchErr.message, batch_id: (row as any).batch_id }
+                    event: 'batch_timesheet_no_rows',
+                    meta: { batch_id: (row as any).batch_id }
                   });
-                  // Continue with empty array rather than failing completely
                 }
 
-                for (const br of (batchRows || [])) {
+                for (const br of batchRows) {
                   if (br.target_date && typeof br.target_date === 'string') {
                     timesheetRows.push({
                       job_id: row.job_id,
