@@ -292,10 +292,13 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
         ? pdfRows.filter(row => row.dailyUsage.some(d => d.remaining < 0) || row.available < 0)
         : pdfRows;
 
-      if (showOnlyShortages && filteredRows.length === 0) {
+      // Avoid calling the PDF generator with no rows at all
+      if (filteredRows.length === 0) {
         toast({
-          title: "Sin faltas",
-          description: "No hay equipos con faltas en esta semana",
+          title: showOnlyShortages ? "Sin faltas" : "Sin datos",
+          description: showOnlyShortages
+            ? "No hay equipos con faltas en esta semana"
+            : "No hay equipos para esta semana en las categorías seleccionadas",
         });
         return;
       }
