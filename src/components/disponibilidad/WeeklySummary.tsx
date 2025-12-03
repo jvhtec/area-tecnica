@@ -22,6 +22,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { safeGetJSON, safeSetJSON } from '@/lib/storage';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 interface WeeklySummaryProps {
   selectedDate: Date;
@@ -58,6 +60,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
   const [filtersEnabled, setFiltersEnabled] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<AllCategories[]>([]);
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
+  const [showOnlyShortages, setShowOnlyShortages] = useState(false);
 
   useEffect(() => {
     safeSetJSON('weeklySummaryOpen', isOpen);
@@ -284,11 +287,27 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
         };
       });
 
-      const blob = await exportWeeklySummaryPDF(currentWeekStart, pdfRows, selectedCategories);
+      // Filter for shortages if option is enabled
+      const filteredRows = showOnlyShortages
+        ? pdfRows.filter(row => row.dailyUsage.some(d => d.remaining < 0) || row.available < 0)
+        : pdfRows;
+
+      if (showOnlyShortages && filteredRows.length === 0) {
+        toast({
+          title: "Sin faltas",
+          description: "No hay equipos con faltas en esta semana",
+        });
+        return;
+      }
+
+      const blob = await exportWeeklySummaryPDF(currentWeekStart, filteredRows, selectedCategories, showOnlyShortages);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
+      const filename = showOnlyShortages
+        ? `faltas-semanal-${format(currentWeekStart, 'yyyy-MM-dd')}.pdf`
+        : `resumen-semanal-${format(currentWeekStart, 'yyyy-MM-dd')}.pdf`;
       link.href = url;
-      link.setAttribute('download', `resumen-semanal-${format(currentWeekStart, 'yyyy-MM-dd')}.pdf`);
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -296,7 +315,9 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
 
       toast({
         title: "PDF Exportado",
-        description: "El resumen semanal se ha exportado correctamente",
+        description: showOnlyShortages
+          ? `Se han exportado ${filteredRows.length} equipos con faltas`
+          : "El resumen semanal se ha exportado correctamente",
       });
     } catch (error) {
       console.error('Error exporting PDF:', error);
@@ -417,15 +438,27 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
             </Button>
           </div>
           <ReloadButton onReload={handleReload} />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportPDF}
-            className={cn(isMobile && "flex-1")}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Exportar PDF
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="shortages-only"
+                checked={showOnlyShortages}
+                onCheckedChange={(checked) => setShowOnlyShortages(checked === true)}
+              />
+              <Label htmlFor="shortages-only" className="text-sm cursor-pointer whitespace-nowrap">
+                Solo faltas
+              </Label>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              className={cn(isMobile && "flex-1")}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar PDF
+            </Button>
+          </div>
           {!isMobile && (
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm">

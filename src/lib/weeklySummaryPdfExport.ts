@@ -25,7 +25,8 @@ interface WeeklySummaryRow {
 export const exportWeeklySummaryPDF = async (
   weekStart: Date,
   rows: WeeklySummaryRow[],
-  selectedCategories: string[]
+  selectedCategories: string[],
+  shortagesOnly: boolean = false
 ): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     try {
@@ -40,7 +41,10 @@ export const exportWeeklySummaryPDF = async (
 
       doc.setFontSize(24);
       doc.setTextColor(255, 255, 255);
-      doc.text("Resumen Semanal de Equipamiento", pageWidth / 2, 20, { align: 'center' });
+      const title = shortagesOnly
+        ? "Faltas de Equipamiento - Resumen Semanal"
+        : "Resumen Semanal de Equipamiento";
+      doc.text(title, pageWidth / 2, 20, { align: 'center' });
 
       const dateRange = `${format(weekStart, "d 'de' MMMM", { locale: es })} - ${format(new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000), "d 'de' MMMM", { locale: es })}`;
       doc.setFontSize(16);
