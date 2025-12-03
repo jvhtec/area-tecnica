@@ -63,19 +63,21 @@ export default function MorningSummary() {
       const summaries: MorningSummaryData[] = [];
 
       for (const dept of departments) {
-        // Get assignments
-      const { data: assignments } = await supabase
-        .from('job_assignments')
-        .select(`
-          technician_id,
-          job:jobs!inner(title, start_time),
-          profile:profiles!job_assignments_technician_id_fkey!inner(first_name, last_name, nickname, department, role)
-        `)
-        .eq('status', 'confirmed')
-        .eq('profile.department', dept)
-        .eq('profile.role', 'house_tech')
-        .gte('job.start_time', date)
-        .lt('job.start_time', tomorrowDate);
+        // Get assignments from timesheets (source of truth)
+        const { data: timesheetData } = await supabase
+          .from('timesheets')
+          .select(`
+            technician_id,
+            job_id,
+            date,
+            jobs!inner(id, title, start_time),
+            profiles!timesheets_technician_id_fkey!inner(first_name, last_name, nickname, department, role)
+          `)
+          .eq('date', date)
+          .eq('profiles.department', dept)
+          .eq('profiles.role', 'house_tech')
+          .gte('jobs.start_time', date)
+          .lt('jobs.start_time', tomorrowDate);
 
         // Get unavailable
       const { data: unavailable } = await supabase
@@ -140,16 +142,16 @@ export default function MorningSummary() {
 
         // Process data
         const jobGroups: Record<string, string[]> = {};
-        for (const assignment of assignments || []) {
-          const jobTitle = (assignment as any).job.title;
-          const techName = (assignment as any).profile.nickname || (assignment as any).profile.first_name;
+        for (const timesheet of timesheetData || []) {
+          const jobTitle = (timesheet as any).jobs.title;
+          const techName = (timesheet as any).profiles.nickname || (timesheet as any).profiles.first_name;
           if (!jobGroups[jobTitle]) {
             jobGroups[jobTitle] = [];
           }
           jobGroups[jobTitle].push(techName);
         }
 
-        const assignedIds = new Set((assignments || []).map((a: any) => a.technician_id));
+        const assignedIds = new Set((timesheetData || []).map((t: any) => t.technician_id));
         const unavailableIds = new Set((unavailableMerged || []).map((u: any) => u.user_id));
         const warehouse = (allTechs || [])
           .filter(t => !assignedIds.has(t.id) && !unavailableIds.has(t.id))
