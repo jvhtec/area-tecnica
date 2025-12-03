@@ -7,6 +7,24 @@ import { Loader2, Calendar, ArrowLeft, Users, Briefcase, Home, Plane, Heart, Sun
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+type TimesheetWithRelations = {
+  technician_id: string;
+  job_id: string;
+  date: string;
+  jobs: {
+    id: string;
+    title: string;
+    start_time: string;
+  };
+  profiles: {
+    first_name: string;
+    last_name: string;
+    nickname: string | null;
+    department: string;
+    role: string;
+  };
+};
+
 type MorningSummaryData = {
   department: string;
   assignments: Array<{
@@ -71,13 +89,13 @@ export default function MorningSummary() {
             job_id,
             date,
             jobs!inner(id, title, start_time),
-            profiles!timesheets_technician_id_fkey!inner(first_name, last_name, nickname, department, role)
+            profiles!fk_timesheets_technician_id!inner(first_name, last_name, nickname, department, role)
           `)
           .eq('date', date)
           .eq('profiles.department', dept)
           .eq('profiles.role', 'house_tech')
           .gte('jobs.start_time', date)
-          .lt('jobs.start_time', tomorrowDate);
+          .lt('jobs.start_time', tomorrowDate) as { data: TimesheetWithRelations[] | null };
 
         // Get unavailable
       const { data: unavailable } = await supabase
@@ -143,15 +161,15 @@ export default function MorningSummary() {
         // Process data
         const jobGroups: Record<string, string[]> = {};
         for (const timesheet of timesheetData || []) {
-          const jobTitle = (timesheet as any).jobs.title;
-          const techName = (timesheet as any).profiles.nickname || (timesheet as any).profiles.first_name;
+          const jobTitle = timesheet.jobs?.title ?? 'Unknown';
+          const techName = timesheet.profiles?.nickname || timesheet.profiles?.first_name || 'Unknown';
           if (!jobGroups[jobTitle]) {
             jobGroups[jobTitle] = [];
           }
           jobGroups[jobTitle].push(techName);
         }
 
-        const assignedIds = new Set((timesheetData || []).map((t: any) => t.technician_id));
+        const assignedIds = new Set((timesheetData || []).map((t: TimesheetWithRelations) => t.technician_id));
         const unavailableIds = new Set((unavailableMerged || []).map((u: any) => u.user_id));
         const warehouse = (allTechs || [])
           .filter(t => !assignedIds.has(t.id) && !unavailableIds.has(t.id))
