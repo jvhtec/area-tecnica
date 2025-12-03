@@ -9,6 +9,7 @@ import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { TechJobCard } from './TechJobCard';
 import { TourCard } from './TourCard';
 import { Theme } from './types';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 interface DashboardScreenProps {
     theme: Theme;
@@ -67,9 +68,12 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                     <h1 className={`text-2xl font-bold ${theme.textMain}`}>Panel</h1>
                     <p className={`text-xs ${theme.textMuted}`}>Bienvenido, {userName}</p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg">
-                    {userInitials}
-                </div>
+                <Avatar className="w-10 h-10 shadow-lg">
+                    <AvatarImage src={userProfile?.profile_picture_url || undefined} alt={userName} />
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold">
+                        {userInitials}
+                    </AvatarFallback>
+                </Avatar>
             </div>
 
             {/* Stats Grid */}

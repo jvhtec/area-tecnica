@@ -16,6 +16,8 @@ import { FolderStructureEditor, type FolderStructure } from "@/components/profil
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
+import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 export const Profile = () => {
   const { toast } = useToast();
@@ -267,6 +269,27 @@ export const Profile = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {/* Profile Picture Section */}
+                <div className="flex justify-center mb-6">
+                  <div className="relative">
+                    <Avatar className="w-24 h-24 border-4">
+                      <AvatarImage src={profile?.profile_picture_url || undefined} alt={profile?.first_name || 'User'} />
+                      <AvatarFallback className="text-3xl font-bold">
+                        {profile?.first_name?.[0]?.toUpperCase() || profile?.email?.[0]?.toUpperCase() || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    {profile?.id && (
+                      <ProfilePictureUpload
+                        userId={profile.id}
+                        currentPictureUrl={profile?.profile_picture_url}
+                        onUploadSuccess={(url) => {
+                          setProfile({ ...profile, profile_picture_url: url });
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">

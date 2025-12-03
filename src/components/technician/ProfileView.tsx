@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Save, User, Phone, MapPin, CreditCard, Calendar as CalendarIcon, Lock, ChevronRight, LogOut, Camera, X, Bell, BellOff, AlertTriangle } from 'lucide-react';
 import { Theme } from './types';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { ProfilePictureUpload } from '@/components/profile/ProfilePictureUpload';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 interface ProfileUser {
     id: string;
@@ -23,6 +25,7 @@ interface UserProfile {
     profile_color?: string;
     role?: string;
     department?: string;
+    profile_picture_url?: string | null;
 }
 
 interface ProfileViewProps {
@@ -67,6 +70,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
     const [phone, setPhone] = useState(userProfile?.phone || '');
     const [city, setCity] = useState(userProfile?.city || '');
     const [dni, setDni] = useState(userProfile?.dni || '');
+    const [profilePictureUrl, setProfilePictureUrl] = useState(userProfile?.profile_picture_url || '');
 
     // Update form when profile loads
     useEffect(() => {
@@ -77,6 +81,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
             setCity(userProfile.city || '');
             setDni(userProfile.dni || '');
             setSelectedColor(userProfile.profile_color || '#3b82f6');
+            setProfilePictureUrl(userProfile.profile_picture_url || '');
         }
     }, [userProfile]);
 
@@ -226,15 +231,22 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                 <div className="absolute top-0 left-0 w-full h-24 opacity-20" style={{ backgroundColor: selectedColor }} />
 
                 <div className="relative mt-4 mb-4">
-                    <div
-                        className={`w-24 h-24 rounded-full border-4 flex items-center justify-center text-3xl font-bold ${theme.bg} ${theme.textMain}`}
-                        style={{ borderColor: selectedColor }}
-                    >
-                        {userInitials}
-                    </div>
-                    <button className="absolute bottom-0 right-0 p-2 rounded-full shadow-lg bg-blue-600 text-white hover:bg-blue-500">
-                        <Camera size={14} />
-                    </button>
+                    <Avatar className="w-24 h-24 border-4" style={{ borderColor: selectedColor }}>
+                        <AvatarImage src={profilePictureUrl || undefined} alt={userName} />
+                        <AvatarFallback className={`text-3xl font-bold ${theme.bg} ${theme.textMain}`}>
+                            {userInitials}
+                        </AvatarFallback>
+                    </Avatar>
+                    {user?.id && (
+                        <ProfilePictureUpload
+                            userId={user.id}
+                            currentPictureUrl={profilePictureUrl}
+                            onUploadSuccess={(url) => {
+                                setProfilePictureUrl(url);
+                                queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+                            }}
+                        />
+                    )}
                 </div>
 
                 <h2 className={`text-xl font-bold ${theme.textMain}`}>{userName}</h2>

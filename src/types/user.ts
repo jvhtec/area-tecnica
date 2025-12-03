@@ -10,4 +10,5 @@ export interface User {
   last_name?: string;
   department?: string;  // Added department field
   custom_folder_structure?: any; // Custom folder structure for local folder creation
+  profile_picture_url?: string | null; // Profile picture URL
 }
