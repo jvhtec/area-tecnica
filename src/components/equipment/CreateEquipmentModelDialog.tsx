@@ -24,6 +24,8 @@ export const CreateEquipmentModelDialog = ({
   const categories = getModelCategoriesForDepartment(department);
   const [name, setName] = useState("");
   const [category, setCategory] = useState(defaultCategory || categories[0]?.value || '');
+  const [resourceId, setResourceId] = useState("");
+  const [flexUrl, setFlexUrl] = useState("");
   const { createModel, isCreating } = useEquipmentModels();
 
   useEffect(() => {
@@ -38,9 +40,15 @@ export const CreateEquipmentModelDialog = ({
     e.preventDefault();
     if (!name.trim()) return;
 
-    createModel({ name: name.trim(), category });
+    createModel({
+      name: name.trim(),
+      category,
+      resource_id: resourceId.trim() || undefined
+    });
     setName("");
     setCategory(defaultCategory || categories[0]?.value || '');
+    setResourceId("");
+    setFlexUrl("");
     onOpenChange(false);
   };
 
@@ -48,6 +56,8 @@ export const CreateEquipmentModelDialog = ({
     if (!newOpen) {
       setName("");
       setCategory(defaultCategory || categories[0]?.value || '');
+      setResourceId("");
+      setFlexUrl("");
     }
     onOpenChange(newOpen);
   };
@@ -83,6 +93,61 @@ export const CreateEquipmentModelDialog = ({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-3 border rounded-md p-3">
+            <div className="space-y-2">
+              <Label htmlFor="resourceId">Flex Resource ID (optional)</Label>
+              <Input
+                id="resourceId"
+                type="text"
+                placeholder="adcf7550-4fa3-11eb-815f-2a0a4490a7fb"
+                value={resourceId}
+                onChange={(e) => setResourceId(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="flexUrl">Flex URL (paste and extract)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="flexUrl"
+                  type="text"
+                  placeholder="https://sectorpro.flexrentalsolutions.com/f5/ui/#inventory-model/UUID/quantity"
+                  value={flexUrl}
+                  onChange={(e) => setFlexUrl(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    const uuidRe = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/;
+                    const m = (flexUrl || '').match(uuidRe)?.[0];
+                    if (m) setResourceId(m);
+                  }}
+                >
+                  Extract
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const clip = await navigator.clipboard.readText();
+                      const uuidRe = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/;
+                      const m = (clip || '').match(uuidRe)?.[0];
+                      setFlexUrl(clip);
+                      if (m) setResourceId(m);
+                    } catch (_) {
+                      // ignore
+                    }
+                  }}
+                >
+                  Paste URL
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Example: https://sectorpro.flexrentalsolutions.com/f5/ui/#inventory-model/adcf7550-4fa3-11eb-815f-2a0a4490a7fb/quantity
+              </p>
+            </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button
