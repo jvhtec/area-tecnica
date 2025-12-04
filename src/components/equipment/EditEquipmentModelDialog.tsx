@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useEquipmentModels, EquipmentModel } from "@/hooks/useEquipmentModels";
 import { useDepartment } from "@/contexts/DepartmentContext";
 import { getModelCategoriesForDepartment } from "@/types/equipment";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 interface EditEquipmentModelDialogProps {
   open: boolean;
@@ -22,10 +25,12 @@ export const EditEquipmentModelDialog = ({
 }: EditEquipmentModelDialogProps) => {
   const { department } = useDepartment();
   const categories = getModelCategoriesForDepartment(department);
+  const { toast } = useToast();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [resourceId, setResourceId] = useState("");
   const [flexUrl, setFlexUrl] = useState("");
+  const [isFetchingFlex, setIsFetchingFlex] = useState(false);
   const { updateModel, isUpdating } = useEquipmentModels();
 
   useEffect(() => {
@@ -139,6 +144,40 @@ export const EditEquipmentModelDialog = ({
                   }}
                 >
                   Paste URL
+                </Button>
+                <Button
+                  type="button"
+                  variant="default"
+                  disabled={isFetchingFlex || !(resourceId || flexUrl)}
+                  onClick={async () => {
+                    try {
+                      setIsFetchingFlex(true);
+                      const { data, error } = await supabase.functions.invoke('fetch-flex-inventory-model', {
+                        body: resourceId
+                          ? { model_id: resourceId }
+                          : { url: flexUrl }
+                      });
+                      if (error) throw error;
+                      if (data?.error) throw new Error(data.error);
+                      const m = data?.mapped || {};
+                      setName(m.name || name);
+                      setResourceId(data?.model_id || resourceId);
+                      toast({ title: 'Fetched from Flex', description: 'Equipment data has been auto-filled.' });
+                    } catch (e: any) {
+                      toast({ title: 'Failed to fetch from Flex', description: e?.message || 'Unknown error', variant: 'destructive' });
+                    } finally {
+                      setIsFetchingFlex(false);
+                    }
+                  }}
+                >
+                  {isFetchingFlex ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Fetching…
+                    </>
+                  ) : (
+                    'Fetch from Flex'
+                  )}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
