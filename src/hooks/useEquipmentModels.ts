@@ -9,6 +9,8 @@ export interface EquipmentModel {
   category: string;
   department: string;
   resource_id?: string | null;
+  manufacturer?: string | null;
+  image_id?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -37,7 +39,7 @@ export const useEquipmentModels = () => {
   });
 
   const createModelMutation = useMutation({
-    mutationFn: async (model: { name: string; category: string; resource_id?: string }) => {
+    mutationFn: async (model: { name: string; category: string; resource_id?: string; manufacturer?: string; image_id?: string }) => {
       const { data, error } = await supabase
         .from('equipment')
         .insert([{ ...model, department: 'sound' }])
@@ -64,7 +66,7 @@ export const useEquipmentModels = () => {
   });
 
   const updateModelMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; name?: string; category?: string; resource_id?: string }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; name?: string; category?: string; resource_id?: string; manufacturer?: string; image_id?: string }) => {
       const { data, error } = await supabase
         .from('equipment')
         .update(updates)

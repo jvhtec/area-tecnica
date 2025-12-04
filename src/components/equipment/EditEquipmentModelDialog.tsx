@@ -27,8 +27,10 @@ export const EditEquipmentModelDialog = ({
   const categories = getModelCategoriesForDepartment(department);
   const { toast } = useToast();
   const [name, setName] = useState("");
+  const [manufacturer, setManufacturer] = useState("");
   const [category, setCategory] = useState("");
   const [resourceId, setResourceId] = useState("");
+  const [imageId, setImageId] = useState("");
   const [flexUrl, setFlexUrl] = useState("");
   const [isFetchingFlex, setIsFetchingFlex] = useState(false);
   const { updateModel, isUpdating } = useEquipmentModels();
@@ -36,8 +38,10 @@ export const EditEquipmentModelDialog = ({
   useEffect(() => {
     if (model) {
       setName(model.name);
+      setManufacturer(model.manufacturer || "");
       setCategory(model.category);
       setResourceId(model.resource_id || "");
+      setImageId(model.image_id || "");
     }
   }, [model]);
 
@@ -49,7 +53,9 @@ export const EditEquipmentModelDialog = ({
       id: model.id,
       name: name.trim(),
       category,
-      resource_id: resourceId.trim() || undefined
+      resource_id: resourceId.trim() || undefined,
+      manufacturer: manufacturer.trim() || undefined,
+      image_id: imageId.trim() || undefined
     });
     onOpenChange(false);
   };
@@ -57,8 +63,10 @@ export const EditEquipmentModelDialog = ({
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setName("");
+      setManufacturer("");
       setCategory("");
       setResourceId("");
+      setImageId("");
       setFlexUrl("");
     }
     onOpenChange(newOpen);
@@ -79,6 +87,15 @@ export const EditEquipmentModelDialog = ({
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter model name"
               required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="manufacturer">Manufacturer</Label>
+            <Input
+              id="manufacturer"
+              value={manufacturer}
+              onChange={(e) => setManufacturer(e.target.value)}
+              placeholder="Enter manufacturer (optional)"
             />
           </div>
           <div className="space-y-2">
@@ -161,7 +178,9 @@ export const EditEquipmentModelDialog = ({
                       if (data?.error) throw new Error(data.error);
                       const m = data?.mapped || {};
                       setName(m.name || name);
+                      setManufacturer(m.manufacturer || manufacturer);
                       setResourceId(data?.model_id || resourceId);
+                      setImageId(m.imageId || imageId);
                       toast({ title: 'Fetched from Flex', description: 'Equipment data has been auto-filled.' });
                     } catch (e: any) {
                       toast({ title: 'Failed to fetch from Flex', description: e?.message || 'Unknown error', variant: 'destructive' });

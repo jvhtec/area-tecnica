@@ -68,11 +68,12 @@ serve(async (req: Request) => {
     const size = info?.size || '';
     const shortName = info?.shortName || '';
     const code = info?.code || '';
+    const imageId = info?.imageThumbnailId || info?.imageId || '';
 
     return new Response(JSON.stringify({
       ok: true,
       model_id: modelId,
-      mapped: { name, manufacturer, notes, size, shortName, code },
+      mapped: { name, manufacturer, notes, size, shortName, code, imageId },
       raw: info
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {

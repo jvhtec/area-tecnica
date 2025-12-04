@@ -4,12 +4,20 @@
 
 BEGIN;
 
--- Step 1: Add resource_id column to equipment table for future flex integration
+-- Step 1: Add new columns to equipment table
 ALTER TABLE equipment
-ADD COLUMN IF NOT EXISTS resource_id TEXT;
+ADD COLUMN IF NOT EXISTS resource_id TEXT,
+ADD COLUMN IF NOT EXISTS manufacturer TEXT,
+ADD COLUMN IF NOT EXISTS image_id TEXT;
 
 COMMENT ON COLUMN equipment.resource_id IS
   'Resource ID for flex integration. Will be used to link equipment to flex resources.';
+
+COMMENT ON COLUMN equipment.manufacturer IS
+  'Equipment manufacturer name from Flex or manually entered.';
+
+COMMENT ON COLUMN equipment.image_id IS
+  'Flex image ID for equipment thumbnail. Used to fetch images on demand.';
 
 -- Step 2: Create index on resource_id for better query performance
 CREATE INDEX IF NOT EXISTS equipment_resource_id_idx ON equipment(resource_id);
@@ -49,6 +57,8 @@ BEGIN
   RAISE NOTICE '  Equipment models found: %', v_equipment_models_count;
   RAISE NOTICE '  Total equipment after migration: %', v_total_equipment;
   RAISE NOTICE '  ✓ resource_id field added for flex integration';
+  RAISE NOTICE '  ✓ manufacturer field added for equipment details';
+  RAISE NOTICE '  ✓ image_id field added for flex images';
   RAISE NOTICE '  ✓ All equipment_models data migrated to equipment table';
 END $$;
 
