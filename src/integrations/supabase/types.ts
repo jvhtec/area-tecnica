@@ -736,6 +736,7 @@ export type Database = {
           department: string
           id: string
           name: string
+          resource_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -744,6 +745,7 @@ export type Database = {
           department?: string
           id?: string
           name: string
+          resource_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -752,31 +754,8 @@ export type Database = {
           department?: string
           id?: string
           name?: string
+          resource_id?: string | null
           updated_at?: string | null
-        }
-        Relationships: []
-      }
-      equipment_models: {
-        Row: {
-          category: string
-          created_at: string
-          id: string
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          category: string
-          created_at?: string
-          id?: string
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          id?: string
-          name?: string
-          updated_at?: string
         }
         Relationships: []
       }
