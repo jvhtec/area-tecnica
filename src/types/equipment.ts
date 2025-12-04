@@ -106,7 +106,7 @@ export const getCategoriesForDepartment = (department: Department): readonly All
   }
 };
 
-// Equipment model categories (for the equipment_models table - text field)
+// Equipment model categories (for the equipment table - sound department)
 export const SOUND_MODEL_CATEGORIES = [
   { value: 'foh_console', label: 'FOH Consoles' },
   { value: 'mon_console', label: 'Monitor Consoles' },
