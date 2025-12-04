@@ -39,11 +39,25 @@ export const useHojaDeRutaInitialization = (
         return "";
       }
 
-      const powerText = powerRequirements
+      // Deduplicate requirements based on table_name and department
+      const uniqueRequirements = powerRequirements.reduce((acc: any[], current: any) => {
+        const x = acc.find(item => item.table_name === current.table_name && item.department === current.department);
+        if (!x) {
+          return acc.concat([current]);
+        } else {
+          return acc;
+        }
+      }, []);
+
+      const powerText = uniqueRequirements
         .map((req: any) => {
+          const current = typeof req.current_per_phase === 'number' 
+            ? req.current_per_phase.toFixed(2) 
+            : req.current_per_phase;
+            
           return `${req.department.toUpperCase()} - ${req.table_name}:\n` +
             `Potencia Total: ${req.total_watts}W\n` +
-            `Corriente por Fase: ${req.current_per_phase}A\n` +
+            `Corriente por Fase: ${current}A\n` +
             `PDU Recomendado: ${req.pdu_type}\n`;
         })
         .join("\n");

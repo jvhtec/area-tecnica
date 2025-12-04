@@ -76,8 +76,8 @@ export class Formatters {
     try {
       const date = new Date(datetime);
       if (isNaN(date.getTime())) return datetime;
-      // Format as "DD/MM/YYYY HH:mm" in Spain time (Europe/Madrid)
-      return formatInTimeZone(date, 'Europe/Madrid', 'dd/MM/yyyy HH:mm');
+      // Format as "dd/MM/yy - HH:mm" in Spain time (Europe/Madrid)
+      return formatInTimeZone(date, 'Europe/Madrid', 'dd/MM/yy - HH:mm');
     } catch {
       return datetime;
     }
