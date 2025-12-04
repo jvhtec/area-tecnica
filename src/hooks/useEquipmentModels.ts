@@ -37,7 +37,7 @@ export const useEquipmentModels = () => {
   });
 
   const createModelMutation = useMutation({
-    mutationFn: async (model: { name: string; category: string }) => {
+    mutationFn: async (model: { name: string; category: string; resource_id?: string }) => {
       const { data, error } = await supabase
         .from('equipment')
         .insert([{ ...model, department: 'sound' }])
@@ -64,7 +64,7 @@ export const useEquipmentModels = () => {
   });
 
   const updateModelMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; name?: string; category?: string }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; name?: string; category?: string; resource_id?: string }) => {
       const { data, error } = await supabase
         .from('equipment')
         .update(updates)
