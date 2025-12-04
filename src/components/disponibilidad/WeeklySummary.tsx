@@ -37,6 +37,8 @@ interface Equipment {
   current_quantity: number;
   base_quantity?: number;
   rental_boost?: number;
+  image_id?: string | null;
+  manufacturer?: string | null;
 }
 
 export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps) {
@@ -87,7 +89,13 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     queryFn: async () => {
       const { data, error } = await supabase
         .from('equipment_availability_with_rentals')
-        .select('*')
+        .select(`
+          *,
+          equipment:equipment_id (
+            image_id,
+            manufacturer
+          )
+        `)
         .in('category', departmentCategories)
         .order('category')
         .order('equipment_name');
@@ -104,7 +112,9 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
         // Treat current_quantity as base stock for weekly calculations
         current_quantity: item.base_quantity || 0,
         base_quantity: item.base_quantity || 0,
-        rental_boost: 0
+        rental_boost: 0,
+        image_id: (item.equipment as any)?.image_id || null,
+        manufacturer: (item.equipment as any)?.manufacturer || null
       })) as Equipment[];
     }
   });
@@ -514,7 +524,34 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
                       return (
                         <TableRow key={item.id}>
                           <TableCell className={cn("w-[200px] font-medium", isMobile && "w-[120px]")}>
-                            <div className="truncate" title={item.name}>{item.name}</div>
+                            {item.image_id ? (
+                              <TooltipProvider>
+                                <Tooltip delayDuration={200}>
+                                  <TooltipTrigger asChild>
+                                    <div className="truncate cursor-pointer" title={item.name}>{item.name}</div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right" className="p-2">
+                                    <div className="space-y-2">
+                                      <img
+                                        src={`https://sectorpro.flexrentalsolutions.com/f5/api/image/${item.image_id}/thumb`}
+                                        alt={item.name}
+                                        className="max-w-[200px] max-h-[200px] rounded"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                          e.currentTarget.nextElementSibling!.textContent = 'Image not available';
+                                        }}
+                                      />
+                                      <div className="text-sm font-medium">{item.name}</div>
+                                      {item.manufacturer && (
+                                        <div className="text-xs text-muted-foreground">{item.manufacturer}</div>
+                                      )}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <div className="truncate" title={item.name}>{item.name}</div>
+                            )}
                           </TableCell>
                           <TableCell className={cn("w-[120px]", isMobile && "w-[80px]")}>
                             <div className="truncate" title={allCategoryLabels[item.category]}>{allCategoryLabels[item.category]}</div>

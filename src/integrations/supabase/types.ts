@@ -735,6 +735,8 @@ export type Database = {
           created_at: string | null
           department: string
           id: string
+          image_id: string | null
+          manufacturer: string | null
           name: string
           updated_at: string | null
         }
@@ -743,6 +745,8 @@ export type Database = {
           created_at?: string | null
           department?: string
           id?: string
+          image_id?: string | null
+          manufacturer?: string | null
           name: string
           updated_at?: string | null
         }
@@ -751,6 +755,8 @@ export type Database = {
           created_at?: string | null
           department?: string
           id?: string
+          image_id?: string | null
+          manufacturer?: string | null
           name?: string
           updated_at?: string | null
         }
