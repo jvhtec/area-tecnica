@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, isWithinInterval } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, isWithinInterval, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Loader2, Palmtree } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
     const [showAddSheet, setShowAddSheet] = useState(false);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     // Fetch unavailability blocks
     const { data: blocks = [], isLoading } = useQuery<AvailabilityBlock[]>({
@@ -95,6 +96,9 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
             const { error } = await supabase.from('technician_availability').delete().eq('id', id);
             if (error) throw error;
         },
+        onMutate: (id) => {
+            setDeletingId(id);
+        },
         onSuccess: () => {
             toast.success('Disponibilidad restaurada');
             queryClient.invalidateQueries({ queryKey: ['my-unavailability'] });
@@ -102,6 +106,9 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
         onError: (e: unknown) => {
             const message = e instanceof Error ? e.message : 'No se pudo eliminar';
             toast.error(message);
+        },
+        onSettled: () => {
+            setDeletingId(null);
         },
     });
 
@@ -226,7 +233,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
                                                     b.status === 'sick' ? 'Baja médica' : 'No disponible'}
                                         </div>
                                         <div className={`text-xs ${theme.textMuted}`}>
-                                            {format(new Date(b.date), 'PPP', { locale: es })}
+                                            {format(parseISO(b.date), 'PPP', { locale: es })}
                                         </div>
                                     </div>
                                 </div>
@@ -234,9 +241,9 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => deleteMutation.mutate(b.id)}
-                                    disabled={deleteMutation.isPending}
+                                    disabled={deleteMutation.isPending && deletingId === b.id}
                                 >
-                                    {deleteMutation.isPending ? (
+                                    {deleteMutation.isPending && deletingId === b.id ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                     ) : (
                                         <Trash2 size={16} className={theme.textMuted} />
