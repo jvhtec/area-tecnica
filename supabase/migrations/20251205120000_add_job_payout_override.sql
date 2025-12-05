@@ -24,7 +24,6 @@ declare
   v_user_id text;
   v_user_role text;
   v_user_department text;
-  v_job_department text;
   v_has_permission boolean := false;
   v_old_enabled boolean;
   v_old_amount numeric;
@@ -50,32 +49,41 @@ begin
     raise exception 'User profile not found';
   end if;
 
-  -- Get job department (from the job's location or assigned technicians)
-  -- For simplicity, we'll get it from the first assigned technician's department
-  -- Admin users can override any job, management users can only override jobs in their department
-  select p.department
-  into v_job_department
-  from job_assignments ja
-  join profiles p on p.id = ja.technician_id
-  where ja.job_id = _job_id
-  limit 1;
-
   -- Check permissions
   -- Admin can override any job
   if v_user_role = 'admin' then
     v_has_permission := true;
-  -- Management can only override jobs in their department
+  -- Management can only override jobs where ALL assigned technicians are from their department
   elsif v_user_role = 'management' then
-    if v_user_department is not null and v_job_department is not null and v_user_department = v_job_department then
-      v_has_permission := true;
-    elsif v_job_department is null then
-      -- If job has no department assigned yet, allow management to override
-      v_has_permission := true;
+    if v_user_department is not null then
+      -- Check if there are any technicians assigned to this job
+      -- If there are assigned technicians, ALL must be from the manager's department
+      -- If there are no assigned technicians yet, allow the override
+      if exists (
+        select 1
+        from job_assignments ja
+        where ja.job_id = _job_id
+      ) then
+        -- Check if ALL technicians are from the manager's department
+        -- If any technician is NOT from the manager's department, deny permission
+        if not exists (
+          select 1
+          from job_assignments ja
+          join profiles p on p.id = ja.technician_id
+          where ja.job_id = _job_id
+            and (p.department is null or p.department != v_user_department)
+        ) then
+          v_has_permission := true;
+        end if;
+      else
+        -- No technicians assigned yet, allow management to override
+        v_has_permission := true;
+      end if;
     end if;
   end if;
 
   if not v_has_permission then
-    raise exception 'Permission denied: Only admin users and department managers can set job payout overrides';
+    raise exception 'Permission denied: Only admin users and department managers (for their department technicians) can set job payout overrides';
   end if;
 
   -- Validate amount if enabled
@@ -135,4 +143,4 @@ $$;
 -- Grant execute permission to authenticated users
 grant execute on function set_job_payout_override to authenticated;
 
-comment on function set_job_payout_override is 'Set or update job payout override with permission checks. Returns JSON with old/new values for email notification.';
+comment on function set_job_payout_override is 'Set or update job payout override with permission checks. Admin users can override any job. Department managers can only override jobs where ALL assigned technicians are from their department. Returns JSON with old/new values for email notification.';
