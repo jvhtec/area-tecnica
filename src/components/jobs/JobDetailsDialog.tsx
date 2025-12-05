@@ -553,9 +553,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const handleDownloadDocument = async (doc: any) => {
     try {
       const { bucket, path } = resolveJobDocLocation(doc.file_path);
-      const { data } = await supabase.storage
+      const { data, error } = await supabase.storage
         .from(bucket)
         .createSignedUrl(path, 3600);
+
+      if (error) throw error;
 
       if (data?.signedUrl) {
         const link = document.createElement('a');
@@ -564,9 +566,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        toast.success('Descargando documento');
+      } else {
+        throw new Error('No se pudo generar el enlace de descarga');
       }
     } catch (error) {
       console.error('Error downloading document:', error);
+      toast.error(`Error al descargar el documento: ${(error as Error).message || 'Error desconocido'}`);
     }
   };
 
@@ -581,9 +587,12 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
       if (data?.signedUrl) {
         window.open(data.signedUrl, '_blank', 'noopener');
+      } else {
+        throw new Error('No se pudo generar el enlace de visualización');
       }
     } catch (error) {
       console.error('Error viewing document:', error);
+      toast.error(`Error al visualizar el documento: ${(error as Error).message || 'Error desconocido'}`);
     }
   };
 
@@ -1323,8 +1332,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                         const isTemplate = doc.template_type === 'soundvision';
                         const isReadOnly = Boolean(doc.read_only);
                         return (
-                          <div key={doc.id} className="flex items-center justify-between p-3 bg-[#0f1219] border border-[#1f232e] rounded min-w-0">
-                            <div className="min-w-0">
+                          <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-[#0f1219] border border-[#1f232e] rounded min-w-0">
+                            <div className="min-w-0 flex-1">
                               <p className="font-medium flex items-center gap-2 break-words">
                                 {doc.file_name}
                                 {isTemplate && (
@@ -1338,11 +1347,12 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 {isReadOnly && <span className="ml-2 italic">Solo lectura</span>}
                               </p>
                             </div>
-                            <div className="flex gap-2 shrink-0">
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:shrink-0">
                               <Button
                                 onClick={() => handleViewDocument(doc)}
                                 size="sm"
                                 variant="outline"
+                                className="w-full sm:w-auto"
                               >
                                 <Eye className="h-4 w-4 mr-2" />
                                 Ver
@@ -1351,6 +1361,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 onClick={() => handleDownloadDocument(doc)}
                                 size="sm"
                                 variant="outline"
+                                className="w-full sm:w-auto"
                               >
                                 <Download className="h-4 w-4 mr-2" />
                                 Descargar
