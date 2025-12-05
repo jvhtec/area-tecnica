@@ -2,13 +2,17 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send } from 'lucide-react';
+import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send, Edit2 } from 'lucide-react';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
+import { useJobPayoutOverride } from '@/hooks/useJobPayoutOverride';
 import { cn, formatCurrency } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import {
   prepareJobPayoutEmailContext,
@@ -19,6 +23,7 @@ import {
 import { sendTourJobEmails } from '@/lib/tour-payout-email';
 import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-export';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import type { JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 
@@ -43,7 +48,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, title, start_time, tour_id, rates_approved, job_type')
+        .select('id, title, start_time, tour_id, rates_approved, job_type, payout_override_enabled, payout_override_amount_eur')
         .eq('id', jobId)
         .maybeSingle();
       if (error) throw error;
@@ -54,6 +59,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         tour_id: string | null;
         rates_approved: boolean | null;
         job_type: string | null;
+        payout_override_enabled: boolean;
+        payout_override_amount_eur: number | null;
       };
     },
     staleTime: 60_000,
@@ -187,10 +194,60 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const [missingEmailTechIds, setMissingEmailTechIds] = React.useState<string[]>([]);
   const lastPreparedContext = React.useRef<JobPayoutEmailContextResult | null>(null);
 
+  // Payout override state
+  const { userRole, user } = useOptimizedAuth();
+  const isManager = userRole === 'admin' || userRole === 'management';
+  const [overrideEnabled, setOverrideEnabled] = React.useState(false);
+  const [overrideAmount, setOverrideAmount] = React.useState('');
+  const payoutOverrideMutation = useJobPayoutOverride();
+
+  // Initialize override state from job metadata
+  React.useEffect(() => {
+    if (jobMeta) {
+      setOverrideEnabled(jobMeta.payout_override_enabled ?? false);
+      setOverrideAmount(
+        jobMeta.payout_override_amount_eur != null
+          ? jobMeta.payout_override_amount_eur.toString()
+          : ''
+      );
+    }
+  }, [jobMeta]);
+
   React.useEffect(() => {
     setMissingEmailTechIds([]);
     lastPreparedContext.current = null;
   }, [jobId, isTourDate]);
+
+  // Calculate total payout (sum of all technicians)
+  const calculatedGrandTotal = React.useMemo(() => {
+    return payoutTotals.reduce((sum, payout) => sum + payout.total_eur, 0);
+  }, [payoutTotals]);
+
+  // Handle override save
+  const handleSaveOverride = React.useCallback(() => {
+    if (overrideEnabled && !overrideAmount) {
+      toast.error('Por favor, ingresa un monto para el override');
+      return;
+    }
+
+    const amountValue = overrideEnabled ? parseFloat(overrideAmount) : 0;
+    if (overrideEnabled && (isNaN(amountValue) || amountValue < 0)) {
+      toast.error('El monto debe ser un número válido mayor o igual a 0');
+      return;
+    }
+
+    payoutOverrideMutation.mutate({
+      jobId,
+      enabled: overrideEnabled,
+      amountEur: amountValue,
+      calculatedTotal: calculatedGrandTotal,
+    });
+  }, [jobId, overrideEnabled, overrideAmount, calculatedGrandTotal, payoutOverrideMutation]);
+
+  // Determine the display total (override or calculated)
+  const displayGrandTotal = jobMeta?.payout_override_enabled && jobMeta.payout_override_amount_eur != null
+    ? jobMeta.payout_override_amount_eur
+    : calculatedGrandTotal;
 
   const prepareStandardContext = React.useCallback(async () => {
     const context = await prepareJobPayoutEmailContext({
@@ -706,16 +763,87 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           </div>
         ))}
 
+        {/* Payout Override Section (Admin/Management only) */}
+        {isManager && payoutTotals.length > 0 && (
+          <div className="mt-6 p-4 bg-amber-500/10 rounded-lg border border-amber-500/30 text-white">
+            <div className="flex items-center gap-2 mb-3">
+              <Edit2 className="h-5 w-5 text-amber-300" />
+              <h3 className="font-semibold text-amber-100">Override de Pago Total</h3>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="override-enabled"
+                  checked={overrideEnabled}
+                  onCheckedChange={(checked) => setOverrideEnabled(checked === true)}
+                  className="border-amber-400 data-[state=checked]:bg-amber-500"
+                />
+                <Label htmlFor="override-enabled" className="text-sm cursor-pointer">
+                  Activar modo override (cantidad fija)
+                </Label>
+              </div>
+
+              {overrideEnabled && (
+                <div className="flex items-center gap-3">
+                  <Label htmlFor="override-amount" className="text-sm min-w-[80px]">
+                    Monto (€):
+                  </Label>
+                  <Input
+                    id="override-amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={overrideAmount}
+                    onChange={(e) => setOverrideAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="max-w-[200px] bg-white/10 border-amber-400/50 text-white placeholder:text-slate-400"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSaveOverride}
+                    disabled={payoutOverrideMutation.isPending}
+                    className="bg-amber-600 hover:bg-amber-500 text-white"
+                  >
+                    {payoutOverrideMutation.isPending ? 'Guardando...' : 'Guardar'}
+                  </Button>
+                </div>
+              )}
+
+              {!overrideEnabled && jobMeta?.payout_override_enabled && (
+                <Button
+                  size="sm"
+                  onClick={handleSaveOverride}
+                  disabled={payoutOverrideMutation.isPending}
+                  className="bg-amber-600 hover:bg-amber-500 text-white"
+                >
+                  {payoutOverrideMutation.isPending ? 'Guardando...' : 'Desactivar Override'}
+                </Button>
+              )}
+
+              <div className="text-xs text-amber-200 bg-amber-900/30 p-2 rounded border border-amber-500/20">
+                <p className="font-medium mb-1">⚠️ Importante:</p>
+                <p>Al activar el override, se enviará un email automático a los administradores y a finanzas@sector-pro.com con los datos del cambio.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Grand total if multiple technicians */}
         {payoutTotals.length > 1 && (
           <div className="mt-6 p-4 bg-white/5 rounded-lg border border-white/10 text-white">
             <div className="flex justify-between items-center text-lg font-bold">
               <span>Total global del trabajo:</span>
-              <span className="text-blue-300">
-                {formatCurrency(
-                  payoutTotals.reduce((sum, payout) => sum + payout.total_eur, 0)
+              <div className="flex items-center gap-2">
+                <span className="text-blue-300">
+                  {formatCurrency(displayGrandTotal)}
+                </span>
+                {jobMeta?.payout_override_enabled && (
+                  <Badge variant="outline" className="text-amber-300 border-amber-500/40 bg-amber-500/10">
+                    Override activo
+                  </Badge>
                 )}
-              </span>
+              </div>
             </div>
             <div className="text-sm text-slate-300 mt-2 space-y-1">
               <div className="flex justify-between">
@@ -734,6 +862,19 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                   )}
                 </span>
               </div>
+              {jobMeta?.payout_override_enabled && (
+                <>
+                  <Separator className="border-white/10 my-2" />
+                  <div className="flex justify-between text-amber-200">
+                    <span>Total calculado (sin override):</span>
+                    <span>{formatCurrency(calculatedGrandTotal)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold text-amber-300">
+                    <span>Total con override:</span>
+                    <span>{formatCurrency(jobMeta.payout_override_amount_eur ?? 0)}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

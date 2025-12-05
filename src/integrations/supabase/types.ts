@@ -3506,6 +3506,10 @@ export type Database = {
           id: string
           job_type: Database["public"]["Enums"]["job_type"]
           location_id: string | null
+          payout_override_amount_eur: number | null
+          payout_override_enabled: boolean
+          payout_override_set_at: string | null
+          payout_override_set_by: string | null
           rates_approved: boolean
           rates_approved_at: string | null
           rates_approved_by: string | null
@@ -3526,6 +3530,10 @@ export type Database = {
           id?: string
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
+          payout_override_amount_eur?: number | null
+          payout_override_enabled?: boolean
+          payout_override_set_at?: string | null
+          payout_override_set_by?: string | null
           rates_approved?: boolean
           rates_approved_at?: string | null
           rates_approved_by?: string | null
@@ -3546,6 +3554,10 @@ export type Database = {
           id?: string
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
+          payout_override_amount_eur?: number | null
+          payout_override_enabled?: boolean
+          payout_override_set_at?: string | null
+          payout_override_set_by?: string | null
           rates_approved?: boolean
           rates_approved_at?: string | null
           rates_approved_by?: string | null
@@ -8035,6 +8047,14 @@ export type Database = {
         Returns: Database["public"]["Enums"]["activity_visibility"]
       }
       rotate_my_calendar_ics_token: { Args: never; Returns: string }
+      set_job_payout_override: {
+        Args: {
+          _job_id: string
+          _enabled: boolean
+          _amount_eur?: number
+        }
+        Returns: Json
+      }
       sync_preset_assignments_for_tour: {
         Args: { _preset_id: string; _tour_id: string }
         Returns: undefined
