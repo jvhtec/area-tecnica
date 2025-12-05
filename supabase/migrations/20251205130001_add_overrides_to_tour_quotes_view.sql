@@ -1,11 +1,11 @@
 -- Update v_tour_job_rate_quotes_2025 view to include override amounts
 -- This ensures tour date PDFs and emails reflect the override totals
 
--- First, drop the existing view if it exists
-drop view if exists v_tour_job_rate_quotes_2025_with_overrides;
+-- Step 1: Rename the existing view to a temporary name
+alter view v_tour_job_rate_quotes_2025 rename to v_tour_job_rate_quotes_2025_base;
 
--- Create a new view that wraps the existing view and adds override logic
-create or replace view v_tour_job_rate_quotes_2025_with_overrides as
+-- Step 2: Create the wrapper view that adds override logic
+create view v_tour_job_rate_quotes_2025 as
 select
   base.job_id,
   base.technician_id,
@@ -31,43 +31,13 @@ select
   -- Use override amount if exists, otherwise use the original calculated totals
   coalesce(overrides.override_amount_eur, base.total_eur) as total_eur,
   coalesce(overrides.override_amount_eur, base.total_with_extras_eur) as total_with_extras_eur
-from v_tour_job_rate_quotes_2025 base
+from v_tour_job_rate_quotes_2025_base base
 left join job_technician_payout_overrides overrides
   on overrides.job_id = base.job_id
   and overrides.technician_id = base.technician_id;
 
--- Now replace the original view with the one that includes overrides
-drop view if exists v_tour_job_rate_quotes_2025;
-
-create view v_tour_job_rate_quotes_2025 as
-select
-  job_id,
-  technician_id,
-  title,
-  start_time,
-  end_time,
-  tour_id,
-  job_type,
-  category,
-  is_house_tech,
-  is_tour_team_member,
-  base_day_eur,
-  week_count,
-  multiplier,
-  per_job_multiplier,
-  iso_year,
-  iso_week,
-  extras,
-  extras_total_eur,
-  vehicle_disclaimer,
-  vehicle_disclaimer_text,
-  breakdown,
-  total_eur,
-  total_with_extras_eur
-from v_tour_job_rate_quotes_2025_with_overrides;
-
 -- Grant appropriate permissions
 grant select on v_tour_job_rate_quotes_2025 to authenticated;
 grant select on v_tour_job_rate_quotes_2025 to service_role;
-grant select on v_tour_job_rate_quotes_2025_with_overrides to authenticated;
-grant select on v_tour_job_rate_quotes_2025_with_overrides to service_role;
+grant select on v_tour_job_rate_quotes_2025_base to authenticated;
+grant select on v_tour_job_rate_quotes_2025_base to service_role;
