@@ -43,37 +43,113 @@ create policy "Users can view payout overrides for jobs they can see"
 create policy "Only admins and department managers can insert overrides"
   on job_technician_payout_overrides for insert
   with check (
+    -- Admin users have unconditional access
     exists (
       select 1 from profiles
       where id = auth.uid()::text
-        and role in ('admin', 'management')
+        and role = 'admin'
+    )
+    or
+    -- Management users can only insert for their department's technicians on assigned jobs
+    (
+      exists (
+        select 1 from profiles p
+        where p.id = auth.uid()::text
+          and p.role = 'management'
+          and p.department = (
+            select department from profiles
+            where id = job_technician_payout_overrides.technician_id
+          )
+      )
+      and exists (
+        select 1 from job_assignments ja
+        where ja.job_id = job_technician_payout_overrides.job_id
+          and ja.technician_id = job_technician_payout_overrides.technician_id
+      )
     )
   );
 
 create policy "Only admins and department managers can update overrides"
   on job_technician_payout_overrides for update
   using (
+    -- Admin users have unconditional access
     exists (
       select 1 from profiles
       where id = auth.uid()::text
-        and role in ('admin', 'management')
+        and role = 'admin'
+    )
+    or
+    -- Management users can only update for their department's technicians on assigned jobs
+    (
+      exists (
+        select 1 from profiles p
+        where p.id = auth.uid()::text
+          and p.role = 'management'
+          and p.department = (
+            select department from profiles
+            where id = job_technician_payout_overrides.technician_id
+          )
+      )
+      and exists (
+        select 1 from job_assignments ja
+        where ja.job_id = job_technician_payout_overrides.job_id
+          and ja.technician_id = job_technician_payout_overrides.technician_id
+      )
     )
   )
   with check (
+    -- Admin users have unconditional access
     exists (
       select 1 from profiles
       where id = auth.uid()::text
-        and role in ('admin', 'management')
+        and role = 'admin'
+    )
+    or
+    -- Management users can only update for their department's technicians on assigned jobs
+    (
+      exists (
+        select 1 from profiles p
+        where p.id = auth.uid()::text
+          and p.role = 'management'
+          and p.department = (
+            select department from profiles
+            where id = job_technician_payout_overrides.technician_id
+          )
+      )
+      and exists (
+        select 1 from job_assignments ja
+        where ja.job_id = job_technician_payout_overrides.job_id
+          and ja.technician_id = job_technician_payout_overrides.technician_id
+      )
     )
   );
 
 create policy "Only admins and department managers can delete overrides"
   on job_technician_payout_overrides for delete
   using (
+    -- Admin users have unconditional access
     exists (
       select 1 from profiles
       where id = auth.uid()::text
-        and role in ('admin', 'management')
+        and role = 'admin'
+    )
+    or
+    -- Management users can only delete for their department's technicians on assigned jobs
+    (
+      exists (
+        select 1 from profiles p
+        where p.id = auth.uid()::text
+          and p.role = 'management'
+          and p.department = (
+            select department from profiles
+            where id = job_technician_payout_overrides.technician_id
+          )
+      )
+      and exists (
+        select 1 from job_assignments ja
+        where ja.job_id = job_technician_payout_overrides.job_id
+          and ja.technician_id = job_technician_payout_overrides.technician_id
+      )
     )
   );
 
@@ -156,9 +232,13 @@ begin
     raise exception 'Permission denied: Only admin users and department managers can override technician payouts for their department';
   end if;
 
-  -- Validate amount
+  -- Validate amount (numeric(10,2) allows max 99,999,999.99)
   if _amount_eur is null or _amount_eur < 0 then
     raise exception 'Override amount must be a positive number';
+  end if;
+
+  if _amount_eur > 99999999.99 then
+    raise exception 'Override amount must not exceed 99,999,999.99 (database constraint)';
   end if;
 
   -- Get job info

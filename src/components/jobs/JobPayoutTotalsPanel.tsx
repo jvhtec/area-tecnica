@@ -235,8 +235,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   // Handle saving override for a technician
   const handleSaveOverride = React.useCallback((techId: string, techName: string, calculatedTotal: number) => {
     const amountValue = parseFloat(editingAmount);
-    if (isNaN(amountValue) || amountValue < 0 || !Number.isFinite(amountValue) || amountValue > 999999999.99) {
-      toast.error('El monto debe ser un número válido mayor o igual a 0 y menor que 1.000.000.000');
+    if (isNaN(amountValue) || amountValue < 0 || !Number.isFinite(amountValue) || amountValue > 99999999.99) {
+      toast.error('El monto debe ser un número válido entre 0 y 99.999.999,99');
       return;
     }
 
