@@ -1237,9 +1237,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   ) : filteredAssignments.length > 0 ? (
                     <div className="space-y-3">
                       {filteredAssignments.map((assignment: any) => (
-                        <div key={assignment.technician_id} className="flex items-center justify-between p-3 bg-muted rounded">
-                          <div>
-                            <p className="font-medium">
+                        <div key={assignment.technician_id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-muted rounded min-w-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium break-words">
                               {assignment.profiles
                                 ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
                                 : assignment.external_technician_name || 'Desconocido'
@@ -1249,7 +1249,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               {assignment.profiles?.department || 'Externo'}
                             </p>
                             {assignment.single_day && (
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground break-words">
                                 {(() => {
                                   const dates = technicianDatesMap.get(assignment.technician_id);
                                   if (dates && dates.size > 0) {
@@ -1267,7 +1267,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               </p>
                             )}
                           </div>
-                          <div className="flex gap-1">
+                          <div className="flex flex-wrap gap-1 w-full sm:w-auto sm:shrink-0">
                             {assignment.sound_role && (
                               <Badge variant="outline" className="text-xs">
                                 Sonido: {labelForCode(assignment.sound_role)}
@@ -1389,16 +1389,16 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   ) : riderFiles.length > 0 ? (
                     <div className="space-y-2">
                       {riderFiles.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between p-3 bg-muted rounded">
-                          <div>
-                            <p className="font-medium">{file.file_name}</p>
-                            <p className="text-sm text-muted-foreground">Artista: {artistNameMap.get(file.artist_id) || 'Desconocido'}</p>
+                        <div key={file.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-muted rounded min-w-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium break-words">{file.file_name}</p>
+                            <p className="text-sm text-muted-foreground break-words">Artista: {artistNameMap.get(file.artist_id) || 'Desconocido'}</p>
                           </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => viewRider(file)}>
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:shrink-0">
+                            <Button size="sm" variant="outline" onClick={() => viewRider(file)} className="w-full sm:w-auto">
                               <Eye className="h-4 w-4 mr-1" /> Ver
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => downloadRider(file)}>
+                            <Button size="sm" variant="outline" onClick={() => downloadRider(file)} className="w-full sm:w-auto">
                               <Download className="h-4 w-4 mr-1" /> Descargar
                             </Button>
                           </div>
@@ -1430,12 +1430,12 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     <div className="space-y-3">
                       {restaurants.map((restaurant: Restaurant) => (
                         <div key={restaurant.id} className="p-3 bg-[#0f1219] border border-[#1f232e] rounded">
-                          <div className="flex items-start justify-between gap-3 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 min-w-0">
                             <div className="flex-1 min-w-0">
                               <p className="font-medium break-words">{restaurant.name}</p>
                               <p className="text-sm text-muted-foreground break-words">{restaurant.address}</p>
 
-                              <div className="flex items-center gap-2 mt-2">
+                              <div className="flex flex-wrap items-center gap-2 mt-2">
                                 {restaurant.rating && (
                                   <Badge variant="outline" className="text-xs">
                                     ⭐ {restaurant.rating}
@@ -1454,18 +1454,20 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               </div>
                             </div>
 
-                            <div className="flex gap-1">
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:shrink-0">
                               {restaurant.phone && (
-                                <Button size="sm" variant="outline" asChild>
+                                <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
                                   <a href={`tel:${restaurant.phone}`}>
-                                    <Phone className="h-4 w-4" />
+                                    <Phone className="h-4 w-4 sm:mr-0" />
+                                    <span className="sm:hidden ml-2">Llamar</span>
                                   </a>
                                 </Button>
                               )}
                               {restaurant.website && (
-                                <Button size="sm" variant="outline" asChild>
+                                <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
                                   <a href={restaurant.website} target="_blank" rel="noopener noreferrer">
-                                    <Globe className="h-4 w-4" />
+                                    <Globe className="h-4 w-4 sm:mr-0" />
+                                    <span className="sm:hidden ml-2">Sitio web</span>
                                   </a>
                                 </Button>
                               )}
