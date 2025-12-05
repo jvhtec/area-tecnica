@@ -324,7 +324,7 @@ serve(async (req) => {
       // Checks for both hard conflicts (confirmed) and soft conflicts (pending)
       // Changed to warning-only mode: conflicts are logged but don't block sending
       // This allows different departments to start at different times without false positives
-      let conflictWarnings: any = null;
+      const conflictWarnings: any[] = [];
       if (shouldOverrideConflicts) {
         console.log('⚠️ CONFLICT CHECK OVERRIDDEN by user - skipping conflict detection');
       } else {
@@ -363,17 +363,17 @@ serve(async (req) => {
                 note: 'Different departments may start at different times, so whole job span conflicts are treated as warnings'
               });
 
-              // Store conflict warnings for metadata logging (don't block)
-              conflictWarnings = {
+              // Accumulate conflict warnings for metadata logging (don't overwrite)
+              conflictWarnings.push({
                 conflict_type: conflictType,
                 conflicts: conflicts,
                 unavailability: conflictResult.unavailabilityConflicts,
                 target_date: dateToCheck
-              };
+              });
             }
           }
 
-          if (conflictWarnings) {
+          if (conflictWarnings.length > 0) {
             console.log('⚠️ Conflicts detected but allowing send to proceed - conflicts logged as warnings');
           } else {
             console.log('✅ No conflicts detected, proceeding to send email');
@@ -384,56 +384,68 @@ serve(async (req) => {
       }
 
       // Step 2c: Hard block for actual timesheet conflicts on specific dates
-      // This prevents double-booking on the same exact date (real conflicts)
-      // while allowing whole-job-span warnings (false positives from different dept start times)
-      if (!shouldOverrideConflicts) {
-        try {
-          console.log('🕒 TIMESHEET CHECK: verifying no double-booking on exact dates...');
+      // CRITICAL: This check is NOT overridable - prevents real double-bookings
+      // Runs regardless of shouldOverrideConflicts flag
+      try {
+        console.log('🕒 TIMESHEET CHECK: verifying no double-booking on exact dates...');
 
-          const datesToCheck = normalizedDates.length > 0 ? normalizedDates : (normalizedTargetDate ? [normalizedTargetDate] : []);
+        // Determine dates to check: use explicit dates if provided, otherwise derive from job
+        let datesToCheck = normalizedDates.length > 0 ? normalizedDates : (normalizedTargetDate ? [normalizedTargetDate] : []);
 
-          if (datesToCheck.length > 0) {
-            // Check if technician already has timesheets for these exact dates
-            const { data: existingTimesheets, error: timesheetErr } = await supabase
-              .from('timesheets')
-              .select('date, job_id, jobs(title)')
-              .eq('technician_id', profile_id)
-              .in('date', datesToCheck)
-              .neq('job_id', job_id);
-
-            if (timesheetErr) {
-              console.warn('⚠️ Timesheet check failed, continuing:', timesheetErr);
-            } else if (existingTimesheets && existingTimesheets.length > 0) {
-              // Found actual timesheet conflicts - this is a real double-booking
-              const conflictDates = existingTimesheets.map(ts => ({
-                date: ts.date,
-                job_title: (ts.jobs as any)?.title || 'Unknown Job'
-              }));
-
-              console.log('⛔ HARD CONFLICT: Timesheet already exists for exact dates:', conflictDates);
-
-              return new Response(JSON.stringify({
-                error: 'Technician already has confirmed work on these dates',
-                details: {
-                  conflict_type: 'timesheet',
-                  dates: conflictDates,
-                  target_job: {
-                    id: job.id,
-                    title: job.title,
-                  },
-                  technician: { id: tech.id, name: fullName }
-                }
-              }), {
-                status: 409,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              });
-            } else {
-              console.log('✅ No timesheet conflicts on exact dates');
-            }
+        // If no explicit dates (whole-span request), derive from job start/end dates
+        if (datesToCheck.length === 0 && job.start_time && job.end_time) {
+          const jobStart = new Date(job.start_time);
+          const jobEnd = new Date(job.end_time);
+          const dates: string[] = [];
+          for (let d = new Date(jobStart); d <= jobEnd; d.setDate(d.getDate() + 1)) {
+            dates.push(d.toISOString().split('T')[0]);
           }
-        } catch (timesheetCheckErr) {
-          console.warn('⚠️ Timesheet check encountered an error, continuing:', timesheetCheckErr);
+          datesToCheck = dates;
+          console.log(`📅 Whole-span request detected, checking ${dates.length} dates from job span`);
         }
+
+        if (datesToCheck.length > 0) {
+          // Check if technician already has timesheets for these exact dates
+          const { data: existingTimesheets, error: timesheetErr } = await supabase
+            .from('timesheets')
+            .select('date, job_id, jobs(title)')
+            .eq('technician_id', profile_id)
+            .in('date', datesToCheck)
+            .neq('job_id', job_id);
+
+          if (timesheetErr) {
+            console.warn('⚠️ Timesheet check failed, continuing:', timesheetErr);
+          } else if (existingTimesheets && existingTimesheets.length > 0) {
+            // Found actual timesheet conflicts - this is a real double-booking
+            const conflictDates = existingTimesheets.map(ts => ({
+              date: ts.date,
+              job_title: (ts.jobs as any)?.title || 'Unknown Job'
+            }));
+
+            console.log('⛔ HARD CONFLICT: Timesheet already exists for exact dates:', conflictDates);
+
+            return new Response(JSON.stringify({
+              error: 'Technician already has confirmed work on these dates',
+              details: {
+                conflict_type: 'timesheet',
+                dates: conflictDates,
+                target_job: {
+                  id: job.id,
+                  title: job.title,
+                },
+                technician: { id: tech.id, name: fullName },
+                note: 'This is a hard block that cannot be overridden - technician already has timesheets for these dates'
+              }
+            }), {
+              status: 409,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } else {
+            console.log('✅ No timesheet conflicts on exact dates');
+          }
+        }
+      } catch (timesheetCheckErr) {
+        console.warn('⚠️ Timesheet check encountered an error, continuing:', timesheetCheckErr);
       }
 
       // Step 3: Generate token
