@@ -49,7 +49,7 @@ export function useSetTechnicianPayoutOverride() {
 
       const result = data as TechnicianPayoutOverrideResult;
 
-      // Send notification email if successful
+      // Send notification email if successful (silently, no user notifications)
       if (result.success) {
         try {
           const { error: emailError } = await supabase.functions.invoke(
@@ -72,12 +72,11 @@ export function useSetTechnicianPayoutOverride() {
 
           if (emailError) {
             console.error('[useSetTechnicianPayoutOverride] Error sending notification email:', emailError);
-            // Don't fail the mutation, just log the error
-            toast.warning('Override guardado, pero no se pudo enviar el email de notificación');
+            // Don't fail the mutation or show user notification, just log the error
           }
         } catch (emailErr) {
           console.error('[useSetTechnicianPayoutOverride] Unexpected error sending notification:', emailErr);
-          toast.warning('Override guardado, pero no se pudo enviar el email de notificación');
+          // Don't fail the mutation or show user notification, just log the error
         }
       }
 
@@ -123,7 +122,7 @@ export function useRemoveTechnicianPayoutOverride() {
 
       const result = data as TechnicianPayoutOverrideResult;
 
-      // Send notification email if successful
+      // Send notification email if successful (silently, no user notifications)
       if (result.success) {
         try {
           await supabase.functions.invoke('send-payout-override-notification', {
@@ -142,6 +141,7 @@ export function useRemoveTechnicianPayoutOverride() {
           });
         } catch (emailErr) {
           console.error('[useRemoveTechnicianPayoutOverride] Error sending notification:', emailErr);
+          // Don't fail the mutation or show user notification, just log the error
         }
       }
 
