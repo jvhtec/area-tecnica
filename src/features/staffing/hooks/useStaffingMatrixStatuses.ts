@@ -138,18 +138,18 @@ export function useStaffingMatrixStatuses(
         dates.forEach(d => {
           const dStr = format(d, 'yyyy-MM-dd')
           // Filter requests to jobs overlapping this date
+          // IMPORTANT: Only show requests with specific target_date to prevent
+          // them from incorrectly following job date changes
           const overlapping = reqs.filter(r => {
-            const job = jobLookup.get(r.job_id)
-            if (!job) return false
-            const dateOverlapsJob = isWithinInterval(d, { start: job.start, end: job.end }) || isSameDay(d, job.start) || isSameDay(d, job.end)
-            if (!dateOverlapsJob) return false
-            // Respect single-day scoping when present
-            if (r.single_day && r.target_date) {
-              const rDate = typeof r.target_date === 'string' ? r.target_date : format(r.target_date, 'yyyy-MM-dd')
-              const dStr = format(d, 'yyyy-MM-dd')
-              return rDate === dStr
-            }
-            return true
+            // Only show staffing requests that have a specific target_date
+            // This prevents full-span requests from dynamically following job reschedules
+            if (!r.target_date) return false
+
+            const rDate = typeof r.target_date === 'string' ? r.target_date : format(r.target_date, 'yyyy-MM-dd')
+            const dStr = format(d, 'yyyy-MM-dd')
+
+            // Only match if the target_date exactly matches this date
+            return rDate === dStr
           })
           if (!overlapping.length) return
 
