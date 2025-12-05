@@ -3583,10 +3583,6 @@ export type Database = {
           id: string
           job_type: Database["public"]["Enums"]["job_type"]
           location_id: string | null
-          payout_override_amount_eur: number | null
-          payout_override_enabled: boolean
-          payout_override_set_at: string | null
-          payout_override_set_by: string | null
           rates_approved: boolean
           rates_approved_at: string | null
           rates_approved_by: string | null
@@ -3607,10 +3603,6 @@ export type Database = {
           id?: string
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
-          payout_override_amount_eur?: number | null
-          payout_override_enabled?: boolean
-          payout_override_set_at?: string | null
-          payout_override_set_by?: string | null
           rates_approved?: boolean
           rates_approved_at?: string | null
           rates_approved_by?: string | null
@@ -3631,10 +3623,6 @@ export type Database = {
           id?: string
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
-          payout_override_amount_eur?: number | null
-          payout_override_enabled?: boolean
-          payout_override_set_at?: string | null
-          payout_override_set_by?: string | null
           rates_approved?: boolean
           rates_approved_at?: string | null
           rates_approved_by?: string | null
