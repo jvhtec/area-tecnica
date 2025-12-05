@@ -40,8 +40,35 @@ create policy "Users can view payout overrides for jobs they can see"
     )
   );
 
-create policy "Only admins and department managers can manage overrides"
-  on job_technician_payout_overrides for all
+create policy "Only admins and department managers can insert overrides"
+  on job_technician_payout_overrides for insert
+  with check (
+    exists (
+      select 1 from profiles
+      where id = auth.uid()::text
+        and role in ('admin', 'management')
+    )
+  );
+
+create policy "Only admins and department managers can update overrides"
+  on job_technician_payout_overrides for update
+  using (
+    exists (
+      select 1 from profiles
+      where id = auth.uid()::text
+        and role in ('admin', 'management')
+    )
+  )
+  with check (
+    exists (
+      select 1 from profiles
+      where id = auth.uid()::text
+        and role in ('admin', 'management')
+    )
+  );
+
+create policy "Only admins and department managers can delete overrides"
+  on job_technician_payout_overrides for delete
   using (
     exists (
       select 1 from profiles
@@ -248,16 +275,28 @@ begin
   where id = _technician_id;
 
   -- Check permissions
+  -- Admin can remove any override
   if v_user_role = 'admin' then
     v_has_permission := true;
+  -- Management can only remove overrides for technicians from their department
   elsif v_user_role = 'management' then
     if v_user_department is not null and v_user_department = v_tech_department then
-      v_has_permission := true;
+      -- Also verify the technician is assigned to this job
+      if exists (
+        select 1
+        from job_assignments ja
+        where ja.job_id = _job_id
+          and ja.technician_id = _technician_id
+      ) then
+        v_has_permission := true;
+      else
+        raise exception 'Technician is not assigned to this job';
+      end if;
     end if;
   end if;
 
   if not v_has_permission then
-    raise exception 'Permission denied';
+    raise exception 'Permission denied: Only admin users and department managers can remove technician payout overrides for their department';
   end if;
 
   -- Get current override value
