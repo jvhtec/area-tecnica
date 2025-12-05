@@ -383,6 +383,59 @@ serve(async (req) => {
         }
       }
 
+      // Step 2c: Hard block for actual timesheet conflicts on specific dates
+      // This prevents double-booking on the same exact date (real conflicts)
+      // while allowing whole-job-span warnings (false positives from different dept start times)
+      if (!shouldOverrideConflicts) {
+        try {
+          console.log('🕒 TIMESHEET CHECK: verifying no double-booking on exact dates...');
+
+          const datesToCheck = normalizedDates.length > 0 ? normalizedDates : (normalizedTargetDate ? [normalizedTargetDate] : []);
+
+          if (datesToCheck.length > 0) {
+            // Check if technician already has timesheets for these exact dates
+            const { data: existingTimesheets, error: timesheetErr } = await supabase
+              .from('timesheets')
+              .select('date, job_id, jobs(title)')
+              .eq('technician_id', profile_id)
+              .in('date', datesToCheck)
+              .neq('job_id', job_id);
+
+            if (timesheetErr) {
+              console.warn('⚠️ Timesheet check failed, continuing:', timesheetErr);
+            } else if (existingTimesheets && existingTimesheets.length > 0) {
+              // Found actual timesheet conflicts - this is a real double-booking
+              const conflictDates = existingTimesheets.map(ts => ({
+                date: ts.date,
+                job_title: (ts.jobs as any)?.title || 'Unknown Job'
+              }));
+
+              console.log('⛔ HARD CONFLICT: Timesheet already exists for exact dates:', conflictDates);
+
+              return new Response(JSON.stringify({
+                error: 'Technician already has confirmed work on these dates',
+                details: {
+                  conflict_type: 'timesheet',
+                  dates: conflictDates,
+                  target_job: {
+                    id: job.id,
+                    title: job.title,
+                  },
+                  technician: { id: tech.id, name: fullName }
+                }
+              }), {
+                status: 409,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              });
+            } else {
+              console.log('✅ No timesheet conflicts on exact dates');
+            }
+          }
+        } catch (timesheetCheckErr) {
+          console.warn('⚠️ Timesheet check encountered an error, continuing:', timesheetCheckErr);
+        }
+      }
+
       // Step 3: Generate token
       console.log('🔐 GENERATING TOKEN...');
       const rid = crypto.randomUUID();
