@@ -14,9 +14,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import {
   prepareJobPayoutEmailContext,
@@ -237,8 +235,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   // Handle saving override for a technician
   const handleSaveOverride = React.useCallback((techId: string, techName: string, calculatedTotal: number) => {
     const amountValue = parseFloat(editingAmount);
-    if (isNaN(amountValue) || amountValue < 0) {
-      toast.error('El monto debe ser un número válido mayor o igual a 0');
+    if (isNaN(amountValue) || amountValue < 0 || !Number.isFinite(amountValue) || amountValue > 999999999.99) {
+      toast.error('El monto debe ser un número válido mayor o igual a 0 y menor que 1.000.000.000');
       return;
     }
 

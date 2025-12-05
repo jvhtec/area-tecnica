@@ -125,7 +125,7 @@ export function useRemoveTechnicianPayoutOverride() {
       // Send notification email if successful (silently, no user notifications)
       if (result.success) {
         try {
-          await supabase.functions.invoke('send-payout-override-notification', {
+          const { error: emailError } = await supabase.functions.invoke('send-payout-override-notification', {
             body: {
               jobId: result.job_id,
               jobTitle: result.job_title,
@@ -139,8 +139,13 @@ export function useRemoveTechnicianPayoutOverride() {
               calculatedTotal: result.calculated_total_eur,
             },
           });
+
+          if (emailError) {
+            console.error('[useRemoveTechnicianPayoutOverride] Error sending notification email:', emailError);
+            // Don't fail the mutation or show user notification, just log the error
+          }
         } catch (emailErr) {
-          console.error('[useRemoveTechnicianPayoutOverride] Error sending notification:', emailErr);
+          console.error('[useRemoveTechnicianPayoutOverride] Unexpected error sending notification:', emailErr);
           // Don't fail the mutation or show user notification, just log the error
         }
       }
