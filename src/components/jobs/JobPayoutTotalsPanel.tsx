@@ -41,6 +41,17 @@ const surface = "bg-[#151820] border-[#2a2e3b]";
 const subtleText = "text-slate-300";
 const controlButton = "bg-white/5 border-white/10 text-white hover:bg-white/10";
 
+/**
+ * Render a panel that displays payout totals, breakdowns, and actions for a specific job.
+ *
+ * The component loads job metadata, computes payout totals (standard or tour-based), shows per-technician
+ * timesheet and extras breakdowns, provides export and email sending actions, and (for manager roles)
+ * allows creating, editing, and removing per-technician payout overrides.
+ *
+ * @param jobId - The job identifier used to load payouts and related data.
+ * @param technicianId - Optional technician identifier to filter the displayed payouts to a single technician.
+ * @returns A React element representing the job payout totals panel.
+ */
 export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPanelProps) {
   const {
     data: jobMeta,
