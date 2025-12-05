@@ -345,7 +345,16 @@ serve(async (req) => {
 </html>
     `;
 
-    // Send email via corporate email function
+    // Get finanzas user profile ID
+    const { data: finanzasProfile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", "finanzas@sector-pro.com")
+      .maybeSingle();
+
+    const finanzasProfileId = finanzasProfile?.id;
+
+    // Send email via corporate email function to admins and finanzas
     const { data: sendResult, error: sendError } = await supabase.functions.invoke(
       "send-corporate-email",
       {
@@ -354,7 +363,7 @@ serve(async (req) => {
           bodyHtml: emailHtml,
           recipients: {
             roles: ["admin"],
-            profileIds: [], // Will be filled with admin users by the function
+            profileIds: finanzasProfileId ? [finanzasProfileId] : [],
           },
         },
       }
@@ -363,47 +372,6 @@ serve(async (req) => {
     if (sendError) {
       console.error("[send-payout-override-notification] Error calling send-corporate-email:", sendError);
       // Don't fail the whole operation, just log it
-    }
-
-    // Also send to finanzas@sector-pro.com via Brevo
-    const BREVO_KEY = Deno.env.get("BREVO_API_KEY");
-    const BREVO_FROM = Deno.env.get("BREVO_FROM");
-
-    if (BREVO_KEY && BREVO_FROM) {
-      try {
-        const brevoResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
-          method: "POST",
-          headers: {
-            "api-key": BREVO_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            sender: {
-              email: BREVO_FROM,
-              name: "Sector-Pro Alertas",
-            },
-            to: [
-              {
-                email: "finanzas@sector-pro.com",
-                name: "Finanzas Sector-Pro",
-              },
-            ],
-            subject: `⚠️ Override de Pago: ${technicianName} - ${jobTitle}`,
-            htmlContent: emailHtml,
-          }),
-        });
-
-        if (!brevoResponse.ok) {
-          const errorText = await brevoResponse.text();
-          console.error(
-            "[send-payout-override-notification] Brevo API error:",
-            brevoResponse.status,
-            errorText
-          );
-        }
-      } catch (brevoError) {
-        console.error("[send-payout-override-notification] Error sending to Brevo:", brevoError);
-      }
     }
 
     return new Response(
