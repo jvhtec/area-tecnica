@@ -7,10 +7,10 @@ alter table jobs
 
 -- Create table for per-technician payout overrides
 create table if not exists job_technician_payout_overrides (
-  job_id text not null references jobs(id) on delete cascade,
-  technician_id text not null references profiles(id) on delete cascade,
-  override_amount_eur numeric(10,2) not null check (override_amount_eur >= 0),
-  set_by text not null references profiles(id),
+  job_id uuid not null references jobs(id) on delete cascade,
+  technician_id uuid not null references profiles(id) on delete cascade,
+  override_amount_eur numeric(10,2) not null check (override_amount_eur >= 0 and override_amount_eur <= 99999999.99),
+  set_by uuid not null references profiles(id),
   set_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (job_id, technician_id)
@@ -31,11 +31,11 @@ create policy "Users can view payout overrides for jobs they can see"
     exists (
       select 1 from job_assignments ja
       where ja.job_id = job_technician_payout_overrides.job_id
-        and ja.technician_id = auth.uid()::text
+        and ja.technician_id = auth.uid()
     )
     or exists (
       select 1 from profiles
-      where id = auth.uid()::text
+      where id = auth.uid()
         and role in ('admin', 'management')
     )
   );
@@ -46,7 +46,7 @@ create policy "Only admins and department managers can insert overrides"
     -- Admin users have unconditional access
     exists (
       select 1 from profiles
-      where id = auth.uid()::text
+      where id = auth.uid()
         and role = 'admin'
     )
     or
@@ -54,7 +54,7 @@ create policy "Only admins and department managers can insert overrides"
     (
       exists (
         select 1 from profiles p
-        where p.id = auth.uid()::text
+        where p.id = auth.uid()
           and p.role = 'management'
           and p.department = (
             select department from profiles
@@ -75,7 +75,7 @@ create policy "Only admins and department managers can update overrides"
     -- Admin users have unconditional access
     exists (
       select 1 from profiles
-      where id = auth.uid()::text
+      where id = auth.uid()
         and role = 'admin'
     )
     or
@@ -83,7 +83,7 @@ create policy "Only admins and department managers can update overrides"
     (
       exists (
         select 1 from profiles p
-        where p.id = auth.uid()::text
+        where p.id = auth.uid()
           and p.role = 'management'
           and p.department = (
             select department from profiles
@@ -101,7 +101,7 @@ create policy "Only admins and department managers can update overrides"
     -- Admin users have unconditional access
     exists (
       select 1 from profiles
-      where id = auth.uid()::text
+      where id = auth.uid()
         and role = 'admin'
     )
     or
@@ -109,7 +109,7 @@ create policy "Only admins and department managers can update overrides"
     (
       exists (
         select 1 from profiles p
-        where p.id = auth.uid()::text
+        where p.id = auth.uid()
           and p.role = 'management'
           and p.department = (
             select department from profiles
@@ -130,7 +130,7 @@ create policy "Only admins and department managers can delete overrides"
     -- Admin users have unconditional access
     exists (
       select 1 from profiles
-      where id = auth.uid()::text
+      where id = auth.uid()
         and role = 'admin'
     )
     or
@@ -138,7 +138,7 @@ create policy "Only admins and department managers can delete overrides"
     (
       exists (
         select 1 from profiles p
-        where p.id = auth.uid()::text
+        where p.id = auth.uid()
           and p.role = 'management'
           and p.department = (
             select department from profiles
@@ -158,15 +158,15 @@ drop function if exists set_job_payout_override(text, boolean, numeric);
 
 -- Create new RPC function to set per-technician payout override
 create or replace function set_technician_payout_override(
-  _job_id text,
-  _technician_id text,
+  _job_id uuid,
+  _technician_id uuid,
   _amount_eur numeric
 ) returns json
 language plpgsql
 security definer
 as $$
 declare
-  v_user_id text;
+  v_user_id uuid;
   v_user_role text;
   v_user_department text;
   v_tech_department text;
@@ -180,7 +180,7 @@ declare
   v_result json;
 begin
   -- Get current user
-  v_user_id := auth.uid()::text;
+  v_user_id := auth.uid();
   if v_user_id is null then
     raise exception 'Not authenticated';
   end if;
@@ -311,14 +311,14 @@ $$;
 
 -- Create function to remove override
 create or replace function remove_technician_payout_override(
-  _job_id text,
-  _technician_id text
+  _job_id uuid,
+  _technician_id uuid
 ) returns json
 language plpgsql
 security definer
 as $$
 declare
-  v_user_id text;
+  v_user_id uuid;
   v_user_role text;
   v_user_department text;
   v_tech_department text;
@@ -331,7 +331,7 @@ declare
   v_result json;
 begin
   -- Get current user
-  v_user_id := auth.uid()::text;
+  v_user_id := auth.uid();
   if v_user_id is null then
     raise exception 'Not authenticated';
   end if;
