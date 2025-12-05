@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Loader2, Palmtree } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Theme } from './types';
 
 interface AvailabilityBlock {
@@ -31,6 +32,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
     const [showAddSheet, setShowAddSheet] = useState(false);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     // Fetch unavailability blocks
     const { data: blocks = [], isLoading } = useQuery<AvailabilityBlock[]>({
@@ -94,6 +96,9 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
             const { error } = await supabase.from('technician_availability').delete().eq('id', id);
             if (error) throw error;
         },
+        onMutate: (id) => {
+            setDeletingId(id);
+        },
         onSuccess: () => {
             toast.success('Disponibilidad restaurada');
             queryClient.invalidateQueries({ queryKey: ['my-unavailability'] });
@@ -101,6 +106,9 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
         onError: (e: unknown) => {
             const message = e instanceof Error ? e.message : 'No se pudo eliminar';
             toast.error(message);
+        },
+        onSettled: () => {
+            setDeletingId(null);
         },
     });
 
@@ -122,6 +130,22 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
         sick: 'bg-rose-500/20 text-rose-500',
         day_off: 'bg-emerald-500/20 text-emerald-500',
     };
+
+    // Filter blocks to only show dates within the current month displayed in the calendar
+    const filteredBlocks = useMemo(() => {
+        if (!blocks.length) return [];
+
+        // Use string-based comparisons to avoid timezone shifts
+        const monthStartDate = startOfMonth(currentMonth);
+        const monthEndDate = endOfMonth(currentMonth);
+        const monthStartStr = format(monthStartDate, 'yyyy-MM-dd');
+        const monthEndStr = format(monthEndDate, 'yyyy-MM-dd');
+
+        return blocks.filter(block => {
+            // Lexicographic comparison of YYYY-MM-DD strings
+            return block.date >= monthStartStr && block.date <= monthEndStr;
+        });
+    }, [blocks, currentMonth]);
 
     return (
         <div className="space-y-6 animate-in fade-in">
@@ -185,45 +209,53 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
                 </div>
             </div>
 
-            {/* Upcoming unavailability blocks */}
+            {/* Unavailability blocks for the current month */}
             {isLoading ? (
                 <div className="flex justify-center py-4">
                     <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
                 </div>
-            ) : (
-                <div className="space-y-2">
-                    {blocks.slice(0, 5).map((b) => (
-                        <div key={b.id} className={`p-3 rounded-xl border ${theme.card} flex items-center justify-between`}>
-                            <div className="flex items-center gap-4">
-                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${statusStyles[b.status] || 'bg-emerald-500/10'}`}>
-                                    <Palmtree size={18} />
-                                </div>
-                                <div>
-                                    <div className={`text-sm font-bold ${theme.textMain}`}>
-                                        {b.status === 'vacation' ? 'Vacaciones' :
-                                            b.status === 'travel' ? 'Viaje' :
-                                                b.status === 'sick' ? 'Baja médica' : 'No disponible'}
-                                    </div>
-                                    <div className={`text-xs ${theme.textMuted}`}>
-                                        {format(new Date(b.date), 'PPP', { locale: es })}
-                                    </div>
-                                </div>
-                            </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => deleteMutation.mutate(b.id)}
-                                disabled={deleteMutation.isPending}
-                            >
-                                {deleteMutation.isPending ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Trash2 size={16} className={theme.textMuted} />
-                                )}
-                            </Button>
-                        </div>
-                    ))}
+            ) : filteredBlocks.length === 0 ? (
+                <div className={`p-4 rounded-xl border ${theme.card} text-center`}>
+                    <p className={`text-sm ${theme.textMuted}`}>
+                        No hay fechas marcadas como no disponibles para {format(currentMonth, 'MMMM yyyy', { locale: es })}
+                    </p>
                 </div>
+            ) : (
+                <ScrollArea className="h-[400px] rounded-xl">
+                    <div className="space-y-2 pr-4">
+                        {filteredBlocks.map((b) => (
+                            <div key={b.id} className={`p-3 rounded-xl border ${theme.card} flex items-center justify-between`}>
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${statusStyles[b.status] || 'bg-emerald-500/10'}`}>
+                                        <Palmtree size={18} />
+                                    </div>
+                                    <div>
+                                        <div className={`text-sm font-bold ${theme.textMain}`}>
+                                            {b.status === 'vacation' ? 'Vacaciones' :
+                                                b.status === 'travel' ? 'Viaje' :
+                                                    b.status === 'sick' ? 'Baja médica' : 'No disponible'}
+                                        </div>
+                                        <div className={`text-xs ${theme.textMuted}`}>
+                                            {format(parseISO(b.date), 'PPP', { locale: es })}
+                                        </div>
+                                    </div>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => deleteMutation.mutate(b.id)}
+                                    disabled={deleteMutation.isPending && deletingId === b.id}
+                                >
+                                    {deleteMutation.isPending && deletingId === b.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Trash2 size={16} className={theme.textMuted} />
+                                    )}
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </ScrollArea>
             )}
 
             {/* Add Sheet */}
