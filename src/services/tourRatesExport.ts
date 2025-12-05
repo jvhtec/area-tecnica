@@ -198,6 +198,7 @@ export async function buildTourRatesExportPayload(
         .from('timesheets')
         .select('id, technician_id, approved_by_manager, amount_breakdown')
         .eq('job_id', job.id)
+        .eq('is_active', true)
         .in('technician_id', techIds)
         .eq('approved_by_manager', true);
       const agg = new Map<string, { h: number; plus: number; otH: number; otAmt: number }>();
@@ -310,6 +311,7 @@ export async function buildTourRatesExportPayload(
           .from('timesheets')
           .select('id, technician_id, approved_by_manager, amount_breakdown, amount_breakdown_visible, created_at')
           .eq('job_id', job.id)
+          .eq('is_active', true)
           .in('technician_id', techIds)
           .eq('approved_by_manager', true);
 

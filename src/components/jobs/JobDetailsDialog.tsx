@@ -926,6 +926,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 .from('timesheets')
                                 .select('*')
                                 .eq('job_id', resolvedJobId)
+                                .eq('is_active', true)
                                 .eq('approved_by_manager', true);
 
                               // Fallback to visibility function when RLS blocks

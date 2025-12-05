@@ -92,6 +92,7 @@ export default function MorningSummary() {
             profiles!fk_timesheets_technician_id!inner(first_name, last_name, nickname, department, role)
           `)
           .eq('date', date)
+          .eq('is_active', true)
           .eq('profiles.department', dept)
           .eq('profiles.role', 'house_tech')
           .gte('jobs.start_time', date)

@@ -98,7 +98,8 @@ const syncTimesheetCategories = async (jobId: string, technicianId: string) => {
       .from('timesheets')
       .update({ category: newCategory })
       .eq('job_id', jobId)
-      .eq('technician_id', technicianId);
+      .eq('technician_id', technicianId)
+      .eq('is_active', true);
 
     if (updateError) {
       console.error('Error updating timesheet categories:', updateError);

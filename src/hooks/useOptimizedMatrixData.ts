@@ -84,6 +84,7 @@ export const fetchMatrixTimesheetAssignments = async ({
     let query = supabase
       .from('timesheets')
       .select('job_id, technician_id, date, is_schedule_only, source')
+      .eq('is_active', true)
       .in('job_id', jobBatch)
       .in('technician_id', technicianIds)
       .order('date', { ascending: true })

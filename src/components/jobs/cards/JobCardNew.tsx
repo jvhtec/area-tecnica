@@ -336,7 +336,8 @@ export function JobCardNew({
       const { data, error } = await supabase
         .from('timesheets')
         .select('technician_id, status')
-        .eq('job_id', job.id);
+        .eq('job_id', job.id)
+        .eq('is_active', true);
       if (error) throw error;
       return data as { technician_id: string; status: string }[];
     },

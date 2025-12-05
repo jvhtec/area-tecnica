@@ -89,6 +89,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
                 locations ( name )
               )
             `)
+            .eq('is_active', true)
             .in('technician_id', techIds)
             .lte('jobs.start_time', endDate.toISOString())
             .gte('jobs.end_time', startDate.toISOString());
