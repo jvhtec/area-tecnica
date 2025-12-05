@@ -8047,11 +8047,18 @@ export type Database = {
         Returns: Database["public"]["Enums"]["activity_visibility"]
       }
       rotate_my_calendar_ics_token: { Args: never; Returns: string }
-      set_job_payout_override: {
+      remove_technician_payout_override: {
         Args: {
           _job_id: string
-          _enabled: boolean
-          _amount_eur?: number
+          _technician_id: string
+        }
+        Returns: Json
+      }
+      set_technician_payout_override: {
+        Args: {
+          _job_id: string
+          _technician_id: string
+          _amount_eur: number
         }
         Returns: Json
       }

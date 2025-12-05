@@ -13,10 +13,11 @@ interface PayoutOverrideNotificationRequest {
   jobId: string;
   jobTitle: string;
   jobStartTime: string;
+  technicianId: string;
+  technicianName: string;
+  technicianDepartment: string;
   actorId: string;
-  oldOverrideEnabled: boolean;
   oldOverrideAmountEur: number | null;
-  newOverrideEnabled: boolean;
   newOverrideAmountEur: number | null;
   calculatedTotal: number;
 }
@@ -36,10 +37,11 @@ serve(async (req) => {
       jobId,
       jobTitle,
       jobStartTime,
+      technicianId,
+      technicianName,
+      technicianDepartment,
       actorId,
-      oldOverrideEnabled,
       oldOverrideAmountEur,
-      newOverrideEnabled,
       newOverrideAmountEur,
       calculatedTotal,
     } = payload;
@@ -84,11 +86,11 @@ serve(async (req) => {
 
     // Determine change type
     let changeDescription = "";
-    if (!oldOverrideEnabled && newOverrideEnabled) {
+    if (oldOverrideAmountEur === null && newOverrideAmountEur !== null) {
       changeDescription = "✅ Override activado";
-    } else if (oldOverrideEnabled && !newOverrideEnabled) {
+    } else if (oldOverrideAmountEur !== null && newOverrideAmountEur === null) {
       changeDescription = "❌ Override desactivado";
-    } else if (oldOverrideEnabled && newOverrideEnabled) {
+    } else if (oldOverrideAmountEur !== null && newOverrideAmountEur !== null) {
       changeDescription = "✏️ Override modificado";
     }
 
@@ -234,8 +236,24 @@ serve(async (req) => {
 <body>
   <div class="container">
     <div class="header">
-      <h1>🔔 Alerta: Override de Pago de Trabajo</h1>
+      <h1>🔔 Alerta: Override de Pago de Técnico</h1>
       <div class="alert-badge">${changeDescription}</div>
+    </div>
+
+    <div class="section">
+      <h2>👤 Técnico Afectado</h2>
+      <div class="info-row">
+        <span class="label">Nombre:</span>
+        <span class="value">${technicianName}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">ID:</span>
+        <span class="value">${technicianId}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Departamento:</span>
+        <span class="value">${technicianDepartment}</span>
+      </div>
     </div>
 
     <div class="section">
@@ -286,10 +304,10 @@ serve(async (req) => {
         <div class="comparison-box old">
           <div class="title">Anterior</div>
           <div class="amount">
-            ${oldOverrideEnabled ? formatCurrency(oldOverrideAmountEur) : formatCurrency(calculatedTotal)}
+            ${oldOverrideAmountEur !== null ? formatCurrency(oldOverrideAmountEur) : formatCurrency(calculatedTotal)}
           </div>
           <div style="font-size: 12px; margin-top: 5px; color: #6b7280;">
-            ${oldOverrideEnabled ? "Override activo" : "Sin override"}
+            ${oldOverrideAmountEur !== null ? "Override activo" : "Sin override"}
           </div>
         </div>
 
@@ -298,21 +316,21 @@ serve(async (req) => {
         <div class="comparison-box new">
           <div class="title">Nuevo</div>
           <div class="amount">
-            ${newOverrideEnabled ? formatCurrency(newOverrideAmountEur) : formatCurrency(calculatedTotal)}
+            ${newOverrideAmountEur !== null ? formatCurrency(newOverrideAmountEur) : formatCurrency(calculatedTotal)}
           </div>
           <div style="font-size: 12px; margin-top: 5px; color: #6b7280;">
-            ${newOverrideEnabled ? "Override activo" : "Sin override"}
+            ${newOverrideAmountEur !== null ? "Override activo" : "Sin override"}
           </div>
         </div>
       </div>
     </div>
 
-    ${newOverrideEnabled ? `
+    ${newOverrideAmountEur !== null ? `
     <div class="warning">
       <div class="warning-title">⚠️ Importante</div>
       <div class="warning-text">
-        El modo override está activo. El total de pago para este trabajo es ahora
-        <strong>${formatCurrency(newOverrideAmountEur)}</strong> en lugar del total calculado
+        El modo override está activo para ${technicianName}. El total de pago para este técnico
+        en este trabajo es ahora <strong>${formatCurrency(newOverrideAmountEur)}</strong> en lugar del total calculado
         de <strong>${formatCurrency(calculatedTotal)}</strong>.
       </div>
     </div>
@@ -332,7 +350,7 @@ serve(async (req) => {
       "send-corporate-email",
       {
         body: {
-          subject: `⚠️ Override de Pago: ${jobTitle}`,
+          subject: `⚠️ Override de Pago: ${technicianName} - ${jobTitle}`,
           bodyHtml: emailHtml,
           recipients: {
             roles: ["admin"],
@@ -370,7 +388,7 @@ serve(async (req) => {
                 name: "Finanzas Sector-Pro",
               },
             ],
-            subject: `⚠️ Override de Pago: ${jobTitle}`,
+            subject: `⚠️ Override de Pago: ${technicianName} - ${jobTitle}`,
             htmlContent: emailHtml,
           }),
         });
