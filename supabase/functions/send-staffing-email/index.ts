@@ -322,12 +322,14 @@ serve(async (req) => {
 
       // Step 2b: Enhanced conflict check using RPC function
       // Checks for both hard conflicts (confirmed) and soft conflicts (pending)
-      // Can be overridden with override_conflicts flag
+      // Changed to warning-only mode: conflicts are logged but don't block sending
+      // This allows different departments to start at different times without false positives
+      const conflictWarnings: any[] = [];
       if (shouldOverrideConflicts) {
         console.log('⚠️ CONFLICT CHECK OVERRIDDEN by user - skipping conflict detection');
       } else {
         try {
-          console.log('🕒 CONFLICT CHECK: using enhanced RPC conflict checker...');
+          console.log('🕒 CONFLICT CHECK: using enhanced RPC conflict checker (warning mode)...');
 
           // Check conflicts for each date if multi-date, otherwise for single date or whole job
           const datesToCheck = normalizedDates.length > 0 ? normalizedDates : [normalizedTargetDate];
@@ -355,46 +357,97 @@ serve(async (req) => {
                 ? conflictResult.hardConflicts
                 : conflictResult.softConflicts;
 
-              console.log(`⛔ ${conflictType} conflict detected:`, {
+              console.log(`⚠️ ${conflictType} conflict detected (warning only - not blocking):`, {
                 jobConflicts: conflicts,
-                unavailability: conflictResult.unavailabilityConflicts
+                unavailability: conflictResult.unavailabilityConflicts,
+                note: 'Different departments may start at different times, so whole job span conflicts are treated as warnings'
               });
 
-              // Build error message based on conflict types
-              let errorMessage = 'Technician has conflicts';
-              if (hasUnavailability && !hasJobConflicts) {
-                errorMessage = 'Technician is unavailable on these dates';
-              } else if (hasJobConflicts) {
-                errorMessage = `Technician has ${conflictType} overlapping assignment`;
-              }
-
-              return new Response(JSON.stringify({
-                error: errorMessage,
-                details: {
-                  conflict_type: conflictType,
-                  conflicts: conflicts,
-                  unavailability: conflictResult.unavailabilityConflicts,
-                  target_job: {
-                    id: job.id,
-                    title: job.title,
-                    start_time: job.start_time,
-                    end_time: job.end_time,
-                    single_day: isSingleDayRequest,
-                    target_date: dateToCheck
-                  },
-                  technician: { id: tech.id, name: fullName }
-                }
-              }), {
-                status: 409,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              // Accumulate conflict warnings for metadata logging (don't overwrite)
+              conflictWarnings.push({
+                conflict_type: conflictType,
+                conflicts: conflicts,
+                unavailability: conflictResult.unavailabilityConflicts,
+                target_date: dateToCheck
               });
             }
           }
 
-          console.log('✅ No conflicts detected, proceeding to send email');
+          if (conflictWarnings.length > 0) {
+            console.log('⚠️ Conflicts detected but allowing send to proceed - conflicts logged as warnings');
+          } else {
+            console.log('✅ No conflicts detected, proceeding to send email');
+          }
         } catch (conflictCheckErr) {
           console.warn('⚠️ Conflict check encountered an error, continuing to send email:', conflictCheckErr);
         }
+      }
+
+      // Step 2c: Hard block for actual timesheet conflicts on specific dates
+      // CRITICAL: This check is NOT overridable - prevents real double-bookings
+      // Runs regardless of shouldOverrideConflicts flag
+      try {
+        console.log('🕒 TIMESHEET CHECK: verifying no double-booking on exact dates...');
+
+        // Determine dates to check: use explicit dates if provided, otherwise derive from job
+        let datesToCheck = normalizedDates.length > 0 ? normalizedDates : (normalizedTargetDate ? [normalizedTargetDate] : []);
+
+        // If no explicit dates (whole-span request), derive from job start/end dates
+        if (datesToCheck.length === 0 && job.start_time && job.end_time) {
+          const jobStart = new Date(job.start_time);
+          const jobEnd = new Date(job.end_time);
+          const dates: string[] = [];
+          for (let d = new Date(jobStart); d <= jobEnd; d.setDate(d.getDate() + 1)) {
+            dates.push(d.toISOString().split('T')[0]);
+          }
+          datesToCheck = dates;
+          console.log(`📅 Whole-span request detected, checking ${dates.length} dates from job span`);
+        }
+
+        if (datesToCheck.length > 0) {
+          // Check if technician already has ACTIVE timesheets for these exact dates
+          // Voided timesheets (is_active = false) don't count as conflicts
+          const { data: existingTimesheets, error: timesheetErr } = await supabase
+            .from('timesheets')
+            .select('date, job_id, jobs(title)')
+            .eq('technician_id', profile_id)
+            .in('date', datesToCheck)
+            .neq('job_id', job_id)
+            .eq('is_active', true); // Only check active timesheets
+
+          if (timesheetErr) {
+            console.warn('⚠️ Timesheet check failed, continuing:', timesheetErr);
+          } else if (existingTimesheets && existingTimesheets.length > 0) {
+            // Found actual timesheet conflicts - this is a real double-booking
+            const conflictDates = existingTimesheets.map(ts => ({
+              date: ts.date,
+              job_title: (ts.jobs as any)?.title || 'Unknown Job'
+            }));
+
+            console.log('⛔ HARD CONFLICT: Timesheet already exists for exact dates:', conflictDates);
+
+            return new Response(JSON.stringify({
+              error: 'Technician already has confirmed work on these dates',
+              details: {
+                conflict_type: 'timesheet',
+                dates: conflictDates,
+                target_job: {
+                  id: job.id,
+                  title: job.title,
+                },
+                technician: { id: tech.id, name: fullName },
+                note: 'This is a hard block that cannot be overridden - technician already has timesheets for these dates'
+              }
+            }), {
+              status: 409,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } else {
+            console.log('✅ No timesheet conflicts on exact dates');
+          }
+        }
+      } catch (timesheetCheckErr) {
+        console.warn('⚠️ Timesheet check encountered an error, continuing:', timesheetCheckErr);
       }
 
       // Step 3: Generate token
@@ -829,7 +882,15 @@ serve(async (req) => {
         await supabase.from('staffing_events').insert({
           staffing_request_id: insertedId,
           event: 'whatsapp_sent',
-          meta: { phase, status: waOk ? 200 : (lastStatus ?? 0), role: role ?? null, single_day: isSingleDayRequest || isBatch, target_date: normalizedTargetDate, dates: normalizedDates }
+          meta: {
+            phase,
+            status: waOk ? 200 : (lastStatus ?? 0),
+            role: role ?? null,
+            single_day: isSingleDayRequest || isBatch,
+            target_date: normalizedTargetDate,
+            dates: normalizedDates,
+            conflict_warnings: conflictWarnings // Include conflict warnings in metadata for tracking
+          }
         });
 
         if (waOk) {
@@ -868,7 +929,16 @@ serve(async (req) => {
         await supabase.from("staffing_events").insert({
           staffing_request_id: insertedId,
           event: "email_sent",
-          meta: { phase, status: sendRes.status, role: role ?? null, message: message ?? null, single_day: isSingleDayRequest || isBatch, target_date: normalizedTargetDate, dates: normalizedDates }
+          meta: {
+            phase,
+            status: sendRes.status,
+            role: role ?? null,
+            message: message ?? null,
+            single_day: isSingleDayRequest || isBatch,
+            target_date: normalizedTargetDate,
+            dates: normalizedDates,
+            conflict_warnings: conflictWarnings // Include conflict warnings in metadata for tracking
+          }
         });
         if (sendRes.ok) {
           try {

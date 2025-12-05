@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight, MessageSquare,
-  Mail, MoreVertical, Edit, Trash2
+  Mail, MoreVertical, Edit, Trash2, Filter, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,6 +17,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
+import { supabase } from "@/lib/supabase";
+import { Badge } from "@/components/ui/badge";
 
 interface DashboardMobileHubProps {
   jobs: any[];
@@ -51,8 +53,101 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
+  const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([]);
+  const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
 
   const canEdit = userRole ? ["admin", "management"].includes(userRole) : false;
+
+  // Load user filter preferences from profiles
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) return;
+
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("selected_job_types, selected_job_statuses")
+          .eq("id", session.user.id)
+          .single();
+
+        if (error) {
+          console.error("Error loading user preferences:", error);
+          return;
+        }
+
+        if (profile?.selected_job_types) {
+          setSelectedJobTypes(profile.selected_job_types);
+        }
+        if (profile?.selected_job_statuses) {
+          setSelectedJobStatuses(profile.selected_job_statuses);
+        }
+      } catch (error) {
+        console.error("Error in loadUserPreferences:", error);
+      }
+    };
+    loadUserPreferences();
+  }, []);
+
+  // Save user preferences to profiles
+  const saveUserPreferences = async (types: string[], statuses?: string[]) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
+
+      const updateData = statuses !== undefined
+        ? { selected_job_types: types, selected_job_statuses: statuses }
+        : { selected_job_types: types };
+
+      const { error } = await supabase
+        .from("profiles")
+        .update(updateData)
+        .eq("id", session.user.id);
+
+      if (error) {
+        console.error("Error saving user preferences:", error);
+      }
+    } catch (error) {
+      console.error("Error in saveUserPreferences:", error);
+    }
+  };
+
+  const handleJobTypeSelection = (type: string) => {
+    const newTypes = selectedJobTypes.includes(type)
+      ? selectedJobTypes.filter((t) => t !== type)
+      : [...selectedJobTypes, type];
+    setSelectedJobTypes(newTypes);
+    saveUserPreferences(newTypes, selectedJobStatuses);
+  };
+
+  const handleJobStatusSelection = (status: string) => {
+    const newStatuses = selectedJobStatuses.includes(status)
+      ? selectedJobStatuses.filter((s) => s !== status)
+      : [...selectedJobStatuses, status];
+    setSelectedJobStatuses(newStatuses);
+    saveUserPreferences(selectedJobTypes, newStatuses);
+  };
+
+  // Get distinct job types and statuses for filter options
+  const distinctJobTypes = useMemo(() => {
+    if (!jobs) return [];
+    const types = jobs
+      .filter(job => job.job_type !== 'tour')
+      .map(job => job.job_type)
+      .filter(Boolean);
+    return Array.from(new Set(types));
+  }, [jobs]);
+
+  const distinctJobStatuses = useMemo(() => {
+    if (!jobs) return [];
+    const statuses = jobs
+      .filter(job => job.job_type !== 'tour')
+      .map(job => job.status)
+      .filter(Boolean);
+    return Array.from(new Set(statuses));
+  }, [jobs]);
 
   const selectedDateJobs = useMemo(() => {
     if (!jobs) return [];
@@ -62,14 +157,29 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
     return jobs
       .filter((job) => {
         if (job.job_type === 'tour') return false;
+
         const jobStart = new Date(job.start_time);
         const jobEnd = new Date(job.end_time);
 
-        return isWithinInterval(dayStart, { start: startOfDay(jobStart), end: endOfDay(jobEnd) }) ||
+        const isInDateRange = isWithinInterval(dayStart, { start: startOfDay(jobStart), end: endOfDay(jobEnd) }) ||
           isWithinInterval(dayEnd, { start: startOfDay(jobStart), end: endOfDay(jobEnd) });
+
+        if (!isInDateRange) return false;
+
+        // Apply job type filters
+        if (selectedJobTypes.length > 0 && !selectedJobTypes.includes(job.job_type)) {
+          return false;
+        }
+
+        // Apply job status filters
+        if (selectedJobStatuses.length > 0 && !selectedJobStatuses.includes(job.status)) {
+          return false;
+        }
+
+        return true;
       })
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-  }, [jobs, selectedDate]);
+  }, [jobs, selectedDate, selectedJobTypes, selectedJobStatuses]);
 
   const handlePrevDay = () => setSelectedDate(prev => subDays(prev, 1));
   const handleNextDay = () => setSelectedDate(prev => addDays(prev, 1));
@@ -124,6 +234,89 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                 </button>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Filters */}
+        {(distinctJobTypes.length > 0 || distinctJobStatuses.length > 0) && (
+          <div className="flex gap-2">
+            {/* Job Type Filter */}
+            {distinctJobTypes.length > 0 && (
+              <Popover open={isTypeFilterOpen} onOpenChange={setIsTypeFilterOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("flex-1", themeTokens.card)}>
+                    <Filter className="h-4 w-4 mr-2" />
+                    <span className={themeTokens.textMain}>Type</span>
+                    {selectedJobTypes.length > 0 && (
+                      <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1">
+                        {selectedJobTypes.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className={cn("w-56 p-2", themeTokens.card)} align="start">
+                  <div className="space-y-1">
+                    {distinctJobTypes.map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => handleJobTypeSelection(type)}
+                        className={cn(
+                          "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                          themeTokens.hover,
+                          themeTokens.textMain
+                        )}
+                      >
+                        <div className={cn("w-4 h-4 border rounded flex items-center justify-center",
+                          selectedJobTypes.includes(type) ? "bg-blue-500 border-blue-500" : "border-muted"
+                        )}>
+                          {selectedJobTypes.includes(type) && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span className="capitalize">{type}</span>
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+
+            {/* Job Status Filter */}
+            {distinctJobStatuses.length > 0 && (
+              <Popover open={isStatusFilterOpen} onOpenChange={setIsStatusFilterOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("flex-1", themeTokens.card)}>
+                    <Filter className="h-4 w-4 mr-2" />
+                    <span className={themeTokens.textMain}>Status</span>
+                    {selectedJobStatuses.length > 0 && (
+                      <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1">
+                        {selectedJobStatuses.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className={cn("w-56 p-2", themeTokens.card)} align="start">
+                  <div className="space-y-1">
+                    {distinctJobStatuses.map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => handleJobStatusSelection(status)}
+                        className={cn(
+                          "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                          themeTokens.hover,
+                          themeTokens.textMain
+                        )}
+                      >
+                        <div className={cn("w-4 h-4 border rounded flex items-center justify-center",
+                          selectedJobStatuses.includes(status) ? "bg-blue-500 border-blue-500" : "border-muted"
+                        )}>
+                          {selectedJobStatuses.includes(status) && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span>{status}</span>
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         )}
 

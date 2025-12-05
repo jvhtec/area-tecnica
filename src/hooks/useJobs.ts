@@ -99,6 +99,7 @@ export const useJobs = () => {
                   )
                 `)
                 .eq('is_schedule_only', false)
+                .eq('is_active', true)
                 .in('job_id', batchIds)
             );
 

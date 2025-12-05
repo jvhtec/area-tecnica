@@ -137,24 +137,23 @@ export function useStaffingMatrixStatuses(
         const reqs = byTech.get(tid) || []
         dates.forEach(d => {
           const dStr = format(d, 'yyyy-MM-dd')
-          // Filter requests to jobs overlapping this date
-          const overlapping = reqs.filter(r => {
-            const job = jobLookup.get(r.job_id)
-            if (!job) return false
-            const dateOverlapsJob = isWithinInterval(d, { start: job.start, end: job.end }) || isSameDay(d, job.start) || isSameDay(d, job.end)
-            if (!dateOverlapsJob) return false
-            // Respect single-day scoping when present
-            if (r.single_day && r.target_date) {
-              const rDate = typeof r.target_date === 'string' ? r.target_date : format(r.target_date, 'yyyy-MM-dd')
-              const dStr = format(d, 'yyyy-MM-dd')
-              return rDate === dStr
-            }
-            return true
+          // Filter requests to jobs with exact target_date match
+          // IMPORTANT: Only show requests with specific target_date to prevent
+          // them from incorrectly following job date changes
+          const exactMatches = reqs.filter(r => {
+            // Only show staffing requests that have a specific target_date
+            // This prevents full-span requests from dynamically following job reschedules
+            if (!r.target_date) return false
+
+            const rDate = typeof r.target_date === 'string' ? r.target_date : format(r.target_date, 'yyyy-MM-dd')
+
+            // Only match if the target_date exactly matches this date
+            return rDate === dStr
           })
-          if (!overlapping.length) return
+          if (!exactMatches.length) return
 
           // Reduce to latest per phase
-          const latest = overlapping.reduce((acc: any, r: any) => {
+          const latest = exactMatches.reduce((acc: any, r: any) => {
             const t = r.updated_at ? new Date(r.updated_at).getTime() : 0
             if (r.phase === 'availability') {
               const accT = acc.availability_updated_at || 0

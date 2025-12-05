@@ -264,6 +264,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
       supabase
         .from('timesheets')
         .select('job_id, status')
+        .eq('is_active', true)
         .in('job_id', reviewList),
       supabase
         .from('job_rate_extras')

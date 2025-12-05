@@ -118,11 +118,13 @@ serve(async (req) => {
   const startDate = startWindow.toISOString().split('T')[0];
   const endDate = endWindow.toISOString().split('T')[0];
 
-  // 1) Fetch timesheets for technician in date window
+  // 1) Fetch ACTIVE timesheets for technician in date window
+  // Filter by is_active = true to exclude voided timesheets (day-off/travel dates)
   const { data: timesheets, error: tsErr } = await supabase
     .from('timesheets')
     .select('job_id, date')
     .eq('technician_id', tid)
+    .eq('is_active', true)
     .gte('date', startDate)
     .lte('date', endDate);
 

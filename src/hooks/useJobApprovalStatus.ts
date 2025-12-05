@@ -34,7 +34,8 @@ export function useJobApprovalStatus(jobId?: string) {
         supabase
           .from('timesheets')
           .select('status')
-          .eq('job_id', jobId),
+          .eq('job_id', jobId)
+          .eq('is_active', true),
         supabase
           .from('job_rate_extras')
           .select('status')
