@@ -200,7 +200,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   });
 
   // Artist list for job (to avoid join issues under RLS)
-  const { data: jobArtists = [] } = useQuery({
+  const { data: jobArtists = [], isLoading: isArtistsLoading, error: artistsError } = useQuery({
     queryKey: ['job-artists', job.id],
     enabled: open && !!job?.id,
     queryFn: async () => {
@@ -208,12 +208,20 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         .from('festival_artists')
         .select('id, name')
         .eq('job_id', job.id);
-      if (error) throw error;
+      if (error) {
+        console.error('[JobDetailsDialog] Error fetching artists:', error);
+        throw error;
+      }
+      console.log('[JobDetailsDialog] Fetched artists for job:', job.id, 'Count:', data?.length || 0);
       return (data || []) as Array<{ id: string; name: string }>;
     }
   });
 
-  const artistIdList = React.useMemo(() => jobArtists.map(a => a.id), [jobArtists]);
+  const artistIdList = React.useMemo(() => {
+    const ids = jobArtists.map(a => a.id);
+    console.log('[JobDetailsDialog] Artist IDs:', ids);
+    return ids;
+  }, [jobArtists]);
   const artistNameMap = React.useMemo(() => new Map(jobArtists.map(a => [a.id, a.name])), [jobArtists]);
 
   // Extras setup and visibility
@@ -381,10 +389,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   }, [open, isDryhire, selectedTab]);
 
   // Rider files for the artists of this job (2-step to be RLS-friendly)
-  const { data: riderFiles = [], isLoading: isRidersLoading } = useQuery({
+  const { data: riderFiles = [], isLoading: isRidersLoading, error: ridersError } = useQuery({
     queryKey: ['job-rider-files', job.id, artistIdList],
     enabled: open && !!job?.id && artistIdList.length > 0,
     queryFn: async () => {
+      console.log('[JobDetailsDialog] Fetching rider files for artists:', artistIdList);
       let query = supabase
         .from('festival_artist_files')
         .select('id, file_name, file_path, uploaded_at, artist_id')
@@ -396,32 +405,57 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         query = query.or(orExpr);
       }
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('[JobDetailsDialog] Error fetching rider files:', error);
+        throw error;
+      }
+      console.log('[JobDetailsDialog] Fetched rider files:', data?.length || 0, 'files');
       return (data || []) as Array<{ id: string; file_name: string; file_path: string; uploaded_at: string; artist_id: string }>;
     }
   });
 
-  const viewRider = async (file: { file_path: string }) => {
-    const { data, error } = await supabase.storage
-      .from('festival_artist_files')
-      .createSignedUrl(file.file_path, 3600);
-    if (error) throw error;
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+  const viewRider = async (file: { file_path: string; file_name: string }) => {
+    try {
+      console.log('[JobDetailsDialog] Viewing rider:', file.file_path);
+      const { data, error } = await supabase.storage
+        .from('festival_artist_files')
+        .createSignedUrl(file.file_path, 3600);
+
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank', 'noopener');
+      } else {
+        throw new Error('No se pudo generar el enlace de visualización');
+      }
+    } catch (error) {
+      console.error('[JobDetailsDialog] Error viewing rider:', error);
+      toast.error(`Error al visualizar el rider: ${(error as Error).message || 'Error desconocido'}`);
+    }
   };
 
   const downloadRider = async (file: { file_path: string; file_name: string }) => {
-    const { data, error } = await supabase.storage
-      .from('festival_artist_files')
-      .download(file.file_path);
-    if (error) throw error;
-    const url = window.URL.createObjectURL(data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.file_name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    try {
+      console.log('[JobDetailsDialog] Downloading rider:', file.file_path);
+      const { data, error } = await supabase.storage
+        .from('festival_artist_files')
+        .download(file.file_path);
+
+      if (error) throw error;
+
+      const url = window.URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.file_name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success('Descargando rider');
+    } catch (error) {
+      console.error('[JobDetailsDialog] Error downloading rider:', error);
+      toast.error(`Error al descargar el rider: ${(error as Error).message || 'Error desconocido'}`);
+    }
   };
 
   // Fetch nearby restaurants
@@ -1383,9 +1417,46 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     Riders de artistas
+                    {jobArtists.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {jobArtists.length} {jobArtists.length === 1 ? 'artista' : 'artistas'}
+                      </Badge>
+                    )}
                   </h3>
-                  {isRidersLoading ? (
-                    <div className="text-center py-4 text-muted-foreground">Cargando riders…</div>
+
+                  {artistsError && (
+                    <Alert variant="destructive" className="mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Error al cargar artistas: {artistsError.message}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {ridersError && (
+                    <Alert variant="destructive" className="mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Error al cargar riders: {ridersError.message}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {isArtistsLoading || isRidersLoading ? (
+                    <div className="text-center py-4 text-muted-foreground">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      Cargando riders…
+                    </div>
+                  ) : jobArtists.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        No hay artistas asociados a este trabajo
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Los riders aparecerán aquí cuando se agreguen artistas al trabajo
+                      </p>
+                    </div>
                   ) : riderFiles.length > 0 ? (
                     <div className="space-y-2">
                       {riderFiles.map((file) => (
@@ -1395,10 +1466,10 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                             <p className="text-sm text-muted-foreground break-words">Artista: {artistNameMap.get(file.artist_id) || 'Desconocido'}</p>
                           </div>
                           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:shrink-0">
-                            <Button size="sm" variant="outline" onClick={() => viewRider(file)} className="w-full sm:w-auto">
+                            <Button size="sm" variant="outline" onClick={() => viewRider({ file_path: file.file_path, file_name: file.file_name })} className="w-full sm:w-auto">
                               <Eye className="h-4 w-4 mr-1" /> Ver
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => downloadRider(file)} className="w-full sm:w-auto">
+                            <Button size="sm" variant="outline" onClick={() => downloadRider({ file_path: file.file_path, file_name: file.file_name })} className="w-full sm:w-auto">
                               <Download className="h-4 w-4 mr-1" /> Descargar
                             </Button>
                           </div>
@@ -1407,8 +1478,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-muted-foreground">No se han subido riders de artistas</p>
+                      <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        No se han subido riders para los {jobArtists.length} {jobArtists.length === 1 ? 'artista' : 'artistas'} de este trabajo
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {jobArtists.map(a => a.name).join(', ')}
+                      </p>
                     </div>
                   )}
                 </Card>
