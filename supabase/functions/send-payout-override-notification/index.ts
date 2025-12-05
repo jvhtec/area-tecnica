@@ -1,13 +1,31 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  throw new Error("Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+/**
+ * Escapes HTML special characters to prevent XSS injection in email templates.
+ * Converts undefined/null to empty string before escaping.
+ */
+function escapeHtml(value: string | null | undefined): string {
+  const str = value ?? "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 interface PayoutOverrideNotificationRequest {
   jobId: string;
@@ -33,6 +51,15 @@ serve(async (req) => {
 
     // Parse request body
     const payload: PayoutOverrideNotificationRequest = await req.json();
+
+    // Validate required fields
+    if (!payload.jobId || !payload.technicianId || !payload.actorId) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields: jobId, technicianId, actorId" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const {
       jobId,
       jobTitle,
@@ -92,6 +119,8 @@ serve(async (req) => {
       changeDescription = "❌ Override desactivado";
     } else if (oldOverrideAmountEur !== null && newOverrideAmountEur !== null) {
       changeDescription = "✏️ Override modificado";
+    } else {
+      changeDescription = "ℹ️ Sin cambios";
     }
 
     // Build email HTML
@@ -244,15 +273,15 @@ serve(async (req) => {
       <h2>👤 Técnico Afectado</h2>
       <div class="info-row">
         <span class="label">Nombre:</span>
-        <span class="value">${technicianName}</span>
+        <span class="value">${escapeHtml(technicianName)}</span>
       </div>
       <div class="info-row">
         <span class="label">ID:</span>
-        <span class="value">${technicianId}</span>
+        <span class="value">${escapeHtml(technicianId)}</span>
       </div>
       <div class="info-row">
         <span class="label">Departamento:</span>
-        <span class="value">${technicianDepartment}</span>
+        <span class="value">${escapeHtml(technicianDepartment)}</span>
       </div>
     </div>
 
@@ -260,15 +289,15 @@ serve(async (req) => {
       <h2>📋 Información del Trabajo</h2>
       <div class="info-row">
         <span class="label">Trabajo:</span>
-        <span class="value">${jobTitle}</span>
+        <span class="value">${escapeHtml(jobTitle)}</span>
       </div>
       <div class="info-row">
         <span class="label">ID:</span>
-        <span class="value">${jobId}</span>
+        <span class="value">${escapeHtml(jobId)}</span>
       </div>
       <div class="info-row">
         <span class="label">Fecha de inicio:</span>
-        <span class="value">${formatDate(jobStartTime)}</span>
+        <span class="value">${escapeHtml(formatDate(jobStartTime))}</span>
       </div>
     </div>
 
@@ -276,19 +305,19 @@ serve(async (req) => {
       <h2>👤 Modificado por</h2>
       <div class="info-row">
         <span class="label">Usuario:</span>
-        <span class="value">${actorName}</span>
+        <span class="value">${escapeHtml(actorName)}</span>
       </div>
       <div class="info-row">
         <span class="label">Email:</span>
-        <span class="value">${actorEmail}</span>
+        <span class="value">${escapeHtml(actorEmail)}</span>
       </div>
       <div class="info-row">
         <span class="label">Rol:</span>
-        <span class="value">${actorRole}</span>
+        <span class="value">${escapeHtml(actorRole)}</span>
       </div>
       <div class="info-row">
         <span class="label">Departamento:</span>
-        <span class="value">${actorDepartment}</span>
+        <span class="value">${escapeHtml(actorDepartment)}</span>
       </div>
     </div>
 
@@ -329,9 +358,9 @@ serve(async (req) => {
     <div class="warning">
       <div class="warning-title">⚠️ Importante</div>
       <div class="warning-text">
-        El modo override está activo para ${technicianName}. El total de pago para este técnico
-        en este trabajo es ahora <strong>${formatCurrency(newOverrideAmountEur)}</strong> en lugar del total calculado
-        de <strong>${formatCurrency(calculatedTotal)}</strong>.
+        El modo override está activo para ${escapeHtml(technicianName)}. El total de pago para este técnico
+        en este trabajo es ahora <strong>${escapeHtml(formatCurrency(newOverrideAmountEur))}</strong> en lugar del total calculado
+        de <strong>${escapeHtml(formatCurrency(calculatedTotal))}</strong>.
       </div>
     </div>
     ` : ""}
@@ -354,12 +383,16 @@ serve(async (req) => {
 
     const finanzasProfileId = finanzasProfile?.id;
 
+    if (!finanzasProfileId) {
+      console.warn("[send-payout-override-notification] finanzas@sector-pro.com profile not found");
+    }
+
     // Send email via corporate email function to admins and finanzas
     const { data: sendResult, error: sendError } = await supabase.functions.invoke(
       "send-corporate-email",
       {
         body: {
-          subject: `⚠️ Override de Pago: ${technicianName} - ${jobTitle}`,
+          subject: `⚠️ Override de Pago: ${escapeHtml(technicianName)} - ${escapeHtml(jobTitle)}`,
           bodyHtml: emailHtml,
           recipients: {
             roles: ["admin"],
