@@ -716,14 +716,34 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
 
                       {/* Delete button - only for management */}
                       {isManagementUser && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => deleteTimesheet(timesheet.id)}
-                          disabled={isBulkUpdating}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={isBulkUpdating}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿De verdad quieres hacer esto?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Vale, vale... eliminar este parte de trabajo es irreversible. No me vengas luego llorando porque "ay, que lo borré sin querer". Una vez que le des a confirmar, adiós muy buenas. ¿Seguro que quieres seguir adelante con esta genialidad?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>No, mejor no</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteTimesheet(timesheet.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Sí, elimínalo
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                     </div>
                   </div>
