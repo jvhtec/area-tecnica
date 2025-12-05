@@ -55,6 +55,34 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
       if (error) throw error;
 
+      // Void timesheets when marking date as 'off' or 'travel'
+      // This hides them from all users while the date type is set
+      if (type === 'off' || type === 'travel') {
+        const { error: voidError } = await supabase
+          .from('timesheets')
+          .update({ is_active: false })
+          .eq('job_id', jobId)
+          .eq('date', formattedDate);
+
+        if (voidError) {
+          console.warn('Error voiding timesheets:', voidError);
+          // Don't fail the whole operation if voiding fails
+        }
+      } else {
+        // Restore timesheets when changing from 'off'/'travel' to another type
+        const { error: restoreError } = await supabase
+          .from('timesheets')
+          .update({ is_active: true })
+          .eq('job_id', jobId)
+          .eq('date', formattedDate)
+          .eq('is_active', false); // Only restore previously voided ones
+
+        if (restoreError) {
+          console.warn('Error restoring timesheets:', restoreError);
+          // Don't fail the whole operation if restore fails
+        }
+      }
+
       // Broadcast push: job date type changed (per-job, per-day)
       try {
         void supabase.functions.invoke('push', {

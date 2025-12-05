@@ -405,13 +405,15 @@ serve(async (req) => {
         }
 
         if (datesToCheck.length > 0) {
-          // Check if technician already has timesheets for these exact dates
+          // Check if technician already has ACTIVE timesheets for these exact dates
+          // Voided timesheets (is_active = false) don't count as conflicts
           const { data: existingTimesheets, error: timesheetErr } = await supabase
             .from('timesheets')
             .select('date, job_id, jobs(title)')
             .eq('technician_id', profile_id)
             .in('date', datesToCheck)
-            .neq('job_id', job_id);
+            .neq('job_id', job_id)
+            .eq('is_active', true); // Only check active timesheets
 
           if (timesheetErr) {
             console.warn('⚠️ Timesheet check failed, continuing:', timesheetErr);
