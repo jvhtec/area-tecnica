@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, isWithinInterval, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Loader2, Palmtree } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -135,12 +135,15 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
     const filteredBlocks = useMemo(() => {
         if (!blocks.length) return [];
 
+        // Use string-based comparisons to avoid timezone shifts
         const monthStartDate = startOfMonth(currentMonth);
         const monthEndDate = endOfMonth(currentMonth);
+        const monthStartStr = format(monthStartDate, 'yyyy-MM-dd');
+        const monthEndStr = format(monthEndDate, 'yyyy-MM-dd');
 
         return blocks.filter(block => {
-            const blockDate = new Date(block.date);
-            return isWithinInterval(blockDate, { start: monthStartDate, end: monthEndDate });
+            // Lexicographic comparison of YYYY-MM-DD strings
+            return block.date >= monthStartStr && block.date <= monthEndStr;
         });
     }, [blocks, currentMonth]);
 
