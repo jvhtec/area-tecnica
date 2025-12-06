@@ -882,7 +882,10 @@ LEFT JOIN LATERAL (
 ) ex ON TRUE
 LEFT JOIN expense_rollup er ON er.job_id = b.job_id AND er.technician_id = b.technician_id;
 
-CREATE OR REPLACE FUNCTION public.get_job_total_amounts(
+-- Drop existing function to allow changing return type
+DROP FUNCTION IF EXISTS public.get_job_total_amounts(UUID, TEXT);
+
+CREATE FUNCTION public.get_job_total_amounts(
   _job_id UUID,
   _user_role TEXT DEFAULT NULL
 )
