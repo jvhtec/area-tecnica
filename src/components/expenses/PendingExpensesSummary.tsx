@@ -7,8 +7,14 @@ import { Receipt, ArrowRight, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { formatCurrency } from '@/lib/utils';
-import { expenseCopy } from './expenseCopy';
 import { useNavigate } from 'react-router-dom';
+
+interface ExpenseResponse {
+  job_id: string;
+  amount_eur: number | null;
+  status: string;
+  job: { title: string } | null;
+}
 
 interface PendingExpense {
   job_id: string;
@@ -41,7 +47,7 @@ export const PendingExpensesSummary: React.FC = () => {
 
       // Group by job
       const grouped = new Map<string, PendingExpense>();
-      (data || []).forEach((expense: any) => {
+      (data || []).forEach((expense: ExpenseResponse) => {
         const existing = grouped.get(expense.job_id) || {
           job_id: expense.job_id,
           job_title: expense.job?.title || 'Sin título',

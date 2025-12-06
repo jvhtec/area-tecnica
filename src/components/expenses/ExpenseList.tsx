@@ -12,6 +12,7 @@ import { formatCurrency } from '@/lib/utils';
 import type { JobExpense } from '@/hooks/useJobExpenses';
 import { useJobExpenseMutations } from '@/hooks/useJobExpenses';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +37,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   showActions = true,
 }) => {
   const { deleteExpense } = useJobExpenseMutations();
+  const { toast } = useToast();
 
   const handleDelete = (id: string, jobId: string) => {
     deleteExpense.mutate({ id, jobId });
@@ -53,6 +55,11 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
       }
     } catch (error) {
       console.error('Error viewing receipt:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo cargar el recibo',
+        variant: 'destructive',
+      });
     }
   };
 

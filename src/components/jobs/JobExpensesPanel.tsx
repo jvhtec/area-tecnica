@@ -365,13 +365,12 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
         if (error) throw error;
         toast.success('Gasto aprobado');
         await invalidateExpenseContext();
-        refetchExpenses();
       } catch (error) {
         console.error('[JobExpensesPanel] Failed to approve expense', error);
         toast.error('No se pudo aprobar el gasto');
       }
     },
-    [invalidateExpenseContext, refetchExpenses]
+    [invalidateExpenseContext]
   );
 
   const handleRejectExpense = React.useCallback(
@@ -385,13 +384,12 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
         if (error) throw error;
         toast.success('Gasto rechazado');
         await invalidateExpenseContext();
-        refetchExpenses();
       } catch (error) {
         console.error('[JobExpensesPanel] Failed to reject expense', error);
         toast.error('No se pudo rechazar el gasto');
       }
     },
-    [invalidateExpenseContext, refetchExpenses]
+    [invalidateExpenseContext]
   );
 
   const handleViewReceipt = React.useCallback(

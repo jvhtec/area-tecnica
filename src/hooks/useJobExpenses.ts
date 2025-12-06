@@ -189,7 +189,7 @@ export const useJobExpenseMutations = () => {
       queryClient.invalidateQueries({ queryKey: ['job-totals'] });
       toast.success(expenseCopy.success.submitted);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       console.error('Error submitting expense:', error);
       const message = error.message || expenseCopy.errors.submitFailed;
       toast.error(message);
