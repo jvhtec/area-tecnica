@@ -56,7 +56,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
     place_id?: string;
     coordinates?: { lat: number; lng: number };
   } | null>(null);
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { getOrCreateLocationWithDetails } = useLocationManagement();
@@ -70,7 +70,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         setColor(job.color || "#7E69AB");
         setJobType(job.job_type || "single");
         setTimezone(job.timezone || "Europe/Madrid");
-        
+
         // Convert UTC times to local input format using job's timezone
         if (job.start_time && job.end_time) {
           const jobTimezone = job.timezone || "Europe/Madrid";
@@ -92,7 +92,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               setVenueAddress(locationData.formatted_address || "");
               setVenueData({
                 place_id: locationData.google_place_id || undefined,
-                coordinates: locationData.latitude && locationData.longitude 
+                coordinates: locationData.latitude && locationData.longitude
                   ? { lat: locationData.latitude, lng: locationData.longitude }
                   : undefined,
               });
@@ -135,7 +135,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   }, [open, job.id]);
 
   const handleDepartmentToggle = (department: Department) => {
-    setSelectedDepartments(prev => 
+    setSelectedDepartments(prev =>
       prev.includes(department)
         ? prev.filter(d => d !== department)
         : [...prev, department]
@@ -162,7 +162,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
       // Handle venue/location updates
       let locationId = job.location_id;
-      
+
       if (venueName && venueAddress) {
         // Create or update location using the location management hook
         const locationDetails = {
@@ -171,13 +171,13 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           coordinates: venueData?.coordinates,
           place_id: venueData?.place_id,
         };
-        
+
         locationId = await getOrCreateLocationWithDetails(locationDetails);
       } else if (venueName && !venueAddress) {
         // If only venue name is provided without address, handle it
-        locationId = await getOrCreateLocationWithDetails({ 
-          name: venueName, 
-          address: venueName 
+        locationId = await getOrCreateLocationWithDetails({
+          name: venueName,
+          address: venueName
         });
       } else if (!venueName && !venueAddress) {
         // If venue is cleared, remove location reference
@@ -207,7 +207,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         .eq("job_id", job.id);
 
       const currentDepartments = currentDepts?.map(d => d.department) || [];
-      
+
       // Remove deselected departments
       const toRemove = currentDepartments.filter(dept => !selectedDepartments.includes(dept as Department));
       if (toRemove.length > 0) {
@@ -258,13 +258,13 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             }
           });
         }
-      } catch {}
+      } catch { }
 
       toast({
         title: "Job updated successfully",
         description: "The job has been updated.",
       });
-      
+
       // Refresh jobs and Hoja de Ruta that depends on the job location
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["hoja-de-ruta", job.id] });
@@ -281,180 +281,180 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
     }
   };
 
-  const departments: Department[] = ["sound", "lights", "video"];
+  const departments: Department[] = ["sound", "lights", "video", "production"];
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible bg-[#05070a] text-white border-[#1f232e]">
-        <DialogHeader>
-          <DialogTitle>Edit Job</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="title">Title</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className={fieldClass}
-            />
-          </div>
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              className={fieldClass}
-            />
-          </div>
-          
-          {/* Venue Section */}
-          <div className="space-y-4 p-4 border rounded-lg bg-[#0f1219] border-[#1f232e]">
-            <Label className="text-base font-semibold">Venue Information</Label>
-            <div className="grid gap-4">
-              <PlaceAutocomplete
-                value={venueName}
-                onSelect={handleVenueSelect}
-                onBusyChange={setIsVenueBusy}
-                placeholder="Search for venue (WiZink Center Madrid, etc.)"
-                label="Venue Name"
-                className="w-full"
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible bg-[#05070a] text-white border-[#1f232e]">
+          <DialogHeader>
+            <DialogTitle>Edit Job</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                className={fieldClass}
               />
+            </div>
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                className={fieldClass}
+              />
+            </div>
+
+            {/* Venue Section */}
+            <div className="space-y-4 p-4 border rounded-lg bg-[#0f1219] border-[#1f232e]">
+              <Label className="text-base font-semibold">Venue Information</Label>
+              <div className="grid gap-4">
+                <PlaceAutocomplete
+                  value={venueName}
+                  onSelect={handleVenueSelect}
+                  onBusyChange={setIsVenueBusy}
+                  placeholder="Search for venue (WiZink Center Madrid, etc.)"
+                  label="Venue Name"
+                  className="w-full"
+                />
+                <div>
+                  <Label htmlFor="venueAddress">Address</Label>
+                  <Input
+                    id="venueAddress"
+                    value={venueAddress}
+                    onChange={(e) => setVenueAddress(e.target.value)}
+                    placeholder="Venue address (auto-filled from venue selection)"
+                    className={fieldClass}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label>Timezone</Label>
+              <Select
+                value={timezone}
+                onValueChange={setTimezone}
+              >
+                <SelectTrigger className={fieldClass}>
+                  <SelectValue placeholder="Select timezone" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
+                  <SelectItem value="Europe/Madrid">Europe/Madrid</SelectItem>
+                  <SelectItem value="Europe/London">Europe/London</SelectItem>
+                  <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
+                  <SelectItem value="America/New_York">America/New_York</SelectItem>
+                  <SelectItem value="America/Los_Angeles">America/Los_Angeles</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="venueAddress">Address</Label>
+                <Label htmlFor="startTime">Start Time</Label>
                 <Input
-                  id="venueAddress"
-                  value={venueAddress}
-                  onChange={(e) => setVenueAddress(e.target.value)}
-                  placeholder="Venue address (auto-filled from venue selection)"
+                  id="startTime"
+                  type="datetime-local"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  required
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <Label htmlFor="endTime">End Time</Label>
+                <Input
+                  id="endTime"
+                  type="datetime-local"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  required
                   className={fieldClass}
                 />
               </div>
             </div>
-          </div>
-          
-          <div>
-            <Label>Timezone</Label>
-            <Select
-              value={timezone}
-              onValueChange={setTimezone}
-            >
-              <SelectTrigger className={fieldClass}>
-                <SelectValue placeholder="Select timezone" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
-                <SelectItem value="Europe/Madrid">Europe/Madrid</SelectItem>
-                <SelectItem value="Europe/London">Europe/London</SelectItem>
-                <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
-                <SelectItem value="America/New_York">America/New_York</SelectItem>
-                <SelectItem value="America/Los_Angeles">America/Los_Angeles</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="startTime">Start Time</Label>
-              <Input
-                id="startTime"
-                type="datetime-local"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                required
-                className={fieldClass}
-              />
+              <Label>Color</Label>
+              <SimplifiedJobColorPicker color={color} onChange={setColor} />
             </div>
-            <div>
-              <Label htmlFor="endTime">End Time</Label>
-              <Input
-                id="endTime"
-                type="datetime-local"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                required
-                className={fieldClass}
-              />
+            <div className="space-y-2">
+              <Label>Job Type</Label>
+              <Select
+                value={jobType}
+                onValueChange={(value) => setJobType(value as JobType)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select job type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single">Single</SelectItem>
+                  <SelectItem value="tour">Tour</SelectItem>
+                  <SelectItem value="tourdate">Tour Date</SelectItem>
+                  <SelectItem value="festival">Festival</SelectItem>
+                  <SelectItem value="dryhire">Dry Hire</SelectItem>
+                  <SelectItem value="evento">Evento</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-          <div>
-            <Label>Color</Label>
-            <SimplifiedJobColorPicker color={color} onChange={setColor} />
-          </div>
-          <div className="space-y-2">
-            <Label>Job Type</Label>
-            <Select
-              value={jobType}
-              onValueChange={(value) => setJobType(value as JobType)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select job type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="single">Single</SelectItem>
-                <SelectItem value="tour">Tour</SelectItem>
-                <SelectItem value="tourdate">Tour Date</SelectItem>
-                <SelectItem value="festival">Festival</SelectItem>
-                <SelectItem value="dryhire">Dry Hire</SelectItem>
-                <SelectItem value="evento">Evento</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Departments</Label>
-            <div className="flex flex-col gap-2">
-              {departments.map((department) => (
-                <div key={department} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`department-${department}`}
-                    checked={selectedDepartments.includes(department)}
-                    onCheckedChange={() => handleDepartmentToggle(department)}
-                  />
-                  <Label htmlFor={`department-${department}`} className="capitalize">
-                    {department}
-                  </Label>
-                </div>
-              ))}
-            </div>
-            {jobType !== 'dryhire' && (
-              <div className="pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setRequirementsOpen(true)}
-                  className="bg-white/5 border-white/10 text-white hover:bg-white/10"
-                >
-                  Manage Requirements
-                </Button>
+            <div className="space-y-2">
+              <Label>Departments</Label>
+              <div className="flex flex-col gap-2">
+                {departments.map((department) => (
+                  <div key={department} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`department-${department}`}
+                      checked={selectedDepartments.includes(department)}
+                      onCheckedChange={() => handleDepartmentToggle(department)}
+                    />
+                    <Label htmlFor={`department-${department}`} className="capitalize">
+                      {department}
+                    </Label>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="bg-white/5 border-white/10 text-white hover:bg-white/10"
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading || isVenueBusy} className="bg-blue-600 hover:bg-blue-500 text-white">
-              {isLoading ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-    {requirementsOpen && (
-      <JobRequirementsEditor
-        open={requirementsOpen}
-        onOpenChange={setRequirementsOpen}
-        jobId={job.id}
-        departments={selectedDepartments}
-      />
-    )}
+              {jobType !== 'dryhire' && (
+                <div className="pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setRequirementsOpen(true)}
+                    className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                  >
+                    Manage Requirements
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading || isVenueBusy} className="bg-blue-600 hover:bg-blue-500 text-white">
+                {isLoading ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {requirementsOpen && (
+        <JobRequirementsEditor
+          open={requirementsOpen}
+          onOpenChange={setRequirementsOpen}
+          jobId={job.id}
+          departments={selectedDepartments}
+        />
+      )}
     </>
   );
 };

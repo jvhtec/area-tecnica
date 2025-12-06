@@ -8,13 +8,13 @@ export class FooterService {
   private static cachedLogoData: string | null = null;
   private static cachedLogoDims: { width: number; height: number } | null = null;
 
-  static async addFooterToAllPages(pdfDoc: PDFDocument): Promise<void> {
+  static async addFooterToAllPages(pdfDoc: PDFDocument, jobName?: string): Promise<void> {
     try {
       // Load Sector Pro logo from public assets
       const logoData = await this.loadSectorProLogo();
       const totalPages = pdfDoc.document.getNumberOfPages();
       const { width: pageWidth, height: pageHeight } = pdfDoc.dimensions;
-      const bottomMargin = 10;
+      const bottomMargin = 12;
 
       // Determine intrinsic logo dimensions once
       let drawWidth = 0;
@@ -31,18 +31,39 @@ export class FooterService {
 
       for (let i = 1; i <= totalPages; i++) {
         pdfDoc.document.setPage(i);
+
+        // Skip cover page (page 1) for page numbers and footer
+        const isContentPage = i > 1;
+
+        // Only add footer elements to content pages (skip cover page)
+        if (isContentPage) {
+          // Draw subtle footer separator line
+          pdfDoc.document.setDrawColor(220, 220, 220);
+          pdfDoc.document.setLineWidth(0.3);
+          pdfDoc.document.line(20, pageHeight - 20, pageWidth - 20, pageHeight - 20);
+
+          // Add logo centered
+          if (logoData && drawWidth > 0 && drawHeight > 0) {
+            const xPosition = (pageWidth - drawWidth) / 2;
+            const yPosition = pageHeight - drawHeight - bottomMargin;
+            pdfDoc.addImage(logoData, 'PNG', xPosition, yPosition, drawWidth, drawHeight);
+          } else {
+            pdfDoc.setText(8, [125, 1, 1]);
+            pdfDoc.addText('Sector-Pro', pageWidth / 2, pageHeight - bottomMargin, { align: 'center' });
+          }
+        }
         
-        if (logoData && drawWidth > 0 && drawHeight > 0) {
-          // Calculate logo dimensions and center position
-          const xPosition = (pageWidth - drawWidth) / 2;
-          // Position the logo at the bottom of the page
-          const yPosition = pageHeight - drawHeight - bottomMargin;
+        // Add page numbers on content pages (skip cover)
+        if (isContentPage) {
+          pdfDoc.setText(8, [120, 120, 120]);
+          // Page number on left
+          pdfDoc.addText(`Pág. ${i - 1} de ${totalPages - 1}`, 20, pageHeight - bottomMargin);
           
-          pdfDoc.addImage(logoData, 'PNG', xPosition, yPosition, drawWidth, drawHeight);
-        } else {
-          // Fallback text if logo fails to load
-          pdfDoc.setText(8, [125, 1, 1]);
-          pdfDoc.addText('[LOGO MISSING]', pageWidth / 2, pageHeight - bottomMargin, { align: 'center' });
+          // Job name on right (if provided)
+          if (jobName) {
+            const truncatedName = jobName.length > 40 ? jobName.substring(0, 40) + '...' : jobName;
+            pdfDoc.addText(truncatedName, pageWidth - 20, pageHeight - bottomMargin, { align: 'right' });
+          }
         }
       }
     } catch (error) {
@@ -50,12 +71,17 @@ export class FooterService {
       // Add fallback text footer
       const totalPages = pdfDoc.document.getNumberOfPages();
       const { width: pageWidth, height: pageHeight } = pdfDoc.dimensions;
-      const bottomMargin = 10;
+      const bottomMargin = 12;
 
       for (let i = 1; i <= totalPages; i++) {
         pdfDoc.document.setPage(i);
         pdfDoc.setText(8, [125, 1, 1]);
-        pdfDoc.addText('[LOGO MISSING]', pageWidth / 2, pageHeight - bottomMargin, { align: 'center' });
+        pdfDoc.addText('Sector-Pro', pageWidth / 2, pageHeight - bottomMargin, { align: 'center' });
+        
+        if (i > 1) {
+          pdfDoc.setText(8, [120, 120, 120]);
+          pdfDoc.addText(`Pág. ${i - 1} de ${totalPages - 1}`, 20, pageHeight - bottomMargin);
+        }
       }
     }
   }

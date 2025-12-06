@@ -45,7 +45,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
   useEffect(() => {
     const fetchTourLogo = async () => {
       if (!tour.id) return;
-      
+
       const { data, error } = await supabase
         .from('tour_logos')
         .select('file_path')
@@ -59,7 +59,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
             .storage
             .from('tour-logos')
             .createSignedUrl(data.file_path, 60 * 60); // 1 hour expiry
-            
+
           if (signedUrlData?.signedUrl) {
             setLogoUrl(signedUrlData.signedUrl);
           } else {
@@ -68,7 +68,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
               .storage
               .from('tour-logos')
               .getPublicUrl(data.file_path);
-              
+
             if (publicUrlData?.publicUrl) {
               setLogoUrl(publicUrlData.publicUrl);
             }
@@ -79,7 +79,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
             .storage
             .from('tour-logos')
             .getPublicUrl(data.file_path);
-            
+
           if (publicUrlData?.publicUrl) {
             setLogoUrl(publicUrlData.publicUrl);
           }
@@ -122,7 +122,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
     try {
       console.log("Creating tour root folders manually for tour:", tour.id);
-      
+
       const result = await createTourRootFoldersManual(tour.id);
 
       if (!result.success) {
@@ -159,7 +159,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
     try {
       console.log("Creating tour date folders for tour:", tour.id);
-      
+
       const result = await createTourDateFolders(tour.id);
 
       if (!result.success) {
@@ -208,7 +208,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
       // Format tour date range
       const startDate = tour.start_date ? new Date(tour.start_date) : null;
       const endDate = tour.end_date ? new Date(tour.end_date) : null;
-      
+
       let dateRange = "";
       if (startDate && endDate) {
         dateRange = `${format(startDate, "yyMMdd")} to ${format(endDate, "yyMMdd")}`;
@@ -220,7 +220,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
       // Create safe folder name
       const { name: rootFolderName, wasSanitized } = createSafeFolderName(tour.name, dateRange);
-      
+
       if (wasSanitized) {
         console.log('TourCard: Folder name was sanitized for safety:', { original: `${tour.name} - ${dateRange}`, sanitized: rootFolderName });
       }
@@ -231,20 +231,20 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
       // Get current user's custom folder structure or use default
       const { data: { user } } = await supabase.auth.getUser();
       let folderStructure = null;
-      
+
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('custom_tour_folder_structure, role')
           .eq('id', user.id)
           .single();
-        
+
         // Only use custom tour structure for management users
         if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_tour_folder_structure) {
           folderStructure = profile.custom_tour_folder_structure;
         }
       }
-      
+
       // Default tour structure if no custom one exists
       if (!folderStructure) {
         folderStructure = [
@@ -255,7 +255,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
           { name: "04 - Archive", subfolders: ["OLD"] }
         ];
       }
-      
+
       // Create main tour folders
       if (Array.isArray(folderStructure)) {
         for (const folder of folderStructure) {
@@ -266,14 +266,14 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
           } else if (folder && typeof folder === 'object' && folder.name) {
             // Special handling for "tourdates" element
             if (folder.name === 'tourdates' && tour.tour_dates && tour.tour_dates.length > 0) {
-              const sortedDates = [...tour.tour_dates].sort((a, b) => 
+              const sortedDates = [...tour.tour_dates].sort((a, b) =>
                 new Date(a.start_date || a.date).getTime() - new Date(b.start_date || b.date).getTime()
               );
 
               for (const tourDate of sortedDates) {
                 let dateFolderName = "";
                 const dateStart = new Date(tourDate.start_date || tourDate.date);
-                
+
                 if (tourDate.date_type === 'rehearsal' && tourDate.end_date) {
                   const dateEnd = new Date(tourDate.end_date);
                   dateFolderName = `${format(dateStart, "yyMMdd")}-${format(dateEnd, "yyMMdd")} - ${tourDate.location?.name || 'TBD'}, Rehearsal`;
@@ -283,15 +283,15 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                   dateFolderName = `${format(dateStart, "yyMMdd")} - ${tourDate.location?.name || 'TBD'}, Show`;
                 }
 
-                  const cleanDateFolderName = sanitizeFolderName(dateFolderName);
+                const cleanDateFolderName = sanitizeFolderName(dateFolderName);
                 const dateDirHandle = await rootDirHandle.getDirectoryHandle(cleanDateFolderName, { create: true });
-                
+
                 // Create subfolders specified in the tourdates element
-                  if (folder.subfolders && Array.isArray(folder.subfolders) && folder.subfolders.length > 0) {
-                    for (const subfolder of folder.subfolders) {
-                      const safeSubfolderName = sanitizeFolderName(subfolder);
-                      await dateDirHandle.getDirectoryHandle(safeSubfolderName, { create: true });
-                    }
+                if (folder.subfolders && Array.isArray(folder.subfolders) && folder.subfolders.length > 0) {
+                  for (const subfolder of folder.subfolders) {
+                    const safeSubfolderName = sanitizeFolderName(subfolder);
+                    await dateDirHandle.getDirectoryHandle(safeSubfolderName, { create: true });
+                  }
                 } else {
                   // Default subfolders if none specified
                   await dateDirHandle.getDirectoryHandle("Technical", { create: true });
@@ -303,7 +303,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
               // Regular folder handling
               const safeFolderName = sanitizeFolderName(folder.name);
               const subDirHandle = await rootDirHandle.getDirectoryHandle(safeFolderName, { create: true });
-              
+
               // Create subfolders if they exist
               if (folder.subfolders && Array.isArray(folder.subfolders) && folder.subfolders.length > 0) {
                 for (const subfolder of folder.subfolders) {
@@ -317,14 +317,14 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
               // Legacy special handling for Dates folder for backward compatibility
               if (folder.name === "03 - Dates" && tour.tour_dates && tour.tour_dates.length > 0) {
-                const sortedDates = [...tour.tour_dates].sort((a, b) => 
+                const sortedDates = [...tour.tour_dates].sort((a, b) =>
                   new Date(a.start_date || a.date).getTime() - new Date(b.start_date || b.date).getTime()
                 );
 
                 for (const tourDate of sortedDates) {
                   let dateFolderName = "";
                   const dateStart = new Date(tourDate.start_date || tourDate.date);
-                  
+
                   if (tourDate.date_type === 'rehearsal' && tourDate.end_date) {
                     const dateEnd = new Date(tourDate.end_date);
                     dateFolderName = `${format(dateStart, "yyMMdd")}-${format(dateEnd, "yyMMdd")} - ${tourDate.location?.name || 'TBD'} - Rehearsal`;
@@ -336,12 +336,12 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
                   const cleanDateFolderName = sanitizeFolderName(dateFolderName);
                   const dateDirHandle = await subDirHandle.getDirectoryHandle(cleanDateFolderName, { create: true });
-                  
+
                   // Create standard subfolders for each date
                   await dateDirHandle.getDirectoryHandle("Technical", { create: true });
                   await dateDirHandle.getDirectoryHandle("Logistics", { create: true });
                   await dateDirHandle.getDirectoryHandle("Documentation", { create: true });
-                  
+
                   if (tourDate.date_type === 'rehearsal') {
                     await dateDirHandle.getDirectoryHandle("Schedule", { create: true });
                     await dateDirHandle.getDirectoryHandle("Notes", { create: true });
@@ -365,7 +365,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
         // User cancelled, don't show error
         return;
       }
-      
+
       let errorMessage = "Failed to create folders";
       if (error.message?.includes("Name is not allowed")) {
         errorMessage = "Invalid folder name detected. Please try again or contact support.";
@@ -374,7 +374,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -403,7 +403,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
   const handleToggleTourStatus = async () => {
     const newStatus = tour.status === 'active' ? 'cancelled' : 'active';
     const actionWord = newStatus === 'cancelled' ? 'cancel' : 'reactivate';
-    
+
     try {
       const { error } = await supabase
         .from('tours')
@@ -428,20 +428,20 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
         variant: "destructive",
       });
     }
-    
+
     setIsMobileMenuOpen(false);
   };
 
   const MenuItems = () => (
     <>
-      <div 
+      <div
         className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
         onClick={handleManageTour}
       >
         <Settings className="h-4 w-4 mr-3" />
         <span>Manage Tour</span>
       </div>
-      <div 
+      <div
         className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
         onClick={handleManageDatesClick}
       >
@@ -449,7 +449,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
         <span>Manage Dates</span>
       </div>
       {tour.status === 'active' ? (
-        <div 
+        <div
           className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors text-red-600"
           onClick={handleToggleTourStatus}
         >
@@ -457,7 +457,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
           <span>Mark as Not Happening</span>
         </div>
       ) : (
-        <div 
+        <div
           className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors text-green-600"
           onClick={handleToggleTourStatus}
         >
@@ -466,7 +466,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
         </div>
       )}
       {!tour.flex_folders_created && (
-        <div 
+        <div
           className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
           onClick={handleCreateTourRootFolders}
         >
@@ -474,24 +474,22 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
           <span>Create Tour Root Folders</span>
         </div>
       )}
-      <div 
-        className={`flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors ${
-          !tour.flex_folders_created ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
+      <div
+        className={`flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors ${!tour.flex_folders_created ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
         onClick={tour.flex_folders_created ? handleCreateFlexFolders : undefined}
       >
         <FolderPlus className="h-4 w-4 mr-3" />
         <span>
-          {!tour.flex_folders_created 
-            ? "Create Root Folders First" 
+          {!tour.flex_folders_created
+            ? "Create Root Folders First"
             : "Create Date Folders"
           }
         </span>
       </div>
-      <div 
-        className={`flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors ${
-          isCreatingLocalFolders ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
+      <div
+        className={`flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors ${isCreatingLocalFolders ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
         onClick={isCreatingLocalFolders ? undefined : createLocalFoldersHandler}
       >
         <HardDrive className="h-4 w-4 mr-3" />
@@ -499,7 +497,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
           {isCreatingLocalFolders ? "Creating Local Folders..." : "Create Local Folders"}
         </span>
       </div>
-      <div 
+      <div
         className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
         onClick={handlePrintClick}
       >
@@ -512,8 +510,8 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
   return (
     <>
       <Card className="cursor-pointer hover:shadow-md transition-shadow h-full flex flex-col" onClick={handleCardClick}>
-        <CardHeader 
-          className="pb-3 relative px-4 py-3 md:px-6 md:py-4"
+        <CardHeader
+          className="pb-3 relative px-3 py-3 md:px-6 md:py-4"
           style={{ backgroundColor: `${tour.color}20` }}
         >
           <div className="flex justify-between items-start gap-2">
@@ -542,14 +540,14 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                 </div>
               </div>
             </div>
-            
+
             {/* Mobile Sheet Menu */}
             {isMobile ? (
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-10 w-10 p-0 touch-manipulation"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -569,17 +567,17 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
               /* Desktop Dropdown Menu */
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-8 w-8 p-0"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent 
-                  align="end" 
+                <DropdownMenuContent
+                  align="end"
                   className="w-56 z-[9999]"
                   sideOffset={5}
                 >
@@ -592,7 +590,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                     Manage Dates
                   </DropdownMenuItem>
                   {tour.status === 'active' ? (
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={handleToggleTourStatus}
                       className="text-red-600 hover:text-red-700"
                     >
@@ -600,7 +598,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                       Mark as Not Happening
                     </DropdownMenuItem>
                   ) : (
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={handleToggleTourStatus}
                       className="text-green-600 hover:text-green-700"
                     >
@@ -614,17 +612,17 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                       Create Tour Root Folders
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={handleCreateFlexFolders}
                     disabled={!tour.flex_folders_created}
                   >
                     <FolderPlus className="h-4 w-4 mr-2" />
-                    {!tour.flex_folders_created 
-                      ? "Create Root Folders First" 
+                    {!tour.flex_folders_created
+                      ? "Create Root Folders First"
                       : "Create Date Folders"
                     }
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={createLocalFoldersHandler}
                     disabled={isCreatingLocalFolders}
                   >
@@ -640,8 +638,8 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
             )}
           </div>
         </CardHeader>
-        
-        <CardContent className="pt-3 px-4 pb-4 md:px-6 md:pb-6 flex-1">
+
+        <CardContent className="pt-3 px-3 pb-4 md:px-6 md:pb-6 flex-1">
           <div className="space-y-3 md:space-y-4">
             {/* Tour dates info */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
@@ -702,12 +700,12 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                   Logo
                 </Badge>
               )}
-              <Badge 
-                variant="outline" 
+              <Badge
+                variant="outline"
                 className="text-xs"
-                style={{ 
+                style={{
                   borderColor: tour.color,
-                  color: tour.color 
+                  color: tour.color
                 }}
               >
                 {tour.tour_dates?.length || 0} dates

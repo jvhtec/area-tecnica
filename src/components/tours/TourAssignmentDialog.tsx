@@ -157,8 +157,11 @@ export const TourAssignmentDialog = ({
     onSuccess: () => {
       toast.success('Assignment removed successfully - automatically removed from all tour jobs');
       refetch();
-      // Invalidate job assignments as they're automatically synced
+      // Invalidate job assignments and job details as they're automatically synced
       queryClient.invalidateQueries({ queryKey: ['job-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['job-details'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
     },
     onError: (error: any) => {
       toast.error(`Failed to remove assignment: ${error.message}`);

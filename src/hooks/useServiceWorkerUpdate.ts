@@ -19,6 +19,16 @@ const isPWAMode = (): boolean => {
 };
 
 /**
+ * Detect if running on iOS
+ */
+const isIOS = (): boolean => {
+  const ua = window.navigator.userAgent;
+  const isIOSDevice = /iPad|iPhone|iPod/.test(ua);
+  const isIOSSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+  return isIOSDevice || isIOSSafari || (window.navigator as any).standalone === true;
+};
+
+/**
  * Hook to handle service worker updates with user-friendly notifications
  *
  * This hook:
@@ -39,6 +49,9 @@ export function useServiceWorkerUpdate() {
     if (!('serviceWorker' in navigator)) {
       return;
     }
+
+    const isIOSPWA = isIOS() && isStandalone;
+    let updateCheckInterval: NodeJS.Timeout | null = null;
 
     const handleUpdate = (registration: ServiceWorkerRegistration) => {
       setWaitingWorker(registration.waiting);
@@ -81,6 +94,18 @@ export function useServiceWorkerUpdate() {
       });
     };
 
+    // Function to manually trigger update check
+    const checkForUpdates = async () => {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration('/');
+        if (registration) {
+          await registration.update();
+        }
+      } catch (error) {
+        console.debug('[SW Update] Update check failed:', error);
+      }
+    };
+
     // Check for existing waiting worker
     navigator.serviceWorker.ready.then((registration) => {
       if (registration.waiting) {
@@ -100,6 +125,17 @@ export function useServiceWorkerUpdate() {
           }
         });
       });
+
+      // iOS PWA: Set up aggressive update checking
+      // iOS doesn't reliably check for updates on launch or via the standard 24h cycle
+      if (isIOSPWA) {
+        // Check for updates every 30 seconds when the app is visible
+        updateCheckInterval = setInterval(() => {
+          if (!document.hidden) {
+            checkForUpdates();
+          }
+        }, 30000); // 30 seconds
+      }
     });
 
     // Listen for the new service worker to take control
@@ -123,10 +159,32 @@ export function useServiceWorkerUpdate() {
       }
     };
 
+    // iOS PWA: Check for updates when app comes to foreground
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isIOSPWA) {
+        console.log('[SW Update] App became visible, checking for updates...');
+        checkForUpdates();
+      }
+    };
+
     navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+    
+    // Add visibility change listener for iOS PWAs
+    if (isIOSPWA) {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
 
     return () => {
       navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      
+      if (isIOSPWA) {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+
+      // Clear interval if it exists
+      if (updateCheckInterval) {
+        clearInterval(updateCheckInterval);
+      }
 
       // Dismiss the toast when component unmounts
       if (toastId.current !== undefined) {

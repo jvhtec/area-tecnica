@@ -1,6 +1,6 @@
 // New role model: discipline-position-level codes with labels
 
-export type Discipline = 'sound' | 'lights' | 'video'
+export type Discipline = 'sound' | 'lights' | 'video' | 'production'
 export type Level = 'R' | 'E' | 'T'
 
 export interface RoleOption {
@@ -43,6 +43,12 @@ const ROLE_REGISTRY: Record<Discipline, RoleOption[]> = {
     { code: 'VID-PROJ-E', label: 'Proyección — Especialista', discipline: 'video', position: 'PROJ', level: 'E' },
 
     { code: 'VID-PA-T', label: 'PA — Técnico', discipline: 'video', position: 'PA', level: 'T' },
+  ],
+  production: [
+    { code: 'PROD-RESP-R', label: 'Responsable de Producción — Responsable', discipline: 'production', position: 'RESP', level: 'R' },
+
+    { code: 'PROD-AYUD-T', label: 'Ayudante de Producción — Técnico', discipline: 'production', position: 'AYUD', level: 'T' },
+    { code: 'PROD-COND-T', label: 'Conductor — Técnico', discipline: 'production', position: 'COND', level: 'T' },
   ],
 }
 

@@ -21,10 +21,10 @@ export class PDFEngine {
   }
 
   async generate(): Promise<void> {
-    const { 
-      eventData, 
-      selectedJobId, 
-      jobTitle, 
+    const {
+      eventData,
+      selectedJobId,
+      jobTitle,
       toast,
       travelArrangements,
       accommodations = [],
@@ -193,8 +193,8 @@ export class PDFEngine {
         await this.contentSections.addRestaurantsSection(this.options.eventData, currentY);
       }
 
-      // Add Sector-Pro footer to all pages
-      await FooterService.addFooterToAllPages(this.pdfDoc);
+      // Add Sector-Pro footer to all pages with page numbers and job name
+      await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle);
 
       // Save and upload PDF
       await this.saveAndUploadPDF();

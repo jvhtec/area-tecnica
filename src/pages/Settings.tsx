@@ -30,6 +30,7 @@ import { PushNotificationSchedule } from '@/components/settings/PushNotification
 import { MorningSummarySubscription } from '@/components/settings/MorningSummarySubscription'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown } from "lucide-react"
+import { VersionDisplay } from "@/components/VersionDisplay"
 
 // Move CollapsibleCard outside to prevent recreation on every render
 const CollapsibleCard = ({
@@ -137,7 +138,7 @@ const Settings = () => {
       if (error) throw error;
 
       const result = data as { status: string; results?: Array<{ ok: boolean; skipped?: boolean }> };
-      
+
       if (result.status === 'sent') {
         const allSkipped = result.results?.every(r => r.skipped);
         if (allSkipped) {
@@ -208,6 +209,7 @@ const Settings = () => {
     'users': false,
     'company-settings': false,
     'equipment-models': false,
+    'version-info': false,
   });
 
   return (
@@ -219,12 +221,12 @@ const Settings = () => {
             <Button onClick={() => setImportUsersOpen(true)} variant="outline" className="w-full sm:w-auto">
               <Upload className="mr-2 h-4 w-4" />
               Import Users
-          </Button>
-          <Button onClick={() => setCreateUserOpen(true)} className="w-full sm:w-auto">
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add User
-          </Button>
-        </div>
+            </Button>
+            <Button onClick={() => setCreateUserOpen(true)} className="w-full sm:w-auto">
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add User
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 auto-rows-fr">
@@ -462,19 +464,30 @@ const Settings = () => {
                 </div>
               </CollapsibleCard>
             )}
+
+            {/* Version Display for testing iOS PWA updates */}
+            <CollapsibleCard
+              id="version-info"
+              title="Version info"
+              description="Build and service worker version details for testing updates."
+              isOpen={collapsibleStates['version-info']}
+              onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'version-info': open }))}
+            >
+              <VersionDisplay />
+            </CollapsibleCard>
           </div>
         </div>
-      <CreateUserDialog
-        open={createUserOpen}
-        onOpenChange={setCreateUserOpen}
-      />
+        <CreateUserDialog
+          open={createUserOpen}
+          onOpenChange={setCreateUserOpen}
+        />
 
-      <ImportUsersDialog
-        open={importUsersOpen}
-        onOpenChange={setImportUsersOpen}
-      />
+        <ImportUsersDialog
+          open={importUsersOpen}
+          onOpenChange={setImportUsersOpen}
+        />
+      </div>
     </div>
-  </div>
   );
 };
 

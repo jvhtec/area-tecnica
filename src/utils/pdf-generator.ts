@@ -2,10 +2,19 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "@/lib/supabase";
 import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
+import { Formatters } from "@/utils/hoja-de-ruta/pdf/utils/formatters";
 
 interface AutoTableJsPDF extends jsPDF {
   lastAutoTable: { finalY: number };
 }
+
+// Helper function to format datetime for PDF display
+// Uses empty string instead of 'N/A' for cleaner table output
+const formatPickupDateTime = (datetime: string | undefined): string => {
+  if (!datetime) return '';
+  const result = Formatters.formatDateTime(datetime);
+  return result === 'N/A' ? '' : result;
+};
 
 export const uploadPdfToJob = async (
   jobId: string,
@@ -36,7 +45,9 @@ export const uploadPdfToJob = async (
       void supabase.functions.invoke('push', {
         body: { action: 'broadcast', type: 'document.uploaded', job_id: jobId, file_name: fileName }
       });
-    } catch {}
+    } catch (err) {
+      console.debug('Push broadcast failed (non-critical):', err);
+    }
   } catch (error) {
     console.error("Error uploading PDF:", error);
     throw error;
@@ -225,9 +236,9 @@ export const generatePDF = (
     yPosition += 10;
     const travelTableData = travelArrangements.map((arr) => [
       arr.transportation_type,
-      `${arr.pickup_address || ""} ${arr.pickup_time || ""}`.trim(),
-      arr.departure_time || "",
-      arr.arrival_time || "",
+      `${arr.pickup_address || ""} ${formatPickupDateTime(arr.pickup_time)}`.trim(),
+      formatPickupDateTime(arr.departure_time),
+      formatPickupDateTime(arr.arrival_time),
       arr.flight_train_number || "",
       arr.notes || "",
     ]);

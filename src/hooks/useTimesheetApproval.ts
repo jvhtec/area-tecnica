@@ -18,6 +18,7 @@ export function useTimesheetApproval() {
           approved_at: new Date().toISOString()
         })
         .eq('id', timesheetId)
+        .eq('is_active', true)
         .select()
         .single();
 

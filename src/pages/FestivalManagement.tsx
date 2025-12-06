@@ -639,6 +639,15 @@ const FestivalManagement = () => {
           options,
         );
 
+        // Broadcast push notification: Flex folders created for job
+        try {
+          void supabase.functions.invoke('push', {
+            body: { action: 'broadcast', type: 'flex.folders.created', job_id: jobId }
+          });
+        } catch (pushError) {
+          console.error('Error sending push notification:', pushError);
+        }
+
         toast({
           title: flexPickerMode === 'create' ? 'Carpetas Flex listas' : 'Carpetas Flex actualizadas',
           description: flexPickerMode === 'create' ? 'Las carpetas se han creado exitosamente.' : 'Las carpetas seleccionadas se han añadido exitosamente.',
@@ -1065,7 +1074,7 @@ const FestivalManagement = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6">
+    <div className="max-w-[1920px] mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6">
       {/* Modern Header Card with Gradient */}
       <Card className="border-0 shadow-lg bg-gradient-to-br from-background via-background to-accent/5">
         <CardHeader className="pb-4">
@@ -1200,7 +1209,7 @@ const FestivalManagement = () => {
       {!isSchedulingRoute && !isArtistRoute && !isGearRoute && (
         <>
           {/* Modern Navigation Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
             <Card
               className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
               onClick={() => navigate(`/festival-management/${jobId}/artists`)}
@@ -1305,7 +1314,7 @@ const FestivalManagement = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 md:gap-4">
                 <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">

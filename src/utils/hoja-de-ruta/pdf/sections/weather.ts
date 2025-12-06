@@ -15,14 +15,16 @@ export class WeatherSection {
       return yPosition;
     }
 
-    // Prepare weather data for table with all required columns
-    const weatherData = eventData.weather.map(weather => [
-      weather.date || '—',
-      weather.condition || '—',
-      weather.maxTemp ? `${weather.maxTemp}°C` : '—',
-      '—', // Wind placeholder - field doesn't exist yet in interface
-      weather.precipitationProbability ? `${weather.precipitationProbability}%` : '—'
-    ]);
+    // Prepare weather data for table
+    const weatherData = eventData.weather.map(weather => {
+      return [
+        weather.date || '—',
+        weather.condition || '—',
+        weather.maxTemp ? `${weather.maxTemp}°C` : '—',
+        '—', // Wind placeholder - field doesn't exist yet in interface
+        weather.precipitationProbability ? `${weather.precipitationProbability}%` : '—'
+      ];
+    });
 
     this.pdfDoc.addTable({
       startY: yPosition,
@@ -31,7 +33,7 @@ export class WeatherSection {
       theme: 'grid',
       styles: {
         fontSize: 9,
-        cellPadding: 3
+        cellPadding: 4
       },
       headStyles: { 
         fillColor: [125, 1, 1], 
@@ -39,41 +41,13 @@ export class WeatherSection {
         fontSize: 10, 
         fontStyle: 'bold' 
       },
-      columnStyles: {
-        0: { cellWidth: 35 }, // Fecha/Hora
-        1: { cellWidth: 35 }, // Condición
-        2: { cellWidth: 25 }, // Temperatura
-        3: { cellWidth: 25 }, // Viento
-        4: { cellWidth: 30 }  // Precipitación
+      alternateRowStyles: {
+        fillColor: [250, 245, 245]
       },
-      margin: { left: 20, right: 20 }
+      margin: { left: 20, right: 20 },
+      tableWidth: 'auto'
     });
 
     return this.pdfDoc.getLastAutoTableY() + 15;
-  }
-
-  private getWeatherIcon(condition: string): string {
-    // Return weather icon based on condition
-    // This is a simplified mapping - in a real implementation, 
-    // you might want to use actual weather icons
-    switch (condition.toLowerCase()) {
-      case 'sunny':
-      case 'clear':
-        return '☀️';
-      case 'cloudy':
-      case 'overcast':
-        return '☁️';
-      case 'rainy':
-      case 'rain':
-        return '🌧️';
-      case 'stormy':
-      case 'thunderstorm':
-        return '⛈️';
-      case 'snowy':
-      case 'snow':
-        return '❄️';
-      default:
-        return '🌤️';
-    }
   }
 }

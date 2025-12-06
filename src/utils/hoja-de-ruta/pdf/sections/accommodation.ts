@@ -191,12 +191,15 @@ export class AccommodationSection {
             head: [["Tipo", "Habitación", "Huésped 1", "Huésped 2"]],
             body: roomData,
             theme: "grid",
-            styles: { fontSize: 9, cellPadding: 3 },
+            styles: { fontSize: 9, cellPadding: 4 },
             headStyles: {
               fillColor: [125, 1, 1],
               textColor: [255, 255, 255],
               fontSize: 10,
               fontStyle: 'bold'
+            },
+            alternateRowStyles: {
+              fillColor: [250, 245, 245]
             },
             margin: { left: 20, right: 20 },
             tableWidth: 'auto'

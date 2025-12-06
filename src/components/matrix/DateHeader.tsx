@@ -64,6 +64,7 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
         .from('timesheets')
         .select('technician_id')
         .eq('job_id', jobId)
+        .eq('is_active', true)
         .in('technician_id', technicianIds);
 
       if (tsErr) {
@@ -111,6 +112,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
       const { data: timesheetData } = await supabase
         .from('timesheets')
         .select('technician_id, job_id')
+        .eq('is_active', true)
         .in('job_id', jobIds);
 
       // Get unique scheduled technician IDs per job
@@ -324,6 +326,7 @@ function useDateConfirmedCount(date: Date, jobs: Array<{ id: string }>, technici
       let query = supabase
         .from('timesheets')
         .select('technician_id')
+        .eq('is_active', true)
         .in('job_id', jobIds)
         .eq('date', dateStr);
 

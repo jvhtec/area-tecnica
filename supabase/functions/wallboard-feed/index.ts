@@ -139,10 +139,10 @@ serve(async (req) => {
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     if (path.endsWith("/jobs-overview")) {
-      // Next 7 days window
+      // Next 7 days window (inclusive of the 7th day)
       const now = new Date();
       const todayStart = startOfDay(now);
-      const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const weekEnd = new Date(todayStart.getTime() + 8 * 24 * 60 * 60 * 1000); // +8 days to include all of day 7
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -158,8 +158,9 @@ serve(async (req) => {
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
         .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", weekEnd.toISOString())
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lt("start_time", weekEnd.toISOString()) // Job starts before window ends
+        .gte("end_time", todayStart.toISOString()) // Job ends after window starts (ongoing or future)
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -236,8 +237,9 @@ serve(async (req) => {
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
         .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", gridStart.toISOString())
-        .lte("start_time", gridEnd.toISOString())
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lt("start_time", gridEnd.toISOString()) // Job starts before calendar ends
+        .gte("end_time", gridStart.toISOString()) // Job ends after calendar starts (ongoing)
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -293,7 +295,7 @@ serve(async (req) => {
     if (path.endsWith("/crew-assignments")) {
       const now = new Date();
       const todayStart = startOfDay(now);
-      const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const weekEnd = new Date(todayStart.getTime() + 8 * 24 * 60 * 60 * 1000); // +8 days to include all of day 7
 
       const { data: jobs, error } = await sb
         .from("jobs")
@@ -313,8 +315,9 @@ serve(async (req) => {
           )
         `)
         .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", weekEnd.toISOString())
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lt("start_time", weekEnd.toISOString()) // Job starts before window ends
+        .gte("end_time", todayStart.toISOString()) // Job ends after window starts (ongoing)
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -384,8 +387,9 @@ serve(async (req) => {
           job_departments(department)
         `)
         .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString())
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lt("start_time", tomorrowEnd.toISOString()) // Job starts before tomorrow ends
+        .gte("end_time", todayStart.toISOString()) // Job ends after today starts (ongoing)
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -424,8 +428,9 @@ serve(async (req) => {
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
         .in("job_type", ["single", "festival", "tourdate"])
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", tomorrowEnd.toISOString());
+        .in("status", ["Confirmado", "Tentativa", "Completado"])
+        .lt("start_time", tomorrowEnd.toISOString()) // Job starts before tomorrow ends
+        .gte("end_time", todayStart.toISOString()); // Job ends after today starts (ongoing)
 
       if (error) throw error;
 
@@ -483,10 +488,10 @@ serve(async (req) => {
     }
 
     if (path.endsWith("/logistics")) {
-      // Return logistics events for the next 7 days
+      // Return logistics events for the next 7 days (inclusive)
       const now = new Date();
       const todayStart = startOfDay(now);
-      const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const weekEnd = new Date(todayStart.getTime() + 8 * 24 * 60 * 60 * 1000); // +8 days to include all of day 7
       const startDate = todayStart.toISOString().slice(0, 10);
       const endDate = weekEnd.toISOString().slice(0, 10);
 

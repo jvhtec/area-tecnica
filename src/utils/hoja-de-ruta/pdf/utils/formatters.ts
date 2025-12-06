@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export class Formatters {
   static formatCurrency(amount: number, currency: string = 'EUR'): string {
@@ -55,9 +56,30 @@ export class Formatters {
   static formatTime(time: string): string {
     if (!time) return 'N/A';
     try {
+      // If it's an ISO datetime string (contains 'T' or full date), parse it directly in Spain time
+      if (time.includes('T') || time.includes('-')) {
+        const date = new Date(time);
+        if (!isNaN(date.getTime())) {
+          // Display in Spain time (Europe/Madrid)
+          return formatInTimeZone(date, 'Europe/Madrid', 'HH:mm');
+        }
+      }
+      // Otherwise, treat it as a time-only string (legacy format)
       return format(new Date(`2000-01-01T${time}`), 'HH:mm');
     } catch {
       return time;
+    }
+  }
+
+  static formatDateTime(datetime: string): string {
+    if (!datetime) return 'N/A';
+    try {
+      const date = new Date(datetime);
+      if (isNaN(date.getTime())) return datetime;
+      // Format as "dd/MM/yy - HH:mm" in Spain time (Europe/Madrid)
+      return formatInTimeZone(date, 'Europe/Madrid', 'dd/MM/yy - HH:mm');
+    } catch {
+      return datetime;
     }
   }
 

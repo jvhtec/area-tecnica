@@ -2,6 +2,28 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { EventData, TravelArrangement, Accommodation, Restaurant } from '@/types/hoja-de-ruta';
 
+/**
+ * Normalizes a datetime value to a valid UTC ISO string for database storage.
+ * Returns null for empty/invalid values.
+ * Ensures consistent storage format regardless of input format.
+ */
+const normalizeDateTime = (value: string | undefined | null): string | null => {
+  if (!value || !value.trim()) return null;
+
+  try {
+    const date = new Date(value);
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid datetime value, storing as null:', value);
+      return null;
+    }
+    // Return UTC ISO string for consistent storage
+    return date.toISOString();
+  } catch (err) {
+    console.warn('Error parsing datetime value, storing as null:', value, err);
+    return null;
+  }
+};
+
 export const useHojaDeRutaData = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -177,25 +199,44 @@ const saveStaff = async (hojaId: string, staff: any[]) => {
 
 const saveTravelArrangements = async (hojaId: string, arrangements: TravelArrangement[]) => {
   // Delete existing arrangements
-  await supabase.from('hoja_de_ruta_transport').delete().eq('hoja_de_ruta_id', hojaId);
-  
+  const { error: deleteError } = await supabase
+    .from('hoja_de_ruta_travel_arrangements')
+    .delete()
+    .eq('hoja_de_ruta_id', hojaId);
+
+  if (deleteError) {
+    console.error('Error deleting travel arrangements:', deleteError);
+    throw deleteError;
+  }
+
   // Insert new arrangements
   if (arrangements.length > 0) {
     const arrangementsData = arrangements
       .filter(arr => arr.transportation_type?.trim() || arr.pickup_address?.trim())
       .map(arr => ({
         hoja_de_ruta_id: hojaId,
-        transport_type: arr.transportation_type,
-        driver_name: arr.driver_name,
-        driver_phone: arr.driver_phone,
-        license_plate: arr.plate_number,
-        date_time: arr.pickup_time ? new Date(`2000-01-01T${arr.pickup_time}`).toISOString() : null,
-        return_date_time: arr.departure_time ? new Date(`2000-01-01T${arr.departure_time}`).toISOString() : null,
-        has_return: !!arr.departure_time
+        transportation_type: arr.transportation_type,
+        pickup_address: arr.pickup_address || null,
+        // Normalize datetime fields to ensure valid UTC ISO strings
+        pickup_time: normalizeDateTime(arr.pickup_time),
+        departure_time: normalizeDateTime(arr.departure_time),
+        arrival_time: normalizeDateTime(arr.arrival_time),
+        flight_train_number: arr.flight_train_number || null,
+        driver_name: arr.driver_name || null,
+        driver_phone: arr.driver_phone || null,
+        plate_number: arr.plate_number || null,
+        notes: arr.notes || null
       }));
-    
+
     if (arrangementsData.length > 0) {
-      await supabase.from('hoja_de_ruta_transport').insert(arrangementsData);
+      const { error: insertError } = await supabase
+        .from('hoja_de_ruta_travel_arrangements')
+        .insert(arrangementsData);
+
+      if (insertError) {
+        console.error('Error inserting travel arrangements:', insertError);
+        throw insertError;
+      }
     }
   }
 };

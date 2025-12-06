@@ -25,9 +25,9 @@ export interface HojaDeRutaMetadata {
 export interface TravelArrangement {
   transportation_type?: string;
   pickup_address?: string;
-  pickup_time?: string;
-  departure_time?: string;
-  arrival_time?: string;
+  pickup_time?: string; // ISO datetime string (e.g., "2025-02-26T14:30:00+00:00")
+  departure_time?: string; // ISO datetime string (e.g., "2025-02-26T14:30:00+00:00")
+  arrival_time?: string; // ISO datetime string (e.g., "2025-02-26T14:30:00+00:00")
   flight_train_number?: string;
   company?: string;
   driver_name?: string;
@@ -42,7 +42,7 @@ export interface Transport {
   driver_name?: string;
   driver_phone?: string;
   license_plate?: string;
-  company?: "pantoja" | "transluminaria" | "transcamarena" | "wild tour" | "camionaje" | "sector-pro" | "other";
+  company?: "pantoja" | "transluminaria" | "transcamarena" | "wild tour" | "camionaje" | "sector-pro" | "crespo" | "montabi_dorado" | "grupo_sese" | "nacex" | "recogida_cliente" | "other";
   date_time?: string;
   has_return?: boolean;
   return_date_time?: string;

@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin,
-  Truck, Users, Plus, MoreVertical, Edit, Trash2
+  Truck, Users, Plus, MoreVertical, Edit, Trash2, Filter, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { supabase } from "@/lib/supabase";
+import { Badge } from "@/components/ui/badge";
 
 interface ToolDefinition {
   label: string;
@@ -92,10 +94,84 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   const navigate = useNavigate();
   const [isDark, setIsDark] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
+  const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([]);
+  const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
 
   const t = isDark ? themeTokens.dark : themeTokens.light;
 
   const canEdit = userRole ? ["admin", "management"].includes(userRole) : false;
+
+  // Load user filter preferences from profiles
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) return;
+
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("selected_job_types, selected_job_statuses")
+          .eq("id", session.user.id)
+          .single();
+
+        if (error) {
+          console.error("Error loading user preferences:", error);
+          return;
+        }
+
+        if (profile?.selected_job_types) {
+          setSelectedJobTypes(profile.selected_job_types);
+        }
+        if (profile?.selected_job_statuses) {
+          setSelectedJobStatuses(profile.selected_job_statuses);
+        }
+      } catch (error) {
+        console.error("Error in loadUserPreferences:", error);
+      }
+    };
+    loadUserPreferences();
+  }, []);
+
+  // Save user preferences to profiles
+  const saveUserPreferences = async (types: string[], statuses?: string[]) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
+
+      const updateData = statuses !== undefined
+        ? { selected_job_types: types, selected_job_statuses: statuses }
+        : { selected_job_types: types };
+
+      const { error } = await supabase
+        .from("profiles")
+        .update(updateData)
+        .eq("id", session.user.id);
+
+      if (error) {
+        console.error("Error saving user preferences:", error);
+      }
+    } catch (error) {
+      console.error("Error in saveUserPreferences:", error);
+    }
+  };
+
+  const handleJobTypeSelection = (type: string) => {
+    const newTypes = selectedJobTypes.includes(type)
+      ? selectedJobTypes.filter((t) => t !== type)
+      : [...selectedJobTypes, type];
+    setSelectedJobTypes(newTypes);
+    saveUserPreferences(newTypes, selectedJobStatuses);
+  };
+
+  const handleJobStatusSelection = (status: string) => {
+    const newStatuses = selectedJobStatuses.includes(status)
+      ? selectedJobStatuses.filter((s) => s !== status)
+      : [...selectedJobStatuses, status];
+    setSelectedJobStatuses(newStatuses);
+    saveUserPreferences(selectedJobTypes, newStatuses);
+  };
 
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
@@ -106,11 +182,43 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
 
         const isInDepartment = job.job_departments?.some((d: any) => d.department === department);
         if (job.tour_date_id) {
-          return isInDepartment && job.tour_date;
+          if (!(isInDepartment && job.tour_date)) return false;
+        } else if (!isInDepartment) {
+          return false;
         }
-        return isInDepartment;
+
+        // Apply job type filters
+        if (selectedJobTypes.length > 0 && !selectedJobTypes.includes(job.job_type)) {
+          return false;
+        }
+
+        // Apply job status filters
+        if (selectedJobStatuses.length > 0 && !selectedJobStatuses.includes(job.status)) {
+          return false;
+        }
+
+        return true;
       })
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  }, [jobs, department, selectedJobTypes, selectedJobStatuses]);
+
+  // Get distinct job types and statuses for filter options
+  const distinctJobTypes = useMemo(() => {
+    if (!jobs) return [];
+    const typesInDept = jobs
+      .filter(job => job.job_type !== 'tour' && job.job_departments?.some((d: any) => d.department === department))
+      .map(job => job.job_type)
+      .filter(Boolean);
+    return Array.from(new Set(typesInDept));
+  }, [jobs, department]);
+
+  const distinctJobStatuses = useMemo(() => {
+    if (!jobs) return [];
+    const statusesInDept = jobs
+      .filter(job => job.job_type !== 'tour' && job.job_departments?.some((d: any) => d.department === department))
+      .map(job => job.status)
+      .filter(Boolean);
+    return Array.from(new Set(statusesInDept));
   }, [jobs, department]);
 
   const selectedDateJobs = useMemo(() => {
@@ -134,7 +242,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   if (!isMobile) return null;
 
   return (
-    <div className={cn("min-h-screen", t.bg, "font-sans p-6 transition-colors duration-300")}>
+    <div className={cn("min-h-screen", t.bg, "font-sans p-1 transition-colors duration-300")}>
       <div className="max-w-md mx-auto space-y-6">
         {/* Header */}
         <div>
@@ -191,6 +299,89 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
             </div>
             <ChevronRight size={20} className={t.textMuted} />
           </Card>
+        )}
+
+        {/* Filters */}
+        {(distinctJobTypes.length > 0 || distinctJobStatuses.length > 0) && (
+          <div className="flex gap-2">
+            {/* Job Type Filter */}
+            {distinctJobTypes.length > 0 && (
+              <Popover open={isTypeFilterOpen} onOpenChange={setIsTypeFilterOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("flex-1", t.card)}>
+                    <Filter className="h-4 w-4 mr-2" />
+                    <span className={t.textMain}>Type</span>
+                    {selectedJobTypes.length > 0 && (
+                      <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1">
+                        {selectedJobTypes.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className={cn("w-56 p-2", t.card)} align="start">
+                  <div className="space-y-1">
+                    {distinctJobTypes.map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => handleJobTypeSelection(type)}
+                        className={cn(
+                          "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                          t.hover,
+                          t.textMain
+                        )}
+                      >
+                        <div className={cn("w-4 h-4 border rounded flex items-center justify-center",
+                          selectedJobTypes.includes(type) ? "bg-blue-500 border-blue-500" : "border-muted"
+                        )}>
+                          {selectedJobTypes.includes(type) && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span className="capitalize">{type}</span>
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+
+            {/* Job Status Filter */}
+            {distinctJobStatuses.length > 0 && (
+              <Popover open={isStatusFilterOpen} onOpenChange={setIsStatusFilterOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("flex-1", t.card)}>
+                    <Filter className="h-4 w-4 mr-2" />
+                    <span className={t.textMain}>Status</span>
+                    {selectedJobStatuses.length > 0 && (
+                      <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1">
+                        {selectedJobStatuses.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className={cn("w-56 p-2", t.card)} align="start">
+                  <div className="space-y-1">
+                    {distinctJobStatuses.map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => handleJobStatusSelection(status)}
+                        className={cn(
+                          "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                          t.hover,
+                          t.textMain
+                        )}
+                      >
+                        <div className={cn("w-4 h-4 border rounded flex items-center justify-center",
+                          selectedJobStatuses.includes(status) ? "bg-blue-500 border-blue-500" : "border-muted"
+                        )}>
+                          {selectedJobStatuses.includes(status) && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span>{status}</span>
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
         )}
 
         {/* Date Navigation */}
@@ -278,7 +469,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                 <Card
                   key={job.id}
                   className={cn(
-                    "p-4 rounded-xl border-l-4 transition-all",
+                    "p-3 rounded-xl border-l-4 transition-all",
                     t.card
                   )}
                   style={{ borderLeftColor: jobColor }}

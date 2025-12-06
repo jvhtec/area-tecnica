@@ -346,16 +346,28 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
       // Get the assignment details before removal for Flex cleanup
       const assignmentToRemove = assignments.find(a => a.technician_id === technicianId);
-      
-      // Remove from database
-      const { error } = await supabase
+
+      // Remove from database - IMPORTANT: Delete timesheets first to avoid orphaned records
+      const { error: timesheetError } = await supabase
+        .from('timesheets')
+        .delete()
+        .eq('job_id', jobId)
+        .eq('technician_id', technicianId);
+
+      if (timesheetError) {
+        console.error('Error removing timesheets:', timesheetError);
+        toast.error("Failed to remove assignment timesheets");
+        return;
+      }
+
+      const { error: assignmentError } = await supabase
         .from('job_assignments')
         .delete()
         .eq('job_id', jobId)
         .eq('technician_id', technicianId);
 
-      if (error) {
-        console.error('Error removing assignment:', error);
+      if (assignmentError) {
+        console.error('Error removing assignment:', assignmentError);
         toast.error("Failed to remove assignment");
         return;
       }

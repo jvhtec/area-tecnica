@@ -601,6 +601,8 @@ export const OptimizedMatrixCell = memo(({
                 onClick={async () => {
                   try {
                     if (!assignment?.job_id) { setPendingRemoveAssignment(false); return; }
+                    // Delete timesheets first to avoid orphaned records
+                    await supabase.from('timesheets').delete().eq('job_id', assignment.job_id).eq('technician_id', technician.id);
                     await supabase.from('job_assignments').delete().eq('job_id', assignment.job_id).eq('technician_id', technician.id)
 
                     const flexDepartments = determineFlexDepartmentsForAssignment(assignment, technician.department);

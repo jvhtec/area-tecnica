@@ -1,3 +1,7 @@
+// Build version - changes with every deployment to ensure iOS detects updates
+// This ensures byte-difference in sw.js file, which is critical for iOS
+const BUILD_VERSION = '__BUILD_TIMESTAMP__' // Will be replaced at build time
+
 // Dynamic cache version that changes with each SW update
 // This ensures old caches are cleared when deploying new versions
 const CACHE_VERSION = 'v2-' + self.registration.scope
@@ -47,6 +51,8 @@ self.broadcastToClients = async (type, data) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
+      console.log('[sw] Activating service worker, build version:', BUILD_VERSION);
+
       if (!isDevHost) {
         // Clear ALL old caches to prevent stale asset issues after deployment
         const keys = await caches.keys()
@@ -64,7 +70,10 @@ self.addEventListener('activate', (event) => {
       await self.clients.claim()
 
       // Notify clients that a new SW has activated
-      await self.broadcastToClients('sw-activated', { cacheVersion: CACHE_VERSION })
+      await self.broadcastToClients('sw-activated', {
+        cacheVersion: CACHE_VERSION,
+        buildVersion: BUILD_VERSION
+      })
     })()
   )
 })

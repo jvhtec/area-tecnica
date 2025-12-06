@@ -88,11 +88,13 @@ export async function getAvailableTechnicians(
     const jobStartDate = normalizedTargetDate || new Date(jobStartTime).toISOString().split('T')[0];
     const jobEndDate = normalizedTargetDate || new Date(jobEndTime).toISOString().split('T')[0];
 
-    // Get all timesheets for these technicians in the relevant date range
+    // Get all ACTIVE timesheets for these technicians in the relevant date range
+    // Filter by is_active to exclude voided timesheets (day-off/travel dates)
     const { data: timesheets, error: timesheetsError } = await supabase
       .from("timesheets")
       .select("technician_id, job_id, date")
       .in("technician_id", technicianIds)
+      .eq("is_active", true)
       .gte("date", jobStartDate)
       .lte("date", jobEndDate);
 
@@ -231,11 +233,13 @@ export async function checkTimeConflict(
       return null;
     }
 
-    // OPTIMIZED: Query timesheets to see which days technician is actually working
+    // OPTIMIZED: Query ACTIVE timesheets to see which days technician is actually working
+    // Filter by is_active to exclude voided timesheets (day-off/travel dates)
     const { data: timesheets, error: timesheetsError } = await supabase
       .from("timesheets")
       .select("job_id, date")
       .eq("technician_id", technicianId)
+      .eq("is_active", true)
       .gte("date", startDate)
       .lte("date", endDate)
       .neq("job_id", targetJobId);  // Exclude target job
@@ -285,11 +289,13 @@ export async function getTechnicianConflicts(
     const jobStartDate = new Date(jobStartTime).toISOString().split('T')[0];
     const jobEndDate = new Date(jobEndTime).toISOString().split('T')[0];
 
-    // OPTIMIZED: Query timesheets to see which days technician is working
+    // OPTIMIZED: Query ACTIVE timesheets to see which days technician is working
+    // Filter by is_active to exclude voided timesheets (day-off/travel dates)
     const { data: timesheets, error: timesheetsError } = await supabase
       .from("timesheets")
       .select("job_id, date")
       .eq("technician_id", technicianId)
+      .eq("is_active", true)
       .gte("date", jobStartDate)
       .lte("date", jobEndDate);
 

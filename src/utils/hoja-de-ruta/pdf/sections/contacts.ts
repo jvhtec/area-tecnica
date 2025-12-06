@@ -33,7 +33,7 @@ export class ContactsSection {
       theme: "grid",
       styles: {
         fontSize: 9,
-        cellPadding: 3,
+        cellPadding: 4,
         valign: 'top',
         overflow: 'linebreak'
       },
@@ -43,10 +43,8 @@ export class ContactsSection {
         fontSize: 10,
         fontStyle: 'bold',
       },
-      columnStyles: {
-        0: { cellWidth: 60 }, // Nombre
-        1: { cellWidth: 40 }, // Cargo
-        2: { cellWidth: 40 }, // Teléfono
+      alternateRowStyles: {
+        fillColor: [250, 245, 245]
       },
       margin: { left: 20, right: 20 },
       tableWidth: 'auto',

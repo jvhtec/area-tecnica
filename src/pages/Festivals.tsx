@@ -222,7 +222,7 @@ const Festivals = () => {
   const emptyFunction = () => {};
 
   return (
-    <div className="max-w-7xl mx-auto space-y-4 md:space-y-6 px-4 sm:px-6 py-4">
+    <div className="w-full space-y-4 md:space-y-6 px-4 sm:px-6 py-4">
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0 pb-2">
           <div className="flex items-center gap-4">
@@ -290,7 +290,7 @@ const Festivals = () => {
             </div>
           ) : (
             <div className="space-y-4 md:space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 snap-y snap-mandatory md:snap-none overflow-y-auto md:overflow-visible max-h-[70vh] md:max-h-none">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 snap-y snap-mandatory md:snap-none overflow-y-auto md:overflow-visible max-h-[70vh] md:max-h-none">
                 {paginatedFestivals.map((job) => (
                   <div 
                     key={job.id} 

@@ -25,13 +25,17 @@ export class HeaderSection {
       this.smallLogoDims
     );
 
-    // Section title below header
+    // Section title (clean, no icons)
     const { width: pageWidth } = this.pdfDoc.dimensions;
-    this.pdfDoc.setText(16, [125, 1, 1]);
+
+    this.pdfDoc.setText(18, [125, 1, 1]); // Slightly larger font
     this.pdfDoc.addText(title, 20, yPosition);
+    
+    // Decorative underline
     this.pdfDoc.setFillColor(125, 1, 1);
-    this.pdfDoc.addRect(20, yPosition + 4, pageWidth - 40, 1, 'F');
-    // Provide minimal spacing below the title
-    return yPosition + 16;
+    this.pdfDoc.addRect(20, yPosition + 5, pageWidth - 40, 1.5, 'F');
+    
+    // Return position with better spacing
+    return yPosition + 20;
   }
 }

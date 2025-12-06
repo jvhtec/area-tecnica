@@ -17,6 +17,59 @@ export const useHojaDeRutaInitialization = (
 ) => {
   const { toast } = useToast();
 
+  // Fetch power requirements for a job
+  const fetchPowerRequirements = useCallback(async (jobId: string): Promise<string> => {
+    if (!jobId) return "";
+
+    console.log("⚡ INITIALIZATION: Fetching power requirements for:", jobId);
+
+    try {
+      const { data: powerRequirements, error } = await supabase
+        .from("power_requirement_tables")
+        .select("*")
+        .eq("job_id", jobId);
+
+      if (error) {
+        console.error("❌ INITIALIZATION: Error fetching power requirements:", error);
+        return "";
+      }
+
+      if (!powerRequirements || powerRequirements.length === 0) {
+        console.log("ℹ️ INITIALIZATION: No power requirements found for this job");
+        return "";
+      }
+
+      // Deduplicate requirements based on table_name and department
+      const uniqueRequirements = powerRequirements.reduce((acc: any[], current: any) => {
+        const x = acc.find(item => item.table_name === current.table_name && item.department === current.department);
+        if (!x) {
+          return acc.concat([current]);
+        } else {
+          return acc;
+        }
+      }, []);
+
+      const powerText = uniqueRequirements
+        .map((req: any) => {
+          const current = typeof req.current_per_phase === 'number' 
+            ? req.current_per_phase.toFixed(2) 
+            : req.current_per_phase;
+            
+          return `${req.department.toUpperCase()} - ${req.table_name}:\n` +
+            `Potencia Total: ${req.total_watts}W\n` +
+            `Corriente por Fase: ${current}A\n` +
+            `PDU Recomendado: ${req.pdu_type}\n`;
+        })
+        .join("\n");
+
+      console.log("✅ INITIALIZATION: Power requirements fetched successfully");
+      return powerText;
+    } catch (error) {
+      console.error("❌ INITIALIZATION: Error fetching power requirements:", error);
+      return "";
+    }
+  }, []);
+
   // Load current job assignments
   const loadCurrentJobAssignments = useCallback(async (jobId: string) => {
     if (!jobId) return null;
@@ -61,11 +114,15 @@ export const useHojaDeRutaInitialization = (
   // Auto-populate basic job data with assignments
   const autoPopulateBasicJobData = useCallback(async (jobId: string) => {
     if (!jobId) return;
-    
+
     console.log("🔄 INITIALIZATION: Auto-populating basic job data with assignments for:", jobId);
-    
+
     try {
-      const assignmentData = await loadCurrentJobAssignments(jobId);
+      const [assignmentData, powerRequirementsText] = await Promise.all([
+        loadCurrentJobAssignments(jobId),
+        fetchPowerRequirements(jobId)
+      ]);
+
       if (!assignmentData) return;
 
       const { jobData, staffFromAssignments } = assignmentData;
@@ -106,7 +163,8 @@ export const useHojaDeRutaInitialization = (
         },
         staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
         schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
-        powerRequirements: "",
+        // Use fetched power requirements from database
+        powerRequirements: powerRequirementsText || "",
         auxiliaryNeeds: "",
         weather: undefined,
       };
@@ -114,17 +172,23 @@ export const useHojaDeRutaInitialization = (
       console.log("✅ INITIALIZATION: Setting basic job data with assignments:", {
         eventName: basicEventData.eventName,
         staffCount: basicEventData.staff.length,
-        staffData: basicEventData.staff
+        staffData: basicEventData.staff,
+        hasPowerRequirements: !!powerRequirementsText
       });
-      
+
       setEventData(basicEventData);
       setHasBasicJobData(true);
       setDataSource('job');
-      
+
+      const description = [
+        staffFromAssignments.length > 0 && `${staffFromAssignments.length} miembros del personal asignado`,
+        powerRequirementsText && 'requisitos de potencia'
+      ].filter(Boolean).join(' y ');
+
       toast({
         title: "📋 Datos básicos cargados",
-        description: staffFromAssignments.length > 0 
-          ? `Se han cargado los datos básicos del trabajo y ${staffFromAssignments.length} miembros del personal asignado.`
+        description: description
+          ? `Se han cargado los datos básicos del trabajo con ${description}.`
           : "Se han cargado los datos básicos del trabajo seleccionado.",
       });
     } catch (error: any) {
@@ -135,7 +199,7 @@ export const useHojaDeRutaInitialization = (
         variant: "destructive",
       });
     }
-  }, [toast, loadCurrentJobAssignments, setEventData, setHasBasicJobData, setDataSource]);
+  }, [toast, loadCurrentJobAssignments, fetchPowerRequirements, setEventData, setHasBasicJobData, setDataSource]);
 
   // Initialize form with current job assignments, then merge with saved data if exists
   useEffect(() => {
@@ -144,9 +208,12 @@ export const useHojaDeRutaInitialization = (
     console.log("🔄 INITIALIZATION: Initialization effect triggered for job:", selectedJobId);
     
     const initializeFormData = async () => {
-      // Always load current job assignments first
-      const assignmentData = await loadCurrentJobAssignments(selectedJobId);
-      
+      // Always load current job assignments and power requirements first
+      const [assignmentData, powerRequirementsText] = await Promise.all([
+        loadCurrentJobAssignments(selectedJobId),
+        fetchPowerRequirements(selectedJobId)
+      ]);
+
       if (!assignmentData) {
         console.log("❌ INITIALIZATION: No assignment data available");
         setIsInitialized(true);
@@ -238,7 +305,8 @@ export const useHojaDeRutaInitialization = (
             ? mergedStaff
             : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
           schedule: savedEventData?.schedule || (startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ""),
-          powerRequirements: savedEventData?.powerRequirements || "",
+          // Use fresh power requirements from database, fallback to saved if none found
+          powerRequirements: powerRequirementsText || savedEventData?.powerRequirements || "",
           auxiliaryNeeds: savedEventData?.auxiliaryNeeds || "",
           weather: savedEventData?.weather || undefined,
         });
@@ -286,19 +354,25 @@ export const useHojaDeRutaInitialization = (
           },
           staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
           schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
-          powerRequirements: "",
+          // Use fetched power requirements from database
+          powerRequirements: powerRequirementsText || "",
           auxiliaryNeeds: "",
           weather: undefined,
         };
-        
+
         setEventData(basicEventData);
         setTravelArrangements([]);
         setAccommodations([]);
-        
+
+        const description = [
+          staffFromAssignments.length > 0 && `${staffFromAssignments.length} miembros del personal asignado`,
+          powerRequirementsText && 'requisitos de potencia'
+        ].filter(Boolean).join(' y ');
+
         toast({
           title: "📋 Datos del trabajo cargados",
-          description: staffFromAssignments.length > 0 
-            ? `Se han cargado ${staffFromAssignments.length} miembros del personal asignado.`
+          description: description
+            ? `Se han cargado ${description}.`
             : "Se han cargado los datos básicos del trabajo.",
         });
       }
@@ -307,7 +381,7 @@ export const useHojaDeRutaInitialization = (
     };
 
     initializeFormData();
-  }, [selectedJobId, hojaDeRuta, isLoadingHojaDeRuta, loadCurrentJobAssignments, toast, setEventData, setTravelArrangements, setAccommodations, setIsInitialized, setHasSavedData, setDataSource]);
+  }, [selectedJobId, hojaDeRuta, isLoadingHojaDeRuta, loadCurrentJobAssignments, fetchPowerRequirements, toast, setEventData, setTravelArrangements, setAccommodations, setIsInitialized, setHasSavedData, setDataSource]);
 
   return {
     autoPopulateBasicJobData,

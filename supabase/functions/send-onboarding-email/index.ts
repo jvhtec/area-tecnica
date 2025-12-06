@@ -16,6 +16,7 @@ interface OnboardingRequestBody {
 // Helper to pick a base URL for links in the email
 function pickEnvBase(): string | undefined {
   const candidates = [
+    'https://sector-pro.work',
     Deno.env.get('PUBLIC_APP_URL'),
     Deno.env.get('PUBLIC_SITE_URL'),
     Deno.env.get('NEXT_PUBLIC_SITE_URL'),
@@ -141,10 +142,14 @@ serve(async (req) => {
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                       <tr>
                         <td align="left" style="vertical-align:middle;">
-                          <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
+                          <a href="https://www.sector-pro.com" target="_blank" rel="noopener noreferrer">
+                            <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />
+                          </a>
                         </td>
                         <td align="right" style="vertical-align:middle;">
-                          <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
+                          <a href="https://sector-pro.work" target="_blank" rel="noopener noreferrer">
+                            <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />
+                          </a>
                         </td>
                       </tr>
                     </table>
@@ -224,7 +229,7 @@ serve(async (req) => {
                     </div>
                     <div>
                       Sector Pro · <a href="https://www.sector-pro.com" style="color:#6b7280;text-decoration:underline;">www.sector-pro.com</a>
-                      &nbsp;|&nbsp; Área Técnica · <a href="https://area-tecnica.lovable.app" style="color:#6b7280;text-decoration:underline;">area-tecnica.lovable.app</a>
+                      &nbsp;|&nbsp; Área Técnica · <a href="https://sector-pro.work" style="color:#6b7280;text-decoration:underline;">sector-pro.work</a>
                     </div>
                   </td>
                 </tr>

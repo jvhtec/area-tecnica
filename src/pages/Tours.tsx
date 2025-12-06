@@ -11,7 +11,7 @@ const Tours = () => {
   const [showTours, setShowTours] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const { userRole } = useOptimizedAuth();
-  
+
   // House techs have view-only access
   const readOnly = userRole === 'house_tech';
 
@@ -56,7 +56,7 @@ const Tours = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-4 px-4 sm:px-6">
+    <div className="w-full space-y-4 px-1 sm:px-6">
       <Card className="w-full bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
         <CardHeader className="flex flex-row items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg md:text-xl">

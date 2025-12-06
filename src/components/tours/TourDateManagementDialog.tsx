@@ -636,6 +636,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
         queryClient.invalidateQueries({ queryKey: ["tours"] }),
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["job-assignments"] }),
         queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] }),
       ]);
 

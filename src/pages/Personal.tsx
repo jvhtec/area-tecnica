@@ -86,7 +86,7 @@ const Personal = () => {
 
   return (
     <div className={`min-h-screen flex flex-col ${theme.bg} transition-colors duration-300 font-sans`}>
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-28">
+      <div className="flex-1 overflow-y-auto p-2 md:p-8 pb-28">
         <div className="w-full mx-auto max-w-full space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
             <div className="space-y-1 lg:col-span-8">
@@ -160,25 +160,7 @@ const Personal = () => {
       </Dialog>
 
       {/* Navigation - only show on mobile */}
-      {isMobile && (
-        <div className={`h-20 ${theme.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-4`}>
-          {[
-            { id: 'dashboard', icon: LayoutDashboard, label: 'Panel' },
-            { id: 'jobs', icon: Briefcase, label: 'Trabajos' },
-            { id: 'availability', icon: CalendarIcon, label: 'Disponib.' },
-            { id: 'profile', icon: User, label: 'Perfil' }
-          ].map(item => (
-            <button
-              key={item.id}
-              onClick={() => navigate('/technician-dashboard')}
-              className={`flex flex-col items-center justify-center gap-1 ${isDark ? 'text-gray-500' : 'text-slate-400'}`}
-            >
-              <item.icon size={22} strokeWidth={2} />
-              <span className="text-[10px] font-medium">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Removed custom navigation as it now uses the global MobileNavBar */}
     </div>
   );
 };

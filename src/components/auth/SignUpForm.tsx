@@ -217,6 +217,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
             <SelectItem value="sound">Sonido</SelectItem>
             <SelectItem value="lights">Iluminación</SelectItem>
             <SelectItem value="video">Video</SelectItem>
+            <SelectItem value="production">Producción</SelectItem>
             <SelectItem value="logistics">Logística</SelectItem>
             <SelectItem value="management">Gestión</SelectItem>
           </SelectContent>

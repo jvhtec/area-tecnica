@@ -29,11 +29,10 @@ interface DisponibilidadCalendarProps {
   onDateSelect?: (date: Date | undefined) => void;
 }
 
-export function DisponibilidadCalendar({ selectedDate, onDateSelect }: DisponibilidadCalendarProps) {
+export function DisponibilidadCalendar({ selectedDate, onDateSelect, className }: DisponibilidadCalendarProps & { className?: string }) {
   const { session, userDepartment } = useOptimizedAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const isMobile = useIsMobile();
 
   const department = (userDepartment || 'sound') as Department;
   const departmentCategories = getCategoriesForDepartment(department);
@@ -186,6 +185,7 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
       });
     });
 
+
     let anyUsesRentals = false;
     for (const [equipmentId, needed] of Object.entries(equipmentNeeded)) {
       const stockRow = stockData.find((s: any) => s.equipment_id === equipmentId);
@@ -220,7 +220,7 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
 
   // Build quick info for tooltips (preset names + conflict status)
   const infoByDate = useMemo(() => {
-    const map: Record<string, { names: string[]; count: number; status: DayStatus } > = {};
+    const map: Record<string, { names: string[]; count: number; status: DayStatus }> = {};
     (presetAssignments || []).forEach((a: any) => {
       const key = a.date;
       if (!map[key]) map[key] = { names: [], count: 0, status: 'none' };
@@ -288,55 +288,36 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
     );
   }
 
-  const navigateToToday = () => {
-    const today = new Date();
-    if (onDateSelect) {
-      onDateSelect(today);
-    }
-  };
-
   return (
-    <Card className="inline-block p-2 md:p-3">
-      {/* Mobile controls */}
-      {isMobile && (
-        <div className="flex items-center justify-between mb-4">
-          <Button variant="outline" size="sm" onClick={navigateToToday}>
-            <CalendarIcon className="h-4 w-4 mr-1" />
-            Today
-          </Button>
-          
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
-                <CalendarIcon className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={onDateSelect}
-                initialFocus
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-      )}
-      
+    <div className={cn("w-full", className)}>
       <Calendar
         mode="single"
         selected={selectedDate}
         onSelect={onDateSelect}
-        className="w-fit mx-auto rounded-md border"
+        className="w-full rounded-md border"
         classNames={{
           caption: "flex justify-center pt-1 relative items-center",
-          table: "w-fit border-collapse space-y-1",
+          table: "w-full border-collapse space-y-1",
+          head_row: "flex w-full justify-between",
+          head_cell: "text-muted-foreground rounded-md w-full font-normal text-[0.8rem]",
+          row: "flex w-full mt-2",
+          cell: "h-9 w-full text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+          day: cn(
+            "h-9 w-full p-0 font-normal aria-selected:opacity-100 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
+          ),
+          day_selected:
+            "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+          day_today: "bg-accent text-accent-foreground",
+          day_outside: "text-muted-foreground opacity-50",
+          day_disabled: "text-muted-foreground opacity-50",
+          day_range_middle:
+            "aria-selected:bg-accent aria-selected:text-accent-foreground",
+          day_hidden: "invisible",
         }}
         components={{ Day: DayWithHover }}
         modifiers={modifiers}
         modifiersStyles={modifiersStyles}
       />
-    </Card>
+    </div>
   );
 }

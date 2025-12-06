@@ -44,10 +44,10 @@ export function wrapInCorporateTemplate(options: CorporateTemplateOptions): stri
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
                   <td align="left" style="vertical-align:middle;">
-                    ${COMPANY_LOGO_URL ? `<img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" />` : ''}
+                    ${COMPANY_LOGO_URL ? `<a href="https://www.sector-pro.com" target="_blank" rel="noopener noreferrer"><img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" style="display:block;border:0;max-height:36px" /></a>` : ''}
                   </td>
                   <td align="right" style="vertical-align:middle;">
-                    ${AT_LOGO_URL ? `<img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" />` : ''}
+                    ${AT_LOGO_URL ? `<a href="https://sector-pro.work" target="_blank" rel="noopener noreferrer"><img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" style="display:block;border:0;max-height:36px" /></a>` : ''}
                   </td>
                 </tr>
               </table>
@@ -78,7 +78,7 @@ export function wrapInCorporateTemplate(options: CorporateTemplateOptions): stri
               </div>
               <div>
                 Sector Pro · <a href="https://www.sector-pro.com" style="color:#6b7280;text-decoration:underline;">www.sector-pro.com</a>
-                &nbsp;|&nbsp; Área Técnica · <a href="https://area-tecnica.lovable.app" style="color:#6b7280;text-decoration:underline;">area-tecnica.lovable.app</a>
+                &nbsp;|&nbsp; Área Técnica · <a href="https://sector-pro.work" style="color:#6b7280;text-decoration:underline;">sector-pro.work</a>
               </div>
             </td>
           </tr>

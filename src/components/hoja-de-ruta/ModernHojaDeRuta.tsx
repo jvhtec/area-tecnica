@@ -147,7 +147,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     removeRoom,
     updateTransport,
     addTransport,
-    removeTransport
+    removeTransport,
+    importTransports
   } = useHojaDeRutaForm(venueImagesForSave);
 
   // If a jobId is provided from parent, lock selection to that job
@@ -661,6 +662,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                          onUpdateTransport={updateTransport}
                          onAddTransport={addTransport}
                          onRemoveTransport={removeTransport}
+                         onImportTransports={importTransports}
+                         jobId={jobId || selectedJobId}
                        />
                      </TabsContent>
 
