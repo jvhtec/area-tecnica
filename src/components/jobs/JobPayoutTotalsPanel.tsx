@@ -558,6 +558,13 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         </CardHeader>
         <CardContent>
           <div className="text-red-400">Error al cargar los pagos</div>
+          {error && (
+            <div className="text-xs text-red-300 mt-2 font-mono whitespace-pre-wrap">
+              {error instanceof Error
+                ? error.message
+                : JSON.stringify(error, null, 2)}
+            </div>
+          )}
         </CardContent>
       </Card>
     );
