@@ -195,7 +195,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const lastPreparedContext = React.useRef<JobPayoutEmailContextResult | null>(null);
 
   // Payout override state
-  const { userRole, user } = useOptimizedAuth();
+  const { userRole } = useOptimizedAuth();
   const isManager = userRole === 'admin' || userRole === 'management';
 
   // Fetch payout overrides for this job
