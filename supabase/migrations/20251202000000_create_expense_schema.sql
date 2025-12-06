@@ -813,7 +813,10 @@ SELECT
 FROM stats s
 GROUP BY s.job_id, s.technician_id, s.category_slug;
 
-CREATE OR REPLACE VIEW public.v_job_tech_payout_2025 AS
+-- Drop existing view to avoid type conflicts when adding expense columns
+DROP VIEW IF EXISTS v_job_tech_payout_2025 CASCADE;
+
+CREATE VIEW public.v_job_tech_payout_2025 AS
 WITH base AS (
   SELECT DISTINCT job_id, technician_id FROM job_assignments
   UNION

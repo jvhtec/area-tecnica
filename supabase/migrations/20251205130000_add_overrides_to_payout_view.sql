@@ -12,6 +12,8 @@ select
   base.timesheets_total_eur,
   base.extras_total_eur,
   base.extras_breakdown,
+  base.expenses_total_eur,
+  base.expenses_breakdown,
   base.vehicle_disclaimer,
   base.vehicle_disclaimer_text,
   -- Use override amount if exists, otherwise use the original calculated total
