@@ -28,15 +28,36 @@ alter table job_technician_payout_overrides enable row level security;
 create policy "Users can view payout overrides for jobs they can see"
   on job_technician_payout_overrides for select
   using (
+    -- Technicians can view their own overrides on jobs they're assigned to
     exists (
       select 1 from job_assignments ja
       where ja.job_id = job_technician_payout_overrides.job_id
         and ja.technician_id = auth.uid()
     )
-    or exists (
+    or
+    -- Admin users have unconditional access
+    exists (
       select 1 from profiles
       where id = auth.uid()
-        and role in ('admin', 'management')
+        and role = 'admin'
+    )
+    or
+    -- Management users can only view overrides for their department's technicians on assigned jobs
+    (
+      exists (
+        select 1 from profiles p
+        where p.id = auth.uid()
+          and p.role = 'management'
+          and p.department = (
+            select department from profiles
+            where id = job_technician_payout_overrides.technician_id
+          )
+      )
+      and exists (
+        select 1 from job_assignments ja
+        where ja.job_id = job_technician_payout_overrides.job_id
+          and ja.technician_id = job_technician_payout_overrides.technician_id
+      )
     )
   );
 
@@ -234,7 +255,7 @@ begin
 
   -- Validate amount (numeric(10,2) allows max 99,999,999.99)
   if _amount_eur is null or _amount_eur < 0 then
-    raise exception 'Override amount must be a positive number';
+    raise exception 'Override amount must be a non-negative number';
   end if;
 
   if _amount_eur > 99999999.99 then
@@ -258,10 +279,10 @@ begin
   where job_id = _job_id
     and technician_id = _technician_id;
 
-  -- Get calculated total from payout view
+  -- Get calculated total from base payout view (without any existing override)
   select total_eur
   into v_calculated_total
-  from v_job_tech_payout_2025
+  from v_job_tech_payout_2025_base
   where job_id = _job_id
     and technician_id = _technician_id;
 
@@ -396,10 +417,10 @@ begin
   from jobs
   where id = _job_id;
 
-  -- Get calculated total
+  -- Get calculated total from base payout view (without any existing override)
   select total_eur
   into v_calculated_total
-  from v_job_tech_payout_2025
+  from v_job_tech_payout_2025_base
   where job_id = _job_id
     and technician_id = _technician_id;
 

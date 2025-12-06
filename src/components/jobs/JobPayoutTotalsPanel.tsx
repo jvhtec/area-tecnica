@@ -244,7 +244,6 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
       jobId,
       technicianId: techId,
       amountEur: amountValue,
-      technicianName: techName,
       calculatedTotal,
     }, {
       onSuccess: () => {
