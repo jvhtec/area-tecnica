@@ -226,6 +226,50 @@ COMMENT ON FUNCTION extras_total_for_job_tech(UUID, UUID) IS
 COMMENT ON FUNCTION get_job_total_amounts(UUID, TEXT) IS
   'Returns job payment totals including timesheets, extras, and expenses. Requires authentication.';
 
+-- Recreate v_job_expense_summary view (dropped by CASCADE earlier)
+-- This view is required by v_job_tech_payout_2025_base
+CREATE OR REPLACE VIEW public.v_job_expense_summary AS
+WITH stats AS (
+  SELECT
+    job_id,
+    technician_id,
+    category_slug,
+    status,
+    COUNT(*) AS entry_count,
+    COALESCE(SUM(amount_eur), 0) AS total_eur
+  FROM job_expenses
+  GROUP BY job_id, technician_id, category_slug, status
+)
+SELECT
+  s.job_id,
+  s.technician_id,
+  s.category_slug,
+  SUM(s.entry_count) AS total_count,
+  COALESCE(jsonb_object_agg(s.status, s.entry_count), '{}'::jsonb) AS status_counts,
+  COALESCE(jsonb_object_agg(s.status, s.total_eur), '{}'::jsonb) AS amount_totals,
+  COALESCE(SUM(CASE WHEN s.status = 'approved' THEN s.total_eur ELSE 0 END), 0)::numeric(12, 2) AS approved_total_eur,
+  COALESCE(SUM(CASE WHEN s.status = 'submitted' THEN s.total_eur ELSE 0 END), 0)::numeric(12, 2) AS submitted_total_eur,
+  COALESCE(SUM(CASE WHEN s.status = 'draft' THEN s.total_eur ELSE 0 END), 0)::numeric(12, 2) AS draft_total_eur,
+  COALESCE(SUM(CASE WHEN s.status = 'rejected' THEN s.total_eur ELSE 0 END), 0)::numeric(12, 2) AS rejected_total_eur,
+  (
+    SELECT MAX(GREATEST(
+      COALESCE(e.updated_at, e.created_at),
+      COALESCE(e.submitted_at, e.created_at)
+    ))
+    FROM job_expenses e
+    WHERE e.job_id = s.job_id
+      AND e.technician_id = s.technician_id
+      AND e.category_slug = s.category_slug
+      AND e.receipt_path IS NOT NULL
+  ) AS last_receipt_at
+FROM stats s
+GROUP BY s.job_id, s.technician_id, s.category_slug;
+
+GRANT SELECT ON v_job_expense_summary TO authenticated, service_role;
+
+COMMENT ON VIEW v_job_expense_summary IS
+  'Per-job/tech/category rollup of expense counts and totals by status';
+
 -- Recreate the views that were dropped at the beginning
 -- Base view with expense integration
 CREATE VIEW v_job_tech_payout_2025_base AS
