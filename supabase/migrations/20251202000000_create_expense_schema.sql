@@ -1027,99 +1027,11 @@ GRANT EXECUTE ON FUNCTION get_job_total_amounts(UUID, TEXT) TO authenticated, se
 GRANT SELECT ON v_job_expense_summary TO authenticated, service_role;
 GRANT SELECT ON v_job_tech_payout_2025 TO authenticated, service_role, anon;
 
+-- Create storage bucket for expense receipts
+-- Note: Storage policies must be configured via Supabase Dashboard
+-- as they require system-level permissions that migrations don't have
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('expense-receipts', 'expense-receipts', FALSE)
 ON CONFLICT (id) DO NOTHING;
-
-UPDATE storage.buckets
-SET public = FALSE
-WHERE id = 'expense-receipts';
-
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Expense receipts read policy" ON storage.objects;
-CREATE POLICY "Expense receipts read policy"
-  ON storage.objects
-  FOR SELECT
-  USING (
-    bucket_id = 'expense-receipts'
-    AND (
-      owner = auth.uid()
-      OR auth.role() = 'service_role'
-      OR EXISTS (
-        SELECT 1
-        FROM profiles p
-        WHERE p.id = auth.uid()
-          AND p.role IN ('admin', 'management')
-      )
-    )
-  );
-
-DROP POLICY IF EXISTS "Expense receipts insert policy" ON storage.objects;
-CREATE POLICY "Expense receipts insert policy"
-  ON storage.objects
-  FOR INSERT
-  WITH CHECK (
-    bucket_id = 'expense-receipts'
-    AND (
-      auth.role() = 'service_role'
-      OR COALESCE(owner, auth.uid()) = auth.uid()
-      OR EXISTS (
-        SELECT 1
-        FROM profiles p
-        WHERE p.id = auth.uid()
-          AND p.role IN ('admin', 'management')
-      )
-    )
-  );
-
-DROP POLICY IF EXISTS "Expense receipts update policy" ON storage.objects;
-CREATE POLICY "Expense receipts update policy"
-  ON storage.objects
-  FOR UPDATE
-  USING (
-    bucket_id = 'expense-receipts'
-    AND (
-      owner = auth.uid()
-      OR auth.role() = 'service_role'
-      OR EXISTS (
-        SELECT 1
-        FROM profiles p
-        WHERE p.id = auth.uid()
-          AND p.role IN ('admin', 'management')
-      )
-    )
-  )
-  WITH CHECK (
-    bucket_id = 'expense-receipts'
-    AND (
-      owner = auth.uid()
-      OR auth.role() = 'service_role'
-      OR EXISTS (
-        SELECT 1
-        FROM profiles p
-        WHERE p.id = auth.uid()
-          AND p.role IN ('admin', 'management')
-      )
-    )
-  );
-
-DROP POLICY IF EXISTS "Expense receipts delete policy" ON storage.objects;
-CREATE POLICY "Expense receipts delete policy"
-  ON storage.objects
-  FOR DELETE
-  USING (
-    bucket_id = 'expense-receipts'
-    AND (
-      owner = auth.uid()
-      OR auth.role() = 'service_role'
-      OR EXISTS (
-        SELECT 1
-        FROM profiles p
-        WHERE p.id = auth.uid()
-          AND p.role IN ('admin', 'management')
-      )
-    )
-  );
 
 COMMIT;
