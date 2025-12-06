@@ -3317,6 +3317,83 @@ export type Database = {
           },
         ]
       }
+      job_technician_payout_overrides: {
+        Row: {
+          job_id: string
+          technician_id: string
+          override_amount_eur: number
+          set_by: string
+          set_at: string
+          updated_at: string
+        }
+        Insert: {
+          job_id: string
+          technician_id: string
+          override_amount_eur: number
+          set_by: string
+          set_at?: string
+          updated_at?: string
+        }
+        Update: {
+          job_id?: string
+          technician_id?: string
+          override_amount_eur?: number
+          set_by?: string
+          set_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_technician_payout_overrides_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_technician_payout_overrides_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_staffing_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_technician_payout_overrides_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_technician_payout_overrides_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_technician_payout_overrides_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_technician_payout_overrides_set_by_fkey"
+            columns: ["set_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_technician_payout_overrides_set_by_fkey"
+            columns: ["set_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_required_roles: {
         Row: {
           created_at: string
@@ -8035,6 +8112,21 @@ export type Database = {
         Returns: Database["public"]["Enums"]["activity_visibility"]
       }
       rotate_my_calendar_ics_token: { Args: never; Returns: string }
+      remove_technician_payout_override: {
+        Args: {
+          _job_id: string
+          _technician_id: string
+        }
+        Returns: Json
+      }
+      set_technician_payout_override: {
+        Args: {
+          _job_id: string
+          _technician_id: string
+          _amount_eur: number
+        }
+        Returns: Json
+      }
       sync_preset_assignments_for_tour: {
         Args: { _preset_id: string; _tour_id: string }
         Returns: undefined
