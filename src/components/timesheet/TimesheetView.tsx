@@ -45,6 +45,12 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, revertTimesheet, refetch } = useTimesheets(jobId, { userRole });
   const { assignments } = useJobAssignmentsRealtime(jobId);
   const { toast } = useToast();
+
+  // Expense state and queries - must be before any early returns
+  const { data: expenses = [] } = useJobExpenses(jobId);
+  const { data: approvalRow } = useJobRatesApproval(jobId);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);
   const [selectedTimesheets, setSelectedTimesheets] = useState<Set<string>>(new Set());
@@ -348,18 +354,13 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     userId: user?.id
   });
 
+  // Expense-related calculations
+  const isRatesApproved = approvalRow?.rates_approved ?? false;
+  const canViewExpenses = !isTechnician || isRatesApproved;
+
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Cargando partes de trabajo...</div>;
   }
-
-  // Expense state and queries
-  const { data: expenses = [] } = useJobExpenses(jobId);
-  const { data: approvalRow } = useJobRatesApproval(jobId);
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const isRatesApproved = approvalRow?.rates_approved ?? false;
-
-  // Only show expenses to technicians after rates are approved
-  const canViewExpenses = !isTechnician || isRatesApproved;
 
   return (
     <div className="space-y-6">

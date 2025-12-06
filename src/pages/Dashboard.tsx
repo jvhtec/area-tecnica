@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Send, Mail } from "lucide-react";
+import { MessageSquare, Send, Mail, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";

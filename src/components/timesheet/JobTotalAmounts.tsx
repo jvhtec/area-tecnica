@@ -124,7 +124,7 @@ export const JobTotalAmounts = ({ jobId, jobTitle }: JobTotalAmountsProps) => {
                       <span>{format(new Date(item.date), 'MMM d')}</span>
                     </div>
                   </div>
-                  <p className="font-semibold">€{item.amount_eur.toFixed(2)}</p>
+                  <p className="font-semibold">€{Number(item.amount_eur ?? 0).toFixed(2)}</p>
                 </div>
               ))}
             </div>

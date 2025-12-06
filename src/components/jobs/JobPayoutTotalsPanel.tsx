@@ -814,7 +814,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         {payoutTotals.length > 1 && (
           <div className="mt-6 p-4 bg-white/5 rounded-lg border border-white/10 text-white">
             <div className="flex justify-between items-center text-lg font-bold">
-
+              <span>Total global:</span>
               <span className="text-blue-300">
                 {formatCurrency(
                   payoutTotals.reduce((sum, payout) => sum + payout.total_eur, 0)
