@@ -21,6 +21,16 @@ DECLARE
   v_payload jsonb;
   v_should_notify boolean := false;
 BEGIN
+  -- Validate configuration
+  IF v_supabase_url IS NULL OR v_service_role_key IS NULL THEN
+    RAISE EXCEPTION 'Expense notification trigger requires app.settings.% to be configured',
+      CASE
+        WHEN v_supabase_url IS NULL AND v_service_role_key IS NULL THEN 'supabase_url and service_role_key'
+        WHEN v_supabase_url IS NULL THEN 'supabase_url'
+        ELSE 'service_role_key'
+      END;
+  END IF;
+
   -- Only notify on status changes to submitted, approved, or rejected
   IF TG_OP = 'UPDATE' AND NEW.status IS DISTINCT FROM OLD.status THEN
     v_should_notify := NEW.status IN ('submitted', 'approved', 'rejected');
@@ -79,10 +89,19 @@ BEGIN
       ),
       body := v_payload
     );
-  EXCEPTION WHEN OTHERS THEN
-    -- If pg_net is not available or fails, log the notification payload
-    RAISE WARNING 'Failed to send expense notification for %: %. Payload: %',
-      NEW.id, SQLERRM, v_payload::text;
+  EXCEPTION
+    WHEN undefined_function THEN
+      -- pg_net extension not installed
+      RAISE WARNING 'pg_net extension not available. Notification not sent for expense %: %',
+        NEW.id, v_payload::text;
+    WHEN SQLSTATE '58000' THEN
+      -- System error (network issues, etc.)
+      RAISE WARNING 'Failed to send expense notification for % due to system error: %. Payload: %',
+        NEW.id, SQLERRM, v_payload::text;
+    WHEN OTHERS THEN
+      -- Unexpected error - log but don't fail the transaction
+      RAISE WARNING 'Unexpected error sending expense notification for %: %. Payload: %',
+        NEW.id, SQLERRM, v_payload::text;
   END;
 
   RETURN NEW;

@@ -158,10 +158,14 @@ serve(async (req) => {
               <tr>
                 <td style="padding:12px 24px 0 24px;">
                   <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;color:#374151;font-size:14px;">
-                    <div style="display:flex;align-items:center;margin-bottom:10px;">
-                      <b>Estado:</b>&nbsp;
-                      <span style="display:inline-block;background:${statusColor};color:white;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;">${statusText}</span>
-                    </div>
+                    <table role="presentation" cellspacing="0" cellpadding="0" style="margin-bottom:10px;">
+                      <tr>
+                        <td style="vertical-align:middle;padding-right:8px;"><b>Estado:</b></td>
+                        <td style="vertical-align:middle;">
+                          <span style="display:inline-block;background:${statusColor};color:white;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;">${statusText}</span>
+                        </td>
+                      </tr>
+                    </table>
                     <ul style="margin:10px 0 0 18px;padding:0;line-height:1.55;">
                       <li><b>Trabajo:</b> ${payload.job_title}</li>
                       <li><b>Categoría:</b> ${payload.category_label}</li>
