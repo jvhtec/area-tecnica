@@ -46,22 +46,27 @@ AS $$
 DECLARE
   v_result jsonb;
 BEGIN
-  -- Calculate extras from job_rate_extras table
+  -- Calculate extras from job_rate_extras joined with rate_extras_2025 for unit prices
   SELECT jsonb_build_object(
-    'total_eur', COALESCE(SUM(amount_eur), 0),
+    'total_eur', COALESCE(SUM(
+      COALESCE(jre.amount_override_eur, jre.quantity * re.amount_eur)
+    ), 0),
     'items', COALESCE(jsonb_agg(
       jsonb_build_object(
-        'description', description,
-        'amount_eur', amount_eur,
-        'category', category
+        'extra_type', jre.extra_type,
+        'quantity', jre.quantity,
+        'unit_eur', re.amount_eur,
+        'amount_eur', COALESCE(jre.amount_override_eur, jre.quantity * re.amount_eur)
       )
-      ORDER BY created_at
-    ) FILTER (WHERE amount_eur IS NOT NULL), '[]'::jsonb)
+      ORDER BY jre.updated_at
+    ) FILTER (WHERE jre.status = 'approved'), '[]'::jsonb)
   )
   INTO v_result
-  FROM job_rate_extras
-  WHERE job_id = _job_id
-    AND technician_id = _technician_id;
+  FROM job_rate_extras jre
+  LEFT JOIN rate_extras_2025 re ON re.extra_type = jre.extra_type
+  WHERE jre.job_id = _job_id
+    AND jre.technician_id = _technician_id
+    AND jre.status = 'approved';
 
   RETURN COALESCE(v_result, '{"total_eur": 0, "items": []}'::jsonb);
 END;
