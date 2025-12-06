@@ -24,6 +24,12 @@ create index if not exists idx_job_tech_payout_overrides_set_by on job_technicia
 -- Enable RLS
 alter table job_technician_payout_overrides enable row level security;
 
+-- Drop existing policies if they exist (for idempotent migrations)
+drop policy if exists "Users can view payout overrides for jobs they can see" on job_technician_payout_overrides;
+drop policy if exists "Only admins and department managers can insert overrides" on job_technician_payout_overrides;
+drop policy if exists "Only admins and department managers can update overrides" on job_technician_payout_overrides;
+drop policy if exists "Only admins and department managers can delete overrides" on job_technician_payout_overrides;
+
 -- RLS policies
 create policy "Users can view payout overrides for jobs they can see"
   on job_technician_payout_overrides for select
