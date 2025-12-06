@@ -420,7 +420,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                     <div className="flex-1">
                       <h3 className={cn("font-bold text-lg", themeTokens.textMain)}>{job.title}</h3>
                       <div className={cn("text-xs mt-1", themeTokens.textMuted)}>
-                        {job.location?.name || "Sin ubicación"}
+                        {job.location_data?.name || "Sin ubicación"}
                       </div>
                       {departments.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">

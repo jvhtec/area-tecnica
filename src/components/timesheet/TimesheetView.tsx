@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarDays, Clock, FileText, Download, Plus, User, Trash2, AlertTriangle, Mail } from "lucide-react";
+import { CalendarDays, Clock, FileText, Download, Plus, User, Trash2, AlertTriangle, Mail, Receipt } from "lucide-react";
 import { useTimesheets } from "@/hooks/useTimesheets";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
@@ -29,6 +29,9 @@ import {
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ExpenseForm, ExpenseList, ExpenseSummaryCard } from "@/components/expenses";
+import { useJobExpenses } from "@/hooks/useJobExpenses";
+import { useJobRatesApproval } from "@/hooks/useJobRatesApproval";
 
 interface TimesheetViewProps {
   jobId: string;
@@ -42,6 +45,12 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, revertTimesheet, refetch } = useTimesheets(jobId, { userRole });
   const { assignments } = useJobAssignmentsRealtime(jobId);
   const { toast } = useToast();
+
+  // Expense state and queries - must be before any early returns
+  const { data: expenses = [] } = useJobExpenses(jobId);
+  const { data: approvalRow } = useJobRatesApproval(jobId);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);
   const [selectedTimesheets, setSelectedTimesheets] = useState<Set<string>>(new Set());
@@ -345,6 +354,10 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     userId: user?.id
   });
 
+  // Expense-related calculations
+  const isRatesApproved = approvalRow?.rates_approved ?? false;
+  const canViewExpenses = !isTechnician || isRatesApproved;
+
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Cargando partes de trabajo...</div>;
   }
@@ -354,8 +367,51 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       {/* Job cost summary (overall) */}
       <JobTotalAmounts jobId={jobId} jobTitle={jobTitle} />
 
-      {/* Technician’s total for this job */}
+      {/* Technician's total for this job */}
       <MyJobTotal jobId={jobId} />
+
+      {/* Expenses section - only show if canViewExpenses */}
+      {canViewExpenses && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Receipt className="h-6 w-6" />
+              {isTechnician ? 'Mis Gastos' : 'Gastos'}
+            </h2>
+            {isTechnician && (
+              <Button
+                onClick={() => setShowExpenseForm(!showExpenseForm)}
+                variant={showExpenseForm ? "outline" : "default"}
+              >
+                {showExpenseForm ? "Cerrar" : "Nuevo Gasto"}
+              </Button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Expense Form (Technicians only) */}
+            {isTechnician && showExpenseForm && (
+              <div className="lg:col-span-2">
+                <ExpenseForm
+                  jobId={jobId}
+                  onSuccess={() => setShowExpenseForm(false)}
+                  onCancel={() => setShowExpenseForm(false)}
+                />
+              </div>
+            )}
+
+            {/* Expense Summary */}
+            <div className={showExpenseForm && isTechnician ? "" : "lg:col-span-1"}>
+              <ExpenseSummaryCard expenses={expenses} />
+            </div>
+
+            {/* Expense List */}
+            <div className={showExpenseForm && isTechnician ? "lg:col-span-1" : "lg:col-span-2"}>
+              <ExpenseList expenses={expenses} showActions={isTechnician} />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between">
         <div>
