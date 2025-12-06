@@ -753,12 +753,8 @@ BEGIN
   WHERE id = p_expense_id
   RETURNING * INTO v_row;
 
-  IF v_old_path IS NOT NULL AND v_new_path IS DISTINCT FROM v_old_path THEN
-    UPDATE storage.objects
-    SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('retired_at', timezone('utc', now()))
-    WHERE bucket_id = 'expense-receipts'
-      AND name = v_old_path;
-  END IF;
+  -- Note: Old receipt cleanup is handled by storage policies and retention
+  -- Removed storage.objects update to avoid permission issues
 
   RETURN v_row;
 END;
