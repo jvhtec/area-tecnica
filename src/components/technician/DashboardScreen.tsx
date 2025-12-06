@@ -9,6 +9,7 @@ import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { TechJobCard } from './TechJobCard';
 import { TourCard } from './TourCard';
 import { Theme } from './types';
+import { PendingExpensesSummary } from '@/components/expenses/PendingExpensesSummary';
 
 interface DashboardScreenProps {
     theme: Theme;
@@ -140,6 +141,9 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                     </div>
                 </div>
             )}
+
+            {/* Pending Expenses Summary */}
+            <PendingExpensesSummary />
 
             {/* Today's Assignment */}
             <div>
