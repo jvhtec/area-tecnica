@@ -27,7 +27,6 @@ import { MessagesModal } from '@/components/technician/MessagesModal';
 import { TourDetailView } from '@/components/technician/TourDetailView';
 import { SoundVisionModal } from '@/components/technician/SoundVisionModal';
 import { TechnicianTourRates } from '@/components/dashboard/TechnicianTourRates';
-import { PendingExpensesSummary } from '@/components/expenses/PendingExpensesSummary';
 
 // Type definitions
 interface TechnicianJobData {
