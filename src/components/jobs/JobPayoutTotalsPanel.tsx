@@ -254,11 +254,10 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   }, [jobId, editingAmount, setOverrideMutation]);
 
   // Handle removing override for a technician
-  const handleRemoveOverride = React.useCallback((techId: string, techName: string) => {
+  const handleRemoveOverride = React.useCallback((techId: string) => {
     removeOverrideMutation.mutate({
       jobId,
       technicianId: techId,
-      technicianName: techName,
     });
   }, [jobId, removeOverrideMutation]);
 
@@ -797,7 +796,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleRemoveOverride(payout.technician_id, techName)}
+                            onClick={() => handleRemoveOverride(payout.technician_id)}
                             disabled={removeOverrideMutation.isPending}
                             className="h-6 px-2 text-red-300 hover:text-red-200 hover:bg-red-500/20"
                           >
