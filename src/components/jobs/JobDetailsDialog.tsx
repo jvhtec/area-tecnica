@@ -165,7 +165,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({
         setIsSendingPayoutEmails(false);
       }
     },
-    [isSendingPayoutEmails, supabase]
+    [isSendingPayoutEmails]
   );
 
   // Fetch comprehensive job data
