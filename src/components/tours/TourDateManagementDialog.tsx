@@ -352,7 +352,7 @@ async function createFoldersForDate(
   }
 }
 
-export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> = ({
+export const TourDateManagementDialog = React.memo<TourDateManagementDialogProps>(({
   open,
   onOpenChange,
   tourId,

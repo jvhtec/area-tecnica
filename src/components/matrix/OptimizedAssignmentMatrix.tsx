@@ -85,7 +85,7 @@ interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignmentMatr
   mobile?: boolean;
 }
 
-export const OptimizedAssignmentMatrix = ({
+export const OptimizedAssignmentMatrix = React.memo(({
   technicians,
   dates,
   jobs,
@@ -1602,4 +1602,18 @@ export const OptimizedAssignmentMatrix = ({
       )}
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  // Compare arrays of technicians, dates, and jobs
+  const techniciansEqual = prevProps.technicians.length === nextProps.technicians.length &&
+    prevProps.technicians.every((tech, index) => tech.id === nextProps.technicians[index]?.id);
+  
+  const datesEqual = prevProps.dates.length === nextProps.dates.length &&
+    prevProps.dates.every((date, index) => date.getTime() === nextProps.dates[index]?.getTime());
+  
+  const jobsEqual = prevProps.jobs.length === nextProps.jobs.length &&
+    prevProps.jobs.every((job, index) => job.id === nextProps.jobs[index]?.id);
+  
+  return techniciansEqual && datesEqual && jobsEqual &&
+         prevProps.mobile === nextProps.mobile;
+});
