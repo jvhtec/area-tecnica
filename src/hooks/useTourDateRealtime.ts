@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
  */
 export const useTourDateRealtime = (tourId: string | null, tourDateIds: string[]) => {
   const queryClient = useQueryClient();
+  const tourDateIdsKey = React.useMemo(() => [...tourDateIds].sort().join(','), [tourDateIds]);
 
   // Subscribe to tour dates changes - matches parent component query key
   useRealtimeSubscription({

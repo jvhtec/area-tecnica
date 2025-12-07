@@ -25,7 +25,7 @@ This document tracks the top impact actions identified during the performance au
 ## 5) Supabase Query Batching
 **Problem:** Multiple sequential requests for job documents and assignments.
 **Fix:** Batch related fetches via stored procedures and React Query `useQueries` orchestration.
-**Expected Impact:** 1–2 fewer round trips per job card, improving perceived latency.
+**Expected Impact:** 1–2 fewer round-trips per job card, improving perceived latency.
 
 ## 6) Transport Request Polling
 **Problem:** Aggressive polling keeps the network busy even when dialogs are closed.
@@ -122,12 +122,9 @@ export const JobDetailsDialog = React.memo<JobDetailsDialogProps>(({
   department = 'sound'
 }) => {
   // Component logic...
-}, (prevProps, nextProps) => {
-  // Custom comparison for better performance
-  return prevProps.open === nextProps.open &&
-         prevProps.job?.id === nextProps.job?.id &&
-         prevProps.department === nextProps.department;
 });
+
+> Prefer the default shallow comparison to avoid brittle custom comparators that can miss behaviorally meaningful props. When additional memoization is required, design stable prop shapes instead of hand-rolled comparison logic.
 ```
 
 **Estimated Improvement:** 40-60% reduction in unnecessary re-renders
@@ -142,7 +139,7 @@ export const JobDetailsDialog = React.memo<JobDetailsDialogProps>(({
 - `public/lovable-uploads/7bd0c1d7-3226-470d-bea4-5cd7222e3248.png` (1.2MB)
 - Multiple 200KB-700KB images in uploads folder
 
-**Problem:** Large PNG images without optimization or modern formats.
+**Problem:** Large PNGs without optimization or modern formats.
 
 **Impact:** **HIGH** - Directly affects initial load time and bandwidth usage
 **Effort:** **QUICK** - Image compression and format conversion
@@ -306,13 +303,22 @@ export const OptimizedMatrixCell = React.memo<OptimizedMatrixCellProps>(({
 **File Affected:**
 - `vite.config.ts` (lines 32-37)
 
-**Problem:** PDF libraries are chunked but could be better optimized with additional vendor chunks.
+**Problem:** PDF libraries are chunked but could be better optimized with additional library-specific chunks.
 
 **Current Configuration:**
 ```typescript
 manualChunks: (id) => {
   if (id.includes('node_modules/jspdf') || id.includes('node_modules/pdf-lib')) {
-    return 'vendor-pdf';
+    return 'pdf-libs';
+  }
+  if (id.includes('node_modules/mapbox-gl')) {
+    return 'maps-lib';
+  }
+  if (id.includes('node_modules/exceljs') || id.includes('node_modules/xlsx')) {
+    return 'spreadsheet-libs';
+  }
+  if (id.includes('node_modules/quill')) {
+    return 'editor-lib';
   }
 }
 ```
@@ -324,16 +330,16 @@ manualChunks: (id) => {
 ```typescript
 manualChunks: (id) => {
   if (id.includes('node_modules/jspdf') || id.includes('node_modules/pdf-lib')) {
-    return 'vendor-pdf';
+    return 'pdf-libs';
   }
   if (id.includes('node_modules/mapbox-gl')) {
-    return 'vendor-maps';
+    return 'maps-lib';
   }
   if (id.includes('node_modules/exceljs') || id.includes('node_modules/xlsx')) {
-    return 'vendor-excel';
+    return 'spreadsheet-libs';
   }
   if (id.includes('node_modules/quill')) {
-    return 'vendor-editor';
+    return 'editor-lib';
   }
 }
 ```
@@ -494,7 +500,9 @@ import * as lucide from "lucide-react";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 
 // For libraries with tree-shaking support:
-import { debounce } from 'lodash-es/debounce';
+import { debounce } from 'lodash-es'; // recommended: named export from ESM entry
+// Or, when importing a single helper subpath:
+import debounce from 'lodash-es/debounce';
 // Instead of:
 import { debounce } from 'lodash';
 ```
