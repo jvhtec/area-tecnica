@@ -1278,4 +1278,10 @@ export const TourDateManagementDialog = React.memo<TourDateManagementDialogProps
     </Dialog>
     </>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return prevProps.open === nextProps.open &&
+         prevProps.tourId === nextProps.tourId &&
+         prevProps.readOnly === nextProps.readOnly &&
+         prevProps.tourDates.length === nextProps.tourDates.length;
+});

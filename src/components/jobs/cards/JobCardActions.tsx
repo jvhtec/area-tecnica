@@ -121,7 +121,7 @@ interface JobCardActionsProps {
   whatsappDisabled?: boolean;
 }
 
-export const JobCardActions: React.FC<JobCardActionsProps> = ({
+export const JobCardActions = React.memo<JobCardActionsProps>(({
   job,
   userRole,
   foldersAreCreated,
@@ -1278,4 +1278,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       })()}
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return prevProps.job?.id === nextProps.job?.id &&
+         prevProps.userRole === nextProps.userRole &&
+         prevProps.foldersAreCreated === nextProps.foldersAreCreated &&
+         prevProps.isProjectManagementPage === nextProps.isProjectManagementPage;
+});
