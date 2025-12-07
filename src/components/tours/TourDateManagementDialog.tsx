@@ -364,7 +364,7 @@ const TourDateManagementDialogComponent: React.FC<TourDateManagementDialogProps>
   const { getOrCreateLocation, getOrCreateLocationWithDetails } = useLocationManagement();
 
   // Add real-time subscriptions
-  const tourDateIds = tourDates.map(d => d.id);
+  const tourDateIds = React.useMemo(() => tourDates.map(d => d.id), [tourDates]);
   useTourDateRealtime(tourId, tourDateIds);
 
   // Force refresh parent component data when dialog opens
