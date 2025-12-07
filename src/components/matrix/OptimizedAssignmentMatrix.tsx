@@ -85,7 +85,7 @@ interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignmentMatr
   mobile?: boolean;
 }
 
-export const OptimizedAssignmentMatrix = ({
+const OptimizedAssignmentMatrixComponent = ({
   technicians,
   dates,
   jobs,
@@ -1631,3 +1631,6 @@ export const OptimizedAssignmentMatrix = ({
     </div>
   );
 };
+
+export const OptimizedAssignmentMatrix = React.memo(OptimizedAssignmentMatrixComponent);
+OptimizedAssignmentMatrix.displayName = 'OptimizedAssignmentMatrix';
