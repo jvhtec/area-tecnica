@@ -36,11 +36,20 @@ export const useTourDateRealtime = (tourId: string | null, tourDateIds: string[]
   React.useEffect(() => {
     if (tourId) {
       console.log('Setting up additional query invalidation for tour:', tourId);
-      
-      // Force invalidate queries periodically to ensure UI stays in sync
+
+      // Force invalidate queries periodically as a fallback to the realtime
+      // subscription. We keep the interval modest to avoid unnecessary churn
+      // when the subscription is delivering timely updates.
+      const fallbackIntervalMs = 15000;
       const interval = setInterval(() => {
-        queryClient.invalidateQueries({ queryKey: ['tour', tourId] });
-      }, 2000); // Check every 2 seconds
+        const state = queryClient.getQueryState(['tour', tourId]);
+        const dataUpdatedAt = state?.dataUpdatedAt ?? 0;
+        const isFresh = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt < fallbackIntervalMs;
+
+        if (!isFresh) {
+          queryClient.invalidateQueries({ queryKey: ['tour', tourId] });
+        }
+      }, fallbackIntervalMs);
 
       return () => clearInterval(interval);
     }
