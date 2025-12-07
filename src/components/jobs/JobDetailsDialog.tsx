@@ -119,7 +119,7 @@ interface JobDetailsDialogProps {
   department?: string;
 }
 
-export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
+export const JobDetailsDialog = React.memo<JobDetailsDialogProps>(({
   open,
   onOpenChange,
   job,
@@ -1606,4 +1606,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
       </DialogContent>
     </Dialog>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return prevProps.open === nextProps.open &&
+         prevProps.job?.id === nextProps.job?.id &&
+         prevProps.department === nextProps.department;
+});

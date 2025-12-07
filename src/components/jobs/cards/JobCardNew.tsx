@@ -60,7 +60,7 @@ export interface JobCardNewProps {
   detailsOnlyMode?: boolean;
 }
 
-export function JobCardNew({
+export const JobCardNew = React.memo(function JobCardNew({
   job,
   onEditClick,
   onDeleteClick,
@@ -1275,6 +1275,11 @@ export function JobCardNew({
       )}
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return prevProps.job?.id === nextProps.job?.id &&
+         prevProps.department === nextProps.department &&
+         prevProps.userRole === nextProps.userRole;
+});
 
 export type { JobDocument } from './JobCardDocuments';
