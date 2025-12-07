@@ -197,21 +197,29 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     setIsStatusDropdownOpen(false);
   };
 
+  const processedJobs = useMemo(() => {
+    if (!jobs) return [];
+    return jobs.map((job) => ({
+      ...job,
+      jobTimezone: job.timezone || 'Europe/Madrid',
+      departmentIds: job.job_departments?.map((d: any) => d.department) || [],
+    }));
+  }, [jobs]);
+
   // Memoize getJobsForDate to prevent unnecessary re-renders and stabilize its reference for effects
   const getJobsForDate = useMemo(() => (date: Date) => {
-    if (!jobs) return [];
-    return jobs.filter((job) => {
+    if (!processedJobs.length) return [];
+    return processedJobs.filter((job) => {
       try {
         if (!job.start_time || !job.end_time) {
           console.warn("Invalid date found for job:", job);
           return false;
         }
 
-        const jobTimezone = job.timezone || 'Europe/Madrid';
-        const isWithinDuration = isJobOnDate(job.start_time, job.end_time, date, jobTimezone);
+        const isWithinDuration = isJobOnDate(job.start_time, job.end_time, date, job.jobTimezone);
 
         const matchesDepartment = department
-          ? isWithinDuration && job.job_departments.some((d: any) => d.department === department)
+          ? isWithinDuration && job.departmentIds.some((dept: string) => dept === department)
           : isWithinDuration;
         const matchesJobType = selectedJobTypes.length === 0 || selectedJobTypes.includes(job.job_type);
         const matchesJobStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
@@ -221,17 +229,25 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         return false;
       }
     });
-  }, [jobs, department, selectedJobTypes, selectedJobStatuses]); // Dependencies for getJobsForDate
+  }, [processedJobs, department, selectedJobTypes, selectedJobStatuses]); // Dependencies for getJobsForDate
 
-  // Simplified date type fetching optimization
-  const jobIdsInView = useMemo(() =>
-    Array.from(new Set(allDays.flatMap(day => getJobsForDate(day).map(job => job.id)))),
-    [allDays, getJobsForDate]
+  const formattedDays = useMemo(() =>
+    allDays.map((d) => ({ date: d, formatted: format(d, 'yyyy-MM-dd') })),
+    [allDays]
   );
 
+  // Simplified date type fetching optimization
+  const jobIdsInView = useMemo(() => {
+    const jobIdSet = new Set<string>();
+    formattedDays.forEach(({ date }) => {
+      getJobsForDate(date).forEach((job) => jobIdSet.add(job.id));
+    });
+    return Array.from(jobIdSet);
+  }, [formattedDays, getJobsForDate]);
+
   const formattedDatesInView = useMemo(() =>
-    Array.from(new Set(allDays.map(d => format(d, 'yyyy-MM-dd')))),
-    [allDays]
+    Array.from(new Set(formattedDays.map(({ formatted }) => formatted))),
+    [formattedDays]
   );
 
   const { data: dateTypes = {} } = useOptimizedDateTypes(jobIdsInView, formattedDatesInView);

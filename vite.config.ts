@@ -33,6 +33,15 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('node_modules/jspdf') || id.includes('node_modules/pdf-lib')) {
               return 'vendor-pdf';
             }
+            if (id.includes('node_modules/mapbox-gl')) {
+              return 'vendor-maps';
+            }
+            if (id.includes('node_modules/exceljs') || id.includes('node_modules/xlsx')) {
+              return 'vendor-excel';
+            }
+            if (id.includes('node_modules/quill')) {
+              return 'vendor-editor';
+            }
           },
         },
       },

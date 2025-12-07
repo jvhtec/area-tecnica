@@ -120,7 +120,7 @@ interface JobDetailsDialogProps {
   department?: string;
 }
 
-export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
+const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({
   open,
   onOpenChange,
   job,
@@ -1734,3 +1734,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     </Dialog>
   );
 };
+
+export const JobDetailsDialog = React.memo(JobDetailsDialogComponent);
+
+JobDetailsDialog.displayName = 'JobDetailsDialog';
