@@ -491,7 +491,8 @@ serve(async (req) => {
           console.error('❌ STAFFING REQUEST BATCH FIRST INSERT ERROR:', firstInsert.error);
           return new Response(JSON.stringify({ error: 'Database error saving first batch request', details: firstInsert.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
-        // Insert remaining dates with upsert to avoid duplicates
+        // Insert remaining dates - use insert with ignoreDuplicates since the unique constraint 
+        // is a partial index that upsert's onConflict can't properly match
         const rest = normalizedDates.slice(1).map(d => ({
           job_id,
           profile_id,
@@ -504,11 +505,14 @@ serve(async (req) => {
           batch_id: batchId,
         }));
         if (rest.length) {
+          console.log('📅 Inserting batch dates:', { count: rest.length, dates: rest.map(r => r.target_date) });
           const up = await supabase
             .from('staffing_requests')
-            .upsert(rest, { onConflict: 'job_id,profile_id,phase,target_date' });
+            .insert(rest, { ignoreDuplicates: true } as any);
           if (up.error) {
-            console.warn('⚠️ Batch upsert had errors:', up.error);
+            console.warn('⚠️ Batch insert had errors:', up.error);
+          } else {
+            console.log('✅ Successfully inserted batch dates');
           }
         }
       } else {
