@@ -450,7 +450,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                             >
                                                 <div className="flex-1 min-w-0 overflow-hidden">
                                                     <div
-                                                        className={`text-sm font-bold ${theme.textMain} leading-snug break-words line-clamp-2 sm:line-clamp-1 sm:truncate mb-1`}
+                                                        className={`text-sm font-bold ${theme.textMain} leading-snug break-words line-clamp-2 sm:truncate mb-1`}
                                                         title={doc.file_name}
                                                     >
                                                         {doc.file_name}
