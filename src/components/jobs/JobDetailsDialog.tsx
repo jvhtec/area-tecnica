@@ -36,6 +36,7 @@ import { labelForCode } from '@/utils/roles';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { TourRatesPanel } from '@/components/tours/TourRatesPanel';
 import { JobExtrasManagement } from '@/components/jobs/JobExtrasManagement';
+import { JobExpensesPanel } from '@/components/jobs/JobExpensesPanel';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
@@ -119,7 +120,7 @@ interface JobDetailsDialogProps {
   department?: string;
 }
 
-export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
+const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({
   open,
   onOpenChange,
   job,
@@ -164,7 +165,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         setIsSendingPayoutEmails(false);
       }
     },
-    [isSendingPayoutEmails, supabase]
+    [isSendingPayoutEmails]
   );
 
   // Fetch comprehensive job data
@@ -200,7 +201,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   });
 
   // Artist list for job (to avoid join issues under RLS)
-  const { data: jobArtists = [] } = useQuery({
+  const { data: jobArtists = [], isLoading: isArtistsLoading, error: artistsError } = useQuery({
     queryKey: ['job-artists', job.id],
     enabled: open && !!job?.id,
     queryFn: async () => {
@@ -208,12 +209,20 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         .from('festival_artists')
         .select('id, name')
         .eq('job_id', job.id);
-      if (error) throw error;
+      if (error) {
+        console.error('[JobDetailsDialog] Error fetching artists:', error);
+        throw error;
+      }
+      console.log('[JobDetailsDialog] Fetched artists for job:', job.id, 'Count:', data?.length || 0);
       return (data || []) as Array<{ id: string; name: string }>;
     }
   });
 
-  const artistIdList = React.useMemo(() => jobArtists.map(a => a.id), [jobArtists]);
+  const artistIdList = React.useMemo(() => {
+    const ids = jobArtists.map(a => a.id);
+    console.log('[JobDetailsDialog] Artist IDs:', ids);
+    return ids;
+  }, [jobArtists]);
   const artistNameMap = React.useMemo(() => new Map(jobArtists.map(a => [a.id, a.name])), [jobArtists]);
 
   // Extras setup and visibility
@@ -229,6 +238,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const showTourRatesTab = !isDryhire
     && jobDetails?.job_type === 'tourdate'
     && canSeeRateTabs;
+  const canManageExpenses = ['admin', 'management', 'logistics'].includes(userRole || '');
+  const showExpensesTab = !isDryhire && canManageExpenses;
   const resolvedDocuments = jobDetails?.job_documents || job?.job_documents || [];
   const documentsLoading = isJobLoading;
   const normalizedDepartment = department?.toLowerCase?.() ?? null;
@@ -269,6 +280,29 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     }
     return map;
   }, [jobDetails?.timesheets]);
+
+  const expenseTechnicianOptions = React.useMemo(() => {
+    const map = new Map<string, string>();
+    (jobDetails?.job_assignments ?? []).forEach((assignment: any) => {
+      const techId = assignment.technician_id;
+      if (!techId || map.has(techId)) return;
+      const name = [assignment.profiles?.first_name, assignment.profiles?.last_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      map.set(techId, name || techId);
+    });
+    (jobDetails?.timesheets ?? []).forEach((row: any) => {
+      const techId = row.technician_id;
+      if (!techId || map.has(techId)) return;
+      const name = [row.technician?.first_name, row.technician?.last_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      map.set(techId, name || techId);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name: name || id }));
+  }, [jobDetails?.job_assignments, jobDetails?.timesheets]);
 
   // Flex Work Orders progress (manager-only)
   const [isSyncingWorkOrders, setIsSyncingWorkOrders] = useState(false);
@@ -336,7 +370,10 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     if (!showExtrasTab && selectedTab === 'extras') {
       setSelectedTab('info');
     }
-  }, [showTourRatesTab, showExtrasTab, selectedTab]);
+    if (!showExpensesTab && selectedTab === 'expenses') {
+      setSelectedTab('info');
+    }
+  }, [showTourRatesTab, showExtrasTab, showExpensesTab, selectedTab]);
 
   // Reset selectedTab to 'info' when dialog opens OR when job changes
   // This prevents showing stale/empty tabs when switching between jobs
@@ -374,17 +411,18 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   // Reset selectedTab if user is on a dryhire-excluded tab when isDryhire is true
   // This runs AFTER the dialog has opened and should handle job type changes
   useEffect(() => {
-    if (open && isDryhire && ['location', 'personnel', 'documents', 'restaurants', 'weather', 'extras'].includes(selectedTab)) {
+    if (open && isDryhire && ['location', 'personnel', 'documents', 'restaurants', 'weather', 'extras', 'expenses'].includes(selectedTab)) {
       console.log('JobDetailsDialog: Dryhire job detected, resetting from', selectedTab, 'to info');
       setSelectedTab('info');
     }
   }, [open, isDryhire, selectedTab]);
 
   // Rider files for the artists of this job (2-step to be RLS-friendly)
-  const { data: riderFiles = [], isLoading: isRidersLoading } = useQuery({
+  const { data: riderFiles = [], isLoading: isRidersLoading, error: ridersError } = useQuery({
     queryKey: ['job-rider-files', job.id, artistIdList],
     enabled: open && !!job?.id && artistIdList.length > 0,
     queryFn: async () => {
+      console.log('[JobDetailsDialog] Fetching rider files for artists:', artistIdList);
       let query = supabase
         .from('festival_artist_files')
         .select('id, file_name, file_path, uploaded_at, artist_id')
@@ -396,32 +434,57 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         query = query.or(orExpr);
       }
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('[JobDetailsDialog] Error fetching rider files:', error);
+        throw error;
+      }
+      console.log('[JobDetailsDialog] Fetched rider files:', data?.length || 0, 'files');
       return (data || []) as Array<{ id: string; file_name: string; file_path: string; uploaded_at: string; artist_id: string }>;
     }
   });
 
-  const viewRider = async (file: { file_path: string }) => {
-    const { data, error } = await supabase.storage
-      .from('festival_artist_files')
-      .createSignedUrl(file.file_path, 3600);
-    if (error) throw error;
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+  const viewRider = async (file: { file_path: string; file_name: string }) => {
+    try {
+      console.log('[JobDetailsDialog] Viewing rider:', file.file_path);
+      const { data, error } = await supabase.storage
+        .from('festival_artist_files')
+        .createSignedUrl(file.file_path, 3600);
+
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank', 'noopener');
+      } else {
+        throw new Error('No se pudo generar el enlace de visualización');
+      }
+    } catch (error) {
+      console.error('[JobDetailsDialog] Error viewing rider:', error);
+      toast.error(`Error al visualizar el rider: ${(error as Error).message || 'Error desconocido'}`);
+    }
   };
 
   const downloadRider = async (file: { file_path: string; file_name: string }) => {
-    const { data, error } = await supabase.storage
-      .from('festival_artist_files')
-      .download(file.file_path);
-    if (error) throw error;
-    const url = window.URL.createObjectURL(data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.file_name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    try {
+      console.log('[JobDetailsDialog] Downloading rider:', file.file_path);
+      const { data, error } = await supabase.storage
+        .from('festival_artist_files')
+        .download(file.file_path);
+
+      if (error) throw error;
+
+      const url = window.URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.file_name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success('Descargando rider');
+    } catch (error) {
+      console.error('[JobDetailsDialog] Error downloading rider:', error);
+      toast.error(`Error al descargar el rider: ${(error as Error).message || 'Error desconocido'}`);
+    }
   };
 
   // Fetch nearby restaurants
@@ -553,9 +616,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   const handleDownloadDocument = async (doc: any) => {
     try {
       const { bucket, path } = resolveJobDocLocation(doc.file_path);
-      const { data } = await supabase.storage
+      const { data, error } = await supabase.storage
         .from(bucket)
         .createSignedUrl(path, 3600);
+
+      if (error) throw error;
 
       if (data?.signedUrl) {
         const link = document.createElement('a');
@@ -564,9 +629,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        toast.success('Descargando documento');
+      } else {
+        throw new Error('No se pudo generar el enlace de descarga');
       }
     } catch (error) {
       console.error('Error downloading document:', error);
+      toast.error(`Error al descargar el documento: ${(error as Error).message || 'Error desconocido'}`);
     }
   };
 
@@ -581,9 +650,12 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
       if (data?.signedUrl) {
         window.open(data.signedUrl, '_blank', 'noopener');
+      } else {
+        throw new Error('No se pudo generar el enlace de visualización');
       }
     } catch (error) {
       console.error('Error viewing document:', error);
+      toast.error(`Error al visualizar el documento: ${(error as Error).message || 'Error desconocido'}`);
     }
   };
 
@@ -621,11 +693,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   // Base tabs: Info (1)
   // Conditional tabs: Location, Personnel, Documents, Restaurants, Weather (5) - hidden if dryhire
   // Optional tabs: Tour Rates, Extras
-  const gridColsClass = isDryhire
-    ? 'grid-cols-1' // Only Info tab for dryhire
-    : showExtrasTab
-      ? (showTourRatesTab ? 'grid-cols-2 sm:grid-cols-4 md:grid-cols-8' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-7')
-      : (showTourRatesTab ? 'grid-cols-2 sm:grid-cols-4 md:grid-cols-7' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-6');
+  const gridColsClass = isDryhire ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-4 md:grid-cols-8';
 
   const showPendingRatesNotice = !isDryhire
     && jobDetails?.job_type === 'tourdate'
@@ -657,6 +725,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 <TabsTrigger value="tour-rates" className="py-2">Tarifas</TabsTrigger>
               )}
               {!isDryhire && showExtrasTab && <TabsTrigger value="extras" className="py-2">Extras</TabsTrigger>}
+              {showExpensesTab && <TabsTrigger value="expenses" className="py-2">Gastos</TabsTrigger>}
             </TabsList>
 
             <div className="mt-3 md:mt-4 px-1 pr-1 min-w-0 overflow-x-hidden">
@@ -883,6 +952,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 .from('timesheets')
                                 .select('*')
                                 .eq('job_id', resolvedJobId)
+                                .eq('is_active', true)
                                 .eq('approved_by_manager', true);
 
                               // Fallback to visibility function when RLS blocks
@@ -1228,9 +1298,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   ) : filteredAssignments.length > 0 ? (
                     <div className="space-y-3">
                       {filteredAssignments.map((assignment: any) => (
-                        <div key={assignment.technician_id} className="flex items-center justify-between p-3 bg-muted rounded">
-                          <div>
-                            <p className="font-medium">
+                        <div key={assignment.technician_id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-muted rounded min-w-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium break-words">
                               {assignment.profiles
                                 ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
                                 : assignment.external_technician_name || 'Desconocido'
@@ -1240,7 +1310,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               {assignment.profiles?.department || 'Externo'}
                             </p>
                             {assignment.single_day && (
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground break-words">
                                 {(() => {
                                   const dates = technicianDatesMap.get(assignment.technician_id);
                                   if (dates && dates.size > 0) {
@@ -1258,7 +1328,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               </p>
                             )}
                           </div>
-                          <div className="flex gap-1">
+                          <div className="flex flex-wrap gap-1 w-full sm:w-auto sm:shrink-0">
                             {assignment.sound_role && (
                               <Badge variant="outline" className="text-xs">
                                 Sonido: {labelForCode(assignment.sound_role)}
@@ -1323,8 +1393,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                         const isTemplate = doc.template_type === 'soundvision';
                         const isReadOnly = Boolean(doc.read_only);
                         return (
-                          <div key={doc.id} className="flex items-center justify-between p-3 bg-[#0f1219] border border-[#1f232e] rounded min-w-0">
-                            <div className="min-w-0">
+                          <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-[#0f1219] border border-[#1f232e] rounded min-w-0">
+                            <div className="min-w-0 flex-1">
                               <p className="font-medium flex items-center gap-2 break-words">
                                 {doc.file_name}
                                 {isTemplate && (
@@ -1338,11 +1408,12 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 {isReadOnly && <span className="ml-2 italic">Solo lectura</span>}
                               </p>
                             </div>
-                            <div className="flex gap-2 shrink-0">
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:shrink-0">
                               <Button
                                 onClick={() => handleViewDocument(doc)}
                                 size="sm"
                                 variant="outline"
+                                className="w-full sm:w-auto"
                               >
                                 <Eye className="h-4 w-4 mr-2" />
                                 Ver
@@ -1351,6 +1422,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 onClick={() => handleDownloadDocument(doc)}
                                 size="sm"
                                 variant="outline"
+                                className="w-full sm:w-auto"
                               >
                                 <Download className="h-4 w-4 mr-2" />
                                 Descargar
@@ -1372,22 +1444,59 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     Riders de artistas
+                    {jobArtists.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {jobArtists.length} {jobArtists.length === 1 ? 'artista' : 'artistas'}
+                      </Badge>
+                    )}
                   </h3>
-                  {isRidersLoading ? (
-                    <div className="text-center py-4 text-muted-foreground">Cargando riders…</div>
+
+                  {artistsError && (
+                    <Alert variant="destructive" className="mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Error al cargar artistas: {artistsError.message}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {ridersError && (
+                    <Alert variant="destructive" className="mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Error al cargar riders: {ridersError.message}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {isArtistsLoading || isRidersLoading ? (
+                    <div className="text-center py-4 text-muted-foreground">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      Cargando riders…
+                    </div>
+                  ) : jobArtists.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        No hay artistas asociados a este trabajo
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Los riders aparecerán aquí cuando se agreguen artistas al trabajo
+                      </p>
+                    </div>
                   ) : riderFiles.length > 0 ? (
                     <div className="space-y-2">
                       {riderFiles.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between p-3 bg-muted rounded">
-                          <div>
-                            <p className="font-medium">{file.file_name}</p>
-                            <p className="text-sm text-muted-foreground">Artista: {artistNameMap.get(file.artist_id) || 'Desconocido'}</p>
+                        <div key={file.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-muted rounded min-w-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium break-words">{file.file_name}</p>
+                            <p className="text-sm text-muted-foreground break-words">Artista: {artistNameMap.get(file.artist_id) || 'Desconocido'}</p>
                           </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => viewRider(file)}>
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:shrink-0">
+                            <Button size="sm" variant="outline" onClick={() => viewRider({ file_path: file.file_path, file_name: file.file_name })} className="w-full sm:w-auto">
                               <Eye className="h-4 w-4 mr-1" /> Ver
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => downloadRider(file)}>
+                            <Button size="sm" variant="outline" onClick={() => downloadRider({ file_path: file.file_path, file_name: file.file_name })} className="w-full sm:w-auto">
                               <Download className="h-4 w-4 mr-1" /> Descargar
                             </Button>
                           </div>
@@ -1396,8 +1505,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-muted-foreground">No se han subido riders de artistas</p>
+                      <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        No se han subido riders para los {jobArtists.length} {jobArtists.length === 1 ? 'artista' : 'artistas'} de este trabajo
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {jobArtists.map(a => a.name).join(', ')}
+                      </p>
                     </div>
                   )}
                 </Card>
@@ -1419,12 +1533,12 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     <div className="space-y-3">
                       {restaurants.map((restaurant: Restaurant) => (
                         <div key={restaurant.id} className="p-3 bg-[#0f1219] border border-[#1f232e] rounded">
-                          <div className="flex items-start justify-between gap-3 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 min-w-0">
                             <div className="flex-1 min-w-0">
                               <p className="font-medium break-words">{restaurant.name}</p>
                               <p className="text-sm text-muted-foreground break-words">{restaurant.address}</p>
 
-                              <div className="flex items-center gap-2 mt-2">
+                              <div className="flex flex-wrap items-center gap-2 mt-2">
                                 {restaurant.rating && (
                                   <Badge variant="outline" className="text-xs">
                                     ⭐ {restaurant.rating}
@@ -1443,18 +1557,20 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                               </div>
                             </div>
 
-                            <div className="flex gap-1">
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:shrink-0">
                               {restaurant.phone && (
-                                <Button size="sm" variant="outline" asChild>
+                                <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
                                   <a href={`tel:${restaurant.phone}`}>
-                                    <Phone className="h-4 w-4" />
+                                    <Phone className="h-4 w-4 sm:mr-0" />
+                                    <span className="sm:hidden ml-2">Llamar</span>
                                   </a>
                                 </Button>
                               )}
                               {restaurant.website && (
-                                <Button size="sm" variant="outline" asChild>
+                                <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
                                   <a href={restaurant.website} target="_blank" rel="noopener noreferrer">
-                                    <Globe className="h-4 w-4" />
+                                    <Globe className="h-4 w-4 sm:mr-0" />
+                                    <span className="sm:hidden ml-2">Sitio web</span>
                                   </a>
                                 </Button>
                               )}
@@ -1600,6 +1716,17 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   />
                 </TabsContent>
               )}
+
+              {showExpensesTab && (
+                <TabsContent value="expenses" className="space-y-4 min-w-0 overflow-x-hidden">
+                  <JobExpensesPanel
+                    jobId={resolvedJobId || job.id}
+                    jobTitle={jobDetails?.title || job?.title}
+                    technicians={expenseTechnicianOptions}
+                    canManage={canManageExpenses}
+                  />
+                </TabsContent>
+              )}
             </div>
           </Tabs>
         </div>
@@ -1607,3 +1734,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     </Dialog>
   );
 };
+
+export const JobDetailsDialog = React.memo(JobDetailsDialogComponent);
+
+JobDetailsDialog.displayName = 'JobDetailsDialog';

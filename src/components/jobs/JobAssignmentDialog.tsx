@@ -46,6 +46,7 @@ import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import { getCategoryFromAssignment } from '@/utils/roleCategory';
 
 interface JobAssignmentDialogProps {
   isOpen: boolean;
@@ -62,6 +63,55 @@ interface Assignment {
 }
 
 // Role options from centralized registry (codes with labels)
+
+// Helper function to sync timesheet categories when assignment roles change
+const syncTimesheetCategories = async (jobId: string, technicianId: string) => {
+  try {
+    // Fetch the current assignment to get all role fields
+    const { data: assignment, error: fetchError } = await supabase
+      .from('job_assignments')
+      .select('sound_role, lights_role, video_role')
+      .eq('job_id', jobId)
+      .eq('technician_id', technicianId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching assignment for category sync:', fetchError);
+      return;
+    }
+
+    if (!assignment) {
+      console.warn('No assignment found for category sync');
+      return;
+    }
+
+    // Calculate the new category based on all roles
+    const newCategory = getCategoryFromAssignment(assignment);
+
+    if (!newCategory) {
+      console.warn('Could not determine category from assignment roles');
+      return;
+    }
+
+    // Update all timesheets for this job/technician with the new category
+    const { error: updateError } = await supabase
+      .from('timesheets')
+      .update({ category: newCategory })
+      .eq('job_id', jobId)
+      .eq('technician_id', technicianId)
+      .eq('is_active', true);
+
+    if (updateError) {
+      console.error('Error updating timesheet categories:', updateError);
+      throw updateError;
+    }
+
+    console.log(`Updated timesheet categories to ${newCategory} for technician ${technicianId} on job ${jobId}`);
+  } catch (error) {
+    console.error('Error in syncTimesheetCategories:', error);
+    throw error;
+  }
+};
 
 // Helper function to format technician name from assignment
 const formatAssignmentTechnicianName = (assignment: any) => {
@@ -571,6 +621,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
                                 if (error) throw error;
 
+                                // Sync timesheet categories with the new role
+                                await syncTimesheetCategories(jobId, assignment.technician_id);
+
                                 toast({
                                   title: "Rol actualizado",
                                   description: "El rol de sonido se ha actualizado exitosamente",
@@ -618,6 +671,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
                                 if (error) throw error;
 
+                                // Sync timesheet categories with the new role
+                                await syncTimesheetCategories(jobId, assignment.technician_id);
+
                                 toast({
                                   title: "Rol actualizado",
                                   description: "El rol de luces se ha actualizado exitosamente",
@@ -664,6 +720,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                   .eq('technician_id', assignment.technician_id);
 
                                 if (error) throw error;
+
+                                // Sync timesheet categories with the new role
+                                await syncTimesheetCategories(jobId, assignment.technician_id);
 
                                 toast({
                                   title: "Rol actualizado",

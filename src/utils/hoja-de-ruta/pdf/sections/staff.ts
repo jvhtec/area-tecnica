@@ -32,21 +32,18 @@ export class StaffSection {
       head: [["Nombre", "Apellidos", "Posición", "DNI"]],
       body: staffData,
       theme: "grid",
-      styles: { fontSize: 9, cellPadding: 3, overflow: 'linebreak' },
+      styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' },
       headStyles: {
         fillColor: [125, 1, 1],
         textColor: [255, 255, 255],
         fontSize: 10,
         fontStyle: 'bold'
       },
-      columnStyles: {
-        0: { cellWidth: 30 }, // Nombre
-        1: { cellWidth: 45 }, // Apellidos
-        2: { cellWidth: 32 }, // Posición
-        3: { cellWidth: 22 }, // DNI
+      alternateRowStyles: {
+        fillColor: [250, 245, 245]
       },
       margin: { left: 20, right: 20 },
-      tableWidth: 'wrap'
+      tableWidth: 'auto'
     });
 
     return this.pdfDoc.getLastAutoTableY() + 10;

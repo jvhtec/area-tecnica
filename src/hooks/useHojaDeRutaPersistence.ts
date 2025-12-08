@@ -142,9 +142,9 @@ export const useHojaDeRutaPersistence = (
             driver_phone: t.driver_phone,
             license_plate: t.license_plate,
             company: t.company,
-            date_time: t.date_time,
+            date_time: t.date_time ? String(t.date_time).replace(' ', 'T').slice(0, 16) : '',
             has_return: t.has_return,
-            return_date_time: t.return_date_time
+            return_date_time: t.return_date_time ? String(t.return_date_time).replace(' ', 'T').slice(0, 16) : ''
           })) : [],
           loadingDetails: logistics?.loading_details || '',
           unloadingDetails: logistics?.unloading_details || '',

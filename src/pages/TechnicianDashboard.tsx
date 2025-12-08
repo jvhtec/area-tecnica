@@ -207,6 +207,7 @@ const TechnicianDashboard = () => {
           )
         `)
         .eq('technician_id', user.id)
+        .eq('is_active', true)
         .in('job_id', jobIds)
         .gte('jobs.start_time', startDate.toISOString())
         .lte('jobs.start_time', endDate.toISOString())

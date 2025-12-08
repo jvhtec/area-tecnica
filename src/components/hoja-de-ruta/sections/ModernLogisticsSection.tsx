@@ -72,27 +72,6 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Loading Details */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <ArrowUp className="w-4 h-4 text-green-600" />
-                Detalles de Carga
-              </Label>
-              <Textarea
-                value={eventData.logistics.loadingDetails}
-                onChange={(e) => setEventData(prev => {
-                  const currentLogistics = prev.logistics || { transport: [], loadingDetails: "", unloadingDetails: "", equipmentLogistics: "" };
-                  const updatedLogistics = {
-                    ...currentLogistics,
-                    loadingDetails: e.target.value
-                  };
-                  return { ...prev, logistics: updatedLogistics };
-                })}
-                placeholder="Horarios, ubicación, personal necesario para la carga..."
-                className="border-2 focus:border-green-300 min-h-[120px]"
-              />
-            </div>
-
             {/* Unloading Details */}
             <div className="space-y-3">
               <Label className="text-sm font-medium flex items-center gap-2">
@@ -111,6 +90,27 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
                 })}
                 placeholder="Horarios, ubicación, personal necesario para la descarga..."
                 className="border-2 focus:border-red-300 min-h-[120px]"
+              />
+            </div>
+
+            {/* Loading Details */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <ArrowUp className="w-4 h-4 text-green-600" />
+                Detalles de Carga
+              </Label>
+              <Textarea
+                value={eventData.logistics.loadingDetails}
+                onChange={(e) => setEventData(prev => {
+                  const currentLogistics = prev.logistics || { transport: [], loadingDetails: "", unloadingDetails: "", equipmentLogistics: "" };
+                  const updatedLogistics = {
+                    ...currentLogistics,
+                    loadingDetails: e.target.value
+                  };
+                  return { ...prev, logistics: updatedLogistics };
+                })}
+                placeholder="Horarios, ubicación, personal necesario para la carga..."
+                className="border-2 focus:border-green-300 min-h-[120px]"
               />
             </div>
           </div>

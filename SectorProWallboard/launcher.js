@@ -1,5 +1,113 @@
 // launcher.js
 
+// ============================================
+// SCREENSAVER PREVENTION METHODS
+// ============================================
+let wakeLock = null;
+let activityInterval = null;
+
+// Method 1: Wake Lock API (modern browsers)
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Wake Lock acquired');
+
+      wakeLock.addEventListener('release', () => {
+        console.log('Wake Lock released');
+      });
+
+      return true;
+    } catch (err) {
+      console.log('Wake Lock not supported or failed:', err);
+      return false;
+    }
+  }
+  return false;
+}
+
+// Method 2: Periodic simulated activity (mouse/touch events)
+function startActivitySimulation() {
+  if (activityInterval) return;
+
+  activityInterval = setInterval(() => {
+    // Simulate a tiny mouse movement
+    const event = new MouseEvent('mousemove', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 1,
+      clientY: 1
+    });
+    document.dispatchEvent(event);
+
+    // Also simulate a touch event for touch displays
+    const touchEvent = new TouchEvent('touchstart', {
+      bubbles: true,
+      cancelable: true,
+      touches: []
+    });
+    document.dispatchEvent(touchEvent);
+  }, 30000); // Every 30 seconds
+
+  console.log('Activity simulation started');
+}
+
+function stopActivitySimulation() {
+  if (activityInterval) {
+    clearInterval(activityInterval);
+    activityInterval = null;
+    console.log('Activity simulation stopped');
+  }
+}
+
+// Method 3: Hidden video playback
+function startVideoBlocker() {
+  const video = document.getElementById('screensaver-blocker');
+  if (video) {
+    video.play().then(() => {
+      console.log('Screensaver blocker video playing');
+    }).catch(err => {
+      console.log('Video blocker failed:', err);
+    });
+  }
+}
+
+function stopVideoBlocker() {
+  const video = document.getElementById('screensaver-blocker');
+  if (video) {
+    video.pause();
+    console.log('Screensaver blocker video stopped');
+  }
+}
+
+// Initialize all screensaver prevention methods
+async function initScreensaverPrevention() {
+  await requestWakeLock();
+  startActivitySimulation();
+  startVideoBlocker();
+}
+
+// Stop all screensaver prevention methods
+function stopScreensaverPrevention() {
+  if (wakeLock) {
+    wakeLock.release();
+    wakeLock = null;
+  }
+  stopActivitySimulation();
+  stopVideoBlocker();
+}
+
+// Re-acquire wake lock on visibility change (if page becomes visible again)
+document.addEventListener('visibilitychange', async () => {
+  if (!document.hidden && isViewing) {
+    await requestWakeLock();
+  }
+});
+
+// ============================================
+// ORIGINAL CODE
+// ============================================
+
 const SOURCES = [
   {
     id: "produccion",
@@ -126,4 +234,5 @@ function backToMenu() {
 
 document.addEventListener("DOMContentLoaded", () => {
   initMenu();
+  initScreensaverPrevention();
 });

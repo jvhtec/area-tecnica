@@ -298,41 +298,46 @@ serve(async (req) => {
             event: 'auto_assign_attempt',
             meta: { role: chosenRole, department: prof.department, job_id: job.id, profile_id: row.profile_id }
           });
-          // 3) Conflict check: ensure no other confirmed assignment overlaps
-          const { data: confirmedAssigns, error: assignErr } = await supabase
-            .from('job_assignments')
-            .select('job_id,status,single_day,assignment_date')
+          // 3) Conflict check: Use timesheets as source of truth for scheduled dates
+          // This avoids false positives from legacy full-span assignments where the tech
+          // only actually works specific dates (timesheets are the real schedule)
+          const { data: existingTimesheets, error: tsErr } = await supabase
+            .from('timesheets')
+            .select('job_id, date')
             .eq('technician_id', row.profile_id)
-            .eq('status', 'confirmed');
-          const confirmedAssignments = !assignErr && Array.isArray(confirmedAssigns) ? confirmedAssigns : [];
-          const otherJobIds = Array.from(new Set(confirmedAssignments.map(a => a.job_id).filter(id => id !== row.job_id)));
-          let otherJobs: { id: number; start_time: string | null; end_time: string | null; title: string | null }[] = [];
-          if (otherJobIds.length > 0) {
-            const { data: otherJobsData } = await supabase
+            .eq('is_active', true)
+            .neq('job_id', row.job_id); // Exclude timesheets for the current job
+          
+          if (tsErr) {
+            console.warn('⚠️ Failed to fetch timesheets for conflict check:', tsErr);
+          }
+          
+          const timesheetDates = !tsErr && Array.isArray(existingTimesheets) ? existingTimesheets : [];
+          
+          // Build a set of dates where the tech is already scheduled
+          const scheduledDatesSet = new Set<string>();
+          const dateToJobMap = new Map<string, { job_id: string }>();
+          for (const ts of timesheetDates) {
+            if (ts.date) {
+              const dateStr = typeof ts.date === 'string' ? ts.date.split('T')[0] : ts.date;
+              scheduledDatesSet.add(dateStr);
+              dateToJobMap.set(dateStr, { job_id: ts.job_id });
+            }
+          }
+          
+          // Fetch job titles for conflict display
+          const conflictingJobIds = Array.from(new Set(timesheetDates.map(ts => ts.job_id)));
+          let jobTitleMap = new Map<string, string>();
+          if (conflictingJobIds.length > 0) {
+            const { data: jobData } = await supabase
               .from('jobs')
-              .select('id,start_time,end_time,title')
-              .in('id', otherJobIds);
-            otherJobs = otherJobsData ?? [];
-          }
-
-          const jobTimeMap = new Map<number, JobTimeInfo>();
-          if (job) {
-            jobTimeMap.set(job.id, {
-              title: job.title ?? null,
-              start: job.start_time ? new Date(job.start_time) : null,
-              end: job.end_time ? new Date(job.end_time) : null,
-              rawStart: job.start_time ?? null,
-              rawEnd: job.end_time ?? null,
-            });
-          }
-          for (const j of otherJobs) {
-            jobTimeMap.set(j.id, {
-              title: j.title ?? null,
-              start: j.start_time ? new Date(j.start_time) : null,
-              end: j.end_time ? new Date(j.end_time) : null,
-              rawStart: j.start_time ?? null,
-              rawEnd: j.end_time ?? null,
-            });
+              .select('id, title')
+              .in('id', conflictingJobIds);
+            if (jobData) {
+              for (const j of jobData) {
+                jobTitleMap.set(j.id, j.title ?? 'Unknown Job');
+              }
+            }
           }
 
           const DAY_MS = 24 * 60 * 60 * 1000;
@@ -343,32 +348,19 @@ serve(async (req) => {
           };
           const addDays = (date: Date, days: number) => new Date(date.getTime() + days * DAY_MS);
 
+          // Build assignment windows from actual timesheet dates (source of truth)
           const existingAssignmentWindows: AssignmentCoverage[] = [];
-          for (const assign of confirmedAssignments) {
-            if (assign.job_id === row.job_id) continue;
-            if (assign.single_day && assign.assignment_date) {
-              const dayStart = toDateOrNull(assign.assignment_date);
-              if (!dayStart) continue;
-              existingAssignmentWindows.push({
-                window: { kind: 'day', start: dayStart, end: addDays(dayStart, 1) },
-                meta: {
-                  job_id: assign.job_id,
-                  job_title: jobTimeMap.get(assign.job_id)?.title ?? null,
-                  assignment_date: assign.assignment_date,
-                },
-              });
-              continue;
-            }
-            const jobInfo = jobTimeMap.get(assign.job_id);
-            if (!jobInfo || !jobInfo.start || !jobInfo.end) continue;
-            if (jobInfo.start.getTime() >= jobInfo.end.getTime()) continue;
+          for (const ts of timesheetDates) {
+            if (!ts.date) continue;
+            const dateStr = typeof ts.date === 'string' ? ts.date.split('T')[0] : ts.date;
+            const dayStart = toDateOrNull(dateStr);
+            if (!dayStart) continue;
             existingAssignmentWindows.push({
-              window: { kind: 'range', start: jobInfo.start, end: jobInfo.end },
+              window: { kind: 'day', start: dayStart, end: addDays(dayStart, 1) },
               meta: {
-                job_id: assign.job_id,
-                job_title: jobInfo.title ?? null,
-                start_time: jobInfo.rawStart,
-                end_time: jobInfo.rawEnd,
+                job_id: ts.job_id,
+                job_title: jobTitleMap.get(ts.job_id) ?? null,
+                assignment_date: dateStr,
               },
             });
           }
@@ -459,32 +451,24 @@ serve(async (req) => {
 
               // Collect all confirmed dates
               if ((row as any)?.batch_id) {
-                // Batch: get all confirmed dates from batch rows
-                const { data: batchRows, error: batchErr } = await supabase
-                  .from('staffing_requests')
-                  .select('target_date,single_day')
-                  .eq('batch_id', (row as any).batch_id)
-                  .eq('job_id', row.job_id)
-                  .eq('profile_id', row.profile_id)
-                  .eq('status', 'confirmed')
-                  .eq('phase', row.phase);
+                // Batch: use already-updated batch rows from the status update above
+                // (updatedBatchRows was populated at line 173 with all updated rows)
+                const batchRows = updatedBatchRows || [];
 
-                if (batchErr) {
-                  console.error('❌ Batch rows fetch failed', {
+                if (!updatedBatchRows || updatedBatchRows.length === 0) {
+                  console.warn('⚠️ No batch rows available for timesheet creation', {
                     batch_id: (row as any).batch_id,
                     job_id: row.job_id,
-                    profile_id: row.profile_id,
-                    error: batchErr
+                    profile_id: row.profile_id
                   });
                   await supabase.from('staffing_events').insert({
                     staffing_request_id: rid,
-                    event: 'batch_timesheet_fetch_error',
-                    meta: { message: batchErr.message, batch_id: (row as any).batch_id }
+                    event: 'batch_timesheet_no_rows',
+                    meta: { batch_id: (row as any).batch_id }
                   });
-                  // Continue with empty array rather than failing completely
                 }
 
-                for (const br of (batchRows || [])) {
+                for (const br of batchRows) {
                   if (br.target_date && typeof br.target_date === 'string') {
                     timesheetRows.push({
                       job_id: row.job_id,

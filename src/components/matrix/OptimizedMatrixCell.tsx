@@ -44,14 +44,14 @@ interface OptimizedMatrixCellProps {
 }
 
 export const OptimizedMatrixCell = memo(({
-  technician, 
-  date, 
-  assignment, 
-  availability, 
-  width, 
-  height, 
-  isSelected, 
-  onSelect, 
+  technician,
+  date,
+  assignment,
+  availability,
+  width,
+  height,
+  isSelected,
+  onSelect,
   onClick,
   onPrefetch,
   onOptimisticUpdate,
@@ -68,7 +68,7 @@ export const OptimizedMatrixCell = memo(({
   React.useEffect(() => {
     onRender?.();
   }, [onRender]);
-  
+
   const isTodayCell = isToday(date);
   const isWeekendCell = isWeekend(date);
   const hasAssignment = !!assignment;
@@ -89,21 +89,21 @@ export const OptimizedMatrixCell = memo(({
   const [pendingCancel, setPendingCancel] = React.useState<null | { phase: 'availability' | 'offer', jobId: string | null }>(null);
   const [pendingRemoveAssignment, setPendingRemoveAssignment] = React.useState(false);
   const [retryChannel, setRetryChannel] = React.useState<'email' | 'whatsapp'>('email');
-  
+
   // Use job-specific status for assigned cells, date-based status for empty cells
   const staffingStatus = hasAssignment ? staffingStatusByJob : staffingStatusByDate;
 
   // Handle staffing email actions
   const handleStaffingEmail = useCallback((e: React.MouseEvent, phase: 'availability' | 'offer') => {
     e.stopPropagation();
-    
+
     // For requests on empty cells, we need to select a job first
     if (phase === 'availability' && !hasAssignment && !jobId) {
       // For the mail icon we want to send via email directly, without channel dialog
       onClick('availability-email');
       return;
     }
-    
+
     if (phase === 'offer') {
       // Determine target job id: assignment > prop (do not auto-pick by status)
       const targetJobId = jobId || assignment?.job_id;
@@ -134,7 +134,7 @@ export const OptimizedMatrixCell = memo(({
 
   const handleCellClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (hasAssignment) {
       if (allowDirectAssign) {
         onClick('assign'); // Edit existing assignment
@@ -152,10 +152,10 @@ export const OptimizedMatrixCell = memo(({
 
   const handleStatusClick = useCallback((e: React.MouseEvent, action: 'confirm' | 'decline') => {
     e.stopPropagation();
-    
+
     // Optimistic update
     onOptimisticUpdate?.(action === 'confirm' ? 'confirmed' : 'declined');
-    
+
     // Then trigger actual update
     onClick(action);
   }, [onClick, onOptimisticUpdate]);
@@ -222,8 +222,8 @@ export const OptimizedMatrixCell = memo(({
             getCellBackground(),
             getBorderColor()
           )}
-          style={{ 
-            width: `${width}px`, 
+          style={{
+            width: `${width}px`,
             height: `${height}px`,
             borderLeftColor: assignment?.job?.color,
             borderLeftWidth: hasAssignment && assignment?.job?.color ? '3px' : '1px',
@@ -235,429 +235,442 @@ export const OptimizedMatrixCell = memo(({
           onClick={handleCellClick}
           onMouseEnter={handleMouseEnter}
         >
-      {/* Fridge indicator */}
-      {isFridge && (
-        <div className="absolute top-1 left-1 z-10" title="En la nevera: no asignable">
-          <Refrigerator className="h-3.5 w-3.5 text-sky-600" />
-        </div>
-      )}
-      {/* Staffing Status Badges */}
-      {(staffingStatus?.availability_status || staffingStatus?.offer_status) && (
-        <div className={`${statusBadgesPosClass} flex gap-1 z-10`}>
-          {staffingStatus.availability_status && (
-            <>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id;
-                  if (targetJobId) {
-                    setPendingRetry({ jobId: targetJobId });
-                  } else {
-                    onClick('select-job-for-staffing');
-                  }
-                }}
-                title="Reintentar solicitud de disponibilidad"
-                className="focus:outline-none"
-              >
-                <Badge 
-                  variant={
-                    staffingStatus.availability_status === 'confirmed' ? 'default' : 
-                    staffingStatus.availability_status === 'declined' ? 'destructive' : 
-                    'secondary'
-                  }
-                  className={`text-xs px-1 py-0 h-3 ${availabilityRetrying ? 'ring-1 ring-blue-400' : ''}`}
-                >
-                  {availabilityRetrying ? 'A:↻' : 'A:' + (staffingStatus.availability_status === 'confirmed' ? '✓' : (staffingStatus.availability_status === 'declined' ? '✗' : '?'))}
-                </Badge>
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id || null;
-                  setPendingCancel({ phase: 'availability', jobId: targetJobId });
-                }}
-                title="Cancelar solicitud de disponibilidad"
-                className="focus:outline-none"
-              >
-                <Badge variant="outline" className="text-[10px] px-1 py-0 h-3">×</Badge>
-              </button>
-            </>
+          {/* Fridge indicator */}
+          {isFridge && (
+            <div className="absolute top-1 left-1 z-10" title="En la nevera: no asignable">
+              <Refrigerator className="h-3.5 w-3.5 text-sky-600" />
+            </div>
           )}
-          {staffingStatus.offer_status && (
-            <>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Determine job for offer; then open offer-details to choose role
-                  const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id;
-                  if (targetJobId) {
-                    onClick('offer-details', targetJobId);
-                  } else {
-                    onClick('select-job-for-staffing');
-                  }
-                }}
-                title="Reintentar oferta"
-                className="focus:outline-none"
-              >
-                <Badge 
-                  variant={
-                    staffingStatus.offer_status === 'confirmed' ? 'default' : 
-                    staffingStatus.offer_status === 'declined' ? 'destructive' : 
-                    'secondary'
-                  }
-                  className="text-xs px-1 py-0 h-3"
-                >
-                  O:{staffingStatus.offer_status === 'confirmed' ? '✓' : 
-                     staffingStatus.offer_status === 'declined' ? '✗' : '?'}
-                </Badge>
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id || null;
-                  setPendingCancel({ phase: 'offer', jobId: targetJobId });
-                }}
-                title="Cancelar oferta"
-                className="focus:outline-none"
-              >
-                <Badge variant="outline" className="text-[10px] px-1 py-0 h-3">×</Badge>
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Declined lock indicator for the job to prevent re-assigning to the same job */}
-      {isDeclinedAssignment && (
-        <div className="absolute top-1 left-1 z-10" title="Rechazado: no se puede reasignar a este trabajo">
-          <Ban className="h-3.5 w-3.5 text-rose-600" />
-        </div>
-      )}
-
-      {/* Staffing Action Buttons */}
-      {(canAskAvailability || canSendOffer || canOfferFallback) && (
-        <div className={`${actionButtonsPosClass} flex gap-1 z-10`}>
-          {canAskAvailability && (
-            <>
-              <Button
-                variant="ghost"
-                size={mobile ? 'default' : 'sm'}
-                className={`${actionBtnSize} p-0 hover:bg-blue-100`}
-                onClick={(e) => handleStaffingEmail(e, 'availability')}
-                disabled={isSendingEmail}
-                title="Solicitar disponibilidad"
-              >
-                <Mail className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-blue-600`} />
-              </Button>
-              <Button
-                variant="ghost"
-                size={mobile ? 'default' : 'sm'}
-                className={`${actionBtnSize} p-0 hover:bg-emerald-100`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClick('availability-wa');
-                }}
-                disabled={isSendingEmail}
-                title="Solicitar disponibilidad por WhatsApp"
-              >
-                <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-emerald-600`} />
-              </Button>
-            </>
-          )}
-          {(canSendOffer || canOfferFallback) && (
-            <>
-              <Button
-                variant="ghost"
-                size={mobile ? 'default' : 'sm'}
-                className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-green-100' : 'opacity-80 hover:bg-muted'}`}
-                onClick={(e) => handleStaffingEmail(e, 'offer')}
-                disabled={isSendingEmail}
-                title={canSendOffer ? 'Enviar oferta' : 'Enviar oferta (progreso manual)'}
-              >
-                <CheckCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-green-600' : 'text-muted-foreground'}`} />
-              </Button>
-              <Button
-                variant="ghost"
-                size={mobile ? 'default' : 'sm'}
-                className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-emerald-100' : 'opacity-80 hover:bg-muted'}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClick('offer-details-wa', jobId || assignment?.job_id || undefined);
-                }}
-                disabled={isSendingEmail}
-                title={canSendOffer ? 'Enviar oferta por WhatsApp' : 'Enviar oferta por WhatsApp (progreso manual)'}
-              >
-                <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-emerald-600' : 'text-muted-foreground'}`} />
-              </Button>
-            </>
-          )}
-        </div>
-      )}
-      {/* Assignment Content */}
-      {hasAssignment && (
-        <div className="flex-1 overflow-hidden">
-          <div 
-            className={cn('font-medium truncate text-xs', assignment.status !== 'confirmed' ? '' : '')}
-            style={{ color: assignment.status === 'confirmed' ? confirmedTextColor : undefined }}
-          >
-            {assignment.job?.title || 'Asignación'}
-          </div>
-          <div
-            className={cn('text-xs truncate', assignment.status === 'confirmed' ? '' : 'text-muted-foreground')}
-            style={{ color: assignment.status === 'confirmed' ? confirmedSubTextColor : undefined }}
-          >
-            {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
-          </div>
-          {assignment.single_day && assignment.assignment_date && (
-            <div className="text-[10px] text-muted-foreground truncate">
-              Día único: {format(new Date(`${assignment.assignment_date}T00:00:00`), 'MMM d')}
+          {/* Staffing Status Badges */}
+          {(staffingStatus?.availability_status || staffingStatus?.offer_status) && (
+            <div className={`${statusBadgesPosClass} flex gap-1 z-10`}>
+              {staffingStatus.availability_status && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id;
+                      if (targetJobId) {
+                        setPendingRetry({ jobId: targetJobId });
+                      } else {
+                        onClick('select-job-for-staffing');
+                      }
+                    }}
+                    title="Reintentar solicitud de disponibilidad"
+                    className="focus:outline-none"
+                  >
+                    <Badge
+                      variant={
+                        staffingStatus.availability_status === 'confirmed' ? 'default' :
+                          staffingStatus.availability_status === 'declined' ? 'destructive' :
+                            'secondary'
+                      }
+                      className={`text-xs px-1 py-0 h-3 ${availabilityRetrying ? 'ring-1 ring-blue-400' : ''}`}
+                    >
+                      {availabilityRetrying ? 'A:↻' : 'A:' + (staffingStatus.availability_status === 'confirmed' ? '✓' : (staffingStatus.availability_status === 'declined' ? '✗' : '?'))}
+                    </Badge>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id || null;
+                      setPendingCancel({ phase: 'availability', jobId: targetJobId });
+                    }}
+                    title="Cancelar solicitud de disponibilidad"
+                    className="focus:outline-none"
+                  >
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-3">×</Badge>
+                  </button>
+                </>
+              )}
+              {staffingStatus.offer_status && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Determine job for offer; then open offer-details to choose role
+                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id;
+                      if (targetJobId) {
+                        onClick('offer-details', targetJobId);
+                      } else {
+                        onClick('select-job-for-staffing');
+                      }
+                    }}
+                    title="Reintentar oferta"
+                    className="focus:outline-none"
+                  >
+                    <Badge
+                      variant={
+                        staffingStatus.offer_status === 'confirmed' ? 'default' :
+                          staffingStatus.offer_status === 'declined' ? 'destructive' :
+                            'secondary'
+                      }
+                      className="text-xs px-1 py-0 h-3"
+                    >
+                      O:{staffingStatus.offer_status === 'confirmed' ? '✓' :
+                        staffingStatus.offer_status === 'declined' ? '✗' : '?'}
+                    </Badge>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id || null;
+                      setPendingCancel({ phase: 'offer', jobId: targetJobId });
+                    }}
+                    title="Cancelar oferta"
+                    className="focus:outline-none"
+                  >
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-3">×</Badge>
+                  </button>
+                </>
+              )}
             </div>
           )}
 
-          {/* Status Actions */}
-          {assignment.status === 'invited' && (
-            <div className="flex gap-1 mt-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 p-0 hover:bg-green-100"
-                onClick={(e) => handleStatusClick(e, 'confirm')}
-                title="Confirmar"
-              >
-                <Check className="h-3 w-3 text-green-600" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 p-0 hover:bg-red-100"
-                onClick={(e) => handleStatusClick(e, 'decline')}
-                title="Rechazar"
-              >
-                <X className="h-3 w-3 text-red-600" />
-              </Button>
+          {/* Declined lock indicator for the job to prevent re-assigning to the same job */}
+          {isDeclinedAssignment && (
+            <div className="absolute top-1 left-1 z-10" title="Rechazado: no se puede reasignar a este trabajo">
+              <Ban className="h-3.5 w-3.5 text-rose-600" />
             </div>
           )}
-          
-          {/* Status Badge - moved to not conflict with staffing badges */}
+
+          {/* Staffing Action Buttons */}
+          {(canAskAvailability || canSendOffer || canOfferFallback) && (
+            <div className={`${actionButtonsPosClass} flex gap-1 z-10`}>
+              {canAskAvailability && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size={mobile ? 'default' : 'sm'}
+                    className={`${actionBtnSize} p-0 hover:bg-blue-100`}
+                    onClick={(e) => handleStaffingEmail(e, 'availability')}
+                    disabled={isSendingEmail}
+                    title="Solicitar disponibilidad"
+                  >
+                    <Mail className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-blue-600`} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size={mobile ? 'default' : 'sm'}
+                    className={`${actionBtnSize} p-0 hover:bg-emerald-100`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClick('availability-wa');
+                    }}
+                    disabled={isSendingEmail}
+                    title="Solicitar disponibilidad por WhatsApp"
+                  >
+                    <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-emerald-600`} />
+                  </Button>
+                </>
+              )}
+              {(canSendOffer || canOfferFallback) && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size={mobile ? 'default' : 'sm'}
+                    className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-green-100' : 'opacity-80 hover:bg-muted'}`}
+                    onClick={(e) => handleStaffingEmail(e, 'offer')}
+                    disabled={isSendingEmail}
+                    title={canSendOffer ? 'Enviar oferta' : 'Enviar oferta (progreso manual)'}
+                  >
+                    <CheckCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-green-600' : 'text-muted-foreground'}`} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size={mobile ? 'default' : 'sm'}
+                    className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-emerald-100' : 'opacity-80 hover:bg-muted'}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClick('offer-details-wa', jobId || assignment?.job_id || undefined);
+                    }}
+                    disabled={isSendingEmail}
+                    title={canSendOffer ? 'Enviar oferta por WhatsApp' : 'Enviar oferta por WhatsApp (progreso manual)'}
+                  >
+                    <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+          {/* Assignment Content */}
           {hasAssignment && (
-            <div className="absolute bottom-1 right-1">
-              <Badge 
-                variant={assignment.status === 'confirmed' ? 'default' : 'secondary'}
-                className="text-xs px-1 py-0 h-4"
+            <div className="flex-1 overflow-hidden">
+              <div
+                className={cn('font-medium truncate text-xs', assignment.status !== 'confirmed' ? '' : '')}
+                style={{ color: assignment.status === 'confirmed' ? confirmedTextColor : undefined }}
               >
-                {assignment.status === 'confirmed' ? 'C' : 
-                 assignment.status === 'declined' ? 'R' : 'P'}
-              </Badge>
+                {assignment.job?.title || 'Asignación'}
+              </div>
+              <div
+                className={cn('text-xs truncate', assignment.status === 'confirmed' ? '' : 'text-muted-foreground')}
+                style={{ color: assignment.status === 'confirmed' ? confirmedSubTextColor : undefined }}
+              >
+                {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
+              </div>
+              {assignment.single_day && assignment.assignment_date && (
+                <div className="text-[10px] text-muted-foreground truncate">
+                  Día único: {format(new Date(`${assignment.assignment_date}T00:00:00`), 'MMM d')}
+                </div>
+              )}
+
+              {/* Status Actions */}
+              {assignment.status === 'invited' && (
+                <div className="flex gap-1 mt-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 hover:bg-green-100"
+                    onClick={(e) => handleStatusClick(e, 'confirm')}
+                    title="Confirmar"
+                  >
+                    <Check className="h-3 w-3 text-green-600" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 hover:bg-red-100"
+                    onClick={(e) => handleStatusClick(e, 'decline')}
+                    title="Rechazar"
+                  >
+                    <X className="h-3 w-3 text-red-600" />
+                  </Button>
+                </div>
+              )}
+
+              {/* Status Badge - moved to not conflict with staffing badges */}
+              {hasAssignment && (
+                <div className="absolute bottom-1 right-1">
+                  <Badge
+                    variant={assignment.status === 'confirmed' ? 'default' : 'secondary'}
+                    className="text-xs px-1 py-0 h-4"
+                  >
+                    {assignment.status === 'confirmed' ? 'C' :
+                      assignment.status === 'declined' ? 'R' : 'P'}
+                  </Badge>
+                </div>
+              )}
+              <div className="absolute top-1 right-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 hover:bg-red-100"
+                  title="Eliminar asignación"
+                  onClick={(e) => { e.stopPropagation(); setPendingRemoveAssignment(true); }}
+                >
+                  <X className="h-3 w-3 text-red-600" />
+                </Button>
+              </div>
             </div>
           )}
-          <div className="absolute top-1 right-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 hover:bg-red-100"
-              title="Eliminar asignación"
-              onClick={(e) => { e.stopPropagation(); setPendingRemoveAssignment(true); }}
-            >
-              <X className="h-3 w-3 text-red-600" />
-            </Button>
-          </div>
-        </div>
-      )}
 
-      {/* Unavailable Content */}
-      {isUnavailable && !hasAssignment && (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <UserX className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
-            <div className="text-xs text-muted-foreground truncate">
-              {availability.reason || 'No disponible'}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Empty Cell */}
-      {!hasAssignment && !isUnavailable && allowDirectAssign && (
-        <div className="flex-1 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-        </div>
-      )}
-
-      {/* Date indicator for today */}
-      {isTodayCell && (
-        <div className="absolute bottom-0 left-0 w-full h-1 bg-orange-400 dark:bg-orange-600" />
-      )}
-
-      {pendingRetry && (
-        <Dialog open={true} onOpenChange={(v) => !v && setPendingRetry(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Reenviar solicitud de disponibilidad</DialogTitle>
-              <DialogDescription>Elige el canal y reenvía la solicitud de disponibilidad.</DialogDescription>
-            </DialogHeader>
-            <div className="py-2">
-              <div className="space-y-3">
-                <label className="font-medium text-sm text-foreground">Canal</label>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="availability-retry-channel"
-                      checked={retryChannel === 'email'}
-                      onChange={() => setRetryChannel('email')}
-                    />
-                    <span>Email</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="availability-retry-channel"
-                      checked={retryChannel === 'whatsapp'}
-                      onChange={() => setRetryChannel('whatsapp')}
-                    />
-                    <span>WhatsApp</span>
-                  </label>
+          {/* Unavailable Content */}
+          {isUnavailable && !hasAssignment && (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <UserX className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
+                <div className="text-xs text-muted-foreground truncate">
+                  {availability.reason || 'No disponible'}
                 </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setPendingRetry(null)}>Cancelar</Button>
-              <Button onClick={() => {
-                if (!pendingRetry) return;
-                setAvailabilityRetrying(true);
-                sendStaffingEmail(
-                  ({ job_id: pendingRetry.jobId, profile_id: technician.id, phase: 'availability', channel: retryChannel, target_date: format(date, 'yyyy-MM-dd'), single_day: true } as any),
-                  {
-                    onSuccess: () => {
-                      setAvailabilityRetrying(false);
-                      setPendingRetry(null);
-                      toast.success('Solicitud de disponibilidad reenviada');
-                    },
-                    onError: (error) => {
-                      setAvailabilityRetrying(false);
-                      setPendingRetry(null);
-                      toast.error(`No se pudo reenviar la solicitud de disponibilidad: ${error.message}`);
-                    }
-                  }
-                );
-              }} disabled={availabilityRetrying}>
-                {availabilityRetrying ? 'Reenviando…' : 'Reenviar'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+          )}
 
-      {pendingCancel && (
-        <Dialog open={true} onOpenChange={(v) => !v && setPendingCancel(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{pendingCancel.phase === 'availability' ? '¿Cancelar solicitud de disponibilidad?' : '¿Cancelar oferta?'}</DialogTitle>
-              <DialogDescription>
-                Esto marcará la fase de {pendingCancel.phase === 'availability' ? 'disponibilidad' : 'oferta'} como cancelada para {displayName}.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setPendingCancel(null)}>Mantener</Button>
-              <Button onClick={() => {
-                if (!pendingCancel.jobId) { setPendingCancel(null); return; }
-                cancelStaffing(
-                  { job_id: pendingCancel.jobId, profile_id: technician.id, phase: pendingCancel.phase },
-                  {
-                    onSuccess: () => {
-                      setPendingCancel(null);
-                      toast.success(`${pendingCancel.phase === 'availability' ? 'Disponibilidad' : 'Oferta'} cancelada`)
-                    },
-                    onError: (e: any) => {
-                      toast.error(e?.message || 'No se pudo cancelar')
-                    }
-                  }
-                )
-              }} disabled={isCancelling}>
-                {isCancelling ? 'Cancelando…' : 'Cancelar'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+          {/* Empty Cell */}
+          {!hasAssignment && !isUnavailable && allowDirectAssign && (
+            <div className="flex-1 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </div>
+          )}
 
-      {pendingRemoveAssignment && (
-        <Dialog open={true} onOpenChange={(v) => !v && setPendingRemoveAssignment(false)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>¿Eliminar asignación?</DialogTitle>
-              <DialogDescription>
-                Se eliminará la asignación de {displayName} en este trabajo.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setPendingRemoveAssignment(false)}>Mantener</Button>
-              <Button
-                variant="destructive"
-                onClick={async () => {
-                  try {
-                    if (!assignment?.job_id) { setPendingRemoveAssignment(false); return; }
-                    await supabase.from('job_assignments').delete().eq('job_id', assignment.job_id).eq('technician_id', technician.id)
+          {/* Date indicator for today */}
+          {isTodayCell && (
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-orange-400 dark:bg-orange-600" />
+          )}
 
-                    const flexDepartments = determineFlexDepartmentsForAssignment(assignment, technician.department);
-                    if (flexDepartments.length > 0) {
-                      await Promise.allSettled(flexDepartments.map(async (department) => {
+          {pendingRetry && (
+            <Dialog open={true} onOpenChange={(v) => !v && setPendingRetry(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Reenviar solicitud de disponibilidad</DialogTitle>
+                  <DialogDescription>Elige el canal y reenvía la solicitud de disponibilidad.</DialogDescription>
+                </DialogHeader>
+                <div className="py-2">
+                  <div className="space-y-3">
+                    <label className="font-medium text-sm text-foreground">Canal</label>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="availability-retry-channel"
+                          checked={retryChannel === 'email'}
+                          onChange={() => setRetryChannel('email')}
+                        />
+                        <span>Email</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="availability-retry-channel"
+                          checked={retryChannel === 'whatsapp'}
+                          onChange={() => setRetryChannel('whatsapp')}
+                        />
+                        <span>WhatsApp</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setPendingRetry(null)}>Cancelar</Button>
+                  <Button onClick={() => {
+                    if (!pendingRetry) return;
+                    setAvailabilityRetrying(true);
+                    sendStaffingEmail(
+                      ({ job_id: pendingRetry.jobId, profile_id: technician.id, phase: 'availability', channel: retryChannel, target_date: format(date, 'yyyy-MM-dd'), single_day: true } as any),
+                      {
+                        onSuccess: () => {
+                          setAvailabilityRetrying(false);
+                          setPendingRetry(null);
+                          toast.success('Solicitud de disponibilidad reenviada');
+                        },
+                        onError: (error) => {
+                          setAvailabilityRetrying(false);
+                          setPendingRetry(null);
+                          toast.error(`No se pudo reenviar la solicitud de disponibilidad: ${error.message}`);
+                        }
+                      }
+                    );
+                  }} disabled={availabilityRetrying}>
+                    {availabilityRetrying ? 'Reenviando…' : 'Reenviar'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {pendingCancel && (
+            <Dialog open={true} onOpenChange={(v) => !v && setPendingCancel(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{pendingCancel.phase === 'availability' ? '¿Cancelar solicitud de disponibilidad?' : '¿Cancelar oferta?'}</DialogTitle>
+                  <DialogDescription>
+                    Esto marcará la fase de {pendingCancel.phase === 'availability' ? 'disponibilidad' : 'oferta'} como cancelada para {displayName}.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setPendingCancel(null)}>Mantener</Button>
+                  <Button onClick={() => {
+                    if (!pendingCancel.jobId) { setPendingCancel(null); return; }
+                    cancelStaffing(
+                      { job_id: pendingCancel.jobId, profile_id: technician.id, phase: pendingCancel.phase },
+                      {
+                        onSuccess: () => {
+                          setPendingCancel(null);
+                          toast.success(`${pendingCancel.phase === 'availability' ? 'Disponibilidad' : 'Oferta'} cancelada`)
+                        },
+                        onError: (e: any) => {
+                          toast.error(e?.message || 'No se pudo cancelar')
+                        }
+                      }
+                    )
+                  }} disabled={isCancelling}>
+                    {isCancelling ? 'Cancelando…' : 'Cancelar'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {pendingRemoveAssignment && (
+            <Dialog open={true} onOpenChange={(v) => !v && setPendingRemoveAssignment(false)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>¿Eliminar asignación?</DialogTitle>
+                  <DialogDescription>
+                    Se eliminará la asignación de {displayName} en este trabajo.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setPendingRemoveAssignment(false)}>Mantener</Button>
+                  <Button
+                    variant="destructive"
+                    onClick={async () => {
+                      try {
+                        if (!assignment?.job_id) { setPendingRemoveAssignment(false); return; }
+
+                        // Use atomic RPC to delete assignment + timesheets in one transaction
+                        const { data, error } = await supabase.rpc('manage_assignment_lifecycle', {
+                          p_job_id: assignment.job_id,
+                          p_technician_id: technician.id,
+                          p_action: 'cancel',
+                          p_delete_mode: 'hard' // Hard delete for matrix removals
+                        });
+
+                        if (error) throw error;
+
+                        if (data?.error) {
+                          throw new Error(data.error);
+                        }
+
+                        const flexDepartments = determineFlexDepartmentsForAssignment(assignment, technician.department);
+                        if (flexDepartments.length > 0) {
+                          await Promise.allSettled(flexDepartments.map(async (department) => {
+                            try {
+                              const { error } = await supabase.functions.invoke('manage-flex-crew-assignments', {
+                                body: {
+                                  job_id: assignment.job_id,
+                                  technician_id: technician.id,
+                                  department,
+                                  action: 'remove'
+                                }
+                              });
+                              if (error) {
+                                console.error('Error removing Flex crew assignment:', error);
+                              }
+                            } catch (flexError) {
+                              console.error('Failed to remove Flex crew assignment:', flexError);
+                            }
+                          }));
+                        }
+
+                        // Send push notification for assignment removal (fire-and-forget, non-blocking)
                         try {
-                          const { error } = await supabase.functions.invoke('manage-flex-crew-assignments', {
+                          void supabase.functions.invoke('push', {
                             body: {
+                              action: 'broadcast',
+                              type: 'assignment.removed',
                               job_id: assignment.job_id,
-                              technician_id: technician.id,
-                              department,
-                              action: 'remove'
+                              recipient_id: technician.id,
+                              technician_id: technician.id
                             }
                           });
-                          if (error) {
-                            console.error('Error removing Flex crew assignment:', error);
-                          }
-                        } catch (flexError) {
-                          console.error('Failed to remove Flex crew assignment:', flexError);
+                        } catch (pushErr) {
+                          // Non-blocking: log but don't fail the removal
+                          console.warn('Failed to send assignment removal notification:', pushErr);
                         }
-                      }));
-                    }
 
-                    // Send push notification for assignment removal (fire-and-forget, non-blocking)
-                    try {
-                      void supabase.functions.invoke('push', {
-                        body: {
-                          action: 'broadcast',
-                          type: 'assignment.removed',
-                          job_id: assignment.job_id,
-                          recipient_id: technician.id,
-                          technician_id: technician.id
-                        }
-                      });
-                    } catch (pushErr) {
-                      // Non-blocking: log but don't fail the removal
-                      console.warn('Failed to send assignment removal notification:', pushErr);
-                    }
-
-                    setPendingRemoveAssignment(false)
-                    toast.success('Asignación eliminada')
-                    window.dispatchEvent(new CustomEvent('assignment-updated'))
-                  } catch (e: any) {
-                    toast.error(e?.message || 'No se pudo eliminar la asignación')
-                  }
-                }}
-              >
-                Eliminar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+                        setPendingRemoveAssignment(false)
+                        toast.success('Asignación eliminada')
+                        window.dispatchEvent(new CustomEvent('assignment-updated'))
+                      } catch (e: any) {
+                        toast.error(e?.message || 'No se pudo eliminar la asignación')
+                      }
+                    }}
+                  >
+                    Eliminar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </TooltipTrigger>
-      <TooltipContent 
-        side="top" 
+      <TooltipContent
+        side="top"
         className="max-w-xs p-2"
       >
         <div className="space-y-1 text-sm">

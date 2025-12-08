@@ -106,6 +106,9 @@ export function MyJobTotalsSection() {
   // Calculate totals
   const approvedPayouts = payoutTotals.filter(p => jobApprovalMap?.get(p.job_id) ?? false);
   const pendingPayouts = payoutTotals.filter(p => !(jobApprovalMap?.get(p.job_id) ?? false));
+  const totalRegularTimesheets = approvedPayouts.reduce((sum, payout) => sum + payout.timesheets_total_eur, 0);
+  const totalRegularExtras = approvedPayouts.reduce((sum, payout) => sum + payout.extras_total_eur, 0);
+  const totalRegularExpenses = approvedPayouts.reduce((sum, payout) => sum + payout.expenses_total_eur, 0);
   const totalNonTourAmount = approvedPayouts.reduce((sum, payout) => sum + payout.total_eur, 0);
   const totalTourAmount = approvedTourQuotes.reduce((sum, quote) => sum + calculateQuoteTotal(quote), 0);
   const grandTotal = totalNonTourAmount + totalTourAmount;
@@ -133,9 +136,12 @@ export function MyJobTotalsSection() {
                   <div>
                     <span className="font-medium">Job {payout.job_id.substring(0, 8)}...</span>
                     <div className="text-xs text-muted-foreground">
-                      Timesheets: {formatCurrency(payout.timesheets_total_eur)}
+                      Partes: {formatCurrency(payout.timesheets_total_eur)}
                       {payout.extras_total_eur > 0 && (
-                        <> + Extras: {formatCurrency(payout.extras_total_eur)}</>
+                        <> · Extras: {formatCurrency(payout.extras_total_eur)}</>
+                      )}
+                      {payout.expenses_total_eur > 0 && (
+                        <> · Gastos: {formatCurrency(payout.expenses_total_eur)}</>
                       )}
                     </div>
                     {payout.vehicle_disclaimer && (
@@ -154,9 +160,14 @@ export function MyJobTotalsSection() {
             
             <div className="flex justify-between items-center pl-6 pt-2 border-t">
               <span className="font-medium">Regular Jobs Total:</span>
-              <Badge variant="default">
-                {formatCurrency(totalNonTourAmount)}
-              </Badge>
+              <div className="flex flex-col items-end gap-1">
+                <Badge variant="default">
+                  {formatCurrency(totalNonTourAmount)}
+                </Badge>
+                <span className="text-[11px] text-muted-foreground">
+                  Partes: {formatCurrency(totalRegularTimesheets)} · Extras: {formatCurrency(totalRegularExtras)} · Gastos: {formatCurrency(totalRegularExpenses)}
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -232,6 +243,11 @@ export function MyJobTotalsSection() {
                 {formatCurrency(grandTotal)}
               </Badge>
             </div>
+            {totalRegularExpenses > 0 && (
+              <div className="text-xs text-muted-foreground text-right">
+                Gastos incluidos: {formatCurrency(totalRegularExpenses)}
+              </div>
+            )}
           </>
         )}
       </CardContent>

@@ -22,9 +22,9 @@ export class LogisticsSection {
         transport.driver_phone || '',
         transport.license_plate || '',
         Formatters.translateCompany(transport.company || ''),
-        transport.date_time || '',
+        Formatters.formatDateTime(transport.date_time || ''),
         transport.has_return ? 'Sí' : 'No',
-        transport.return_date_time || ''
+        Formatters.formatDateTime(transport.return_date_time || '')
       ]);
 
       this.pdfDoc.addTable({
@@ -32,24 +32,18 @@ export class LogisticsSection {
         head: [["Tipo", "Conductor", "Teléfono", "Matrícula", "Empresa", "Salida", "Retorno", "Vuelta"]],
         body: transportData,
         theme: "grid",
-        styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
+        styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' },
         headStyles: {
           fillColor: [125, 1, 1],
           textColor: [255, 255, 255],
-          fontSize: 8,
+          fontSize: 9,
           fontStyle: 'bold'
         },
-        columnStyles: {
-          0: { cellWidth: 18 }, // Tipo
-          1: { cellWidth: 22 }, // Conductor
-          2: { cellWidth: 20 }, // Teléfono
-          3: { cellWidth: 18 }, // Matrícula
-          4: { cellWidth: 20 }, // Empresa
-          5: { cellWidth: 25 }, // Salida
-          6: { cellWidth: 15 }, // Retorno
-          7: { cellWidth: 25 }  // Vuelta
+        alternateRowStyles: {
+          fillColor: [250, 245, 245]
         },
-        margin: { left: 20, right: 20 }
+        margin: { left: 20, right: 20 },
+        tableWidth: 'auto'
       });
 
       yPosition = this.pdfDoc.getLastAutoTableY() + 10;

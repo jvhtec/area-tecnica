@@ -444,9 +444,17 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                 {job?.job_documents && job.job_documents.filter((d: JobDocument) => d.visible_to_tech).length > 0 ? (
                                     <div className="space-y-2">
                                         {job.job_documents.filter((d: JobDocument) => d.visible_to_tech).map((doc) => (
-                                            <div key={doc.id} className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 flex items-center justify-between`}>
-                                                <div className="min-w-0 pr-4">
-                                                    <div className={`text-sm font-bold ${theme.textMain} truncate mb-1`}>{doc.file_name}</div>
+                                            <div
+                                                key={doc.id}
+                                                className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3`}
+                                            >
+                                                <div className="flex-1 min-w-0 overflow-hidden">
+                                                    <div
+                                                        className={`text-sm font-bold ${theme.textMain} leading-snug break-words line-clamp-2 sm:truncate mb-1`}
+                                                        title={doc.file_name}
+                                                    >
+                                                        {doc.file_name}
+                                                    </div>
                                                     <div className={`text-xs ${theme.textMuted}`}>
                                                         {doc.uploaded_at && `Subido el ${format(new Date(doc.uploaded_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`}
                                                     </div>
@@ -459,12 +467,13 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                                         )}
                                                     </div>
                                                 </div>
-                                                <div className="flex gap-2 shrink-0">
+                                                <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto">
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
                                                         onClick={() => handleViewDocument(doc)}
                                                         disabled={documentLoading.has(doc.id)}
+                                                        className="w-full sm:min-w-[90px]"
                                                     >
                                                         {documentLoading.has(doc.id) ? (
                                                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -479,6 +488,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                                         size="sm"
                                                         onClick={() => handleDownload(doc)}
                                                         disabled={documentLoading.has(doc.id)}
+                                                        className="w-full sm:min-w-[90px]"
                                                     >
                                                         {documentLoading.has(doc.id) ? (
                                                             <Loader2 className="h-4 w-4 animate-spin" />

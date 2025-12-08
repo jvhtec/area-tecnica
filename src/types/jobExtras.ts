@@ -19,8 +19,19 @@ export interface JobExtraItem {
 }
 
 export interface JobExtrasBreakdown {
-  items: JobExtraItem[];
-  total_eur: number;
+  items?: JobExtraItem[];
+  total_eur?: number;
+}
+
+export interface JobExpenseBreakdownItem {
+  category_slug: string;
+  status_counts?: Record<string, number>;
+  amount_totals?: Record<string, number>;
+  approved_total_eur?: number;
+  submitted_total_eur?: number;
+  draft_total_eur?: number;
+  rejected_total_eur?: number;
+  last_receipt_at?: string | null;
 }
 
 export interface JobPayoutTotals {
@@ -28,8 +39,10 @@ export interface JobPayoutTotals {
   technician_id: string;
   timesheets_total_eur: number;
   extras_total_eur: number;
+  expenses_total_eur: number;
   total_eur: number;
   extras_breakdown: JobExtrasBreakdown;
+  expenses_breakdown: JobExpenseBreakdownItem[];
   vehicle_disclaimer: boolean;
   vehicle_disclaimer_text?: string;
 }

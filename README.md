@@ -1,11 +1,11 @@
-# Sector Pro
+# Area Tecnica
 
 **URL**: 
 http://sector-pro.work
 
 ## Project info
 
-Sector Pro – Technical Operations Platform
+Area Tecnica – Technical Operations Platform
 
 Sector Pro is an integrated operations platform for live events, festivals, tours, logistics, technical crews and production workflows.
 It consolidates tools and processes that are traditionally spread across emails, spreadsheets, messaging apps and standalone software.

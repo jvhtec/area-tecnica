@@ -15,11 +15,11 @@ interface BulkTourFolderActionsProps {
   defaultCollapsed?: boolean;
 }
 
-export const BulkTourFolderActions = ({ 
-  tours, 
-  onRefresh, 
+export const BulkTourFolderActions = ({
+  tours,
+  onRefresh,
   isCollapsible = false,
-  defaultCollapsed = false 
+  defaultCollapsed = false
 }: BulkTourFolderActionsProps) => {
   const { toast } = useToast();
   const [isCreating, setIsCreating] = useState(false);
@@ -27,32 +27,51 @@ export const BulkTourFolderActions = ({
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
   // Find tours that need root folders - check both flags and actual folder IDs
-  const toursNeedingRootFolders = tours.filter(tour => !tour.flex_folders_created);
+  // Exclude cancelled tours and tours that have already ended
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Reset to start of day for accurate comparison
+
+  const toursNeedingRootFolders = tours.filter(tour => {
+    // Exclude if folders already created
+    if (tour.flex_folders_created) return false;
+
+    // Exclude cancelled tours
+    if (tour.status === 'cancelled') return false;
+
+    // Exclude tours that have already ended
+    if (tour.end_date) {
+      const endDate = new Date(tour.end_date);
+      endDate.setHours(0, 0, 0, 0);
+      if (endDate < today) return false;
+    }
+
+    return true;
+  });
 
   const handleVerifyFolders = async () => {
     setIsVerifying(true);
-    
+
     try {
       let updatedCount = 0;
-      
+
       for (const tour of toursNeedingRootFolders) {
         console.log(`Checking tour: ${tour.name} (ID: ${tour.id})`);
-        
+
         // Check if tour actually has folder IDs but flag is false
         if (tour.flex_main_folder_id) {
           console.log(`Tour ${tour.name} has main folder ID: ${tour.flex_main_folder_id}, updating flag`);
-          
+
           const { error } = await supabase
             .from('tours')
             .update({ flex_folders_created: true })
             .eq('id', tour.id);
-            
+
           if (!error) {
             updatedCount++;
           }
         }
       }
-      
+
       if (updatedCount > 0) {
         toast({
           title: "Verification Complete",
@@ -61,11 +80,11 @@ export const BulkTourFolderActions = ({
         onRefresh();
       } else {
         toast({
-          title: "Verification Complete", 
+          title: "Verification Complete",
           description: "No tours needed status updates.",
         });
       }
-      
+
     } catch (error: any) {
       console.error("Verification error:", error);
       toast({
@@ -80,7 +99,7 @@ export const BulkTourFolderActions = ({
 
   const handleCreateBulkRootFolders = async () => {
     setIsCreating(true);
-    
+
     try {
       let successCount = 0;
       let errorCount = 0;
@@ -90,7 +109,7 @@ export const BulkTourFolderActions = ({
         try {
           console.log(`Creating root folders for tour: ${tour.name}`);
           const result = await createTourRootFolders(tour.id);
-          
+
           if (result.success) {
             successCount++;
           } else {
@@ -161,60 +180,60 @@ export const BulkTourFolderActions = ({
             <p className="text-xs md:text-sm text-muted-foreground">
               {toursNeedingRootFolders.length} tour(s) appear to need root folders. This might be a display issue if folders already exist.
             </p>
-          
-          <div className="flex flex-wrap gap-1.5 md:gap-2">
-            {toursNeedingRootFolders.map((tour) => (
-              <Badge key={tour.id} variant="outline" className="border-orange-300 text-orange-700 text-xs">
-                {tour.name}
-                {tour.flex_main_folder_id && (
-                  <span className="ml-1 text-xs text-green-600">(Has Folder ID)</span>
+
+            <div className="flex flex-wrap gap-1.5 md:gap-2">
+              {toursNeedingRootFolders.map((tour) => (
+                <Badge key={tour.id} variant="outline" className="border-orange-300 text-orange-700 text-xs">
+                  {tour.name}
+                  {tour.flex_main_folder_id && (
+                    <span className="ml-1 text-xs text-green-600">(Has Folder ID)</span>
+                  )}
+                </Badge>
+              ))}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                onClick={handleVerifyFolders}
+                disabled={isVerifying || isCreating}
+                variant="outline"
+                className="flex-1 touch-manipulation"
+              >
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <span className="hidden sm:inline">Verifying...</span>
+                    <span className="sm:hidden">Verifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Verify Status</span>
+                    <span className="sm:hidden">Verify</span>
+                  </>
                 )}
-              </Badge>
-            ))}
-          </div>
+              </Button>
 
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button 
-              onClick={handleVerifyFolders}
-              disabled={isVerifying || isCreating}
-              variant="outline"
-              className="flex-1 touch-manipulation"
-            >
-              {isVerifying ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  <span className="hidden sm:inline">Verifying...</span>
-                  <span className="sm:hidden">Verifying...</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Verify Status</span>
-                  <span className="sm:hidden">Verify</span>
-                </>
-              )}
-            </Button>
-
-            <Button 
-              onClick={handleCreateBulkRootFolders}
-              disabled={isCreating || isVerifying}
-              className="flex-1 touch-manipulation"
-            >
-              {isCreating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  <span className="hidden sm:inline">Creating Root Folders...</span>
-                  <span className="sm:hidden">Creating...</span>
-                </>
-              ) : (
-                <>
-                  <FolderPlus className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Create Root Folders</span>
-                  <span className="sm:hidden">Create</span>
-                </>
-              )}
-            </Button>
-          </div>
+              <Button
+                onClick={handleCreateBulkRootFolders}
+                disabled={isCreating || isVerifying}
+                className="flex-1 touch-manipulation"
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <span className="hidden sm:inline">Creating Root Folders...</span>
+                    <span className="sm:hidden">Creating...</span>
+                  </>
+                ) : (
+                  <>
+                    <FolderPlus className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Create Root Folders</span>
+                    <span className="sm:hidden">Create</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </CardContent>
       )}

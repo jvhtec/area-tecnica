@@ -936,11 +936,39 @@ export const OptimizedAssignmentMatrix = ({
     if (availabilityDialog?.open) {
       setAvailabilityCoverage(availabilityDialog.singleDay ? 'single' : 'full');
       try {
-        setAvailabilitySingleDate(availabilityDialog.dateIso ? new Date(`${availabilityDialog.dateIso}T00:00:00`) : null);
-        setAvailabilityMultiDates(availabilityDialog.dateIso ? [new Date(`${availabilityDialog.dateIso}T00:00:00`)] : []);
+        // Extract dates from selectedCells for this technician
+        const technicianId = availabilityDialog.profileId;
+        const selectedDatesForTech: Date[] = [];
+
+        // Parse selectedCells to find all dates for this technician
+        for (const cellKey of selectedCells) {
+          // cellKey format: "${technicianId}-yyyy-MM-dd"
+          if (cellKey.startsWith(`${technicianId}-`)) {
+            const dateStr = cellKey.substring(technicianId.length + 1); // Remove "techId-" prefix
+            try {
+              const parsedDate = new Date(`${dateStr}T00:00:00`);
+              if (!isNaN(parsedDate.getTime())) {
+                selectedDatesForTech.push(parsedDate);
+              }
+            } catch { /* ignore invalid dates */ }
+          }
+        }
+
+        // If we have multiple selected cells, use them; otherwise fall back to the clicked date
+        if (selectedDatesForTech.length > 1) {
+          // Multiple dates selected - initialize with all of them
+          setAvailabilitySingleDate(null);
+          setAvailabilityMultiDates(selectedDatesForTech.sort((a, b) => a.getTime() - b.getTime()));
+          setAvailabilityCoverage('multiple'); // Set to multiple to show the multi-date picker
+        } else {
+          // Single date or no selection - use the clicked date
+          const clickedDate = availabilityDialog.dateIso ? new Date(`${availabilityDialog.dateIso}T00:00:00`) : null;
+          setAvailabilitySingleDate(clickedDate);
+          setAvailabilityMultiDates(clickedDate ? [clickedDate] : []);
+        }
       } catch { /* ignore */ }
     }
-  }, [availabilityDialog?.open]);
+  }, [availabilityDialog?.open, selectedCells]);
 
   // Cycle through technician sorting methods
   const cycleTechSort = useCallback(() => {

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import { Loader2, Calendar, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { labelForCode } from '@/utils/roles';
 
 interface AssignmentStatusDialogProps {
@@ -27,6 +27,12 @@ interface AssignmentStatusDialogProps {
   action: 'confirm' | 'decline';
 }
 
+// Query keys for cache management
+const ASSIGNMENT_QUERY_KEYS = [
+  ['optimized-matrix-assignments'],
+  ['matrix-assignments'],
+] as const;
+
 export const AssignmentStatusDialog = ({
   open,
   onClose,
@@ -36,7 +42,6 @@ export const AssignmentStatusDialog = ({
   action
 }: AssignmentStatusDialogProps) => {
   const [notes, setNotes] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
 
   // Get technician details
@@ -55,132 +60,69 @@ export const AssignmentStatusDialog = ({
     enabled: open && !!technicianId
   });
 
-  const handleSubmit = async () => {
-    if (!assignment?.job_id) {
-      toast.error('No se encontró asignación');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const newStatus = action === 'confirm' ? 'confirmed' : 'declined';
-
-      console.log('Updating assignment status:', {
-        job_id: assignment.job_id,
-        technician_id: technicianId,
-        current_status: assignment.status,
-        new_status: newStatus
+  // Mutation with proper optimistic update and rollback
+  const assignmentMutation = useMutation({
+    mutationFn: async ({
+      jobId,
+      techId,
+      actionType,
+      isTourAssignment
+    }: {
+      jobId: string;
+      techId: string;
+      actionType: 'confirm' | 'decline';
+      isTourAssignment: boolean;
+    }) => {
+      // Use atomic RPC for transactional safety
+      const { data, error } = await supabase.rpc('manage_assignment_lifecycle', {
+        p_job_id: jobId,
+        p_technician_id: techId,
+        p_action: actionType,
+        p_delete_mode: isTourAssignment ? 'hard' : 'soft',
+        p_metadata: { notes, source: 'matrix_dialog' }
       });
 
-      if (newStatus === 'declined') {
-        // Check if this is a tour assignment by querying the job_assignment record
-        const { data: jobAssignment } = await supabase
-          .from('job_assignments')
-          .select('assignment_source')
-          .eq('job_id', assignment.job_id)
-          .eq('technician_id', technicianId)
-          .single();
-
-        const isTourAssignment = jobAssignment?.assignment_source === 'tour';
-
-        // If declining a tour assignment, delete it completely (job_assignments + timesheets)
-        // This makes it disappear from everywhere (matrix, job cards, job details)
-        if (isTourAssignment) {
-          console.log('Declining tour assignment - deleting completely');
-
-          // Delete timesheets first
-          const { error: timesheetError } = await supabase
-            .from('timesheets')
-            .delete()
-            .eq('job_id', assignment.job_id)
-            .eq('technician_id', technicianId);
-
-          if (timesheetError) {
-            console.error('Error deleting timesheets:', timesheetError);
-            throw timesheetError;
-          }
-
-          // Then delete the job_assignment
-          const { error: assignmentError } = await supabase
-            .from('job_assignments')
-            .delete()
-            .eq('job_id', assignment.job_id)
-            .eq('technician_id', technicianId);
-
-          if (assignmentError) {
-            console.error('Error deleting assignment:', assignmentError);
-            throw assignmentError;
-          }
-
-          console.log('Tour assignment and timesheets deleted');
-        } else {
-          // For non-tour assignments, just mark as declined (keep for audit trail)
-          const { data, error } = await supabase
-            .from('job_assignments')
-            .update({
-              status: newStatus,
-              response_time: new Date().toISOString(),
-            })
-            .eq('job_id', assignment.job_id)
-            .eq('technician_id', technicianId)
-            .select();
-
-          if (error) {
-            console.error('Database error details:', error);
-            throw error;
-          }
-
-          console.log('Update successful:', data);
-
-          // Delete timesheets so it disappears from matrix
-          const { error: timesheetError } = await supabase
-            .from('timesheets')
-            .delete()
-            .eq('job_id', assignment.job_id)
-            .eq('technician_id', technicianId);
-
-          if (timesheetError) {
-            console.error('Error deleting timesheets:', timesheetError);
-          } else {
-            console.log('Timesheets deleted for declined assignment');
-          }
-        }
-      } else {
-        // Confirming - just update the status
-        const { data, error } = await supabase
-          .from('job_assignments')
-          .update({
-            status: newStatus,
-            response_time: new Date().toISOString(),
-          })
-          .eq('job_id', assignment.job_id)
-          .eq('technician_id', technicianId)
-          .select();
-
-        if (error) {
-          console.error('Database error details:', error);
-          throw error;
-        }
-
-        console.log('Update successful:', data);
+      if (error) {
+        console.error('RPC error:', error);
+        throw new Error(error.message || 'Database operation failed');
       }
 
-      // Immediately update the query cache with the new status
-      const assignmentQueries = [
-        ['optimized-matrix-assignments'],
-        ['matrix-assignments'],
-        ['job-assignments', assignment.job_id]
-      ];
+      // Check RPC result
+      if (!data?.success) {
+        const errorMessage = data?.message || data?.error || 'Operation failed';
+        console.error('RPC returned failure:', data);
+        throw new Error(errorMessage);
+      }
 
-      assignmentQueries.forEach(queryKey => {
+      return data;
+    },
+
+    // Save previous cache state BEFORE mutation
+    onMutate: async (variables) => {
+      // Cancel any outgoing refetches to prevent race conditions
+      await queryClient.cancelQueries({ queryKey: ['optimized-matrix-assignments'] });
+      await queryClient.cancelQueries({ queryKey: ['matrix-assignments'] });
+      await queryClient.cancelQueries({ queryKey: ['job-assignments', variables.jobId] });
+
+      // Snapshot the previous values for rollback
+      const previousData: Record<string, unknown> = {};
+
+      ASSIGNMENT_QUERY_KEYS.forEach(queryKey => {
+        previousData[JSON.stringify(queryKey)] = queryClient.getQueryData(queryKey);
+      });
+      previousData[JSON.stringify(['job-assignments', variables.jobId])] =
+        queryClient.getQueryData(['job-assignments', variables.jobId]);
+
+      // Optimistically update the cache
+      const newStatus = variables.actionType === 'confirm' ? 'confirmed' : 'declined';
+
+      [...ASSIGNMENT_QUERY_KEYS, ['job-assignments', variables.jobId]].forEach(queryKey => {
         try {
           queryClient.setQueryData(queryKey, (oldData: any) => {
             if (!oldData) return oldData;
-
             if (Array.isArray(oldData)) {
               return oldData.map((item: any) => {
-                if (item.job_id === assignment.job_id && item.technician_id === technicianId) {
+                if (item.job_id === variables.jobId && item.technician_id === variables.techId) {
                   return { ...item, status: newStatus, response_time: new Date().toISOString() };
                 }
                 return item;
@@ -190,55 +132,96 @@ export const AssignmentStatusDialog = ({
           });
         } catch (e: any) {
           if (typeof window !== 'undefined' && e?.name === 'InvalidStateError') {
-            console.warn('Broadcast channel closed; skipping optimistic update broadcast');
-          } else {
-            console.warn('setQueryData error (non-fatal):', e);
+            console.warn('Broadcast channel closed; skipping optimistic update');
           }
         }
       });
 
-      // Invalidate relevant queries to refresh the UI
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] }),
-        queryClient.invalidateQueries({ queryKey: ['matrix-assignments'] }),
-        queryClient.invalidateQueries({ queryKey: ['job-assignments', assignment.job_id] }),
-        queryClient.invalidateQueries({ queryKey: ['job-details', assignment.job_id] }),
-        queryClient.invalidateQueries({ queryKey: ['jobs'] }),
-        queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] })
-      ]);
+      // Return context with previous data for rollback
+      return { previousData, jobId: variables.jobId };
+    },
 
-      if (newStatus === 'confirmed') {
-        const recipientName = `${technician?.first_name ?? ''} ${technician?.last_name ?? ''}`.trim();
-        try {
-          void supabase.functions.invoke('push', {
-            body: {
-              action: 'broadcast',
-              type: 'job.assignment.confirmed',
-              job_id: assignment.job_id,
-              recipient_id: technicianId,
-              recipient_name: recipientName || undefined
-            }
-          });
-        } catch (_) {
-          // Ignore push errors
-        }
+    // Rollback on error
+    onError: (err, variables, context) => {
+      console.error('Assignment mutation failed, rolling back:', err);
+
+      // Restore all previous cache values
+      if (context?.previousData) {
+        Object.entries(context.previousData).forEach(([keyString, value]) => {
+          try {
+            const queryKey = JSON.parse(keyString);
+            queryClient.setQueryData(queryKey, value);
+          } catch (e) {
+            console.warn('Failed to restore cache for key:', keyString);
+          }
+        });
       }
 
-      const statusText = action === 'confirm' ? 'confirmed' : 'declined';
-      toast.success(
-        `Asignación ${statusText === 'confirmed' ? 'confirmada' : 'rechazada'} para ${technician?.first_name} ${technician?.last_name}`
-      );
-      onClose();
-    } catch (error: any) {
-      console.error('Error updating assignment status:', error);
+      // Show error to user
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+      toast.error(`Error al actualizar la asignación: ${errorMessage}`);
+    },
 
-      // More detailed error message
-      const errorMessage = error?.message || 'Unknown database error';
-      toast.error(`Error al actualizar el estado de la asignación: ${errorMessage}`);
-    } finally {
-      setIsSubmitting(false);
+    // On success, invalidate queries to refetch from server
+    onSuccess: (data, variables) => {
+      console.log('Assignment operation successful:', data);
+
+      // Invalidate all relevant queries to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['matrix-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['job-assignments', variables.jobId] });
+      queryClient.invalidateQueries({ queryKey: ['job-details', variables.jobId] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+
+      // Send push notification for confirmations
+      if (variables.actionType === 'confirm') {
+        const recipientName = `${technician?.first_name ?? ''} ${technician?.last_name ?? ''}`.trim();
+        supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'job.assignment.confirmed',
+            job_id: variables.jobId,
+            recipient_id: variables.techId,
+            recipient_name: recipientName || undefined
+          }
+        }).catch(() => { /* Ignore push errors */ });
+      }
+
+      // Show success message
+      const statusText = variables.actionType === 'confirm' ? 'confirmada' : 'rechazada';
+      toast.success(
+        `Asignación ${statusText} para ${technician?.first_name ?? ''} ${technician?.last_name ?? ''}`
+      );
+
+      onClose();
     }
-  };
+  });
+
+  const handleSubmit = useCallback(async () => {
+    if (!assignment?.job_id) {
+      toast.error('No se encontró asignación');
+      return;
+    }
+
+    // Check if tour assignment to determine delete mode
+    const { data: jobAssignment } = await supabase
+      .from('job_assignments')
+      .select('assignment_source')
+      .eq('job_id', assignment.job_id)
+      .eq('technician_id', technicianId)
+      .maybeSingle();
+
+    const isTourAssignment = jobAssignment?.assignment_source === 'tour';
+
+    // Execute the mutation
+    assignmentMutation.mutate({
+      jobId: assignment.job_id,
+      techId: technicianId,
+      actionType: action,
+      isTourAssignment
+    });
+  }, [assignment?.job_id, technicianId, action, assignmentMutation]);
 
   const actionConfig = {
     confirm: {
@@ -311,10 +294,10 @@ export const AssignmentStatusDialog = ({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={assignmentMutation.isPending}
             className={config.buttonClass}
           >
-            {isSubmitting ? (
+            {assignmentMutation.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Procesando...

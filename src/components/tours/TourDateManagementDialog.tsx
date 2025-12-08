@@ -207,7 +207,7 @@ async function createFoldersForDate(
 
       // Create department-specific hojaInfo elements for sound, lights, and video
       if (["sound", "lights", "video"].includes(dept)) {
-        const job = { title: 'Default Job Title' }; // Define the job variable
+        const folderTitle = `${locationName} - ${formattedDate}`;
         const hojaInfoType = dept === "sound"
           ? FLEX_FOLDER_IDS.hojaInfoSx
           : dept === "lights"
@@ -221,7 +221,7 @@ async function createFoldersForDate(
           parentElementId: mainFolderElementId,
           open: true,
           locked: false,
-          name: `Hoja de Información - ${job.title}`,
+          name: `Hoja de Información - ${folderTitle}`,
           plannedStartDate: formattedStartDate,
           plannedEndDate: formattedEndDate,
           locationId: FLEX_FOLDER_IDS.location,
@@ -364,7 +364,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const { getOrCreateLocation, getOrCreateLocationWithDetails } = useLocationManagement();
 
   // Add real-time subscriptions
-  const tourDateIds = tourDates.map(d => d.id);
+  const tourDateIds = React.useMemo(() => tourDates.map(d => d.id), [tourDates]);
   useTourDateRealtime(tourId, tourDateIds);
 
   // Force refresh parent component data when dialog opens

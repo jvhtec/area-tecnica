@@ -19,7 +19,7 @@ export class PowerSection {
     for (const line of powerLines) {
       if (line.trim()) {
         this.pdfDoc.addText(line.trim(), 30, yPosition);
-        yPosition += 12;
+        yPosition += 5;
       }
     }
 

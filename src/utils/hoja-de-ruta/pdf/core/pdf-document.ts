@@ -10,7 +10,7 @@ export class PDFDocument {
   private pageWidth: number;
   private pageHeight: number;
   private footerSpace: number = 40;
-  
+
   constructor() {
     this.doc = new jsPDF() as AutoTableJsPDF;
     this.pageWidth = this.doc.internal.pageSize.width;

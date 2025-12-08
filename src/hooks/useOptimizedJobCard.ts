@@ -68,6 +68,7 @@ export const useOptimizedJobCard = (
             profiles!fk_timesheets_technician_id (first_name, nickname, last_name, department)
           `)
           .eq('job_id', job.id)
+          .eq('is_active', true)
       ]);
 
       if (tsError) {

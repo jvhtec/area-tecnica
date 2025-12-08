@@ -45,9 +45,9 @@ export function MobileAvailabilityView({
     const [showPresetDialog, setShowPresetDialog] = useState(false);
     const [showWeeklySummary, setShowWeeklySummary] = useState(false);
 
-    // Generate 2 weeks of dates centered around selected date for the strip
-    const days = Array.from({ length: 14 }, (_, i) => {
-        const start = subDays(selectedDate, 3); // Start 3 days before selected
+    // Generate 6 days around selected date for the strip (2 before, selected, 3 after)
+    const days = Array.from({ length: 6 }, (_, i) => {
+        const start = subDays(selectedDate, 2); // Start 2 days before selected
         return addDays(start, i);
     });
 
@@ -60,7 +60,7 @@ export function MobileAvailabilityView({
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-140px)]">
+        <div className="flex flex-col min-h-screen bg-[#05070a] -mx-3 -mt-4 -mb-[calc(4.5rem+env(safe-area-inset-bottom))]">
             {/* Header */}
             <div className="bg-[#0f1219] border-b border-[#1f232e] p-4 sticky top-0 z-20">
                 <div className="flex items-center justify-between mb-3">
@@ -188,7 +188,7 @@ export function MobileAvailabilityView({
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 pb-32 space-y-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-white">
                         {format(selectedDate, 'EEEE, d MMMM', { locale: es })}
@@ -199,27 +199,27 @@ export function MobileAvailabilityView({
                 </div>
 
                 {jobs.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         {jobs.map((job: any) => {
                             const logo = logoMap[job.id];
                             return (
                                 <div
                                     key={job.id}
-                                    className="bg-[#0f1219] border border-[#1f232e] rounded-xl p-4 flex items-start gap-4 shadow-sm"
+                                    className="bg-[#0f1219] border border-[#1f232e] rounded-lg p-3 flex items-start gap-3 shadow-sm"
                                 >
                                     {logo ? (
-                                        <img src={logo} alt="logo" className="h-12 w-12 rounded-lg object-cover border border-[#2a2e3b]" />
+                                        <img src={logo} alt="logo" className="h-10 w-10 rounded-md object-cover border border-[#2a2e3b]" />
                                     ) : (
-                                        <div className="h-12 w-12 rounded-lg bg-[#1a1d24] flex items-center justify-center border border-[#2a2e3b] text-lg font-bold text-slate-500">
+                                        <div className="h-10 w-10 rounded-md bg-[#1a1d24] flex items-center justify-center border border-[#2a2e3b] text-base font-bold text-slate-500">
                                             {String(job.title || '?').slice(0, 1).toUpperCase()}
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-semibold text-white truncate">{job.title}</h3>
+                                        <h3 className="text-[15px] font-semibold text-white truncate">{job.title}</h3>
                                         {job.location?.name && (
-                                            <p className="text-sm text-slate-400 truncate">{job.location.name}</p>
+                                            <p className="text-xs text-slate-400 truncate">{job.location.name}</p>
                                         )}
-                                        <div className="flex items-center gap-2 mt-2">
+                                        <div className="flex items-center gap-2 mt-1.5">
                                             <Badge variant="secondary" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20">
                                                 {format(new Date(job.start_time), 'HH:mm')}
                                             </Badge>
@@ -235,7 +235,7 @@ export function MobileAvailabilityView({
                         })}
                     </div>
                 ) : assignedPresets && assignedPresets.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         {assignedPresets.map((assignment: any) => {
                             const job = assignment?.preset?.job;
                             const title = job?.title || assignment?.preset?.name;
@@ -245,21 +245,21 @@ export function MobileAvailabilityView({
                             return (
                                 <div
                                     key={assignment.id}
-                                    className="bg-[#0f1219] border border-[#1f232e] rounded-xl p-4 flex items-start gap-4 shadow-sm"
+                                    className="bg-[#0f1219] border border-[#1f232e] rounded-lg p-3 flex items-start gap-3 shadow-sm"
                                 >
                                     {logo ? (
-                                        <img src={logo} alt="logo" className="h-12 w-12 rounded-lg object-cover border border-[#2a2e3b]" />
+                                        <img src={logo} alt="logo" className="h-10 w-10 rounded-md object-cover border border-[#2a2e3b]" />
                                     ) : (
-                                        <div className="h-12 w-12 rounded-lg bg-[#1a1d24] flex items-center justify-center border border-[#2a2e3b] text-lg font-bold text-slate-500">
+                                        <div className="h-10 w-10 rounded-md bg-[#1a1d24] flex items-center justify-center border border-[#2a2e3b] text-base font-bold text-slate-500">
                                             {String(title || '?').slice(0, 1).toUpperCase()}
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-semibold text-white truncate">{title}</h3>
+                                        <h3 className="text-[15px] font-semibold text-white truncate">{title}</h3>
                                         {location && (
-                                            <p className="text-sm text-slate-400 truncate">{location}</p>
+                                            <p className="text-xs text-slate-400 truncate">{location}</p>
                                         )}
-                                        <div className="mt-2">
+                                        <div className="mt-1.5">
                                             <Badge variant="secondary" className="text-[10px] bg-purple-500/10 text-purple-400 border-purple-500/20">
                                                 Preset
                                             </Badge>
@@ -270,11 +270,11 @@ export function MobileAvailabilityView({
                         })}
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
-                        <div className="h-16 w-16 rounded-full bg-[#1a1d24] flex items-center justify-center">
-                            <CalendarIcon className="h-8 w-8 text-slate-600" />
+                    <div className="flex flex-col items-center justify-center py-10 text-center space-y-2">
+                        <div className="h-14 w-14 rounded-full bg-[#1a1d24] flex items-center justify-center">
+                            <CalendarIcon className="h-7 w-7 text-slate-600" />
                         </div>
-                        <h3 className="text-lg font-medium text-slate-300">Sin eventos</h3>
+                        <h3 className="text-base font-medium text-slate-300">Sin eventos</h3>
                         <p className="text-sm text-slate-500 max-w-[200px]">
                             No hay trabajos ni presets asignados para este día.
                         </p>
