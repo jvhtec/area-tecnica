@@ -110,7 +110,7 @@ serve(async (req) => {
     const body = await req.json();
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
 
-    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts } = body;
+    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, idempotency_key } = body;
     const datesArrayRaw: unknown = (body as any)?.dates;
     const shouldOverrideConflicts = Boolean(override_conflicts);
     const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp') ? 'whatsapp' : 'email';
@@ -144,7 +144,8 @@ serve(async (req) => {
       message: { value: message ?? null },
       target_date: { value: target_date ?? null, normalized: normalizedTargetDate },
       single_day: { value: single_day ?? null, effective: isSingleDayRequest },
-      dates: normalizedDates
+      dates: normalizedDates,
+      idempotency_key: { value: idempotency_key ?? null }
     });
     
     if (!job_id || !profile_id || !["availability","offer"].includes(phase)) {
@@ -162,6 +163,39 @@ serve(async (req) => {
     }
     
     console.log('✅ VALIDATION PASSED - Proceeding with email send...');
+
+    // Idempotency check: prevent duplicate sends within 24h
+    if (idempotency_key && typeof idempotency_key === 'string') {
+      console.log('🔑 CHECKING IDEMPOTENCY KEY:', idempotency_key.substring(0, 8) + '...');
+      const since24h = new Date(Date.now() - 24*60*60*1000).toISOString();
+      
+      const { data: existing, error: idempotencyError } = await supabase
+        .from('staffing_requests')
+        .select('id, status, created_at')
+        .eq('idempotency_key', idempotency_key)
+        .gte('created_at', since24h)
+        .maybeSingle();
+
+      if (idempotencyError) {
+        console.warn('⚠️ Idempotency check failed (non-blocking):', idempotencyError);
+      } else if (existing) {
+        console.log('✅ IDEMPOTENT REQUEST DETECTED - returning cached response:', {
+          request_id: existing.id,
+          created_at: existing.created_at
+        });
+        return new Response(JSON.stringify({ 
+          success: true, 
+          cached: true,
+          staffing_request_id: existing.id,
+          message: 'Request already processed (idempotent)'
+        }), { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } else {
+        console.log('✅ New idempotency key - proceeding with send');
+      }
+    }
 
     // Check required environment variables
     console.log('🔧 CHECKING ENV VARIABLES:', {
@@ -486,6 +520,7 @@ serve(async (req) => {
           single_day: true,
           target_date: firstDate,
           batch_id: batchId,
+          idempotency_key: idempotency_key || null,
         });
         if (firstInsert.error) {
           console.error('❌ STAFFING REQUEST BATCH FIRST INSERT ERROR:', firstInsert.error);
@@ -527,6 +562,7 @@ serve(async (req) => {
           token_expires_at: exp,
           single_day: isSingleDayRequest,
           target_date: normalizedTargetDate,
+          idempotency_key: idempotency_key || null,
         });
         if (insertRes.error && insertRes.error.code === "23505") {
           console.log('🔄 DUPLICATE FOUND, UPDATING...');
