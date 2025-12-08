@@ -69,6 +69,7 @@ const WallboardPublic = lazy(() => import('@/pages/WallboardPublic'));
 const Announcements = lazy(() => import('@/pages/Announcements'));
 const WallboardPresets = lazy(() => import('@/pages/WallboardPresets'));
 const RatesCenterPage = lazy(() => import('@/pages/RatesCenterPage'));
+const ExpensesPage = lazy(() => import('@/pages/Expenses'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -230,6 +231,7 @@ export default function App() {
                               <Route path="/announcements" element={<ProtectedRoute allowedRoles={['admin']}><Announcements /></ProtectedRoute>} />
                               <Route path="/management/wallboard-presets" element={<ProtectedRoute allowedRoles={['admin']}><WallboardPresets /></ProtectedRoute>} />
                               <Route path="/management/rates" element={<ProtectedRoute allowedRoles={['admin', 'management']}><RatesCenterPage /></ProtectedRoute>} />
+                              <Route path="/gastos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><ExpensesPage /></ProtectedRoute>} />
                               <Route path="/manual" element={<UserManual />} />
 
                               {/* Tour Management Route */}

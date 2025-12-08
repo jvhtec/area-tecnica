@@ -82,8 +82,8 @@ const ExpensesPage: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [statusFilter, setStatusFilter] = React.useState<ExpenseStatus | 'all'>('submitted');
-  const [technicianFilter, setTechnicianFilter] = React.useState<string>('');
-  const [jobFilter, setJobFilter] = React.useState<string>('');
+  const [technicianFilter, setTechnicianFilter] = React.useState<string>('all');
+  const [jobFilter, setJobFilter] = React.useState<string>('all');
   const [fromDate, setFromDate] = React.useState<string>('');
   const [toDate, setToDate] = React.useState<string>('');
   const [searchTerm, setSearchTerm] = React.useState<string>('');
@@ -172,10 +172,10 @@ const ExpensesPage: React.FC = () => {
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
       }
-      if (technicianFilter) {
+      if (technicianFilter && technicianFilter !== 'all') {
         query = query.eq('technician_id', technicianFilter);
       }
-      if (jobFilter) {
+      if (jobFilter && jobFilter !== 'all') {
         query = query.eq('job_id', jobFilter);
       }
       if (fromDate) {
@@ -356,7 +356,7 @@ const ExpensesPage: React.FC = () => {
         </div>
       </div>
 
-      <Card className="bg-[#0f1219] border-[#1f232e] text-white">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" /> Filtros
@@ -366,7 +366,7 @@ const ExpensesPage: React.FC = () => {
           <div className="space-y-2">
             <Label>Estado</Label>
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ExpenseStatus | 'all')}>
-              <SelectTrigger className="bg-[#151820] border-[#1f232e]">
+              <SelectTrigger>
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
@@ -386,11 +386,11 @@ const ExpensesPage: React.FC = () => {
               onValueChange={setTechnicianFilter}
               disabled={isLoadingFilterOptions}
             >
-              <SelectTrigger className="bg-[#151820] border-[#1f232e]">
+              <SelectTrigger>
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 {technicianOptions.map((tech) => (
                   <SelectItem key={tech.id} value={tech.id}>
                     {tech.label}
@@ -407,11 +407,11 @@ const ExpensesPage: React.FC = () => {
               onValueChange={setJobFilter}
               disabled={isLoadingFilterOptions}
             >
-              <SelectTrigger className="bg-[#151820] border-[#1f232e]">
+              <SelectTrigger>
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 {jobOptions.map((job) => (
                   <SelectItem key={job.id} value={job.id}>
                     {job.label}
@@ -427,7 +427,6 @@ const ExpensesPage: React.FC = () => {
               type="date"
               value={fromDate}
               onChange={(event) => setFromDate(event.target.value)}
-              className="bg-[#151820] border-[#1f232e]"
             />
           </div>
 
@@ -437,7 +436,6 @@ const ExpensesPage: React.FC = () => {
               type="date"
               value={toDate}
               onChange={(event) => setToDate(event.target.value)}
-              className="bg-[#151820] border-[#1f232e]"
             />
           </div>
 
@@ -447,32 +445,31 @@ const ExpensesPage: React.FC = () => {
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Busca por técnico, trabajo o categoría"
-              className="bg-[#151820] border-[#1f232e]"
             />
           </div>
         </CardContent>
       </Card>
 
-      <Card className="bg-[#0f1219] border-[#1f232e] text-white">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Resumen
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-4 text-sm text-slate-200">
-          <Badge variant="outline" className="border-white/20">
+        <CardContent className="flex flex-wrap gap-4 text-sm">
+          <Badge variant="outline">
             Total: {summary.totalCount} · {formatCurrency(summary.totalAmount)}
           </Badge>
-          <Badge variant="outline" className="border-amber-500/40 text-amber-200">
+          <Badge variant="outline" className="border-amber-500/40 text-amber-600 dark:text-amber-200">
             Pendientes: {summary.pendingCount} · {formatCurrency(summary.pendingAmount)}
           </Badge>
-          <Badge variant="outline" className="border-emerald-500/40 text-emerald-200">
+          <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-200">
             Aprobados: {formatCurrency(summary.approvedAmount)}
           </Badge>
         </CardContent>
       </Card>
 
-      <Card className="bg-[#0f1219] border-[#1f232e] text-white">
+      <Card>
         <CardHeader>
           <CardTitle>Listado de gastos</CardTitle>
         </CardHeader>
@@ -488,7 +485,7 @@ const ExpensesPage: React.FC = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="text-xs uppercase text-slate-400">
+                <thead className="text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-2 text-left w-10">Sel.</th>
                     <th className="py-2 pr-2 text-left">Técnico</th>
@@ -500,7 +497,7 @@ const ExpensesPage: React.FC = () => {
                     <th className="py-2 text-left">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-border">
                   {expenses.map((expense) => {
                     const technicianName = [expense.technician?.first_name, expense.technician?.last_name]
                       .filter(Boolean)
@@ -521,12 +518,12 @@ const ExpensesPage: React.FC = () => {
                           />
                         </td>
                         <td className="py-2 pr-2 align-top">
-                          <div className="font-medium text-slate-100">{technicianName}</div>
-                          <div className="text-slate-400">{expense.technician_id}</div>
+                          <div className="font-medium">{technicianName}</div>
+                          <div className="text-muted-foreground">{expense.technician_id}</div>
                         </td>
                         <td className="py-2 pr-2 align-top">
-                          <div className="font-medium text-slate-100 break-words">{jobTitle}</div>
-                          <div className="text-slate-400">{expense.job_id}</div>
+                          <div className="font-medium break-words">{jobTitle}</div>
+                          <div className="text-muted-foreground">{expense.job_id}</div>
                         </td>
                         <td className="py-2 pr-2 align-top">
                           {expense.category?.label_es || expense.category_slug}
@@ -534,9 +531,9 @@ const ExpensesPage: React.FC = () => {
                         <td className="py-2 pr-2 align-top">
                           {format(new Date(expense.expense_date), 'PPP', { locale: es })}
                         </td>
-                        <td className="py-2 pr-2 align-top text-right font-semibold text-slate-100">
+                        <td className="py-2 pr-2 align-top text-right font-semibold">
                           {formatCurrency(expense.amount_eur)}
-                          <div className="text-slate-400 text-[11px]">
+                          <div className="text-muted-foreground text-[11px]">
                             {expense.amount_original.toFixed(2)} {expense.currency_code}
                           </div>
                         </td>
@@ -545,12 +542,12 @@ const ExpensesPage: React.FC = () => {
                             variant="outline"
                             className={
                               expense.status === 'submitted'
-                                ? 'border-amber-500/40 text-amber-200'
+                                ? 'border-amber-500/40 text-amber-600 dark:text-amber-200'
                                 : expense.status === 'approved'
-                                  ? 'border-emerald-500/40 text-emerald-200'
+                                  ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-200'
                                   : expense.status === 'rejected'
-                                    ? 'border-rose-500/40 text-rose-300'
-                                    : 'border-white/20 text-slate-200'
+                                    ? 'border-rose-500/40 text-rose-600 dark:text-rose-300'
+                                    : 'border-border'
                             }
                           >
                             {statusOptions.find((s) => s.value === expense.status)?.label || expense.status}
@@ -561,7 +558,7 @@ const ExpensesPage: React.FC = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-blue-200 hover:text-blue-100"
+                              className="text-blue-600 dark:text-blue-200 hover:text-blue-700 dark:hover:text-blue-100"
                               onClick={() => handleViewReceipt(expense)}
                               disabled={viewReceiptState?.expenseId === expense.id && viewReceiptState.loading}
                             >
@@ -620,7 +617,7 @@ const ExpensesPage: React.FC = () => {
       </Card>
 
       <Dialog open={Boolean(rejectDialog)} onOpenChange={(open) => !open && setRejectDialog(null)}>
-        <DialogContent className="bg-[#0f1219] border-[#1f232e] text-white max-w-md">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Rechazar gasto</DialogTitle>
           </DialogHeader>
@@ -632,7 +629,6 @@ const ExpensesPage: React.FC = () => {
               <Textarea
                 value={rejectDialog.reason}
                 onChange={(event) => setRejectDialog((prev) => prev ? { ...prev, reason: event.target.value } : prev)}
-                className="bg-[#151820] border-[#1f232e]"
                 placeholder="Motivo del rechazo"
                 rows={3}
               />
