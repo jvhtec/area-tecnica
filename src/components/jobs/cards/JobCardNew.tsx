@@ -60,7 +60,7 @@ export interface JobCardNewProps {
   detailsOnlyMode?: boolean;
 }
 
-export function JobCardNew({
+function JobCardNewComponent({
   job,
   onEditClick,
   onDeleteClick,
@@ -1277,5 +1277,8 @@ export function JobCardNew({
     </div>
   );
 }
+
+export const JobCardNew = React.memo(JobCardNewComponent);
+JobCardNew.displayName = 'JobCardNew';
 
 export type { JobDocument } from './JobCardDocuments';

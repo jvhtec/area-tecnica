@@ -31,7 +31,16 @@ export default defineConfig(({ mode }) => ({
         output: {
           manualChunks: (id) => {
             if (id.includes('node_modules/jspdf') || id.includes('node_modules/pdf-lib')) {
-              return 'vendor-pdf';
+              return 'pdf-libs';
+            }
+            if (id.includes('node_modules/mapbox-gl')) {
+              return 'maps-lib';
+            }
+            if (id.includes('node_modules/exceljs') || id.includes('node_modules/xlsx')) {
+              return 'spreadsheet-libs';
+            }
+            if (id.includes('node_modules/quill')) {
+              return 'editor-lib';
             }
           },
         },
