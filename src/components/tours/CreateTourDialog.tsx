@@ -22,19 +22,16 @@ const CreateTourDialog = ({
     setTitle,
     description,
     setDescription,
-    dates,
     color,
     setColor,
     departments,
-    handleAddDate,
-    handleRemoveDate,
-    handleDateChange,
     handleDepartmentChange,
     handleSubmit,
     startDate,
     endDate,
     handleStartDateChange,
     handleEndDateChange,
+    isCreating,
   } = useTourCreation(currentDepartment, () => onOpenChange(false));
 
   // Mock available departments for now - you might want to fetch these from a hook
@@ -56,10 +53,6 @@ const CreateTourDialog = ({
               setTitle={setTitle}
               description={description}
               setDescription={setDescription}
-              dates={dates}
-              onDateChange={handleDateChange}
-              onAddDate={handleAddDate}
-              onRemoveDate={handleRemoveDate}
               color={color}
               setColor={setColor}
               departments={departments}
@@ -81,11 +74,19 @@ const CreateTourDialog = ({
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 type="submit"
                 className="w-full sm:w-auto min-w-[120px]"
+                disabled={isCreating}
               >
-                Create Tour
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Tour"
+                )}
               </Button>
             </div>
           </div>
