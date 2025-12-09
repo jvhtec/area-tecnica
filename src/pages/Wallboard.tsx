@@ -7,6 +7,7 @@ import { Plane, Wrench, Star, Moon, Mic } from 'lucide-react';
 import SplashScreen from '@/components/SplashScreen';
 import { WallboardApi, WallboardApiError } from '@/lib/wallboard-api';
 import { useLgScreensaverBlock } from '@/hooks/useLgScreensaverBlock';
+import { WakeLockVideo } from '@/components/WakeLockVideo';
 import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
 
 type Dept = 'sound' | 'lights' | 'video';
@@ -1969,6 +1970,7 @@ function WallboardDisplay({
       </div>
       <Ticker messages={tickerMsgs} bottomOffset={footerH} theme={theme} onMeasureHeight={setTickerH} />
       <FooterLogo onToggle={() => setIsAlien(v => !v)} onMeasure={setFooterH} theme={theme} />
+      <WakeLockVideo />
     </div>
   );
 }
