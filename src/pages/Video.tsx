@@ -18,8 +18,10 @@ import type { JobType } from "@/types/job";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Video = () => {
+  const isMobile = useIsMobile();
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
   const [presetJobType, setPresetJobType] = useState<JobType | undefined>(undefined);
   
@@ -166,34 +168,38 @@ const Video = () => {
           icon={VideoIcon}
           tools={mobileTools}
         />
-        <LightsHeader
-          onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
-          department="Video"
-          canCreate={userRole ? ["admin","management"].includes(userRole) : true}
-        />
+        {!isMobile && (
+          <>
+            <LightsHeader
+              onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
+              department="Video"
+              canCreate={userRole ? ["admin","management"].includes(userRole) : true}
+            />
 
-        <div className="bg-card border border-border rounded-xl p-3 sm:p-4 shadow-sm">
-          <div className="flex flex-wrap gap-3 sm:gap-4 items-center justify-end">
-            <Link to="/video-pesos-tool">
-              <Button variant="outline" className="gap-2">
-                <Scale className="h-4 w-4" />
-                Weight Calculator
-              </Button>
-            </Link>
-            <Link to="/video-consumos-tool">
-              <Button variant="outline" className="gap-2">
-                <Zap className="h-4 w-4" />
-                Power Calculator
-              </Button>
-            </Link>
-            <Link to="/video-memoria-tecnica">
-              <Button variant="outline" className="gap-2">
-                <File className="h-4 w-4" />
-                Memoria Técnica
-              </Button>
-            </Link>
-          </div>
-        </div>
+            <div className="bg-card border border-border rounded-xl p-3 sm:p-4 shadow-sm">
+              <div className="flex flex-wrap gap-3 sm:gap-4 items-center justify-end">
+                <Link to="/video-pesos-tool">
+                  <Button variant="outline" className="gap-2">
+                    <Scale className="h-4 w-4" />
+                    Weight Calculator
+                  </Button>
+                </Link>
+                <Link to="/video-consumos-tool">
+                  <Button variant="outline" className="gap-2">
+                    <Zap className="h-4 w-4" />
+                    Power Calculator
+                  </Button>
+                </Link>
+                <Link to="/video-memoria-tecnica">
+                  <Button variant="outline" className="gap-2">
+                    <File className="h-4 w-4" />
+                    Memoria Técnica
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           <div className="xl:col-span-8 2xl:col-span-9">

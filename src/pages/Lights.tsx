@@ -17,9 +17,11 @@ import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Lights = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
   const [presetJobType, setPresetJobType] = useState<JobType | undefined>(undefined);
   
@@ -168,48 +170,52 @@ const Lights = () => {
           icon={Lightbulb}
           tools={mobileTools}
         />
-        <LightsHeader
-          onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
-          department="Luces"
-          canCreate={userRole ? ["admin","management"].includes(userRole) : true}
-        />
+        {!isMobile && (
+          <>
+            <LightsHeader
+              onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
+              department="Luces"
+              canCreate={userRole ? ["admin","management"].includes(userRole) : true}
+            />
 
-        <div className="bg-card border border-border rounded-xl p-3 sm:p-4 shadow-sm">
-          <div className="flex flex-wrap gap-3 sm:gap-4 items-center justify-end">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/lights-disponibilidad')}
-              className="flex items-center gap-2"
-            >
-              <Calendar className="h-4 w-4" />
-              Disponibilidad
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/lights-pesos-tool')}
-              className="flex items-center gap-2"
-            >
-              <Scale className="h-4 w-4" />
-              Calculadora de Peso
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/lights-consumos-tool')}
-              className="flex items-center gap-2"
-            >
-              <Zap className="h-4 w-4" />
-              Calculadora de Potencia
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/lights-memoria-tecnica')}
-              className="flex items-center gap-2"
-            >
-              <FileText className="h-4 w-4" />
-              Memoria Técnica
-            </Button>
-          </div>
-        </div>
+            <div className="bg-card border border-border rounded-xl p-3 sm:p-4 shadow-sm">
+              <div className="flex flex-wrap gap-3 sm:gap-4 items-center justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/lights-disponibilidad')}
+                  className="flex items-center gap-2"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Disponibilidad
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/lights-pesos-tool')}
+                  className="flex items-center gap-2"
+                >
+                  <Scale className="h-4 w-4" />
+                  Calculadora de Peso
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/lights-consumos-tool')}
+                  className="flex items-center gap-2"
+                >
+                  <Zap className="h-4 w-4" />
+                  Calculadora de Potencia
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/lights-memoria-tecnica')}
+                  className="flex items-center gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Memoria Técnica
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           <div className="xl:col-span-8 2xl:col-span-9">
