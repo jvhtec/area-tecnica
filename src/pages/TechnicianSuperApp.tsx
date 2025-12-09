@@ -165,7 +165,7 @@ export default function TechnicianSuperApp() {
       // First, fetch job_assignments for this technician to get roles and status
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('job_assignments')
-        .select('job_id, sound_role, lights_role, video_role, status, assigned_at')
+        .select('job_id, sound_role, lights_role, video_role, status, assigned_at, single_day, assignment_date')
         .eq('technician_id', user.id)
         .eq('status', 'confirmed');
 
@@ -261,6 +261,8 @@ export default function TechnicianSuperApp() {
             sound_role: assignment?.sound_role,
             lights_role: assignment?.lights_role,
             video_role: assignment?.video_role,
+            single_day: assignment?.single_day,
+            assignment_date: assignment?.assignment_date,
             jobs: row.jobs
           };
         });
