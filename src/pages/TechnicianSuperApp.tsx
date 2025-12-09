@@ -3,14 +3,12 @@ import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useMyTours } from '@/hooks/useMyTours';
-import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
+import { useAssignments, type TechnicianJobData, type TechnicianAssignment } from '@/hooks/useAssignments';
 import { useTechnicianDashboardSubscriptions } from '@/hooks/useMobileRealtimeSubscriptions';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
-import { format, addMonths } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { labelForCode } from '@/utils/roles';
 
 import {
@@ -52,45 +50,6 @@ import { SoundVisionModal } from '@/components/technician/SoundVisionModal';
 import { ObliqueStrategyModal } from '@/components/technician/ObliqueStrategyModal';
 import { TimesheetView } from '@/components/technician/TimesheetView';
 import { DetailsModal } from '@/components/technician/DetailsModal';
-
-// --- TYPE DEFINITIONS ---
-interface TechnicianJobData {
-  id: string;
-  title: string;
-  description?: string;
-  start_time: string;
-  end_time: string;
-  timezone?: string;
-  location_id?: string;
-  job_type?: string;
-  color?: string;
-  status?: string;
-  location?: { name: string } | null;
-  job_documents?: Array<{
-    id: string;
-    file_name: string;
-    file_path: string;
-    visible_to_tech?: boolean;
-    uploaded_at?: string;
-    read_only?: boolean;
-    template_type?: string | null;
-  }>;
-}
-
-interface TechnicianAssignment {
-  id: string;
-  job_id: string;
-  technician_id: string;
-  department: string;
-  role: string;
-  category: string;
-  sound_role?: string | null;
-  lights_role?: string | null;
-  video_role?: string | null;
-  single_day?: boolean | null;
-  assignment_date?: string | null;
-  jobs: TechnicianJobData;
-}
 
 // --- THEME STYLES (using next-themes compatible approach) ---
 const getThemeStyles = (isDark: boolean) => ({
@@ -154,129 +113,11 @@ export default function TechnicianSuperApp() {
     enabled: !!user?.id,
   });
 
-  // Fetch assignments (past 3 months to future 3 months for filtering)
-  const { data: assignments = [], isLoading } = useRealtimeQuery(
-    ['assignments-superapp'],
-    async () => {
-      if (!user?.id) return [];
-
-      // Fetch broader range for past/upcoming filtering
-      const startDate = addMonths(new Date(), -3);
-      const endDate = addMonths(new Date(), 3);
-
-      // First, fetch job_assignments for this technician to get roles and status
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('job_assignments')
-        .select('job_id, sound_role, lights_role, video_role, status, assigned_at, single_day, assignment_date')
-        .eq('technician_id', user.id)
-        .eq('status', 'confirmed');
-
-      if (assignmentsError) {
-        console.error('Error fetching assignments:', assignmentsError);
-        return [];
-      }
-
-      if (!assignmentsData || assignmentsData.length === 0) {
-        return [];
-      }
-
-      // Get unique job IDs from assignments
-      const jobIds = assignmentsData.map(a => a.job_id);
-
-      // Then fetch timesheets and jobs for those job IDs
-      const { data: timesheetData, error } = await supabase
-        .from('timesheets')
-        .select(`
-          job_id,
-          technician_id,
-          date,
-          jobs!inner (
-            id,
-            title,
-            description,
-            start_time,
-            end_time,
-            timezone,
-            location_id,
-            job_type,
-            color,
-            status,
-            location:locations(name),
-            job_documents(
-              id,
-              file_name,
-              file_path,
-              visible_to_tech,
-              uploaded_at,
-              read_only,
-              template_type
-            )
-          )
-        `)
-        .eq('technician_id', user.id)
-        .eq('is_active', true)
-        .in('job_id', jobIds)
-        .gte('jobs.start_time', startDate.toISOString())
-        .lte('jobs.start_time', endDate.toISOString())
-        .order('start_time', { referencedTable: 'jobs' });
-
-      if (error) {
-        console.error('Error fetching assignments:', error);
-        return [];
-      }
-
-      // Create a map of job_id to assignment for quick lookup
-      const assignmentsByJobId = new Map(
-        assignmentsData.map(a => [a.job_id, a])
-      );
-
-      // Deduplicate by job_id (timesheets have one row per date, we want one per job)
-      const seenJobIds = new Set<string>();
-      const jobAssignments = (timesheetData || []).filter(row => {
-        if (seenJobIds.has(row.job_id)) return false;
-        seenJobIds.add(row.job_id);
-        return true;
-      });
-
-      return jobAssignments
-        .filter(row => row.jobs)
-        .map(row => {
-          let department = "unknown";
-          const assignment = assignmentsByJobId.get(row.job_id);
-          if (assignment?.sound_role) department = "sound";
-          else if (assignment?.lights_role) department = "lights";
-          else if (assignment?.video_role) department = "video";
-
-          const category = getCategoryFromAssignment({
-            sound_role: assignment?.sound_role,
-            lights_role: assignment?.lights_role,
-            video_role: assignment?.video_role
-          });
-
-          return {
-            id: `job-${row.job_id}`,
-            job_id: row.job_id,
-            technician_id: row.technician_id,
-            department,
-            role: assignment?.sound_role || assignment?.lights_role || assignment?.video_role || "Assigned",
-            category,
-            sound_role: assignment?.sound_role,
-            lights_role: assignment?.lights_role,
-            video_role: assignment?.video_role,
-            single_day: assignment?.single_day,
-            assignment_date: assignment?.assignment_date,
-            jobs: row.jobs
-          };
-        });
-    },
-    'timesheets',
-    {
-      refetchOnWindowFocus: true,
-      refetchOnMount: true,
-      staleTime: 1000 * 60 * 2,
-      gcTime: 1000 * 60 * 5,
-    }
-  );
+  // Fetch assignments using shared hook
+  const { assignments, isLoading } = useAssignments({
+    userId: user?.id,
+    queryKey: ['assignments-superapp', user?.id],
+  });
 
   const t = getThemeStyles(isDark);
 
