@@ -414,8 +414,8 @@ export default function JobAssignmentMatrix() {
   } = useVirtualizedDateRange({
     initialWeeksBefore: 1,   // Start with 1 week before today
     initialWeeksAfter: 2,    // Start with 2 weeks after today
-    maxWeeksBefore: 26,      // Allow up to 6 months before
-    maxWeeksAfter: 26,       // Allow up to 6 months after
+    maxWeeksBefore: 52,      // Allow up to 1 year before
+    maxWeeksAfter: 52,       // Allow up to 1 year after
     expandByWeeks: 4         // Expand by 4 weeks at a time
   });
 
