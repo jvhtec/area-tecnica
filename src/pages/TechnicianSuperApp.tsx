@@ -87,6 +87,8 @@ interface TechnicianAssignment {
   sound_role?: string | null;
   lights_role?: string | null;
   video_role?: string | null;
+  single_day?: boolean | null;
+  assignment_date?: string | null;
   jobs: TechnicianJobData;
 }
 
