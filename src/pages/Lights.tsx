@@ -214,37 +214,37 @@ const Lights = () => {
                 </Button>
               </div>
             </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              <div className="xl:col-span-8 2xl:col-span-9">
+                <div className="bg-card rounded-xl border border-border shadow-sm">
+                  <CalendarSection
+                    date={date}
+                    onDateSelect={setDate}
+                    jobs={getDepartmentJobs()}
+                    department={currentDepartment}
+                    onDateTypeChange={() => {}} // Add empty handler as it's required
+                  />
+                </div>
+              </div>
+              <div className="xl:col-span-4 2xl:col-span-3 hidden md:block">
+                <div className="bg-card rounded-xl border border-border shadow-sm">
+                  <TodaySchedule
+                    jobs={getSelectedDateJobs()}
+                    onEditClick={handleEditClick}
+                    onDeleteClick={handleDeleteClick}
+                    onJobClick={handleJobClick}
+                    userRole={userRole}
+                    selectedDate={date}
+                    detailsOnlyMode
+                    department={currentDepartment}
+                    viewMode="sidebar"
+                  />
+                </div>
+              </div>
+            </div>
           </>
         )}
-
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          <div className="xl:col-span-8 2xl:col-span-9">
-            <div className="bg-card rounded-xl border border-border shadow-sm">
-              <CalendarSection 
-                date={date} 
-                onDateSelect={setDate}
-                jobs={getDepartmentJobs()}
-                department={currentDepartment}
-                onDateTypeChange={() => {}} // Add empty handler as it's required
-              />
-            </div>
-          </div>
-          <div className="xl:col-span-4 2xl:col-span-3 hidden md:block">
-            <div className="bg-card rounded-xl border border-border shadow-sm">
-              <TodaySchedule
-                jobs={getSelectedDateJobs()}
-                onEditClick={handleEditClick}
-                onDeleteClick={handleDeleteClick}
-                onJobClick={handleJobClick}
-                userRole={userRole}
-                selectedDate={date}
-                detailsOnlyMode
-                department={currentDepartment}
-                viewMode="sidebar"
-              />
-            </div>
-          </div>
-        </div>
       </div>
 
       <CreateJobDialog
