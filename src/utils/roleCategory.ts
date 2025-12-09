@@ -1,9 +1,14 @@
 /**
+ * Type representing technician categories
+ */
+export type TechnicianCategory = 'responsable' | 'especialista' | 'tecnico' | null;
+
+/**
  * Determines the technician category from a role code
  * @param roleCode - Role code like 'SND-FOH-R', 'LGT-BRD-E', 'VID-PA-T'
  * @returns 'responsable' | 'especialista' | 'tecnico' | null
  */
-export function getCategoryFromRole(roleCode: string | null | undefined): 'responsable' | 'especialista' | 'tecnico' | null {
+export function getCategoryFromRole(roleCode: string | null | undefined): TechnicianCategory {
   if (!roleCode) return null;
   
   const normalized = roleCode.trim().toUpperCase();
@@ -36,7 +41,7 @@ export function getCategoryFromAssignment(assignment: {
   sound_role?: string | null;
   lights_role?: string | null;
   video_role?: string | null;
-}): 'responsable' | 'especialista' | 'tecnico' | null {
+}): TechnicianCategory {
   const roles = [assignment.sound_role, assignment.lights_role, assignment.video_role];
   const categories = roles.map(role => getCategoryFromRole(role)).filter(cat => cat !== null);
 

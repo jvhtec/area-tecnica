@@ -176,7 +176,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
        userRole === "admin" || userRole === "management" || userRole === "logistics",
    },
    {
-
+    id: "management-department",
     label: ({ userDepartment }) => {
       const normalized = userDepartment?.toLowerCase() ?? ""
       return departmentLabelMap[normalized] || userDepartment || null

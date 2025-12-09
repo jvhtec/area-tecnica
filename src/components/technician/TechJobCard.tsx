@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
-import { MapPin, Clock, User, FileText, Lightbulb } from 'lucide-react';
+import { MapPin, Clock, User, FileText, Lightbulb, Info } from 'lucide-react';
 import { labelForCode } from '@/utils/roles';
 import { TechnicianIncidentReportDialog } from '@/components/incident-reports/TechnicianIncidentReportDialog';
 import { JobCardProps } from './types';
@@ -84,6 +84,16 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
                     <User size={12} /> {roleLabel}
                 </div>
             </div>
+
+            {/* Partial Assignment Disclaimer */}
+            {job.single_day && (
+                <div className={`mb-4 p-3 rounded-lg border ${isDark ? 'bg-blue-500/10 border-blue-500/30 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-700'} flex items-start gap-2`}>
+                    <Info size={16} className="shrink-0 mt-0.5" />
+                    <p className="text-xs leading-relaxed">
+                        <strong>Nota:</strong> Las fechas mostradas corresponden al trabajo completo. Estás asignado solo para días específicos dentro de este periodo.
+                    </p>
+                </div>
+            )}
 
             {/* Action Grid */}
             <div className={`grid gap-3 ${showTimesheetButton ? 'grid-cols-2' : 'grid-cols-1'}`}>

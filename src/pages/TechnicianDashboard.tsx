@@ -2,19 +2,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { addWeeks, addMonths } from 'date-fns';
 import {
   LayoutDashboard, Calendar as CalendarIcon, User, Briefcase,
   Euro, X
 } from 'lucide-react';
 
-import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
 import { useTechnicianDashboardSubscriptions } from '@/hooks/useMobileRealtimeSubscriptions';
 import { useTourRateSubscriptions } from '@/hooks/useTourRateSubscriptions';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { getCategoryFromAssignment } from '@/utils/roleCategory';
+import { useAssignments, type TechnicianJobData, type TechnicianAssignment } from '@/hooks/useAssignments';
+import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
+import { supabase } from '@/integrations/supabase/client';
 
 import { DashboardScreen } from '@/components/technician/DashboardScreen';
 import { JobsView } from '@/components/technician/JobsView';
@@ -27,44 +25,6 @@ import { MessagesModal } from '@/components/technician/MessagesModal';
 import { TourDetailView } from '@/components/technician/TourDetailView';
 import { SoundVisionModal } from '@/components/technician/SoundVisionModal';
 import { TechnicianTourRates } from '@/components/dashboard/TechnicianTourRates';
-
-// Type definitions
-interface TechnicianJobData {
-  id: string;
-  title: string;
-  description?: string;
-  start_time: string;
-  end_time: string;
-  timezone?: string;
-  location_id?: string;
-  job_type?: string;
-  color?: string;
-  status?: string;
-  created_at?: string;
-  location?: { name: string } | null;
-  job_documents?: Array<{
-    id: string;
-    file_name: string;
-    file_path: string;
-    visible_to_tech?: boolean;
-    uploaded_at?: string;
-    read_only?: boolean;
-    template_type?: string | null;
-  }>;
-}
-
-interface TechnicianAssignment {
-  id: string;
-  job_id: string;
-  technician_id: string;
-  department: string;
-  role: string;
-  category: string;
-  sound_role?: string | null;
-  lights_role?: string | null;
-  video_role?: string | null;
-  jobs: TechnicianJobData;
-}
 
 // Theme styles helper
 const getThemeStyles = (isDark: boolean) => ({
@@ -115,11 +75,6 @@ const TechnicianDashboard = () => {
   const [showRatesModal, setShowRatesModal] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
 
-  const assignmentsQueryKey = useMemo(
-    () => ['assignments-technician-dashboard'],
-    []
-  );
-
   // Set up real-time subscriptions
   useTechnicianDashboardSubscriptions();
   useTourRateSubscriptions();
@@ -143,126 +98,11 @@ const TechnicianDashboard = () => {
     }
   );
 
-  // Fetch assignments (past 3 months to future 3 months)
-  const { data: assignments = [], isLoading } = useRealtimeQuery(
-    assignmentsQueryKey,
-    async () => {
-      if (!user?.id) return [];
-
-      const startDate = addMonths(new Date(), -3);
-      const endDate = addMonths(new Date(), 3);
-
-      // Step 1: Fetch confirmed job assignments to get role/status info
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('job_assignments')
-        .select('job_id, sound_role, lights_role, video_role, status, assigned_at')
-        .eq('technician_id', user.id)
-        .eq('status', 'confirmed');
-
-      if (assignmentsError) {
-        console.error('Error fetching job assignments:', assignmentsError);
-        toast.error('Error loading assignment roles');
-        return [];
-      }
-
-      if (!assignmentsData || assignmentsData.length === 0) {
-        return [];
-      }
-
-      // Create a map for quick role lookup and a list of job IDs to fetch
-      const assignmentsByJobId = new Map(
-        assignmentsData.map((assignment) => [assignment.job_id, assignment])
-      );
-      const jobIds = Array.from(new Set(assignmentsData.map((assignment) => assignment.job_id)));
-
-      // Step 2: Fetch timesheets (with jobs) for those assignments
-      const { data: timesheetData, error } = await supabase
-        .from('timesheets')
-        .select(`
-          job_id,
-          technician_id,
-          date,
-          jobs!inner (
-            id,
-            title,
-            description,
-            start_time,
-            end_time,
-            timezone,
-            location_id,
-            job_type,
-            color,
-            status,
-            location:locations(name),
-            job_documents(
-              id,
-              file_name,
-              file_path,
-              visible_to_tech,
-              visible_to_tech,
-              uploaded_at,
-              read_only,
-              template_type
-            )
-          )
-        `)
-        .eq('technician_id', user.id)
-        .eq('is_active', true)
-        .in('job_id', jobIds)
-        .gte('jobs.start_time', startDate.toISOString())
-        .lte('jobs.start_time', endDate.toISOString())
-        .order('start_time', { referencedTable: 'jobs' });
-
-      if (error) {
-        console.error('Error fetching assignments:', error);
-        return [];
-      }
-
-      // Deduplicate by job_id
-      const seenJobIds = new Set<string>();
-      const jobAssignments = (timesheetData || []).filter(row => {
-        if (seenJobIds.has(row.job_id)) return false;
-        seenJobIds.add(row.job_id);
-        return true;
-      });
-
-      return jobAssignments
-        .filter(row => row.jobs)
-        .map(row => {
-          let department = "unknown";
-          const assignment = assignmentsByJobId.get(row.job_id);
-          if (assignment?.sound_role) department = "sound";
-          else if (assignment?.lights_role) department = "lights";
-          else if (assignment?.video_role) department = "video";
-
-          const category = getCategoryFromAssignment({
-            sound_role: assignment?.sound_role,
-            lights_role: assignment?.lights_role,
-            video_role: assignment?.video_role
-          });
-
-          return {
-            id: `job-${row.job_id}`,
-            job_id: row.job_id,
-            technician_id: row.technician_id,
-            department,
-            role: assignment?.sound_role || assignment?.lights_role || assignment?.video_role || "Assigned",
-            category,
-            sound_role: assignment?.sound_role,
-            lights_role: assignment?.lights_role,
-            video_role: assignment?.video_role,
-            jobs: row.jobs
-          };
-        });
-    },
-    'timesheets',
-    {
-      refetchOnWindowFocus: true,
-      refetchOnMount: true,
-      staleTime: 1000 * 60 * 2,
-      gcTime: 1000 * 60 * 5,
-    }
-  );
+  // Fetch assignments using shared hook
+  const { assignments, isLoading } = useAssignments({
+    userId: user?.id,
+    queryKey: ['assignments-technician-dashboard', user?.id],
+  });
 
   const t = getThemeStyles(isDark);
 
@@ -333,7 +173,7 @@ const TechnicianDashboard = () => {
         />
       )}
       {activeModal === 'details' && selectedJob && (
-        <DetailsModal theme={t} isDark={isDark} job={selectedJob as any} onClose={() => setActiveModal(null)} />
+        <DetailsModal theme={t} isDark={isDark} job={selectedJob} onClose={() => setActiveModal(null)} />
       )}
       {activeModal === 'soundvision' && hasSoundVisionAccess && (
         <SoundVisionModal theme={t} isDark={isDark} onClose={() => setActiveModal(null)} />

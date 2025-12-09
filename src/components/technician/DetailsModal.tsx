@@ -19,7 +19,7 @@ import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from '@/typ
 interface DetailsModalProps {
     theme: Theme;
     isDark: boolean;
-    job: JobWithLocationAndDocs;
+    job: { id: string } | JobWithLocationAndDocs;
     onClose: () => void;
 }
 
