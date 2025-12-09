@@ -3,7 +3,7 @@ import { addMonths } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
-import { getCategoryFromAssignment } from '@/utils/roleCategory';
+import { getCategoryFromAssignment, type TechnicianCategory } from '@/utils/roleCategory';
 
 // Type definitions
 export interface TechnicianJobData {
@@ -36,7 +36,7 @@ export interface TechnicianAssignment {
   technician_id: string;
   department: string;
   role: string;
-  category: string;
+  category: TechnicianCategory;
   sound_role?: string | null;
   lights_role?: string | null;
   video_role?: string | null;
@@ -141,6 +141,7 @@ export const useAssignments = ({
 
       if (error) {
         console.error('Error fetching assignments:', error);
+        toast.error('Error loading job details');
         return [];
       }
 

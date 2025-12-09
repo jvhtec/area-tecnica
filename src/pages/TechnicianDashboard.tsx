@@ -173,7 +173,7 @@ const TechnicianDashboard = () => {
         />
       )}
       {activeModal === 'details' && selectedJob && (
-        <DetailsModal theme={t} isDark={isDark} job={selectedJob as any} onClose={() => setActiveModal(null)} />
+        <DetailsModal theme={t} isDark={isDark} job={selectedJob} onClose={() => setActiveModal(null)} />
       )}
       {activeModal === 'soundvision' && hasSoundVisionAccess && (
         <SoundVisionModal theme={t} isDark={isDark} onClose={() => setActiveModal(null)} />
