@@ -137,23 +137,35 @@ export function useStaffingMatrixStatuses(
         const reqs = byTech.get(tid) || []
         dates.forEach(d => {
           const dStr = format(d, 'yyyy-MM-dd')
-          // Filter requests to jobs with exact target_date match
-          // IMPORTANT: Only show requests with specific target_date to prevent
-          // them from incorrectly following job date changes
-          const exactMatches = reqs.filter(r => {
-            // Only show staffing requests that have a specific target_date
-            // This prevents full-span requests from dynamically following job reschedules
-            if (!r.target_date) return false
+          // Filter requests based on type:
+          // - Single-day requests: exact target_date match (prevents following job reschedules)
+          // - Full-span requests: show on all dates within the job's date range
+          const matchingRequests = reqs.filter(r => {
+            // Single-day requests with target_date: exact match only
+            if (r.single_day && r.target_date) {
+              const rDate = typeof r.target_date === 'string' ? r.target_date : format(r.target_date, 'yyyy-MM-dd')
+              return rDate === dStr
+            }
 
-            const rDate = typeof r.target_date === 'string' ? r.target_date : format(r.target_date, 'yyyy-MM-dd')
+            // Full-span requests (no target_date): show on all job dates
+            if (!r.single_day) {
+              const job = jobLookup.get(r.job_id)
+              if (!job) return false
+              const cellDate = new Date(d)
+              cellDate.setHours(0, 0, 0, 0)
+              const start = new Date(job.start)
+              start.setHours(0, 0, 0, 0)
+              const end = new Date(job.end)
+              end.setHours(0, 0, 0, 0)
+              return cellDate >= start && cellDate <= end
+            }
 
-            // Only match if the target_date exactly matches this date
-            return rDate === dStr
+            return false
           })
-          if (!exactMatches.length) return
+          if (!matchingRequests.length) return
 
           // Reduce to latest per phase
-          const latest = exactMatches.reduce((acc: any, r: any) => {
+          const latest = matchingRequests.reduce((acc: any, r: any) => {
             const t = r.updated_at ? new Date(r.updated_at).getTime() : 0
             if (r.phase === 'availability') {
               const accT = acc.availability_updated_at || 0

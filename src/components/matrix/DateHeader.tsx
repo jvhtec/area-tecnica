@@ -33,30 +33,65 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
     queryFn: async () => {
       if (!jobId || !technicianIds?.length) return { invitations: 0, offers: 0, confirmations: 0 } as const;
 
-      // Fetch latest staffing_requests per (profile_id, phase) for this job
-      const { data: reqRows, error: reqErr } = await supabase
-        .from('staffing_requests')
-        .select('job_id, profile_id, phase, status, updated_at')
+      // Use the new staffing RPC which already normalizes latest statuses per technician/job
+      const normalizeAvailability = (s: string | null) => {
+        if (!s) return null;
+        if (s === 'pending') return 'requested';
+        if (s === 'expired') return null;
+        return s;
+      };
+      const normalizeOffer = (s: string | null) => {
+        if (!s) return null;
+        if (s === 'pending') return 'sent';
+        if (s === 'expired') return null;
+        return s;
+      };
+
+      let invitations = 0; // availability requested
+      let offers = 0;      // offer sent
+
+      const { data: staffingData, error: staffingErr } = await supabase
+        .rpc('get_assignment_matrix_staffing')
         .eq('job_id', jobId)
         .in('profile_id', technicianIds);
-      if (reqErr) {
-        console.warn('Counts staffing_requests error', reqErr);
+
+      if (staffingErr) {
+        console.warn('Counts staffing RPC error', staffingErr);
+      } else {
+        (staffingData || []).forEach((r: any) => {
+          const av = normalizeAvailability(r.availability_status);
+          const of = normalizeOffer(r.offer_status);
+          if (av === 'requested') invitations++;
+          if (of === 'sent') offers++;
+        });
       }
 
-      const latestByTechPhase = new Map<string, { phase: 'availability' | 'offer'; status: string | null; t: number }>();
-      (reqRows || []).forEach((r: any) => {
-        const key = `${r.profile_id}-${r.phase}`;
-        const t = r.updated_at ? new Date(r.updated_at).getTime() : 0;
-        const cur = latestByTechPhase.get(key);
-        if (!cur || t > cur.t) latestByTechPhase.set(key, { phase: r.phase, status: r.status, t });
-      });
+      // Fallback to raw staffing_requests if RPC returned nothing (e.g., old rows without view coverage)
+      if ((staffingErr || !(staffingData || []).length)) {
+        const { data: reqRows, error: reqErr } = await supabase
+          .from('staffing_requests')
+          .select('job_id, profile_id, phase, status, updated_at')
+          .eq('job_id', jobId)
+          .in('profile_id', technicianIds);
+        if (reqErr) {
+          console.warn('Counts staffing_requests error', reqErr);
+        }
 
-      let invitations = 0; // availability pending
-      let offers = 0;      // offer pending
-      latestByTechPhase.forEach((v) => {
-        if (v.phase === 'availability' && v.status === 'pending') invitations++;
-        if (v.phase === 'offer' && v.status === 'pending') offers++;
-      });
+        const latestByTechPhase = new Map<string, { phase: 'availability' | 'offer'; status: string | null; t: number }>();
+        (reqRows || []).forEach((r: any) => {
+          const key = `${r.profile_id}-${r.phase}`;
+          const t = r.updated_at ? new Date(r.updated_at).getTime() : 0;
+          const cur = latestByTechPhase.get(key);
+          if (!cur || t > cur.t) latestByTechPhase.set(key, { phase: r.phase, status: r.status, t });
+        });
+
+        invitations = 0;
+        offers = 0;
+        latestByTechPhase.forEach((v) => {
+          if (v.phase === 'availability' && (v.status === 'pending' || v.status === 'requested')) invitations++;
+          if (v.phase === 'offer' && (v.status === 'pending' || v.status === 'sent')) offers++;
+        });
+      }
 
       // Confirmed/scheduled technicians from timesheets (source of truth)
       // Count unique technicians with timesheets for this job
