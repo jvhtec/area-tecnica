@@ -128,6 +128,11 @@ export const LogisticsEventDialog = ({
       setNotes("");
       setSelectedDepartments(initialDepartments || []);
       setColor("#7E69AB");
+      setAlsoCreateUnload(false);
+      // Ensure job selection is cleared if no initial job is provided
+      if (!initialJobId) {
+        setSelectedJob(null);
+      }
     }
     // Only re-run when dialog opens or we switch to a different event
   }, [open, selectedEvent?.id]);
@@ -194,7 +199,9 @@ export const LogisticsEventDialog = ({
 
       // Close both the delete dialog and the main event dialog
       setShowDeleteDialog(false);
-      onOpenChange(false);
+      // Small timeout to allow the alert dialog to fully unmount before closing the parent dialog
+      // This prevents "Failed to execute 'removeChild' on 'Node'" errors
+      setTimeout(() => onOpenChange(false), 100);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -357,7 +364,7 @@ export const LogisticsEventDialog = ({
         // notify caller on create
         try {
           onCreated?.({ id: newEvent.id, event_type: newEvent.event_type, event_date: newEvent.event_date, event_time: newEvent.event_time });
-        } catch {}
+        } catch { }
 
         if (selectedDepartments.length > 0) {
           const { error: deptError } = await supabase
@@ -388,7 +395,7 @@ export const LogisticsEventDialog = ({
           }
           try {
             onCreated?.({ id: unloadEvent.id, event_type: unloadEvent.event_type, event_date: unloadEvent.event_date, event_time: unloadEvent.event_time });
-          } catch {}
+          } catch { }
 
           await broadcastLogisticsEvent(newEvent, {
             type: "logistics.event.created",
@@ -411,10 +418,10 @@ export const LogisticsEventDialog = ({
           await broadcastLogisticsEvent(newEvent);
         }
 
-      toast({
-        title: "Éxito",
-        description: "Evento de logística creado correctamente.",
-      });
+        toast({
+          title: "Éxito",
+          description: "Evento de logística creado correctamente.",
+        });
       }
 
       queryClient.invalidateQueries({ queryKey: ["logistics-events"] });
@@ -439,7 +446,7 @@ export const LogisticsEventDialog = ({
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Job Selection or locked job display */}
+            {/* Job Selection or locked job display */}
             {(!selectedEvent && !initialJobId) ? (
               <div className="space-y-2">
                 <Label>Trabajo</Label>
