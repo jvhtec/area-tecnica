@@ -85,9 +85,10 @@ export function StockMovementDialog({
       }
     },
     onSuccess: () => {
-      // Invalidate both queries to refresh the UI
-      queryClient.invalidateQueries({ queryKey: ['current-stock-levels'] });
-      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+      // Invalidate queries to refresh the UI - use partial match to catch all department variants
+      queryClient.invalidateQueries({ queryKey: ['current-stock-levels'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['equipment-with-stock'], exact: false });
       toast({
         title: "Success",
         description: `Stock ${isAddition ? 'added' : 'removed'} successfully`

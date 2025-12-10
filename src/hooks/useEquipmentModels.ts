@@ -7,8 +7,12 @@ export interface EquipmentModel {
   id: string;
   name: string;
   category: string;
-  created_at: string;
-  updated_at: string;
+  department: string;
+  resource_id?: string | null;
+  manufacturer?: string | null;
+  image_id?: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export const useEquipmentModels = () => {
@@ -23,8 +27,9 @@ export const useEquipmentModels = () => {
     queryKey: ['equipment-models'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('equipment_models')
+        .from('equipment')
         .select('*')
+        .eq('department', 'sound')
         .order('category', { ascending: true })
         .order('name', { ascending: true });
 
@@ -34,10 +39,10 @@ export const useEquipmentModels = () => {
   });
 
   const createModelMutation = useMutation({
-    mutationFn: async (model: { name: string; category: string }) => {
+    mutationFn: async (model: { name: string; category: string; resource_id?: string; manufacturer?: string; image_id?: string }) => {
       const { data, error } = await supabase
-        .from('equipment_models')
-        .insert([model])
+        .from('equipment')
+        .insert([{ ...model, department: 'sound' }])
         .select()
         .single();
 
@@ -61,11 +66,12 @@ export const useEquipmentModels = () => {
   });
 
   const updateModelMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; name?: string; category?: string }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; name?: string; category?: string; resource_id?: string; manufacturer?: string; image_id?: string }) => {
       const { data, error } = await supabase
-        .from('equipment_models')
+        .from('equipment')
         .update(updates)
         .eq('id', id)
+        .eq('department', 'sound')
         .select()
         .single();
 
@@ -91,9 +97,10 @@ export const useEquipmentModels = () => {
   const deleteModelMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('equipment_models')
+        .from('equipment')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('department', 'sound');
 
       if (error) throw error;
     },
