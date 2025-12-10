@@ -195,7 +195,13 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
           >
             <Printer className="h-4 w-4" />
           </Button>
-          <Button onClick={() => setShowEventDialog(true)} size="sm">
+          <Button
+            onClick={() => {
+              setSelectedEvent(null);
+              setShowEventDialog(true);
+            }}
+            size="sm"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add Event
           </Button>
@@ -226,27 +232,27 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
                   <span className="text-sm">{format(day, "d")}</span>
                   <div className="space-y-1 mt-1">
                     {dayEvents?.slice(0, maxVisibleEvents).map((event) => (
-  <Tooltip key={event.id}>
-    <TooltipTrigger asChild>
-      <div>
-        <LogisticsEventCard
-          event={event}
-          onClick={(e) => handleEventClick(e, event)}
-          compact
-          variant="calendar" // Pass variant for calendar display
-          className="px-1.5 py-0.5 text-xs truncate hover:bg-accent/50"
-        />
-      </div>
-    </TooltipTrigger>
-    <TooltipContent side="top" align="start" className="w-64">
-      <LogisticsEventCard 
-        event={event} 
-        onClick={(e) => handleEventClick(e, event)}
-        className="border-0 shadow-none p-0"
-      />
-    </TooltipContent>
-  </Tooltip>
-))}
+                      <Tooltip key={event.id}>
+                        <TooltipTrigger asChild>
+                          <div>
+                            <LogisticsEventCard
+                              event={event}
+                              onClick={(e) => handleEventClick(e, event)}
+                              compact
+                              variant="calendar" // Pass variant for calendar display
+                              className="px-1.5 py-0.5 text-xs truncate hover:bg-accent/50"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start" className="w-64">
+                          <LogisticsEventCard
+                            event={event}
+                            onClick={(e) => handleEventClick(e, event)}
+                            className="border-0 shadow-none p-0"
+                          />
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
 
                     {dayEvents && dayEvents.length > maxVisibleEvents && (
                       <div className="text-xs text-muted-foreground mt-1">
@@ -260,8 +266,8 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
           </div>
         </div>
 
-        <LogisticsEventDialog 
-          open={showEventDialog} 
+        <LogisticsEventDialog
+          open={showEventDialog}
           onOpenChange={setShowEventDialog}
           selectedDate={currentMonth}
           selectedEvent={selectedEvent}
