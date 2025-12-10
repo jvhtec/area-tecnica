@@ -72,6 +72,15 @@ export const useTourCreation = (
       return;
     }
 
+    if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+      toast({
+        title: "Invalid Dates",
+        description: "End date cannot be earlier than start date",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsCreating(true);
 
     try {

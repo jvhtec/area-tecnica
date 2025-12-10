@@ -76,6 +76,7 @@ export const TourFormFields = ({
             id="endDate"
             type="date"
             value={endDate}
+            min={startDate}
             onChange={(e) => onEndDateChange(e.target.value)}
           />
         </div>
