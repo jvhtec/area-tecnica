@@ -6,9 +6,10 @@ import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks }
 import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase';
+import { SUPABASE_URL } from '@/lib/api-config';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -39,6 +40,71 @@ interface Equipment {
   rental_boost?: number;
   image_id?: string | null;
   manufacturer?: string | null;
+}
+
+// Component to fetch and display Flex images with proper authentication
+function FlexImage({ imageId, alt, className }: { imageId: string; alt: string; className?: string }) {
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchImage = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          setError(true);
+          return;
+        }
+
+        const response = await fetch(
+          `${SUPABASE_URL}/functions/v1/fetch-flex-image?imageId=${encodeURIComponent(imageId)}&size=thumb`,
+          {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          setError(true);
+          return;
+        }
+
+        const blob = await response.blob();
+        if (isMounted) {
+          const url = URL.createObjectURL(blob);
+          setImageSrc(url);
+        }
+      } catch {
+        if (isMounted) {
+          setError(true);
+        }
+      }
+    };
+
+    fetchImage();
+
+    return () => {
+      isMounted = false;
+      if (imageSrc) {
+        URL.revokeObjectURL(imageSrc);
+      }
+    };
+  }, [imageId]);
+
+  if (error || !imageSrc) {
+    return <span className="text-xs text-muted-foreground">Image not available</span>;
+  }
+
+  return (
+    <img
+      src={imageSrc}
+      alt={alt}
+      className={className}
+    />
+  );
 }
 
 export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps) {
@@ -90,11 +156,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
       const { data, error } = await supabase
         .from('equipment_availability_with_rentals')
         .select(`
-          *,
-          equipment:equipment_id (
-            image_id,
-            manufacturer
-          )
+          *
         `)
         .in('category', departmentCategories)
         .order('category')
@@ -113,8 +175,8 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
         current_quantity: item.base_quantity || 0,
         base_quantity: item.base_quantity || 0,
         rental_boost: 0,
-        image_id: (item.equipment as any)?.image_id || null,
-        manufacturer: (item.equipment as any)?.manufacturer || null
+        image_id: item.image_id || null,
+        manufacturer: item.manufacturer || null
       })) as Equipment[];
     }
   });
@@ -532,14 +594,10 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
                                   </TooltipTrigger>
                                   <TooltipContent side="right" className="p-2">
                                     <div className="space-y-2">
-                                      <img
-                                        src={`https://sectorpro.flexrentalsolutions.com/f5/api/image/${item.image_id}/thumb`}
+                                      <FlexImage
+                                        imageId={item.image_id}
                                         alt={item.name}
                                         className="max-w-[200px] max-h-[200px] rounded"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = 'none';
-                                          e.currentTarget.nextElementSibling!.textContent = 'Image not available';
-                                        }}
                                       />
                                       <div className="text-sm font-medium">{item.name}</div>
                                       {item.manufacturer && (

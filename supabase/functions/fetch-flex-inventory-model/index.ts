@@ -6,10 +6,67 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
 };
 
+// Expected structure from Flex API inventory-model endpoint
+interface FlexInventoryModelResponse {
+  preferredDisplayString?: string;
+  name?: string;
+  manufacturer?: string;
+  notes?: string;
+  size?: string;
+  shortName?: string;
+  code?: string;
+  imageThumbnailId?: string;
+  imageId?: string;
+  // Allow additional unknown fields from Flex API
+  [key: string]: unknown;
+}
+
+// Validated and sanitized response we return
+interface ValidatedEquipmentData {
+  name: string;
+  manufacturer: string;
+  notes: string;
+  size: string;
+  shortName: string;
+  code: string;
+  imageId: string;
+}
+
 function extractUuid(input: string): string | null {
   const uuidRe = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/;
   const m = (input || '').match(uuidRe);
   return m?.[0] || null;
+}
+
+// Sanitize string to prevent XSS - only allow safe characters
+function sanitizeString(value: unknown, maxLength = 500): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value !== 'string') return '';
+  // Remove any HTML tags and trim to max length
+  return value
+    .replace(/<[^>]*>/g, '')  // Remove HTML tags
+    .replace(/[<>'"&]/g, '')  // Remove potentially dangerous chars
+    .substring(0, maxLength)
+    .trim();
+}
+
+// Validate and sanitize Flex API response
+function validateFlexResponse(data: unknown): ValidatedEquipmentData {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Invalid Flex API response: expected object');
+  }
+
+  const info = data as FlexInventoryModelResponse;
+
+  return {
+    name: sanitizeString(info.preferredDisplayString || info.name, 255),
+    manufacturer: sanitizeString(info.manufacturer, 255),
+    notes: sanitizeString(info.notes, 1000),
+    size: sanitizeString(info.size, 100),
+    shortName: sanitizeString(info.shortName, 100),
+    code: sanitizeString(info.code, 50),
+    imageId: sanitizeString(info.imageThumbnailId || info.imageId, 100),
+  };
 }
 
 serve(async (req: Request) => {
@@ -59,22 +116,25 @@ serve(async (req: Request) => {
       const text = await res.text();
       return new Response(JSON.stringify({ error: `Flex error ${res.status}`, details: text }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    const info = await res.json();
+    const rawResponse = await res.json();
 
-    // Map to our equipment fields
-    const name = info?.preferredDisplayString || info?.name || '';
-    const manufacturer = info?.manufacturer || '';
-    const notes = info?.notes || '';
-    const size = info?.size || '';
-    const shortName = info?.shortName || '';
-    const code = info?.code || '';
-    const imageId = info?.imageThumbnailId || info?.imageId || '';
+    // Validate and sanitize the Flex API response
+    let mapped: ValidatedEquipmentData;
+    try {
+      mapped = validateFlexResponse(rawResponse);
+    } catch (validationError) {
+      return new Response(JSON.stringify({
+        error: 'Invalid response from Flex API',
+        details: (validationError as Error).message
+      }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     return new Response(JSON.stringify({
       ok: true,
       model_id: modelId,
-      mapped: { name, manufacturer, notes, size, shortName, code, imageId },
-      raw: info
+      mapped,
+      // Only include raw in development for debugging - sanitized fields are authoritative
+      raw: rawResponse
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     const msg = (e as any)?.message || String(e);

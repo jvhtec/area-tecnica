@@ -762,30 +762,9 @@ export type Database = {
         }
         Relationships: []
       }
-      equipment_models: {
-        Row: {
-          category: string
-          created_at: string
-          id: string
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          category: string
-          created_at?: string
-          id?: string
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          id?: string
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
+      // NOTE: equipment_models table has been deprecated and renamed to
+      // equipment_models_deprecated_20251204. All data migrated to equipment table.
+      // This type definition removed to prevent accidental usage.
       expense_categories: {
         Row: {
           slug: string
