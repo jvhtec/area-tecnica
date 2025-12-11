@@ -290,7 +290,7 @@ export default function TechnicianSuperApp() {
     <div className={`min-h-screen flex flex-col ${t.bg} transition-colors duration-300 font-sans`}>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 pb-24">
+      <div className="flex-1 overflow-y-auto p-6 pb-[calc(6rem+var(--safe-area-bottom))]">
         {tab === 'dashboard' && (
           <DashboardScreen
             theme={t}
@@ -334,7 +334,7 @@ export default function TechnicianSuperApp() {
       </div>
 
       {/* Navigation */}
-      <div className={`h-20 ${t.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-safe-3`}>
+      <div className={`min-h-20 ${t.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-safe-3`}>
         {[
           { id: 'dashboard', icon: LayoutDashboard, label: 'Panel' },
           { id: 'jobs', icon: Briefcase, label: 'Trabajos' },
