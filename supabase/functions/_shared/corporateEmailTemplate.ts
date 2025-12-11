@@ -92,8 +92,9 @@ export function wrapInCorporateTemplate(options: CorporateTemplateOptions): stri
 
 /**
  * Simple HTML escape helper
+ * Exported for use in other email-related functions to prevent XSS
  */
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   const map: Record<string, string> = {
     '&': '&amp;',
     '<': '&lt;',

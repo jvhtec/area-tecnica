@@ -81,6 +81,25 @@ export function BugReportForm() {
   const onSubmit = async (data: BugReportFormData) => {
     setIsSubmitting(true);
     try {
+      // Validate screenshot size before sending (max 5MB accounting for base64 overhead)
+      if (screenshot) {
+        // Remove data URL prefix to get pure base64
+        const base64Data = screenshot.split(",")[1] || screenshot;
+        // Calculate approximate binary size (base64 is ~33% larger than binary)
+        const binarySize = (base64Data.length * 3) / 4;
+        const maxSize = 5 * 1024 * 1024; // 5MB
+
+        if (binarySize > maxSize) {
+          toast({
+            title: "Imagen demasiado grande",
+            description: `La captura de pantalla es demasiado grande (${(binarySize / 1024 / 1024).toFixed(2)}MB). El tamaño máximo es 5MB. Por favor, usa una imagen más pequeña.`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       // Get app version from environment
       const appVersion = import.meta.env.VITE_APP_VERSION || "unknown";
 

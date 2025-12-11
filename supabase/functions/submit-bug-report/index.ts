@@ -161,6 +161,26 @@ serve(async (req) => {
       );
     }
 
+    // Validate screenshot size (max 5MB after base64 decode)
+    if (bugReport.screenshot) {
+      const base64Data = bugReport.screenshot.split(",")[1] || bugReport.screenshot;
+      const binarySize = Math.ceil((base64Data.length * 3) / 4);
+      const maxSize = 5 * 1024 * 1024; // 5MB
+
+      if (binarySize > maxSize) {
+        return new Response(
+          JSON.stringify({
+            error: "Screenshot too large",
+            details: `Screenshot size (${(binarySize / 1024 / 1024).toFixed(2)}MB) exceeds maximum allowed size of 5MB`,
+          }),
+          {
+            status: 413,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
     // Get current user if authenticated
     const user = await getCurrentUser(req);
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -244,11 +264,12 @@ serve(async (req) => {
       .single();
 
     if (dbError) {
-      console.error("[submit-bug-report] Database error:", dbError);
+      const errorId = `BR-DB-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      console.error(`[submit-bug-report] Database error ${errorId}:`, dbError);
       return new Response(
         JSON.stringify({
           error: "Failed to save bug report",
-          details: dbError.message,
+          errorId: errorId,
         }),
         {
           status: 500,
@@ -277,11 +298,15 @@ serve(async (req) => {
       }
     );
   } catch (err) {
-    console.error("[submit-bug-report] Unexpected error", err);
+    // Log full error details server-side for debugging
+    const errorId = `BR-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    console.error(`[submit-bug-report] Error ${errorId}:`, err);
+
+    // Return generic error to client without leaking internal details
     return new Response(
       JSON.stringify({
         error: "Internal server error",
-        details: (err as Error).message,
+        errorId: errorId,
       }),
       {
         status: 500,

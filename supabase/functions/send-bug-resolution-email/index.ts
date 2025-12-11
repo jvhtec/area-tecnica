@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { wrapInCorporateTemplate } from "../_shared/corporateEmailTemplate.ts";
+import { wrapInCorporateTemplate, escapeHtml } from "../_shared/corporateEmailTemplate.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -171,19 +171,19 @@ serve(async (req) => {
       );
     }
 
-    // Build email content
+    // Build email content (escape all user-controlled content to prevent XSS)
     const bodyHtml = `
       <h2>Tu error ha sido resuelto</h2>
       <p>Hola,</p>
       <p>Te escribimos para informarte que el error que reportaste ha sido resuelto.</p>
 
       <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0; border-radius: 5px;">
-        <h3 style="margin-top: 0;">${bugReport.title}</h3>
-        <p style="margin-bottom: 0;"><strong>Descripción:</strong> ${bugReport.description}</p>
+        <h3 style="margin-top: 0;">${escapeHtml(bugReport.title)}</h3>
+        <p style="margin-bottom: 0;"><strong>Descripción:</strong> ${escapeHtml(bugReport.description)}</p>
       </div>
 
       ${bugReport.github_issue_url ? `
-        <p>Puedes ver más detalles en el <a href="${bugReport.github_issue_url}">issue de GitHub</a>.</p>
+        <p>Puedes ver más detalles en el <a href="${escapeHtml(bugReport.github_issue_url)}">issue de GitHub</a>.</p>
       ` : ''}
 
       <p>Gracias por tu ayuda para mejorar nuestra aplicación.</p>
@@ -215,11 +215,12 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorMessage = await response.text();
-      console.error("[send-bug-resolution-email] Brevo error:", response.status, errorMessage);
+      const errorId = `BRE-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      console.error(`[send-bug-resolution-email] Brevo error ${errorId}:`, response.status, errorMessage);
       return new Response(
         JSON.stringify({
           error: "Failed to send email",
-          details: errorMessage || `Brevo responded with status ${response.status}`,
+          errorId: errorId,
         }),
         {
           status: response.status,
@@ -242,11 +243,15 @@ serve(async (req) => {
       }
     );
   } catch (err) {
-    console.error("[send-bug-resolution-email] Unexpected error", err);
+    // Log full error details server-side for debugging
+    const errorId = `BRE-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    console.error(`[send-bug-resolution-email] Error ${errorId}:`, err);
+
+    // Return generic error to client without leaking internal details
     return new Response(
       JSON.stringify({
         error: "Internal server error",
-        details: (err as Error).message,
+        errorId: errorId,
       }),
       {
         status: 500,

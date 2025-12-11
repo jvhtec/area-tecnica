@@ -119,11 +119,15 @@ serve(async (req) => {
       }
     );
   } catch (err) {
-    console.error("[submit-feature-request] Unexpected error", err);
+    // Log full error details server-side for debugging
+    const errorId = `FR-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    console.error(`[submit-feature-request] Error ${errorId}:`, err);
+
+    // Return generic error to client without leaking internal details
     return new Response(
       JSON.stringify({
         error: "Internal server error",
-        details: (err as Error).message,
+        errorId: errorId,
       }),
       {
         status: 500,

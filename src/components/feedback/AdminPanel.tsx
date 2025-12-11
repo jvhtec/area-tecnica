@@ -49,6 +49,8 @@ type BugReport = {
   console_logs: Array<{ type: string; message: string; timestamp: string }> | null;
   created_at: string;
   updated_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
   admin_notes: string | null;
   app_version: string | null;
   environment_info: Record<string, unknown> | null;
