@@ -38,7 +38,7 @@ Este sistema permite a los usuarios reportar errores y solicitar nuevas funcione
 
 ### Frontend (React + TypeScript)
 
-```
+```text
 src/
 ├── pages/
 │   └── Feedback.tsx                    # Página principal
@@ -53,7 +53,7 @@ src/
 
 ### Backend (Supabase)
 
-```
+```text
 supabase/
 ├── migrations/
 │   ├── 20251211000000_create_feedback_system.sql    # Tablas y RLS

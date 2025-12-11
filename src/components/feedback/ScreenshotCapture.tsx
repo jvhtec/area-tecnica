@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Camera, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,11 @@ export function ScreenshotCapture({
 }: ScreenshotCaptureProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentScreenshot || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync previewUrl with currentScreenshot prop to avoid stale previews
+  useEffect(() => {
+    setPreviewUrl(currentScreenshot || null);
+  }, [currentScreenshot]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -44,10 +49,11 @@ export function ScreenshotCapture({
   };
 
   const handleCapture = async () => {
+    let stream: MediaStream | null = null;
     try {
       // Try to capture screen using modern API
       if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-        const stream = await navigator.mediaDevices.getDisplayMedia({
+        stream = await navigator.mediaDevices.getDisplayMedia({
           video: { mediaSource: "screen" } as MediaTrackConstraints,
         });
 
@@ -72,9 +78,6 @@ export function ScreenshotCapture({
           setPreviewUrl(dataUrl);
           onScreenshotCapture(dataUrl, "screenshot.png");
         }
-
-        // Stop all tracks
-        stream.getTracks().forEach((track) => track.stop());
       } else {
         // Fallback to file upload
         fileInputRef.current?.click();
@@ -83,6 +86,9 @@ export function ScreenshotCapture({
       console.error("Error capturing screenshot:", error);
       // Fallback to file upload
       fileInputRef.current?.click();
+    } finally {
+      // Always stop stream tracks to prevent leaking active screen capture
+      stream?.getTracks().forEach((track) => track.stop());
     }
   };
 

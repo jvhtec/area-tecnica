@@ -106,7 +106,7 @@ export function BugReportForm() {
       // Collect environment info
       const environmentInfo = {
         browser: navigator.userAgent,
-        os: navigator.platform,
+        os: (navigator as any).userAgentData?.platform || navigator.platform || "unknown",
         screenWidth: window.screen.width,
         screenHeight: window.screen.height,
         language: navigator.language,
