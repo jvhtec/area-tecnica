@@ -61,7 +61,6 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const [bulkFormData, setBulkFormData] = useState<Partial<TimesheetFormData>>({
     start_time: '',
     end_time: '',
-    break_minutes: undefined,
     overtime_hours: undefined,
     notes: '',
     ends_next_day: false
@@ -70,7 +69,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     date: selectedDate,
     start_time: "09:00",
     end_time: "17:00",
-    break_minutes: 30,
+    break_minutes: 0,
     overtime_hours: 0,
     notes: "",
     ends_next_day: false,
@@ -119,7 +118,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     await updateTimesheet(editingTimesheet, {
       start_time: formData.start_time,
       end_time: formData.end_time,
-      break_minutes: formData.break_minutes,
+      break_minutes: 0,
       overtime_hours: formData.overtime_hours,
       notes: formData.notes,
       ends_next_day: formData.ends_next_day,
@@ -134,7 +133,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       date: timesheet.date,
       start_time: timesheet.start_time || "09:00",
       end_time: timesheet.end_time || "17:00",
-      break_minutes: timesheet.break_minutes || 0,
+      break_minutes: 0,
       overtime_hours: timesheet.overtime_hours || 0,
       notes: timesheet.notes || "",
       ends_next_day: timesheet.ends_next_day || false,
@@ -275,7 +274,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
 
         if (bulkFormData.start_time) updates.start_time = bulkFormData.start_time;
         if (bulkFormData.end_time) updates.end_time = bulkFormData.end_time;
-        if (bulkFormData.break_minutes !== undefined) updates.break_minutes = bulkFormData.break_minutes;
+        updates.break_minutes = 0;
         if (bulkFormData.overtime_hours !== undefined) updates.overtime_hours = bulkFormData.overtime_hours;
         if (bulkFormData.notes) updates.notes = bulkFormData.notes;
         if (bulkFormData.ends_next_day !== undefined) updates.ends_next_day = bulkFormData.ends_next_day;
@@ -297,7 +296,6 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       setBulkFormData({
         start_time: '',
         end_time: '',
-        break_minutes: undefined,
         overtime_hours: undefined,
         notes: '',
         ends_next_day: false
@@ -510,17 +508,6 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   type="time"
                   value={bulkFormData.end_time}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, end_time: e.target.value })}
-                  placeholder="Dejar vacío para omitir"
-                  disabled={isBulkUpdating}
-                />
-              </div>
-              <div>
-                <Label htmlFor="bulk_break_minutes">Descanso (minutos)</Label>
-                <Input
-                  id="bulk_break_minutes"
-                  type="number"
-                  value={bulkFormData.break_minutes || ''}
-                  onChange={(e) => setBulkFormData({ ...bulkFormData, break_minutes: e.target.value ? parseInt(e.target.value) : undefined })}
                   placeholder="Dejar vacío para omitir"
                   disabled={isBulkUpdating}
                 />
@@ -839,15 +826,6 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="break_minutes">Descanso (minutos)</Label>
-                        <Input
-                          id="break_minutes"
-                          type="number"
-                          value={formData.break_minutes}
-                          onChange={(e) => setFormData({ ...formData, break_minutes: parseInt(e.target.value) || 0 })}
-                        />
-                      </div>
                       <div className="flex items-center gap-2 mt-6">
                         <input
                           id="ends_next_day"
@@ -870,11 +848,11 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="tecnico">técnico</SelectItem>
-                            <SelectItem value="especialista">especialista</SelectItem>
-                            <SelectItem value="responsable">responsable</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                          <SelectItem value="especialista">especialista</SelectItem>
+                          <SelectItem value="responsable">responsable</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                       <div>
                         <Label htmlFor="overtime_hours">Horas Extra</Label>
                         <Input
@@ -914,16 +892,12 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         <p className="font-medium">{timesheet.end_time || 'No establecido'}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Descanso</p>
-                        <p className="font-medium">{timesheet.break_minutes || 0} min</p>
-                      </div>
-                      <div>
                         <p className="text-muted-foreground">Horas Totales</p>
                         <p className="font-medium">
                           {calculateHours(
                             timesheet.start_time || '09:00',
                             timesheet.end_time || '17:00',
-                            timesheet.break_minutes || 0,
+                            0,
                             timesheet.ends_next_day
                           ).toFixed(1)}h
                         </p>

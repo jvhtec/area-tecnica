@@ -12,7 +12,6 @@ import {
   Calendar as CalendarIcon,
   MapPin,
   Play,
-  Coffee,
   PenTool,
   Euro,
   X,
@@ -123,7 +122,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
     date: '',
     start_time: '09:00',
     end_time: '17:00',
-    break_minutes: 30,
+    break_minutes: 0,
     overtime_hours: 0,
     notes: '',
     ends_next_day: false,
@@ -142,7 +141,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
       date: timesheet.date,
       start_time: timesheet.start_time || '09:00',
       end_time: timesheet.end_time || '17:00',
-      break_minutes: timesheet.break_minutes || 0,
+      break_minutes: 0,
       overtime_hours: timesheet.overtime_hours || 0,
       notes: timesheet.notes || '',
       ends_next_day: timesheet.ends_next_day || false,
@@ -171,7 +170,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
       await updateTimesheet(timesheetId, {
         start_time: formData.start_time,
         end_time: formData.end_time,
-        break_minutes: formData.break_minutes,
+        break_minutes: 0,
         overtime_hours: formData.overtime_hours,
         notes: formData.notes,
         ends_next_day: formData.ends_next_day,
@@ -348,14 +347,14 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                       ? calculateHours(
                         formData.start_time,
                         formData.end_time,
-                        formData.break_minutes,
+                        0,
                         formData.ends_next_day
                       )
                       : (timesheet.start_time && timesheet.end_time)
                         ? calculateHours(
                           timesheet.start_time,
                           timesheet.end_time,
-                          timesheet.break_minutes || 0,
+                          0,
                           timesheet.ends_next_day
                         )
                         : 0;
@@ -413,36 +412,20 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                               </div>
                             </div>
 
-                            {/* Break and overnight */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className={`text-xs font-bold ${theme.textMuted} mb-1 block`}>Descanso (min)</label>
-                                <Input
-                                  type="number"
-                                  value={formData.break_minutes}
-                                  onChange={(e) => setFormData({ ...formData, break_minutes: parseInt(e.target.value) || 0 })}
-                                  className={`${theme.input} font-mono`}
-                                  min={0}
-                                  max={180}
-                                  step={15}
-                                />
-                              </div>
-                              <div className="flex items-end">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={formData.ends_next_day}
-                                    onChange={(e) => setFormData({ ...formData, ends_next_day: e.target.checked })}
-                                    className="w-4 h-4 rounded"
-                                  />
-                                  <span className={`text-xs ${theme.textMuted}`}>Termina al día siguiente</span>
-                                  {formData.end_time < formData.start_time && (
-                                    <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 text-[9px] px-1.5 py-0.5">
-                                      Auto
-                                    </Badge>
-                                  )}
-                                </label>
-                              </div>
+                            {/* Overnight */}
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={formData.ends_next_day}
+                                onChange={(e) => setFormData({ ...formData, ends_next_day: e.target.checked })}
+                                className="w-4 h-4 rounded"
+                              />
+                              <span className={`text-xs ${theme.textMuted}`}>Termina al día siguiente</span>
+                              {formData.end_time < formData.start_time && (
+                                <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 text-[9px] px-1.5 py-0.5">
+                                  Auto
+                                </Badge>
+                              )}
                             </div>
 
                             {/* Category */}
@@ -530,7 +513,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                             {/* Display mode */}
                             <div className="space-y-3">
                               {/* Time display */}
-                              <div className="grid grid-cols-3 gap-3">
+                              <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <div className={`text-[10px] font-bold uppercase ${theme.textMuted}`}>Entrada</div>
                                   <div className={`font-mono font-bold ${theme.textMain}`}>{timesheet.start_time || '--:--'}</div>
@@ -538,10 +521,6 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                                 <div>
                                   <div className={`text-[10px] font-bold uppercase ${theme.textMuted}`}>Salida</div>
                                   <div className={`font-mono font-bold ${theme.textMain}`}>{timesheet.end_time || '--:--'}</div>
-                                </div>
-                                <div>
-                                  <div className={`text-[10px] font-bold uppercase ${theme.textMuted}`}>Descanso</div>
-                                  <div className={`font-mono font-bold ${theme.textMain}`}>{timesheet.break_minutes || 0} min</div>
                                 </div>
                               </div>
 
