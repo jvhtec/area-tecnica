@@ -143,16 +143,36 @@ export function AdminPanel() {
       const { error } = await supabase.from("bug_reports").update(updates).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bug_reports"] });
-      toast({ title: "Bug report updated successfully" });
+    onMutate: async ({ id, updates }) => {
+      // Snapshot the current state before mutation
+      const previousBug = selectedBug;
+
+      // Optimistically update the UI
+      if (selectedBug && selectedBug.id === id) {
+        setSelectedBug({ ...selectedBug, ...updates });
+      }
+
+      // Return context with previous state for potential rollback
+      return { previousBug };
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      // Rollback to previous state on error
+      if (context?.previousBug) {
+        setSelectedBug(context.previousBug);
+      }
+
       toast({
         title: "Error updating bug report",
         description: error.message,
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Always refetch to ensure UI is in sync with server
+      queryClient.invalidateQueries({ queryKey: ["bug_reports"] });
+    },
+    onSuccess: () => {
+      toast({ title: "Bug report updated successfully" });
     },
   });
 
@@ -415,7 +435,6 @@ export function AdminPanel() {
                         id: selectedBug.id,
                         updates: { severity: value as BugReport["severity"] },
                       });
-                      setSelectedBug({ ...selectedBug, severity: value as BugReport["severity"] });
                     }}
                   >
                     <SelectTrigger>
@@ -439,7 +458,6 @@ export function AdminPanel() {
                         id: selectedBug.id,
                         updates: { status: value as BugReport["status"] },
                       });
-                      setSelectedBug({ ...selectedBug, status: value as BugReport["status"] });
                     }}
                   >
                     <SelectTrigger>

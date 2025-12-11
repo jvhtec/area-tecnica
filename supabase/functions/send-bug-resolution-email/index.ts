@@ -120,21 +120,6 @@ serve(async (req) => {
       );
     }
 
-    // Validate environment variables
-    if (!BREVO_KEY || !BREVO_FROM) {
-      console.error("[send-bug-resolution-email] Missing Brevo configuration");
-      return new Response(
-        JSON.stringify({
-          error: "Server configuration error",
-          details: "Email service not configured",
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
     // Parse request body
     console.log("[send-bug-resolution-email] Parsing request...");
     const body = (await req.json()) as BugResolutionEmailRequest;
@@ -215,7 +200,7 @@ serve(async (req) => {
     const emailPayload = {
       sender: { email: BREVO_FROM, name: "Sector-Pro" },
       to: [{ email: bugReport.reporter_email }],
-      subject: `Tu error ha sido resuelto - ${bugReport.title}`,
+      subject: `Tu error ha sido resuelto - ${escapeHtml(bugReport.title).substring(0, 100)}`,
       htmlContent,
     };
 

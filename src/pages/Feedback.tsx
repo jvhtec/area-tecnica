@@ -16,7 +16,12 @@ export default function Feedback() {
 
   // Initialize console capture when component mounts
   useEffect(() => {
-    initConsoleCapture();
+    const capture = initConsoleCapture();
+
+    // Restore original console methods on unmount
+    return () => {
+      capture.restore();
+    };
   }, []);
 
   return (

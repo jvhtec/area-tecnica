@@ -86,7 +86,7 @@ export function BugReportForm() {
         // Remove data URL prefix to get pure base64
         const base64Data = screenshot.split(",")[1] || screenshot;
         // Calculate approximate binary size (base64 is ~33% larger than binary)
-        const binarySize = (base64Data.length * 3) / 4;
+        const binarySize = Math.ceil((base64Data.length * 3) / 4);
         const maxSize = 5 * 1024 * 1024; // 5MB
 
         if (binarySize > maxSize) {
