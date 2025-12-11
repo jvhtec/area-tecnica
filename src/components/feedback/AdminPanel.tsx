@@ -23,6 +23,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -96,6 +106,10 @@ export function AdminPanel() {
   const [selectedFeature, setSelectedFeature] = useState<FeatureRequest | null>(null);
   const [showBugDialog, setShowBugDialog] = useState(false);
   const [showFeatureDialog, setShowFeatureDialog] = useState(false);
+  const [showDeleteBugDialog, setShowDeleteBugDialog] = useState(false);
+  const [showDeleteFeatureDialog, setShowDeleteFeatureDialog] = useState(false);
+  const [bugToDelete, setBugToDelete] = useState<string | null>(null);
+  const [featureToDelete, setFeatureToDelete] = useState<string | null>(null);
 
   // Fetch bug reports
   const { data: bugReports = [], isLoading: loadingBugs } = useQuery({
@@ -222,12 +236,22 @@ export function AdminPanel() {
   });
 
   const handleResolveBug = async (bug: BugReport) => {
-    await updateBugMutation.mutateAsync({
-      id: bug.id,
-      updates: { status: "resolved", resolved_at: new Date().toISOString() },
-    });
-    await sendResolutionEmailMutation.mutateAsync(bug.id);
-    setShowBugDialog(false);
+    try {
+      // Send email first - if this fails, we don't mark the bug as resolved
+      await sendResolutionEmailMutation.mutateAsync(bug.id);
+
+      // Only update status if email was sent successfully
+      await updateBugMutation.mutateAsync({
+        id: bug.id,
+        updates: { status: "resolved", resolved_at: new Date().toISOString() },
+      });
+
+      setShowBugDialog(false);
+    } catch (error) {
+      // If email send fails, the bug remains in its current state
+      // The mutation's onError will show a toast
+      console.error("Failed to resolve bug:", error);
+    }
   };
 
   return (
@@ -503,7 +527,10 @@ export function AdminPanel() {
               <DialogFooter className="flex gap-2">
                 <Button
                   variant="destructive"
-                  onClick={() => deleteBugMutation.mutate(selectedBug.id)}
+                  onClick={() => {
+                    setBugToDelete(selectedBug.id);
+                    setShowDeleteBugDialog(true);
+                  }}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Eliminar
@@ -602,7 +629,10 @@ export function AdminPanel() {
               <DialogFooter className="flex gap-2">
                 <Button
                   variant="destructive"
-                  onClick={() => deleteFeatureMutation.mutate(selectedFeature.id)}
+                  onClick={() => {
+                    setFeatureToDelete(selectedFeature.id);
+                    setShowDeleteFeatureDialog(true);
+                  }}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Eliminar
@@ -623,6 +653,64 @@ export function AdminPanel() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Bug Confirmation Dialog */}
+      <AlertDialog open={showDeleteBugDialog} onOpenChange={setShowDeleteBugDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente este reporte de error.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (bugToDelete) {
+                  deleteBugMutation.mutate(bugToDelete);
+                  setShowDeleteBugDialog(false);
+                  setShowBugDialog(false);
+                  setBugToDelete(null);
+                }
+              }}
+              disabled={deleteBugMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteBugMutation.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Feature Request Confirmation Dialog */}
+      <AlertDialog open={showDeleteFeatureDialog} onOpenChange={setShowDeleteFeatureDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente esta solicitud de función.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (featureToDelete) {
+                  deleteFeatureMutation.mutate(featureToDelete);
+                  setShowDeleteFeatureDialog(false);
+                  setShowFeatureDialog(false);
+                  setFeatureToDelete(null);
+                }
+              }}
+              disabled={deleteFeatureMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteFeatureMutation.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

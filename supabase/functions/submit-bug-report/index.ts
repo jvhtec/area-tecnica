@@ -82,7 +82,6 @@ async function createGitHubIssue(
 
   body += `## Información del entorno\n`;
   body += `- **Severidad**: ${severityEmoji[bugReport.severity]} ${bugReport.severity.toUpperCase()}\n`;
-  body += `- **Correo del reportero**: ${bugReport.reporterEmail}\n`;
 
   if (bugReport.appVersion) {
     body += `- **Versión de la app**: ${bugReport.appVersion}\n`;
@@ -118,12 +117,17 @@ async function createGitHubIssue(
   });
 
   // Tag agents in a comment
-  await octokit.issues.createComment({
-    owner: GITHUB_REPO_OWNER,
-    repo: GITHUB_REPO_NAME,
-    issue_number: issue.number,
-    body: "cc @claude-code @codex @cto",
-  });
+  try {
+    await octokit.issues.createComment({
+      owner: GITHUB_REPO_OWNER,
+      repo: GITHUB_REPO_NAME,
+      issue_number: issue.number,
+      body: "cc @claude-code @codex @cto",
+    });
+  } catch (commentError) {
+    // Log error but don't fail the entire function since the issue was created successfully
+    console.error("[submit-bug-report] Failed to create tagging comment:", commentError);
+  }
 
   return {
     url: issue.html_url,
