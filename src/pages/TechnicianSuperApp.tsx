@@ -334,7 +334,7 @@ export default function TechnicianSuperApp() {
       </div>
 
       {/* Navigation */}
-      <div className={`h-20 ${t.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-4`}>
+      <div className={`h-20 ${t.nav} fixed bottom-0 w-full grid grid-cols-4 px-2 z-40 pb-safe-3`}>
         {[
           { id: 'dashboard', icon: LayoutDashboard, label: 'Panel' },
           { id: 'jobs', icon: Briefcase, label: 'Trabajos' },
