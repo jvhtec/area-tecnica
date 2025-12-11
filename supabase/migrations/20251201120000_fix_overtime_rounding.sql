@@ -92,8 +92,9 @@ BEGIN
     )) / 3600.0 - (COALESCE(v_timesheet.break_minutes, 0) / 60.0);
   END IF;
 
-  -- Round to nearest 0.5
-  v_worked_hours := ROUND(v_worked_hours * 2) / 2.0;
+  -- Round to nearest whole hour (0.5 rounds UP)
+  -- Half hours don't pay separately; normalize to full hours for billing
+  v_worked_hours := ROUND(v_worked_hours);
 
   -- **EVENTO SPECIAL LOGIC**: Locked rate = base_day + plus_10_12 (not time-based)
   -- ALL categories (responsable, especialista, tecnico) use the same logic
