@@ -16,19 +16,6 @@ ON storage.objects FOR INSERT
 TO public
 WITH CHECK (bucket_id = 'feedback-system' AND (storage.foldername(name))[1] = 'bug-reports');
 
--- Allow admins to view all files
-CREATE POLICY "Admins can view all feedback files"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'feedback-system' AND
-  EXISTS (
-    SELECT 1 FROM profiles
-    WHERE profiles.id = auth.uid()
-    AND profiles.role IN ('admin', 'management')
-  )
-);
-
 -- Allow admins to delete files
 CREATE POLICY "Admins can delete feedback files"
 ON storage.objects FOR DELETE
@@ -43,6 +30,7 @@ USING (
 );
 
 -- Allow public read access to all files (for displaying in GitHub issues and emails)
+-- This makes the admin-specific SELECT policy redundant
 CREATE POLICY "Public can view feedback files"
 ON storage.objects FOR SELECT
 TO public

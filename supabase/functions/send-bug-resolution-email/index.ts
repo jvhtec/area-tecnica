@@ -2,14 +2,15 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { wrapInCorporateTemplate, escapeHtml } from "../_shared/corporateEmailTemplate.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const BREVO_KEY = Deno.env.get("BREVO_API_KEY")!;
-const BREVO_FROM = Deno.env.get("BREVO_FROM")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const BREVO_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
+const BREVO_FROM = Deno.env.get("BREVO_FROM") ?? "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 interface BugResolutionEmailRequest {
@@ -62,6 +63,21 @@ async function checkUserPermission(userId: string): Promise<boolean> {
 }
 
 serve(async (req) => {
+  // Validate required environment variables
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !BREVO_KEY || !BREVO_FROM) {
+    console.error("[send-bug-resolution-email] Missing required environment variables");
+    return new Response(
+      JSON.stringify({
+        error: "Server configuration error",
+        details: "Required environment variables are not configured",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -204,44 +220,68 @@ serve(async (req) => {
     };
 
     console.log("[send-bug-resolution-email] Sending email to:", bugReport.reporter_email);
-    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: {
-        "api-key": BREVO_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(emailPayload),
-    });
 
-    if (!response.ok) {
-      const errorMessage = await response.text();
-      const errorId = `BRE-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      console.error(`[send-bug-resolution-email] Brevo error ${errorId}:`, response.status, errorMessage);
+    // Add timeout for Brevo API call (10 seconds)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": BREVO_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(emailPayload),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        const errorId = `BRE-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        console.error(`[send-bug-resolution-email] Brevo error ${errorId}:`, response.status, errorMessage);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to send email",
+            errorId: errorId,
+          }),
+          {
+            status: response.status,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      const brevoResponse = await response.json();
+      console.log("[send-bug-resolution-email] Email sent successfully:", brevoResponse);
+
       return new Response(
         JSON.stringify({
-          error: "Failed to send email",
+          success: true,
+          messageId: brevoResponse.messageId,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      const errorId = `BRE-TIMEOUT-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      console.error(`[send-bug-resolution-email] Fetch error ${errorId}:`, fetchError);
+      return new Response(
+        JSON.stringify({
+          error: "Email service timeout or network error",
           errorId: errorId,
         }),
         {
-          status: response.status,
+          status: 504,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
-
-    const brevoResponse = await response.json();
-    console.log("[send-bug-resolution-email] Email sent successfully:", brevoResponse);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        messageId: brevoResponse.messageId,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
   } catch (err) {
     // Log full error details server-side for debugging
     const errorId = `BRE-${Date.now()}-${Math.random().toString(36).substring(7)}`;

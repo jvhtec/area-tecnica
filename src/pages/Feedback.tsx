@@ -9,7 +9,7 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { initConsoleCapture } from "@/utils/consoleCapture";
 
 export default function Feedback() {
-  const { user, userRole } = useOptimizedAuth();
+  const { userRole } = useOptimizedAuth();
   const [activeTab, setActiveTab] = useState("bug");
 
   const isAdmin = userRole === "admin" || userRole === "management";

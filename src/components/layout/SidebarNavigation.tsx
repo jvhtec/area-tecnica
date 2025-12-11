@@ -384,7 +384,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 16,
     mobileSlot: "secondary",
     getPath: () => "/feedback",
-    isVisible: () => true,
+    isVisible: ({ userRole }) => userRole !== "technician",
   },
   {
     id: "settings",
