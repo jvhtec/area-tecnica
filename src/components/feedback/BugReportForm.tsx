@@ -25,7 +25,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/integrations/supabase/supabase-client";
+import { supabase } from "@/lib/supabase-client";
 import { ScreenshotCapture } from "./ScreenshotCapture";
 import { getRecentConsoleLogs } from "@/utils/consoleCapture";
 import {

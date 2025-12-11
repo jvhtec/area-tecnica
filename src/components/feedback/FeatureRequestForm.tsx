@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/integrations/supabase/supabase-client";
+import { supabase } from "@/lib/supabase-client";
 import {
   Dialog,
   DialogContent,

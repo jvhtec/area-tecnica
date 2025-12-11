@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/supabase-client";
+import { supabase } from "@/lib/supabase-client";
 import { useToast } from "@/hooks/use-toast";
 import { ExternalLink, Trash2, Edit, CheckCircle, Eye } from "lucide-react";
 import { format } from "date-fns";
