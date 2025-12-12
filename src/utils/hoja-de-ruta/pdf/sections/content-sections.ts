@@ -153,11 +153,15 @@ export class ContentSections {
     if (!accommodations || accommodations.length === 0) return false;
 
     return accommodations.some(acc => {
+      if (!acc) return false;
+
       const hasHotelInfo = DataValidators.hasData(acc.hotel_name) ||
         DataValidators.hasData(acc.hotel_address) ||
         DataValidators.hasData(acc.address);
       const hasDates = DataValidators.hasData(acc.check_in) || DataValidators.hasData(acc.check_out);
-      const hasRooms = Array.isArray(acc.rooms) && acc.rooms.some(DataValidators.hasMeaningfulRoomData);
+      const hasRooms = Array.isArray(acc.rooms) && (
+        acc.rooms.some(room => DataValidators.hasMeaningfulRoomData(room)) || acc.rooms.length > 0
+      );
 
       return hasHotelInfo || hasDates || hasRooms;
     });
@@ -173,7 +177,7 @@ export class ContentSections {
     if (!eventData.logistics) return false;
 
     const { transport = [], loadingDetails, unloadingDetails, equipmentLogistics } = eventData.logistics;
-    const hasTransportEntries = Array.isArray(transport) && transport.some(DataValidators.hasData);
+    const hasTransportEntries = Array.isArray(transport) && transport.some(item => DataValidators.hasData(item));
     const hasDetails = DataValidators.hasData(loadingDetails) ||
       DataValidators.hasData(unloadingDetails) ||
       DataValidators.hasData(equipmentLogistics);
