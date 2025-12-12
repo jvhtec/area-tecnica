@@ -14,6 +14,7 @@ import { PowerSection } from './power';
 import { AuxNeedsSection } from './aux-needs';
 import { ProgramSection } from './program';
 import { RestaurantsSection } from './restaurants';
+import { DataValidators } from '../utils/validators';
 
 export class ContentSections {
   private eventSection: EventSection;
@@ -149,9 +150,17 @@ export class ContentSections {
   }
 
   hasAccommodationData(accommodations: any[]): boolean {
-    return accommodations && accommodations.some(acc => 
-      acc.hotel_name || acc.hotel_address
-    );
+    if (!accommodations || accommodations.length === 0) return false;
+
+    return accommodations.some(acc => {
+      const hasHotelInfo = DataValidators.hasData(acc.hotel_name) ||
+        DataValidators.hasData(acc.hotel_address) ||
+        DataValidators.hasData(acc.address);
+      const hasDates = DataValidators.hasData(acc.check_in) || DataValidators.hasData(acc.check_out);
+      const hasRooms = Array.isArray(acc.rooms) && acc.rooms.some(DataValidators.hasMeaningfulRoomData);
+
+      return hasHotelInfo || hasDates || hasRooms;
+    });
   }
 
   hasRoomingData(accommodations: any[]): boolean {
@@ -161,8 +170,15 @@ export class ContentSections {
   }
 
   hasLogisticsData(eventData: EventData): boolean {
-    return eventData.logistics && eventData.logistics.transport && 
-           eventData.logistics.transport.length > 0;
+    if (!eventData.logistics) return false;
+
+    const { transport = [], loadingDetails, unloadingDetails, equipmentLogistics } = eventData.logistics;
+    const hasTransportEntries = Array.isArray(transport) && transport.some(DataValidators.hasData);
+    const hasDetails = DataValidators.hasData(loadingDetails) ||
+      DataValidators.hasData(unloadingDetails) ||
+      DataValidators.hasData(equipmentLogistics);
+
+    return hasTransportEntries || hasDetails;
   }
 
   hasPowerData(eventData: EventData): boolean {
