@@ -55,10 +55,18 @@ export const useHojaDeRutaInitialization = (
             ? req.current_per_phase.toFixed(2) 
             : req.current_per_phase;
             
-          return `${req.department.toUpperCase()} - ${req.table_name}:\n` +
+          const pduType = req.custom_pdu_type || req.pdu_type;
+          
+          let text = `${req.department.toUpperCase()} - ${req.table_name}:\n` +
             `Potencia Total: ${req.total_watts}W\n` +
             `Corriente por Fase: ${current}A\n` +
-            `PDU Recomendado: ${req.pdu_type}\n`;
+            `PDU Recomendado: ${pduType}\n`;
+
+          if (req.includes_hoist) {
+            text += `Requiere potencia adicional de motores (CEE32A 3P+N+G)\n`;
+          }
+
+          return text;
         })
         .join("\n");
 
