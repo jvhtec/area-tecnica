@@ -158,7 +158,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       console.log('🔄 Fetching fresh profile data...');
       setIsProfileLoading(true);
 
-      // Prefer new flag name; alias to expected key. Fallback if column missing.
+      // Prefer new flag name; alias to expected key. Fallback if columns missing.
       let { data, error } = await supabase
         .from('profiles')
         .select('role, department, soundvision_access:soundvision_access_enabled, assignable_as_tech')
@@ -166,16 +166,29 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         .maybeSingle();
 
       if (error && (error as any)?.code === '42703') {
-        // Column missing in this environment; fetch without it and default to false
-        console.warn('profiles.soundvision_access_enabled missing; defaulting to false');
+        const message = String((error as any)?.message ?? '');
+        const missingSoundVision = message.includes('soundvision_access_enabled');
+        const missingAssignable = message.includes('assignable_as_tech');
+
+        const selectParts = ['role', 'department'];
+        if (!missingSoundVision) selectParts.push('soundvision_access:soundvision_access_enabled');
+        if (!missingAssignable) selectParts.push('assignable_as_tech');
+
+        console.warn(
+          `profiles column missing; soundvision_access_enabled=${missingSoundVision}, assignable_as_tech=${missingAssignable}. Defaulting missing flags to false.`,
+        );
+
         const fallback = await supabase
           .from('profiles')
-          .select('role, department, assignable_as_tech')
+          .select(selectParts.join(', '))
           .eq('id', userId)
           .maybeSingle();
+
         data = fallback.data as any;
         error = fallback.error as any;
-        if (data) (data as any).soundvision_access = false;
+
+        if (data && missingSoundVision) (data as any).soundvision_access = false;
+        if (data && missingAssignable) (data as any).assignable_as_tech = false;
       }
 
       if (error) {

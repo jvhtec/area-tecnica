@@ -172,6 +172,21 @@ serve(async (req) => {
       );
     }
 
+    // Validate GitHub URL if present (only allow http: or https: protocols)
+    let githubLinkHtml = '';
+    if (bugReport.github_issue_url) {
+      try {
+        const url = new URL(bugReport.github_issue_url);
+        if (url.protocol === 'http:' || url.protocol === 'https:') {
+          githubLinkHtml = `<p>Puedes ver más detalles en el <a href="${escapeHtml(bugReport.github_issue_url)}">issue de GitHub</a>.</p>`;
+        } else {
+          console.warn('[send-bug-resolution-email] Invalid URL protocol:', url.protocol);
+        }
+      } catch (error) {
+        console.warn('[send-bug-resolution-email] Invalid GitHub URL:', error);
+      }
+    }
+
     // Build email content (escape all user-controlled content to prevent XSS)
     const bodyHtml = `
       <h2>Tu error ha sido resuelto</h2>
@@ -183,9 +198,7 @@ serve(async (req) => {
         <p style="margin-bottom: 0;"><strong>Descripción:</strong> ${escapeHtml(bugReport.description)}</p>
       </div>
 
-      ${bugReport.github_issue_url ? `
-        <p>Puedes ver más detalles en el <a href="${escapeHtml(bugReport.github_issue_url)}">issue de GitHub</a>.</p>
-      ` : ''}
+      ${githubLinkHtml}
 
       <p>Gracias por tu ayuda para mejorar nuestra aplicación.</p>
       <p><strong>Equipo de Sector-Pro</strong></p>
@@ -204,7 +217,9 @@ serve(async (req) => {
       htmlContent,
     };
 
-    console.log("[send-bug-resolution-email] Sending email to:", bugReport.reporter_email);
+    // Log email domain only (avoid PII)
+    const emailDomain = bugReport.reporter_email.split('@')[1] || 'unknown';
+    console.log("[send-bug-resolution-email] Sending email to domain:", emailDomain);
 
     // Add timeout for Brevo API call (10 seconds)
     const controller = new AbortController();

@@ -256,21 +256,43 @@ export function AdminPanel() {
   });
 
   const handleResolveBug = async (bug: BugReport) => {
-    try {
-      // Send email first - if this fails, we don't mark the bug as resolved
-      await sendResolutionEmailMutation.mutateAsync(bug.id);
+    const previousStatus = bug.status;
+    const previousResolvedAt = bug.resolved_at;
 
-      // Only update status if email was sent successfully
+    try {
+      // Mark bug as resolved first (backend requires this before sending email)
       await updateBugMutation.mutateAsync({
         id: bug.id,
         updates: { status: "resolved", resolved_at: new Date().toISOString() },
       });
 
+      // Then send the resolution email
+      await sendResolutionEmailMutation.mutateAsync(bug.id);
+
       setShowBugDialog(false);
     } catch (error) {
-      // If email send fails, the bug remains in its current state
-      // The mutation's onError will show a toast
+      // If email send fails, revert the status back to previous state
       console.error("Failed to resolve bug:", error);
+
+      // Attempt to revert status
+      try {
+        await updateBugMutation.mutateAsync({
+          id: bug.id,
+          updates: { status: previousStatus, resolved_at: previousResolvedAt },
+        });
+        toast({
+          title: "Failed to send resolution email",
+          description: "Bug status has been reverted. Please try again.",
+          variant: "destructive",
+        });
+      } catch (revertError) {
+        console.error("Failed to revert bug status:", revertError);
+        toast({
+          title: "Critical error",
+          description: "Bug marked as resolved but email failed to send. Please manually retry.",
+          variant: "destructive",
+        });
+      }
     }
   };
 

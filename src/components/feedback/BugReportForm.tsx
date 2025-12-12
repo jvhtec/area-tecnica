@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -67,6 +67,13 @@ export function BugReportForm() {
       reporterEmail: user?.email || "",
     },
   });
+
+  // Update reporterEmail when user data loads
+  useEffect(() => {
+    if (user?.email && !form.getValues("reporterEmail")) {
+      form.setValue("reporterEmail", user.email);
+    }
+  }, [user?.email, form]);
 
   const handleScreenshotCapture = (dataUrl: string, filename: string) => {
     setScreenshot(dataUrl);
@@ -256,7 +263,7 @@ export function BugReportForm() {
                 <FormControl>
                   <Checkbox
                     checked={field.value}
-                    onCheckedChange={field.onChange}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
                   />
                 </FormControl>
                 <div className="space-y-1 leading-none">
