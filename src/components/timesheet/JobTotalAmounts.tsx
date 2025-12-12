@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Euro, Users, TrendingUp, Clock } from "lucide-react";
 import { useJobTotals } from "@/hooks/useJobTotals";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface JobTotalAmountsProps {
   jobId: string;
@@ -121,7 +122,7 @@ export const JobTotalAmounts = ({ jobId, jobTitle }: JobTotalAmountsProps) => {
                       <Badge variant="outline" className="text-xs px-1 py-0">
                         {item.category}
                       </Badge>
-                      <span>{format(new Date(item.date), 'MMM d')}</span>
+                      <span>{format(new Date(item.date), 'd MMM', { locale: es })}</span>
                     </div>
                   </div>
                   <p className="font-semibold">€{Number(item.amount_eur ?? 0).toFixed(2)}</p>

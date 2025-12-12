@@ -6,6 +6,7 @@ import { Clock, ChevronLeft, ChevronRight, Calendar, MapPin } from "lucide-react
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { format, isAfter, isBefore, addDays } from "date-fns";
+import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 
 interface TimesheetSidebarProps {
@@ -28,16 +29,16 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
         const isDryHire = job.job_type === 'dry_hire' || job.job_type === 'dryhire';
         const isTourDate = job.job_type === 'tourdate';
         if (isDryHire || isTourDate) return false;
-        
+
         // Check if job has any work date types (not just "off" or "travel")
         if (job.job_date_types && job.job_date_types.length > 0) {
-          const hasWorkDates = job.job_date_types.some((dateType: any) => 
+          const hasWorkDates = job.job_date_types.some((dateType: any) =>
             dateType.type !== 'off' && dateType.type !== 'travel'
           );
           // Only include jobs that have at least one work date
           return hasWorkDates;
         }
-        
+
         // If no date types are defined, assume it's a work job
         return true;
       })
@@ -51,21 +52,21 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
       const jobDate = new Date(job.start_time);
       return jobDate.toDateString() === today.toDateString();
     });
-    
+
     if (todayIndex !== -1) {
       return Math.floor(todayIndex / JOBS_PER_PAGE);
     }
-    
+
     // If no job today, find the closest upcoming job
     const upcomingIndex = relevantJobs.findIndex(job => {
       const jobDate = new Date(job.start_time);
       return jobDate >= today;
     });
-    
+
     if (upcomingIndex !== -1) {
       return Math.floor(upcomingIndex / JOBS_PER_PAGE);
     }
-    
+
     // Default to first page
     return 0;
   }, [relevantJobs]);
@@ -114,7 +115,7 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
         return 'bg-gray-500/20 text-gray-700 border-gray-500/30';
     }
   };
-  
+
   const isJobToday = (jobDate: Date) => {
     const today = new Date();
     return jobDate.toDateString() === today.toDateString();
@@ -131,11 +132,11 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
   return (
     <div className="fixed inset-0 z-50 lg:z-auto">
       {/* Backdrop for mobile */}
-      <div 
-        className="fixed inset-0 bg-black/20 lg:hidden" 
+      <div
+        className="fixed inset-0 bg-black/20 lg:hidden"
         onClick={onClose}
       />
-      
+
       {/* Sidebar */}
       <div className="fixed right-0 top-0 h-full w-96 bg-background border-l border-border shadow-lg overflow-hidden flex flex-col">
         {/* Header */}
@@ -171,65 +172,64 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
                 const jobDate = new Date(job.start_time);
                 const isPast = isJobInPast(jobDate);
                 const isToday = isJobToday(jobDate);
-                
+
                 return (
-                <Card 
-                  key={job.id} 
-                  className={`cursor-pointer hover:shadow-md transition-shadow border border-border/50 hover:border-border ${
-                    isToday ? 'ring-2 ring-primary/50 bg-primary/5' : isPast ? 'opacity-75' : ''
-                  }`}
-                  onClick={() => handleJobSelect(job.id)}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-sm font-medium leading-tight">
-                        {job.title}
-                        {isToday && <span className="ml-2 text-xs text-primary">(Today)</span>}
-                        {isPast && <span className="ml-2 text-xs text-muted-foreground">(Past)</span>}
-                      </CardTitle>
-                      <Badge 
-                        variant="outline" 
-                        className={`text-xs ml-2 flex-shrink-0 ${getJobStatusColor(job.status)}`}
-                      >
-                        {job.status}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
-                        <span>
-                          {format(new Date(job.start_time), 'MMM dd, yyyy')}
-                        </span>
+                  <Card
+                    key={job.id}
+                    className={`cursor-pointer hover:shadow-md transition-shadow border border-border/50 hover:border-border ${isToday ? 'ring-2 ring-primary/50 bg-primary/5' : isPast ? 'opacity-75' : ''
+                      }`}
+                    onClick={() => handleJobSelect(job.id)}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <CardTitle className="text-sm font-medium leading-tight">
+                          {job.title}
+                          {isToday && <span className="ml-2 text-xs text-primary">(Today)</span>}
+                          {isPast && <span className="ml-2 text-xs text-muted-foreground">(Past)</span>}
+                        </CardTitle>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ml-2 flex-shrink-0 ${getJobStatusColor(job.status)}`}
+                        >
+                          {job.status}
+                        </Badge>
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>
-                          {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
-                        </span>
-                      </div>
-                      {job.venue && (
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2 text-sm">
                         <div className="flex items-center gap-2 text-muted-foreground">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate">{job.venue}</span>
+                          <Calendar className="h-3 w-3" />
+                          <span>
+                            {format(new Date(job.start_time), "MMM dd, yyyy", { locale: es })}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                    
-                    <Button 
-                      size="sm" 
-                      className="w-full mt-3" 
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleJobSelect(job.id);
-                      }}
-                    >
-                      View Timesheets
-                    </Button>
-                  </CardContent>
-                </Card>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          <span>
+                            {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+                          </span>
+                        </div>
+                        {job.venue && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <MapPin className="h-3 w-3" />
+                            <span className="truncate">{job.venue}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        size="sm"
+                        className="w-full mt-3"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleJobSelect(job.id);
+                        }}
+                      >
+                        View Timesheets
+                      </Button>
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
@@ -248,11 +248,11 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
               <ChevronLeft className="h-4 w-4" />
               Previous
             </Button>
-            
+
             <span className="text-sm text-muted-foreground">
               Page {currentPage + 1} of {totalPages}
             </span>
-            
+
             <Button
               variant="outline"
               size="sm"

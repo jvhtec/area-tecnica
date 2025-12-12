@@ -16,6 +16,7 @@ import { TimesheetSignature } from "./TimesheetSignature";
 import { JobTotalAmounts } from "./JobTotalAmounts";
 import { MyJobTotal } from "./MyJobTotal";
 import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { sendTimesheetReminder } from "@/lib/timesheet-reminder-email";
 import {
@@ -101,6 +102,16 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       case 'rejected': return 'destructive';
       default: return 'secondary';
     }
+  };
+
+  const translateStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'draft': 'Borrador',
+      'submitted': 'Enviado',
+      'approved': 'Aprobado',
+      'rejected': 'Rechazado'
+    };
+    return statusMap[status] || status;
   };
 
   const handleCreateTimesheets = async () => {
@@ -647,7 +658,9 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5" />
-              {format(parseISO(date), 'EEEE, MMMM do, yyyy')}
+              <span className="capitalize">
+                {format(parseISO(date), "EEEE, d 'de' MMMM, yyyy", { locale: es })}
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -694,7 +707,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         )}
                       </div>
                       <Badge variant={getStatusColor(timesheet.status)}>
-                        {timesheet.status}
+                        {translateStatus(timesheet.status)}
                       </Badge>
                     </div>
 
