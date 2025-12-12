@@ -14,6 +14,7 @@ interface AuthContextType {
   userRole: string | null;
   userDepartment: string | null;
   hasSoundVisionAccess: boolean;
+  assignableAsTech: boolean;
   isLoading: boolean;
   isInitialized: boolean;
   isProfileLoading: boolean;
@@ -47,6 +48,7 @@ interface CachedProfile {
   role: string | null;
   department: string | null;
   soundVisionAccess?: boolean;
+  assignableAsTech?: boolean;
   userId: string;
   timestamp: number;
 }
@@ -55,6 +57,7 @@ interface ProfileData {
   role: string | null;
   department: string | null;
   soundvision_access?: boolean | null;
+  assignable_as_tech?: boolean | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,6 +82,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [soundVisionAccessFlag, setSoundVisionAccessFlag] = useState(false);
+  const [assignableAsTechFlag, setAssignableAsTechFlag] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -104,12 +108,13 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     return null;
   }, []);
 
-  const setCachedProfile = useCallback((userId: string, role: string | null, department: string | null, soundVisionAccess: boolean) => {
+  const setCachedProfile = useCallback((userId: string, role: string | null, department: string | null, soundVisionAccess: boolean, assignableAsTech: boolean) => {
     try {
       const profile: CachedProfile = {
         role,
         department,
         soundVisionAccess,
+        assignableAsTech,
         userId,
         timestamp: Date.now()
       };
@@ -128,6 +133,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       console.error('Error clearing profile cache:', error);
     }
     setSoundVisionAccessFlag(false);
+    setAssignableAsTechFlag(false);
   }, []);
 
   const fetchUserProfile = useCallback(async (userId: string, useCache = true): Promise<ProfileData | null> => {
@@ -139,10 +145,12 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           setUserRole(cached.role);
           setUserDepartment(cached.department);
           setSoundVisionAccessFlag(Boolean(cached.soundVisionAccess));
+          setAssignableAsTechFlag(Boolean(cached.assignableAsTech));
           return {
             role: cached.role,
             department: cached.department,
-            soundvision_access: Boolean(cached.soundVisionAccess)
+            soundvision_access: Boolean(cached.soundVisionAccess),
+            assignable_as_tech: Boolean(cached.assignableAsTech)
           };
         }
       }
@@ -153,7 +161,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       // Prefer new flag name; alias to expected key. Fallback if column missing.
       let { data, error } = await supabase
         .from('profiles')
-        .select('role, department, soundvision_access:soundvision_access_enabled')
+        .select('role, department, soundvision_access:soundvision_access_enabled, assignable_as_tech')
         .eq('id', userId)
         .maybeSingle();
 
@@ -162,7 +170,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         console.warn('profiles.soundvision_access_enabled missing; defaulting to false');
         const fallback = await supabase
           .from('profiles')
-          .select('role, department')
+          .select('role, department, assignable_as_tech')
           .eq('id', userId)
           .maybeSingle();
         data = fallback.data as any;
@@ -177,13 +185,16 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
       if (data) {
         const soundVisionAccess = Boolean((data as any).soundvision_access);
+        const assignableAsTech = Boolean((data as any).assignable_as_tech);
         setUserRole(data.role);
         setUserDepartment(data.department);
         setSoundVisionAccessFlag(soundVisionAccess);
-        setCachedProfile(userId, data.role, data.department, soundVisionAccess);
-        return { ...(data as any), soundvision_access: soundVisionAccess } as any;
+        setAssignableAsTechFlag(assignableAsTech);
+        setCachedProfile(userId, data.role, data.department, soundVisionAccess, assignableAsTech);
+        return { ...(data as any), soundvision_access: soundVisionAccess, assignable_as_tech: assignableAsTech } as any;
       } else {
         setSoundVisionAccessFlag(false);
+        setAssignableAsTechFlag(false);
       }
       return data ?? null;
     } catch (error) {
@@ -637,6 +648,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     userRole,
     userDepartment,
     hasSoundVisionAccess,
+    assignableAsTech: assignableAsTechFlag,
     isLoading,
     isInitialized,
     isProfileLoading,

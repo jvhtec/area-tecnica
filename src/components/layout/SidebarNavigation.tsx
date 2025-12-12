@@ -35,6 +35,7 @@ export interface NavigationContext {
   userRole: string | null
   userDepartment?: string | null
   hasSoundVisionAccess: boolean
+  assignableAsTech?: boolean
 }
 
 export interface SidebarNavigationProps extends NavigationContext {
@@ -99,8 +100,11 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 1,
     mobileSlot: "primary",
     getPath: () => "/technician-dashboard",
-    isVisible: ({ userRole }) =>
-      userRole === "technician" || userRole === "house_tech",
+    isVisible: ({ userRole, assignableAsTech }) =>
+      userRole === "technician" ||
+      userRole === "house_tech" ||
+      (userRole === "admin" && assignableAsTech === true) ||
+      (userRole === "management" && assignableAsTech === true),
   },
   {
     id: "technician-jobs",
@@ -177,7 +181,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
        userRole === "admin" || userRole === "management" || userRole === "logistics",
    },
    {
-
+    id: "management-department",
     label: ({ userDepartment }) => {
       const normalized = userDepartment?.toLowerCase() ?? ""
       return departmentLabelMap[normalized] || userDepartment || null
@@ -477,6 +481,10 @@ export const buildNavigationItems = (
   if (isAdmin) {
     return navigationConfig
       .map((config) => {
+        // Allow technician-dashboard for admins with assignableAsTech flag
+        if (config.id === "technician-dashboard" && context.assignableAsTech) {
+          return createNavigationItem(config)
+        }
         if (adminExcludedIds.has(config.id)) {
           return null
         }

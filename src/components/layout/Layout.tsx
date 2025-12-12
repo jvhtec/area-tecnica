@@ -167,6 +167,7 @@ const Layout = () => {
     userRole,
     userDepartment,
     hasSoundVisionAccess,
+    assignableAsTech,
     isLoading,
     logout,
   } = useOptimizedAuth()
@@ -324,8 +325,9 @@ const Layout = () => {
       userRole,
       userDepartment,
       hasSoundVisionAccess,
+      assignableAsTech,
     }),
-    [userRole, userDepartment, hasSoundVisionAccess],
+    [userRole, userDepartment, hasSoundVisionAccess, assignableAsTech],
   )
 
   const navigationItems = useMemo(
