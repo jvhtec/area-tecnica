@@ -158,7 +158,7 @@ export function AdminPanel() {
     if (fullBugDetails && selectedBug && fullBugDetails.id === selectedBug.id) {
       setSelectedBug({ ...selectedBug, admin_notes: fullBugDetails.admin_notes });
     }
-  }, [fullBugDetails?.id, fullBugDetails?.admin_notes]);
+  }, [fullBugDetails?.id, fullBugDetails?.admin_notes, selectedBug?.id]);
 
   // Update bug report
   const updateBugMutation = useMutation({
