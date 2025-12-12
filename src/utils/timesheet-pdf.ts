@@ -212,7 +212,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
       technicianName, 
       startTime, 
       endTime, 
-      breakTime, 
+      // breakTime, // Removed from PDF
       totalHours,
       overtime, 
       signatureStatus
@@ -229,7 +229,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
   // Create the table using autoTable with updated headers
   autoTable(doc, {
     startY: yPosition,
-    head: [['Date', 'Technician', 'Start Time', 'End Time', 'Break', 'Total Hours', 'Overtime', 'Signature']],
+    head: [['Date', 'Technician', 'Start Time', 'End Time', 'Total Hours', 'Overtime', 'Signature']],
     body: tableData,
     theme: 'grid',
     headStyles: {
@@ -246,12 +246,13 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
       fillColor: [248, 248, 248],
     },
     columnStyles: {
-      0: { cellWidth: 18 }, // Date
-      1: { cellWidth: 35 }, // Technician
-      2: { cellWidth: 18 }, // Start
-      3: { cellWidth: 18 }, // End  
-      4: { cellWidth: 15 }, // Break
-      5: { cellWidth: 15 }, // Overtime
+      0: { cellWidth: 20 }, // Date (+2)
+      1: { cellWidth: 40 }, // Technician (+5)
+      2: { cellWidth: 20 }, // Start (+2)
+      3: { cellWidth: 20 }, // End (+2)
+      // 4: { cellWidth: 15 }, // Break - Removed (15 width redistributed)
+      4: { cellWidth: 18 }, // Total (+3)
+      5: { cellWidth: 16 }, // Overtime (+1)
       6: { cellWidth: 22 }, // Signature
     },
     didDrawCell: (data: any) => {

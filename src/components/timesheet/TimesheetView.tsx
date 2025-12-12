@@ -61,7 +61,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const [bulkFormData, setBulkFormData] = useState<Partial<TimesheetFormData>>({
     start_time: '',
     end_time: '',
-    break_minutes: undefined,
+    // break_minutes: undefined, // Removed from UI
     overtime_hours: undefined,
     notes: '',
     ends_next_day: false
@@ -70,7 +70,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     date: selectedDate,
     start_time: "09:00",
     end_time: "17:00",
-    break_minutes: 30,
+    break_minutes: 0, // Default to 0 as UI field is removed
     overtime_hours: 0,
     notes: "",
     ends_next_day: false,
@@ -297,7 +297,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       setBulkFormData({
         start_time: '',
         end_time: '',
-        break_minutes: undefined,
+        // break_minutes: undefined, // Removed from UI
         overtime_hours: undefined,
         notes: '',
         ends_next_day: false
@@ -514,7 +514,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   disabled={isBulkUpdating}
                 />
               </div>
-              <div>
+              {/* Break minutes field removed from UI */}
+              {/* <div>
                 <Label htmlFor="bulk_break_minutes">Descanso (minutos)</Label>
                 <Input
                   id="bulk_break_minutes"
@@ -524,7 +525,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   placeholder="Dejar vacío para omitir"
                   disabled={isBulkUpdating}
                 />
-              </div>
+              </div> */}
               <div>
                 <Label htmlFor="bulk_overtime_hours">Horas Extra</Label>
                 <Input
@@ -839,7 +840,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
                         />
                       </div>
-                      <div>
+                      {/* Break minutes input removed from UI */}
+                      {/* <div>
                         <Label htmlFor="break_minutes">Descanso (minutos)</Label>
                         <Input
                           id="break_minutes"
@@ -847,7 +849,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           value={formData.break_minutes}
                           onChange={(e) => setFormData({ ...formData, break_minutes: parseInt(e.target.value) || 0 })}
                         />
-                      </div>
+                      </div> */}
                       <div className="flex items-center gap-2 mt-6">
                         <input
                           id="ends_next_day"
@@ -913,10 +915,11 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         <p className="text-muted-foreground">Hora de Fin</p>
                         <p className="font-medium">{timesheet.end_time || 'No establecido'}</p>
                       </div>
-                      <div>
+                      {/* Break time display removed from UI */}
+                      {/* <div>
                         <p className="text-muted-foreground">Descanso</p>
                         <p className="font-medium">{timesheet.break_minutes || 0} min</p>
-                      </div>
+                      </div> */}
                       <div>
                         <p className="text-muted-foreground">Horas Totales</p>
                         <p className="font-medium">
@@ -1048,7 +1051,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
             </Label>
             <Textarea
               id="rejection-notes"
-              placeholder="Falta descanso, por favor ajuste la hora de finalización..."
+              placeholder="Por favor ajuste la hora de finalización..."
               value={rejectionNotes}
               onChange={(event) => setRejectionNotes(event.target.value)}
               minLength={0}
