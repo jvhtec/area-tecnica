@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,6 +136,29 @@ export function AdminPanel() {
       return data as FeatureRequest[];
     },
   });
+
+  // Fetch full bug report details when dialog opens (including heavy fields)
+  const { data: fullBugDetails, isLoading: loadingFullBug } = useQuery({
+    queryKey: ["bug_report", selectedBug?.id],
+    queryFn: async () => {
+      if (!selectedBug?.id) return null;
+      const { data, error } = await supabase
+        .from("bug_reports")
+        .select("*")
+        .eq("id", selectedBug.id)
+        .single();
+      if (error) throw error;
+      return data as BugReport;
+    },
+    enabled: !!selectedBug?.id,
+  });
+
+  // Reset admin notes to DB value when full bug details load (prevent stale edits)
+  useEffect(() => {
+    if (fullBugDetails && selectedBug && fullBugDetails.id === selectedBug.id) {
+      setSelectedBug({ ...selectedBug, admin_notes: fullBugDetails.admin_notes });
+    }
+  }, [fullBugDetails?.id, fullBugDetails?.admin_notes]);
 
   // Update bug report
   const updateBugMutation = useMutation({
@@ -470,122 +493,130 @@ export function AdminPanel() {
 
           {selectedBug && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Severidad</Label>
-                  <Select
-                    value={selectedBug.severity}
-                    onValueChange={(value) => {
-                      updateBugMutation.mutate({
-                        id: selectedBug.id,
-                        updates: { severity: value as BugReport["severity"] },
-                      });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Baja</SelectItem>
-                      <SelectItem value="medium">Media</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="critical">Crítica</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {loadingFullBug ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-sm text-muted-foreground">Cargando detalles...</div>
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Severidad</Label>
+                      <Select
+                        value={selectedBug.severity}
+                        onValueChange={(value) => {
+                          updateBugMutation.mutate({
+                            id: selectedBug.id,
+                            updates: { severity: value as BugReport["severity"] },
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Baja</SelectItem>
+                          <SelectItem value="medium">Media</SelectItem>
+                          <SelectItem value="high">Alta</SelectItem>
+                          <SelectItem value="critical">Crítica</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <div>
-                  <Label>Estado</Label>
-                  <Select
-                    value={selectedBug.status}
-                    onValueChange={(value) => {
-                      updateBugMutation.mutate({
-                        id: selectedBug.id,
-                        updates: { status: value as BugReport["status"] },
-                      });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="open">Abierto</SelectItem>
-                      <SelectItem value="in_progress">En progreso</SelectItem>
-                      <SelectItem value="resolved">Resuelto</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label>Descripción</Label>
-                <p className="mt-2 text-sm">{selectedBug.description}</p>
-              </div>
-
-              {selectedBug.reproduction_steps && (
-                <div>
-                  <Label>Pasos para reproducir</Label>
-                  <p className="mt-2 text-sm whitespace-pre-wrap">
-                    {selectedBug.reproduction_steps}
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <Label>Correo del reportero</Label>
-                <p className="mt-2 text-sm">{selectedBug.reporter_email}</p>
-              </div>
-
-              {selectedBug.github_issue_url && (
-                <div>
-                  <Label>GitHub Issue</Label>
-                  <a
-                    href={selectedBug.github_issue_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 flex items-center text-sm text-blue-600 hover:underline"
-                  >
-                    #{selectedBug.github_issue_number} <ExternalLink className="ml-1 h-3 w-3" />
-                  </a>
-                </div>
-              )}
-
-              {selectedBug.screenshot_url && (
-                <div>
-                  <Label>Captura de pantalla</Label>
-                  <img
-                    src={selectedBug.screenshot_url}
-                    alt="Screenshot"
-                    className="mt-2 rounded-md border max-w-full h-auto"
-                  />
-                </div>
-              )}
-
-              {selectedBug.console_logs && selectedBug.console_logs.length > 0 && (
-                <div>
-                  <Label>Registros de consola</Label>
-                  <div className="mt-2 rounded-md bg-gray-100 p-4 max-h-60 overflow-y-auto">
-                    <pre className="text-xs">
-                      {selectedBug.console_logs
-                        .map(
-                          (log) =>
-                            `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}`
-                        )
-                        .join("\n")}
-                    </pre>
+                    <div>
+                      <Label>Estado</Label>
+                      <Select
+                        value={selectedBug.status}
+                        onValueChange={(value) => {
+                          updateBugMutation.mutate({
+                            id: selectedBug.id,
+                            updates: { status: value as BugReport["status"] },
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="open">Abierto</SelectItem>
+                          <SelectItem value="in_progress">En progreso</SelectItem>
+                          <SelectItem value="resolved">Resuelto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              <div>
-                <Label>Notas del administrador</Label>
-                <Textarea
-                  value={selectedBug.admin_notes || ""}
-                  onChange={(e) => setSelectedBug({ ...selectedBug, admin_notes: e.target.value })}
-                  placeholder="Añadir notas internas..."
-                  className="mt-2"
-                />
-              </div>
+                  <div>
+                    <Label>Descripción</Label>
+                    <p className="mt-2 text-sm">{selectedBug.description}</p>
+                  </div>
+
+                  {selectedBug.reproduction_steps && (
+                    <div>
+                      <Label>Pasos para reproducir</Label>
+                      <p className="mt-2 text-sm whitespace-pre-wrap">
+                        {selectedBug.reproduction_steps}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <Label>Correo del reportero</Label>
+                    <p className="mt-2 text-sm">{selectedBug.reporter_email}</p>
+                  </div>
+
+                  {selectedBug.github_issue_url && (
+                    <div>
+                      <Label>GitHub Issue</Label>
+                      <a
+                        href={selectedBug.github_issue_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 flex items-center text-sm text-blue-600 hover:underline"
+                      >
+                        #{selectedBug.github_issue_number} <ExternalLink className="ml-1 h-3 w-3" />
+                      </a>
+                    </div>
+                  )}
+
+                  {fullBugDetails?.screenshot_url && (
+                    <div>
+                      <Label>Captura de pantalla</Label>
+                      <img
+                        src={fullBugDetails.screenshot_url}
+                        alt="Screenshot"
+                        className="mt-2 rounded-md border max-w-full h-auto"
+                      />
+                    </div>
+                  )}
+
+                  {fullBugDetails?.console_logs && fullBugDetails.console_logs.length > 0 && (
+                    <div>
+                      <Label>Registros de consola</Label>
+                      <div className="mt-2 rounded-md bg-gray-100 p-4 max-h-60 overflow-y-auto">
+                        <pre className="text-xs">
+                          {fullBugDetails.console_logs
+                            .map(
+                              (log) =>
+                                `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}`
+                            )
+                            .join("\n")}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <Label>Notas del administrador</Label>
+                    <Textarea
+                      value={selectedBug.admin_notes || ""}
+                      onChange={(e) => setSelectedBug({ ...selectedBug, admin_notes: e.target.value })}
+                      placeholder="Añadir notas internas..."
+                      className="mt-2"
+                    />
+                  </div>
+                </>
+              )}
 
               <DialogFooter className="flex gap-2">
                 <Button

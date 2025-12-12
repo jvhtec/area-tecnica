@@ -60,6 +60,13 @@ interface ProfileData {
   assignable_as_tech?: boolean | null;
 }
 
+interface ProfileQueryResult {
+  role: string | null;
+  department: string | null;
+  soundvision_access?: boolean;
+  assignable_as_tech?: boolean;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PROFILE_CACHE_KEY = 'supabase_user_profile';
@@ -177,13 +184,15 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           .eq('id', userId)
           .maybeSingle();
 
-        data = fallback.data as any;
-        error = fallback.error as any;
+        data = fallback.data;
+        error = fallback.error;
 
         // Default both new fields to false
         if (data) {
-          (data as any).soundvision_access = false;
-          (data as any).assignable_as_tech = false;
+          const typedData = data as ProfileQueryResult;
+          typedData.soundvision_access = false;
+          typedData.assignable_as_tech = false;
+          data = typedData;
         }
       }
 
@@ -193,14 +202,15 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       }
 
       if (data) {
-        const soundVisionAccess = Boolean((data as any).soundvision_access);
-        const assignableAsTech = Boolean((data as any).assignable_as_tech);
-        setUserRole(data.role);
-        setUserDepartment(data.department);
+        const typedData = data as ProfileQueryResult;
+        const soundVisionAccess = Boolean(typedData.soundvision_access);
+        const assignableAsTech = Boolean(typedData.assignable_as_tech);
+        setUserRole(typedData.role);
+        setUserDepartment(typedData.department);
         setSoundVisionAccessFlag(soundVisionAccess);
         setAssignableAsTechFlag(assignableAsTech);
-        setCachedProfile(userId, data.role, data.department, soundVisionAccess, assignableAsTech);
-        return { ...(data as any), soundvision_access: soundVisionAccess, assignable_as_tech: assignableAsTech } as any;
+        setCachedProfile(userId, typedData.role, typedData.department, soundVisionAccess, assignableAsTech);
+        return { ...typedData, soundvision_access: soundVisionAccess, assignable_as_tech: assignableAsTech } as ProfileData;
       } else {
         setSoundVisionAccessFlag(false);
         setAssignableAsTechFlag(false);

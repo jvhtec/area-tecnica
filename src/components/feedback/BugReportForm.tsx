@@ -277,8 +277,8 @@ export function BugReportForm() {
                 <div className="space-y-1 leading-none">
                   <FormLabel>Incluir registro de consola</FormLabel>
                   <FormDescription>
-                    Esto puede incluir información técnica de tu dispositivo.
-                    Los últimos 100 mensajes de consola serán incluidos.
+                    Esto puede incluir información técnica de tu dispositivo y de la aplicación.
+                    Los últimos 100 mensajes de consola serán incluidos. Por favor, revisa que no contenga información sensible antes de enviar.
                   </FormDescription>
                 </div>
               </FormItem>
