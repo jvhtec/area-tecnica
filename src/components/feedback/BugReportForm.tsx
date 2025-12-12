@@ -149,8 +149,16 @@ export function BugReportForm() {
       setGithubIssueUrl(result?.githubIssue?.url || null);
       setShowSuccessDialog(true);
 
-      // Reset form
-      form.reset();
+      // Reset form (preserve reporterEmail to avoid re-prompting)
+      const currentEmail = form.getValues("reporterEmail");
+      form.reset({
+        title: "",
+        description: "",
+        reproductionSteps: "",
+        severity: "medium",
+        includeConsoleLogs: false,
+        reporterEmail: currentEmail,
+      });
       setScreenshot(null);
       setScreenshotFilename(null);
     } catch (error) {

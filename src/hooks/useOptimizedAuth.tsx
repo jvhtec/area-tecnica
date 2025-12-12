@@ -166,29 +166,25 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         .maybeSingle();
 
       if (error && (error as any)?.code === '42703') {
-        const message = String((error as any)?.message ?? '');
-        const missingSoundVision = message.includes('soundvision_access_enabled');
-        const missingAssignable = message.includes('assignable_as_tech');
-
-        const selectParts = ['role', 'department'];
-        if (!missingSoundVision) selectParts.push('soundvision_access:soundvision_access_enabled');
-        if (!missingAssignable) selectParts.push('assignable_as_tech');
-
+        // Column missing - fallback to base columns only and default new fields to false
         console.warn(
-          `profiles column missing; soundvision_access_enabled=${missingSoundVision}, assignable_as_tech=${missingAssignable}. Defaulting missing flags to false.`,
+          'profiles columns missing (soundvision_access_enabled or assignable_as_tech). Falling back to role/department only.',
         );
 
         const fallback = await supabase
           .from('profiles')
-          .select(selectParts.join(', '))
+          .select('role, department')
           .eq('id', userId)
           .maybeSingle();
 
         data = fallback.data as any;
         error = fallback.error as any;
 
-        if (data && missingSoundVision) (data as any).soundvision_access = false;
-        if (data && missingAssignable) (data as any).assignable_as_tech = false;
+        // Default both new fields to false
+        if (data) {
+          (data as any).soundvision_access = false;
+          (data as any).assignable_as_tech = false;
+        }
       }
 
       if (error) {

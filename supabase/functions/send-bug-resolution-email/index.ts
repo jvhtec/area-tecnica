@@ -178,7 +178,8 @@ serve(async (req) => {
       try {
         const url = new URL(bugReport.github_issue_url);
         if (url.protocol === 'http:' || url.protocol === 'https:') {
-          githubLinkHtml = `<p>Puedes ver más detalles en el <a href="${escapeHtml(bugReport.github_issue_url)}">issue de GitHub</a>.</p>`;
+          // Use normalized url.href to avoid edge cases
+          githubLinkHtml = `<p>Puedes ver más detalles en el <a href="${escapeHtml(url.href)}">issue de GitHub</a>.</p>`;
         } else {
           console.warn('[send-bug-resolution-email] Invalid URL protocol:', url.protocol);
         }

@@ -111,13 +111,13 @@ export function AdminPanel() {
   const [bugToDelete, setBugToDelete] = useState<string | null>(null);
   const [featureToDelete, setFeatureToDelete] = useState<string | null>(null);
 
-  // Fetch bug reports
+  // Fetch bug reports (excluding heavy fields for list view)
   const { data: bugReports = [], isLoading: loadingBugs } = useQuery({
     queryKey: ["bug_reports"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bug_reports")
-        .select("*")
+        .select("id, title, severity, status, reporter_email, github_issue_url, github_issue_number, created_at, updated_at, resolved_at, resolved_by, admin_notes, description, reproduction_steps, app_version, environment_info")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as BugReport[];
@@ -182,16 +182,39 @@ export function AdminPanel() {
       const { error } = await supabase.from("feature_requests").update(updates).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["feature_requests"] });
-      toast({ title: "Feature request updated successfully" });
+    onMutate: async ({ id, updates }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["feature_requests"] });
+
+      // Snapshot the current state before mutation
+      const previousFeature = selectedFeature;
+
+      // Optimistically update the UI
+      if (selectedFeature && selectedFeature.id === id) {
+        setSelectedFeature({ ...selectedFeature, ...updates });
+      }
+
+      // Return context with previous state for potential rollback
+      return { previousFeature };
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      // Rollback to previous state on error
+      if (context?.previousFeature) {
+        setSelectedFeature(context.previousFeature);
+      }
+
       toast({
         title: "Error updating feature request",
         description: error.message,
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Always refetch to ensure UI is in sync with server
+      queryClient.invalidateQueries({ queryKey: ["feature_requests"] });
+    },
+    onSuccess: () => {
+      toast({ title: "Feature request updated successfully" });
     },
   });
 
@@ -617,10 +640,6 @@ export function AdminPanel() {
                     updateFeatureMutation.mutate({
                       id: selectedFeature.id,
                       updates: { status: value as FeatureRequest["status"] },
-                    });
-                    setSelectedFeature({
-                      ...selectedFeature,
-                      status: value as FeatureRequest["status"],
                     });
                   }}
                 >
