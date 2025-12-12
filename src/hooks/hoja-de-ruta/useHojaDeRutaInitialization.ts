@@ -305,10 +305,16 @@ export const useHojaDeRutaInitialization = (
             ? mergedStaff
             : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
           schedule: savedEventData?.schedule || (startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ""),
+          // Structured program schedules
+          programSchedule: savedEventData?.programSchedule || undefined,
+          programScheduleDays: savedEventData?.programScheduleDays || undefined,
           // Use fresh power requirements from database, fallback to saved if none found
           powerRequirements: powerRequirementsText || savedEventData?.powerRequirements || "",
           auxiliaryNeeds: savedEventData?.auxiliaryNeeds || "",
           weather: savedEventData?.weather || undefined,
+          // Restaurants
+          restaurants: savedEventData?.restaurants || undefined,
+          selectedRestaurants: savedEventData?.selectedRestaurants || undefined,
         });
 
         // Set travel arrangements using transformed data
