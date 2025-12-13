@@ -263,33 +263,43 @@ serve(async (req) => {
 
     // Save to database
     console.log("[submit-bug-report] Saving to database...");
+    const insertData = {
+      title: bugReport.title,
+      description: bugReport.description,
+      reproduction_steps: bugReport.reproductionSteps,
+      severity: bugReport.severity,
+      screenshot_url: screenshotUrl,
+      console_logs: bugReport.consoleLogs,
+      reporter_email: bugReport.reporterEmail,
+      app_version: bugReport.appVersion,
+      environment_info: bugReport.environmentInfo,
+      github_issue_url: githubIssue?.url,
+      github_issue_number: githubIssue?.number,
+      created_by: user?.id,
+      status: "open",
+    };
+    console.log("[submit-bug-report] Insert data:", JSON.stringify(insertData, null, 2));
+
     const { data: savedReport, error: dbError } = await supabase
       .from("bug_reports")
-      .insert({
-        title: bugReport.title,
-        description: bugReport.description,
-        reproduction_steps: bugReport.reproductionSteps,
-        severity: bugReport.severity,
-        screenshot_url: screenshotUrl,
-        console_logs: bugReport.consoleLogs,
-        reporter_email: bugReport.reporterEmail,
-        app_version: bugReport.appVersion,
-        environment_info: bugReport.environmentInfo,
-        github_issue_url: githubIssue?.url,
-        github_issue_number: githubIssue?.number,
-        created_by: user?.id,
-        status: "open",
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (dbError) {
       const errorId = `BR-DB-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      console.error(`[submit-bug-report] Database error ${errorId}:`, dbError);
+      console.error(`[submit-bug-report] Database error ${errorId}:`, {
+        message: dbError.message,
+        details: dbError.details,
+        hint: dbError.hint,
+        code: dbError.code,
+        fullError: dbError,
+      });
       return new Response(
         JSON.stringify({
           error: "Failed to save bug report",
           errorId: errorId,
+          details: import.meta.env.DEV ? dbError.message : undefined,
         }),
         {
           status: 500,
@@ -297,6 +307,8 @@ serve(async (req) => {
         }
       );
     }
+
+    console.log("[submit-bug-report] Successfully saved to database:", savedReport?.id);
 
     // Send confirmation email (optional - can be implemented later)
     // TODO: Send confirmation email to reporter

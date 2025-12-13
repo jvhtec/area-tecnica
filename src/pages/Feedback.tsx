@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bug, Lightbulb, Settings } from "lucide-react";
@@ -6,23 +6,12 @@ import { BugReportForm } from "@/components/feedback/BugReportForm";
 import { FeatureRequestForm } from "@/components/feedback/FeatureRequestForm";
 import { AdminPanel } from "@/components/feedback/AdminPanel";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { initConsoleCapture } from "@/utils/consoleCapture";
 
 export default function Feedback() {
   const { userRole } = useOptimizedAuth();
   const [activeTab, setActiveTab] = useState("bug");
 
   const isAdmin = userRole === "admin" || userRole === "management";
-
-  // Initialize console capture when component mounts
-  useEffect(() => {
-    const capture = initConsoleCapture();
-
-    // Restore original console methods on unmount
-    return () => {
-      capture.restore();
-    };
-  }, []);
 
   return (
     <div className="container mx-auto py-6 px-4 max-w-5xl">

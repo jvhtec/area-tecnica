@@ -35,3 +35,9 @@ verify_jwt = false
 
 [functions.wallboard-feed]
 verify_jwt = true
+
+[functions.submit-bug-report]
+verify_jwt = false
+
+[functions.send-bug-resolution-email]
+verify_jwt = true

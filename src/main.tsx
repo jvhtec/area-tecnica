@@ -3,6 +3,10 @@ import App from './App.tsx'
 import './index.css'
 import { isChunkLoadErrorEvent, isChunkLoadPromiseRejection } from '@/utils/errorUtils'
 import { CHUNK_ERROR_RELOAD_KEY, MAX_CHUNK_ERROR_RELOADS } from '@/utils/chunkErrorConstants'
+import { initConsoleCapture } from '@/utils/consoleCapture'
+
+// Initialize console capture globally to capture logs throughout the app lifecycle
+initConsoleCapture();
 
 // Global error handler for chunk load errors that happen outside React's error boundary
 // In-memory guard to prevent infinite reload loops if sessionStorage is unavailable
