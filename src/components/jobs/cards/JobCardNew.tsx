@@ -100,19 +100,18 @@ export function JobCardNew({
 
   // Open hoja de ruta modal if requested via URL parameter
   useEffect(() => {
-    if (openHojaDeRuta && !openedFromParamRef.current) {
-      openedFromParamRef.current = true;
-      setRouteSheetOpen(true);
-      onHojaDeRutaOpened?.();
-    }
-  }, [openHojaDeRuta]);
-
-  // Reset the ref when openHojaDeRuta becomes false (URL param cleared)
-  useEffect(() => {
     if (!openHojaDeRuta) {
       openedFromParamRef.current = false;
+      return;
     }
-  }, [openHojaDeRuta]);
+    // Only "consume" the URL param when we can actually show the modal
+    if (!isProjectManagementPage || detailsOnlyMode) return;
+    if (openedFromParamRef.current) return;
+
+    openedFromParamRef.current = true;
+    setRouteSheetOpen(true);
+    onHojaDeRutaOpened?.();
+  }, [openHojaDeRuta, isProjectManagementPage, detailsOnlyMode]);
 
   // Load artists then rider files (2-step RLS-friendly)
   const { data: cardArtists = [] } = useQuery({
