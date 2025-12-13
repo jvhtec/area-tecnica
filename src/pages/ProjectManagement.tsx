@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle, Search, Filter, X } from "lucide-react";
@@ -24,6 +24,7 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 const ProjectManagement = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { userDepartment, isLoading: authLoading } = useOptimizedAuth();
@@ -41,6 +42,9 @@ const ProjectManagement = () => {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const { forceSubscribe } = useSubscriptionContext();
+
+  // URL parameter for opening hoja de ruta modal
+  const openHojaDeRutaJobId = searchParams.get('openHojaDeRuta');
 
   const startDate = startOfMonth(currentDate);
   const endDate = endOfMonth(currentDate);
@@ -393,6 +397,12 @@ const ProjectManagement = () => {
             onDeleteDocument={undefined}
             userRole={userRole}
             highlightToday={highlightToday}
+            openHojaDeRutaJobId={openHojaDeRutaJobId}
+            onHojaDeRutaOpened={() => {
+              // Clear the URL parameter after modal is opened
+              searchParams.delete('openHojaDeRuta');
+              setSearchParams(searchParams);
+            }}
           />
         </CardContent>
       </Card>

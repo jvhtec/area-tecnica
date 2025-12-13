@@ -1516,10 +1516,9 @@ function resolveNotificationUrl(
       ? `/festival-management/${jobId}`
       : `/festival-management/${jobId}?singleJob=true`;
   }
-  // Hoja de ruta notifications navigate to project management (modal opens from there)
+  // Hoja de ruta notifications navigate to project management with jobId to open modal
   else if (type === EVENT_TYPES.HOJA_UPDATED) {
-    // TODO: Add support for opening hoja de ruta modal with specific jobId
-    return '/project-management';
+    return jobId ? `/project-management?openHojaDeRuta=${jobId}` : '/project-management';
   }
   // Timesheet notifications navigate to timesheets page
   else if (type === EVENT_TYPES.TIMESHEET_SUBMITTED ||
@@ -1564,7 +1563,7 @@ function resolveNotificationUrl(
            type === EVENT_TYPES.FLEX_TOURDATE_FOLDER_CREATED) {
     return '/project-management';
   }
-  // Staffing events navigate to the job or assignment matrix
+  // Staffing events navigate to job assignment matrix
   else if (type === EVENT_TYPES.STAFFING_AVAILABILITY_SENT ||
            type === EVENT_TYPES.STAFFING_AVAILABILITY_CONFIRMED ||
            type === EVENT_TYPES.STAFFING_AVAILABILITY_DECLINED ||
@@ -1573,11 +1572,7 @@ function resolveNotificationUrl(
            type === EVENT_TYPES.STAFFING_OFFER_CONFIRMED ||
            type === EVENT_TYPES.STAFFING_OFFER_DECLINED ||
            type === EVENT_TYPES.STAFFING_OFFER_CANCELLED) {
-    if (!jobId) return '/job-assignment-matrix';
-    // Festival jobs go to /festival-management/{jobId}, others add ?singleJob=true
-    return jobType === 'festival'
-      ? `/festival-management/${jobId}`
-      : `/festival-management/${jobId}?singleJob=true`;
+    return '/job-assignment-matrix';
   }
   // Task events navigate to festival management
   else if (type === EVENT_TYPES.TASK_ASSIGNED ||

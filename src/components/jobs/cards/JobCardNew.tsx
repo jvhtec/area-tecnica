@@ -58,6 +58,8 @@ export interface JobCardNewProps {
   isProjectManagementPage?: boolean;
   hideTasks?: boolean;
   detailsOnlyMode?: boolean;
+  openHojaDeRuta?: boolean;
+  onHojaDeRutaOpened?: () => void;
 }
 
 export function JobCardNew({
@@ -73,7 +75,9 @@ export function JobCardNew({
   showManageArtists = false,
   isProjectManagementPage = false,
   hideTasks = false,
-  detailsOnlyMode = false
+  detailsOnlyMode = false,
+  openHojaDeRuta = false,
+  onHojaDeRutaOpened
 }: JobCardNewProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -90,6 +94,15 @@ export function JobCardNew({
   // Collapsible sections (collapsed by default)
   const [docsCollapsed, setDocsCollapsed] = useState(true);
   const [ridersCollapsed, setRidersCollapsed] = useState(true);
+
+  // Open hoja de ruta modal if requested via URL parameter
+  useEffect(() => {
+    if (openHojaDeRuta && !routeSheetOpen) {
+      setRouteSheetOpen(true);
+      onHojaDeRutaOpened?.();
+    }
+  }, [openHojaDeRuta, routeSheetOpen, onHojaDeRutaOpened]);
+
   // Load artists then rider files (2-step RLS-friendly)
   const { data: cardArtists = [] } = useQuery({
     queryKey: ['jobcard-artists', job.id],
