@@ -83,6 +83,16 @@ const departmentIconMap: Record<string, LucideIcon> = {
 
 const baseNavigationConfig: NavigationItemConfig[] = [
   {
+    id: "tech-app",
+    label: "Tech app",
+    mobileLabel: "Tech app",
+    icon: LayoutDashboard,
+    mobilePriority: 1,
+    mobileSlot: "primary",
+    getPath: () => "/tech-app",
+    isVisible: ({ userRole }) => userRole === "house_tech",
+  },
+  {
     id: "management-dashboard",
     label: "Panel principal",
     mobileLabel: "Panel",
@@ -424,6 +434,7 @@ const resolveIcon = (
 }
 
 const adminExcludedIds = new Set([
+  "tech-app",
   "technician-dashboard",
   "technician-jobs",
   "technician-availability",
@@ -493,7 +504,7 @@ export const buildNavigationItems = (
       .filter(Boolean) as NavigationItem[]
   }
 
-  return navigationConfig
+  const visibleItems = navigationConfig
     .map((config) => {
       if (!config.isVisible(context)) {
         return null
@@ -501,6 +512,26 @@ export const buildNavigationItems = (
       return createNavigationItem(config)
     })
     .filter(Boolean) as NavigationItem[]
+
+  if (context.userRole === "house_tech") {
+    const orderedHouseTechItems = [
+      "tech-app",
+      "personal",
+      "logistics",
+      "house-department",
+      "profile",
+    ]
+    const allowedHouseTechItems = new Set(orderedHouseTechItems)
+
+    const filtered = visibleItems.filter((item) => allowedHouseTechItems.has(item.id))
+
+    return filtered.sort(
+      (a, b) =>
+        orderedHouseTechItems.indexOf(a.id) - orderedHouseTechItems.indexOf(b.id),
+    )
+  }
+
+  return visibleItems
 }
 
 export const SidebarNavigation = ({
