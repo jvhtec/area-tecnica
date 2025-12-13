@@ -1891,6 +1891,11 @@ async function handleBroadcast(
     }
 
     // 2. Send notification to management (using tech's name)
+    // Department-aware: only notify management from job's department + admins based on their preference
+    const deptMgmt = jobDepartment ? await getManagementByDepartmentUserIds(client, jobDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, jobDepartment);
+    const relevantMgmtIds = Array.from(new Set([...deptMgmt, ...relevantAdmins]));
+
     const mgmtTitle = 'Asignación directa';
     let mgmtText = '';
     if (assignedTechName) {
@@ -1910,7 +1915,7 @@ async function handleBroadcast(
     const { data: mgmtSubs } = await client
       .from('push_subscriptions')
       .select('endpoint, p256dh, auth, user_id')
-      .in('user_id', Array.from(mgmt));
+      .in('user_id', relevantMgmtIds);
 
     if (mgmtSubs && mgmtSubs.length > 0) {
       mgmtSubsCount = mgmtSubs.length;
@@ -1977,6 +1982,11 @@ async function handleBroadcast(
     }
 
     // Notify management
+    // Department-aware: only notify management from job's department + admins based on their preference
+    const deptMgmt = jobDepartment ? await getManagementByDepartmentUserIds(client, jobDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, jobDepartment);
+    const relevantMgmtIds = Array.from(new Set([...deptMgmt, ...relevantAdmins]));
+
     const mgmtTitle = 'Asignación eliminada';
     const mgmtText = singleDayFlag && formattedTargetDate
       ? `${actor} ha eliminado a ${removedTechName} de "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`
@@ -1985,7 +1995,7 @@ async function handleBroadcast(
     const { data: mgmtSubs } = await client
       .from('push_subscriptions')
       .select('endpoint, p256dh, auth, user_id')
-      .in('user_id', Array.from(mgmt));
+      .in('user_id', relevantMgmtIds);
 
     if (mgmtSubs && mgmtSubs.length > 0) {
       mgmtSubsCount = mgmtSubs.length;
