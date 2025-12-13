@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,14 @@ const ProjectManagement = () => {
 
   // URL parameter for opening hoja de ruta modal
   const openHojaDeRutaJobId = searchParams.get('openHojaDeRuta');
+
+  // Memoized callback to clear URL parameter after modal is opened
+  const handleHojaDeRutaOpened = useCallback(() => {
+    // Create new URLSearchParams to avoid mutating the existing one
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('openHojaDeRuta');
+    setSearchParams(newParams);
+  }, [searchParams, setSearchParams]);
 
   const startDate = startOfMonth(currentDate);
   const endDate = endOfMonth(currentDate);
@@ -398,11 +406,7 @@ const ProjectManagement = () => {
             userRole={userRole}
             highlightToday={highlightToday}
             openHojaDeRutaJobId={openHojaDeRutaJobId}
-            onHojaDeRutaOpened={() => {
-              // Clear the URL parameter after modal is opened
-              searchParams.delete('openHojaDeRuta');
-              setSearchParams(searchParams);
-            }}
+            onHojaDeRutaOpened={handleHojaDeRutaOpened}
           />
         </CardContent>
       </Card>

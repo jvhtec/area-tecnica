@@ -1476,12 +1476,23 @@ function summarizeTaskChanges(changes: BroadcastBody['changes']): string {
 /**
  * Validates and sanitizes a URL to prevent open-redirect attacks.
  * Only allows internal URLs (starting with /) but not protocol-relative URLs (//).
+ * Also checks for encoded slashes and other obfuscation techniques.
  */
 function validateInternalUrl(url: string | undefined): string | undefined {
   if (!url) return undefined;
 
-  // Only allow internal URLs starting with / but not //
-  if (!url.startsWith('/') || url.startsWith('//')) {
+  // Decode the URL to catch encoded slashes and other obfuscation
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(url);
+  } catch (e) {
+    // If decoding fails, reject the URL
+    console.warn(`⚠️ Rejecting URL with invalid encoding: ${url}`);
+    return undefined;
+  }
+
+  // Only allow internal URLs starting with / but not //, and reject encoded slashes
+  if (!url.startsWith('/') || url.startsWith('//') || decoded.startsWith('//')) {
     console.warn(`⚠️ Rejecting potentially unsafe URL: ${url}`);
     return undefined;
   }

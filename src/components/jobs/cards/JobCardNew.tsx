@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
@@ -95,13 +95,24 @@ export function JobCardNew({
   const [docsCollapsed, setDocsCollapsed] = useState(true);
   const [ridersCollapsed, setRidersCollapsed] = useState(true);
 
+  // Track if we've already opened the modal from URL param to prevent race condition
+  const openedFromParamRef = useRef(false);
+
   // Open hoja de ruta modal if requested via URL parameter
   useEffect(() => {
-    if (openHojaDeRuta && !routeSheetOpen) {
+    if (openHojaDeRuta && !openedFromParamRef.current) {
+      openedFromParamRef.current = true;
       setRouteSheetOpen(true);
       onHojaDeRutaOpened?.();
     }
-  }, [openHojaDeRuta, routeSheetOpen, onHojaDeRutaOpened]);
+  }, [openHojaDeRuta]);
+
+  // Reset the ref when openHojaDeRuta becomes false (URL param cleared)
+  useEffect(() => {
+    if (!openHojaDeRuta) {
+      openedFromParamRef.current = false;
+    }
+  }, [openHojaDeRuta]);
 
   // Load artists then rider files (2-step RLS-friendly)
   const { data: cardArtists = [] } = useQuery({
