@@ -758,6 +758,21 @@ async function getJobDepartment(client: ReturnType<typeof createClient>, jobId?:
   }
 }
 
+async function getJobType(client: ReturnType<typeof createClient>, jobId?: string): Promise<string | null> {
+  if (!jobId) return null;
+  try {
+    const { data, error } = await client.from('jobs').select('job_type').eq('id', jobId).maybeSingle();
+    if (error) {
+      console.error('⚠️ Failed to fetch job type:', { jobId, error });
+      return null;
+    }
+    return data?.job_type ?? null;
+  } catch (err) {
+    console.error('⚠️ Exception fetching job type:', { jobId, err });
+    return null;
+  }
+}
+
 async function getTourName(client: ReturnType<typeof createClient>, tourId?: string): Promise<string | null> {
   if (!tourId) return null;
   try {
@@ -1482,6 +1497,7 @@ function resolveNotificationUrl(
   type: string,
   jobId: string | undefined,
   tourId: string | undefined,
+  jobType: string | null | undefined,
 ): string {
   // Assignment notifications navigate to job assignment matrix
   if (type === EVENT_TYPES.JOB_ASSIGNMENT_CONFIRMED ||
@@ -1489,16 +1505,21 @@ function resolveNotificationUrl(
       type === EVENT_TYPES.ASSIGNMENT_REMOVED) {
     return '/job-assignment-matrix';
   }
-  // Document notifications navigate to the job card
+  // Document notifications navigate to the job in festival management
   else if (type === EVENT_TYPES.DOCUMENT_UPLOADED ||
            type === EVENT_TYPES.DOCUMENT_DELETED ||
            type === EVENT_TYPES.DOCUMENT_TECH_VISIBLE_ENABLED ||
            type === EVENT_TYPES.DOCUMENT_TECH_VISIBLE_DISABLED) {
-    return jobId ? `/jobs/${jobId}` : '/project-management';
+    if (!jobId) return '/project-management';
+    // Festival jobs go to /festival-management/{jobId}, others add ?singleJob=true
+    return jobType === 'festival'
+      ? `/festival-management/${jobId}`
+      : `/festival-management/${jobId}?singleJob=true`;
   }
-  // Hoja de ruta notifications navigate to hoja de ruta UI
+  // Hoja de ruta notifications navigate to project management (modal opens from there)
   else if (type === EVENT_TYPES.HOJA_UPDATED) {
-    return '/hoja-de-ruta';
+    // TODO: Add support for opening hoja de ruta modal with specific jobId
+    return '/project-management';
   }
   // Timesheet notifications navigate to timesheets page
   else if (type === EVENT_TYPES.TIMESHEET_SUBMITTED ||
@@ -1523,7 +1544,7 @@ function resolveNotificationUrl(
            type === EVENT_TYPES.TOURDATE_DELETED) {
     return tourId ? `/tour-management/${tourId}` : '/tours';
   }
-  // Job events navigate to the specific job
+  // Job events navigate to the specific job in festival management
   else if (type === EVENT_TYPES.JOB_CREATED ||
            type === EVENT_TYPES.JOB_UPDATED ||
            type === EVENT_TYPES.JOB_DELETED ||
@@ -1532,14 +1553,18 @@ function resolveNotificationUrl(
            type === EVENT_TYPES.JOB_CALLTIME_UPDATED ||
            type === EVENT_TYPES.JOB_REQUIREMENTS_UPDATED ||
            type?.startsWith('job.type.changed')) {
-    return jobId ? `/jobs/${jobId}` : '/project-management';
+    if (!jobId) return '/project-management';
+    // Festival jobs go to /festival-management/{jobId}, others add ?singleJob=true
+    return jobType === 'festival'
+      ? `/festival-management/${jobId}`
+      : `/festival-management/${jobId}?singleJob=true`;
   }
   // Flex folder events navigate to project management
   else if (type === EVENT_TYPES.FLEX_FOLDERS_CREATED ||
            type === EVENT_TYPES.FLEX_TOURDATE_FOLDER_CREATED) {
     return '/project-management';
   }
-  // Staffing events navigate to job assignment matrix (for management)
+  // Staffing events navigate to the job or assignment matrix
   else if (type === EVENT_TYPES.STAFFING_AVAILABILITY_SENT ||
            type === EVENT_TYPES.STAFFING_AVAILABILITY_CONFIRMED ||
            type === EVENT_TYPES.STAFFING_AVAILABILITY_DECLINED ||
@@ -1548,21 +1573,37 @@ function resolveNotificationUrl(
            type === EVENT_TYPES.STAFFING_OFFER_CONFIRMED ||
            type === EVENT_TYPES.STAFFING_OFFER_DECLINED ||
            type === EVENT_TYPES.STAFFING_OFFER_CANCELLED) {
-    return jobId ? `/jobs/${jobId}` : '/job-assignment-matrix';
+    if (!jobId) return '/job-assignment-matrix';
+    // Festival jobs go to /festival-management/{jobId}, others add ?singleJob=true
+    return jobType === 'festival'
+      ? `/festival-management/${jobId}`
+      : `/festival-management/${jobId}?singleJob=true`;
   }
-  // Task events navigate to festival management or job/tour
+  // Task events navigate to festival management
   else if (type === EVENT_TYPES.TASK_ASSIGNED ||
            type === EVENT_TYPES.TASK_UPDATED ||
            type === EVENT_TYPES.TASK_COMPLETED) {
-    return jobId ? `/festival-management/${jobId}` : tourId ? `/tours/${tourId}` : '/project-management';
+    if (jobId) {
+      // Festival jobs go to /festival-management/{jobId}, others add ?singleJob=true
+      return jobType === 'festival'
+        ? `/festival-management/${jobId}`
+        : `/festival-management/${jobId}?singleJob=true`;
+    }
+    return tourId ? `/tours/${tourId}` : '/project-management';
   }
   // Message notifications navigate to dashboard with messages panel
   else if (type === EVENT_TYPES.MESSAGE_RECEIVED) {
     return '/dashboard?showMessages=true';
   }
-  // Default fallback: job card, tour, or home
+  // Default fallback: job, tour, or home
   else {
-    return jobId ? `/jobs/${jobId}` : tourId ? `/tours/${tourId}` : '/';
+    if (jobId) {
+      // Festival jobs go to /festival-management/{jobId}, others add ?singleJob=true
+      return jobType === 'festival'
+        ? `/festival-management/${jobId}`
+        : `/festival-management/${jobId}?singleJob=true`;
+    }
+    return tourId ? `/tours/${tourId}` : '/';
   }
 }
 
@@ -1582,6 +1623,7 @@ async function handleBroadcast(
   }
   const jobTitle = await getJobTitle(client, jobId);
   const jobDepartment = await getJobDepartment(client, jobId);
+  const jobType = await getJobType(client, jobId);
   const tourId = body.tour_id;
   const tourName = body.tour_name || (await getTourName(client, tourId)) || null;
 
@@ -1628,7 +1670,7 @@ async function handleBroadcast(
   let text = '';
 
   // Determine navigation URL: validate custom URL or resolve based on event type
-  let url = validateInternalUrl(body.url) || resolveNotificationUrl(type, jobId, tourId);
+  let url = validateInternalUrl(body.url) || resolveNotificationUrl(type, jobId, tourId, jobType);
 
   const actorIdForLookup = (body as any)?.actor_id || userId;
   const actor = body.actor_name || (await getProfileDisplayName(client, actorIdForLookup)) || 'Alguien';
