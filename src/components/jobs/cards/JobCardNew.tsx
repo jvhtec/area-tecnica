@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
@@ -58,6 +58,8 @@ export interface JobCardNewProps {
   isProjectManagementPage?: boolean;
   hideTasks?: boolean;
   detailsOnlyMode?: boolean;
+  openHojaDeRuta?: boolean;
+  onHojaDeRutaOpened?: () => void;
 }
 
 export function JobCardNew({
@@ -73,7 +75,9 @@ export function JobCardNew({
   showManageArtists = false,
   isProjectManagementPage = false,
   hideTasks = false,
-  detailsOnlyMode = false
+  detailsOnlyMode = false,
+  openHojaDeRuta = false,
+  onHojaDeRutaOpened
 }: JobCardNewProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -90,6 +94,25 @@ export function JobCardNew({
   // Collapsible sections (collapsed by default)
   const [docsCollapsed, setDocsCollapsed] = useState(true);
   const [ridersCollapsed, setRidersCollapsed] = useState(true);
+
+  // Track if we've already opened the modal from URL param to prevent race condition
+  const openedFromParamRef = useRef(false);
+
+  // Open hoja de ruta modal if requested via URL parameter
+  useEffect(() => {
+    if (!openHojaDeRuta) {
+      openedFromParamRef.current = false;
+      return;
+    }
+    // Only "consume" the URL param when we can actually show the modal
+    if (!isProjectManagementPage || detailsOnlyMode) return;
+    if (openedFromParamRef.current) return;
+
+    openedFromParamRef.current = true;
+    setRouteSheetOpen(true);
+    onHojaDeRutaOpened?.();
+  }, [openHojaDeRuta, isProjectManagementPage, detailsOnlyMode]);
+
   // Load artists then rider files (2-step RLS-friendly)
   const { data: cardArtists = [] } = useQuery({
     queryKey: ['jobcard-artists', job.id],

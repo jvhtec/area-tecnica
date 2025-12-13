@@ -15,6 +15,8 @@ interface DepartmentTabsProps {
   onDeleteDocument?: (jobId: string, document: any) => void;
   userRole?: string | null;
   highlightToday?: boolean;
+  openHojaDeRutaJobId?: string | null;
+  onHojaDeRutaOpened?: () => void;
 }
 
 export const DepartmentTabs = ({
@@ -24,7 +26,9 @@ export const DepartmentTabs = ({
   jobsLoading,
   onDeleteDocument,
   userRole,
-  highlightToday = false
+  highlightToday = false,
+  openHojaDeRutaJobId,
+  onHojaDeRutaOpened
 }: DepartmentTabsProps) => {
   const isMobile = useIsMobile();
   
@@ -85,6 +89,8 @@ export const DepartmentTabs = ({
                       showUpload={true}
                       showManageArtists={true}
                       isProjectManagementPage={true}
+                      openHojaDeRuta={openHojaDeRutaJobId === job.id}
+                      onHojaDeRutaOpened={onHojaDeRutaOpened}
                     />
                   </div>
                 );
