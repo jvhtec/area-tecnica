@@ -31,6 +31,7 @@ import { MorningSummarySubscription } from '@/components/settings/MorningSummary
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown } from "lucide-react"
 import { VersionDisplay } from "@/components/VersionDisplay"
+import { BugReportDialog } from "@/components/BugReportDialog"
 
 // Move CollapsibleCard outside to prevent recreation on every render
 const CollapsibleCard = ({
@@ -206,6 +207,7 @@ const Settings = () => {
     'push-matrix': false,
     'push-schedule': false,
     'morning-summary': false,
+    'bug-report': false,
     'users': false,
     'company-settings': false,
     'equipment-models': false,
@@ -393,6 +395,29 @@ const Settings = () => {
               onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'morning-summary': open }))}
             >
               <MorningSummarySubscription />
+            </CollapsibleCard>
+
+            <CollapsibleCard
+              id="bug-report"
+              title="Reportar error"
+              description="Ayúdanos a mejorar la aplicación reportando errores o problemas que encuentres."
+              isOpen={collapsibleStates['bug-report']}
+              onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'bug-report': open }))}
+            >
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Si encuentras un error o problema en la aplicación, puedes reportarlo aquí. 
+                  La información del navegador y el sistema se incluirán automáticamente.
+                </p>
+                <BugReportDialog 
+                  trigger={
+                    <Button variant="default" className="w-full">
+                      <Bug className="h-4 w-4 mr-2" />
+                      Abrir formulario de reporte
+                    </Button>
+                  }
+                />
+              </div>
             </CollapsibleCard>
 
             <CollapsibleCard
