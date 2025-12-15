@@ -143,22 +143,20 @@ export const useHojaDeRutaSave = (
         userId: user.id
       });
 
-      // Save all data in parallel for better performance
-      const savePromises = [];
-
-      // Always save event data
+      // Save event data first (required before saving dependent data)
       console.log("💾 SAVE: Saving event data...");
-      savePromises.push(
-        saveHojaDeRuta({
-          eventData,
-          userId: user.id
-        })
-      );
+      await saveHojaDeRuta({
+        eventData,
+        userId: user.id
+      });
+
+      // After the main hoja_de_ruta is saved, save related data in parallel
+      const relatedSavePromises = [];
 
       // Save travel arrangements if any exist
       if (travelArrangements.length > 0) {
         console.log("🚗 SAVE: Saving travel arrangements...", travelArrangements.length);
-        savePromises.push(
+        relatedSavePromises.push(
           saveTravelArrangements(travelArrangements)
         );
       }
@@ -166,7 +164,7 @@ export const useHojaDeRutaSave = (
       // Save accommodations if any exist
       if (accommodations.length > 0) {
         console.log("🏨 SAVE: Saving accommodations...", accommodations.length);
-        savePromises.push(
+        relatedSavePromises.push(
           saveAccommodations(accommodations)
         );
       }
@@ -174,13 +172,15 @@ export const useHojaDeRutaSave = (
       // Save venue images if any exist
       if (venueImages.length > 0) {
         console.log("📸 SAVE: Saving venue images...", venueImages.length);
-        savePromises.push(
+        relatedSavePromises.push(
           saveVenueImages(venueImages)
         );
       }
 
-      // Execute all saves in parallel
-      await Promise.all(savePromises);
+      // Execute related saves in parallel (after main save is complete)
+      if (relatedSavePromises.length > 0) {
+        await Promise.all(relatedSavePromises);
+      }
 
       // Update tracking
       lastSaveDataRef.current = currentDataSignature;
