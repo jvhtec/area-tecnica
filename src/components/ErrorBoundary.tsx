@@ -3,6 +3,7 @@ import { RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { isChunkLoadError } from '@/utils/errorUtils';
 import { CHUNK_ERROR_RELOAD_KEY, MAX_CHUNK_ERROR_RELOADS } from '@/utils/chunkErrorConstants';
+import { reportException } from '@/services/errorReporting';
 
 type ErrorBoundaryProps = {
   children: React.ReactNode;
@@ -49,6 +50,14 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Unhandled error captured by ErrorBoundary', error, errorInfo);
+
+    // Report the error to the database (non-blocking)
+    reportException(error, {
+      componentStack: errorInfo.componentStack,
+      location: window.location.href,
+    }).catch((err) => {
+      console.warn('Failed to report error to database:', err);
+    });
 
     // Cancel the reload count clear timeout if error occurs
     if (this.clearTimeoutId) {
