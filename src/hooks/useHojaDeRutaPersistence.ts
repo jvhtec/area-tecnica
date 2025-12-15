@@ -465,14 +465,20 @@ export const useHojaDeRutaPersistence = (
       );
 
       if (validArrangements.length > 0) {
+        const emptyToNull = (value: string | undefined) => {
+          if (!value) return null;
+          const trimmed = value.trim();
+          return trimmed ? trimmed : null;
+        };
+
         const travelData = validArrangements.map(arrangement => ({
           hoja_de_ruta_id: hojaDeRutaId,
-          transportation_type: arrangement.transportation_type,
+          transportation_type: arrangement.transportation_type?.trim() || 'van',
           pickup_address: arrangement.pickup_address || '',
-          pickup_time: arrangement.pickup_time || '',
+          pickup_time: emptyToNull(arrangement.pickup_time),
           flight_train_number: arrangement.flight_train_number || '',
-          departure_time: arrangement.departure_time || '',
-          arrival_time: arrangement.arrival_time || '',
+          departure_time: emptyToNull(arrangement.departure_time),
+          arrival_time: emptyToNull(arrangement.arrival_time),
           driver_name: arrangement.driver_name || '',
           driver_phone: arrangement.driver_phone || '',
           plate_number: arrangement.plate_number || '',
