@@ -143,17 +143,15 @@ export const useHojaDeRutaSave = (
         userId: user.id
       });
 
-      // Save all data in parallel for better performance
-      const savePromises = [];
-
-      // Always save event data
+      // First, save the main hoja de ruta data (this creates the record if it doesn't exist)
       console.log("💾 SAVE: Saving event data...");
-      savePromises.push(
-        saveHojaDeRuta({
-          eventData,
-          userId: user.id
-        })
-      );
+      await saveHojaDeRuta({
+        eventData,
+        userId: user.id
+      });
+
+      // Now save related data in parallel (they all depend on hoja_de_ruta existing)
+      const savePromises = [];
 
       // Save travel arrangements if any exist
       if (travelArrangements.length > 0) {
@@ -179,8 +177,10 @@ export const useHojaDeRutaSave = (
         );
       }
 
-      // Execute all saves in parallel
-      await Promise.all(savePromises);
+      // Execute related saves in parallel
+      if (savePromises.length > 0) {
+        await Promise.all(savePromises);
+      }
 
       // Update tracking
       lastSaveDataRef.current = currentDataSignature;
