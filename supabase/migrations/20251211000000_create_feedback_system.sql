@@ -85,7 +85,7 @@ CREATE POLICY "Users can view their own bug reports"
     ON bug_reports FOR SELECT
     USING (
         auth.uid() = created_by
-        OR reporter_email = (SELECT email FROM auth.users WHERE id = auth.uid())
+        OR reporter_email = auth.jwt()->>'email'
     );
 
 -- Admins and management can view all reports
@@ -132,7 +132,7 @@ CREATE POLICY "Users can view their own feature requests"
     ON feature_requests FOR SELECT
     USING (
         auth.uid() = created_by
-        OR reporter_email = (SELECT email FROM auth.users WHERE id = auth.uid())
+        OR reporter_email = auth.jwt()->>'email'
     );
 
 -- Admins and management can view all requests
