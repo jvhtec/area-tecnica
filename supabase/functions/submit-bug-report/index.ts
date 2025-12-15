@@ -285,11 +285,19 @@ serve(async (req) => {
 
     if (dbError) {
       const errorId = `BR-DB-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      console.error(`[submit-bug-report] Database error ${errorId}:`, dbError);
+      // Properly serialize Supabase error object
+      const errorDetails = {
+        message: dbError.message,
+        code: dbError.code,
+        details: dbError.details,
+        hint: dbError.hint,
+      };
+      console.error(`[submit-bug-report] Database error ${errorId}:`, JSON.stringify(errorDetails));
       return new Response(
         JSON.stringify({
           error: "Failed to save bug report",
           errorId: errorId,
+          details: errorDetails.message || "Unknown database error",
         }),
         {
           status: 500,

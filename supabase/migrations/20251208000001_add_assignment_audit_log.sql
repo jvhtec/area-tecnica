@@ -27,7 +27,7 @@ CREATE INDEX idx_audit_log_action ON assignment_audit_log(action);
 -- Add RLS policy (admin and management can read, system can write)
 ALTER TABLE assignment_audit_log ENABLE ROW LEVEL SECURITY;
 
--- Allow reading for authenticated users with admin/management/coordinator roles
+-- Allow reading for authenticated users with admin/management roles
 CREATE POLICY "Allow read for authorized roles" ON assignment_audit_log
   FOR SELECT
   TO authenticated
@@ -35,7 +35,7 @@ CREATE POLICY "Allow read for authorized roles" ON assignment_audit_log
     EXISTS (
       SELECT 1 FROM profiles
       WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'management', 'coordinator')
+      AND profiles.role IN ('admin', 'management')
     )
   );
 
