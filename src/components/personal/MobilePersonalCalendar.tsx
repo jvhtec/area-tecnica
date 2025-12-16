@@ -18,7 +18,6 @@ import {
   Lightbulb,
   Truck
 } from "lucide-react";
-import { PrintDialog, PrintSettings } from "@/components/dashboard/PrintDialog";
 import { format, addDays, subDays, isToday, isSameDay, isWithinInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import { TechContextMenu } from "./TechContextMenu";
@@ -26,6 +25,8 @@ import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 import { TechDetailModal } from "./TechDetailModal";
 import { Theme } from "@/components/technician/types";
+import { PersonalCalendarPrintDialog } from "./PersonalCalendarPrintDialog";
+import { generatePersonalCalendarPDF, generatePersonalCalendarXLS } from "@/utils/personalCalendarPdfExport";
 
 interface MobilePersonalCalendarProps {
   date: Date;
@@ -46,15 +47,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'warehouse' | 'job' | 'off'>('all');
   const [showPrintDialog, setShowPrintDialog] = useState(false);
-  const [printSettings, setPrintSettings] = useState<PrintSettings>({
-    jobTypes: {
-      tourdate: true,
-      tour: true,
-      single: true,
-      dryhire: true,
-      festival: true,
-    },
-  });
+  const [printDepartments, setPrintDepartments] = useState<string[]>([]);
 
   // Modal state for showing assignment/job details like desktop
   const [detailOpen, setDetailOpen] = useState(false);
@@ -98,6 +91,11 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
   const currentDateAssignments = getAssignmentsForDate(currentDate);
 
+  // Extract unique departments
+  const uniqueDepartments = Array.from(
+    new Set(houseTechs.map(tech => tech.department).filter((dept): dept is string => !!dept))
+  ).sort();
+
   const navigateToPrevious = () => {
     const newDate = subDays(currentDate, 1);
     setCurrentDate(newDate);
@@ -122,6 +120,28 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
   const handleAvailabilityRemove = (techId: string, targetDate: Date) => {
     removeAvailability(techId, targetDate);
+  };
+
+  const handleGeneratePDF = async (range: "month" | "quarter" | "year") => {
+    await generatePersonalCalendarPDF(range, {
+      houseTechs,
+      assignments,
+      getAvailabilityStatus,
+      currentDate,
+      selectedDepartments: printDepartments.length > 0 ? printDepartments : undefined,
+    });
+    setShowPrintDialog(false);
+  };
+
+  const handleGenerateXLS = (range: "month" | "quarter" | "year") => {
+    generatePersonalCalendarXLS(range, {
+      houseTechs,
+      assignments,
+      getAvailabilityStatus,
+      currentDate,
+      selectedDepartments: printDepartments.length > 0 ? printDepartments : undefined,
+    });
+    setShowPrintDialog(false);
   };
 
   const isWeekend = (day: Date) => {
@@ -370,15 +390,6 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     return statusMeta.key === statusFilter;
   });
 
-  const generatePDF = (range: "month" | "quarter" | "year") => {
-    console.log("PDF móvil para técnicos de planta no implementado para", range);
-    setShowPrintDialog(false);
-  };
-
-  const generateXLS = (range: "month" | "quarter" | "year") => {
-    console.log("XLS móvil para técnicos de planta no implementado para", range);
-    setShowPrintDialog(false);
-  };
 
   if (isLoading || isAvailabilityLoading) {
     return (
@@ -424,6 +435,9 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
             </Button>
             <Button variant="ghost" size="icon" onClick={navigateToNext} aria-label="Día siguiente" className={theme.textMain}>
               <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setShowPrintDialog(true)} aria-label="Imprimir calendario" className={theme.textMain}>
+              <Printer className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -581,15 +595,15 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
         )}
       </div>
 
-      <PrintDialog
+      <PersonalCalendarPrintDialog
         showDialog={showPrintDialog}
         setShowDialog={setShowPrintDialog}
-        printSettings={printSettings}
-        setPrintSettings={setPrintSettings}
-        generatePDF={generatePDF}
-        generateXLS={generateXLS}
         currentMonth={currentDate}
-        selectedJobTypes={[]}
+        onGeneratePDF={handleGeneratePDF}
+        onGenerateXLS={handleGenerateXLS}
+        departments={uniqueDepartments}
+        selectedDepartments={printDepartments}
+        onDepartmentsChange={setPrintDepartments}
       />
 
       {selectedTech && (

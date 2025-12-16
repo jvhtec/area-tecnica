@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users, Warehouse, Briefcase, Sun, CalendarOff, Car, Thermometer } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users, Warehouse, Briefcase, Sun, CalendarOff, Car, Thermometer, Printer } from "lucide-react";
 import {
   format,
   startOfMonth,
@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { HouseTechBadge } from "./HouseTechBadge";
 import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
+import { PersonalCalendarPrintDialog } from "./PersonalCalendarPrintDialog";
+import { generatePersonalCalendarPDF, generatePersonalCalendarXLS } from "@/utils/personalCalendarPdfExport";
 
 interface PersonalCalendarProps {
   date: Date;
@@ -34,6 +36,8 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null); // State for selected department
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [printDepartments, setPrintDepartments] = useState<string[]>([]);
 
   const currentMonth = date;
   const firstDayOfMonth = startOfMonth(currentMonth);
@@ -70,6 +74,11 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     houseTechsCount: houseTechs.length,
     assignmentsCount: assignments.length
   });
+
+  // Extract unique departments
+  const uniqueDepartments = Array.from(
+    new Set(houseTechs.map(tech => tech.department).filter((dept): dept is string => !!dept))
+  ).sort();
 
   const handlePreviousMonth = () => {
     const newDate = new Date(currentMonth);
@@ -125,6 +134,28 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 
   const handleAvailabilityRemove = (techId: string, date: Date) => {
     removeAvailability(techId, date);
+  };
+
+  const handleGeneratePDF = async (range: "month" | "quarter" | "year") => {
+    await generatePersonalCalendarPDF(range, {
+      houseTechs,
+      assignments,
+      getAvailabilityStatus,
+      currentDate: currentMonth,
+      selectedDepartments: printDepartments.length > 0 ? printDepartments : undefined,
+    });
+    setShowPrintDialog(false);
+  };
+
+  const handleGenerateXLS = (range: "month" | "quarter" | "year") => {
+    generatePersonalCalendarXLS(range, {
+      houseTechs,
+      assignments,
+      getAvailabilityStatus,
+      currentDate: currentMonth,
+      selectedDepartments: printDepartments.length > 0 ? printDepartments : undefined,
+    });
+    setShowPrintDialog(false);
   };
 
   // Personnel summary for selected date
@@ -459,8 +490,23 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
               <Button variant="ghost" size="icon" onClick={() => setIsCollapsed(!isCollapsed)}>
                 {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
               </Button>
+              <Button variant="ghost" size="icon" onClick={() => setShowPrintDialog(true)}>
+                <Printer className="h-4 w-4" />
+              </Button>
             </div>
           </div>
+
+          {/* Print Dialog */}
+          <PersonalCalendarPrintDialog
+            showDialog={showPrintDialog}
+            setShowDialog={setShowPrintDialog}
+            currentMonth={currentMonth}
+            onGeneratePDF={handleGeneratePDF}
+            onGenerateXLS={handleGenerateXLS}
+            departments={uniqueDepartments}
+            selectedDepartments={printDepartments}
+            onDepartmentsChange={setPrintDepartments}
+          />
 
           {!isCollapsed && (
             <div className="border rounded-lg overflow-x-auto">
