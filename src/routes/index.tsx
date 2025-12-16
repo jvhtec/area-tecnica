@@ -13,6 +13,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import RatesCenterPage from "@/pages/RatesCenterPage";
 import ExpensesPage from "@/pages/Expenses";
+import SoundVisionFiles from "@/pages/SoundVisionFiles";
 
 // Create a placeholder for missing pages
 const Placeholder = () => (
@@ -181,6 +182,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['admin', 'management']}>
             <Placeholder />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: "/soundvision-files",
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}>
+            <SoundVisionFiles />
           </ProtectedRoute>
         )
       },
