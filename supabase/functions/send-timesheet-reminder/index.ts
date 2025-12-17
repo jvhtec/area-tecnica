@@ -119,7 +119,7 @@ serve(async (req) => {
     // Fetch job details separately since there's no foreign key
     const { data: job, error: jobError } = await supabaseAdmin
       .from('jobs')
-      .select('id, title, client_name')
+      .select('id, title')
       .eq('id', timesheet.job_id)
       .single()
 
