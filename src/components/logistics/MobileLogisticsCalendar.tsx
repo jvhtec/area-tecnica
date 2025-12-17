@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar, ChevronLeft, ChevronRight, Plus, Printer } from "lucide-react";
-import { PrintDialog, PrintSettings } from "@/components/dashboard/PrintDialog";
 import { format, addDays, subDays, isToday, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -9,6 +8,8 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { LogisticsEventDialog } from "./LogisticsEventDialog";
 import { LogisticsEventCard } from "./LogisticsEventCard";
+import { LogisticsCalendarPrintDialog } from "./LogisticsCalendarPrintDialog";
+import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/utils/logisticsCalendarExport";
 
 interface MobileLogisticsCalendarProps {
   date: Date;
@@ -23,15 +24,6 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
-  const [printSettings, setPrintSettings] = useState<PrintSettings>({
-    jobTypes: {
-      tourdate: true,
-      tour: true,
-      single: true,
-      dryhire: true,
-      festival: true,
-    },
-  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -79,13 +71,20 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
 
   const currentDateEvents = getEventsForDate(currentDate);
 
-  const generatePDF = (range: "month" | "quarter" | "year") => {
-    console.log("PDF móvil de logística no implementado para", range);
+  // PDF export handler
+  const handleGeneratePDF = async (range: "current_week" | "next_week" | "month") => {
+    await generateLogisticsCalendarPDF(range, {
+      events: events || [],
+      currentDate,
+    });
     setShowPrintDialog(false);
   };
 
-  const generateXLS = (range: "month" | "quarter" | "year") => {
-    console.log("XLS móvil de logística no implementado para", range);
+  const handleGenerateXLS = (range: "current_week" | "next_week" | "month") => {
+    generateLogisticsCalendarXLS(range, {
+      events: events || [],
+      currentDate,
+    });
     setShowPrintDialog(false);
   };
 
@@ -192,15 +191,12 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
         selectedEvent={selectedEvent}
       />
 
-      <PrintDialog
+      <LogisticsCalendarPrintDialog
         showDialog={showPrintDialog}
         setShowDialog={setShowPrintDialog}
-        printSettings={printSettings}
-        setPrintSettings={setPrintSettings}
-        generatePDF={generatePDF}
-        generateXLS={generateXLS}
         currentMonth={currentDate}
-        selectedJobTypes={[]}
+        onGeneratePDF={handleGeneratePDF}
+        onGenerateXLS={handleGenerateXLS}
       />
     </div>
   );

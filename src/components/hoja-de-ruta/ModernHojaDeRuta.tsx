@@ -62,6 +62,8 @@ import { ModernStatusIndicator } from "./components/ModernStatusIndicator";
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
 import { ModernWeatherSection } from "./sections/ModernWeatherSection";
 import { ModernRestaurantSection } from "./sections/ModernRestaurantSection";
+import { HojaDeRutaPrintDialog } from "./HojaDeRutaPrintDialog";
+import { generateHojaDeRutaXLS } from "@/utils/hojaDeRutaExport";
 
 type ModernHojaDeRutaProps = {
   jobId?: string;
@@ -72,6 +74,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
   const [activeTab, setActiveTab] = useState("event");
   const [completionProgress, setCompletionProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
 
   // Get image management functions first (needed for form hook)
   const {
@@ -246,6 +249,43 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
       });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Excel export handler
+  const handleGenerateXLS = () => {
+    if (!selectedJobId) {
+      toast({
+        title: "Error",
+        description: "Por favor, seleccione un trabajo antes de exportar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const jobDetails = jobs?.find(job => job.id === selectedJobId);
+
+      generateHojaDeRutaXLS({
+        eventData,
+        travelArrangements,
+        accommodations,
+        jobTitle: jobDetails?.title || "",
+        jobDate: jobDetails?.start_time || undefined,
+      });
+
+      toast({
+        title: "✅ Exportado correctamente",
+        description: "La hoja de ruta ha sido exportada a Excel.",
+      });
+      setShowPrintDialog(false);
+    } catch (error) {
+      console.error("Error generating Excel:", error);
+      toast({
+        title: "❌ Error",
+        description: "Hubo un problema al exportar a Excel.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -436,22 +476,13 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
               </Button>
 
               <Button
-                onClick={handleGeneratePDF}
-                disabled={isGenerating || !selectedJobId}
-                aria-label="Generar PDF"
+                onClick={() => setShowPrintDialog(true)}
+                disabled={!selectedJobId}
+                aria-label="Exportar"
                 className="h-11 min-w-[44px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
               >
-                {isGenerating ? (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                  </motion.div>
-                ) : (
-                  <Download className="w-4 h-4 mr-2" />
-                )}
-                <span className="hidden sm:inline">Generar PDF</span>
+                <Download className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Exportar</span>
               </Button>
             </div>
           </div>
@@ -688,6 +719,14 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
           </div>
         </div>
       </div>
+
+      <HojaDeRutaPrintDialog
+        showDialog={showPrintDialog}
+        setShowDialog={setShowPrintDialog}
+        onGeneratePDF={handleGeneratePDF}
+        onGenerateXLS={handleGenerateXLS}
+        isGenerating={isGenerating}
+      />
     </div>
   );
 };

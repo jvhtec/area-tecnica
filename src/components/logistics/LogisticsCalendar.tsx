@@ -9,9 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { LogisticsEventDialog } from "./LogisticsEventDialog";
 import { LogisticsEventCard } from "./LogisticsEventCard";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import jsPDF from "jspdf";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { LogisticsCalendarPrintDialog } from "./LogisticsCalendarPrintDialog";
+import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/utils/logisticsCalendarExport";
 
 interface LogisticsCalendarProps {
   onDateSelect?: (date: Date) => void;
@@ -97,53 +97,20 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
     setCurrentMonth(new Date());
   };
 
-  const generatePDF = async () => {
-    const doc = new jsPDF('landscape');
-    const startDate = startOfMonth(currentMonth);
-    const endDate = endOfMonth(currentMonth);
-    const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const cellWidth = 40;
-    const cellHeight = 30;
-    const startX = 10;
-    const startY = 20;
-
-    doc.setFontSize(16);
-    doc.text(format(currentMonth, 'MMMM yyyy'), 140, 15, { align: 'center' });
-
-    daysOfWeek.forEach((day, index) => {
-      doc.setFillColor(41, 128, 185);
-      doc.rect(startX + (index * cellWidth), startY, cellWidth, 10, 'F');
-      doc.setTextColor(255);
-      doc.setFontSize(10);
-      doc.text(day, startX + (index * cellWidth) + 15, startY + 7);
+  // PDF export handler
+  const handleGeneratePDF = async (range: "current_week" | "next_week" | "month") => {
+    await generateLogisticsCalendarPDF(range, {
+      events: events || [],
+      currentDate: currentMonth,
     });
+    setShowPrintDialog(false);
+  };
 
-    const yPos = startY + 10;
-    allDays.forEach((day, i) => {
-      const x = startX + ((i % 7) * cellWidth);
-      const y = yPos + (Math.floor(i / 7) * cellHeight);
-
-      doc.setDrawColor(200);
-      doc.rect(x, y, cellWidth, cellHeight);
-
-      doc.setTextColor(isSameMonth(day, currentMonth) ? 0 : 200);
-      doc.setFontSize(12);
-      doc.text(format(day, 'd'), x + 2, y + 5);
-
-      const dayEvents = getDayEvents(day);
-      if (dayEvents && dayEvents.length > 0) {
-        dayEvents.forEach((event, index) => {
-          if (event && event.job) {
-            doc.setFontSize(8);
-            doc.setTextColor(0);
-            const eventText = event.job.title || `${event.event_type} - ${event.transport_type}`;
-            doc.text(eventText.substring(0, 20), x + 5, y + 10 + (index * 5));
-          }
-        });
-      }
+  const handleGenerateXLS = (range: "current_week" | "next_week" | "month") => {
+    generateLogisticsCalendarXLS(range, {
+      events: events || [],
+      currentDate: currentMonth,
     });
-
-    doc.save(`logistics-calendar-${format(currentMonth, 'yyyy-MM')}.pdf`);
     setShowPrintDialog(false);
   };
 
@@ -165,16 +132,13 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <CardTitle className="text-xl font-bold">Logistics Calendar</CardTitle>
         <div className="flex items-center space-x-2">
-          <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Print Calendar</DialogTitle>
-              </DialogHeader>
-              <Button onClick={generatePDF} className="mt-4">
-                Export Current Month
-              </Button>
-            </DialogContent>
-          </Dialog>
+          <LogisticsCalendarPrintDialog
+            showDialog={showPrintDialog}
+            setShowDialog={setShowPrintDialog}
+            currentMonth={currentMonth}
+            onGeneratePDF={handleGeneratePDF}
+            onGenerateXLS={handleGenerateXLS}
+          />
           <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
