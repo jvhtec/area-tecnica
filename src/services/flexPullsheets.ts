@@ -34,7 +34,7 @@ async function addResourceLineItem(options: {
 
   const query = new URLSearchParams({
     resourceParentId: documentId, // Use pullsheet itself as parent
-    managedResourceLineItemType: 'resource', // Equipment is 'resource' not 'service-offering'
+    managedResourceLineItemType: 'service-offering', // Standard type for adding resources
     quantity: String(quantity),
   });
 
@@ -66,7 +66,7 @@ async function addResourceLineItem(options: {
     };
     const form = new URLSearchParams({
       resourceParentId: documentId,
-      managedResourceLineItemType: 'resource',
+      managedResourceLineItemType: 'service-offering',
       quantity: String(quantity),
       parentLineItemId: '',
       nextSiblingId: '',
