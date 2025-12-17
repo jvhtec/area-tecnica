@@ -27,9 +27,11 @@ async function addResourceLineItem(options: {
   documentId: string;
   resourceId: string;
   quantity: number;
+  parentLineItemId?: string;
+  nextSiblingId?: string;
   token: string;
-}): Promise<{ success: boolean; error?: string }> {
-  const { documentId, resourceId, quantity, token } = options;
+}): Promise<{ success: boolean; error?: string; lineItemId?: string }> {
+  const { documentId, resourceId, quantity, parentLineItemId = '', nextSiblingId = '', token } = options;
   const baseUrl = `${FLEX_API_BASE_URL}/line-item/${encodeURIComponent(documentId)}/add-resource/${encodeURIComponent(resourceId)}`;
 
   const headers = {
@@ -43,8 +45,8 @@ async function addResourceLineItem(options: {
     resourceParentId: '', // Empty for root-level additions
     managedResourceLineItemType: 'inventory-model', // Correct type for equipment
     quantity: String(quantity),
-    parentLineItemId: '', // Empty for root-level additions
-    nextSiblingId: '', // Empty for root-level additions
+    parentLineItemId: parentLineItemId,
+    nextSiblingId: nextSiblingId,
   });
 
   try {
@@ -60,12 +62,18 @@ async function addResourceLineItem(options: {
       return { success: false, error: `API error: ${res.status}` };
     }
 
-    const payload = await res.json().catch(() => null);
+    const payload = await res.json().catch(() => null) as {
+      addedResourceLineIds?: string[];
+    } | null;
+
     if (!payload) {
       return { success: false, error: 'Invalid response from API' };
     }
 
-    return { success: true };
+    // Extract the first line item ID from the response
+    const lineItemId = payload.addedResourceLineIds?.[0];
+
+    return { success: true, lineItemId };
   } catch (err) {
     console.error('[FlexPullsheets] Failed to add resource line item', err);
     return { success: false, error: 'Network error' };
@@ -180,10 +188,9 @@ export async function pushEquipmentToPullsheet(
         token,
       });
 
-      if (categoryResponse.success) {
-        // Extract the category line ID from the response (we'd need to modify addResourceLineItem to return it)
-        // For now, we'll add items at root level
-        console.log(`[FlexPullsheets] ✓ Category ${category} created`);
+      if (categoryResponse.success && categoryResponse.lineItemId) {
+        parentLineItemId = categoryResponse.lineItemId;
+        console.log(`[FlexPullsheets] ✓ Category ${category} created with ID: ${parentLineItemId}`);
       } else {
         console.error(`[FlexPullsheets] ✗ Failed to create category ${category}`);
       }
@@ -191,12 +198,13 @@ export async function pushEquipmentToPullsheet(
 
     // Add equipment items (either nested under category or at root)
     for (const item of items) {
-      console.log(`[FlexPullsheets] Pushing ${item.name} (qty: ${item.quantity}, resourceId: ${item.resourceId})`);
+      console.log(`[FlexPullsheets] Pushing ${item.name} (qty: ${item.quantity}, resourceId: ${item.resourceId}, parent: ${parentLineItemId || 'root'})`);
 
       const response = await addResourceLineItem({
         documentId: pullsheetElementId,
         resourceId: item.resourceId,
         quantity: item.quantity,
+        parentLineItemId: parentLineItemId,
         token,
       });
 
