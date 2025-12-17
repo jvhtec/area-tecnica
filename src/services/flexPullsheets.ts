@@ -23,62 +23,92 @@ async function getFlexAuthToken(): Promise<string> {
   return token;
 }
 
+async function fetchPullsheetLineItems(documentId: string, token: string): Promise<{ rootLineId: string; lastLineId: string } | null> {
+  try {
+    const url = `${FLEX_API_BASE_URL}/line-item/${encodeURIComponent(documentId)}/tree`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Auth-Token': token,
+        'apikey': token,
+      },
+    });
+
+    if (!res.ok) {
+      console.error('[FlexPullsheets] Failed to fetch line items:', res.status);
+      return null;
+    }
+
+    const data = await res.json();
+
+    // The tree structure should have a root line item and children
+    // We'll add items as children of the root, after the last existing item
+    const rootLineId = data?.id || data?.lineItemId;
+    const children = data?.children || [];
+    const lastLineId = children.length > 0 ? children[children.length - 1]?.id : '';
+
+    if (!rootLineId) {
+      console.error('[FlexPullsheets] No root line item found in tree');
+      return null;
+    }
+
+    return { rootLineId, lastLineId };
+  } catch (err) {
+    console.error('[FlexPullsheets] Error fetching line items:', err);
+    return null;
+  }
+}
+
 async function addResourceLineItem(options: {
   documentId: string;
   resourceId: string;
   quantity: number;
+  parentLineItemId: string;
+  nextSiblingId: string;
   token: string;
 }): Promise<{ success: boolean; error?: string }> {
-  const { documentId, resourceId, quantity, token } = options;
-  const baseUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/add-resource/${encodeURIComponent(resourceId)}`;
+  const { documentId, resourceId, quantity, parentLineItemId, nextSiblingId, token } = options;
+  const baseUrl = `${FLEX_API_BASE_URL}/line-item/${encodeURIComponent(documentId)}/add-resource/${encodeURIComponent(resourceId)}`;
 
-  const query = new URLSearchParams({
-    resourceParentId: documentId, // Use pullsheet itself as parent
-    managedResourceLineItemType: 'service-offering', // Standard type for adding resources
-    quantity: String(quantity),
-  });
-
-  const tryRequest = async (init: RequestInit): Promise<Record<string, unknown> | null> => {
-    try {
-      const res = await fetch(`${baseUrl}?${query.toString()}`, init);
-      if (!res.ok) {
-        const errorText = await res.text().catch(() => '');
-        console.error('[FlexPullsheets] API error:', res.status, errorText);
-        return null;
-      }
-      return await res.json().catch(() => null);
-    } catch (err) {
-      console.error('[FlexPullsheets] Failed to add resource line item', err);
-      return null;
-    }
+  const headers = {
+    accept: '*/*',
+    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    'X-Auth-Token': token,
+    'apikey': token,
   };
 
-  const headers = { accept: '*/*', 'X-Auth-Token': token, 'apikey': token } as Record<string, string>;
+  const form = new URLSearchParams({
+    resourceParentId: '', // Empty for pullsheets
+    managedResourceLineItemType: 'inventory-model', // Correct type for equipment
+    quantity: String(quantity),
+    parentLineItemId: parentLineItemId,
+    nextSiblingId: nextSiblingId,
+  });
 
-  // Try JSON POST first
-  let payload = await tryRequest({ method: 'POST', headers });
-
-  // Fallback to form-encoded POST if JSON fails
-  if (!payload) {
-    const fallbackHeaders = {
-      ...headers,
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    };
-    const form = new URLSearchParams({
-      resourceParentId: documentId,
-      managedResourceLineItemType: 'service-offering',
-      quantity: String(quantity),
-      parentLineItemId: '',
-      nextSiblingId: '',
+  try {
+    const res = await fetch(baseUrl, {
+      method: 'POST',
+      headers,
+      body: form.toString(),
     });
-    payload = await tryRequest({ method: 'POST', headers: fallbackHeaders, body: form.toString() });
-  }
 
-  if (!payload) {
-    return { success: false, error: 'Failed to add line item to Flex' };
-  }
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => '');
+      console.error('[FlexPullsheets] API error:', res.status, errorText);
+      return { success: false, error: `API error: ${res.status}` };
+    }
 
-  return { success: true };
+    const payload = await res.json().catch(() => null);
+    if (!payload) {
+      return { success: false, error: 'Invalid response from API' };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('[FlexPullsheets] Failed to add resource line item', err);
+    return { success: false, error: 'Network error' };
+  }
 }
 
 export interface EquipmentItem {
@@ -118,7 +148,24 @@ export async function pushEquipmentToPullsheet(
     return result;
   }
 
+  // Fetch the pullsheet line item structure
+  console.log('[FlexPullsheets] Fetching pullsheet line item structure...');
+  const lineItems = await fetchPullsheetLineItems(pullsheetElementId, token);
+
+  if (!lineItems) {
+    console.error('[FlexPullsheets] Failed to fetch line item structure');
+    equipment.forEach(item => {
+      result.failed.push({ name: item.name, error: 'Failed to fetch pullsheet structure' });
+    });
+    return result;
+  }
+
+  console.log('[FlexPullsheets] Line items:', lineItems);
+
   // Push each equipment item sequentially
+  // Each new item becomes the nextSiblingId for the following item
+  let currentNextSiblingId = lineItems.lastLineId;
+
   for (const item of equipment) {
     console.log(`[FlexPullsheets] Pushing ${item.name} (qty: ${item.quantity}, resourceId: ${item.resourceId})`);
 
@@ -126,12 +173,16 @@ export async function pushEquipmentToPullsheet(
       documentId: pullsheetElementId,
       resourceId: item.resourceId,
       quantity: item.quantity,
+      parentLineItemId: lineItems.rootLineId,
+      nextSiblingId: currentNextSiblingId,
       token,
     });
 
     if (response.success) {
       result.succeeded++;
       console.log(`[FlexPullsheets] ✓ Successfully pushed ${item.name}`);
+      // Update nextSiblingId for the next item (empty string means add at the end)
+      currentNextSiblingId = '';
     } else {
       result.failed.push({ name: item.name, error: response.error || 'Unknown error' });
       console.error(`[FlexPullsheets] ✗ Failed to push ${item.name}:`, response.error);
