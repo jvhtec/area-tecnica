@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { Save } from "lucide-react";
+import { Save, Upload } from "lucide-react";
 import { GearSetupFormData } from "@/types/festival-gear";
 import { StageGearSetup } from "@/types/festival";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
@@ -17,6 +17,7 @@ import { MicrophoneNeedsCalculator } from "./gear-setup/MicrophoneNeedsCalculato
 import { FestivalConsoleSetupSection } from "./form/sections/FestivalConsoleSetupSection";
 import { FestivalMicKitConfig } from "./gear-setup/FestivalMicKitConfig";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { PushToFlexPullsheetDialog } from "./PushToFlexPullsheetDialog";
 
 interface FestivalGearSetupFormProps {
   jobId: string;
@@ -60,6 +61,7 @@ export const FestivalGearSetupForm = ({
   const [existingSetupId, setExistingSetupId] = useState<string | null>(null);
   const [stageSetupId, setStageSetupId] = useState<string | null>(null);
   const [hasStageSpecificSetup, setHasStageSpecificSetup] = useState(false);
+  const [showPushDialog, setShowPushDialog] = useState(false);
   const isPrimaryStage = stageNumber === 1;
 
   useEffect(() => {
@@ -226,13 +228,25 @@ export const FestivalGearSetupForm = ({
     console.log('Changes received:', changes);
     console.log('Current setup wired_mics before change:', setup.wired_mics);
     console.log('New wired_mics in changes:', changes.wired_mics);
-    
+
     setSetup(prev => {
       const newSetup = { ...prev, ...changes };
       console.log('New setup wired_mics after merge:', newSetup.wired_mics);
       console.log('Full new setup:', newSetup);
       return newSetup;
     });
+  };
+
+  const handlePushToFlex = () => {
+    if (!existingSetupId) {
+      toast({
+        title: "Configuración no guardada",
+        description: "Por favor guarda la configuración de equipamiento antes de enviar a Flex.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setShowPushDialog(true);
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -635,16 +649,36 @@ export const FestivalGearSetupForm = ({
         </Accordion>
       </div>
 
-      <Button type="submit" disabled={isLoading} className="w-full">
-        <Save className="h-4 w-4 mr-2" />
-        {isLoading ? "Guardando..." : (
-          isPrimaryStage
-            ? "Guardar Configuración Global"
-            : hasStageSpecificSetup
-              ? `Actualizar Configuración de Stage ${stageNumber}`
-              : `Crear Configuración Personalizada para Stage ${stageNumber}`
-        )}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handlePushToFlex}
+          disabled={!existingSetupId || isLoading}
+          className="flex-1"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Push to Flex Pullsheet
+        </Button>
+
+        <Button type="submit" disabled={isLoading} className="flex-1">
+          <Save className="h-4 w-4 mr-2" />
+          {isLoading ? "Guardando..." : (
+            isPrimaryStage
+              ? "Guardar Configuración Global"
+              : hasStageSpecificSetup
+                ? `Actualizar Configuración de Stage ${stageNumber}`
+                : `Crear Configuración Personalizada para Stage ${stageNumber}`
+          )}
+        </Button>
+      </div>
+
+      <PushToFlexPullsheetDialog
+        open={showPushDialog}
+        onOpenChange={setShowPushDialog}
+        gearSetup={setup}
+        jobId={jobId}
+      />
     </form>
   );
 };
