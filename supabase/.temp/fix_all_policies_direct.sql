@@ -12,7 +12,9 @@ DECLARE
   fixed_using TEXT;
   fixed_with_check TEXT;
   fix_count INTEGER := 0;
+  skip_count INTEGER := 0;
   policy_sql TEXT;
+  error_msg TEXT;
 BEGIN
   RAISE NOTICE 'Starting RLS policy performance fix...';
   RAISE NOTICE 'This will fix policies by wrapping auth functions in SELECT subqueries';
@@ -101,48 +103,97 @@ BEGIN
       );
     END IF;
 
-    -- Build the DROP POLICY statement
-    policy_sql := 'DROP POLICY IF EXISTS "' || policy_record.policyname || '" ON ' || policy_record.tablename || ';';
-    EXECUTE policy_sql;
+    -- Wrap the DROP and CREATE in a nested exception block
+    BEGIN
+      -- Build the DROP POLICY statement
+      policy_sql := 'DROP POLICY IF EXISTS "' || policy_record.policyname || '" ON ' || policy_record.tablename || ';';
+      EXECUTE policy_sql;
 
-    -- Build the CREATE POLICY statement
-    policy_sql := 'CREATE POLICY "' || policy_record.policyname || '" ON ' || policy_record.tablename;
+      -- Build the CREATE POLICY statement
+      policy_sql := 'CREATE POLICY "' || policy_record.policyname || '" ON ' || policy_record.tablename;
 
-    -- Add command type
-    policy_sql := policy_sql ||
-      CASE policy_record.cmd
-        WHEN 'SELECT' THEN ' FOR SELECT'
-        WHEN 'INSERT' THEN ' FOR INSERT'
-        WHEN 'UPDATE' THEN ' FOR UPDATE'
-        WHEN 'DELETE' THEN ' FOR DELETE'
-        WHEN 'ALL' THEN ' FOR ALL'
-        ELSE ''
-      END;
+      -- Add command type
+      policy_sql := policy_sql ||
+        CASE policy_record.cmd
+          WHEN 'SELECT' THEN ' FOR SELECT'
+          WHEN 'INSERT' THEN ' FOR INSERT'
+          WHEN 'UPDATE' THEN ' FOR UPDATE'
+          WHEN 'DELETE' THEN ' FOR DELETE'
+          WHEN 'ALL' THEN ' FOR ALL'
+          ELSE ''
+        END;
 
-    -- Add roles if not public
-    IF array_to_string(policy_record.roles, ',') != 'public' THEN
-      policy_sql := policy_sql || ' TO ' || array_to_string(policy_record.roles, ', ');
-    END IF;
+      -- Add roles if not public
+      IF array_to_string(policy_record.roles, ',') != 'public' THEN
+        policy_sql := policy_sql || ' TO ' || array_to_string(policy_record.roles, ', ');
+      END IF;
 
-    -- Add USING clause (only for SELECT, UPDATE, DELETE, ALL - not INSERT)
-    IF fixed_using IS NOT NULL AND policy_record.cmd IN ('SELECT', 'UPDATE', 'DELETE', 'ALL') THEN
-      policy_sql := policy_sql || ' USING (' || fixed_using || ')';
-    END IF;
+      -- Add USING clause (only for SELECT, UPDATE, DELETE, ALL - not INSERT)
+      IF fixed_using IS NOT NULL AND policy_record.cmd IN ('SELECT', 'UPDATE', 'DELETE', 'ALL') THEN
+        policy_sql := policy_sql || ' USING (' || fixed_using || ')';
+      END IF;
 
-    -- Add WITH CHECK clause (only for INSERT, UPDATE, ALL - not SELECT or DELETE)
-    IF fixed_with_check IS NOT NULL AND policy_record.cmd IN ('INSERT', 'UPDATE', 'ALL') THEN
-      policy_sql := policy_sql || ' WITH CHECK (' || fixed_with_check || ')';
-    END IF;
+      -- Add WITH CHECK clause (only for INSERT, UPDATE, ALL - not SELECT or DELETE)
+      IF fixed_with_check IS NOT NULL AND policy_record.cmd IN ('INSERT', 'UPDATE', 'ALL') THEN
+        policy_sql := policy_sql || ' WITH CHECK (' || fixed_with_check || ')';
+      END IF;
 
-    policy_sql := policy_sql || ';';
+      policy_sql := policy_sql || ';';
 
-    -- Execute the CREATE POLICY statement
-    EXECUTE policy_sql;
+      -- Execute the CREATE POLICY statement
+      EXECUTE policy_sql;
 
-    -- Log progress every 10 policies
-    IF fix_count % 10 = 0 THEN
-      RAISE NOTICE 'Fixed % policies so far...', fix_count;
-    END IF;
+      -- Log progress every 10 policies
+      IF fix_count % 10 = 0 THEN
+        RAISE NOTICE 'Fixed % policies so far...', fix_count;
+      END IF;
+
+    EXCEPTION
+      WHEN OTHERS THEN
+        -- Rollback to the original policy by recreating it without changes
+        skip_count := skip_count + 1;
+        error_msg := SQLERRM;
+
+        RAISE NOTICE 'SKIPPED policy "%" on table "%" - Error: %',
+          policy_record.policyname,
+          policy_record.tablename,
+          error_msg;
+
+        -- Try to recreate the original policy (without modifications)
+        BEGIN
+          policy_sql := 'CREATE POLICY "' || policy_record.policyname || '" ON ' || policy_record.tablename;
+
+          policy_sql := policy_sql ||
+            CASE policy_record.cmd
+              WHEN 'SELECT' THEN ' FOR SELECT'
+              WHEN 'INSERT' THEN ' FOR INSERT'
+              WHEN 'UPDATE' THEN ' FOR UPDATE'
+              WHEN 'DELETE' THEN ' FOR DELETE'
+              WHEN 'ALL' THEN ' FOR ALL'
+              ELSE ''
+            END;
+
+          IF array_to_string(policy_record.roles, ',') != 'public' THEN
+            policy_sql := policy_sql || ' TO ' || array_to_string(policy_record.roles, ', ');
+          END IF;
+
+          IF policy_record.qual IS NOT NULL AND policy_record.cmd IN ('SELECT', 'UPDATE', 'DELETE', 'ALL') THEN
+            policy_sql := policy_sql || ' USING (' || policy_record.qual::text || ')';
+          END IF;
+
+          IF policy_record.with_check IS NOT NULL AND policy_record.cmd IN ('INSERT', 'UPDATE', 'ALL') THEN
+            policy_sql := policy_sql || ' WITH CHECK (' || policy_record.with_check::text || ')';
+          END IF;
+
+          policy_sql := policy_sql || ';';
+          EXECUTE policy_sql;
+
+          RAISE NOTICE '  -> Restored original policy (needs manual fixing)';
+        EXCEPTION
+          WHEN OTHERS THEN
+            RAISE NOTICE '  -> WARNING: Could not restore original policy!';
+        END;
+    END;
 
   END LOOP;
 
@@ -150,15 +201,24 @@ BEGIN
   RAISE NOTICE '========================================';
   RAISE NOTICE 'RLS POLICY FIX COMPLETE!';
   RAISE NOTICE 'Total policies fixed: %', fix_count;
+  RAISE NOTICE 'Policies skipped (need manual fix): %', skip_count;
   RAISE NOTICE '========================================';
   RAISE NOTICE '';
+
+  IF skip_count > 0 THEN
+    RAISE NOTICE 'Note: % policies could not be automatically fixed.', skip_count;
+    RAISE NOTICE 'These policies have been restored to their original state.';
+    RAISE NOTICE 'Check the log above for details on which policies were skipped.';
+    RAISE NOTICE '';
+  END IF;
+
   RAISE NOTICE 'Next steps:';
-  RAISE NOTICE '1. Re-run the diagnostic query to verify 0 policies remain';
-  RAISE NOTICE '2. Check Supabase dashboard - warnings should be gone';
+  RAISE NOTICE '1. Re-run the diagnostic query to check remaining policies';
+  RAISE NOTICE '2. Check Supabase dashboard - most warnings should be gone';
   RAISE NOTICE '3. Monitor query performance improvements';
   RAISE NOTICE '';
 
 EXCEPTION
   WHEN OTHERS THEN
-    RAISE EXCEPTION 'Error fixing policies: %', SQLERRM;
+    RAISE EXCEPTION 'Fatal error in policy fix script: %', SQLERRM;
 END $$;
