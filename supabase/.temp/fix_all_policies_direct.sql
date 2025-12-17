@@ -64,6 +64,14 @@ BEGIN
         '(SELECT auth.role())',
         'g'
       );
+      -- Remove table name prefixes (e.g., "table_name.column" -> "column")
+      -- This handles cases like "day_preset_assignments.user_id" which cause FROM-clause errors
+      fixed_using := regexp_replace(
+        fixed_using,
+        '\y' || policy_record.tablename || '\.',
+        '',
+        'g'
+      );
     END IF;
 
     -- Replace unwrapped auth functions with wrapped ones in WITH CHECK clause
@@ -82,6 +90,13 @@ BEGIN
         ),
         'auth\.role\(\)',
         '(SELECT auth.role())',
+        'g'
+      );
+      -- Remove table name prefixes
+      fixed_with_check := regexp_replace(
+        fixed_with_check,
+        '\y' || policy_record.tablename || '\.',
+        '',
         'g'
       );
     END IF;
