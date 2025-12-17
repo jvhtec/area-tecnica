@@ -109,12 +109,12 @@ BEGIN
       policy_sql := policy_sql || ' TO ' || array_to_string(policy_record.roles, ', ');
     END IF;
 
-    -- Add USING clause
-    IF fixed_using IS NOT NULL THEN
+    -- Add USING clause (only for SELECT, UPDATE, DELETE, ALL - not INSERT)
+    IF fixed_using IS NOT NULL AND policy_record.cmd IN ('SELECT', 'UPDATE', 'DELETE', 'ALL') THEN
       policy_sql := policy_sql || ' USING (' || fixed_using || ')';
     END IF;
 
-    -- Add WITH CHECK clause (only for INSERT and UPDATE)
+    -- Add WITH CHECK clause (only for INSERT, UPDATE, ALL - not SELECT or DELETE)
     IF fixed_with_check IS NOT NULL AND policy_record.cmd IN ('INSERT', 'UPDATE', 'ALL') THEN
       policy_sql := policy_sql || ' WITH CHECK (' || fixed_with_check || ')';
     END IF;
