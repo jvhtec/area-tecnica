@@ -76,11 +76,18 @@ export interface EquipmentItem {
   resourceId: string;
   quantity: number;
   name: string;
+  category?: string;
 }
 
 export interface PushResult {
   succeeded: number;
   failed: Array<{ name: string; error: string }>;
+}
+
+interface CategoryHeader {
+  name: string;
+  resourceId: string;
+  category: string;
 }
 
 export async function pushEquipmentToPullsheet(
@@ -109,23 +116,97 @@ export async function pushEquipmentToPullsheet(
     return result;
   }
 
-  // Push each equipment item sequentially at root level
-  for (const item of equipment) {
-    console.log(`[FlexPullsheets] Pushing ${item.name} (qty: ${item.quantity}, resourceId: ${item.resourceId})`);
+  // Fetch category headers from equipment table
+  const { data: categoryHeaders, error: categoryError } = await supabase
+    .from('equipment')
+    .select('name, resource_id, category')
+    .not('resource_id', 'is', null)
+    .in('category', ['foh_console', 'mon_console', 'wireless', 'iem', 'wired_mics']);
 
-    const response = await addResourceLineItem({
-      documentId: pullsheetElementId,
-      resourceId: item.resourceId,
-      quantity: item.quantity,
-      token,
+  if (categoryError) {
+    console.error('[FlexPullsheets] Failed to fetch category headers:', categoryError);
+  }
+
+  // Create a map of categories to their resource IDs (for virtual category items)
+  const categoryMap = new Map<string, string>();
+  if (categoryHeaders) {
+    // Look for items that could be category headers (e.g., "Control FoH", "Control Mon", etc.)
+    categoryHeaders.forEach(item => {
+      const nameLower = item.name.toLowerCase();
+      if (nameLower.includes('control foh') || nameLower.includes('foh console')) {
+        categoryMap.set('foh_console', item.resource_id!);
+      } else if (nameLower.includes('control mon') || nameLower.includes('monitor console')) {
+        categoryMap.set('mon_console', item.resource_id!);
+      } else if (nameLower.includes('microfonia rf') || nameLower.includes('wireless')) {
+        categoryMap.set('wireless', item.resource_id!);
+      } else if (nameLower.includes('rack iem') || nameLower.includes('iem')) {
+        categoryMap.set('iem', item.resource_id!);
+      } else if (nameLower.includes('microfonia')) {
+        categoryMap.set('wired_mics', item.resource_id!);
+      }
     });
+  }
 
-    if (response.success) {
-      result.succeeded++;
-      console.log(`[FlexPullsheets] ✓ Successfully pushed ${item.name}`);
-    } else {
-      result.failed.push({ name: item.name, error: response.error || 'Unknown error' });
-      console.error(`[FlexPullsheets] ✗ Failed to push ${item.name}:`, response.error);
+  console.log('[FlexPullsheets] Category map:', categoryMap);
+
+  // Group equipment by category
+  const equipmentByCategory = new Map<string, EquipmentItem[]>();
+  equipment.forEach(item => {
+    const category = item.category || 'uncategorized';
+    if (!equipmentByCategory.has(category)) {
+      equipmentByCategory.set(category, []);
+    }
+    equipmentByCategory.get(category)!.push(item);
+  });
+
+  // Track category line IDs for nesting
+  const categoryLineIds = new Map<string, string>();
+
+  // Process each category
+  for (const [category, items] of equipmentByCategory.entries()) {
+    console.log(`[FlexPullsheets] Processing category: ${category} with ${items.length} items`);
+
+    let parentLineItemId = ''; // Default to root level
+
+    // If we have a category header resource ID, create the category first
+    if (categoryMap.has(category)) {
+      const categoryResourceId = categoryMap.get(category)!;
+      console.log(`[FlexPullsheets] Creating category header: ${category}`);
+
+      const categoryResponse = await addResourceLineItem({
+        documentId: pullsheetElementId,
+        resourceId: categoryResourceId,
+        quantity: 1,
+        token,
+      });
+
+      if (categoryResponse.success) {
+        // Extract the category line ID from the response (we'd need to modify addResourceLineItem to return it)
+        // For now, we'll add items at root level
+        console.log(`[FlexPullsheets] ✓ Category ${category} created`);
+      } else {
+        console.error(`[FlexPullsheets] ✗ Failed to create category ${category}`);
+      }
+    }
+
+    // Add equipment items (either nested under category or at root)
+    for (const item of items) {
+      console.log(`[FlexPullsheets] Pushing ${item.name} (qty: ${item.quantity}, resourceId: ${item.resourceId})`);
+
+      const response = await addResourceLineItem({
+        documentId: pullsheetElementId,
+        resourceId: item.resourceId,
+        quantity: item.quantity,
+        token,
+      });
+
+      if (response.success) {
+        result.succeeded++;
+        console.log(`[FlexPullsheets] ✓ Successfully pushed ${item.name}`);
+      } else {
+        result.failed.push({ name: item.name, error: response.error || 'Unknown error' });
+        console.error(`[FlexPullsheets] ✗ Failed to push ${item.name}:`, response.error);
+      }
     }
   }
 

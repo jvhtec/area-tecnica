@@ -125,7 +125,8 @@ export function PushToFlexPullsheetDialog({
 
         const processItems = (
           items: EquipmentItemWithModel[],
-          getQuantity: (item: EquipmentItemWithModel) => number
+          getQuantity: (item: EquipmentItemWithModel) => number,
+          category: string
         ) => {
           items.forEach(item => {
             if (!item.model) return;
@@ -139,7 +140,7 @@ export function PushToFlexPullsheetDialog({
               if (existing) {
                 existing.quantity += qty;
               } else {
-                found.push({ resourceId, quantity: qty, name: item.model });
+                found.push({ resourceId, quantity: qty, name: item.model, category });
               }
             } else if (!missing.includes(item.model)) {
               missing.push(item.model);
@@ -147,11 +148,11 @@ export function PushToFlexPullsheetDialog({
           });
         };
 
-        processItems(gearSetup.foh_consoles, c => c.quantity);
-        processItems(gearSetup.mon_consoles, c => c.quantity);
-        processItems(gearSetup.wireless_systems, w => (w.quantity_hh || 0) + (w.quantity_bp || 0) + (w.quantity || 0));
-        processItems(gearSetup.iem_systems, i => (i.quantity_hh || 0) + (i.quantity_bp || 0) + (i.quantity || 0));
-        processItems(gearSetup.wired_mics, m => m.quantity);
+        processItems(gearSetup.foh_consoles, c => c.quantity, 'foh_console');
+        processItems(gearSetup.mon_consoles, c => c.quantity, 'mon_console');
+        processItems(gearSetup.wireless_systems, w => (w.quantity_hh || 0) + (w.quantity_bp || 0) + (w.quantity || 0), 'wireless');
+        processItems(gearSetup.iem_systems, i => (i.quantity_hh || 0) + (i.quantity_bp || 0) + (i.quantity || 0), 'iem');
+        processItems(gearSetup.wired_mics, m => m.quantity, 'wired_mics');
 
         setEquipmentLookup({ found, missing });
       } catch (error) {
