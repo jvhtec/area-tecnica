@@ -22,6 +22,27 @@ export default function Timesheets() {
   const { data: jobs = [], isLoading: jobsLoading } = useOptimizedJobs();
   const { timesheets } = useTimesheets(selectedJobId || "", { userRole });
 
+  const canManage = userRole === 'admin' || userRole === 'management';
+  const canDownloadPDF = userRole === 'admin' || userRole === 'management';
+
+  // Initialize department filter with user's department if available
+  const [filterDepartment, setFilterDepartment] = useState<string>("all");
+  const [filterTechnician, setFilterTechnician] = useState<string>("all");
+  const [filterDate, setFilterDate] = useState<string>("");
+
+  useEffect(() => {
+    if (user?.department && canManage) {
+      // Normalize department casing if needed, or assume exact match
+      const userDept = user.department;
+      // We'll set it, validity will be checked by the Select options later or it just shows 'all' if not found
+      // Actually, we should probably wait until departments are computed? 
+      // But user.department is usually stable. Let me set it.
+      // Wait, if I set it here, "all" select item might be tricky?
+      // No, "all" is always an option.
+      setFilterDepartment(userDept);
+    }
+  }, [user?.department, canManage]);
+
   useEffect(() => {
     if (jobIdFromUrl) {
       setSelectedJobId(jobIdFromUrl);
@@ -47,11 +68,57 @@ export default function Timesheets() {
 
   const selectedJob = jobs.find(job => job.id === selectedJobId);
   const timesheetsDisabled = selectedJob && (selectedJob.job_type === 'dryhire' || selectedJob.job_type === 'tourdate');
-  const canManage = userRole === 'admin' || userRole === 'management';
-  const canDownloadPDF = userRole === 'admin' || userRole === 'management';
+
+
+  // Derived lists for filters
+  const departments = useMemo(() => {
+    if (!timesheets) return [];
+    return Array.from(new Set(timesheets.map(t => t.technician?.department).filter(Boolean))).sort();
+  }, [timesheets]);
+
+  const technicians = useMemo(() => {
+    if (!timesheets) return [];
+    const techMap = new Map();
+    timesheets.forEach(t => {
+      if (t.technician) {
+        techMap.set(t.technician.id, t.technician);
+      }
+    });
+    return Array.from(techMap.values()).sort((a, b) =>
+      (a.first_name || '').localeCompare(b.first_name || '')
+    );
+  }, [timesheets]);
+
+  const availableDates = useMemo(() => {
+    if (!timesheets) return [];
+    const dates = new Set(timesheets.map(t => {
+      // Handle potentially missing date fields or formatted timestamps
+      // Assuming t.date is YYYY-MM-DD or t.start_time has date
+      // The timesheet object usually has 'date' field or we check start_time
+      // Looking at TimesheetView usage: timesheetsByDate puts them in YYYY-MM-DD buckets.
+      // We can do similar or just extract from date field.
+      // Let's use start_time as fallback
+      if (t.date) return t.date;
+      if (t.start_time) return t.start_time.split('T')[0];
+      return null;
+    }).filter(Boolean));
+    return Array.from(dates).sort().reverse(); // Newest first
+  }, [timesheets]);
 
   const handleJobSelect = (jobId: string) => {
     setSelectedJobId(jobId);
+    // Reset filters when changing job
+    // Reset filters when changing job
+    // Keep department if it matches user? Or reset to user default?
+    // Let's reset to "all" to avoid confusion, or user dept? 
+    // Requirement: "default to their department" usually means on load. 
+    // If they change job, maybe they want to see everything? 
+    // I'll stick to resetting related filters but maybe re-apply user dept if intuitive? 
+    // Let's reset to user department if available, else all.
+    setFilterDepartment(user?.department && canManage ? user.department : "all");
+    setFilterTechnician("all");
+    setFilterDate("");
+
     // Preserve other params if any
     const next = new URLSearchParams(searchParams);
     if (jobId) next.set('jobId', jobId); else next.delete('jobId');
@@ -117,12 +184,6 @@ export default function Timesheets() {
           </div>
           {selectedJobId && canDownloadPDF && !timesheetsDisabled && (
             <>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-2 border rounded-md"
-              />
               <Button
                 onClick={handleDownloadPDF}
                 variant="outline"
@@ -214,11 +275,79 @@ export default function Timesheets() {
         </Card>
       )}
 
+      {/* Filters Section - Only allow management to filter */}
+      {selectedJobId && !timesheetsDisabled && canManage && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Filtros
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Departamento</label>
+                <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos los departamentos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los departamentos</SelectItem>
+                    {departments.map(dept => (
+                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Técnico</label>
+                <Select value={filterTechnician} onValueChange={setFilterTechnician}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos los técnicos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los técnicos</SelectItem>
+                    {technicians.map(tech => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        {tech.first_name} {tech.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Fecha</label>
+                <label className="text-sm font-medium">Fecha</label>
+                <Select value={filterDate} onValueChange={setFilterDate}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas las fechas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las fechas</SelectItem>
+                    {availableDates.map(date => (
+                      <SelectItem key={date as string} value={date as string}>
+                        {format(new Date(date as string), "d 'de' MMMM", { locale: es })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {selectedJobId && !timesheetsDisabled && (
         <TimesheetView
           jobId={selectedJobId}
           jobTitle={selectedJob?.title}
           canManage={canManage}
+          filterDepartment={filterDepartment}
+          filterTechnicianId={filterTechnician}
+          filterDate={filterDate}
         />
       )}
     </div>

@@ -12,9 +12,10 @@ import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 
 interface MyJobTotalProps {
   jobId: string;
+  filterTechnicianId?: string;
 }
 
-export function MyJobTotal({ jobId }: MyJobTotalProps) {
+export function MyJobTotal({ jobId, filterTechnicianId }: MyJobTotalProps) {
   const { user, userRole } = useOptimizedAuth();
   const isTech = userRole === 'technician' || userRole === 'house_tech';
   // Techs: filter by current user. Management: fetch all rows for job.
@@ -46,11 +47,16 @@ export function MyJobTotal({ jobId }: MyJobTotalProps) {
 
   // Management: allow choosing the technician
   const [selectedTechId, setSelectedTechId] = useState<string | null>(null);
+  
+  // Sync internal selection with parent filter if provided
   useEffect(() => {
-    if (!isTech && rows.length && !selectedTechId) {
+    if (filterTechnicianId) {
+      setSelectedTechId(filterTechnicianId);
+    } else if (!isTech && rows.length && !selectedTechId) {
+      // Default behavior if no filter: select first
       setSelectedTechId(rows[0].technician_id);
     }
-  }, [isTech, rows, selectedTechId]);
+  }, [isTech, rows, selectedTechId, filterTechnicianId]);
 
   if (isLoading) {
     return (

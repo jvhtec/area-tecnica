@@ -39,9 +39,19 @@ interface TimesheetViewProps {
   jobId: string;
   jobTitle?: string;
   canManage?: boolean;
+  filterDepartment?: string;
+  filterTechnicianId?: string;
+  filterDate?: string;
 }
 
-export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetViewProps) => {
+export const TimesheetView = ({
+  jobId,
+  jobTitle,
+  canManage = false,
+  filterDepartment,
+  filterTechnicianId,
+  filterDate
+}: TimesheetViewProps) => {
   // Ensure userRole is initialized before passing into hooks that depend on it
   const { user, userRole } = useOptimizedAuth();
   const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, revertTimesheet, refetch } = useTimesheets(jobId, { userRole });
@@ -62,7 +72,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const [bulkFormData, setBulkFormData] = useState<Partial<TimesheetFormData>>({
     start_time: '',
     end_time: '',
-    // break_minutes: undefined, // Removed from UI
+    break_minutes: undefined,
     overtime_hours: undefined,
     notes: '',
     ends_next_day: false
@@ -71,7 +81,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     date: selectedDate,
     start_time: "09:00",
     end_time: "17:00",
-    break_minutes: 0, // Default to 0 as UI field is removed
+    break_minutes: 30, // Default to 30 for convenience
     overtime_hours: 0,
     notes: "",
     ends_next_day: false,
@@ -81,18 +91,32 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const [rejectionNotes, setRejectionNotes] = useState("");
   const [sendingReminder, setSendingReminder] = useState<string | null>(null);
 
-  // Filter timesheets based on user role
+  // Filter timesheets based on user role and props
   const filteredTimesheets = useMemo(() => {
     if (!timesheets || !user) return [];
 
-    // Technicians and house_tech only see their own timesheets
+    let filtered = timesheets;
+
+    // First filter by role
     if (userRole === 'technician' || userRole === 'house_tech') {
-      return timesheets.filter(t => t.technician_id === user.id);
+      filtered = filtered.filter(t => t.technician_id === user.id);
     }
 
-    // Management sees all timesheets
-    return timesheets;
-  }, [timesheets, userRole, user]);
+    // Then apply explicit filters (mostly for management)
+    if (filterDepartment && filterDepartment !== 'all') {
+      filtered = filtered.filter(t => t.technician?.department === filterDepartment);
+    }
+
+    if (filterTechnicianId && filterTechnicianId !== 'all') {
+      filtered = filtered.filter(t => t.technician_id === filterTechnicianId);
+    }
+
+    if (filterDate) {
+      filtered = filtered.filter(t => t.date === filterDate);
+    }
+
+    return filtered;
+  }, [timesheets, userRole, user, filterDepartment, filterTechnicianId, filterDate]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -308,7 +332,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       setBulkFormData({
         start_time: '',
         end_time: '',
-        // break_minutes: undefined, // Removed from UI
+        break_minutes: undefined,
         overtime_hours: undefined,
         notes: '',
         ends_next_day: false
@@ -380,7 +404,10 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       <JobTotalAmounts jobId={jobId} jobTitle={jobTitle} />
 
       {/* Technician's total for this job */}
-      <MyJobTotal jobId={jobId} />
+      <MyJobTotal
+        jobId={jobId}
+        filterTechnicianId={filterTechnicianId === 'all' ? undefined : filterTechnicianId}
+      />
 
       {/* Expenses section - only show if canViewExpenses */}
       {canViewExpenses && (
@@ -516,6 +543,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
               </div>
               <div>
                 <Label htmlFor="bulk_end_time">Hora de Fin</Label>
+
                 <Input
                   id="bulk_end_time"
                   type="time"
@@ -525,8 +553,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   disabled={isBulkUpdating}
                 />
               </div>
-              {/* Break minutes field removed from UI */}
-              {/* <div>
+              <div>
                 <Label htmlFor="bulk_break_minutes">Descanso (minutos)</Label>
                 <Input
                   id="bulk_break_minutes"
@@ -536,7 +563,10 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   placeholder="Dejar vacío para omitir"
                   disabled={isBulkUpdating}
                 />
-              </div> */}
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Solo para descansos por convenio o montajes/desmontajes, no para comidas.
+                </p>
+              </div>
               <div>
                 <Label htmlFor="bulk_overtime_hours">Horas Extra</Label>
                 <Input
@@ -846,6 +876,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       </div>
                       <div>
                         <Label htmlFor="end_time">Hora de Fin</Label>
+
                         <Input
                           id="end_time"
                           type="time"
@@ -853,8 +884,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
                         />
                       </div>
-                      {/* Break minutes input removed from UI */}
-                      {/* <div>
+                      <div>
                         <Label htmlFor="break_minutes">Descanso (minutos)</Label>
                         <Input
                           id="break_minutes"
@@ -862,7 +892,10 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           value={formData.break_minutes}
                           onChange={(e) => setFormData({ ...formData, break_minutes: parseInt(e.target.value) || 0 })}
                         />
-                      </div> */}
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          Solo para descansos por convenio o montajes/desmontajes, no para comidas.
+                        </p>
+                      </div>
                       <div className="flex items-center gap-2 mt-6">
                         <input
                           id="ends_next_day"
@@ -924,15 +957,15 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         <p className="text-muted-foreground">Hora de Inicio</p>
                         <p className="font-medium">{timesheet.start_time || 'No establecido'}</p>
                       </div>
+
                       <div>
                         <p className="text-muted-foreground">Hora de Fin</p>
                         <p className="font-medium">{timesheet.end_time || 'No establecido'}</p>
                       </div>
-                      {/* Break time display removed from UI */}
-                      {/* <div>
+                      <div>
                         <p className="text-muted-foreground">Descanso</p>
                         <p className="font-medium">{timesheet.break_minutes || 0} min</p>
-                      </div> */}
+                      </div>
                       <div>
                         <p className="text-muted-foreground">Horas Totales</p>
                         <p className="font-medium">

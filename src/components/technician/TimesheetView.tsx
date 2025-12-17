@@ -426,6 +426,9 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                                   max={180}
                                   step={15}
                                 />
+                                <p className="text-[9px] text-muted-foreground mt-1">
+                                  Solo para descansos por convenio o montajes/desmontajes, no para comidas.
+                                </p>
                               </div>
                               <div className="flex items-end">
                                 <label className="flex items-center gap-2 cursor-pointer">
