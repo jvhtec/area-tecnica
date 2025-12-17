@@ -114,8 +114,8 @@ BEGIN
       policy_sql := policy_sql || ' USING (' || fixed_using || ')';
     END IF;
 
-    -- Add WITH CHECK clause
-    IF fixed_with_check IS NOT NULL THEN
+    -- Add WITH CHECK clause (only for INSERT and UPDATE)
+    IF fixed_with_check IS NOT NULL AND policy_record.cmd IN ('INSERT', 'UPDATE', 'ALL') THEN
       policy_sql := policy_sql || ' WITH CHECK (' || fixed_with_check || ')';
     END IF;
 
