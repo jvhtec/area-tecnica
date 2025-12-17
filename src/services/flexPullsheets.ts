@@ -124,38 +124,17 @@ export async function pushEquipmentToPullsheet(
     return result;
   }
 
-  // Fetch category headers from equipment table
-  const { data: categoryHeaders, error: categoryError } = await supabase
-    .from('equipment')
-    .select('name, resource_id, category')
-    .not('resource_id', 'is', null)
-    .in('category', ['foh_console', 'mon_console', 'wireless', 'iem', 'wired_mics']);
+  // Hardcoded category header resource IDs from Flex
+  // These are virtual/container items that serve as category headers in pullsheets
+  const categoryMap = new Map<string, string>([
+    ['foh_console', '98905ca2-b094-45bc-ad5b-67fe311a48e8'], // Control FoH
+    ['mon_console', 'aadfee39-e5e4-4a68-b7d8-03d55b3f29f8'], // Control Mon
+    ['wireless', 'a8f2e63b-55f1-4531-83a4-835232d2bd04'],    // Microfonia RF
+    ['iem', '5194620b-ed50-4a31-bf6b-a986614b3d2d'],         // Rack IEM
+    ['wired_mics', '9a33f593-67e9-462d-b085-e7e215f5da72'],  // Microfonia
+  ]);
 
-  if (categoryError) {
-    console.error('[FlexPullsheets] Failed to fetch category headers:', categoryError);
-  }
-
-  // Create a map of categories to their resource IDs (for virtual category items)
-  const categoryMap = new Map<string, string>();
-  if (categoryHeaders) {
-    // Look for items that could be category headers (e.g., "Control FoH", "Control Mon", etc.)
-    categoryHeaders.forEach(item => {
-      const nameLower = item.name.toLowerCase();
-      if (nameLower.includes('control foh') || nameLower.includes('foh console')) {
-        categoryMap.set('foh_console', item.resource_id!);
-      } else if (nameLower.includes('control mon') || nameLower.includes('monitor console')) {
-        categoryMap.set('mon_console', item.resource_id!);
-      } else if (nameLower.includes('microfonia rf') || nameLower.includes('wireless')) {
-        categoryMap.set('wireless', item.resource_id!);
-      } else if (nameLower.includes('rack iem') || nameLower.includes('iem')) {
-        categoryMap.set('iem', item.resource_id!);
-      } else if (nameLower.includes('microfonia')) {
-        categoryMap.set('wired_mics', item.resource_id!);
-      }
-    });
-  }
-
-  console.log('[FlexPullsheets] Category map:', categoryMap);
+  console.log('[FlexPullsheets] Using category headers:', Array.from(categoryMap.entries()));
 
   // Group equipment by category
   const equipmentByCategory = new Map<string, EquipmentItem[]>();
