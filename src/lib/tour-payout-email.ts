@@ -13,15 +13,20 @@ export interface TourJobEmailJobDetails {
   rates_approved?: boolean | null;
 }
 
+// ...
+const NON_AUTONOMO_DEDUCTION_EUR = 30;
+
 export interface TourJobEmailAttachment {
   technician_id: string;
   email?: string | null;
   full_name: string;
   quote: TourJobRateQuote;
+  deduction_eur?: number;
   pdfBase64: string;
   filename: string;
   autonomo?: boolean | null;
 }
+
 
 export interface TourJobEmailContextResult {
   job: TourJobEmailJobDetails;
@@ -87,12 +92,31 @@ async function fetchLpoMap(
   return new Map((data || []).map((row: any) => [row.technician_id, row.lpo_number || null]));
 }
 
+async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<any[]> {
+  const { data, error } = await client
+    .from('timesheets')
+    .select('technician_id, date, approved_by_manager')
+    .eq('job_id', jobId)
+    .eq('approved_by_manager', true);
+  if (error) throw error;
+  return data || [];
+}
+
 export async function prepareTourJobEmailContext(
   input: TourJobEmailInput
 ): Promise<TourJobEmailContextResult> {
   const { jobId, supabase, quotes, profiles } = input;
   const job = await fetchJobDetails(supabase, jobId);
   const lpoMap = await fetchLpoMap(supabase, jobId);
+  const timesheetRows = await fetchTimesheets(supabase, jobId);
+
+  // Build Timesheet Date Set Map
+  const timesheetDateMap = new Map<string, Set<string>>();
+  timesheetRows.forEach(row => {
+      if (!row.technician_id || !row.date) return;
+      if (!timesheetDateMap.has(row.technician_id)) timesheetDateMap.set(row.technician_id, new Set());
+      timesheetDateMap.get(row.technician_id)!.add(row.date);
+  });
 
   const profileMap = new Map(profiles.map((p) => [p.id, p]));
   const attachments: TourJobEmailAttachment[] = [];
@@ -105,13 +129,23 @@ export async function prepareTourJobEmailContext(
 
     const profile = profileMap.get(techId);
     const fullName = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || techId;
+    
+    // Calculate deduction based on timesheet count, as per user requirement (source of truth)
+    let deduction = 0;
+    if (profile?.autonomo === false) {
+        const daysCount = timesheetDateMap.get(techId)?.size || 0;
+        deduction = daysCount * NON_AUTONOMO_DEDUCTION_EUR;
+    }
 
     const blob = (await generateRateQuotePDF(
       techQuotes,
       { id: job.id, title: job.title, start_time: job.start_time, end_time: undefined, tour_id: job.tour_id, job_type: job.job_type },
       profiles,
       lpoMap,
-      { download: false }
+      { 
+          download: false,
+          timesheetMap: timesheetDateMap 
+      }
     )) as Blob | void;
     if (!blob) continue;
 
@@ -126,6 +160,7 @@ export async function prepareTourJobEmailContext(
       email: (profile as any)?.email ?? null,
       full_name: fullName,
       quote: techQuotes[0],
+      deduction_eur: deduction,
       pdfBase64,
       filename,
       autonomo: profile?.autonomo ?? null,
@@ -186,6 +221,7 @@ export async function sendTourJobEmails(
       const baseTotal = Number(q.total_eur || 0);
       const extrasTotal = Number(q.extras_total_eur || 0);
       const grandTotal = Number(q.total_with_extras_eur != null ? q.total_with_extras_eur : baseTotal + extrasTotal);
+      const deduction = attachment.deduction_eur || 0;
       return {
         technician_id: attachment.technician_id,
         email: attachment.email,
@@ -193,7 +229,8 @@ export async function sendTourJobEmails(
         totals: {
           timesheets_total_eur: baseTotal, // base portion for tour rates
           extras_total_eur: extrasTotal,
-          total_eur: grandTotal,
+          total_eur: grandTotal - deduction,
+          deduction_eur: deduction,
         },
         pdf_base64: attachment.pdfBase64,
         filename: attachment.filename,

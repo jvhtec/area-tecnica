@@ -45,6 +45,7 @@ export interface JobPayoutTotals {
   expenses_breakdown: JobExpenseBreakdownItem[];
   vehicle_disclaimer: boolean;
   vehicle_disclaimer_text?: string;
+  payout_approved?: boolean;
 }
 
 export const EXTRA_TYPE_LABELS: Record<JobExtraType, string> = {

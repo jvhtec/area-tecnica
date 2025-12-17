@@ -7,7 +7,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { PresetWithItems, Equipment, PresetItem } from '@/types/equipment';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Save, X } from 'lucide-react';
+import { Save, X, Upload } from 'lucide-react';
+import { PushPresetToFlexDialog } from './PushPresetToFlexDialog';
 import {
   Select,
   SelectContent,
@@ -31,6 +32,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
   const { department } = useDepartment();
   const [name, setName] = useState(preset?.name || '');
   const [selectedTourId, setSelectedTourId] = useState<string | undefined | null>(fixedTourId ?? (preset as any)?.tour_id ?? undefined);
+  const [showPushDialog, setShowPushDialog] = useState(false);
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     if (!preset?.items) return {};
     return preset.items.reduce((acc, item) => {
@@ -94,6 +96,23 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
     onSave(name, items, (fixedTourId ?? selectedTourId) || null);
   };
 
+  const handlePushToFlex = () => {
+    setShowPushDialog(true);
+  };
+
+  // Convert current quantities to PresetItem format for the dialog
+  const currentPresetItems: PresetItem[] = Object.entries(quantities)
+    .filter(([_, quantity]) => quantity > 0)
+    .map(([equipment_id, quantity]) => ({
+      id: `temp-${equipment_id}`,
+      preset_id: preset?.id || 'temp',
+      equipment_id,
+      quantity,
+      notes: '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }));
+
   return (
     <Card className="w-full h-[600px] bg-white/80 backdrop-blur-sm">
       <CardHeader>
@@ -155,18 +174,33 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
               ))}
             </div>
           </ScrollArea>
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="outline" onClick={onCancel}>
+          <div className="flex gap-2 pt-4">
+            <Button variant="outline" onClick={onCancel} className="flex-shrink-0">
               <X className="mr-2 h-4 w-4" />
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={!name.trim()}>
+            <Button
+              variant="outline"
+              onClick={handlePushToFlex}
+              disabled={currentPresetItems.length === 0}
+              className="flex-1"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Push to Flex Pullsheet
+            </Button>
+            <Button onClick={handleSave} disabled={!name.trim()} className="flex-shrink-0">
               <Save className="mr-2 h-4 w-4" />
               Save Preset
             </Button>
           </div>
         </div>
       </CardContent>
+      <PushPresetToFlexDialog
+        open={showPushDialog}
+        onOpenChange={setShowPushDialog}
+        presetItems={currentPresetItems}
+        equipment={equipmentList || []}
+      />
     </Card>
   );
 };

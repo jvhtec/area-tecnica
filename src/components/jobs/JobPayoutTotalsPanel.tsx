@@ -16,6 +16,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
   prepareJobPayoutEmailContext,
@@ -27,6 +28,7 @@ import { sendTourJobEmails } from '@/lib/tour-payout-email';
 import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-export';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useToggleTechnicianPayoutApproval } from '@/hooks/useToggleTechnicianPayoutApproval';
 import type { JobExpenseBreakdownItem, JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 
@@ -39,6 +41,7 @@ const cardBase = "bg-[#0f1219] border-[#1f232e] text-white overflow-hidden";
 const surface = "bg-[#151820] border-[#2a2e3b]";
 const subtleText = "text-slate-300";
 const controlButton = "bg-white/5 border-white/10 text-white hover:bg-white/10";
+const NON_AUTONOMO_DEDUCTION_EUR = 30;
 
 export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPanelProps) {
   const {
@@ -88,6 +91,62 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     jobMeta?.tour_id ?? undefined
   );
 
+  // Fetch approvals for tour dates (since useJobPayoutTotals is disabled)
+  const { data: tourApprovals = new Map<string, boolean>() } = useQuery({
+    queryKey: ['job-tech-payout', jobId, 'approvals'],
+    enabled: !!jobId && isTourDate,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('technician_id, approved_by_manager')
+        .eq('job_id', jobId);
+
+      if (error) throw error;
+
+      const techApprovals = new Map<string, boolean[]>();
+      (data || []).forEach(t => {
+        if (!t.technician_id) return;
+        const current = techApprovals.get(t.technician_id) || [];
+        current.push(t.approved_by_manager || false);
+        techApprovals.set(t.technician_id, current);
+      });
+
+      const approvalMap = new Map<string, boolean>();
+      techApprovals.forEach((statuses, techId) => {
+        const allApproved = statuses.length > 0 && statuses.every(s => s === true);
+        approvalMap.set(techId, allApproved);
+      });
+      return approvalMap;
+    },
+    staleTime: 30 * 1000,
+  });
+
+  // Fetch timesheet unique days count for standard jobs
+  const { data: techDaysMap = new Map<string, number>() } = useQuery({
+    queryKey: ['job-tech-days', jobId],
+    enabled: !!jobId && !isTourDate && !jobMetaLoading,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('technician_id, date')
+        .eq('job_id', jobId)
+        .eq('approved_by_manager', true);
+      if (error) throw error;
+
+      const map = new Map<string, Set<string>>();
+      data?.forEach(row => {
+        if (!row.technician_id || !row.date) return;
+        if (!map.has(row.technician_id)) map.set(row.technician_id, new Set());
+        map.get(row.technician_id)!.add(row.date);
+      });
+
+      const countMap = new Map<string, number>();
+      map.forEach((dates, tech) => countMap.set(tech, dates.size));
+      return countMap;
+    },
+    staleTime: 60_000,
+  });
+
   const visibleTourQuotes = React.useMemo(() => {
     const quotes = (rawTourQuotes as TourJobRateQuote[]) || [];
     if (technicianId) {
@@ -122,9 +181,12 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         },
         vehicle_disclaimer: Boolean(quote.vehicle_disclaimer),
         vehicle_disclaimer_text: quote.vehicle_disclaimer_text ?? undefined,
+        payout_approved: tourApprovals.get(quote.technician_id) ?? false,
+        expenses_total_eur: 0,
+        expenses_breakdown: [],
       } satisfies JobPayoutTotals;
     });
-  }, [visibleTourQuotes]);
+  }, [visibleTourQuotes, tourApprovals]);
 
   const payoutTotals = isTourDate ? tourPayoutTotals : standardPayoutTotals;
   const isLoading = jobMetaLoading || (isTourDate ? tourQuotesLoading : standardLoading);
@@ -148,13 +210,12 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     [lpoRows]
   );
   const FLEX_UI_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
-  const FIN_DOC_VIEW_ID = '8238f39c-f42e-11e0-a8de-00e08175e43e'; // fixed view id for fin-doc
+  const FIN_DOC_VIEW_ID = '8238f39c-f42e-11e0-a8de-00e08175e43e';
   const buildFinDocUrl = React.useCallback((elementId: string | null | undefined) => {
     if (!elementId) return null;
     return `${FLEX_UI_BASE_URL}#fin-doc/${encodeURIComponent(elementId)}/doc-view/${FIN_DOC_VIEW_ID}/detail`;
   }, []);
 
-  // Fetch profile names for technicians shown in the payout list
   const techIds = React.useMemo(
     () => Array.from(new Set(payoutTotals.map((p) => p.technician_id).filter(Boolean))) as string[],
     [payoutTotals]
@@ -195,16 +256,14 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const [missingEmailTechIds, setMissingEmailTechIds] = React.useState<string[]>([]);
   const lastPreparedContext = React.useRef<JobPayoutEmailContextResult | null>(null);
 
-  // Payout override state
   const { userRole } = useOptimizedAuth();
   const isManager = userRole === 'admin' || userRole === 'management';
 
-  // Fetch payout overrides for this job
   const { data: payoutOverrides = [] } = useJobTechnicianPayoutOverrides(jobId);
   const setOverrideMutation = useSetTechnicianPayoutOverride();
   const removeOverrideMutation = useRemoveTechnicianPayoutOverride();
+  const toggleApprovalMutation = useToggleTechnicianPayoutApproval();
 
-  // Track which technician's override is being edited
   const [editingTechId, setEditingTechId] = React.useState<string | null>(null);
   const [editingAmount, setEditingAmount] = React.useState('');
 
@@ -213,27 +272,36 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     lastPreparedContext.current = null;
   }, [jobId, isTourDate]);
 
-  // Calculate total payout (sum of all technicians, using overrides where they exist)
   const calculatedGrandTotal = React.useMemo(() => {
     return payoutTotals.reduce((sum, payout) => {
       const override = payoutOverrides.find(o => o.technician_id === payout.technician_id);
-      return sum + (override?.override_amount_eur ?? payout.total_eur);
-    }, 0);
-  }, [payoutTotals, payoutOverrides]);
 
-  // Get override for a specific technician
+      let deduction = 0;
+      const isNonAutonomo = autonomoMap.get(payout.technician_id) === false;
+      if (isNonAutonomo && !override) { // Only apply deduction if no override (override implies final amount) -> Or should it apply to override too? Usually override is final.
+        if (isTourDate) {
+          deduction = NON_AUTONOMO_DEDUCTION_EUR;
+        } else {
+          const days = techDaysMap.get(payout.technician_id) || (payout.timesheets_total_eur > 0 ? 1 : 0);
+          deduction = days * NON_AUTONOMO_DEDUCTION_EUR;
+        }
+      }
+
+      const effectiveTotal = (override?.override_amount_eur ?? payout.total_eur) - (override ? 0 : deduction);
+      return sum + effectiveTotal;
+    }, 0);
+  }, [payoutTotals, payoutOverrides, autonomoMap, isTourDate, techDaysMap]);
+
   const getTechOverride = React.useCallback((techId: string) => {
     return payoutOverrides.find(o => o.technician_id === techId);
   }, [payoutOverrides]);
 
-  // Handle starting edit for a technician
   const handleStartEdit = React.useCallback((techId: string, currentAmount: number) => {
     setEditingTechId(techId);
     const override = getTechOverride(techId);
     setEditingAmount((override?.override_amount_eur ?? currentAmount).toString());
   }, [getTechOverride]);
 
-  // Handle saving override for a technician
   const handleSaveOverride = React.useCallback((techId: string, techName: string, calculatedTotal: number) => {
     const amountValue = parseFloat(editingAmount);
     if (isNaN(amountValue) || amountValue < 0 || !Number.isFinite(amountValue) || amountValue > 99999999.99) {
@@ -246,6 +314,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
       technicianId: techId,
       amountEur: amountValue,
       calculatedTotal,
+      technicianName: techName,
     }, {
       onSuccess: () => {
         setEditingTechId(null);
@@ -254,25 +323,24 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     });
   }, [jobId, editingAmount, setOverrideMutation]);
 
-  // Handle removing override for a technician
   const handleRemoveOverride = React.useCallback((techId: string) => {
     removeOverrideMutation.mutate({
       jobId,
       technicianId: techId,
+      technicianName: getTechName(techId),
     });
-  }, [jobId, removeOverrideMutation]);
+  }, [jobId, removeOverrideMutation, getTechName]);
 
-  // Handle canceling edit
   const handleCancelEdit = React.useCallback(() => {
     setEditingTechId(null);
     setEditingAmount('');
   }, []);
 
-  const prepareStandardContext = React.useCallback(async () => {
+  const prepareStandardContext = React.useCallback(async (payouts: JobPayoutTotals[]) => {
     const context = await prepareJobPayoutEmailContext({
       jobId,
       supabase,
-      payouts: standardPayoutTotals,
+      payouts,
       profiles: profilesWithEmail,
       lpoMap,
       jobDetails: jobMeta || undefined,
@@ -280,7 +348,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     lastPreparedContext.current = context;
     setMissingEmailTechIds(context.missingEmails);
     return context;
-  }, [jobId, standardPayoutTotals, profilesWithEmail, lpoMap, jobMeta]);
+  }, [jobId, profilesWithEmail, lpoMap, jobMeta]);
 
   const handleExport = React.useCallback(async () => {
     if (!jobId) return;
@@ -314,7 +382,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     if (standardPayoutTotals.length === 0) return;
     setIsExporting(true);
     try {
-      const context = await prepareStandardContext();
+      const context = await prepareStandardContext(standardPayoutTotals);
       await generateJobPayoutPDF(
         context.payouts,
         context.job,
@@ -336,7 +404,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     jobMeta,
     profilesWithEmail,
     lpoMap,
-    standardPayoutTotals.length,
+    standardPayoutTotals,
     prepareStandardContext,
   ]);
 
@@ -344,6 +412,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     if (!jobId) return;
 
     if (isTourDate) {
+      // Tour logic remains separate for now
       if (visibleTourQuotes.length === 0) return;
       setIsSendingEmails(true);
       try {
@@ -383,13 +452,20 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
       return;
     }
 
-    if (standardPayoutTotals.length === 0) return;
+    // Standard Job Logic: Filter by granular approval
+    const approvedPayouts = standardPayoutTotals.filter(p => p.payout_approved);
+
+    if (approvedPayouts.length === 0) {
+      toast.warning('No hay técnicos aprobados para enviar correos.');
+      return;
+    }
+
     setIsSendingEmails(true);
     try {
       const result = await sendJobPayoutEmails({
         jobId,
         supabase,
-        payouts: standardPayoutTotals,
+        payouts: approvedPayouts,
         profiles: profilesWithEmail,
         lpoMap,
         jobDetails: jobMeta || undefined,
@@ -436,8 +512,14 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   ]);
 
   const handleSendEmailForTech = React.useCallback(
-    async (techId: string) => {
+    async (techId: string, isApproved?: boolean) => {
       if (!jobId) return;
+
+      if (!isTourDate && !isApproved) {
+        toast.warning('Debes aprobar el pago de este técnico antes de enviar el correo.');
+        return;
+      }
+
       const hasEmail = Boolean(profileMap.get(techId)?.email);
       if (!hasEmail) {
         toast.warning('Este técnico no tiene correo configurado.');
@@ -468,8 +550,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           } else {
             const sentResult = Array.isArray(result.response?.results)
               ? (result.response.results as Array<{ technician_id: string; sent: boolean }>).find(
-                  (r) => r.technician_id === techId
-                )
+                (r) => r.technician_id === techId
+              )
               : { sent: result.success } as { sent: boolean };
             if (sentResult?.sent) {
               toast.success('Correo enviado a este técnico');
@@ -502,8 +584,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         } else {
           const sent = Array.isArray(result.response?.results)
             ? (result.response.results as Array<{ technician_id: string; sent: boolean }>).find(
-                (r) => r.technician_id === techId
-              )?.sent
+              (r) => r.technician_id === techId
+            )?.sent
             : true;
           if (result.success && sent) {
             toast.success('Correo enviado a este técnico');
@@ -608,17 +690,12 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             <Button
               size="sm"
               onClick={handleSendEmails}
-              disabled={isSendingEmails || !jobRatesApproved || payoutTotals.length === 0}
-              variant={jobRatesApproved ? 'default' : 'secondary'}
-              title={
-                jobRatesApproved
-                  ? 'Enviar los resúmenes por correo'
-                  : 'Aprueba las tarifas para habilitar el envío'
-              }
-              className={jobRatesApproved ? "bg-blue-600 hover:bg-blue-500 text-white" : undefined}
+              disabled={isSendingEmails || payoutTotals.length === 0}
+              variant="default"
+              className="bg-blue-600 hover:bg-blue-500 text-white"
             >
               <Send className="h-4 w-4 mr-1" />
-              {isSendingEmails ? 'Enviando…' : 'Enviar por correo'}
+              {isSendingEmails ? 'Enviando…' : 'Enviar aprobados'}
             </Button>
           </div>
         </div>
@@ -632,7 +709,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
               surface,
               (!profileMap.get(payout.technician_id)?.email ||
                 missingEmailTechIds.includes(payout.technician_id)) &&
-                'border-amber-400/70 bg-amber-500/10'
+              'border-amber-400/70 bg-amber-500/10'
             )}
           >
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -695,27 +772,68 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                 )}
               </div>
               <div className="text-right flex flex-col items-end gap-2 sm:min-w-[140px]">
+                {!isTourDate && (
+                  <div className="flex items-center gap-2 mb-1 bg-black/20 p-1.5 rounded-md border border-white/5">
+                    <label htmlFor={`approve-${payout.technician_id}`} className="text-xs text-slate-300 cursor-pointer select-none">
+                      {payout.payout_approved ? 'Aprobado' : 'Pendiente'}
+                    </label>
+                    <Switch
+                      id={`approve-${payout.technician_id}`}
+                      checked={!!payout.payout_approved}
+                      onCheckedChange={(checked) => toggleApprovalMutation.mutate({
+                        jobId,
+                        technicianId: payout.technician_id,
+                        approved: checked
+                      })}
+                      disabled={toggleApprovalMutation.isPending}
+                    />
+                  </div>
+                )}
                 <div className="text-xl font-bold text-white leading-tight">
-                  {formatCurrency(payout.total_eur)}
+                  {(() => {
+                    const isNonAutonomo = autonomoMap.get(payout.technician_id) === false;
+                    let deduction = 0;
+                    let daysUsed = 0;
+                    if (isNonAutonomo) {
+                      if (isTourDate) {
+                        deduction = NON_AUTONOMO_DEDUCTION_EUR;
+                      } else {
+                        daysUsed = techDaysMap.get(payout.technician_id) || (payout.timesheets_total_eur > 0 ? 1 : 0);
+                        deduction = daysUsed * NON_AUTONOMO_DEDUCTION_EUR;
+                      }
+                    }
+                    const effectiveTotal = payout.total_eur - deduction;
+
+                    return (
+                      <div className="flex flex-col items-end">
+                        <span>{formatCurrency(effectiveTotal)}</span>
+                        {deduction > 0 && (
+                          <span className="text-[10px] text-red-400 font-normal">
+                            (-{formatCurrency(deduction)} IRPF por alta obligatoria)
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleSendEmailForTech(payout.technician_id)}
+                  onClick={() => handleSendEmailForTech(payout.technician_id, payout.payout_approved)}
                   disabled={
                     sendingByTech[payout.technician_id] ||
-                    !jobRatesApproved ||
+                    (!isTourDate && !payout.payout_approved) ||
                     !profileMap.get(payout.technician_id)?.email
                   }
                   title={
-                    jobRatesApproved
-                      ? (profileMap.get(payout.technician_id)?.email ? 'Enviar sólo a este técnico' : 'Sin correo configurado')
-                      : 'Aprueba las tarifas para habilitar el envío'
+                    !isTourDate && !payout.payout_approved
+                      ? 'Aprueba el pago para habilitar el envío'
+                      : (profileMap.get(payout.technician_id)?.email ? 'Enviar sólo a este técnico' : 'Sin correo configurado')
                   }
                   className={controlButton}
                 >
                   <Send className="h-3.5 w-3.5 mr-1" />
-                  {sendingByTech[payout.technician_id] ? 'Enviando…' : 'Enviar a este técnico'}
+                  {sendingByTech[payout.technician_id] ? 'Enviando…' : 'Enviar a este'}
                 </Button>
               </div>
             </div>

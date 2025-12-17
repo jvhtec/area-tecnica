@@ -24,9 +24,11 @@ interface TechnicianPayload {
     timesheets_total_eur?: number;
     extras_total_eur?: number;
     total_eur?: number;
+    deduction_eur?: number;
   };
   pdf_base64: string;
   filename?: string;
+  lpo_number?: string;
 }
 
 interface JobPayoutRequestBody {
@@ -123,6 +125,9 @@ serve(async (req) => {
       const parts = formatCurrency(tech.totals?.timesheets_total_eur);
       const extras = formatCurrency(tech.totals?.extras_total_eur);
       const grand = formatCurrency(tech.totals?.total_eur);
+      const deductionAmount = tech.totals?.deduction_eur ?? 0;
+      const deductionFormatted = formatCurrency(deductionAmount);
+      const hasDeduction = deductionAmount > 0;
 
       const htmlContent = `<!DOCTYPE html>
       <html lang="es">
@@ -153,9 +158,13 @@ serve(async (req) => {
                 <tr>
                   <td style="padding:24px 24px 8px 24px;">
                     <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeName || 'equipo'},</h2>
-                    <p style="margin:0;color:#374151;line-height:1.55;">
-                      Adjuntamos tu resumen de pagos correspondiente al trabajo <b>${body.job.title}</b>, programado para el <b>${jobDate}</b>.
-                    </p>
+                      <p style="margin:0;color:#374151;line-height:1.55;">
+                        Adjuntamos tu resumen de pagos correspondiente al trabajo <b>${body.job.title}</b>.
+                        ${tech.lpo_number ? `<br><b>LPO:</b> ${tech.lpo_number}` : ''}
+                      </p>
+                      <p style="margin:4px 0 0 0;color:#374151;line-height:1.55;">
+                        Programado para el <b>${jobDate}</b>.
+                      </p>
                   </td>
                 </tr>
                 <tr>
@@ -165,8 +174,10 @@ serve(async (req) => {
                       <ul style="margin:10px 0 0 18px;padding:0;line-height:1.55;">
                         <li><b>Partes aprobados:</b> ${parts}</li>
                         <li><b>Extras:</b> ${extras}</li>
+                        ${hasDeduction ? `<li><b style="color:#b91c1c;">Deducción IRPF (estimada):</b> -${deductionFormatted}</li>` : ''}
                         <li><b>Total general:</b> ${grand}</li>
                       </ul>
+                       ${hasDeduction ? `<p style="margin:10px 0 0 0;font-size:12px;color:#b91c1c;">* Se ha aplicado una deducción de 30€/día por condición de no autónomo.</p>` : ''}
                     </div>
                   </td>
                 </tr>

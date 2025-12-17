@@ -19,14 +19,19 @@ export interface JobPayoutEmailJobDetails {
   rates_approved?: boolean | null;
 }
 
+// ...
+const NON_AUTONOMO_DEDUCTION_EUR = 30;
+
 export interface JobPayoutEmailAttachment {
   technician_id: string;
   email?: string | null;
   full_name: string;
   payout: JobPayoutTotals;
+  deduction_eur?: number;
   pdfBase64: string;
   filename: string;
   autonomo?: boolean | null;
+  lpo_number?: string | null;
 }
 
 export interface JobPayoutEmailContextResult {
@@ -199,6 +204,21 @@ export async function prepareJobPayoutEmailContext(
     const perTechMap = new Map<string, TimesheetLine[]>([
       [payout.technician_id, timesheetMap.get(payout.technician_id) || []],
     ]);
+    
+    // Calculate deduction
+    let deduction = 0;
+    if (profile?.autonomo === false) {
+        let daysCount = 0;
+        const lines = timesheetMap.get(payout.technician_id) || [];
+        if (lines.length > 0) {
+            const uniqueDates = new Set(lines.map(l => l.date).filter(Boolean));
+            daysCount = uniqueDates.size > 0 ? uniqueDates.size : 1;
+        } else if (payout.timesheets_total_eur > 0) {
+            daysCount = 1;
+        }
+        deduction = daysCount * NON_AUTONOMO_DEDUCTION_EUR;
+    }
+
     const blob = (await generateJobPayoutPDF(
       [payout],
       job,
@@ -218,9 +238,11 @@ export async function prepareJobPayoutEmailContext(
       email: profile?.email ?? null,
       full_name: fullName,
       payout,
+      deduction_eur: deduction,
       pdfBase64,
       filename,
       autonomo: profile?.autonomo ?? null,
+      lpo_number: lpoMap.get(payout.technician_id) ?? null,
     });
   }
 
@@ -281,11 +303,13 @@ export async function sendJobPayoutEmails(
       totals: {
         timesheets_total_eur: attachment.payout.timesheets_total_eur,
         extras_total_eur: attachment.payout.extras_total_eur,
-        total_eur: attachment.payout.total_eur,
+        total_eur: attachment.payout.total_eur - (attachment.deduction_eur || 0),
+        deduction_eur: attachment.deduction_eur,
       },
       pdf_base64: attachment.pdfBase64,
       filename: attachment.filename,
       autonomo: attachment.autonomo ?? null,
+      lpo_number: attachment.lpo_number ?? null,
     })),
     missing_emails: context.missingEmails,
     requested_at: new Date().toISOString(),
