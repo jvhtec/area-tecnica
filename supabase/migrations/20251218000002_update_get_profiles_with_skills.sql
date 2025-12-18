@@ -24,11 +24,6 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  -- Only return data for authenticated users
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'Authentication required';
-  END IF;
-
   RETURN QUERY
   SELECT
     p.id,
@@ -54,6 +49,8 @@ BEGIN
     ) as skills
   FROM profiles p
   LEFT JOIN profile_skills ps ON p.id = ps.profile_id
+  -- Only return data for authenticated users (RLS-style check in WHERE clause)
+  WHERE (auth.uid() IS NOT NULL OR current_setting('role') = 'service_role')
   GROUP BY p.id, p.first_name, p.nickname, p.last_name, p.email, p.department, p.role, p.bg_color, p.profile_picture_url, p.assignable_as_tech;
 END;
 $$;
