@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -1299,34 +1300,50 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({
                     <div className="space-y-3">
                       {filteredAssignments.map((assignment: any) => (
                         <div key={assignment.technician_id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-muted rounded min-w-0">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium break-words">
-                              {assignment.profiles
-                                ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
-                                : assignment.external_technician_name || 'Desconocido'
-                              }
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {assignment.profiles?.department || 'Externo'}
-                            </p>
-                            {assignment.single_day && (
-                              <p className="text-xs text-muted-foreground break-words">
-                                {(() => {
-                                  const dates = technicianDatesMap.get(assignment.technician_id);
-                                  if (dates && dates.size > 0) {
-                                    const sortedDates = Array.from(dates).sort();
-                                    if (sortedDates.length === 1) {
-                                      return `Solo día: ${format(new Date(sortedDates[0]), 'PPP', { locale: es })}`;
-                                    } else {
-                                      return `Días: ${sortedDates.map(d => format(new Date(d), 'dd/MM')).join(', ')}`;
-                                    }
-                                  }
-                                  return assignment.assignment_date
-                                    ? `Solo día: ${format(new Date(assignment.assignment_date), 'PPP', { locale: es })}`
-                                    : 'Sin fecha definida';
-                                })()}
+                          <div className="min-w-0 flex-1 flex items-center gap-3">
+                            <Avatar className="h-10 w-10 shrink-0">
+                              {assignment.profiles?.profile_picture_url && (
+                                <AvatarImage
+                                  src={assignment.profiles.profile_picture_url}
+                                  alt={`${assignment.profiles.first_name} ${assignment.profiles.last_name}`}
+                                />
+                              )}
+                              <AvatarFallback className="text-sm">
+                                {assignment.profiles
+                                  ? `${assignment.profiles.first_name?.[0] || ''}${assignment.profiles.last_name?.[0] || ''}`.toUpperCase()
+                                  : 'EX'
+                                }
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="font-medium break-words">
+                                {assignment.profiles
+                                  ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
+                                  : assignment.external_technician_name || 'Desconocido'
+                                }
                               </p>
-                            )}
+                              <p className="text-sm text-muted-foreground">
+                                {assignment.profiles?.department || 'Externo'}
+                              </p>
+                              {assignment.single_day && (
+                                <p className="text-xs text-muted-foreground break-words">
+                                  {(() => {
+                                    const dates = technicianDatesMap.get(assignment.technician_id);
+                                    if (dates && dates.size > 0) {
+                                      const sortedDates = Array.from(dates).sort();
+                                      if (sortedDates.length === 1) {
+                                        return `Solo día: ${format(new Date(sortedDates[0]), 'PPP', { locale: es })}`;
+                                      } else {
+                                        return `Días: ${sortedDates.map(d => format(new Date(d), 'dd/MM')).join(', ')}`;
+                                      }
+                                    }
+                                    return assignment.assignment_date
+                                      ? `Solo día: ${format(new Date(assignment.assignment_date), 'PPP', { locale: es })}`
+                                      : 'Sin fecha definida';
+                                  })()}
+                                </p>
+                              )}
+                            </div>
                           </div>
                           <div className="flex flex-wrap gap-1 w-full sm:w-auto sm:shrink-0">
                             {assignment.sound_role && (

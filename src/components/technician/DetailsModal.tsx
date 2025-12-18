@@ -8,6 +8,7 @@ import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Down
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Theme } from './types';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { PlacesRestaurantService } from '@/utils/hoja-de-ruta/services/places-restaurant-service';
@@ -416,13 +417,26 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                             video: 'text-purple-400 bg-purple-900/30 border-purple-900/50',
                                         };
                                         return (
-                                            <div key={idx} className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4`}>
-                                                <div className={`font-bold text-sm ${theme.textMain} mb-1`}>
-                                                    {tech?.first_name} {tech?.last_name}
-                                                </div>
-                                                <div className={`text-xs ${theme.textMuted}`}>{role}</div>
-                                                <div className={`mt-2 inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${deptColors[dept] || theme.textMuted}`}>
-                                                    {dept}
+                                            <div key={idx} className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 flex items-start gap-3`}>
+                                                <Avatar className="h-12 w-12 shrink-0">
+                                                    {tech?.profile_picture_url && (
+                                                        <AvatarImage
+                                                            src={tech.profile_picture_url}
+                                                            alt={`${tech.first_name} ${tech.last_name}`}
+                                                        />
+                                                    )}
+                                                    <AvatarFallback className="text-sm">
+                                                        {`${tech?.first_name?.[0] || ''}${tech?.last_name?.[0] || ''}`.toUpperCase() || 'T'}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="flex-1">
+                                                    <div className={`font-bold text-sm ${theme.textMain} mb-1`}>
+                                                        {tech?.first_name} {tech?.last_name}
+                                                    </div>
+                                                    <div className={`text-xs ${theme.textMuted}`}>{role}</div>
+                                                    <div className={`mt-2 inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${deptColors[dept] || theme.textMuted}`}>
+                                                        {dept}
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
