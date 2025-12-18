@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Loader2, Save, User, Phone, MapPin, CreditCard, Calendar as CalendarIcon, Lock, ChevronRight, LogOut, Camera, X, Bell, BellOff, AlertTriangle } from 'lucide-react';
 import { Theme } from './types';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -228,25 +229,31 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                 <div className="absolute top-0 left-0 w-full h-24 opacity-20" style={{ backgroundColor: selectedColor }} />
 
                 <div className="relative mt-4 mb-4">
-                    <ProfilePictureUpload
-                        userId={user?.id || ''}
-                        currentPictureUrl={userProfile?.profile_picture_url}
-                        userInitials={userInitials}
-                        onUploadComplete={(url) => {
-                            queryClient.setQueryData(['user-profile'], (old: any) => ({
-                                ...old,
-                                profile_picture_url: url
-                            }));
-                        }}
-                        onRemove={() => {
-                            queryClient.setQueryData(['user-profile'], (old: any) => ({
-                                ...old,
-                                profile_picture_url: null
-                            }));
-                        }}
-                        size="lg"
-                        showCameraIcon={true}
-                    />
+                    {user?.id ? (
+                        <ProfilePictureUpload
+                            userId={user.id}
+                            currentPictureUrl={userProfile?.profile_picture_url}
+                            userInitials={userInitials}
+                            onUploadComplete={(url) => {
+                                queryClient.setQueryData(['user-profile'], (old: any) => ({
+                                    ...old,
+                                    profile_picture_url: url
+                                }));
+                            }}
+                            onRemove={() => {
+                                queryClient.setQueryData(['user-profile'], (old: any) => ({
+                                    ...old,
+                                    profile_picture_url: null
+                                }));
+                            }}
+                            size="lg"
+                            showCameraIcon={true}
+                        />
+                    ) : (
+                        <Avatar className="h-32 w-32">
+                            <AvatarFallback className="text-lg font-semibold">{userInitials}</AvatarFallback>
+                        </Avatar>
+                    )}
                 </div>
 
                 <h2 className={`text-xl font-bold ${theme.textMain}`}>{userName}</h2>

@@ -6,7 +6,8 @@ VALUES (
   true, -- Public bucket for easy access without signed URLs
   2097152, -- 2MB limit for profile pictures
   ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
-);
+)
+ON CONFLICT (id) DO NOTHING;
 
 -- RLS Policies for profile-pictures bucket
 

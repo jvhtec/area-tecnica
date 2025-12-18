@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, X, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,11 @@ export function ProfilePictureUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // Sync previewUrl with currentPictureUrl prop changes
+  useEffect(() => {
+    setPreviewUrl(currentPictureUrl || null);
+  }, [currentPictureUrl]);
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -81,8 +86,8 @@ export function ProfilePictureUpload({
       const fileName = generateProfilePictureFileName(userId, optimizedFile.name);
 
       // Delete old profile picture if exists
-      if (currentPictureUrl) {
-        const oldPath = currentPictureUrl.split('/profile-pictures/')[1];
+      if (previewUrl && previewUrl.includes('/profile-pictures/')) {
+        const oldPath = previewUrl.split('/profile-pictures/')[1];
         if (oldPath) {
           await supabase.storage.from('profile-pictures').remove([oldPath]);
         }
@@ -141,13 +146,13 @@ export function ProfilePictureUpload({
   };
 
   const handleRemove = async () => {
-    if (!currentPictureUrl) return;
+    if (!previewUrl || !previewUrl.includes('/profile-pictures/')) return;
 
     setUploading(true);
 
     try {
       // Delete from storage
-      const filePath = currentPictureUrl.split('/profile-pictures/')[1];
+      const filePath = previewUrl.split('/profile-pictures/')[1];
       if (filePath) {
         const { error: deleteError } = await supabase.storage
           .from('profile-pictures')

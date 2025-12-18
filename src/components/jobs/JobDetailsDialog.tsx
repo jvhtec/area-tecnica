@@ -182,7 +182,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({
             job_id, technician_id, assigned_by, assigned_at,
             sound_role, lights_role, video_role, status,
             single_day, assignment_date,
-            profiles(id, first_name, last_name, department, role)
+            profiles(id, first_name, last_name, department, role, profile_picture_url)
           ),
           timesheets(technician_id, date),
           job_documents(id, file_name, file_path, uploaded_at, file_size, visible_to_tech, read_only, template_type),
