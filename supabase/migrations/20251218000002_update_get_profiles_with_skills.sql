@@ -2,6 +2,9 @@
 -- This function is used by the job assignment matrix to fetch technician profiles
 -- SECURITY: Only returns non-sensitive data needed for matrix display
 
+-- Drop existing function to allow return type changes
+DROP FUNCTION IF EXISTS public.get_profiles_with_skills();
+
 CREATE OR REPLACE FUNCTION public.get_profiles_with_skills()
 RETURNS TABLE (
   id uuid,
