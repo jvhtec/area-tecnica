@@ -36,7 +36,7 @@ export interface MatrixTimesheetAssignment {
 }
 
 interface OptimizedMatrixDataProps {
-  technicians: Array<{ id: string; first_name: string; nickname?: string | null; last_name: string; email: string; department: string; role: string; }>;
+  technicians: Array<{ id: string; first_name: string; nickname?: string | null; last_name: string; email: string; department: string; role: string; profile_picture_url?: string | null; }>;
   dates: Date[];
   jobs: MatrixJob[];
 }
@@ -393,7 +393,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       queryFn: async () => {
         const { data, error } = await supabase
           .from('profiles')
-          .select('first_name, nickname, last_name, department')
+          .select('first_name, nickname, last_name, department, profile_picture_url')
           .eq('id', technicianId)
           .single();
 
