@@ -11,6 +11,7 @@ export type Profile = {
   department: Department | null;
   dni: string | null;
   residencia: string | null;
+  profile_picture_url?: string | null;
   assignable_as_tech?: boolean | null;
   flex_resource_id?: string | null;
   soundvision_access_enabled?: boolean | null;

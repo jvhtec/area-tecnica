@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Save, User, Phone, MapPin, CreditCard, Calendar as CalendarIcon, Lock, ChevronRight, LogOut, Camera, X, Bell, BellOff, AlertTriangle } from 'lucide-react';
 import { Theme } from './types';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { ProfilePictureUpload } from '@/components/profile/ProfilePictureUpload';
 
 interface ProfileUser {
     id: string;
@@ -21,6 +22,7 @@ interface UserProfile {
     city?: string;
     dni?: string;
     profile_color?: string;
+    profile_picture_url?: string;
     role?: string;
     department?: string;
 }
@@ -226,15 +228,25 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                 <div className="absolute top-0 left-0 w-full h-24 opacity-20" style={{ backgroundColor: selectedColor }} />
 
                 <div className="relative mt-4 mb-4">
-                    <div
-                        className={`w-24 h-24 rounded-full border-4 flex items-center justify-center text-3xl font-bold ${theme.bg} ${theme.textMain}`}
-                        style={{ borderColor: selectedColor }}
-                    >
-                        {userInitials}
-                    </div>
-                    <button className="absolute bottom-0 right-0 p-2 rounded-full shadow-lg bg-blue-600 text-white hover:bg-blue-500">
-                        <Camera size={14} />
-                    </button>
+                    <ProfilePictureUpload
+                        userId={user?.id || ''}
+                        currentPictureUrl={userProfile?.profile_picture_url}
+                        userInitials={userInitials}
+                        onUploadComplete={(url) => {
+                            queryClient.setQueryData(['user-profile'], (old: any) => ({
+                                ...old,
+                                profile_picture_url: url
+                            }));
+                        }}
+                        onRemove={() => {
+                            queryClient.setQueryData(['user-profile'], (old: any) => ({
+                                ...old,
+                                profile_picture_url: null
+                            }));
+                        }}
+                        size="lg"
+                        showCameraIcon={true}
+                    />
                 </div>
 
                 <h2 className={`text-xl font-bold ${theme.textMain}`}>{userName}</h2>

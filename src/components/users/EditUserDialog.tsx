@@ -16,6 +16,7 @@ import { HouseTechRateEditor } from "@/components/settings/HouseTechRateEditor";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { formatUserName } from "@/utils/userName";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
+import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
 
 interface EditUserDialogProps {
   user: Profile | null;
@@ -35,6 +36,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   const [isSendingOnboarding, setIsSendingOnboarding] = useState(false);
   const [residencia, setResidencia] = useState<string>(user?.residencia || "");
   const [bgColor, setBgColor] = useState<string>(user?.bg_color || "");
+  const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(user?.profile_picture_url || null);
 
   useEffect(() => {
     setAssignableAsTech(!!user?.assignable_as_tech);
@@ -45,6 +47,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     setIsAutonomo(user?.autonomo !== false);
     setResidencia(user?.residencia || "");
     setBgColor(user?.bg_color || "");
+    setProfilePictureUrl(user?.profile_picture_url || null);
   }, [user?.id]);
 
   const isSoundTechnician = user?.department === 'sound' && user?.role === 'technician';
@@ -131,6 +134,19 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
         </DialogHeader>
         <div className="space-y-6 py-4">
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Profile Picture */}
+            <div className="flex justify-center py-4">
+              <ProfilePictureUpload
+                userId={user?.id || ''}
+                currentPictureUrl={profilePictureUrl}
+                userInitials={`${user?.first_name?.[0] || ''}${(user?.nickname || user?.last_name)?.[0] || ''}`.toUpperCase() || 'U'}
+                onUploadComplete={(url) => setProfilePictureUrl(url)}
+                onRemove={() => setProfilePictureUrl(null)}
+                size="lg"
+                showCameraIcon={true}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name</Label>
               <Input

@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, Copy, RefreshCcw } from "lucide-react";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
+import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
@@ -268,6 +269,19 @@ export const Profile = () => {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Profile Picture Upload */}
+                  <div className="flex justify-center mb-6">
+                    <ProfilePictureUpload
+                      userId={profile.id}
+                      currentPictureUrl={profile.profile_picture_url}
+                      userInitials={`${profile.first_name?.[0] || ''}${(profile.nickname || profile.last_name)?.[0] || ''}`.toUpperCase() || 'U'}
+                      onUploadComplete={(url) => setProfile({ ...profile, profile_picture_url: url })}
+                      onRemove={() => setProfile({ ...profile, profile_picture_url: null })}
+                      size="xl"
+                      showCameraIcon={true}
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">Nombre</Label>

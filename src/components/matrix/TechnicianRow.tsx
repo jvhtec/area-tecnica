@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin, Refrigerator, Edit, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ interface TechnicianRowProps {
     department: string;
     role: string;
     bg_color?: string | null;
+    profile_picture_url?: string | null;
     skills?: Array<{ name?: string; category?: string | null; proficiency?: number | null; is_primary?: boolean | null }>;
   };
   height: number;
@@ -279,6 +280,9 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
               <div className="h-full flex flex-col items-center justify-center">
                 <div className="relative">
                   <Avatar className="h-8 w-8">
+                    {technician.profile_picture_url && (
+                      <AvatarImage src={technician.profile_picture_url} alt={displayName} />
+                    )}
                     <AvatarFallback className="text-xs">
                       {getInitials()}
                     </AvatarFallback>
@@ -292,6 +296,9 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
             ) : (
               <div className="flex items-center gap-3 h-full">
                 <Avatar className="h-8 w-8">
+                  {technician.profile_picture_url && (
+                    <AvatarImage src={technician.profile_picture_url} alt={displayName} />
+                  )}
                   <AvatarFallback className="text-xs">
                     {getInitials()}
                   </AvatarFallback>
@@ -328,6 +335,9 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12">
+                {technician.profile_picture_url && (
+                  <AvatarImage src={technician.profile_picture_url} alt={displayName} />
+                )}
                 <AvatarFallback>
                   {getInitials()}
                 </AvatarFallback>
