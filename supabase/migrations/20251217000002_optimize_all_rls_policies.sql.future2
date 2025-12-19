@@ -1,0 +1,764 @@
+-- =============================================================================
+-- OPTIMIZE ALL RLS POLICIES
+-- =============================================================================
+-- Replaces 96 RLS policies that query profiles table with cached functions.
+-- This is the main fix for the 29M profile queries issue.
+--
+-- Pattern replacements:
+--   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN (...))
+--   → current_user_role() IN (...)
+--
+--   (SELECT department FROM profiles WHERE id = auth.uid())
+--   → current_user_department()
+-- =============================================================================
+
+-- Helper: Check if user is admin or management
+CREATE OR REPLACE FUNCTION is_admin_or_management()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+AS $$
+  SELECT current_user_role() IN ('admin', 'management');
+$$;
+
+GRANT EXECUTE ON FUNCTION is_admin_or_management() TO authenticated, anon;
+
+-- =============================================================================
+-- ACTIVITY_LOG (2 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "activity_log_management" ON activity_log;
+DROP POLICY IF EXISTS "activity_log_house_plus" ON activity_log;
+
+CREATE POLICY "activity_log_management" ON activity_log
+  FOR SELECT USING (current_user_role() IN ('management', 'admin'));
+
+CREATE POLICY "activity_log_house_plus" ON activity_log
+  FOR SELECT USING (
+    visibility = 'house_plus_job'::activity_visibility
+    AND current_user_role() = 'house_tech'
+  );
+
+-- =============================================================================
+-- APP_CHANGELOG (3 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "app_changelog_update_editors" ON app_changelog;
+DROP POLICY IF EXISTS "app_changelog_insert_editors" ON app_changelog;
+DROP POLICY IF EXISTS "app_changelog_delete_admin" ON app_changelog;
+
+CREATE POLICY "app_changelog_update_editors" ON app_changelog
+  FOR UPDATE USING (
+    is_admin_or_management()
+    OR lower(COALESCE(auth.jwt()->>'email', '')) = 'sonido@sector-pro.com'
+  )
+  WITH CHECK (
+    is_admin_or_management()
+    OR lower(COALESCE(auth.jwt()->>'email', '')) = 'sonido@sector-pro.com'
+  );
+
+CREATE POLICY "app_changelog_insert_editors" ON app_changelog
+  FOR INSERT WITH CHECK (
+    is_admin_or_management()
+    OR lower(COALESCE(auth.jwt()->>'email', '')) = 'sonido@sector-pro.com'
+  );
+
+CREATE POLICY "app_changelog_delete_admin" ON app_changelog
+  FOR DELETE USING (current_user_role() = 'admin');
+
+-- =============================================================================
+-- CUSTOM_TECH_RATES (3 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "house_rates_mgr_sel" ON custom_tech_rates;
+DROP POLICY IF EXISTS "house_rates_mgr_upd" ON custom_tech_rates;
+DROP POLICY IF EXISTS "house_rates_mgr_ins" ON custom_tech_rates;
+
+CREATE POLICY "house_rates_mgr_sel" ON custom_tech_rates
+  FOR SELECT USING (is_admin_or_management());
+
+CREATE POLICY "house_rates_mgr_upd" ON custom_tech_rates
+  FOR UPDATE USING (is_admin_or_management())
+  WITH CHECK (is_admin_or_management());
+
+CREATE POLICY "house_rates_mgr_ins" ON custom_tech_rates
+  FOR INSERT WITH CHECK (is_admin_or_management());
+
+-- =============================================================================
+-- DAY_ASSIGNMENTS (1 policy - partial fix for WITH CHECK)
+-- =============================================================================
+DROP POLICY IF EXISTS "Users can manage day assignments" ON day_assignments;
+
+CREATE POLICY "Users can manage day assignments" ON day_assignments
+  FOR ALL
+  USING (user_id = auth.uid())
+  WITH CHECK (is_admin_or_management());
+
+-- =============================================================================
+-- EQUIPMENT (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Users can view own department equipment" ON equipment;
+
+CREATE POLICY "Users can view own department equipment" ON equipment
+  FOR SELECT USING (department = current_user_department());
+
+-- =============================================================================
+-- EXPENSE_CATEGORIES (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Expense categories readable" ON expense_categories;
+
+CREATE POLICY "Expense categories readable" ON expense_categories
+  FOR SELECT USING (
+    auth.role() = 'service_role'
+    OR auth.uid() IS NOT NULL
+  );
+
+-- =============================================================================
+-- EXPENSE_PERMISSIONS (2 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "Technicians read own permissions" ON expense_permissions;
+DROP POLICY IF EXISTS "Management manages expense permissions" ON expense_permissions;
+
+CREATE POLICY "Technicians read own permissions" ON expense_permissions
+  FOR SELECT USING (
+    technician_id = auth.uid()
+    OR is_admin_or_management()
+  );
+
+CREATE POLICY "Management manages expense permissions" ON expense_permissions
+  FOR ALL USING (
+    auth.role() = 'service_role'
+    OR is_admin_or_management()
+  )
+  WITH CHECK (
+    auth.role() = 'service_role'
+    OR is_admin_or_management()
+  );
+
+-- =============================================================================
+-- FESTIVAL_ARTIST_FILES (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "festival_riders_select_management" ON festival_artist_files;
+
+CREATE POLICY "festival_riders_select_management" ON festival_artist_files
+  FOR SELECT USING (is_admin_or_management());
+
+-- =============================================================================
+-- FESTIVAL_ARTISTS (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "festival_artists_select_management" ON festival_artists;
+
+CREATE POLICY "festival_artists_select_management" ON festival_artists
+  FOR SELECT USING (is_admin_or_management());
+
+-- =============================================================================
+-- GLOBAL_STOCK_ENTRIES (3 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "Users can view own department stock" ON global_stock_entries;
+DROP POLICY IF EXISTS "Users can update own department stock" ON global_stock_entries;
+DROP POLICY IF EXISTS "Users can insert own department stock" ON global_stock_entries;
+
+CREATE POLICY "Users can view own department stock" ON global_stock_entries
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM equipment e
+      WHERE e.id = global_stock_entries.equipment_id
+      AND e.department = current_user_department()
+    )
+  );
+
+CREATE POLICY "Users can update own department stock" ON global_stock_entries
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM equipment e
+      WHERE e.id = global_stock_entries.equipment_id
+      AND e.department = current_user_department()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM equipment e
+      WHERE e.id = global_stock_entries.equipment_id
+      AND e.department = current_user_department()
+    )
+  );
+
+CREATE POLICY "Users can insert own department stock" ON global_stock_entries
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM equipment e
+      WHERE e.id = global_stock_entries.equipment_id
+      AND e.department = current_user_department()
+    )
+  );
+
+-- =============================================================================
+-- JOB_EXPENSES (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Management manages job expenses" ON job_expenses;
+
+CREATE POLICY "Management manages job expenses" ON job_expenses
+  FOR ALL USING (
+    auth.role() = 'service_role'
+    OR is_admin_or_management()
+  )
+  WITH CHECK (
+    auth.role() = 'service_role'
+    OR is_admin_or_management()
+  );
+
+-- =============================================================================
+-- JOB_RATE_EXTRAS (2 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "job_extras_mgr_write" ON job_rate_extras;
+DROP POLICY IF EXISTS "job_extras_mgr_read" ON job_rate_extras;
+
+CREATE POLICY "job_extras_mgr_read" ON job_rate_extras
+  FOR SELECT USING (is_admin_or_management());
+
+CREATE POLICY "job_extras_mgr_write" ON job_rate_extras
+  FOR ALL USING (is_admin_or_management())
+  WITH CHECK (is_admin_or_management());
+
+-- =============================================================================
+-- JOB_WHATSAPP_GROUP_REQUESTS (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "job_whatsapp_group_requests_select_mgmt" ON job_whatsapp_group_requests;
+
+CREATE POLICY "job_whatsapp_group_requests_select_mgmt" ON job_whatsapp_group_requests
+  FOR SELECT USING (is_admin_or_management());
+
+-- =============================================================================
+-- JOB_WHATSAPP_GROUPS (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "job_whatsapp_groups_select_mgmt" ON job_whatsapp_groups;
+
+CREATE POLICY "job_whatsapp_groups_select_mgmt" ON job_whatsapp_groups
+  FOR SELECT USING (is_admin_or_management());
+
+-- =============================================================================
+-- JOBS (2 policies that use profiles)
+-- =============================================================================
+DROP POLICY IF EXISTS "management_update_job_rates_approval" ON jobs;
+
+CREATE POLICY "management_update_job_rates_approval" ON jobs
+  FOR UPDATE USING (is_admin_or_management())
+  WITH CHECK (is_admin_or_management());
+
+-- Note: house_tech_calendar_jobs and "House techs can view jobs" are complex
+-- and involve JOINs - keeping them but they use get_current_user_role() already
+
+-- =============================================================================
+-- LIGHTS_JOB_PERSONNEL (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Department personnel can manage lights personnel" ON lights_job_personnel;
+
+CREATE POLICY "Department personnel can manage lights personnel" ON lights_job_personnel
+  FOR ALL USING (
+    current_user_department() IN ('lights', 'admin', 'management')
+  )
+  WITH CHECK (is_admin_or_management());
+
+-- =============================================================================
+-- LIGHTS_JOB_TASKS (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Lights personnel can manage lights tasks" ON lights_job_tasks;
+
+CREATE POLICY "Lights personnel can manage lights tasks" ON lights_job_tasks
+  FOR ALL USING (
+    current_user_department() IN ('lights', 'admin', 'management')
+  )
+  WITH CHECK (is_admin_or_management());
+
+-- =============================================================================
+-- MESSAGES (5 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "messages_update_status_mgmt" ON messages;
+DROP POLICY IF EXISTS "Users can manage own messages" ON messages;
+DROP POLICY IF EXISTS "Users can view department messages" ON messages;
+DROP POLICY IF EXISTS "messages_delete_self_or_mgmt" ON messages;
+DROP POLICY IF EXISTS "messages_select_self_or_mgmt" ON messages;
+
+CREATE POLICY "messages_update_status_mgmt" ON messages
+  FOR UPDATE USING (is_admin_or_management())
+  WITH CHECK (is_admin_or_management());
+
+CREATE POLICY "Users can manage own messages" ON messages
+  FOR ALL USING (sender_id = auth.uid())
+  WITH CHECK (is_admin_or_management());
+
+CREATE POLICY "Users can view department messages" ON messages
+  FOR SELECT USING (is_admin_or_management());
+
+CREATE POLICY "messages_delete_self_or_mgmt" ON messages
+  FOR DELETE USING (
+    sender_id = auth.uid()
+    OR is_admin_or_management()
+  );
+
+CREATE POLICY "messages_select_self_or_mgmt" ON messages
+  FOR SELECT USING (
+    sender_id = auth.uid()
+    OR is_admin_or_management()
+  );
+
+-- =============================================================================
+-- MORNING_SUMMARY_SUBSCRIPTIONS (3 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "Users can update their own subscriptions" ON morning_summary_subscriptions;
+DROP POLICY IF EXISTS "Users can create their own subscriptions" ON morning_summary_subscriptions;
+DROP POLICY IF EXISTS "Admins can view all subscriptions" ON morning_summary_subscriptions;
+
+CREATE POLICY "Users can update their own subscriptions" ON morning_summary_subscriptions
+  FOR UPDATE USING (user_id = auth.uid())
+  WITH CHECK (
+    user_id = auth.uid()
+    AND current_user_role() IN ('admin', 'management', 'house_tech')
+  );
+
+CREATE POLICY "Users can create their own subscriptions" ON morning_summary_subscriptions
+  FOR INSERT WITH CHECK (
+    user_id = auth.uid()
+    AND current_user_role() IN ('admin', 'management', 'house_tech')
+  );
+
+CREATE POLICY "Admins can view all subscriptions" ON morning_summary_subscriptions
+  FOR SELECT USING (current_user_role() = 'admin');
+
+-- =============================================================================
+-- NOTIFICATION_PREFERENCES (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Users can manage own notification preferences" ON notification_preferences;
+
+CREATE POLICY "Users can manage own notification preferences" ON notification_preferences
+  FOR ALL USING (user_id = auth.uid())
+  WITH CHECK (
+    user_id = auth.uid()
+    AND current_user_role() IN ('admin', 'management', 'house_tech')
+  );
+
+-- =============================================================================
+-- NOTIFICATION_SUBSCRIPTIONS (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Management can manage notification subscriptions" ON notification_subscriptions;
+
+CREATE POLICY "Management can manage notification subscriptions" ON notification_subscriptions
+  FOR ALL USING (
+    user_id = auth.uid()
+    OR current_user_role() IN ('admin', 'management')
+  )
+  WITH CHECK (
+    user_id = auth.uid()
+    AND current_user_role() IN ('admin', 'management', 'house_tech')
+  );
+
+-- =============================================================================
+-- PRESETS (4 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "Department can delete presets" ON presets;
+DROP POLICY IF EXISTS "Department can view presets" ON presets;
+DROP POLICY IF EXISTS "Department can update presets" ON presets;
+DROP POLICY IF EXISTS "Department can insert presets" ON presets;
+
+-- Note: Original policy had a bug (pf.department = pf.department is always true)
+-- Fixing to actually check against preset's department
+CREATE POLICY "Department can view presets" ON presets
+  FOR SELECT USING (department = current_user_department() OR is_admin_or_management());
+
+CREATE POLICY "Department can update presets" ON presets
+  FOR UPDATE USING (department = current_user_department() OR is_admin_or_management())
+  WITH CHECK (department = current_user_department() OR is_admin_or_management());
+
+CREATE POLICY "Department can insert presets" ON presets
+  FOR INSERT WITH CHECK (department = current_user_department() OR is_admin_or_management());
+
+CREATE POLICY "Department can delete presets" ON presets
+  FOR DELETE USING (department = current_user_department() OR is_admin_or_management());
+
+-- =============================================================================
+-- PUSH_CRON_CONFIG (2 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "Only admins can modify cron config" ON push_cron_config;
+DROP POLICY IF EXISTS "Only admins can view cron config" ON push_cron_config;
+
+CREATE POLICY "Only admins can view cron config" ON push_cron_config
+  FOR SELECT USING (current_user_role() = 'admin');
+
+CREATE POLICY "Only admins can modify cron config" ON push_cron_config
+  FOR ALL USING (current_user_role() = 'admin')
+  WITH CHECK (current_user_role() = 'admin');
+
+-- =============================================================================
+-- PUSH_CRON_EXECUTION_LOG (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Admins can view push cron logs" ON push_cron_execution_log;
+
+CREATE POLICY "Admins can view push cron logs" ON push_cron_execution_log
+  FOR SELECT USING (current_user_role() = 'admin');
+
+-- =============================================================================
+-- PUSH_NOTIFICATION_SCHEDULES (2 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "Admins and management can view schedules" ON push_notification_schedules;
+DROP POLICY IF EXISTS "Admins and management can modify schedules" ON push_notification_schedules;
+
+CREATE POLICY "Admins and management can view schedules" ON push_notification_schedules
+  FOR SELECT USING (is_admin_or_management());
+
+CREATE POLICY "Admins and management can modify schedules" ON push_notification_schedules
+  FOR ALL USING (is_admin_or_management())
+  WITH CHECK (is_admin_or_management());
+
+-- =============================================================================
+-- RATE_CARDS_2025 (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Management can manage rate cards" ON rate_cards_2025;
+
+CREATE POLICY "Management can manage rate cards" ON rate_cards_2025
+  FOR ALL USING (is_admin_or_management());
+
+-- =============================================================================
+-- RATE_CARDS_TOUR_2025 (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Management and authenticated users can view tour rate cards" ON rate_cards_tour_2025;
+
+CREATE POLICY "Management and authenticated users can view tour rate cards" ON rate_cards_tour_2025
+  FOR SELECT USING (
+    current_user_role() IN ('admin', 'management', 'house_tech', 'technician')
+  );
+
+-- =============================================================================
+-- RATE_EXTRAS_2025 (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "rate_extras_2025_mgr_write" ON rate_extras_2025;
+
+CREATE POLICY "rate_extras_2025_mgr_write" ON rate_extras_2025
+  FOR ALL USING (is_admin_or_management())
+  WITH CHECK (is_admin_or_management());
+
+-- =============================================================================
+-- SOUND_JOB_PERSONNEL (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Department personnel can manage sound personnel" ON sound_job_personnel;
+
+CREATE POLICY "Department personnel can manage sound personnel" ON sound_job_personnel
+  FOR ALL USING (
+    current_user_department() IN ('sound', 'admin', 'management')
+  )
+  WITH CHECK (is_admin_or_management());
+
+-- =============================================================================
+-- SOUND_JOB_TASKS (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Sound personnel can manage sound tasks" ON sound_job_tasks;
+
+CREATE POLICY "Sound personnel can manage sound tasks" ON sound_job_tasks
+  FOR ALL USING (
+    current_user_department() IN ('sound', 'admin', 'management')
+  )
+  WITH CHECK (is_admin_or_management());
+
+-- =============================================================================
+-- SOUNDVISION_FILES (4 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "soundvision_files_insert_authorized" ON soundvision_files;
+DROP POLICY IF EXISTS "soundvision_files_select_authenticated" ON soundvision_files;
+DROP POLICY IF EXISTS "soundvision_files_update_authorized" ON soundvision_files;
+DROP POLICY IF EXISTS "soundvision_files_delete_management" ON soundvision_files;
+
+-- These need to check soundvision_access_enabled from profiles - keep one query
+CREATE POLICY "soundvision_files_select_authenticated" ON soundvision_files
+  FOR SELECT USING (
+    is_admin_or_management()
+    OR (current_user_role() = 'house_tech' AND current_user_department() = 'sound')
+    OR EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND COALESCE(soundvision_access_enabled, false)
+    )
+  );
+
+CREATE POLICY "soundvision_files_insert_authorized" ON soundvision_files
+  FOR INSERT WITH CHECK (
+    is_admin_or_management()
+    OR (current_user_role() = 'house_tech' AND current_user_department() = 'sound')
+    OR EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND COALESCE(soundvision_access_enabled, false)
+    )
+  );
+
+CREATE POLICY "soundvision_files_update_authorized" ON soundvision_files
+  FOR UPDATE USING (
+    is_admin_or_management()
+    OR (current_user_role() = 'house_tech' AND current_user_department() = 'sound')
+    OR EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND COALESCE(soundvision_access_enabled, false)
+    )
+  )
+  WITH CHECK (
+    is_admin_or_management()
+    OR (current_user_role() = 'house_tech' AND current_user_department() = 'sound')
+    OR EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND COALESCE(soundvision_access_enabled, false)
+    )
+  );
+
+CREATE POLICY "soundvision_files_delete_management" ON soundvision_files
+  FOR DELETE USING (is_admin_or_management());
+
+-- =============================================================================
+-- STOCK_MOVEMENTS (2 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "Users can view own department movements" ON stock_movements;
+DROP POLICY IF EXISTS "Users can insert own department movements" ON stock_movements;
+
+CREATE POLICY "Users can view own department movements" ON stock_movements
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM equipment e
+      WHERE e.id = stock_movements.equipment_id
+      AND e.department = current_user_department()
+    )
+  );
+
+CREATE POLICY "Users can insert own department movements" ON stock_movements
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM equipment e
+      WHERE e.id = stock_movements.equipment_id
+      AND e.department = current_user_department()
+    )
+  );
+
+-- =============================================================================
+-- TASK_DOCUMENTS (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Users can manage task documents" ON task_documents;
+
+CREATE POLICY "Users can manage task documents" ON task_documents
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- =============================================================================
+-- TIMESHEETS (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Users can view visible timesheet amounts" ON timesheets;
+
+CREATE POLICY "Users can view visible timesheet amounts" ON timesheets
+  FOR SELECT USING (
+    auth.uid() = technician_id
+    OR is_admin_or_management()
+  );
+
+-- =============================================================================
+-- TOUR_ACCOMMODATIONS (2 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "tour_accommodations_management" ON tour_accommodations;
+DROP POLICY IF EXISTS "tour_accommodations_select" ON tour_accommodations;
+
+CREATE POLICY "tour_accommodations_management" ON tour_accommodations
+  FOR ALL USING (is_admin_or_management())
+  WITH CHECK (is_admin_or_management());
+
+CREATE POLICY "tour_accommodations_select" ON tour_accommodations
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM tour_assignments
+      WHERE tour_assignments.tour_id = tour_accommodations.tour_id
+      AND tour_assignments.technician_id = auth.uid()
+    )
+    OR is_admin_or_management()
+  );
+
+-- =============================================================================
+-- TOUR_DOCUMENTS (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "All users can upload tour documents" ON tour_documents;
+
+CREATE POLICY "All users can upload tour documents" ON tour_documents
+  FOR ALL USING (auth.uid() IS NOT NULL)
+  WITH CHECK (is_admin_or_management());
+
+-- =============================================================================
+-- TOUR_SCHEDULE_TEMPLATES (2 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "tour_schedule_templates_management" ON tour_schedule_templates;
+DROP POLICY IF EXISTS "tour_schedule_templates_select" ON tour_schedule_templates;
+
+CREATE POLICY "tour_schedule_templates_management" ON tour_schedule_templates
+  FOR ALL USING (is_admin_or_management())
+  WITH CHECK (is_admin_or_management());
+
+CREATE POLICY "tour_schedule_templates_select" ON tour_schedule_templates
+  FOR SELECT USING (
+    is_global = true
+    OR tour_id IS NULL
+    OR EXISTS (
+      SELECT 1 FROM tour_assignments
+      WHERE tour_assignments.tour_id = tour_schedule_templates.tour_id
+      AND tour_assignments.technician_id = auth.uid()
+    )
+    OR is_admin_or_management()
+  );
+
+-- =============================================================================
+-- TOUR_TIMELINE_EVENTS (2 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "tour_timeline_events_management" ON tour_timeline_events;
+DROP POLICY IF EXISTS "tour_timeline_events_select" ON tour_timeline_events;
+
+CREATE POLICY "tour_timeline_events_management" ON tour_timeline_events
+  FOR ALL USING (is_admin_or_management())
+  WITH CHECK (is_admin_or_management());
+
+CREATE POLICY "tour_timeline_events_select" ON tour_timeline_events
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM tour_assignments
+      WHERE tour_assignments.tour_id = tour_timeline_events.tour_id
+      AND tour_assignments.technician_id = auth.uid()
+    )
+    OR is_admin_or_management()
+  );
+
+-- =============================================================================
+-- TOUR_TRAVEL_SEGMENTS (2 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "tour_travel_segments_select" ON tour_travel_segments;
+DROP POLICY IF EXISTS "tour_travel_segments_management" ON tour_travel_segments;
+
+CREATE POLICY "tour_travel_segments_management" ON tour_travel_segments
+  FOR ALL USING (is_admin_or_management())
+  WITH CHECK (is_admin_or_management());
+
+CREATE POLICY "tour_travel_segments_select" ON tour_travel_segments
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM tour_assignments
+      WHERE tour_assignments.tour_id = tour_travel_segments.tour_id
+      AND tour_assignments.technician_id = auth.uid()
+    )
+    OR is_admin_or_management()
+  );
+
+-- =============================================================================
+-- TOURS (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "management_update_tour_rates_approval" ON tours;
+
+CREATE POLICY "management_update_tour_rates_approval" ON tours
+  FOR UPDATE USING (is_admin_or_management())
+  WITH CHECK (is_admin_or_management());
+
+-- =============================================================================
+-- VACATION_REQUESTS (5 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "Management can manage department requests" ON vacation_requests;
+DROP POLICY IF EXISTS "House techs can create vacation requests" ON vacation_requests;
+DROP POLICY IF EXISTS "House techs can update their own pending requests" ON vacation_requests;
+DROP POLICY IF EXISTS "Management can view department requests" ON vacation_requests;
+DROP POLICY IF EXISTS "Users can view their own vacation requests" ON vacation_requests;
+
+CREATE POLICY "Users can view their own vacation requests" ON vacation_requests
+  FOR SELECT USING (technician_id = auth.uid());
+
+CREATE POLICY "House techs can create vacation requests" ON vacation_requests
+  FOR INSERT WITH CHECK (
+    current_user_role() IN ('technician', 'house_tech', 'admin', 'management')
+  );
+
+CREATE POLICY "House techs can update their own pending requests" ON vacation_requests
+  FOR UPDATE USING (
+    technician_id = auth.uid() AND status::text = 'pending'
+  )
+  WITH CHECK (
+    current_user_role() IN ('technician', 'house_tech', 'admin', 'management')
+  );
+
+-- Management department check needs to query profiles to get technician's department
+CREATE POLICY "Management can view department requests" ON vacation_requests
+  FOR SELECT USING (
+    current_user_role() = 'management'
+    AND EXISTS (
+      SELECT 1 FROM profiles tech_profile
+      WHERE tech_profile.id = vacation_requests.technician_id
+      AND tech_profile.department = current_user_department()
+    )
+  );
+
+CREATE POLICY "Management can manage department requests" ON vacation_requests
+  FOR ALL USING (
+    current_user_role() = 'management'
+    AND EXISTS (
+      SELECT 1 FROM profiles tech_profile
+      WHERE tech_profile.id = vacation_requests.technician_id
+      AND tech_profile.department = current_user_department()
+    )
+  )
+  WITH CHECK (
+    current_user_role() IN ('technician', 'house_tech', 'admin', 'management')
+  );
+
+-- =============================================================================
+-- VENUES (3 policies)
+-- =============================================================================
+DROP POLICY IF EXISTS "venues_delete_management" ON venues;
+DROP POLICY IF EXISTS "venues_update_authorized" ON venues;
+DROP POLICY IF EXISTS "venues_insert_authorized" ON venues;
+
+CREATE POLICY "venues_delete_management" ON venues
+  FOR DELETE USING (is_admin_or_management());
+
+CREATE POLICY "venues_update_authorized" ON venues
+  FOR UPDATE USING (
+    current_user_role() IN ('admin', 'management', 'house_tech', 'technician', 'logistics')
+  )
+  WITH CHECK (
+    current_user_role() IN ('admin', 'management', 'house_tech', 'technician', 'logistics')
+  );
+
+CREATE POLICY "venues_insert_authorized" ON venues
+  FOR INSERT WITH CHECK (
+    current_user_role() IN ('admin', 'management', 'house_tech', 'technician', 'logistics')
+  );
+
+-- =============================================================================
+-- VIDEO_JOB_PERSONNEL (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Department personnel can manage video personnel" ON video_job_personnel;
+
+CREATE POLICY "Department personnel can manage video personnel" ON video_job_personnel
+  FOR ALL USING (
+    current_user_department() IN ('video', 'admin', 'management')
+  )
+  WITH CHECK (
+    current_user_role() IN ('admin', 'management', 'house_tech', 'technician', 'logistics')
+  );
+
+-- =============================================================================
+-- VIDEO_JOB_TASKS (1 policy)
+-- =============================================================================
+DROP POLICY IF EXISTS "Video personnel can manage video tasks" ON video_job_tasks;
+
+CREATE POLICY "Video personnel can manage video tasks" ON video_job_tasks
+  FOR ALL USING (
+    current_user_department() IN ('video', 'admin', 'management')
+  )
+  WITH CHECK (
+    current_user_role() IN ('admin', 'management', 'house_tech', 'technician', 'logistics')
+  );
+
+-- =============================================================================
+-- NOTE: Some complex policies are NOT updated here:
+-- - day_preset_assignments (JOINs presets table)
+-- - preset_items (JOINs presets table)
+-- - job_technician_payout_overrides (complex multi-table logic)
+-- - locations.house_tech_calendar_locations (JOINs multiple tables)
+-- - jobs.house_tech_calendar_jobs (already uses get_current_user_role)
+-- - jobs."House techs can view jobs" (complex JOIN)
+-- - job_assignments.house_tech_calendar_job_assignments (already uses get_current_user_role)
+-- - availability_schedules.house_tech_calendar_availability (already uses get_current_user_role)
+-- - sub_rentals policies (complex, have bugs in original)
+--
+-- These need individual attention or have been left as-is because they
+-- already use get_current_user_role() or have complex JOIN logic.
+-- =============================================================================

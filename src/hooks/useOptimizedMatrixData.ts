@@ -97,10 +97,7 @@ export const fetchMatrixTimesheetAssignments = async ({
   }
 
   // Leverage materialized view for staffing status/cost rollups per job
-  const staffingPromise = supabase
-    .from('v_job_staffing_summary')
-    .select('job_id, assigned_count, worked_count, total_cost_eur, approved_cost_eur')
-    .in('job_id', jobIds);
+  const staffingPromise = supabase.rpc('get_job_staffing_summary', { p_job_ids: jobIds });
 
   // Batch job_assignments query to avoid URL length limits
   const assignmentBatchSize = 100;
