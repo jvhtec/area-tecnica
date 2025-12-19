@@ -8317,7 +8317,7 @@ export type Database = {
         Args: never
         Returns: {
           assignable_as_tech: boolean
-          bg_color: string
+          bg_color: string | null
           department: string
           dni: string
           email: string
