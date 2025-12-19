@@ -18,12 +18,12 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
       // First, find all jobs that span this date
       const sod = startOfDay(date).toISOString()
       const eod = endOfDay(date).toISOString()
+      const dayRange = `[${sod},${eod}]`
       const { data: jobs, error: jobsError } = await supabase
         .from('jobs')
         .select('id')
         // Jobs that overlap with this calendar day
-        .lte('start_time', eod)
-        .gte('end_time', sod)
+        .filter('time_range', 'ov', dayRange)
 
       if (jobsError) {
         console.warn('⚠️ jobs lookup error:', jobsError)

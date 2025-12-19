@@ -1327,6 +1327,7 @@ function WallboardDisplay({
       const weekEndISO = weekEnd.toISOString();
       const calendarStartISO = calendarGridStart.toISOString();
       const calendarEndISO = calendarGridEnd.toISOString();
+      const calendarRange = `[${calendarStartISO},${calendarEndISO}]`;
       const weekStartMs = todayStart.getTime();
       const weekEndMs = weekEnd.getTime();
       const calendarStartMs = calendarGridStart.getTime();
@@ -1349,8 +1350,7 @@ function WallboardDisplay({
         .select('id,title,start_time,end_time,status,location_id,job_type,tour_id,timezone,color')
         .in('job_type', ['single', 'festival', 'tourdate', 'dryhire', 'evento'])
         .in('status', ['Confirmado', 'Tentativa', 'Completado'])
-        .lte('start_time', calendarEndISO)
-        .gte('end_time', calendarStartISO)
+        .filter('time_range', 'ov', calendarRange)
         .order('start_time', { ascending: true });
       if (jobsError) console.error('Wallboard jobs query error:', jobsError?.message || jobsError, { calendarStartISO, calendarEndISO });
       let jobArr = jobs || [];

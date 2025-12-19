@@ -36,6 +36,7 @@ type MatrixJob = {
 };
 
 async function fetchJobsForWindow(start: Date, end: Date, department: string) {
+  const windowRange = `[${start.toISOString()},${end.toISOString()}]`;
   let query = supabase
     .from('jobs')
     .select(`
@@ -43,8 +44,7 @@ async function fetchJobsForWindow(start: Date, end: Date, department: string) {
       job_departments!inner(department),
       job_assignments!job_id(technician_id)
     `)
-    .lte('start_time', end.toISOString())
-    .gte('end_time', start.toISOString())
+    .filter('time_range', 'ov', windowRange)
     .in('job_type', ['single', 'festival', 'tourdate', 'evento'])
     .limit(500);
 
@@ -562,6 +562,7 @@ export default function JobAssignmentMatrix() {
     queryFn: async () => {
       const startDate = rangeInfo.start;
       const endDate = rangeInfo.end;
+      const windowRange = `[${startDate.toISOString()},${endDate.toISOString()}]`;
 
       // Use interval overlap logic to show all jobs that overlap with the visible date range
       // This ensures long-running jobs (e.g., multi-month tours) are visible even if they
@@ -575,8 +576,7 @@ export default function JobAssignmentMatrix() {
           job_departments!inner(department),
           job_assignments!job_id(technician_id)
         `)
-        .lte('start_time', endDate.toISOString())    // Job starts before range ends
-        .gte('end_time', startDate.toISOString())    // Job ends after range starts
+        .filter('time_range', 'ov', windowRange)
         .in('job_type', ['single', 'festival', 'tourdate', 'evento'])
         .limit(500); // Limit for performance
 
