@@ -4896,6 +4896,7 @@ export type Database = {
           last_name: string | null
           nickname: string | null
           phone: string | null
+          profile_picture_url: string | null
           residencia: string | null
           role: Database["public"]["Enums"]["user_role"]
           selected_job_statuses: string[] | null
@@ -4928,6 +4929,7 @@ export type Database = {
           last_name?: string | null
           nickname?: string | null
           phone?: string | null
+          profile_picture_url?: string | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           selected_job_statuses?: string[] | null
@@ -4960,6 +4962,7 @@ export type Database = {
           last_name?: string | null
           nickname?: string | null
           phone?: string | null
+          profile_picture_url?: string | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           selected_job_statuses?: string[] | null
@@ -8323,6 +8326,7 @@ export type Database = {
           last_name: string
           nickname: string
           phone: string
+          profile_picture_url: string | null
           role: Database["public"]["Enums"]["user_role"]
           skills: Json
         }[]
