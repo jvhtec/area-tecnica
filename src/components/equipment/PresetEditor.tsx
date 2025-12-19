@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { PresetWithItems, Equipment, PresetItem } from '@/types/equipment';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Save, X, Upload } from 'lucide-react';
+import { Save, X, Upload, Search } from 'lucide-react';
 import { PushPresetToFlexDialog } from './PushPresetToFlexDialog';
 import {
   Select,
@@ -33,6 +33,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
   const [name, setName] = useState(preset?.name || '');
   const [selectedTourId, setSelectedTourId] = useState<string | undefined | null>(fixedTourId ?? (preset as any)?.tour_id ?? undefined);
   const [showPushDialog, setShowPushDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     if (!preset?.items) return {};
     return preset.items.reduce((acc, item) => {
@@ -113,16 +114,30 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
       updated_at: new Date().toISOString()
     }));
 
+  // Filter by search query and sort: selected items (quantity > 0) first
+  const filteredAndSortedEquipment = equipmentList
+    ?.filter((equipment) =>
+      equipment.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      equipment.category?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aSelected = (quantities[a.id] || 0) > 0;
+      const bSelected = (quantities[b.id] || 0) > 0;
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
   return (
-    <Card className="w-full h-[600px] bg-white/80 backdrop-blur-sm">
-      <CardHeader>
+    <Card className="w-full h-[600px] bg-card/80 backdrop-blur-sm flex flex-col overflow-hidden">
+      <CardHeader className="flex-shrink-0">
         <CardTitle>
           {isCopy ? 'Copy Preset' : preset ? 'Edit Preset' : 'Create New Preset'}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div>
+      <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex flex-col h-full gap-4">
+          <div className="flex-shrink-0">
             <Label htmlFor="preset-name">Preset Name</Label>
             <Input
               id="preset-name"
@@ -133,7 +148,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
             />
           </div>
           {!fixedTourId && (
-            <div>
+            <div className="flex-shrink-0">
               <Label>Tour (optional)</Label>
               <Select
                 value={selectedTourId ?? 'no-tour'}
@@ -153,28 +168,43 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
               </Select>
             </div>
           )}
-          <ScrollArea className="h-[400px] pr-4">
-            <div className="space-y-4">
-              {equipmentList?.map((equipment) => (
-                <div key={equipment.id} className="flex items-center space-x-4">
-                  <div className="flex-1">
-                    <Label>{equipment.name}</Label>
-                    {equipment.category && (
-                      <p className="text-sm text-muted-foreground">{equipment.category}</p>
-                    )}
+          <div className="relative flex-shrink-0">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search equipment..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <ScrollArea className="flex-1 min-h-0 pr-4">
+            <div className="space-y-2">
+              {filteredAndSortedEquipment?.map((equipment) => {
+                const isSelected = (quantities[equipment.id] || 0) > 0;
+                return (
+                  <div
+                    key={equipment.id}
+                    className={`flex items-center space-x-4 p-2 rounded-md ${isSelected ? 'bg-primary/10' : ''}`}
+                  >
+                    <div className="flex-1">
+                      <Label>{equipment.name}</Label>
+                      {equipment.category && (
+                        <p className="text-sm text-muted-foreground">{equipment.category}</p>
+                      )}
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={quantities[equipment.id] || 0}
+                      onChange={(e) => handleQuantityChange(equipment.id, e.target.value)}
+                      className="w-24"
+                    />
                   </div>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={quantities[equipment.id] || 0}
-                    onChange={(e) => handleQuantityChange(equipment.id, e.target.value)}
-                    className="w-24"
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
           </ScrollArea>
-          <div className="flex gap-2 pt-4">
+          <div className="flex gap-2 pt-2 flex-shrink-0">
             <Button variant="outline" onClick={onCancel} className="flex-shrink-0">
               <X className="mr-2 h-4 w-4" />
               Cancel
