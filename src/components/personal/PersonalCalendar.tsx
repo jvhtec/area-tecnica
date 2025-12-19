@@ -21,6 +21,7 @@ import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 import { PersonalCalendarPrintDialog } from "./PersonalCalendarPrintDialog";
 import { generatePersonalCalendarPDF, generatePersonalCalendarXLS } from "@/utils/personalCalendarPdfExport";
+import { useMadridHolidays } from "@/hooks/useMadridHolidays";
 
 interface PersonalCalendarProps {
   date: Date;
@@ -67,6 +68,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     getAvailabilityStatus,
     isLoading: isAvailabilityLoading
   } = useTechnicianAvailability(currentMonth);
+  const { isWorkingDay, getHolidayName, holidays, loading: holidaysLoading } = useMadridHolidays();
 
   console.log('PersonalCalendar: Render state', {
     isLoading,
@@ -143,6 +145,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
       getAvailabilityStatus,
       currentDate: currentMonth,
       selectedDepartments: printDepartments.length > 0 ? printDepartments : undefined,
+      madridHolidays: holidays,
     });
     setShowPrintDialog(false);
   };
@@ -154,6 +157,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
       getAvailabilityStatus,
       currentDate: currentMonth,
       selectedDepartments: printDepartments.length > 0 ? printDepartments : undefined,
+      madridHolidays: holidays,
     });
     setShowPrintDialog(false);
   };
@@ -162,6 +166,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   const getPersonnelSummary = () => {
     const targetDate = selectedDate;
     const targetAssignments = getAssignmentsForDate(targetDate);
+    const isMadridWorkingDay = isWorkingDay(targetDate);
 
     const departmentSummary = houseTechs.reduce((acc, tech) => {
       const dept = tech.department || 'Unknown';
@@ -171,7 +176,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
           assignedAndAvailable: 0, // Assigned and not unavailable
           assignedButUnavailable: 0, // Assigned but unavailable
           unavailable: 0, // Total unavailable (assigned or not)
-          availableAndNotInWarehouse: 0, // Available and no assignment
+          availableAndNotInWarehouse: 0, // Available and no assignment (only on working days)
         };
       }
       acc[dept].total++;
@@ -193,7 +198,8 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
           acc[dept].assignedButUnavailable++;
         }
       } else { // No assignment
-        if (!isUnavailable) {
+        // Only count as "in warehouse" on Madrid working days (not holidays/weekends)
+        if (!isUnavailable && isMadridWorkingDay) {
           acc[dept].availableAndNotInWarehouse++;
         }
         // If no assignment and unavailable, they are just counted in unavailable
@@ -237,6 +243,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   const getPersonnelTotals = () => {
     const targetDate = selectedDate;
     const targetAssignments = getAssignmentsForDate(targetDate);
+    const isMadridWorkingDay = isWorkingDay(targetDate);
 
     let techsInWarehouse = 0;
     let techsOnJobs = 0;
@@ -255,8 +262,9 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
       // Count warehouse overrides explicitly
       if (availabilityStatus === 'warehouse') {
         techsInWarehouse++;
-      } else if (!hasAssignment && !isUnavailable) {
+      } else if (!hasAssignment && !isUnavailable && isMadridWorkingDay) {
         // Default warehouse (available but not assigned)
+        // ONLY count on Madrid working days (not holidays/weekends)
         techsInWarehouse++;
       }
 
@@ -352,7 +360,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     );
   };
 
-  if (isLoading || isAvailabilityLoading) {
+  if (isLoading || isAvailabilityLoading || holidaysLoading) {
     return (
       <Card className="h-full flex flex-col">
         <CardContent className="flex-grow p-4 flex items-center justify-center">
@@ -524,6 +532,8 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                   const weekend = isWeekend(day);
                   const today = isToday(day);
                   const isSelected = isSameDay(day, selectedDate);
+                  const isMadridWorkingDay = isWorkingDay(day);
+                  const holidayName = getHolidayName(day);
 
                   return (
                     <div
@@ -531,19 +541,36 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                       className={cn(
                         "p-2 min-h-[140px] border-t relative cursor-pointer hover:bg-accent/50 transition-colors",
                         weekend ? "bg-slate-50 dark:bg-slate-800/50" : "bg-background",
+                        !isMadridWorkingDay && isCurrentMonth && "bg-amber-50/50 dark:bg-amber-900/10",
                         today && "ring-2 ring-primary ring-inset",
                         isSelected && "bg-accent/30",
                         !isCurrentMonth && "text-muted-foreground/50"
                       )}
                       onClick={() => handleDateClick(day)}
                     >
-                      <span className={cn(
-                        "text-sm font-medium",
-                        today && "text-primary font-bold",
-                        isSelected && "text-primary"
-                      )}>
-                        {format(day, "d")}
-                      </span>
+                      <div className="flex items-start justify-between">
+                        <span className={cn(
+                          "text-sm font-medium",
+                          today && "text-primary font-bold",
+                          isSelected && "text-primary"
+                        )}>
+                          {format(day, "d")}
+                        </span>
+                        {!isMadridWorkingDay && isCurrentMonth && (
+                          <span
+                            className="text-xs text-amber-600 dark:text-amber-500"
+                            title={holidayName || "Non-working day (weekend)"}
+                          >
+                            🏖️
+                          </span>
+                        )}
+                      </div>
+
+                      {holidayName && isCurrentMonth && (
+                        <div className="text-[10px] text-amber-700 dark:text-amber-400 font-medium truncate" title={holidayName}>
+                          {holidayName}
+                        </div>
+                      )}
 
                       {/* House tech badges - now in rows */}
                       <div className="mt-1">

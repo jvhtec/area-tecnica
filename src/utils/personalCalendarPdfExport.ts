@@ -15,6 +15,8 @@ import {
   isSameDay,
   parse,
 } from "date-fns";
+import type { MadridHoliday } from "./madridCalendar";
+import { isMadridWorkingDaySync, getMadridHolidayName } from "./madridCalendar";
 
 interface HouseTech {
   id: string;
@@ -42,6 +44,7 @@ interface PersonalCalendarExportData {
   getAvailabilityStatus: (techId: string, date: Date) => string | null;
   currentDate: Date;
   selectedDepartments?: string[];
+  madridHolidays?: MadridHoliday[];
 }
 
 const getTechnicianName = (tech: HouseTech): string => {
@@ -154,7 +157,7 @@ export const generatePersonalCalendarPDF = async (
   range: "month" | "quarter" | "year",
   data: PersonalCalendarExportData
 ) => {
-  const { houseTechs, assignments, getAvailabilityStatus, currentDate, selectedDepartments } = data;
+  const { houseTechs, assignments, getAvailabilityStatus, currentDate, selectedDepartments, madridHolidays = [] } = data;
 
   const doc = new jsPDF("landscape", "mm", [420, 297]); // A3 dimensions
 
@@ -347,6 +350,15 @@ export const generatePersonalCalendarPDF = async (
         doc.setFont("helvetica", "bold");
         doc.text(format(day, "d"), x + 2, currentY + 6);
 
+        // Show holiday indicator if it's a Madrid holiday
+        const holidayName = getMadridHolidayName(day, madridHolidays);
+        if (holidayName) {
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(180, 100, 0); // Amber color
+          doc.text("H", x + cellWidth - 8, currentY + 6);
+        }
+
         const dayTechsData = getTechsForDay(day);
 
         if (dayTechsData.length === 0) continue;
@@ -448,7 +460,7 @@ export const generatePersonalCalendarXLS = (
   range: "month" | "quarter" | "year",
   data: PersonalCalendarExportData
 ) => {
-  const { houseTechs, assignments, getAvailabilityStatus, currentDate, selectedDepartments } = data;
+  const { houseTechs, assignments, getAvailabilityStatus, currentDate, selectedDepartments, madridHolidays = [] } = data;
 
   let startDate: Date, endDate: Date;
 
@@ -555,7 +567,11 @@ export const generatePersonalCalendarXLS = (
         const dayString = format(day, "d");
         const dayTechs = getTechsForDayXls(day);
 
-        weekRows[0][dayIndex] = isSameMonth(day, monthStart) ? dayString : format(day, "d");
+        // Add holiday indicator if it's a Madrid holiday
+        const holidayName = getMadridHolidayName(day, madridHolidays);
+        const dayDisplayString = holidayName ? `${dayString} 🏖️` : dayString;
+
+        weekRows[0][dayIndex] = isSameMonth(day, monthStart) ? dayDisplayString : format(day, "d");
 
         for (let i = 0; i < dayTechs.length; i++) {
           if (i + 1 < rowsPerDayCell) {

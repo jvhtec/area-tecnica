@@ -27,6 +27,7 @@ import { TechDetailModal } from "./TechDetailModal";
 import { Theme } from "@/components/technician/types";
 import { PersonalCalendarPrintDialog } from "./PersonalCalendarPrintDialog";
 import { generatePersonalCalendarPDF, generatePersonalCalendarXLS } from "@/utils/personalCalendarPdfExport";
+import { useMadridHolidays } from "@/hooks/useMadridHolidays";
 
 interface MobilePersonalCalendarProps {
   date: Date;
@@ -68,6 +69,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     getAvailabilityStatus,
     isLoading: isAvailabilityLoading
   } = useTechnicianAvailability(currentDate);
+  const { isWorkingDay, getHolidayName, holidays, loading: holidaysLoading } = useMadridHolidays();
 
   const getAssignmentsForDate = useCallback((targetDate: Date) => {
     return assignments.filter(assignment => {
@@ -129,6 +131,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
       getAvailabilityStatus,
       currentDate,
       selectedDepartments: printDepartments.length > 0 ? printDepartments : undefined,
+      madridHolidays: holidays,
     });
     setShowPrintDialog(false);
   };
@@ -140,6 +143,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
       getAvailabilityStatus,
       currentDate,
       selectedDepartments: printDepartments.length > 0 ? printDepartments : undefined,
+      madridHolidays: holidays,
     });
     setShowPrintDialog(false);
   };
@@ -187,6 +191,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   const getPersonnelSummary = () => {
     const targetDate = currentDate;
     const targetAssignments = getAssignmentsForDate(targetDate);
+    const isMadridWorkingDay = isWorkingDay(targetDate);
 
     const departmentSummary = houseTechs.reduce((acc, tech) => {
       const dept = tech.department || 'Desconocido';
@@ -222,7 +227,8 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
           acc[dept].assignedButUnavailable++;
         }
       } else {
-        if (!isUnavailable) {
+        // Only count as "in warehouse" on Madrid working days (not holidays/weekends)
+        if (!isUnavailable && isMadridWorkingDay) {
           acc[dept].availableAndNotInWarehouse++;
         }
       }
@@ -242,6 +248,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   const getPersonnelTotals = () => {
     const targetDate = currentDate;
     const targetAssignments = getAssignmentsForDate(targetDate);
+    const isMadridWorkingDay = isWorkingDay(targetDate);
 
     let techsInWarehouse = 0;
     let techsOnJobs = 0;
@@ -260,8 +267,9 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
       // Count warehouse overrides separately
       if (availabilityStatus === 'warehouse') {
         techsInWarehouse++;
-      } else if (!hasAssignment && !isUnavailable) {
+      } else if (!hasAssignment && !isUnavailable && isMadridWorkingDay) {
         // Default warehouse (available but not assigned)
+        // ONLY count on Madrid working days (not holidays/weekends)
         techsInWarehouse++;
       }
 
@@ -391,7 +399,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   });
 
 
-  if (isLoading || isAvailabilityLoading) {
+  if (isLoading || isAvailabilityLoading || holidaysLoading) {
     return (
       <Card className={`h-full flex flex-col ${theme.card}`}>
         <CardContent className="flex-grow p-4 flex items-center justify-center">
@@ -427,7 +435,17 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
             <div className={`flex items-center gap-2 text-sm font-semibold ${theme.textMain}`}>
               <Calendar className="h-4 w-4 text-blue-500" />
               <span className={cn("", isToday(currentDate) && "text-blue-500")}>{format(currentDate, "EEE, MMM d")}</span>
+              {!isWorkingDay(currentDate) && (
+                <span className="text-xs text-amber-600 dark:text-amber-500" title={getHolidayName(currentDate) || "Non-working day"}>
+                  🏖️
+                </span>
+              )}
             </div>
+            {getHolidayName(currentDate) && (
+              <p className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">
+                {getHolidayName(currentDate)}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={navigateToPrevious} aria-label="Día anterior" className={theme.textMain}>
