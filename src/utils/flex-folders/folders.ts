@@ -19,6 +19,22 @@ import {
 } from "./constants";
 
 /**
+ * Format date string for Flex API (ISO format with milliseconds)
+ * @param dateStr Date string to format
+ * @returns Formatted date string or undefined if invalid
+ */
+function formatDateForFlex(dateStr: string | undefined): string | undefined {
+  if (!dateStr) return undefined;
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return undefined;
+    return date.toISOString().split('.')[0] + '.000Z';
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Helper function to fetch selected departments for a job
  */
 async function getJobDepartments(jobId: string): Promise<string[]> {
@@ -162,18 +178,6 @@ const buildPullsheetTemplates = (
     sanitizedMetadata.forEach((entry, index) => {
       const defaultEntry = defaultEntries[index];
       const name = entry.name?.trim?.() || defaultEntry?.name || fallbackNameForIndex(index, defaultEntry);
-
-      // Format dates properly - convert to ISO format like working elements do
-      const formatDateForFlex = (dateStr: string | undefined): string | undefined => {
-        if (!dateStr) return undefined;
-        try {
-          const date = new Date(dateStr);
-          if (isNaN(date.getTime())) return undefined;
-          return date.toISOString().split('.')[0] + '.000Z';
-        } catch {
-          return undefined;
-        }
-      };
 
       const plannedStartDate =
         formatDateForFlex(entry.plannedStartDate) ||
@@ -415,6 +419,11 @@ export async function createAllFoldersForJob(
             console.log(`Persisted comercial presupuesto for ${extra.dept} with element_id: ${presupuestoResponse.elementId}`);
           } catch (err) {
             console.error(`Failed to persist comercial presupuesto for ${extra.dept}:`, err);
+            console.error(`Orphaned Flex folder created with element_id: ${presupuestoResponse.elementId}`);
+            throw new Error(
+              `Failed to persist comercial presupuesto for ${extra.dept} (element_id: ${presupuestoResponse.elementId}). ` +
+              `Flex folder was created but could not be recorded in database. Original error: ${err}`
+            );
           }
         }
       }
@@ -680,6 +689,11 @@ export async function createAllFoldersForJob(
           console.log(`Persisted hojaInfo for ${dept} with element_id: ${hojaInfoResponse.elementId}`);
         } catch (err) {
           console.error(`Failed to persist hojaInfo for ${dept}:`, err);
+          console.error(`Orphaned Flex folder created with element_id: ${hojaInfoResponse.elementId}`);
+          throw new Error(
+            `Failed to persist hojaInfo for ${dept} (element_id: ${hojaInfoResponse.elementId}). ` +
+            `Flex folder was created but could not be recorded in database. Original error: ${err}`
+          );
         }
       }
 
@@ -741,6 +755,11 @@ export async function createAllFoldersForJob(
             console.log(`Persisted ${sf.key} for ${dept} with element_id: ${subFolderResponse.elementId}`);
           } catch (err) {
             console.error(`Failed to persist ${sf.key} for ${dept}:`, err);
+            console.error(`Orphaned Flex folder created with element_id: ${subFolderResponse.elementId}`);
+            throw new Error(
+              `Failed to persist ${sf.key} for ${dept} (element_id: ${subFolderResponse.elementId}). ` +
+              `Flex folder was created but could not be recorded in database. Original error: ${err}`
+            );
           }
         }
       } else if (dept === "comercial") {
@@ -824,6 +843,11 @@ export async function createAllFoldersForJob(
               console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
             } catch (err) {
               console.error(`Failed to persist pullsheet ${template.name}:`, err);
+              console.error(`Orphaned Flex folder created with element_id: ${pullsheetResponse.elementId}`);
+              throw new Error(
+                `Failed to persist pullsheet ${template.name} (element_id: ${pullsheetResponse.elementId}). ` +
+                `Flex folder was created but could not be recorded in database. Original error: ${err}`
+              );
             }
           }
         }
@@ -1059,6 +1083,11 @@ export async function createAllFoldersForJob(
         console.log(`Persisted hojaInfo for ${dept} with element_id: ${hojaInfoResponse.elementId}`);
       } catch (err) {
         console.error(`Failed to persist hojaInfo for ${dept}:`, err);
+        console.error(`Orphaned Flex folder created with element_id: ${hojaInfoResponse.elementId}`);
+        throw new Error(
+          `Failed to persist hojaInfo for ${dept} (job_id: ${job.id}, element_id: ${hojaInfoResponse.elementId}). ` +
+          `Flex folder was created but could not be recorded in database. Original error: ${err}`
+        );
       }
     }
 
@@ -1133,6 +1162,11 @@ export async function createAllFoldersForJob(
             console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
           } catch (err) {
             console.error(`Failed to persist pullsheet ${template.name}:`, err);
+            console.error(`Orphaned Flex folder created with element_id: ${pullsheetResponse.elementId}`);
+            throw new Error(
+              `Failed to persist pullsheet ${template.name} (element_id: ${pullsheetResponse.elementId}). ` +
+              `Flex folder was created but could not be recorded in database. Original error: ${err}`
+            );
           }
         }
       }
@@ -1197,6 +1231,11 @@ export async function createAllFoldersForJob(
           console.log(`Persisted ${sf.key} for ${dept} with element_id: ${created.elementId}`);
         } catch (err) {
           console.error(`Failed to persist ${sf.key} for ${dept}:`, err);
+          console.error(`Orphaned Flex folder created with element_id: ${created.elementId}`);
+          throw new Error(
+            `Failed to persist ${sf.key} for ${dept} (element_id: ${created.elementId}). ` +
+            `Flex folder was created but could not be recorded in database. Original error: ${err}`
+          );
         }
       }
     } else if (dept === "comercial") {
@@ -1302,6 +1341,11 @@ export async function createAllFoldersForJob(
             console.log(`Persisted gastos de personal with element_id: ${created.elementId}`);
           } catch (err) {
             console.error("Failed to persist gastos de personal:", err);
+            console.error(`Orphaned Flex folder created with element_id: ${created.elementId}`);
+            throw new Error(
+              `Failed to persist gastos de personal (element_id: ${created.elementId}). ` +
+              `Flex folder was created but could not be recorded in database. Original error: ${err}`
+            );
           }
         }
       }
