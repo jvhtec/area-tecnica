@@ -16,7 +16,7 @@ import {
   parse,
 } from "date-fns";
 import type { MadridHoliday } from "./madridCalendar";
-import { getMadridHolidayName } from "./madridCalendar";
+import { getMadridHolidayName, isMadridWorkingDaySync } from "./madridCalendar";
 
 interface HouseTech {
   id: string;
@@ -132,7 +132,8 @@ const shouldShowTechOnDay = (
   day: Date,
   dayAssignments: Assignment[],
   getAvailabilityStatus: (techId: string, date: Date) => string | null,
-  selectedDepartments?: string[]
+  selectedDepartments?: string[],
+  madridHolidays?: MadridHoliday[]
 ): boolean => {
   // If departments are selected, only show techs from those departments
   if (selectedDepartments && selectedDepartments.length > 0) {
@@ -146,7 +147,12 @@ const shouldShowTechOnDay = (
   );
   const availabilityStatus = getAvailabilityStatus(tech.id, day);
 
-  if (isWeekend(day) && !hasAssignment && !availabilityStatus) {
+  // If it's a non-working day (weekend or holiday) and no assignment and not marked unavailable, don't show
+  const isMadridWorkingDay = madridHolidays
+    ? isMadridWorkingDaySync(day, madridHolidays)
+    : !isWeekend(day); // Fallback to weekend check if holidays not provided
+
+  if (!isMadridWorkingDay && !hasAssignment && !availabilityStatus) {
     return false;
   }
 
@@ -216,7 +222,7 @@ export const generatePersonalCalendarPDF = async (
   const getTechsForDay = (day: Date) => {
     const dayAssignments = getAssignmentsForDate(day, assignments);
     const visibleTechs = houseTechs.filter((tech) =>
-      shouldShowTechOnDay(tech, day, dayAssignments, getAvailabilityStatus, selectedDepartments)
+      shouldShowTechOnDay(tech, day, dayAssignments, getAvailabilityStatus, selectedDepartments, madridHolidays)
     );
 
     // Group by department
@@ -487,7 +493,7 @@ export const generatePersonalCalendarXLS = (
   const getTechsForDayXls = (day: Date) => {
     const dayAssignments = getAssignmentsForDate(day, assignments);
     const visibleTechs = houseTechs.filter((tech) =>
-      shouldShowTechOnDay(tech, day, dayAssignments, getAvailabilityStatus, selectedDepartments)
+      shouldShowTechOnDay(tech, day, dayAssignments, getAvailabilityStatus, selectedDepartments, madridHolidays)
     );
 
     const soundTechs = visibleTechs.filter(

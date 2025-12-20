@@ -165,8 +165,8 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     );
     const availabilityStatus = getAvailabilityStatus(tech.id, day);
 
-    // If it's a weekend and no assignment and not marked unavailable, don't show
-    if (isWeekend(day) && !hasAssignment && !availabilityStatus) {
+    // If it's a non-working day (weekend or holiday) and no assignment and not marked unavailable, don't show
+    if (!isWorkingDay(day) && !hasAssignment && !availabilityStatus) {
       return false;
     }
 
