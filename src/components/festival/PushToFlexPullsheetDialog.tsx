@@ -50,10 +50,16 @@ export function PushToFlexPullsheetDialog({
       return;
     }
 
+    let isMounted = true;
+
     const loadPullsheets = async () => {
       setIsLoadingPullsheets(true);
       try {
         const pullsheets = await getJobPullsheetsWithFlexApi(jobId);
+
+        // Only update state if component is still mounted and context hasn't changed
+        if (!isMounted) return;
+
         setAvailablePullsheets(pullsheets);
 
         // Auto-select if only one pullsheet available
@@ -69,6 +75,8 @@ export function PushToFlexPullsheetDialog({
           setInputMode('url');
         }
       } catch (error) {
+        if (!isMounted) return;
+
         console.error('Failed to load pullsheets:', error);
         toast({
           title: 'Error',
@@ -76,11 +84,18 @@ export function PushToFlexPullsheetDialog({
           variant: 'destructive',
         });
       } finally {
-        setIsLoadingPullsheets(false);
+        if (isMounted) {
+          setIsLoadingPullsheets(false);
+        }
       }
     };
 
     loadPullsheets();
+
+    // Cleanup function to prevent stale state updates
+    return () => {
+      isMounted = false;
+    };
   }, [open, jobId, toast]);
 
   // Handle pullsheet selection

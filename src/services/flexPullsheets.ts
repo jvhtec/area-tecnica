@@ -261,22 +261,38 @@ export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPul
       return dbPullsheets;
     }
 
-    // Fetch Flex tree
+    // Fetch Flex tree with timeout
     const token = await getFlexAuthToken();
-    const response = await fetch(
-      `${FLEX_API_BASE_URL}/element/${mainFolder.element_id}/tree`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Auth-Token': token,
-          'apikey': token,
-        },
-      }
-    );
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-    if (!response.ok) {
-      console.warn('[FlexPullsheets] Failed to fetch Flex tree, returning DB results only');
+    try {
+      const response = await fetch(
+        `${FLEX_API_BASE_URL}/element/${mainFolder.element_id}/tree`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Auth-Token': token,
+            'apikey': token,
+          },
+          signal: controller.signal,
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn('[FlexPullsheets] Failed to fetch Flex tree, returning DB results only');
+        return dbPullsheets;
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.warn('[FlexPullsheets] Flex API request timed out, returning DB results only');
+      } else {
+        console.warn('[FlexPullsheets] Flex API request failed, returning DB results only:', fetchError);
+      }
       return dbPullsheets;
     }
 
