@@ -211,7 +211,7 @@ export interface JobPullsheet {
 /**
  * Query pullsheets for a specific job
  * @param jobId The job ID to query pullsheets for
- * @returns Array of pullsheet records with their element IDs
+ * @returns Array of pullsheet records with their element IDs (limited to 100 most recent)
  */
 export async function getJobPullsheets(jobId: string): Promise<JobPullsheet[]> {
   const { data, error } = await supabase
@@ -220,7 +220,8 @@ export async function getJobPullsheets(jobId: string): Promise<JobPullsheet[]> {
     .eq('job_id', jobId)
     .eq('folder_type', 'pull_sheet')
     .order('department', { ascending: true })
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .limit(100);
 
   if (error) {
     console.error('[FlexPullsheets] Failed to query pullsheets:', error);

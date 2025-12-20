@@ -347,6 +347,11 @@ export async function createAllFoldersForJob(
           console.log(`Persisted comercial extras folder for ${extra.dept} with element_id: ${extrasFolderElementId}`);
         } catch (err) {
           console.error(`Failed to persist comercial extras folder for ${extra.dept}:`, err);
+          console.error(`Orphaned Flex folder created with element_id: ${extrasFolderElementId}`);
+          throw new Error(
+            `Failed to persist comercial extras folder for ${extra.dept} (element_id: ${extrasFolderElementId}). ` +
+            `Flex folder was created but could not be recorded in database. Original error: ${err}`
+          );
         }
 
         // If extras folder was created, presupuestos go inside it

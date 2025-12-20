@@ -243,7 +243,22 @@ const prepareOptionsForSubmit = (
     }
   }
 
-  return hasAny ? result : undefined;
+  // If nothing is selected, return explicit empty selections for all departments
+  // This prevents createAllFoldersForJob from treating undefined as "create everything"
+  if (!hasAny) {
+    const emptyResult: CreateFoldersOptions = {};
+    for (const [dept] of Object.entries(options) as [
+      DepartmentKey,
+      DepartmentSelectionOptions,
+    ][]) {
+      if (hasItems(dept)) {
+        emptyResult[dept] = { subfolders: [] };
+      }
+    }
+    return emptyResult;
+  }
+
+  return result;
 };
 
 export const getFlexFolderDefaultSelection: DepartmentDefaultSelector = dept =>
