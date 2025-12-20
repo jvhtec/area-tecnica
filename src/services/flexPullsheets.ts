@@ -213,6 +213,26 @@ export interface JobPullsheet {
 // Pullsheet definition ID from Flex API
 const PULLSHEET_DEFINITION_ID = 'a220432c-af33-11df-b8d5-00e08175e43e';
 
+// Maximum recursion depth to prevent stack overflow
+const MAX_TREE_DEPTH = 50;
+
+// Interface for Flex API tree nodes
+interface FlexTreeNode {
+  elementId?: string;
+  nodeId?: string;
+  id?: string;
+  definitionId?: string;
+  elementDefinitionId?: string;
+  displayName?: string;
+  name?: string;
+  createdAt?: string;
+  created_at?: string;
+  dateCreated?: string;
+  date_created?: string;
+  children?: FlexTreeNode[];
+  [key: string]: unknown;
+}
+
 /**
  * Query pullsheets for a specific job from database only
  * @param jobId The job ID to query pullsheets for
@@ -253,7 +273,6 @@ export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPul
       .select('element_id')
       .eq('job_id', jobId)
       .or('folder_type.eq.main_event,folder_type.eq.main')
-      .limit(1)
       .single();
 
     if (mainFolderError || !mainFolder?.element_id) {
@@ -305,9 +324,6 @@ export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPul
       return dbPullsheets;
     }
 
-    // Log the tree structure for debugging
-    console.log('[FlexPullsheets] Flex tree data:', treeData);
-
     // Extract pullsheets from tree (recursively search for nodes with pullsheet definitionId)
     const flexPullsheets = extractPullsheetsFromTree(treeData);
 
@@ -327,15 +343,19 @@ export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPul
 /**
  * Recursively extract pullsheet nodes from Flex API tree response
  */
-function extractPullsheetsFromTree(node: any, depth: number = 0): JobPullsheet[] {
+function extractPullsheetsFromTree(node: FlexTreeNode | FlexTreeNode[], depth: number = 0): JobPullsheet[] {
+  // Depth protection to prevent stack overflow
+  if (depth > MAX_TREE_DEPTH) {
+    console.warn(`[FlexPullsheets] Max tree depth (${MAX_TREE_DEPTH}) exceeded, stopping recursion`);
+    return [];
+  }
+
   if (!node) {
-    console.log(`[FlexPullsheets] extractPullsheetsFromTree: node is null/undefined at depth ${depth}`);
     return [];
   }
 
   // If node is an array, process each element
   if (Array.isArray(node)) {
-    console.log(`[FlexPullsheets] extractPullsheetsFromTree: processing array of ${node.length} nodes at depth ${depth}`);
     const results: JobPullsheet[] = [];
     for (const item of node) {
       results.push(...extractPullsheetsFromTree(item, depth));
@@ -349,17 +369,6 @@ function extractPullsheetsFromTree(node: any, depth: number = 0): JobPullsheet[]
   const elementId = node.elementId || node.nodeId || node.id;
   const definitionId = node.definitionId || node.elementDefinitionId;
   const displayName = node.displayName || node.name;
-
-  // Log node for debugging (only first few levels to avoid spam)
-  if (depth < 3) {
-    console.log(`[FlexPullsheets] Checking node at depth ${depth}:`, {
-      elementId,
-      definitionId,
-      displayName,
-      expectedDefinitionId: PULLSHEET_DEFINITION_ID,
-      matches: definitionId === PULLSHEET_DEFINITION_ID
-    });
-  }
 
   if (elementId && definitionId === PULLSHEET_DEFINITION_ID) {
     // Try to extract creation date from various possible fields
@@ -380,13 +389,11 @@ function extractPullsheetsFromTree(node: any, depth: number = 0): JobPullsheet[]
       source: 'flex_api',
     };
 
-    console.log(`[FlexPullsheets] Found pullsheet from Flex API:`, pullsheet);
     results.push(pullsheet);
   }
 
   // Recursively search children
   if (Array.isArray(node.children)) {
-    console.log(`[FlexPullsheets] Processing ${node.children.length} children at depth ${depth}`);
     for (const child of node.children) {
       results.push(...extractPullsheetsFromTree(child, depth + 1));
     }

@@ -434,7 +434,7 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
                             {' '}
                             <span className="text-xs text-muted-foreground">
                               {ps.source === 'flex_api' && '(from Flex) '}
-                              ({new Date(ps.created_at).toLocaleDateString()})
+                              ({ps.source === 'flex_api' && ps.created_at === '2000-01-01T00:00:00.000Z' ? 'Unknown' : new Date(ps.created_at).toLocaleDateString()})
                             </span>
                           </SelectItem>
                         ))}
