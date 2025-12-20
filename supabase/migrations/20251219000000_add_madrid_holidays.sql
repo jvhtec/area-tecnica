@@ -1,5 +1,5 @@
--- Create table for Comunidad de Madrid regional holidays
--- This table stores official non-working days for the Comunidad de Madrid
+-- Create table for Spanish national and Comunidad de Madrid regional holidays
+-- This table stores official non-working days (both national and Madrid regional)
 -- Used to determine when house techs are NOT expected at the warehouse
 
 CREATE TABLE IF NOT EXISTS madrid_holidays (
@@ -44,7 +44,7 @@ CREATE POLICY "Admins and management can manage Madrid holidays"
     )
   );
 
--- Insert 2025 Comunidad de Madrid holidays
+-- Insert 2025 Spanish national and Madrid regional holidays
 INSERT INTO madrid_holidays (date, name, year) VALUES
   ('2025-01-01', 'Año Nuevo', 2025),
   ('2025-01-06', 'Epifanía del Señor (Reyes)', 2025),
@@ -52,6 +52,7 @@ INSERT INTO madrid_holidays (date, name, year) VALUES
   ('2025-04-18', 'Viernes Santo', 2025),
   ('2025-05-01', 'Fiesta del Trabajo', 2025),
   ('2025-05-02', 'Fiesta de la Comunidad de Madrid', 2025),
+  ('2025-05-15', 'San Isidro (Patrón de Madrid)', 2025),
   ('2025-07-25', 'Santiago Apóstol', 2025),
   ('2025-08-15', 'Asunción de la Virgen', 2025),
   ('2025-10-12', 'Fiesta Nacional de España', 2025),
@@ -61,7 +62,7 @@ INSERT INTO madrid_holidays (date, name, year) VALUES
   ('2025-12-25', 'Natividad del Señor (Navidad)', 2025)
 ON CONFLICT (date) DO NOTHING;
 
--- Insert 2026 Comunidad de Madrid holidays
+-- Insert 2026 Spanish national and Madrid regional holidays
 INSERT INTO madrid_holidays (date, name, year) VALUES
   ('2026-01-01', 'Año Nuevo', 2026),
   ('2026-01-06', 'Epifanía del Señor (Reyes)', 2026),
@@ -69,6 +70,7 @@ INSERT INTO madrid_holidays (date, name, year) VALUES
   ('2026-04-03', 'Viernes Santo', 2026),
   ('2026-05-01', 'Fiesta del Trabajo', 2026),
   ('2026-05-02', 'Fiesta de la Comunidad de Madrid', 2026),
+  ('2026-05-15', 'San Isidro (Patrón de Madrid)', 2026),
   ('2026-07-25', 'Santiago Apóstol', 2026),
   ('2026-08-15', 'Asunción de la Virgen', 2026),
   ('2026-10-12', 'Fiesta Nacional de España', 2026),
@@ -131,6 +133,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
-COMMENT ON TABLE madrid_holidays IS 'Official non-working days for Comunidad de Madrid. Used to determine warehouse working days for house techs.';
-COMMENT ON FUNCTION is_madrid_working_day IS 'Returns true if the given date is a working day in Madrid (not weekend, not holiday)';
-COMMENT ON FUNCTION get_madrid_holidays IS 'Returns all active Madrid holidays, optionally filtered by year';
+COMMENT ON TABLE madrid_holidays IS 'Official non-working days including Spanish national holidays and Comunidad de Madrid regional holidays (e.g., San Isidro). Used to determine warehouse working days for house techs.';
+COMMENT ON FUNCTION is_madrid_working_day IS 'Returns true if the given date is a working day in Madrid (not weekend, not national/regional holiday)';
+COMMENT ON FUNCTION get_madrid_holidays IS 'Returns all active national and Madrid regional holidays, optionally filtered by year';
