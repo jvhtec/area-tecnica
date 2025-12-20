@@ -206,10 +206,15 @@ export interface JobPullsheet {
   element_id: string;
   department: string | null;
   created_at: string;
+  display_name?: string;
+  source?: 'database' | 'flex_api';
 }
 
+// Pullsheet definition ID from Flex API
+const PULLSHEET_DEFINITION_ID = 'a220432c-af33-11df-b8d5-00e08175e43e';
+
 /**
- * Query pullsheets for a specific job
+ * Query pullsheets for a specific job from database only
  * @param jobId The job ID to query pullsheets for
  * @returns Array of pullsheet records with their element IDs (limited to 100 most recent)
  */
@@ -228,5 +233,100 @@ export async function getJobPullsheets(jobId: string): Promise<JobPullsheet[]> {
     throw new Error(`Failed to query pullsheets: ${error.message}`);
   }
 
-  return data || [];
+  return (data || []).map(ps => ({ ...ps, source: 'database' as const }));
+}
+
+/**
+ * Query pullsheets for a specific job from both database and Flex API
+ * This captures pullsheets created before tracking was implemented or created in parallel
+ * @param jobId The job ID to query pullsheets for
+ * @returns Array of pullsheet records merged from DB and Flex API, deduplicated by element_id
+ */
+export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPullsheet[]> {
+  // Get pullsheets from database
+  const dbPullsheets = await getJobPullsheets(jobId);
+
+  try {
+    // Get main element ID for this job
+    const { data: mainFolder, error: mainFolderError } = await supabase
+      .from('flex_folders')
+      .select('element_id')
+      .eq('job_id', jobId)
+      .or('folder_type.eq.main_event,folder_type.eq.main')
+      .limit(1)
+      .single();
+
+    if (mainFolderError || !mainFolder?.element_id) {
+      console.warn('[FlexPullsheets] No main folder found for job, returning DB results only:', mainFolderError);
+      return dbPullsheets;
+    }
+
+    // Fetch Flex tree
+    const token = await getFlexAuthToken();
+    const response = await fetch(
+      `${FLEX_API_BASE_URL}/element/${mainFolder.element_id}/tree`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Auth-Token': token,
+          'apikey': token,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.warn('[FlexPullsheets] Failed to fetch Flex tree, returning DB results only');
+      return dbPullsheets;
+    }
+
+    const treeData = await response.json();
+
+    // Extract pullsheets from tree (recursively search for nodes with pullsheet definitionId)
+    const flexPullsheets = extractPullsheetsFromTree(treeData);
+
+    // Merge and deduplicate
+    const dbElementIds = new Set(dbPullsheets.map(ps => ps.element_id));
+    const uniqueFlexPullsheets = flexPullsheets.filter(ps => !dbElementIds.has(ps.element_id));
+
+    console.log(`[FlexPullsheets] Found ${dbPullsheets.length} from DB, ${uniqueFlexPullsheets.length} new from Flex API`);
+
+    return [...dbPullsheets, ...uniqueFlexPullsheets];
+  } catch (error) {
+    console.warn('[FlexPullsheets] Error fetching from Flex API, returning DB results only:', error);
+    return dbPullsheets;
+  }
+}
+
+/**
+ * Recursively extract pullsheet nodes from Flex API tree response
+ */
+function extractPullsheetsFromTree(node: any): JobPullsheet[] {
+  if (!node) return [];
+
+  const results: JobPullsheet[] = [];
+
+  // Check if current node is a pullsheet
+  const elementId = node.elementId || node.nodeId || node.id;
+  const definitionId = node.definitionId || node.elementDefinitionId;
+
+  if (elementId && definitionId === PULLSHEET_DEFINITION_ID) {
+    results.push({
+      id: elementId, // Use element_id as id for consistency
+      element_id: elementId,
+      department: null, // We don't have department info from Flex tree
+      created_at: new Date().toISOString(), // Placeholder - we don't have creation date from tree
+      display_name: node.displayName || node.name,
+      source: 'flex_api',
+    });
+  }
+
+  // Recursively search children
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      results.push(...extractPullsheetsFromTree(child));
+    }
+  }
+
+  return results;
 }

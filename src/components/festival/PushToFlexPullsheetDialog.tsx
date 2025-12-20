@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle2, XCircle, AlertTriangle, Upload } from 'lucide-react';
 import { GearSetupFormData } from '@/types/festival-gear';
 import { extractFlexElementId, isFlexUrl } from '@/utils/flexUrlParser';
-import { pushEquipmentToPullsheet, EquipmentItem, getJobPullsheets, JobPullsheet } from '@/services/flexPullsheets';
+import { pushEquipmentToPullsheet, EquipmentItem, getJobPullsheetsWithFlexApi, JobPullsheet } from '@/services/flexPullsheets';
 import { supabase } from '@/lib/supabase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -53,7 +53,7 @@ export function PushToFlexPullsheetDialog({
     const loadPullsheets = async () => {
       setIsLoadingPullsheets(true);
       try {
-        const pullsheets = await getJobPullsheets(jobId);
+        const pullsheets = await getJobPullsheetsWithFlexApi(jobId);
         setAvailablePullsheets(pullsheets);
 
         // Auto-select if only one pullsheet available
@@ -330,9 +330,10 @@ export function PushToFlexPullsheetDialog({
                     <SelectContent>
                       {availablePullsheets.map((ps) => (
                         <SelectItem key={ps.id} value={ps.element_id}>
-                          {ps.department ? `${ps.department.charAt(0).toUpperCase() + ps.department.slice(1)} Pullsheet` : 'Pullsheet'}
+                          {ps.display_name || (ps.department ? `${ps.department.charAt(0).toUpperCase() + ps.department.slice(1)} Pullsheet` : 'Pullsheet')}
                           {' '}
                           <span className="text-xs text-muted-foreground">
+                            {ps.source === 'flex_api' && '(from Flex) '}
                             ({new Date(ps.created_at).toLocaleDateString()})
                           </span>
                         </SelectItem>
