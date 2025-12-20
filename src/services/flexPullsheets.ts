@@ -266,6 +266,7 @@ export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPul
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
+    let treeData;
     try {
       const response = await fetch(
         `${FLEX_API_BASE_URL}/element/${mainFolder.element_id}/tree`,
@@ -286,6 +287,14 @@ export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPul
         console.warn('[FlexPullsheets] Failed to fetch Flex tree, returning DB results only');
         return dbPullsheets;
       }
+
+      // Parse JSON inside try-catch to handle parsing errors
+      try {
+        treeData = await response.json();
+      } catch (jsonError) {
+        console.warn('[FlexPullsheets] Failed to parse Flex tree JSON, returning DB results only:', jsonError);
+        return dbPullsheets;
+      }
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
@@ -296,7 +305,8 @@ export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPul
       return dbPullsheets;
     }
 
-    const treeData = await response.json();
+    // Log the tree structure for debugging
+    console.log('[FlexPullsheets] Flex tree data:', treeData);
 
     // Extract pullsheets from tree (recursively search for nodes with pullsheet definitionId)
     const flexPullsheets = extractPullsheetsFromTree(treeData);
@@ -317,30 +327,68 @@ export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPul
 /**
  * Recursively extract pullsheet nodes from Flex API tree response
  */
-function extractPullsheetsFromTree(node: any): JobPullsheet[] {
-  if (!node) return [];
+function extractPullsheetsFromTree(node: any, depth: number = 0): JobPullsheet[] {
+  if (!node) {
+    console.log(`[FlexPullsheets] extractPullsheetsFromTree: node is null/undefined at depth ${depth}`);
+    return [];
+  }
+
+  // If node is an array, process each element
+  if (Array.isArray(node)) {
+    console.log(`[FlexPullsheets] extractPullsheetsFromTree: processing array of ${node.length} nodes at depth ${depth}`);
+    const results: JobPullsheet[] = [];
+    for (const item of node) {
+      results.push(...extractPullsheetsFromTree(item, depth));
+    }
+    return results;
+  }
 
   const results: JobPullsheet[] = [];
 
   // Check if current node is a pullsheet
   const elementId = node.elementId || node.nodeId || node.id;
   const definitionId = node.definitionId || node.elementDefinitionId;
+  const displayName = node.displayName || node.name;
+
+  // Log node for debugging (only first few levels to avoid spam)
+  if (depth < 3) {
+    console.log(`[FlexPullsheets] Checking node at depth ${depth}:`, {
+      elementId,
+      definitionId,
+      displayName,
+      expectedDefinitionId: PULLSHEET_DEFINITION_ID,
+      matches: definitionId === PULLSHEET_DEFINITION_ID
+    });
+  }
 
   if (elementId && definitionId === PULLSHEET_DEFINITION_ID) {
-    results.push({
-      id: elementId, // Use element_id as id for consistency
+    // Try to extract creation date from various possible fields
+    const createdAt =
+      node.createdAt ||
+      node.created_at ||
+      node.dateCreated ||
+      node.date_created ||
+      // Fallback to a far past date so Flex API items sort before DB items
+      '2000-01-01T00:00:00.000Z';
+
+    const pullsheet: JobPullsheet = {
+      id: elementId,
       element_id: elementId,
       department: null, // We don't have department info from Flex tree
-      created_at: new Date().toISOString(), // Placeholder - we don't have creation date from tree
-      display_name: node.displayName || node.name,
+      created_at: createdAt,
+      display_name: displayName,
       source: 'flex_api',
-    });
+    };
+
+    console.log(`[FlexPullsheets] Found pullsheet from Flex API:`, pullsheet);
+    results.push(pullsheet);
   }
 
   // Recursively search children
   if (Array.isArray(node.children)) {
+    console.log(`[FlexPullsheets] Processing ${node.children.length} children at depth ${depth}`);
     for (const child of node.children) {
-      results.push(...extractPullsheetsFromTree(child));
+      results.push(...extractPullsheetsFromTree(child, depth + 1));
     }
   }
 
