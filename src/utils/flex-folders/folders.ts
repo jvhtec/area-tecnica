@@ -705,7 +705,21 @@ export async function createAllFoldersForJob(
               personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
             };
 
-            await createFlexFolder(pullsheetPayload);
+            const pullsheetResponse = await createFlexFolder(pullsheetPayload);
+
+            // Persist pullsheet element ID to database
+            try {
+              await supabase.from("flex_folders").insert({
+                job_id: job.id,
+                parent_id: childRow.id,
+                element_id: pullsheetResponse.elementId,
+                department: dept,
+                folder_type: "pull_sheet",
+              });
+              console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
+            } catch (err) {
+              console.error(`Failed to persist pullsheet ${template.name}:`, err);
+            }
           }
         }
       }
@@ -978,7 +992,22 @@ export async function createAllFoldersForJob(
             personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
           };
 
-          await createFlexFolder(pullsheetPayload);
+          const pullsheetResponse = await createFlexFolder(pullsheetPayload);
+
+          // Persist pullsheet element ID to database
+          const parentFolderRow = existingDepartmentMap.get(dept);
+          try {
+            await supabase.from("flex_folders").insert({
+              job_id: job.id,
+              parent_id: parentFolderRow?.id ?? null,
+              element_id: pullsheetResponse.elementId,
+              department: dept,
+              folder_type: "pull_sheet",
+            });
+            console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
+          } catch (err) {
+            console.error(`Failed to persist pullsheet ${template.name}:`, err);
+          }
         }
       }
     }
