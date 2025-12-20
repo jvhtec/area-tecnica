@@ -15,6 +15,8 @@ import {
   isSameDay,
   parse,
 } from "date-fns";
+import type { MadridHoliday } from "./madridCalendar";
+import { getMadridHolidayName, isMadridWorkingDaySync } from "./madridCalendar";
 
 interface HouseTech {
   id: string;
@@ -42,6 +44,7 @@ interface PersonalCalendarExportData {
   getAvailabilityStatus: (techId: string, date: Date) => string | null;
   currentDate: Date;
   selectedDepartments?: string[];
+  madridHolidays?: MadridHoliday[];
 }
 
 const getTechnicianName = (tech: HouseTech): string => {
@@ -129,7 +132,8 @@ const shouldShowTechOnDay = (
   day: Date,
   dayAssignments: Assignment[],
   getAvailabilityStatus: (techId: string, date: Date) => string | null,
-  selectedDepartments?: string[]
+  selectedDepartments?: string[],
+  madridHolidays?: MadridHoliday[]
 ): boolean => {
   // If departments are selected, only show techs from those departments
   if (selectedDepartments && selectedDepartments.length > 0) {
@@ -143,7 +147,12 @@ const shouldShowTechOnDay = (
   );
   const availabilityStatus = getAvailabilityStatus(tech.id, day);
 
-  if (isWeekend(day) && !hasAssignment && !availabilityStatus) {
+  // If it's a non-working day (weekend or holiday) and no assignment and not marked unavailable, don't show
+  const isMadridWorkingDay = madridHolidays
+    ? isMadridWorkingDaySync(day, madridHolidays)
+    : !isWeekend(day); // Fallback to weekend check if holidays not provided
+
+  if (!isMadridWorkingDay && !hasAssignment && !availabilityStatus) {
     return false;
   }
 
@@ -154,7 +163,7 @@ export const generatePersonalCalendarPDF = async (
   range: "month" | "quarter" | "year",
   data: PersonalCalendarExportData
 ) => {
-  const { houseTechs, assignments, getAvailabilityStatus, currentDate, selectedDepartments } = data;
+  const { houseTechs, assignments, getAvailabilityStatus, currentDate, selectedDepartments, madridHolidays = [] } = data;
 
   const doc = new jsPDF("landscape", "mm", [420, 297]); // A3 dimensions
 
@@ -213,7 +222,7 @@ export const generatePersonalCalendarPDF = async (
   const getTechsForDay = (day: Date) => {
     const dayAssignments = getAssignmentsForDate(day, assignments);
     const visibleTechs = houseTechs.filter((tech) =>
-      shouldShowTechOnDay(tech, day, dayAssignments, getAvailabilityStatus, selectedDepartments)
+      shouldShowTechOnDay(tech, day, dayAssignments, getAvailabilityStatus, selectedDepartments, madridHolidays)
     );
 
     // Group by department
@@ -347,6 +356,15 @@ export const generatePersonalCalendarPDF = async (
         doc.setFont("helvetica", "bold");
         doc.text(format(day, "d"), x + 2, currentY + 6);
 
+        // Show holiday indicator if it's a Madrid holiday
+        const holidayName = getMadridHolidayName(day, madridHolidays);
+        if (holidayName) {
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(180, 100, 0); // Amber color
+          doc.text("H", x + cellWidth - 8, currentY + 6);
+        }
+
         const dayTechsData = getTechsForDay(day);
 
         if (dayTechsData.length === 0) continue;
@@ -448,7 +466,7 @@ export const generatePersonalCalendarXLS = (
   range: "month" | "quarter" | "year",
   data: PersonalCalendarExportData
 ) => {
-  const { houseTechs, assignments, getAvailabilityStatus, currentDate, selectedDepartments } = data;
+  const { houseTechs, assignments, getAvailabilityStatus, currentDate, selectedDepartments, madridHolidays = [] } = data;
 
   let startDate: Date, endDate: Date;
 
@@ -475,7 +493,7 @@ export const generatePersonalCalendarXLS = (
   const getTechsForDayXls = (day: Date) => {
     const dayAssignments = getAssignmentsForDate(day, assignments);
     const visibleTechs = houseTechs.filter((tech) =>
-      shouldShowTechOnDay(tech, day, dayAssignments, getAvailabilityStatus, selectedDepartments)
+      shouldShowTechOnDay(tech, day, dayAssignments, getAvailabilityStatus, selectedDepartments, madridHolidays)
     );
 
     const soundTechs = visibleTechs.filter(
@@ -555,7 +573,11 @@ export const generatePersonalCalendarXLS = (
         const dayString = format(day, "d");
         const dayTechs = getTechsForDayXls(day);
 
-        weekRows[0][dayIndex] = isSameMonth(day, monthStart) ? dayString : format(day, "d");
+        // Add holiday indicator if it's a Madrid holiday
+        const holidayName = getMadridHolidayName(day, madridHolidays);
+        const dayDisplayString = holidayName ? `${dayString} 🏖️` : dayString;
+
+        weekRows[0][dayIndex] = isSameMonth(day, monthStart) ? dayDisplayString : format(day, "d");
 
         for (let i = 0; i < dayTechs.length; i++) {
           if (i + 1 < rowsPerDayCell) {
