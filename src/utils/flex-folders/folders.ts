@@ -162,10 +162,27 @@ const buildPullsheetTemplates = (
     sanitizedMetadata.forEach((entry, index) => {
       const defaultEntry = defaultEntries[index];
       const name = entry.name?.trim?.() || defaultEntry?.name || fallbackNameForIndex(index, defaultEntry);
+
+      // Format dates properly - convert to ISO format like working elements do
+      const formatDateForFlex = (dateStr: string | undefined): string | undefined => {
+        if (!dateStr) return undefined;
+        try {
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return undefined;
+          return date.toISOString().split('.')[0] + '.000Z';
+        } catch {
+          return undefined;
+        }
+      };
+
       const plannedStartDate =
-        entry.plannedStartDate || defaultEntry?.plannedStartDate || fallbackStartDate;
+        formatDateForFlex(entry.plannedStartDate) ||
+        formatDateForFlex(defaultEntry?.plannedStartDate) ||
+        fallbackStartDate;
       const plannedEndDate =
-        entry.plannedEndDate || defaultEntry?.plannedEndDate || fallbackEndDate;
+        formatDateForFlex(entry.plannedEndDate) ||
+        formatDateForFlex(defaultEntry?.plannedEndDate) ||
+        fallbackEndDate;
       const suffix = getUniqueSuffix(defaultEntry?.suffix);
 
       templates.push({ name, plannedStartDate, plannedEndDate, suffix });
@@ -279,11 +296,10 @@ export async function createAllFoldersForJob(
     const extrasJobTitle = jobTitle?.trim?.() || job?.title?.trim?.() || parentName;
 
     for (const extra of replacements) {
-      const shouldCreateExtrasFolder =
-        shouldCreateItem("comercial", extra.extrasKey, options) ||
-        shouldCreateItem("comercial", extra.presupuestoKey, options);
+      const shouldCreateExtras = shouldCreateItem("comercial", extra.extrasKey, options);
+      const shouldCreatePresupuesto = shouldCreateItem("comercial", extra.presupuestoKey, options);
 
-      if (!shouldCreateExtrasFolder) {
+      if (!shouldCreateExtras && !shouldCreatePresupuesto) {
         continue;
       }
 
@@ -300,18 +316,25 @@ export async function createAllFoldersForJob(
         personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept as Department],
       };
 
-      const extrasPayload = {
-        definitionId: FLEX_FOLDER_IDS.subFolder,
-        name: extrasBaseName,
-        ...sharedPayload,
-      };
+      let presupuestoParentId = parentElementId; // Default: create presupuesto directly in comercial folder
+      let presupuestoParentDbId: string | null = null;
 
-      const extrasFolder = await createFlexFolder(extrasPayload);
-      const extrasFolderElementId = extrasFolder.elementId;
+      // Create extras folder if requested
+      if (shouldCreateExtras) {
+        const extrasPayload = {
+          definitionId: FLEX_FOLDER_IDS.subFolder,
+          name: extrasBaseName,
+          ...sharedPayload,
+        };
 
-      if (!extrasFolderElementId) {
-        console.warn("Unable to resolve extras folder element id for", extrasPayload);
-      } else {
+        const extrasFolder = await createFlexFolder(extrasPayload);
+        const extrasFolderElementId = extrasFolder.elementId;
+
+        if (!extrasFolderElementId) {
+          console.warn("Unable to resolve extras folder element id for", extrasPayload);
+          continue;
+        }
+
         // Persist comercial extras folder
         try {
           await supabase.from("flex_folders").insert({
@@ -325,60 +348,69 @@ export async function createAllFoldersForJob(
         } catch (err) {
           console.error(`Failed to persist comercial extras folder for ${extra.dept}:`, err);
         }
+
+        // If extras folder was created, presupuestos go inside it
+        presupuestoParentId = extrasFolderElementId;
+        presupuestoParentDbId = extrasFolderElementId;
       }
 
-      if (!shouldCreateItem("comercial", extra.presupuestoKey, options) || !extrasFolderElementId) {
-        continue;
-      }
+      // Create presupuesto(s) if requested
+      if (shouldCreatePresupuesto) {
+        const presupuestoEntries = extrasMetadata.length > 0
+          ? extrasMetadata
+          : [
+              {
+                name: "",
+                plannedStartDate: formattedStartDate,
+                plannedEndDate: formattedEndDate,
+              },
+            ];
 
-      const presupuestoEntries = extrasMetadata.length > 0
-        ? extrasMetadata
-        : [
-            {
-              name: "",
-              plannedStartDate: formattedStartDate,
-              plannedEndDate: formattedEndDate,
-            },
-          ];
+        for (let index = 0; index < presupuestoEntries.length; index += 1) {
+          const entry = presupuestoEntries[index];
+          const trimmedName = entry?.name?.trim?.();
 
-      for (let index = 0; index < presupuestoEntries.length; index += 1) {
-        const entry = presupuestoEntries[index];
-        const trimmedName = entry?.name?.trim?.();
-        const childNameBase = trimmedName
-          ? `Extras ${extrasJobTitle} - ${trimmedName}`
-          : `${extrasBaseName} - Presupuesto${presupuestoEntries.length > 1 ? ` ${index + 1}` : ""}`;
+          // Name differs based on whether it's inside extras or standalone
+          const childNameBase = shouldCreateExtras
+            ? (trimmedName
+                ? `Extras ${extrasJobTitle} - ${trimmedName}`
+                : `${extrasBaseName} - Presupuesto${presupuestoEntries.length > 1 ? ` ${index + 1}` : ""}`)
+            : (trimmedName
+                ? `${extrasJobTitle} - ${extra.label} - ${trimmedName}`
+                : `${extrasJobTitle} - ${extra.label} - Presupuesto${presupuestoEntries.length > 1 ? ` ${index + 1}` : ""}`);
 
-        const childPayload = {
-          definitionId: FLEX_FOLDER_IDS.presupuesto,
-          parentElementId: extrasFolderElementId,
-          open: true,
-          locked: false,
-          name: childNameBase,
-          plannedStartDate: entry?.plannedStartDate || formattedStartDate,
-          plannedEndDate: entry?.plannedEndDate || formattedEndDate,
-          locationId: FLEX_FOLDER_IDS.location,
-          departmentId: DEPARTMENT_IDS[extra.dept as Department],
-          documentNumber:
-            presupuestoEntries.length > 1
-              ? `${sharedPayload.documentNumber}PR${String(index + 1).padStart(2, "0")}`
-              : sharedPayload.documentNumber,
-          personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept as Department],
-        };
+          const childPayload = {
+            definitionId: FLEX_FOLDER_IDS.presupuesto,
+            parentElementId: presupuestoParentId,
+            open: true,
+            locked: false,
+            name: childNameBase,
+            plannedStartDate: entry?.plannedStartDate || formattedStartDate,
+            plannedEndDate: entry?.plannedEndDate || formattedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            departmentId: DEPARTMENT_IDS[extra.dept as Department],
+            documentNumber:
+              presupuestoEntries.length > 1
+                ? `${sharedPayload.documentNumber}PR${String(index + 1).padStart(2, "0")}`
+                : sharedPayload.documentNumber,
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept as Department],
+          };
 
-        const presupuestoResponse = await createFlexFolder(childPayload);
+          const presupuestoResponse = await createFlexFolder(childPayload);
 
-        // Persist comercial presupuesto
-        try {
-          await supabase.from("flex_folders").insert({
-            job_id: job.id,
-            parent_id: extrasFolderElementId,
-            element_id: presupuestoResponse.elementId,
-            department: extra.dept,
-            folder_type: "comercial_presupuesto",
-          });
-          console.log(`Persisted comercial presupuesto for ${extra.dept} with element_id: ${presupuestoResponse.elementId}`);
-        } catch (err) {
-          console.error(`Failed to persist comercial presupuesto for ${extra.dept}:`, err);
+          // Persist comercial presupuesto
+          try {
+            await supabase.from("flex_folders").insert({
+              job_id: job.id,
+              parent_id: presupuestoParentDbId || parentElementId,
+              element_id: presupuestoResponse.elementId,
+              department: extra.dept,
+              folder_type: "comercial_presupuesto",
+            });
+            console.log(`Persisted comercial presupuesto for ${extra.dept} with element_id: ${presupuestoResponse.elementId}`);
+          } catch (err) {
+            console.error(`Failed to persist comercial presupuesto for ${extra.dept}:`, err);
+          }
         }
       }
     }
