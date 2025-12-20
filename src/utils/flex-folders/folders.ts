@@ -339,16 +339,33 @@ export async function createAllFoldersForJob(
           continue;
         }
 
-        // Persist comercial extras folder
+        // Persist comercial extras folder and capture DB row ID
         try {
-          await supabase.from("flex_folders").insert({
-            job_id: job.id,
-            parent_id: parentElementId,
-            element_id: extrasFolderElementId,
-            department: extra.dept,
-            folder_type: "comercial_extras",
-          });
-          console.log(`Persisted comercial extras folder for ${extra.dept} with element_id: ${extrasFolderElementId}`);
+          const { data: insertedRow, error: insertError } = await supabase
+            .from("flex_folders")
+            .insert({
+              job_id: job.id,
+              parent_id: parentElementId,
+              element_id: extrasFolderElementId,
+              department: extra.dept,
+              folder_type: "comercial_extras",
+            })
+            .select('id')
+            .single();
+
+          if (insertError) {
+            throw insertError;
+          }
+
+          if (!insertedRow?.id) {
+            throw new Error('Failed to retrieve inserted row ID');
+          }
+
+          console.log(`Persisted comercial extras folder for ${extra.dept} with element_id: ${extrasFolderElementId}, db_id: ${insertedRow.id}`);
+
+          // If extras folder was created, presupuestos go inside it
+          presupuestoParentId = extrasFolderElementId; // Element ID for Flex API
+          presupuestoParentDbId = insertedRow.id; // DB row ID for parent_id field
         } catch (err) {
           console.error(`Failed to persist comercial extras folder for ${extra.dept}:`, err);
           console.error(`Orphaned Flex folder created with element_id: ${extrasFolderElementId}`);
@@ -357,10 +374,6 @@ export async function createAllFoldersForJob(
             `Flex folder was created but could not be recorded in database. Original error: ${err}`
           );
         }
-
-        // If extras folder was created, presupuestos go inside it
-        presupuestoParentId = extrasFolderElementId;
-        presupuestoParentDbId = extrasFolderElementId;
       }
 
       // Create presupuesto(s) if requested
