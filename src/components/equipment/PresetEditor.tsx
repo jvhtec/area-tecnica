@@ -25,9 +25,10 @@ interface PresetEditorProps {
   onSave: (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[], tourId?: string | null) => void;
   onCancel: () => void;
   fixedTourId?: string; // If provided, hide Tour selection and force this value
+  jobId?: string; // If provided, enables pullsheet selection
 }
 
-export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTourId }: PresetEditorProps) => {
+export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTourId, jobId }: PresetEditorProps) => {
   const { session } = useOptimizedAuth();
   const { department } = useDepartment();
   const [name, setName] = useState(preset?.name || '');
@@ -230,6 +231,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
         onOpenChange={setShowPushDialog}
         presetItems={currentPresetItems}
         equipment={equipmentList || []}
+        jobId={jobId}
       />
     </Card>
   );
