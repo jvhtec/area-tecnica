@@ -68,7 +68,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     getAvailabilityStatus,
     isLoading: isAvailabilityLoading
   } = useTechnicianAvailability(currentMonth);
-  const { isWorkingDay, getHolidayName, holidays, loading: holidaysLoading } = useMadridHolidays();
+  const { isWorkingDay, getHolidayName, holidays, loading: holidaysLoading, error: holidaysError } = useMadridHolidays();
 
   console.log('PersonalCalendar: Render state', {
     isLoading,
@@ -359,6 +359,41 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
       </>
     );
   };
+
+  // Show error if Madrid holidays failed to load
+  if (holidaysError) {
+    return (
+      <Card className="h-full flex flex-col">
+        <CardContent className="flex-grow p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">{format(currentMonth, "MMMM yyyy")}</h2>
+            <div className="flex items-center space-x-2">
+              <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleNextMonth}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleTodayClick}>
+                Today
+              </Button>
+            </div>
+          </div>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+            <h3 className="text-amber-900 dark:text-amber-100 font-semibold mb-2">
+              Error loading Madrid holidays
+            </h3>
+            <p className="text-amber-800 dark:text-amber-200 text-sm mb-2">
+              {holidaysError.message}
+            </p>
+            <p className="text-amber-700 dark:text-amber-300 text-xs">
+              The calendar will display with limited holiday information (weekends only). Warehouse day counts may be inaccurate until holidays are loaded.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading || isAvailabilityLoading || holidaysLoading) {
     return (

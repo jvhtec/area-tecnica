@@ -69,7 +69,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     getAvailabilityStatus,
     isLoading: isAvailabilityLoading
   } = useTechnicianAvailability(currentDate);
-  const { isWorkingDay, getHolidayName, holidays, loading: holidaysLoading } = useMadridHolidays();
+  const { isWorkingDay, getHolidayName, holidays, loading: holidaysLoading, error: holidaysError } = useMadridHolidays();
 
   const getAssignmentsForDate = useCallback((targetDate: Date) => {
     return assignments.filter(assignment => {
@@ -399,6 +399,38 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   });
 
 
+  // Show error if Madrid holidays failed to load
+  if (holidaysError) {
+    return (
+      <Card className={`h-full flex flex-col ${theme.card}`}>
+        <CardContent className="flex-grow p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className={`text-xl font-semibold ${theme.textMain}`}>Personal Calendar</h2>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={navigateToPrevious} className={theme.textMain}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={navigateToNext} className={theme.textMain}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+            <h3 className="text-amber-900 dark:text-amber-100 font-semibold mb-2">
+              Error cargando festivos de Madrid
+            </h3>
+            <p className="text-amber-800 dark:text-amber-200 text-sm mb-2">
+              {holidaysError.message}
+            </p>
+            <p className="text-amber-700 dark:text-amber-300 text-xs">
+              El calendario se mostrará con información limitada de festivos (solo fines de semana). Los recuentos de almacén pueden ser inexactos hasta que se carguen los festivos.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (isLoading || isAvailabilityLoading || holidaysLoading) {
     return (
       <Card className={`h-full flex flex-col ${theme.card}`}>
@@ -432,20 +464,27 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-500">Fecha seleccionada</p>
-            <div className={`flex items-center gap-2 text-sm font-semibold ${theme.textMain}`}>
-              <Calendar className="h-4 w-4 text-blue-500" />
-              <span className={cn("", isToday(currentDate) && "text-blue-500")}>{format(currentDate, "EEE, MMM d")}</span>
-              {!isWorkingDay(currentDate) && (
-                <span className="text-xs text-amber-600 dark:text-amber-500" title={getHolidayName(currentDate) || "Non-working day"}>
-                  🏖️
-                </span>
-              )}
-            </div>
-            {getHolidayName(currentDate) && (
-              <p className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">
-                {getHolidayName(currentDate)}
-              </p>
-            )}
+            {(() => {
+              const holidayName = getHolidayName(currentDate);
+              return (
+                <>
+                  <div className={`flex items-center gap-2 text-sm font-semibold ${theme.textMain}`}>
+                    <Calendar className="h-4 w-4 text-blue-500" />
+                    <span className={cn("", isToday(currentDate) && "text-blue-500")}>{format(currentDate, "EEE, MMM d")}</span>
+                    {!isWorkingDay(currentDate) && (
+                      <span className="text-xs text-amber-600 dark:text-amber-500" title={holidayName || "Non-working day"}>
+                        🏖️
+                      </span>
+                    )}
+                  </div>
+                  {holidayName && (
+                    <p className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">
+                      {holidayName}
+                    </p>
+                  )}
+                </>
+              );
+            })()}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={navigateToPrevious} aria-label="Día anterior" className={theme.textMain}>

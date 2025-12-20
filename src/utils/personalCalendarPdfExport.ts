@@ -16,7 +16,7 @@ import {
   parse,
 } from "date-fns";
 import type { MadridHoliday } from "./madridCalendar";
-import { isMadridWorkingDaySync, getMadridHolidayName } from "./madridCalendar";
+import { getMadridHolidayName } from "./madridCalendar";
 
 interface HouseTech {
   id: string;

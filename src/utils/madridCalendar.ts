@@ -121,8 +121,9 @@ export function getMadridHolidayName(
   date: Date | string,
   holidays: MadridHoliday[]
 ): string | null {
-  // Format date as YYYY-MM-DD
-  const dateStr = typeof date === 'string' ? date : format(date, 'yyyy-MM-dd');
+  // Convert to Date object if string, then format to ensure consistent YYYY-MM-DD format
+  const dateObj = typeof date === 'string' ? parseISO(date) : date;
+  const dateStr = format(dateObj, 'yyyy-MM-dd');
 
   // Find the holiday
   const holiday = holidays.find(h => h.date === dateStr);
