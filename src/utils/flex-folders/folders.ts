@@ -311,6 +311,20 @@ export async function createAllFoldersForJob(
 
       if (!extrasFolderElementId) {
         console.warn("Unable to resolve extras folder element id for", extrasPayload);
+      } else {
+        // Persist comercial extras folder
+        try {
+          await supabase.from("flex_folders").insert({
+            job_id: job.id,
+            parent_id: parentElementId,
+            element_id: extrasFolderElementId,
+            department: extra.dept,
+            folder_type: "comercial_extras",
+          });
+          console.log(`Persisted comercial extras folder for ${extra.dept} with element_id: ${extrasFolderElementId}`);
+        } catch (err) {
+          console.error(`Failed to persist comercial extras folder for ${extra.dept}:`, err);
+        }
       }
 
       if (!shouldCreateItem("comercial", extra.presupuestoKey, options) || !extrasFolderElementId) {
@@ -351,7 +365,21 @@ export async function createAllFoldersForJob(
           personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept as Department],
         };
 
-        await createFlexFolder(childPayload);
+        const presupuestoResponse = await createFlexFolder(childPayload);
+
+        // Persist comercial presupuesto
+        try {
+          await supabase.from("flex_folders").insert({
+            job_id: job.id,
+            parent_id: extrasFolderElementId,
+            element_id: presupuestoResponse.elementId,
+            department: extra.dept,
+            folder_type: "comercial_presupuesto",
+          });
+          console.log(`Persisted comercial presupuesto for ${extra.dept} with element_id: ${presupuestoResponse.elementId}`);
+        } catch (err) {
+          console.error(`Failed to persist comercial presupuesto for ${extra.dept}:`, err);
+        }
       }
     }
   };
@@ -593,9 +621,29 @@ export async function createAllFoldersForJob(
           documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${hojaInfoSuffix}`,
           personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
         };
-        
+
         console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
-        await createFlexFolder(hojaInfoPayload);
+        const hojaInfoResponse = await createFlexFolder(hojaInfoPayload);
+
+        // Persist hojaInfo element ID
+        const hojaInfoFolderType = dept === "sound"
+          ? "hoja_info_sx"
+          : dept === "lights"
+            ? "hoja_info_lx"
+            : "hoja_info_vx";
+
+        try {
+          await supabase.from("flex_folders").insert({
+            job_id: job.id,
+            parent_id: childRow.id,
+            element_id: hojaInfoResponse.elementId,
+            department: dept,
+            folder_type: hojaInfoFolderType,
+          });
+          console.log(`Persisted hojaInfo for ${dept} with element_id: ${hojaInfoResponse.elementId}`);
+        } catch (err) {
+          console.error(`Failed to persist hojaInfo for ${dept}:`, err);
+        }
       }
 
       if (dept !== "personnel" && dept !== "comercial") {
@@ -636,7 +684,27 @@ export async function createAllFoldersForJob(
             personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
           };
 
-          await createFlexFolder(subPayload);
+          const subFolderResponse = await createFlexFolder(subPayload);
+
+          // Persist subfolder element ID
+          const folderTypeMap: Record<string, string> = {
+            documentacionTecnica: "doc_tecnica",
+            presupuestosRecibidos: "presupuestos_recibidos",
+            hojaGastos: "hoja_gastos",
+          };
+
+          try {
+            await supabase.from("flex_folders").insert({
+              job_id: job.id,
+              parent_id: childRow.id,
+              element_id: subFolderResponse.elementId,
+              department: dept,
+              folder_type: folderTypeMap[sf.key],
+            });
+            console.log(`Persisted ${sf.key} for ${dept} with element_id: ${subFolderResponse.elementId}`);
+          } catch (err) {
+            console.error(`Failed to persist ${sf.key} for ${dept}:`, err);
+          }
         }
       } else if (dept === "comercial") {
         await createComercialExtras(
@@ -931,9 +999,30 @@ export async function createAllFoldersForJob(
         documentNumber: `${documentNumber}${hojaInfoSuffix}`,
         personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
       };
-      
+
       console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
-      await createFlexFolder(hojaInfoPayload);
+      const hojaInfoResponse = await createFlexFolder(hojaInfoPayload);
+
+      // Persist hojaInfo element ID
+      const hojaInfoFolderType = dept === "sound"
+        ? "hoja_info_sx"
+        : dept === "lights"
+          ? "hoja_info_lx"
+          : "hoja_info_vx";
+
+      const parentFolderRow = existingDepartmentMap.get(dept);
+      try {
+        await supabase.from("flex_folders").insert({
+          job_id: job.id,
+          parent_id: parentFolderRow?.id ?? null,
+          element_id: hojaInfoResponse.elementId,
+          department: dept,
+          folder_type: hojaInfoFolderType,
+        });
+        console.log(`Persisted hojaInfo for ${dept} with element_id: ${hojaInfoResponse.elementId}`);
+      } catch (err) {
+        console.error(`Failed to persist hojaInfo for ${dept}:`, err);
+      }
     }
 
     if (["sound", "lights", "video"].includes(dept)) {
@@ -1052,21 +1141,25 @@ export async function createAllFoldersForJob(
 
         const created = await createFlexFolder(subPayload);
 
-        // Persist Documentación Técnica element for reliable lookups
-        if (sf.key === 'documentacionTecnica' && created?.elementId) {
-          try {
-            await supabase
-              .from('flex_folders')
-              .insert({
-                job_id: job.id,
-                parent_id: deptFolderId,
-                element_id: created.elementId,
-                folder_type: 'doc_tecnica',
-                department: dept,
-              });
-          } catch (persistErr) {
-            console.warn('[folders] Failed to persist doc_tecnica row', persistErr);
-          }
+        // Persist subfolder element ID
+        const folderTypeMap: Record<string, string> = {
+          documentacionTecnica: "doc_tecnica",
+          presupuestosRecibidos: "presupuestos_recibidos",
+          hojaGastos: "hoja_gastos",
+        };
+
+        const parentFolderRow = existingDepartmentMap.get(dept);
+        try {
+          await supabase.from("flex_folders").insert({
+            job_id: job.id,
+            parent_id: parentFolderRow?.id ?? null,
+            element_id: created.elementId,
+            department: dept,
+            folder_type: folderTypeMap[sf.key],
+          });
+          console.log(`Persisted ${sf.key} for ${dept} with element_id: ${created.elementId}`);
+        } catch (err) {
+          console.error(`Failed to persist ${sf.key} for ${dept}:`, err);
         }
       }
     } else if (dept === "comercial") {
@@ -1157,6 +1250,21 @@ export async function createAllFoldersForJob(
             }
           } catch (error) {
             console.error("Unexpected error inserting work order Flex folder:", error);
+          }
+        }
+        if (sf.key === "gastosDePersonal") {
+          const parentFolderRow = existingDepartmentMap.get(dept);
+          try {
+            await supabase.from("flex_folders").insert({
+              job_id: job.id,
+              parent_id: parentFolderRow?.id ?? null,
+              element_id: created.elementId,
+              department: dept,
+              folder_type: "hoja_gastos",
+            });
+            console.log(`Persisted gastos de personal with element_id: ${created.elementId}`);
+          } catch (err) {
+            console.error("Failed to persist gastos de personal:", err);
           }
         }
       }
