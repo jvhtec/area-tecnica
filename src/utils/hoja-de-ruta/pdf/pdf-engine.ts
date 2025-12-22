@@ -220,7 +220,12 @@ export class PDFEngine {
     
     // Generate filename
     const eventName = eventData.eventName || jobTitle || 'Evento';
-    const safeEventName = eventName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+    // Remove special characters but keep accents (which are common in Spanish names like "Ana Belén")
+    // or just sanitize strictly to ASCII if filesystem compatibility is the concern
+    const safeEventName = eventName.normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '_') || 'Evento';
+      
     const timestamp = new Date().toISOString().split('T')[0];
     const filename = `hoja_de_ruta_${safeEventName}_${timestamp}.pdf`;
 
