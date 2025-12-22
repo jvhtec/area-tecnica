@@ -91,6 +91,7 @@ export function JobCardNew({
   const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
   const [flexPickerOpen, setFlexPickerOpen] = useState(false);
   const [flexPickerOptions, setFlexPickerOptions] = useState<CreateFoldersOptions | undefined>(undefined);
+  const [flexPickerMode, setFlexPickerMode] = useState<'create' | 'add'>('create');
   // Collapsible sections (collapsed by default)
   const [docsCollapsed, setDocsCollapsed] = useState(true);
   const [ridersCollapsed, setRidersCollapsed] = useState(true);
@@ -567,26 +568,46 @@ export function JobCardNew({
     // For dryhire jobs, the structure is fixed — create directly without opening the picker
     if (job.job_type === 'dryhire') {
       console.log("JobCardNew: Dryhire detected — creating folders directly without picker", job.id);
-      void handleFlexPickerConfirm(undefined);
+      void handleFlexPickerConfirm(undefined, 'create');
       return;
     }
 
     if (actualFoldersExist) {
-      console.log("JobCardNew: Folders actually exist, preventing creation");
-      toast({
-        title: "Folders already created",
-        description: "Flex folders have already been created for this job.",
-        variant: "destructive"
-      });
+      console.log("JobCardNew: Folders already exist — opening picker in add mode", job.id);
+      setFlexPickerMode('add');
+      setFlexPickerOpen(true);
       return;
     }
 
     // Open the modal instead of creating immediately
     console.log("JobCardNew: Opening folder picker modal for job:", job.id);
+    setFlexPickerMode('create');
     setFlexPickerOpen(true);
   };
 
-  const handleFlexPickerConfirm = async (options?: CreateFoldersOptions) => {
+  const addFlexFoldersHandler = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (isCreatingFolders) {
+      console.log("JobCardNew: Folder creation already in progress");
+      return;
+    }
+
+    if (job.job_type === 'dryhire') {
+      console.log("JobCardNew: Dryhire detected — add mode not applicable", job.id);
+      return;
+    }
+
+    console.log("JobCardNew: Opening folder picker modal in add mode for job:", job.id);
+    setFlexPickerMode('add');
+    setFlexPickerOpen(true);
+  };
+
+  const handleFlexPickerConfirm = async (
+    options?: CreateFoldersOptions,
+    modeOverride?: 'create' | 'add'
+  ) => {
+    const mode = modeOverride ?? flexPickerMode;
     console.log("JobCardNew: Flex picker confirmed with options:", options);
     setFlexPickerOptions(options);
     setFlexPickerOpen(false);
@@ -594,21 +615,23 @@ export function JobCardNew({
     try {
       setIsCreatingFolders(true);
 
-      // Double-check folders don't exist
-      const { data: existingFolders } = await supabase
-        .from("flex_folders")
-        .select("id")
-        .eq("job_id", job.id)
-        .limit(1);
+      if (mode === 'create') {
+        // Double-check folders don't exist (create-only)
+        const { data: existingFolders } = await supabase
+          .from("flex_folders")
+          .select("id")
+          .eq("job_id", job.id)
+          .limit(1);
 
-      if (existingFolders && existingFolders.length > 0) {
-        console.log("JobCardNew: Found existing folders in final check:", existingFolders);
-        toast({
-          title: "Folders already exist",
-          description: "Flex folders have already been created for this job.",
-          variant: "destructive"
-        });
-        return;
+        if (existingFolders && existingFolders.length > 0) {
+          console.log("JobCardNew: Found existing folders in final check:", existingFolders);
+          toast({
+            title: "Folders already exist",
+            description: "Flex folders have already been created for this job.",
+            variant: "destructive"
+          });
+          return;
+        }
       }
 
       const startDate = new Date(job.start_time);
@@ -618,21 +641,23 @@ export function JobCardNew({
       const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
 
       toast({
-        title: "Creating folders...",
-        description: "Setting up Flex folder structure for this job."
+        title: mode === 'create' ? "Creating folders..." : "Adding folders...",
+        description:
+          mode === 'create'
+            ? "Setting up Flex folder structure for this job."
+            : "Creating the selected Flex folders."
       });
 
       // Pass options to the creation function
       await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber, options);
 
+      // Ensure the job is marked as having Flex folders (idempotent).
       const { error: updateError } = await supabase
         .from('jobs')
         .update({ flex_folders_created: true })
         .eq('id', job.id);
 
-      if (updateError) {
-        console.error("Error updating job record:", updateError);
-      }
+      if (updateError) console.error("Error updating job record:", updateError);
 
       // Broadcast push notification: Flex folders created for job
       try {
@@ -644,8 +669,11 @@ export function JobCardNew({
       }
 
       toast({
-        title: "Success!",
-        description: "Flex folders have been created successfully."
+        title: mode === 'create' ? "Success!" : "Updated!",
+        description:
+          mode === 'create'
+            ? "Flex folders have been created successfully."
+            : "Selected Flex folders have been added successfully."
       });
 
       await Promise.all([
@@ -974,6 +1002,7 @@ export function JobCardNew({
             onEditButtonClick={handleEditButtonClick}
             onDeleteClick={handleDeleteClick}
             onCreateFlexFolders={createFlexFoldersHandler}
+            onAddFlexFolders={addFlexFoldersHandler}
             onCreateLocalFolders={createLocalFoldersHandler}
             onFestivalArtistsClick={handleFestivalArtistsClick}
             onAssignmentDialogOpen={(e) => {

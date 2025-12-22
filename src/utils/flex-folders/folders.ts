@@ -122,8 +122,14 @@ function shouldCreateItem(
   key: SubfolderKey,
   options?: CreateFoldersOptions
 ): boolean {
-  if (!options || options[dept] === undefined) return true;
+  // Backwards-compatible default: if no options are provided, create everything.
+  if (!options) return true;
+
+  // If options are provided, treat missing departments as "not selected".
+  // This matches FlexFolderPicker semantics where users explicitly choose what to create.
   const selection = options[dept];
+  if (selection === undefined) return false;
+
   const { keys, hasExplicitSelection } = getSubfolderSelectionSummary(selection);
   if (!hasExplicitSelection) return true;
   return keys.includes(key);

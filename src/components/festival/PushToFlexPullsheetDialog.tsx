@@ -1,17 +1,18 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle2, XCircle, AlertTriangle, Upload } from 'lucide-react';
 import { GearSetupFormData } from '@/types/festival-gear';
-import { extractFlexElementId, isFlexUrl } from '@/utils/flexUrlParser';
+import { extractFlexElementId } from '@/utils/flexUrlParser';
 import { pushEquipmentToPullsheet, EquipmentItem, getJobPullsheetsWithFlexApi, JobPullsheet } from '@/services/flexPullsheets';
 import { supabase } from '@/lib/supabase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 
 interface PushToFlexPullsheetDialogProps {
   open: boolean;
@@ -25,13 +26,32 @@ interface EquipmentLookupResult {
   missing: string[];
 }
 
+type PaPresetOption = {
+  id: string;
+  name: string;
+  job_id: string | null;
+};
+
+type PresetEquipmentRow = {
+  id: string;
+  name: string;
+  category: string | null;
+  resource_id: string | null;
+};
+
+type PresetItemRow = {
+  quantity: number | null;
+  equipment: PresetEquipmentRow | PresetEquipmentRow[] | null;
+};
+
+const PA_PRESET_CATEGORIES = new Set(['speakers', 'amplificacion']);
+
 export function PushToFlexPullsheetDialog({
   open,
   onOpenChange,
   gearSetup,
   jobId,
 }: PushToFlexPullsheetDialogProps) {
-  const { toast } = useToast();
   const [pullsheetUrl, setPullsheetUrl] = useState('');
   const [isValidUrl, setIsValidUrl] = useState(false);
   const [elementId, setElementId] = useState<string | null>(null);
@@ -41,6 +61,11 @@ export function PushToFlexPullsheetDialog({
   const [availablePullsheets, setAvailablePullsheets] = useState<JobPullsheet[]>([]);
   const [selectedPullsheetId, setSelectedPullsheetId] = useState<string | null>(null);
   const [isLoadingPullsheets, setIsLoadingPullsheets] = useState(false);
+
+  const [includePaPreset, setIncludePaPreset] = useState(false);
+  const [paPresets, setPaPresets] = useState<PaPresetOption[]>([]);
+  const [selectedPaPresetId, setSelectedPaPresetId] = useState<string | null>(null);
+  const [isLoadingPaPresets, setIsLoadingPaPresets] = useState(false);
 
   // Load available pullsheets when dialog opens
   useEffect(() => {
@@ -96,7 +121,54 @@ export function PushToFlexPullsheetDialog({
     return () => {
       isMounted = false;
     };
-  }, [open, jobId, toast]);
+  }, [open, jobId]);
+
+  useEffect(() => {
+    if (!open || !jobId) {
+      setIncludePaPreset(false);
+      setPaPresets([]);
+      setSelectedPaPresetId(null);
+      setIsLoadingPaPresets(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadPaPresets = async () => {
+      setIsLoadingPaPresets(true);
+      try {
+        const { data, error } = await supabase
+          .from('presets')
+          .select('id, name, job_id')
+          .eq('department', 'sound')
+          .or(`job_id.eq.${jobId},job_id.is.null`)
+          .order('job_id', { ascending: false })
+          .order('name');
+
+        if (error) throw error;
+        if (!isMounted) return;
+        setPaPresets((data || []) as PaPresetOption[]);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to load PA presets:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load PA presets',
+          variant: 'destructive',
+        });
+      } finally {
+        if (isMounted) {
+          setIsLoadingPaPresets(false);
+        }
+      }
+    };
+
+    loadPaPresets();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, jobId]);
 
   // Handle pullsheet selection
   useEffect(() => {
@@ -239,10 +311,109 @@ export function PushToFlexPullsheetDialog({
     };
 
     lookupEquipment();
-  }, [open, allModelNames, gearSetup, toast]);
+  }, [open, allModelNames, gearSetup]);
+
+  const [paPresetLookup, setPaPresetLookup] = useState<EquipmentLookupResult | null>(null);
+  const [isLookingUpPaPreset, setIsLookingUpPaPreset] = useState(false);
+
+  useEffect(() => {
+    if (!open || !includePaPreset || !selectedPaPresetId) {
+      setPaPresetLookup(null);
+      setIsLookingUpPaPreset(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const lookupPaPreset = async () => {
+      setIsLookingUpPaPreset(true);
+      try {
+        const { data, error } = await supabase
+          .from('preset_items')
+          .select('quantity, equipment:equipment(id, name, category, resource_id)')
+          .eq('preset_id', selectedPaPresetId);
+
+        if (error) throw error;
+        if (!isMounted) return;
+
+        const foundByResource = new Map<string, EquipmentItem>();
+        const missing: string[] = [];
+
+        (data || []).forEach((row: PresetItemRow) => {
+          const equipmentRow = Array.isArray(row.equipment) ? row.equipment[0] : row.equipment;
+          if (!equipmentRow) return;
+
+          if (!equipmentRow.category || !PA_PRESET_CATEGORIES.has(equipmentRow.category)) return;
+
+          const qty = Number(row.quantity) || 0;
+          if (qty <= 0) return;
+
+          if (!equipmentRow.resource_id) {
+            missing.push(equipmentRow.name);
+            return;
+          }
+
+          const existing = foundByResource.get(equipmentRow.resource_id);
+          if (existing) {
+            existing.quantity += qty;
+            return;
+          }
+
+          foundByResource.set(equipmentRow.resource_id, {
+            resourceId: equipmentRow.resource_id,
+            quantity: qty,
+            name: equipmentRow.name,
+            category: equipmentRow.category,
+          });
+        });
+
+        setPaPresetLookup({
+          found: Array.from(foundByResource.values()),
+          missing,
+        });
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to lookup PA preset equipment:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to lookup preset equipment in database',
+          variant: 'destructive',
+        });
+      } finally {
+        if (isMounted) {
+          setIsLookingUpPaPreset(false);
+        }
+      }
+    };
+
+    lookupPaPreset();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, includePaPreset, selectedPaPresetId]);
+
+  const equipmentToPush = useMemo(() => {
+    const items = [
+      ...(equipmentLookup?.found || []),
+      ...(includePaPreset ? paPresetLookup?.found || [] : []),
+    ];
+
+    const merged = new Map<string, EquipmentItem>();
+    for (const item of items) {
+      const existing = merged.get(item.resourceId);
+      if (existing) {
+        existing.quantity += item.quantity;
+      } else {
+        merged.set(item.resourceId, { ...item });
+      }
+    }
+
+    return Array.from(merged.values());
+  }, [equipmentLookup, includePaPreset, paPresetLookup]);
 
   const handlePush = async () => {
-    if (!elementId || !equipmentLookup || equipmentLookup.found.length === 0) {
+    if (!elementId || equipmentToPush.length === 0) {
       return;
     }
 
@@ -250,7 +421,7 @@ export function PushToFlexPullsheetDialog({
     setPushResult(null);
 
     try {
-      const result = await pushEquipmentToPullsheet(elementId, equipmentLookup.found);
+      const result = await pushEquipmentToPullsheet(elementId, equipmentToPush);
       setPushResult(result);
 
       if (result.failed.length === 0) {
@@ -291,14 +462,16 @@ export function PushToFlexPullsheetDialog({
       setPushResult(null);
       setSelectedPullsheetId(null);
       setElementId(null);
+      setIncludePaPreset(false);
+      setSelectedPaPresetId(null);
+      setPaPresetLookup(null);
       onOpenChange(false);
     }
   };
 
   const canPush =
     elementId &&
-    equipmentLookup &&
-    equipmentLookup.found.length > 0 &&
+    equipmentToPush.length > 0 &&
     !isPushing &&
     (inputMode === 'select' ? !!selectedPullsheetId : isValidUrl);
 
@@ -313,6 +486,59 @@ export function PushToFlexPullsheetDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Optional PA preset */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="include-pa-preset">Include PA preset</Label>
+                <p className="text-xs text-muted-foreground">
+                  Adds speakers + amplificación items from a preset.
+                </p>
+              </div>
+              <Switch
+                id="include-pa-preset"
+                checked={includePaPreset}
+                onCheckedChange={(checked) => {
+                  setIncludePaPreset(checked);
+                  setSelectedPaPresetId(null);
+                  setPaPresetLookup(null);
+                }}
+                disabled={isPushing || isLoadingPaPresets}
+              />
+            </div>
+
+            {includePaPreset && (
+              <div className="space-y-2">
+                <Label htmlFor="pa-preset-select">PA preset</Label>
+                <Select
+                  value={selectedPaPresetId || ''}
+                  onValueChange={(value) => setSelectedPaPresetId(value)}
+                  disabled={isPushing || isLoadingPaPresets || paPresets.length === 0}
+                >
+                  <SelectTrigger id="pa-preset-select">
+                    <SelectValue
+                      placeholder={
+                        isLoadingPaPresets
+                          ? 'Loading presets...'
+                          : paPresets.length === 0
+                            ? 'No presets found'
+                            : 'Select a preset...'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paPresets.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                        {p.job_id === jobId ? ' (job)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
           {/* Pullsheet Selection */}
           <Tabs value={inputMode} onValueChange={(value) => setInputMode(value as 'select' | 'url')}>
             <TabsList className="grid w-full grid-cols-2">
@@ -385,37 +611,49 @@ export function PushToFlexPullsheetDialog({
           </Tabs>
 
           {/* Equipment Preview */}
-          {isLookingUp && (
+          {(isLookingUp || isLookingUpPaPreset) && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Looking up equipment...
             </div>
           )}
 
-          {equipmentLookup && !isLookingUp && (
+          {!isLookingUp && !isLookingUpPaPreset && (
             <div className="space-y-2">
-              {equipmentLookup.found.length > 0 && (
+              {equipmentToPush.length > 0 && (
                 <Alert>
                   <CheckCircle2 className="h-4 w-4" />
                   <AlertDescription>
-                    Ready to push {equipmentLookup.found.length} equipment items ({equipmentLookup.found.reduce((sum, e) => sum + e.quantity, 0)} total units)
+                    Ready to push {equipmentToPush.length} equipment items ({equipmentToPush.reduce((sum, e) => sum + e.quantity, 0)} total units)
                   </AlertDescription>
                 </Alert>
               )}
 
-              {equipmentLookup.missing.length > 0 && (
+              {(equipmentLookup?.missing?.length || 0) > 0 && (
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    {equipmentLookup.missing.length} items will be skipped (no Flex resource ID):
+                    {equipmentLookup!.missing.length} items will be skipped (no Flex resource ID):
                     <div className="mt-1 text-xs max-h-20 overflow-y-auto">
-                      {equipmentLookup.missing.join(', ')}
+                      {equipmentLookup!.missing.join(', ')}
                     </div>
                   </AlertDescription>
                 </Alert>
               )}
 
-              {equipmentLookup.found.length === 0 && (
+              {includePaPreset && selectedPaPresetId && (paPresetLookup?.missing?.length || 0) > 0 && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    {paPresetLookup!.missing.length} preset items will be skipped (no Flex resource ID):
+                    <div className="mt-1 text-xs max-h-20 overflow-y-auto">
+                      {paPresetLookup!.missing.join(', ')}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {equipmentToPush.length === 0 && (
                 <Alert variant="destructive">
                   <XCircle className="h-4 w-4" />
                   <AlertDescription>
@@ -465,7 +703,7 @@ export function PushToFlexPullsheetDialog({
             {isPushing ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Pushing {equipmentLookup?.found.length} items...
+                Pushing {equipmentToPush.length} items...
               </>
             ) : (
               <>

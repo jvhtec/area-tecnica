@@ -54,9 +54,10 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         )
         .in('job_type', ['single', 'festival', 'tourdate', 'evento'])
         .eq('job_departments.department', department)
-        // Include jobs overlapping this day
-        .lte('start_time', dayRange.end)
-        .gte('end_time', dayRange.start)
+        // Include jobs overlapping this day (handle end_time NULL)
+        .or(
+          `and(end_time.is.null,start_time.gte.${dayRange.start},start_time.lte.${dayRange.end}),and(end_time.gte.${dayRange.start},start_time.lte.${dayRange.end})`
+        )
         .order('start_time', { ascending: true });
 
       if (error) throw error;
@@ -238,6 +239,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         }}
         jobId={(editingPreset || copyingPreset)?.job_id ?? undefined}
         jobCandidates={jobCandidates}
+        allowedCategories={department === 'sound' ? ['speakers', 'amplificacion'] : undefined}
       />
     );
   }

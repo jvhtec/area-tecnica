@@ -92,12 +92,6 @@ export interface PushResult {
   failed: Array<{ name: string; error: string }>;
 }
 
-interface CategoryHeader {
-  name: string;
-  resourceId: string;
-  category: string;
-}
-
 export async function pushEquipmentToPullsheet(
   pullsheetElementId: string,
   equipment: EquipmentItem[]
@@ -147,8 +141,6 @@ export async function pushEquipmentToPullsheet(
   });
 
   // Track category line IDs for nesting
-  const categoryLineIds = new Map<string, string>();
-
   // Process each category
   for (const [category, items] of equipmentByCategory.entries()) {
     console.log(`[FlexPullsheets] Processing category: ${category} with ${items.length} items`);

@@ -103,8 +103,12 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
       queryClient.invalidateQueries({ queryKey: ['preset-assignments'] });
       toast({ title: 'Assigned', description: 'Preset assigned to job dates' });
     },
-    onError: (e: any) => {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to assign preset to job dates',
+        variant: 'destructive',
+      });
     }
   });
 
@@ -125,7 +129,12 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
       queryClient.invalidateQueries({ queryKey: ['presets', department] });
       toast({ title: 'Preset deleted' });
     },
-    onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    onError: (error) =>
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to delete preset',
+        variant: 'destructive',
+      })
   });
 
   const handleSavePreset = async (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[]) => {
@@ -187,8 +196,12 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
       setEditingPreset(null);
       setCopyingPreset(null);
       toast({ title: 'Preset saved and assigned to all job dates' });
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save preset',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -267,6 +280,7 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
               onSave={handleSavePreset}
               onCancel={() => { setIsCreating(false); setEditingPreset(null); setCopyingPreset(null); }}
               jobId={jobId}
+              allowedCategories={department === 'sound' ? ['speakers', 'amplificacion'] : undefined}
             />
           </DepartmentProvider>
         ) : (

@@ -27,14 +27,16 @@ interface PresetEditorProps {
   fixedTourId?: string; // If provided, hide Tour selection and force this value
   jobId?: string; // If provided, enables pullsheet selection
   jobCandidates?: Array<{ id: string; title: string; startTime?: string | null }>;
+  allowedCategories?: string[]; // When provided, defaults to showing these categories
 }
 
-export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTourId, jobId, jobCandidates }: PresetEditorProps) => {
+export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTourId, jobId, jobCandidates, allowedCategories }: PresetEditorProps) => {
   const { session } = useOptimizedAuth();
   const { department } = useDepartment();
   const [name, setName] = useState(preset?.name || '');
   const [selectedTourId, setSelectedTourId] = useState<string | undefined | null>(fixedTourId ?? preset?.tour_id ?? undefined);
   const [showPushDialog, setShowPushDialog] = useState(false);
+  const [showAllEquipment, setShowAllEquipment] = useState(() => !allowedCategories?.length);
   const [searchQuery, setSearchQuery] = useState('');
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     if (!preset?.items) return {};
@@ -116,12 +118,23 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
       updated_at: new Date().toISOString()
     }));
 
+  const shouldFilterCategories = Boolean(allowedCategories?.length && !showAllEquipment);
+
   // Filter by search query and sort: selected items (quantity > 0) first
   const filteredAndSortedEquipment = equipmentList
-    ?.filter((equipment) =>
-      equipment.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      equipment.category?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    ?.filter((equipment) => {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        equipment.name.toLowerCase().includes(query) ||
+        equipment.category?.toLowerCase().includes(query);
+
+      if (!matchesSearch) return false;
+      if (!shouldFilterCategories) return true;
+
+      const isAllowedCategory = equipment.category ? allowedCategories!.includes(equipment.category) : false;
+      const isSelected = (quantities[equipment.id] || 0) > 0;
+      return isAllowedCategory || isSelected;
+    })
     .sort((a, b) => {
       const aSelected = (quantities[a.id] || 0) > 0;
       const bSelected = (quantities[b.id] || 0) > 0;
@@ -171,13 +184,27 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
             </div>
           )}
           <div className="relative flex-shrink-0">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search equipment..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search equipment..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              {allowedCategories?.length ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowAllEquipment((prev) => !prev)}
+                  className="flex-shrink-0"
+                >
+                  {showAllEquipment ? 'PA only' : 'All'}
+                </Button>
+              ) : null}
+            </div>
           </div>
           <ScrollArea className="flex-1 min-h-0 pr-4">
             <div className="space-y-2">

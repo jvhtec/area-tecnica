@@ -101,6 +101,7 @@ interface JobCardActionsProps {
   onEditButtonClick: (e: React.MouseEvent) => void;
   onDeleteClick: (e: React.MouseEvent) => void;
   onCreateFlexFolders: (e: React.MouseEvent) => void;
+  onAddFlexFolders?: (e: React.MouseEvent) => void;
   onCreateLocalFolders: (e: React.MouseEvent) => void;
   onFestivalArtistsClick: (e: React.MouseEvent) => void;
   onAssignmentDialogOpen: (e: React.MouseEvent) => void;
@@ -141,6 +142,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   onEditButtonClick,
   onDeleteClick,
   onCreateFlexFolders,
+  onAddFlexFolders,
   onCreateLocalFolders,
   onFestivalArtistsClick,
   onAssignmentDialogOpen,
@@ -917,38 +919,57 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       )}
       {canCreateFlexFolders && (
         foldersAreCreated ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              if (!canOpenFlex) {
-                e.stopPropagation();
-                toast({
-                  title: 'No se puede abrir Flex',
-                  description: 'No hay un elemento Flex válido disponible para este trabajo.',
-                  variant: 'destructive',
-                });
-                return;
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                if (!canOpenFlex) {
+                  e.stopPropagation();
+                  toast({
+                    title: 'No se puede abrir Flex',
+                    description: 'No hay un elemento Flex válido disponible para este trabajo.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                handleOpenFlex(e);
+              }}
+              disabled={!canOpenFlex}
+              className="gap-2"
+              title={
+                !canOpenFlex
+                  ? 'No hay un elemento Flex válido disponible'
+                  : isFlexLoading || isCreatingFolders || folderStateLoading
+                    ? 'Cargando…'
+                    : 'Abrir en Flex'
               }
-              handleOpenFlex(e);
-            }}
-            disabled={!canOpenFlex}
-            className="gap-2"
-            title={
-              !canOpenFlex
-                ? 'No hay un elemento Flex válido disponible'
-                : isFlexLoading || isCreatingFolders || folderStateLoading
-                  ? 'Cargando…'
-                  : 'Abrir en Flex'
-            }
-          >
-            {(isFlexLoading || isCreatingFolders || folderStateLoading) ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ExternalLink className="h-4 w-4" />
-            )}
-            <span className="hidden sm:inline">Abrir Flex</span>
-          </Button>
+            >
+              {(isFlexLoading || isCreatingFolders || folderStateLoading) ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ExternalLink className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">Abrir Flex</span>
+            </Button>
+
+            {job.job_type !== 'dryhire' && onAddFlexFolders ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onAddFlexFolders}
+                disabled={folderStateLoading || isCreatingFolders}
+                title="Añadir carpetas Flex"
+                className={
+                  folderStateLoading || isCreatingFolders
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-accent/50"
+                }
+              >
+                <img src={createFolderIcon} alt="Añadir carpetas Flex" className="h-4 w-4" />
+              </Button>
+            ) : null}
+          </>
         ) : (
           <Button
             variant="ghost"

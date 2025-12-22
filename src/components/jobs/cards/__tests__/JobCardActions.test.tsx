@@ -7,10 +7,17 @@ import * as resolveFlexUrl from '@/utils/flex-folders/resolveFlexUrl';
 import * as useFlexUuidModule from '@/hooks/useFlexUuid';
 import * as flexMainFolderId from '@/utils/flexMainFolderId';
 
-const FlexElementSelectorDialogMock = vi.fn(() => null);
-const openFlexElementMock = vi.fn();
-const getElementTreeMock = vi.fn();
-const MOCK_PRESUPUESTO_DRYHIRE_ID = 'mock-presupuesto-dryhire';
+const {
+  FlexElementSelectorDialogMock,
+  openFlexElementMock,
+  getElementTreeMock,
+  MOCK_PRESUPUESTO_DRYHIRE_ID,
+} = vi.hoisted(() => ({
+  FlexElementSelectorDialogMock: vi.fn(() => null),
+  openFlexElementMock: vi.fn(),
+  getElementTreeMock: vi.fn(),
+  MOCK_PRESUPUESTO_DRYHIRE_ID: 'mock-presupuesto-dryhire',
+}));
 
 // Mock modules
 vi.mock('@/hooks/use-toast', () => ({
@@ -144,7 +151,7 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
 
-      const openFlexButton = screen.getByTitle(/No valid Flex element available|Open in Flex/);
+      const openFlexButton = screen.getByTitle(/No hay un elemento Flex válido disponible|Abrir en Flex/);
       expect(openFlexButton).toBeDisabled();
     });
 
@@ -161,7 +168,7 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
 
-      const openFlexButton = screen.getByTitle('Open in Flex');
+      const openFlexButton = screen.getByTitle('Abrir en Flex');
       expect(openFlexButton).not.toBeDisabled();
     });
 
@@ -181,7 +188,7 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
 
-      const openFlexButton = screen.getByTitle('Open in Flex');
+      const openFlexButton = screen.getByTitle('Abrir en Flex');
       expect(openFlexButton).not.toBeDisabled();
     });
 
@@ -202,7 +209,7 @@ describe('JobCardActions', () => {
       render(<JobCardActions {...props} />);
 
       // The button shows spinner when loading
-      const openFlexButton = screen.getByRole('button', { name: /Open Flex/i });
+      const openFlexButton = screen.getByRole('button', { name: /Abrir Flex/i });
       expect(openFlexButton).toBeDisabled();
     });
   });
@@ -230,7 +237,7 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
 
-      const openFlexButton = screen.getByTitle('Open in Flex');
+      const openFlexButton = screen.getByTitle('Abrir en Flex');
       expect(openFlexButton).not.toBeDisabled();
       await user.click(openFlexButton);
 
@@ -263,7 +270,7 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
 
-      const openFlexButton = screen.getByTitle(/No valid Flex element available|Open in Flex/);
+      const openFlexButton = screen.getByTitle(/No hay un elemento Flex válido disponible|Abrir en Flex/);
       expect(openFlexButton).toBeDisabled();
     });
 
@@ -303,7 +310,7 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
 
-      const openFlexButton = screen.getByTitle('Open in Flex');
+      const openFlexButton = screen.getByTitle('Abrir en Flex');
       expect(openFlexButton).not.toBeDisabled();
 
       await user.click(openFlexButton);
@@ -514,7 +521,7 @@ describe('JobCardActions', () => {
       render(<JobCardActions {...props} />);
       
       // Component renders without errors
-      expect(screen.getByTitle(/No valid Flex element available|Loading…/)).toBeTruthy();
+      expect(screen.getByTitle(/No hay un elemento Flex válido disponible|Cargando…/)).toBeTruthy();
     });
 
     it('should show toast for unmapped intents', () => {
@@ -526,7 +533,7 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
       
-      expect(screen.getByTitle(/No valid Flex element available|Loading…/)).toBeTruthy();
+      expect(screen.getByTitle(/No hay un elemento Flex válido disponible|Cargando…/)).toBeTruthy();
     });
   });
 
@@ -544,7 +551,7 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
 
-      expect(screen.getByText('Open Flex')).toBeTruthy();
+      expect(screen.getByText('Abrir Flex')).toBeTruthy();
     });
 
     it('should show Create Flex folders button when folders are not created', () => {
@@ -555,21 +562,21 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
 
-      const createButton = screen.getByTitle(/Create Flex folders|Folders already exist/);
+      const createButton = screen.getByTitle(/Crear carpetas Flex|Las carpetas ya existen/);
       expect(createButton).toBeTruthy();
     });
 
     it('should show refresh button', () => {
       render(<JobCardActions {...defaultProps} />);
 
-      const refreshButton = screen.getByTitle('Refresh');
+      const refreshButton = screen.getByTitle('Actualizar');
       expect(refreshButton).toBeTruthy();
     });
 
     it('should show edit button when canEditJobs is true', () => {
       render(<JobCardActions {...defaultProps} />);
 
-      const editButton = screen.getByTitle('Edit job details');
+      const editButton = screen.getByTitle('Editar detalles del trabajo');
       expect(editButton).toBeTruthy();
     });
 
@@ -597,7 +604,7 @@ describe('JobCardActions', () => {
 
       render(<JobCardActions {...props} />);
 
-      const openFlexButton = screen.getByTitle('Open in Flex');
+      const openFlexButton = screen.getByTitle('Abrir en Flex');
       expect(openFlexButton).not.toBeDisabled();
     });
   });
