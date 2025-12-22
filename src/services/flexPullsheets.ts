@@ -124,11 +124,11 @@ function resolveFlexCategoryKey(item: EquipmentItem): string {
     if (subsystemKey) return subsystemKey;
   }
 
-  if (item.category && FLEX_CATEGORY_MAP.has(item.category)) {
+  if (item.category) {
     return item.category;
   }
 
-  return 'pa_mains';
+  return 'uncategorized';
 }
 
 function normalizeEquipmentItems(
