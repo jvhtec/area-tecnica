@@ -77,6 +77,7 @@ interface PushPresetToFlexDialogProps {
   presetItems: PresetItem[];
   equipment: Equipment[];
   jobId?: string;
+  jobCandidates?: Array<{ id: string; title: string; startTime?: string | null }>;
 }
 
 export function PushPresetToFlexDialog({
@@ -85,6 +86,7 @@ export function PushPresetToFlexDialog({
   presetItems,
   equipment,
   jobId,
+  jobCandidates,
 }: PushPresetToFlexDialogProps) {
   const hasUserSelectedInputModeRef = useRef(false);
   const [pullsheetUrl, setPullsheetUrl] = useState('');
@@ -98,6 +100,9 @@ export function PushPresetToFlexDialog({
   const [availablePullsheets, setAvailablePullsheets] = useState<JobPullsheet[]>([]);
   const [selectedPullsheetId, setSelectedPullsheetId] = useState<string | null>(null);
   const [isLoadingPullsheets, setIsLoadingPullsheets] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+  const resolvedJobId = jobId ?? selectedJobId;
 
   useEffect(() => {
     if (open) return;
@@ -110,8 +115,16 @@ export function PushPresetToFlexDialog({
     setAvailablePullsheets([]);
     setSelectedPullsheetId(null);
     setIsLoadingPullsheets(false);
+    setSelectedJobId(null);
     setInputMode(jobId ? 'select' : 'url');
   }, [open, jobId]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (jobId) return;
+    if (!jobCandidates || jobCandidates.length !== 1) return;
+    setSelectedJobId(jobCandidates[0].id);
+  }, [open, jobId, jobCandidates]);
 
   // Load available pullsheets when dialog opens (if jobId provided)
   useEffect(() => {
@@ -119,7 +132,7 @@ export function PushPresetToFlexDialog({
 
     hasUserSelectedInputModeRef.current = false;
 
-    if (!jobId) {
+    if (!resolvedJobId) {
       setInputMode('url');
       setAvailablePullsheets([]);
       setSelectedPullsheetId(null);
@@ -132,7 +145,7 @@ export function PushPresetToFlexDialog({
     const loadPullsheets = async () => {
       setIsLoadingPullsheets(true);
       try {
-        const pullsheets = await getJobPullsheetsWithFlexApi(jobId);
+        const pullsheets = await getJobPullsheetsWithFlexApi(resolvedJobId);
 
         if (!isMounted) return;
 
@@ -171,7 +184,7 @@ export function PushPresetToFlexDialog({
     return () => {
       isMounted = false;
     };
-  }, [open, jobId]);
+  }, [open, resolvedJobId]);
 
   // Handle pullsheet selection
   useEffect(() => {
@@ -293,7 +306,7 @@ export function PushPresetToFlexDialog({
     elementId &&
       equipmentToPush.length > 0 &&
       !isPushing &&
-      (!jobId || inputMode === 'url' ? isValidUrl : selectedPullsheetId)
+      (inputMode === 'url' ? isValidUrl : Boolean(resolvedJobId && selectedPullsheetId))
   );
 
   return (
@@ -307,8 +320,34 @@ export function PushPresetToFlexDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Pullsheet Selection (only shown if jobId is provided) */}
-          {jobId ? (
+          {!jobId && jobCandidates && jobCandidates.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="job-select">Job</Label>
+              <Select
+                value={selectedJobId || ''}
+                onValueChange={(value) => {
+                  setSelectedJobId(value);
+                  setAvailablePullsheets([]);
+                  setSelectedPullsheetId(null);
+                  setElementId(null);
+                }}
+              >
+                <SelectTrigger id="job-select">
+                  <SelectValue placeholder="Select a job..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobCandidates.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Pullsheet Selection (only shown if jobId is provided or a job is selected) */}
+          {resolvedJobId ? (
             <Tabs
               value={inputMode}
               onValueChange={(value) => {

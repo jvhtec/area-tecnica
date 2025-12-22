@@ -26,13 +26,14 @@ interface PresetEditorProps {
   onCancel: () => void;
   fixedTourId?: string; // If provided, hide Tour selection and force this value
   jobId?: string; // If provided, enables pullsheet selection
+  jobCandidates?: Array<{ id: string; title: string; startTime?: string | null }>;
 }
 
-export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTourId, jobId }: PresetEditorProps) => {
+export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTourId, jobId, jobCandidates }: PresetEditorProps) => {
   const { session } = useOptimizedAuth();
   const { department } = useDepartment();
   const [name, setName] = useState(preset?.name || '');
-  const [selectedTourId, setSelectedTourId] = useState<string | undefined | null>(fixedTourId ?? (preset as any)?.tour_id ?? undefined);
+  const [selectedTourId, setSelectedTourId] = useState<string | undefined | null>(fixedTourId ?? preset?.tour_id ?? undefined);
   const [showPushDialog, setShowPushDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
@@ -232,6 +233,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
         presetItems={currentPresetItems}
         equipment={equipmentList || []}
         jobId={jobId}
+        jobCandidates={jobCandidates}
       />
     </Card>
   );

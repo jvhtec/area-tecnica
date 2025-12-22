@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -11,6 +11,7 @@ import { Copy, Pencil, Trash2 } from 'lucide-react';
 import { PresetWithItems, PresetItem } from '@/types/equipment';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useDepartment } from '@/contexts/DepartmentContext';
+import { endOfDay, startOfDay } from 'date-fns';
 
 interface PresetCreationManagerProps {
   onClose?: () => void;
@@ -26,6 +27,59 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
   const [copyingPreset, setCopyingPreset] = useState<PresetWithItems | null>(null);
   const [presetToDelete, setPresetToDelete] = useState<PresetWithItems | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  const dayRange = useMemo(() => {
+    if (!selectedDate) return null;
+    return {
+      start: startOfDay(selectedDate).toISOString(),
+      end: endOfDay(selectedDate).toISOString(),
+    };
+  }, [selectedDate]);
+
+  const { data: jobsForSelectedDate = [] } = useQuery({
+    queryKey: ['jobs-for-preset-push', department, dayRange?.start, dayRange?.end],
+    queryFn: async () => {
+      if (!department || !dayRange) return [];
+
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(
+          `
+            id,
+            title,
+            start_time,
+            end_time,
+            job_departments!inner(department)
+          `
+        )
+        .in('job_type', ['single', 'festival', 'tourdate', 'evento'])
+        .eq('job_departments.department', department)
+        // Include jobs overlapping this day
+        .lte('start_time', dayRange.end)
+        .gte('end_time', dayRange.start)
+        .order('start_time', { ascending: true });
+
+      if (error) throw error;
+      return (data || []) as Array<{
+        id: string;
+        title: string | null;
+        start_time: string | null;
+      }>;
+    },
+    enabled: Boolean(department && dayRange),
+  });
+
+  const jobCandidates = useMemo(
+    () =>
+      jobsForSelectedDate
+        .filter((job) => Boolean(job?.id))
+        .map((job) => ({
+          id: job.id,
+          title: job.title || 'Untitled job',
+          startTime: job.start_time,
+        })),
+    [jobsForSelectedDate]
+  );
 
   // Fetch all presets for the department (shared access)
   const { data: presets } = useQuery({
@@ -183,6 +237,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
           setIsCreating(false);
         }}
         jobId={(editingPreset || copyingPreset)?.job_id ?? undefined}
+        jobCandidates={jobCandidates}
       />
     );
   }
