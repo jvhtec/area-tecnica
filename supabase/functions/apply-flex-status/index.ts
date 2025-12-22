@@ -15,6 +15,8 @@ interface RequestBody {
   cascade?: boolean;        // apply to children if master
 }
 
+const FLEX_API_BASE_URL = Deno.env.get('FLEX_API_BASE_URL') || 'https://sectorpro.flexrentalsolutions.com/f5/api';
+
 const workflowActions: Record<'master'|'sub', Record<Status, string>> = {
   master: {
     confirmado: "7b46c4b7-a196-498a-9f83-787a0ed5ac88",
@@ -27,6 +29,101 @@ const workflowActions: Record<'master'|'sub', Record<Status, string>> = {
     cancelado:  "34c0b30c-b050-11df-b8d5-00e08175e43e",
   }
 };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function extractFlexErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const p = payload as any;
+  if (typeof p.exceptionMessage === 'string' && p.exceptionMessage.trim()) return p.exceptionMessage.trim();
+  if (typeof p.error === 'string' && p.error.trim()) return p.error.trim();
+  if (p.success === false && typeof p.message === 'string' && p.message.trim()) return p.message.trim();
+  return null;
+}
+
+function annotateFlexResponse(payload: unknown, meta: Record<string, unknown>, fallbackMessage?: string): Record<string, unknown> {
+  if (isPlainObject(payload)) return { ...payload, __meta: meta };
+  const res: Record<string, unknown> = { __meta: meta };
+  if (fallbackMessage) res.message = fallbackMessage;
+  if (payload !== undefined) res.payload = payload as any;
+  return res;
+}
+
+async function callFlexWorkflowAction(args: {
+  elementId: string;
+  workflowActionId: string;
+  flexAuthToken: string;
+}): Promise<{
+  ok: boolean;
+  httpStatus: number;
+  response: Record<string, unknown>;
+  errorMessage: string | null;
+}> {
+  const { elementId, workflowActionId, flexAuthToken } = args;
+  const url = `${FLEX_API_BASE_URL}/workflow-action/${encodeURIComponent(elementId)}/process/${encodeURIComponent(workflowActionId)}?bulkProcess=false`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    redirect: 'manual',
+    headers: {
+      'accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-Auth-Token': flexAuthToken,
+      'apikey': flexAuthToken,
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    // Flex expects a JSON array of WorkflowJobParameter objects (can be empty).
+    body: '[]',
+  });
+
+  const httpStatus = res.status;
+  const contentType = res.headers.get('content-type') || '';
+  const rawText = await res.text().catch(() => '');
+  const hasBody = rawText.trim().length > 0;
+
+  let parsed: unknown = null;
+  if (hasBody) {
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      parsed = null;
+    }
+  }
+
+  const meta = {
+    url,
+    http_status: httpStatus,
+    ok: res.ok,
+    content_type: contentType,
+    redirected: res.redirected,
+  };
+
+  // If Flex ever returns an HTML login page (or other non-JSON) with 200, avoid false positives.
+  const jsonParsed = parsed !== null;
+  const payloadError = extractFlexErrorMessage(parsed);
+  const ok = res.ok && (!hasBody || jsonParsed) && !payloadError;
+
+  const response = annotateFlexResponse(
+    jsonParsed ? parsed : undefined,
+    meta,
+    jsonParsed ? undefined : (hasBody ? rawText.slice(0, 2000) : undefined)
+  );
+
+  const errorMessage =
+    ok
+      ? null
+      : payloadError
+        ? payloadError
+        : jsonParsed
+          ? `Flex request failed (HTTP ${httpStatus})`
+          : hasBody
+            ? `Flex returned a non-JSON response (HTTP ${httpStatus})`
+            : `Flex request failed (HTTP ${httpStatus})`;
+
+  return { ok, httpStatus, response, errorMessage };
+}
 
 Deno.serve(async (req) => {
   // CORS preflight
@@ -46,6 +143,19 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json() as RequestBody;
     const { folder_id, element_id, status, cascade = false } = body;
+    let cascadeResult: null | {
+      attempted: number;
+      succeeded: number;
+      failed: number;
+      failures: Array<{
+        folder_id: string;
+        element_id?: string | null;
+        department?: string | null;
+        folder_type?: string | null;
+        http_status?: number | null;
+        error?: string | null;
+      }>;
+    } = null;
 
     if (!status || !['tentativa','confirmado','cancelado'].includes(status)) {
       return new Response(JSON.stringify({ error: 'Invalid or missing status' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
@@ -66,7 +176,7 @@ Deno.serve(async (req) => {
     if (folder_id) {
       const { data, error } = await supabase
         .from('flex_folders')
-        .select('id, element_id, parent_id, current_status')
+        .select('id, element_id, parent_id, current_status, job_id, folder_type, department')
         .eq('id', folder_id)
         .single();
       if (error || !data) {
@@ -78,12 +188,15 @@ Deno.serve(async (req) => {
     }
 
     const targetElementId = folderRow?.element_id || element_id!;
-    const isMaster = !folderRow?.parent_id; // if null => master
+    const isMaster =
+      folderRow
+        ? String(folderRow.folder_type || '').toLowerCase() === 'main_event' || !folderRow.parent_id
+        : true;
     const type: 'master'|'sub' = isMaster ? 'master' : 'sub';
     const workflowActionId = workflowActions[type][status];
 
     // Resolve Flex auth token: prefer env, else fetch via get-secret using caller's auth
-    let flexAuthToken = Deno.env.get('X_AUTH_TOKEN') || '';
+    let flexAuthToken = Deno.env.get('X_AUTH_TOKEN') || Deno.env.get('FLEX_X_AUTH_TOKEN') || '';
     if (!flexAuthToken) {
       try {
         const { data: secretData, error: secretError } = await supabase.functions.invoke('get-secret', {
@@ -99,28 +212,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: false, error: 'Flex authentication token missing' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
     }
 
-    const url = `https://sectorpro.flexrentalsolutions.com/f5/api/workflow-action/${targetElementId}/process/${workflowActionId}?bulkProcess=false`;
-    const flexRes = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'X-Auth-Token': flexAuthToken,
-        'apikey': flexAuthToken,
-        'Content-Type': 'application/json',
-      },
-      body: '{}'
+    const { ok: success, response: responseJson, errorMessage } = await callFlexWorkflowAction({
+      elementId: targetElementId,
+      workflowActionId,
+      flexAuthToken,
     });
-
-    let responseJson: any = null;
-    try { responseJson = await flexRes.json(); } catch { responseJson = { status: flexRes.status } }
-
-    const success = flexRes.ok;
 
     // Update DB current_status if we have folder context
     if (folderRow) {
-      await supabase
-        .from('flex_folders')
-        .update({ current_status: status })
-        .eq('id', folderRow.id);
+      if (success) {
+        await supabase
+          .from('flex_folders')
+          .update({ current_status: status })
+          .eq('id', folderRow.id);
+      }
 
       // Log
       await supabase.from('flex_status_log').insert({
@@ -131,30 +236,84 @@ Deno.serve(async (req) => {
         processed_by: processedBy,
         success,
         flex_response: responseJson,
-        error: success ? null : (typeof responseJson === 'object' ? JSON.stringify(responseJson) : String(responseJson))
+        error: success ? null : (errorMessage || JSON.stringify(responseJson))
       });
 
       // Cascade to children if requested and master
       if (success && cascade && isMaster) {
-        const { data: children } = await supabase
-          .from('flex_folders')
-          .select('id, element_id, current_status')
-          .eq('parent_id', folderRow.id);
-        if (children && children.length) {
+        // Try to locate department subfolders even if parent_id semantics differ (row id vs element id).
+        const jobId = folderRow.job_id as string | null;
+        const parentKeys = [folderRow.id as string | null, folderRow.element_id as string | null].filter(Boolean) as string[];
+
+        let children: any[] = [];
+        if (jobId) {
+          if (parentKeys.length) {
+            const { data } = await supabase
+              .from('flex_folders')
+              .select('id, element_id, current_status, parent_id, folder_type, department')
+              .eq('job_id', jobId)
+              .eq('folder_type', 'department')
+              .in('parent_id', parentKeys);
+            children = data || [];
+          }
+
+          // Fallback: if we still don't have children, just target all department folders for the job.
+          if (!children.length) {
+            const { data } = await supabase
+              .from('flex_folders')
+              .select('id, element_id, current_status, parent_id, folder_type, department')
+              .eq('job_id', jobId)
+              .eq('folder_type', 'department');
+            children = data || [];
+          }
+        }
+
+        cascadeResult = {
+          attempted: children.length,
+          succeeded: 0,
+          failed: 0,
+          failures: [],
+        };
+
+        if (children.length) {
           for (const child of children) {
             try {
-              const childUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/workflow-action/${child.element_id}/process/${workflowActions.sub[status]}?bulkProcess=false`;
-              const childRes = await fetch(childUrl, {
-                method: 'POST',
-                headers: { 'X-Auth-Token': flexAuthToken, 'apikey': flexAuthToken, 'Content-Type': 'application/json' },
-                body: '{}'
+              if (!child?.element_id) {
+                cascadeResult.failed += 1;
+                cascadeResult.failures.push({
+                  folder_id: child?.id || 'unknown',
+                  element_id: child?.element_id || null,
+                  department: child?.department || null,
+                  folder_type: child?.folder_type || null,
+                  http_status: null,
+                  error: 'Missing child element_id',
+                });
+                continue;
+              }
+              const { ok: childSuccess, response: childJson, errorMessage: childErrorMessage } = await callFlexWorkflowAction({
+                elementId: child.element_id,
+                workflowActionId: workflowActions.sub[status],
+                flexAuthToken,
               });
-              let childJson: any = null; try { childJson = await childRes.json(); } catch {}
-              const childSuccess = childRes.ok;
-              await supabase
-                .from('flex_folders')
-                .update({ current_status: status })
-                .eq('id', child.id);
+
+              if (childSuccess) {
+                await supabase
+                  .from('flex_folders')
+                  .update({ current_status: status })
+                  .eq('id', child.id);
+                cascadeResult.succeeded += 1;
+              } else {
+                cascadeResult.failed += 1;
+                cascadeResult.failures.push({
+                  folder_id: child.id,
+                  element_id: child.element_id,
+                  department: child.department || null,
+                  folder_type: child.folder_type || null,
+                  http_status: (childJson as any)?.__meta?.http_status ?? null,
+                  error: childErrorMessage || JSON.stringify(childJson),
+                });
+              }
+
               await supabase.from('flex_status_log').insert({
                 folder_id: child.id,
                 previous_status: child.current_status,
@@ -163,9 +322,18 @@ Deno.serve(async (req) => {
                 processed_by: processedBy,
                 success: childSuccess,
                 flex_response: childJson,
-                error: childSuccess ? null : (typeof childJson === 'object' ? JSON.stringify(childJson) : String(childJson))
+                error: childSuccess ? null : (childErrorMessage || JSON.stringify(childJson))
               });
             } catch (childErr) {
+              cascadeResult.failed += 1;
+              cascadeResult.failures.push({
+                folder_id: child?.id || 'unknown',
+                element_id: child?.element_id || null,
+                department: child?.department || null,
+                folder_type: child?.folder_type || null,
+                http_status: null,
+                error: String(childErr),
+              });
               await supabase.from('flex_status_log').insert({
                 folder_id: child.id,
                 previous_status: child.current_status,
@@ -182,7 +350,7 @@ Deno.serve(async (req) => {
     }
 
     // Always return 200 so clients can parse structured result
-    return new Response(JSON.stringify({ success, response: responseJson }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    return new Response(JSON.stringify({ success, response: responseJson, error: success ? null : errorMessage, cascade: cascadeResult }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
 
   } catch (error: any) {
     console.error('apply-flex-status error:', error);

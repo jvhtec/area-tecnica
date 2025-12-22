@@ -87,44 +87,86 @@ export const JobStatusSelector = ({
         }
       };
 
-      const flexStatus = toFlexStatus(newStatus);
-      if (flexStatus) {
-        try {
-          // Find master flex folder for this job based on department subfolder's parent
-          const { data: folders, error: foldersError } = await supabase
-            .from('flex_folders')
-            .select('id, parent_id, department, folder_type')
-            .eq('job_id', jobId);
+	      const flexStatus = toFlexStatus(newStatus);
+	      if (flexStatus) {
+	        try {
+	          const { data: folders, error: foldersError } = await supabase
+	            .from('flex_folders')
+	            .select('id, parent_id, department, folder_type')
+	            .eq('job_id', jobId);
 
-          if (!foldersError && folders && folders.length > 0) {
-            const deptTypes = ['sound','lights','video'];
-            const sub = folders.find((f: any) => deptTypes.includes((f.department || f.folder_type || '').toLowerCase()));
-            const masterId = sub?.parent_id || null;
-            const master = masterId ? folders.find((f: any) => f.id === masterId) : null;
-            if (master) {
-              const { data: syncRes, error: syncErr } = await supabase.functions.invoke('apply-flex-status', {
-                body: { folder_id: master.id, status: flexStatus, cascade: true }
-              });
-              if (syncErr || !syncRes?.success) {
-                console.warn('Flex status sync failed', syncErr || syncRes);
-                toast({
-                  title: 'Flex sync warning',
-                  description: 'Updated locally, but Flex sync did not complete.',
-                });
-              } else {
-                toast({
-                  title: 'Flex synced',
-                  description: 'Status synchronized with Flex.'
-                });
-              }
-            } else {
-              console.log('No master Flex folder found via subfolder parent; skipping Flex sync');
-            }
-          } else {
-            // No folders for this job: nothing to sync
-            console.log('No flex_folders found for job; skipping Flex sync');
-          }
-        } catch (syncError) {
+	          if (!foldersError && folders && folders.length > 0) {
+	            const master =
+	              folders.find((f: any) => !f.parent_id && String(f.folder_type || '').toLowerCase() === 'main_event')
+	              || folders.find((f: any) => !f.parent_id)
+	              || null;
+
+	            if (!master) {
+	              console.warn('Flex sync skipped: no master folder found for job', { jobId, foldersCount: folders.length });
+	              toast({
+	                title: 'Flex sync warning',
+	                description: 'Updated locally, but no Flex master folder was found to sync.',
+	              });
+	              return;
+	            }
+
+	            const { data: syncRes, error: syncErr } = await supabase.functions.invoke('apply-flex-status', {
+	              body: { folder_id: master.id, status: flexStatus, cascade: true }
+	            });
+
+	            if (syncErr || !syncRes?.success) {
+	              const msg =
+	                (syncRes as any)?.error
+	                || (syncRes as any)?.response?.exceptionMessage
+	                || (syncRes as any)?.response?.primaryMessage
+	                || (syncRes as any)?.response?.message
+	                || undefined;
+
+	              console.warn('Flex status sync failed', syncErr || syncRes);
+	              toast({
+	                title: 'Flex sync warning',
+	                description: msg ? `Updated locally, but Flex sync did not complete: ${msg}` : 'Updated locally, but Flex sync did not complete.',
+	              });
+	            } else {
+	              const cascade = (syncRes as any)?.cascade as any;
+	              const attempted = typeof cascade?.attempted === 'number' ? cascade.attempted : null;
+	              const succeeded = typeof cascade?.succeeded === 'number' ? cascade.succeeded : null;
+	              const failed = typeof cascade?.failed === 'number' ? cascade.failed : null;
+	
+	              if (attempted !== null && attempted > 0) {
+	                if (failed === 0) {
+	                  toast({
+	                    title: 'Flex synced',
+	                    description: `Status synchronized with Flex (root + ${attempted} subfolder${attempted === 1 ? '' : 's'}).`
+	                  });
+	                } else if (typeof failed === 'number' && failed > 0) {
+	                  toast({
+	                    title: 'Flex sync warning',
+	                    description: `Root synced, but only ${succeeded ?? 0}/${attempted} subfolders updated. Check Flex logs.`
+	                  });
+	                } else {
+	                  toast({
+	                    title: 'Flex synced',
+	                    description: 'Status synchronized with Flex.'
+	                  });
+	                }
+	              } else if (attempted === 0) {
+	                toast({
+	                  title: 'Flex synced',
+	                  description: 'Status synchronized with Flex (root only; no subfolders found).'
+	                });
+	              } else {
+	              toast({
+	                title: 'Flex synced',
+	                description: 'Status synchronized with Flex.'
+	              });
+	              }
+	            }
+	          } else {
+	            // No folders for this job: nothing to sync
+	            console.log('No flex_folders found for job; skipping Flex sync');
+	          }
+	        } catch (syncError) {
           console.warn('Error during Flex sync:', syncError);
           // Non-blocking warning; status already updated locally
         }

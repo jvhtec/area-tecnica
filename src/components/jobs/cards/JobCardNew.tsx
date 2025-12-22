@@ -480,28 +480,61 @@ export function JobCardNew({
         .from('flex_folders')
         .select('id, parent_id, department, folder_type')
         .eq('job_id', job.id);
-      if (fErr || !folders || folders.length === 0) {
-        toast({ title: 'No Flex folders', description: 'Create Flex folders before syncing status.', variant: 'destructive' });
-        return;
-      }
-      // Prefer the department subfolder's parent as master, using department column
-      const deptLc = (department || '').toLowerCase();
-      const sub = folders.find((f: any) => (f.department || '').toLowerCase() === deptLc)
-        || folders.find((f: any) => ['sound', 'lights', 'video'].includes((f.department || f.folder_type || '').toLowerCase()));
-      const master = sub?.parent_id ? folders.find((f: any) => f.id === sub.parent_id) : null;
-      const targetFolderId = master?.id || sub?.parent_id || sub?.id; // fallback to any available id
-      const { data: res, error } = await supabase.functions.invoke('apply-flex-status', {
-        body: { folder_id: targetFolderId, status: flexStatus, cascade: true }
-      });
-      if (error || !res?.success) {
-        toast({ title: 'Flex sync failed', description: 'See logs for details.' });
-      } else {
-        toast({ title: 'Flex synced', description: 'Status synchronized with Flex.' });
-      }
-    } catch (err: any) {
-      toast({ title: 'Error', description: err?.message || String(err), variant: 'destructive' });
-    }
-  };
+	      if (fErr || !folders || folders.length === 0) {
+	        toast({ title: 'No Flex folders', description: 'Create Flex folders before syncing status.', variant: 'destructive' });
+	        return;
+	      }
+	      const master =
+	        folders.find((f: any) => !f.parent_id && String(f.folder_type || '').toLowerCase() === 'main_event')
+	        || folders.find((f: any) => !f.parent_id)
+	        || null;
+
+	      if (!master?.id) {
+	        toast({ title: 'Flex sync failed', description: 'No Flex master folder found for this job.', variant: 'destructive' });
+	        return;
+	      }
+
+	      const { data: res, error } = await supabase.functions.invoke('apply-flex-status', {
+	        body: { folder_id: master.id, status: flexStatus, cascade: true }
+	      });
+	      if (error || !res?.success) {
+	        const msg =
+	          (res as any)?.error
+	          || (res as any)?.response?.exceptionMessage
+	          || (res as any)?.response?.primaryMessage
+	          || (res as any)?.response?.message
+	          || undefined;
+	        toast({ title: 'Flex sync failed', description: msg || 'See logs for details.', variant: 'destructive' });
+	      } else {
+	        const cascade = (res as any)?.cascade as any;
+	        const attempted = typeof cascade?.attempted === 'number' ? cascade.attempted : null;
+	        const succeeded = typeof cascade?.succeeded === 'number' ? cascade.succeeded : null;
+	        const failed = typeof cascade?.failed === 'number' ? cascade.failed : null;
+
+	        if (attempted !== null && attempted > 0) {
+	          if (failed === 0) {
+	            toast({
+	              title: 'Flex synced',
+	              description: `Status synchronized with Flex (root + ${attempted} subfolder${attempted === 1 ? '' : 's'}).`
+	            });
+	          } else if (typeof failed === 'number' && failed > 0) {
+	            toast({
+	              title: 'Flex sync warning',
+	              description: `Root synced, but only ${succeeded ?? 0}/${attempted} subfolders updated. Check Flex logs.`
+	            });
+	          } else {
+	            toast({ title: 'Flex synced', description: 'Status synchronized with Flex.' });
+	          }
+	        } else if (attempted === 0) {
+	          toast({ title: 'Flex synced', description: 'Status synchronized with Flex (root only; no subfolders found).' });
+	        } else {
+	          toast({ title: 'Flex synced', description: 'Status synchronized with Flex.' });
+	        }
+	      }
+	    } catch (err: any) {
+	      toast({ title: 'Error', description: err?.message || String(err), variant: 'destructive' });
+	    }
+	  };
 
   // Optimistic delete handler with instant UI feedback
   const handleDeleteClick = async (e: React.MouseEvent) => {

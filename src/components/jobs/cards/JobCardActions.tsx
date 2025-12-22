@@ -725,7 +725,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     navigate(`/festival-management/${job.id}?${params.toString()}`);
   };
 
-  const showFlexButtons = false; // Temporarily hide Flex sync and logs buttons
+  const showFlexButtons = true;
   const isMobile = useIsMobile();
 
   return (
