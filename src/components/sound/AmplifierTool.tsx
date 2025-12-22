@@ -520,6 +520,14 @@ export const AmplifierTool = () => {
 
     setIsSavingPreset(true);
     try {
+      const { data: previousItems, error: fetchError } = await supabase
+        .from('preset_items')
+        .select('preset_id, equipment_id, quantity, subsystem, source, notes')
+        .eq('preset_id', selectedPresetId)
+        .eq('source', 'amp_calculator');
+
+      if (fetchError) throw fetchError;
+
       const { error: deleteError } = await supabase
         .from('preset_items')
         .delete()
@@ -530,7 +538,19 @@ export const AmplifierTool = () => {
 
       if (itemsToInsert.length > 0) {
         const { error: insertError } = await supabase.from('preset_items').insert(itemsToInsert);
-        if (insertError) throw insertError;
+        if (insertError) {
+          // Attempt to restore previous items to avoid losing data
+          if (previousItems && previousItems.length > 0) {
+            await supabase.from('preset_items').insert(
+              previousItems.map((item) => ({
+                ...item,
+                // ensure nullable fields remain defined
+                notes: item.notes ?? null,
+              }))
+            );
+          }
+          throw insertError;
+        }
       }
 
       queryClient.invalidateQueries({
