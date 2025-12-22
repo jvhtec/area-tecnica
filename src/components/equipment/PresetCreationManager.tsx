@@ -161,12 +161,12 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         title: "Success",
         description: "Preset saved successfully"
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving preset:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message
+        description: error instanceof Error ? error.message : 'Failed to save preset'
       });
     }
   };
@@ -182,6 +182,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
           setCopyingPreset(null);
           setIsCreating(false);
         }}
+        jobId={(editingPreset || copyingPreset)?.job_id ?? undefined}
       />
     );
   }

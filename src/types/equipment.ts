@@ -12,7 +12,9 @@ export type Preset = {
   user_id: string;
   department?: string;
   created_by?: string | null;
+  job_id?: string | null;
   tour_id?: string | null;
+  is_template?: boolean | null;
   created_at?: string;
   updated_at?: string;
 };

@@ -212,6 +212,8 @@ export interface JobPullsheet {
 
 // Pullsheet definition ID from Flex API
 const PULLSHEET_DEFINITION_ID = 'a220432c-af33-11df-b8d5-00e08175e43e';
+// Some Flex tree responses omit definitionId; pullsheets still have this domainId.
+const PULLSHEET_DOMAIN_ID = 'equipment-list';
 
 // Maximum recursion depth to prevent stack overflow
 const MAX_TREE_DEPTH = 50;
@@ -223,6 +225,9 @@ interface FlexTreeNode {
   id?: string;
   definitionId?: string;
   elementDefinitionId?: string;
+  domainId?: string;
+  leaf?: boolean;
+  documentNumber?: string;
   displayName?: string;
   name?: string;
   createdAt?: string;
@@ -368,9 +373,19 @@ function extractPullsheetsFromTree(node: FlexTreeNode | FlexTreeNode[], depth: n
   // Check if current node is a pullsheet
   const elementId = node.elementId || node.nodeId || node.id;
   const definitionId = node.definitionId || node.elementDefinitionId;
-  const displayName = node.displayName || node.name;
+  const domainId = node.domainId;
+  const isLeaf =
+    node.leaf === true ||
+    (node.leaf === undefined && (!Array.isArray(node.children) || node.children.length === 0));
+  const displayName =
+    node.displayName ||
+    (node.name && node.documentNumber ? `${node.name} (${node.documentNumber})` : node.name);
 
-  if (elementId && definitionId === PULLSHEET_DEFINITION_ID) {
+  const isPullsheet =
+    (elementId && definitionId === PULLSHEET_DEFINITION_ID) ||
+    (elementId && domainId === PULLSHEET_DOMAIN_ID && isLeaf);
+
+  if (isPullsheet) {
     // Try to extract creation date from various possible fields
     const createdAt =
       node.createdAt ||

@@ -1,17 +1,75 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle2, XCircle, AlertTriangle, Upload } from 'lucide-react';
-import { extractFlexElementId, isFlexUrl } from '@/utils/flexUrlParser';
+import { extractFlexElementId } from '@/utils/flexUrlParser';
 import { pushEquipmentToPullsheet, EquipmentItem, getJobPullsheetsWithFlexApi, JobPullsheet } from '@/services/flexPullsheets';
-import { supabase } from '@/lib/supabase';
 import { PresetItem, Equipment } from '@/types/equipment';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const UNKNOWN_DATE_SENTINEL = '2000-01-01T00:00:00.000Z';
+
+function getPullsheetDisplayName(pullsheet: JobPullsheet) {
+  if (pullsheet.display_name) return pullsheet.display_name;
+  if (pullsheet.department) {
+    return `${pullsheet.department.charAt(0).toUpperCase() + pullsheet.department.slice(1)} Pullsheet`;
+  }
+  return 'Pullsheet';
+}
+
+function getPullsheetCreatedAtLabel(pullsheet: JobPullsheet) {
+  if (pullsheet.source === 'flex_api' && pullsheet.created_at === UNKNOWN_DATE_SENTINEL) {
+    return 'Unknown';
+  }
+
+  const createdAt = new Date(pullsheet.created_at);
+  if (Number.isNaN(createdAt.getTime())) return 'Unknown';
+  return createdAt.toLocaleDateString();
+}
+
+interface PullsheetUrlInputProps {
+  pullsheetUrl: string;
+  onPullsheetUrlChange: (url: string) => void;
+  isPushing: boolean;
+  isValidUrl: boolean;
+  elementId: string | null;
+}
+
+function PullsheetUrlInput({
+  pullsheetUrl,
+  onPullsheetUrlChange,
+  isPushing,
+  isValidUrl,
+  elementId,
+}: PullsheetUrlInputProps) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="pullsheet-url">Pullsheet URL</Label>
+      <div className="flex gap-2">
+        <Input
+          id="pullsheet-url"
+          placeholder="Paste Flex pullsheet URL here..."
+          value={pullsheetUrl}
+          onChange={(e) => onPullsheetUrlChange(e.target.value)}
+          disabled={isPushing}
+          className={isValidUrl ? 'border-green-500' : ''}
+        />
+        {isValidUrl && <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-2" />}
+      </div>
+      {pullsheetUrl && !isValidUrl && (
+        <p className="text-sm text-destructive">Invalid Flex URL format</p>
+      )}
+      {isValidUrl && elementId && (
+        <p className="text-sm text-muted-foreground">Element ID: {elementId}</p>
+      )}
+    </div>
+  );
+}
 
 interface PushPresetToFlexDialogProps {
   open: boolean;
@@ -28,7 +86,7 @@ export function PushPresetToFlexDialog({
   equipment,
   jobId,
 }: PushPresetToFlexDialogProps) {
-  const { toast } = useToast();
+  const hasUserSelectedInputModeRef = useRef(false);
   const [pullsheetUrl, setPullsheetUrl] = useState('');
   const [isValidUrl, setIsValidUrl] = useState(false);
   const [elementId, setElementId] = useState<string | null>(null);
@@ -41,11 +99,31 @@ export function PushPresetToFlexDialog({
   const [selectedPullsheetId, setSelectedPullsheetId] = useState<string | null>(null);
   const [isLoadingPullsheets, setIsLoadingPullsheets] = useState(false);
 
+  useEffect(() => {
+    if (open) return;
+
+    hasUserSelectedInputModeRef.current = false;
+    setPullsheetUrl('');
+    setIsValidUrl(false);
+    setElementId(null);
+    setPushResult(null);
+    setAvailablePullsheets([]);
+    setSelectedPullsheetId(null);
+    setIsLoadingPullsheets(false);
+    setInputMode(jobId ? 'select' : 'url');
+  }, [open, jobId]);
+
   // Load available pullsheets when dialog opens (if jobId provided)
   useEffect(() => {
-    if (!open || !jobId) {
+    if (!open) return;
+
+    hasUserSelectedInputModeRef.current = false;
+
+    if (!jobId) {
+      setInputMode('url');
       setAvailablePullsheets([]);
       setSelectedPullsheetId(null);
+      setIsLoadingPullsheets(false);
       return;
     }
 
@@ -60,17 +138,17 @@ export function PushPresetToFlexDialog({
 
         setAvailablePullsheets(pullsheets);
 
+        const canAutoSelect = !hasUserSelectedInputModeRef.current;
+
         // Auto-select if only one pullsheet available
-        if (pullsheets.length === 1) {
+        if (pullsheets.length === 1 && canAutoSelect) {
           setSelectedPullsheetId(pullsheets[0].element_id);
           setElementId(pullsheets[0].element_id);
         }
 
         // Set default mode based on available pullsheets
-        if (pullsheets.length > 0) {
-          setInputMode('select');
-        } else {
-          setInputMode('url');
+        if (canAutoSelect) {
+          setInputMode(pullsheets.length > 0 ? 'select' : 'url');
         }
       } catch (error) {
         if (!isMounted) return;
@@ -93,7 +171,7 @@ export function PushPresetToFlexDialog({
     return () => {
       isMounted = false;
     };
-  }, [open, jobId, toast]);
+  }, [open, jobId]);
 
   // Handle pullsheet selection
   useEffect(() => {
@@ -200,24 +278,26 @@ export function PushPresetToFlexDialog({
     }
   };
 
-  const handleClose = () => {
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      onOpenChange(true);
+      return;
+    }
+
     if (!isPushing) {
-      setPullsheetUrl('');
-      setPushResult(null);
-      setSelectedPullsheetId(null);
-      setElementId(null);
       onOpenChange(false);
     }
   };
 
-  const canPush =
+  const canPush = Boolean(
     elementId &&
-    equipmentToPush.length > 0 &&
-    !isPushing &&
-    (inputMode === 'select' ? !!selectedPullsheetId : isValidUrl);
+      equipmentToPush.length > 0 &&
+      !isPushing &&
+      (!jobId || inputMode === 'url' ? isValidUrl : selectedPullsheetId)
+  );
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
           <DialogTitle>Push Equipment Preset to Flex Pullsheet</DialogTitle>
@@ -229,7 +309,13 @@ export function PushPresetToFlexDialog({
         <div className="space-y-4 py-4">
           {/* Pullsheet Selection (only shown if jobId is provided) */}
           {jobId ? (
-            <Tabs value={inputMode} onValueChange={(value) => setInputMode(value as 'select' | 'url')}>
+            <Tabs
+              value={inputMode}
+              onValueChange={(value) => {
+                hasUserSelectedInputModeRef.current = true;
+                setInputMode(value as 'select' | 'url');
+              }}
+            >
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="select" disabled={availablePullsheets.length === 0 && !isLoadingPullsheets}>
                   Select Pullsheet {availablePullsheets.length > 0 && `(${availablePullsheets.length})`}
@@ -260,11 +346,10 @@ export function PushPresetToFlexDialog({
                       <SelectContent>
                         {availablePullsheets.map((ps) => (
                           <SelectItem key={ps.id} value={ps.element_id}>
-                            {ps.display_name || (ps.department ? `${ps.department.charAt(0).toUpperCase() + ps.department.slice(1)} Pullsheet` : 'Pullsheet')}
-                            {' '}
+                            {getPullsheetDisplayName(ps)}{' '}
                             <span className="text-xs text-muted-foreground">
                               {ps.source === 'flex_api' && '(from Flex) '}
-                              ({ps.source === 'flex_api' && ps.created_at === '2000-01-01T00:00:00.000Z' ? 'Unknown' : new Date(ps.created_at).toLocaleDateString()})
+                              ({getPullsheetCreatedAtLabel(ps)})
                             </span>
                           </SelectItem>
                         ))}
@@ -277,48 +362,24 @@ export function PushPresetToFlexDialog({
                 )}
               </TabsContent>
 
-              <TabsContent value="url" className="space-y-2">
-                <Label htmlFor="pullsheet-url">Pullsheet URL</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="pullsheet-url"
-                    placeholder="Paste Flex pullsheet URL here..."
-                    value={pullsheetUrl}
-                    onChange={(e) => setPullsheetUrl(e.target.value)}
-                    disabled={isPushing}
-                    className={isValidUrl ? 'border-green-500' : ''}
-                  />
-                  {isValidUrl && <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-2" />}
-                </div>
-                {pullsheetUrl && !isValidUrl && (
-                  <p className="text-sm text-destructive">Invalid Flex URL format</p>
-                )}
-                {isValidUrl && elementId && (
-                  <p className="text-sm text-muted-foreground">Element ID: {elementId}</p>
-                )}
+              <TabsContent value="url">
+                <PullsheetUrlInput
+                  pullsheetUrl={pullsheetUrl}
+                  onPullsheetUrlChange={(url) => setPullsheetUrl(url)}
+                  isPushing={isPushing}
+                  isValidUrl={isValidUrl}
+                  elementId={elementId}
+                />
               </TabsContent>
             </Tabs>
           ) : (
-            <div className="space-y-2">
-              <Label htmlFor="pullsheet-url">Pullsheet URL</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="pullsheet-url"
-                  placeholder="Paste Flex pullsheet URL here..."
-                  value={pullsheetUrl}
-                  onChange={(e) => setPullsheetUrl(e.target.value)}
-                  disabled={isPushing}
-                  className={isValidUrl ? 'border-green-500' : ''}
-                />
-                {isValidUrl && <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-2" />}
-              </div>
-              {pullsheetUrl && !isValidUrl && (
-                <p className="text-sm text-destructive">Invalid Flex URL format</p>
-              )}
-              {isValidUrl && elementId && (
-                <p className="text-sm text-muted-foreground">Element ID: {elementId}</p>
-              )}
-            </div>
+            <PullsheetUrlInput
+              pullsheetUrl={pullsheetUrl}
+              onPullsheetUrlChange={(url) => setPullsheetUrl(url)}
+              isPushing={isPushing}
+              isValidUrl={isValidUrl}
+              elementId={elementId}
+            />
           )}
 
           {/* Equipment Preview */}
@@ -384,7 +445,7 @@ export function PushPresetToFlexDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isPushing}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isPushing}>
             Cancel
           </Button>
           <Button onClick={handlePush} disabled={!canPush}>
