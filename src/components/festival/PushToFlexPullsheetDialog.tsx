@@ -8,8 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle2, XCircle, AlertTriangle, Upload } from 'lucide-react';
 import { GearSetupFormData } from '@/types/festival-gear';
 import { extractFlexElementId, isFlexUrl } from '@/utils/flexUrlParser';
-import { pushEquipmentToPullsheet, EquipmentItem } from '@/services/flexPullsheets';
+import { pushEquipmentToPullsheet, EquipmentItem, getJobPullsheetsWithFlexApi, JobPullsheet } from '@/services/flexPullsheets';
 import { supabase } from '@/lib/supabase';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface PushToFlexPullsheetDialogProps {
   open: boolean;
@@ -35,12 +37,81 @@ export function PushToFlexPullsheetDialog({
   const [elementId, setElementId] = useState<string | null>(null);
   const [isPushing, setIsPushing] = useState(false);
   const [pushResult, setPushResult] = useState<{ succeeded: number; failed: Array<{ name: string; error: string }> } | null>(null);
+  const [inputMode, setInputMode] = useState<'select' | 'url'>('select');
+  const [availablePullsheets, setAvailablePullsheets] = useState<JobPullsheet[]>([]);
+  const [selectedPullsheetId, setSelectedPullsheetId] = useState<string | null>(null);
+  const [isLoadingPullsheets, setIsLoadingPullsheets] = useState(false);
+
+  // Load available pullsheets when dialog opens
+  useEffect(() => {
+    if (!open || !jobId) {
+      setAvailablePullsheets([]);
+      setSelectedPullsheetId(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadPullsheets = async () => {
+      setIsLoadingPullsheets(true);
+      try {
+        const pullsheets = await getJobPullsheetsWithFlexApi(jobId);
+
+        // Only update state if component is still mounted and context hasn't changed
+        if (!isMounted) return;
+
+        setAvailablePullsheets(pullsheets);
+
+        // Auto-select if only one pullsheet available
+        if (pullsheets.length === 1) {
+          setSelectedPullsheetId(pullsheets[0].element_id);
+          setElementId(pullsheets[0].element_id);
+        }
+
+        // Set default mode based on available pullsheets
+        if (pullsheets.length > 0) {
+          setInputMode('select');
+        } else {
+          setInputMode('url');
+        }
+      } catch (error) {
+        if (!isMounted) return;
+
+        console.error('Failed to load pullsheets:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load pullsheets for this job',
+          variant: 'destructive',
+        });
+      } finally {
+        if (isMounted) {
+          setIsLoadingPullsheets(false);
+        }
+      }
+    };
+
+    loadPullsheets();
+
+    // Cleanup function to prevent stale state updates
+    return () => {
+      isMounted = false;
+    };
+  }, [open, jobId, toast]);
+
+  // Handle pullsheet selection
+  useEffect(() => {
+    if (inputMode === 'select' && selectedPullsheetId) {
+      setElementId(selectedPullsheetId);
+    }
+  }, [inputMode, selectedPullsheetId]);
 
   // Extract element ID from URL
   useEffect(() => {
-    if (!pullsheetUrl) {
-      setIsValidUrl(false);
-      setElementId(null);
+    if (inputMode !== 'url' || !pullsheetUrl) {
+      if (inputMode === 'url') {
+        setIsValidUrl(false);
+        setElementId(null);
+      }
       return;
     }
 
@@ -52,7 +123,7 @@ export function PushToFlexPullsheetDialog({
       setElementId(null);
       setIsValidUrl(false);
     }
-  }, [pullsheetUrl]);
+  }, [pullsheetUrl, inputMode]);
 
   // Collect all equipment model names from gear setup
   const allModelNames = useMemo(() => {
@@ -218,11 +289,18 @@ export function PushToFlexPullsheetDialog({
     if (!isPushing) {
       setPullsheetUrl('');
       setPushResult(null);
+      setSelectedPullsheetId(null);
+      setElementId(null);
       onOpenChange(false);
     }
   };
 
-  const canPush = isValidUrl && equipmentLookup && equipmentLookup.found.length > 0 && !isPushing;
+  const canPush =
+    elementId &&
+    equipmentLookup &&
+    equipmentLookup.found.length > 0 &&
+    !isPushing &&
+    (inputMode === 'select' ? !!selectedPullsheetId : isValidUrl);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -230,32 +308,81 @@ export function PushToFlexPullsheetDialog({
         <DialogHeader>
           <DialogTitle>Push Equipment to Flex Pullsheet</DialogTitle>
           <DialogDescription>
-            Enter the Flex pullsheet URL to add equipment items as line items
+            Select an existing pullsheet or enter a Flex pullsheet URL to add equipment items
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* URL Input */}
-          <div className="space-y-2">
-            <Label htmlFor="pullsheet-url">Pullsheet URL</Label>
-            <div className="flex gap-2">
-              <Input
-                id="pullsheet-url"
-                placeholder="Paste Flex pullsheet URL here..."
-                value={pullsheetUrl}
-                onChange={(e) => setPullsheetUrl(e.target.value)}
-                disabled={isPushing}
-                className={isValidUrl ? 'border-green-500' : ''}
-              />
-              {isValidUrl && <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-2" />}
-            </div>
-            {pullsheetUrl && !isValidUrl && (
-              <p className="text-sm text-destructive">Invalid Flex URL format</p>
-            )}
-            {isValidUrl && elementId && (
-              <p className="text-sm text-muted-foreground">Element ID: {elementId}</p>
-            )}
-          </div>
+          {/* Pullsheet Selection */}
+          <Tabs value={inputMode} onValueChange={(value) => setInputMode(value as 'select' | 'url')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="select" disabled={availablePullsheets.length === 0 && !isLoadingPullsheets}>
+                Select Pullsheet {availablePullsheets.length > 0 && `(${availablePullsheets.length})`}
+              </TabsTrigger>
+              <TabsTrigger value="url">Enter URL</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="select" className="space-y-2">
+              {isLoadingPullsheets ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading pullsheets...
+                </div>
+              ) : availablePullsheets.length === 0 ? (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    No pullsheets found for this job. Create pullsheets first or use the URL input option.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <>
+                  <Label htmlFor="pullsheet-select">Available Pullsheets</Label>
+                  <Select value={selectedPullsheetId || ''} onValueChange={setSelectedPullsheetId}>
+                    <SelectTrigger id="pullsheet-select">
+                      <SelectValue placeholder="Select a pullsheet..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePullsheets.map((ps) => (
+                        <SelectItem key={ps.id} value={ps.element_id}>
+                          {ps.display_name || (ps.department ? `${ps.department.charAt(0).toUpperCase() + ps.department.slice(1)} Pullsheet` : 'Pullsheet')}
+                          {' '}
+                          <span className="text-xs text-muted-foreground">
+                            {ps.source === 'flex_api' && '(from Flex) '}
+                            ({ps.source === 'flex_api' && ps.created_at === '2000-01-01T00:00:00.000Z' ? 'Unknown' : new Date(ps.created_at).toLocaleDateString()})
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedPullsheetId && (
+                    <p className="text-sm text-muted-foreground">Element ID: {selectedPullsheetId}</p>
+                  )}
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="url" className="space-y-2">
+              <Label htmlFor="pullsheet-url">Pullsheet URL</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="pullsheet-url"
+                  placeholder="Paste Flex pullsheet URL here..."
+                  value={pullsheetUrl}
+                  onChange={(e) => setPullsheetUrl(e.target.value)}
+                  disabled={isPushing}
+                  className={isValidUrl ? 'border-green-500' : ''}
+                />
+                {isValidUrl && <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-2" />}
+              </div>
+              {pullsheetUrl && !isValidUrl && (
+                <p className="text-sm text-destructive">Invalid Flex URL format</p>
+              )}
+              {isValidUrl && elementId && (
+                <p className="text-sm text-muted-foreground">Element ID: {elementId}</p>
+              )}
+            </TabsContent>
+          </Tabs>
 
           {/* Equipment Preview */}
           {isLookingUp && (

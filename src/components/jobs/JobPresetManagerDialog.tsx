@@ -266,6 +266,7 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
               isCopy={!!copyingPreset}
               onSave={handleSavePreset}
               onCancel={() => { setIsCreating(false); setEditingPreset(null); setCopyingPreset(null); }}
+              jobId={jobId}
             />
           </DepartmentProvider>
         ) : (

@@ -33,7 +33,7 @@ const DEPARTMENT_SECTIONS: Record<DepartmentKey, DepartmentSection> = {
   sound: {
     label: "Sonido",
     items: [
-      { key: "hojaInfo", label: "Hoja de Información (SIP)" },
+      // { key: "hojaInfo", label: "Hoja de Información (SIP)" }, // DEPRECATED - not used anymore
       { key: "documentacionTecnica", label: "Documentación Técnica" },
       { key: "presupuestosRecibidos", label: "Presupuestos Recibidos" },
       { key: "hojaGastos", label: "Hoja de Gastos" },
@@ -44,7 +44,7 @@ const DEPARTMENT_SECTIONS: Record<DepartmentKey, DepartmentSection> = {
   lights: {
     label: "Luces",
     items: [
-      { key: "hojaInfo", label: "Hoja de Información (LIP)" },
+      // { key: "hojaInfo", label: "Hoja de Información (LIP)" }, // DEPRECATED - not used anymore
       { key: "documentacionTecnica", label: "Documentación Técnica" },
       { key: "presupuestosRecibidos", label: "Presupuestos Recibidos" },
       { key: "hojaGastos", label: "Hoja de Gastos" },
@@ -53,7 +53,7 @@ const DEPARTMENT_SECTIONS: Record<DepartmentKey, DepartmentSection> = {
   video: {
     label: "Video",
     items: [
-      { key: "hojaInfo", label: "Hoja de Información (VIP)" },
+      // { key: "hojaInfo", label: "Hoja de Información (VIP)" }, // DEPRECATED - not used anymore
       { key: "documentacionTecnica", label: "Documentación Técnica" },
       { key: "presupuestosRecibidos", label: "Presupuestos Recibidos" },
       { key: "hojaGastos", label: "Hoja de Gastos" },
@@ -105,29 +105,14 @@ const DEPARTMENT_SECTIONS: Record<DepartmentKey, DepartmentSection> = {
   },
 };
 
+// Default selections changed to empty - user must explicitly select what they want
 const DEFAULT_SELECTIONS: Record<DepartmentKey, SubfolderKey[]> = {
-  sound: [
-    "hojaInfo",
-    "documentacionTecnica",
-    "presupuestosRecibidos",
-    "hojaGastos",
-    "pullSheetTP",
-    "pullSheetPA",
-  ],
-  lights: ["hojaInfo", "documentacionTecnica", "presupuestosRecibidos", "hojaGastos"],
-  video: ["hojaInfo", "documentacionTecnica", "presupuestosRecibidos", "hojaGastos"],
-  production: [
-    "documentacionTecnica",
-    "presupuestosRecibidos",
-    "hojaGastos",
-  ],
-  personnel: ["workOrder", "gastosDePersonal", "crewCallSound", "crewCallLights"],
-  comercial: [
-    "extrasSound",
-    "presupuestoSound",
-    "extrasLights",
-    "presupuestoLights",
-  ],
+  sound: [],
+  lights: [],
+  video: [],
+  production: [],
+  personnel: [],
+  comercial: [],
 };
 
 const departmentEntries = Object.entries(DEPARTMENT_SECTIONS) as [
@@ -258,7 +243,22 @@ const prepareOptionsForSubmit = (
     }
   }
 
-  return hasAny ? result : undefined;
+  // If nothing is selected, return explicit empty selections for all departments
+  // This prevents createAllFoldersForJob from treating undefined as "create everything"
+  if (!hasAny) {
+    const emptyResult: CreateFoldersOptions = {};
+    for (const [dept] of Object.entries(options) as [
+      DepartmentKey,
+      DepartmentSelectionOptions,
+    ][]) {
+      if (hasItems(dept)) {
+        emptyResult[dept] = { subfolders: [] };
+      }
+    }
+    return emptyResult;
+  }
+
+  return result;
 };
 
 export const getFlexFolderDefaultSelection: DepartmentDefaultSelector = dept =>

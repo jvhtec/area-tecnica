@@ -200,3 +200,219 @@ export async function pushEquipmentToPullsheet(
   console.log('[FlexPullsheets] Push complete:', result);
   return result;
 }
+
+export interface JobPullsheet {
+  id: string;
+  element_id: string;
+  department: string | null;
+  created_at: string;
+  display_name?: string;
+  source?: 'database' | 'flex_api';
+}
+
+// Pullsheet definition ID from Flex API
+const PULLSHEET_DEFINITION_ID = 'a220432c-af33-11df-b8d5-00e08175e43e';
+// Some Flex tree responses omit definitionId; pullsheets still have this domainId.
+const PULLSHEET_DOMAIN_ID = 'equipment-list';
+
+// Maximum recursion depth to prevent stack overflow
+const MAX_TREE_DEPTH = 50;
+
+// Interface for Flex API tree nodes
+interface FlexTreeNode {
+  elementId?: string;
+  nodeId?: string;
+  id?: string;
+  definitionId?: string;
+  elementDefinitionId?: string;
+  domainId?: string;
+  leaf?: boolean;
+  documentNumber?: string;
+  displayName?: string;
+  name?: string;
+  createdAt?: string;
+  created_at?: string;
+  dateCreated?: string;
+  date_created?: string;
+  children?: FlexTreeNode[];
+  [key: string]: unknown;
+}
+
+/**
+ * Query pullsheets for a specific job from database only
+ * @param jobId The job ID to query pullsheets for
+ * @returns Array of pullsheet records with their element IDs (limited to 100 most recent)
+ */
+export async function getJobPullsheets(jobId: string): Promise<JobPullsheet[]> {
+  const { data, error } = await supabase
+    .from('flex_folders')
+    .select('id, element_id, department, created_at')
+    .eq('job_id', jobId)
+    .eq('folder_type', 'pull_sheet')
+    .order('department', { ascending: true })
+    .order('created_at', { ascending: true })
+    .limit(100);
+
+  if (error) {
+    console.error('[FlexPullsheets] Failed to query pullsheets:', error);
+    throw new Error(`Failed to query pullsheets: ${error.message}`);
+  }
+
+  return (data || []).map(ps => ({ ...ps, source: 'database' as const }));
+}
+
+/**
+ * Query pullsheets for a specific job from both database and Flex API
+ * This captures pullsheets created before tracking was implemented or created in parallel
+ * @param jobId The job ID to query pullsheets for
+ * @returns Array of pullsheet records merged from DB and Flex API, deduplicated by element_id
+ */
+export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPullsheet[]> {
+  // Get pullsheets from database
+  const dbPullsheets = await getJobPullsheets(jobId);
+
+  try {
+    // Get main element ID for this job
+    const { data: mainFolder, error: mainFolderError } = await supabase
+      .from('flex_folders')
+      .select('element_id')
+      .eq('job_id', jobId)
+      .or('folder_type.eq.main_event,folder_type.eq.main')
+      .single();
+
+    if (mainFolderError || !mainFolder?.element_id) {
+      console.warn('[FlexPullsheets] No main folder found for job, returning DB results only:', mainFolderError);
+      return dbPullsheets;
+    }
+
+    // Fetch Flex tree with timeout
+    const token = await getFlexAuthToken();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    let treeData;
+    try {
+      const response = await fetch(
+        `${FLEX_API_BASE_URL}/element/${mainFolder.element_id}/tree`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Auth-Token': token,
+            'apikey': token,
+          },
+          signal: controller.signal,
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn('[FlexPullsheets] Failed to fetch Flex tree, returning DB results only');
+        return dbPullsheets;
+      }
+
+      // Parse JSON inside try-catch to handle parsing errors
+      try {
+        treeData = await response.json();
+      } catch (jsonError) {
+        console.warn('[FlexPullsheets] Failed to parse Flex tree JSON, returning DB results only:', jsonError);
+        return dbPullsheets;
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.warn('[FlexPullsheets] Flex API request timed out, returning DB results only');
+      } else {
+        console.warn('[FlexPullsheets] Flex API request failed, returning DB results only:', fetchError);
+      }
+      return dbPullsheets;
+    }
+
+    // Extract pullsheets from tree (recursively search for nodes with pullsheet definitionId)
+    const flexPullsheets = extractPullsheetsFromTree(treeData);
+
+    // Merge and deduplicate
+    const dbElementIds = new Set(dbPullsheets.map(ps => ps.element_id));
+    const uniqueFlexPullsheets = flexPullsheets.filter(ps => !dbElementIds.has(ps.element_id));
+
+    console.log(`[FlexPullsheets] Found ${dbPullsheets.length} from DB, ${uniqueFlexPullsheets.length} new from Flex API`);
+
+    return [...dbPullsheets, ...uniqueFlexPullsheets];
+  } catch (error) {
+    console.warn('[FlexPullsheets] Error fetching from Flex API, returning DB results only:', error);
+    return dbPullsheets;
+  }
+}
+
+/**
+ * Recursively extract pullsheet nodes from Flex API tree response
+ */
+function extractPullsheetsFromTree(node: FlexTreeNode | FlexTreeNode[], depth: number = 0): JobPullsheet[] {
+  // Depth protection to prevent stack overflow
+  if (depth > MAX_TREE_DEPTH) {
+    console.warn(`[FlexPullsheets] Max tree depth (${MAX_TREE_DEPTH}) exceeded, stopping recursion`);
+    return [];
+  }
+
+  if (!node) {
+    return [];
+  }
+
+  // If node is an array, process each element
+  if (Array.isArray(node)) {
+    const results: JobPullsheet[] = [];
+    for (const item of node) {
+      results.push(...extractPullsheetsFromTree(item, depth));
+    }
+    return results;
+  }
+
+  const results: JobPullsheet[] = [];
+
+  // Check if current node is a pullsheet
+  const elementId = node.elementId || node.nodeId || node.id;
+  const definitionId = node.definitionId || node.elementDefinitionId;
+  const domainId = node.domainId;
+  const isLeaf =
+    node.leaf === true ||
+    (node.leaf === undefined && (!Array.isArray(node.children) || node.children.length === 0));
+  const displayName =
+    node.displayName ||
+    (node.name && node.documentNumber ? `${node.name} (${node.documentNumber})` : node.name);
+
+  const isPullsheet =
+    (elementId && definitionId === PULLSHEET_DEFINITION_ID) ||
+    (elementId && domainId === PULLSHEET_DOMAIN_ID && isLeaf);
+
+  if (isPullsheet) {
+    // Try to extract creation date from various possible fields
+    const createdAt =
+      node.createdAt ||
+      node.created_at ||
+      node.dateCreated ||
+      node.date_created ||
+      // Fallback to a far past date so Flex API items sort before DB items
+      '2000-01-01T00:00:00.000Z';
+
+    const pullsheet: JobPullsheet = {
+      id: elementId,
+      element_id: elementId,
+      department: null, // We don't have department info from Flex tree
+      created_at: createdAt,
+      display_name: displayName,
+      source: 'flex_api',
+    };
+
+    results.push(pullsheet);
+  }
+
+  // Recursively search children
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      results.push(...extractPullsheetsFromTree(child, depth + 1));
+    }
+  }
+
+  return results;
+}
