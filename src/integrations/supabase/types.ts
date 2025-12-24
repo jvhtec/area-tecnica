@@ -4702,6 +4702,8 @@ export type Database = {
           notes: string | null
           preset_id: string
           quantity: number
+          source: string | null
+          subsystem: string | null
           updated_at: string | null
         }
         Insert: {
@@ -4711,6 +4713,8 @@ export type Database = {
           notes?: string | null
           preset_id: string
           quantity?: number
+          source?: string | null
+          subsystem?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -4720,6 +4724,8 @@ export type Database = {
           notes?: string | null
           preset_id?: string
           quantity?: number
+          source?: string | null
+          subsystem?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -8611,6 +8617,12 @@ export type Database = {
         | "iem"
         | "wired_mics"
         | "amplificacion"
+        | "pa_mains"
+        | "pa_outfill"
+        | "pa_subs"
+        | "pa_frontfill"
+        | "pa_delays"
+        | "pa_amp"
       expense_status: "draft" | "submitted" | "approved" | "rejected"
       flex_work_order_item_source: "role" | "extra"
       form_status: "pending" | "submitted" | "expired"
@@ -8925,6 +8937,12 @@ export const Constants = {
         "iem",
         "wired_mics",
         "amplificacion",
+        "pa_mains",
+        "pa_outfill",
+        "pa_subs",
+        "pa_frontfill",
+        "pa_delays",
+        "pa_amp",
       ],
       expense_status: ["draft", "submitted", "approved", "rejected"],
       flex_work_order_item_source: ["role", "extra"],

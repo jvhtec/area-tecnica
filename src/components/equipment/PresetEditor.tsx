@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { PresetWithItems, Equipment, PresetItem } from '@/types/equipment';
+import { PresetWithItems, Equipment, PresetItem, PresetSubsystem, resolveSubsystemForEquipment } from '@/types/equipment';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Save, X, Upload, Search } from 'lucide-react';
@@ -45,6 +45,13 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
       return acc;
     }, {} as Record<string, number>);
   });
+  const [itemSubsystems, setItemSubsystems] = useState<Record<string, PresetSubsystem | null>>(() => {
+    if (!preset?.items) return {};
+    return preset.items.reduce((acc, item) => {
+      acc[item.equipment_id] = item.subsystem ?? resolveSubsystemForEquipment(item.equipment) ?? null;
+      return acc;
+    }, {} as Record<string, PresetSubsystem | null>);
+  });
 
   const { data: equipmentList } = useQuery({
     queryKey: ['equipment', department],
@@ -59,6 +66,20 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
       return equipment as Equipment[];
     }
   });
+
+  const sourceMap = useMemo(
+    () => new Map(preset?.items?.map((item) => [item.equipment_id, item.source ?? null]) ?? []),
+    [preset?.items]
+  );
+
+  const equipmentMap = useMemo(
+    () => new Map((equipmentList || []).map((eq) => [eq.id, eq])),
+    [equipmentList]
+  );
+
+  const getSubsystemForItem = (equipmentId: string): PresetSubsystem | null => {
+    return itemSubsystems[equipmentId] ?? resolveSubsystemForEquipment(equipmentMap.get(equipmentId)) ?? null;
+  };
 
   // Fetch tours when no fixed tour is enforced
   const { data: tours } = useQuery({
@@ -77,6 +98,16 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
   const handleQuantityChange = (equipmentId: string, value: string) => {
     const quantity = parseInt(value) || 0;
     if (quantity >= 0) {
+      if (itemSubsystems[equipmentId] === undefined) {
+        const defaultSubsystem = resolveSubsystemForEquipment(equipmentMap.get(equipmentId));
+        if (defaultSubsystem) {
+          setItemSubsystems((prev) => ({
+            ...prev,
+            [equipmentId]: defaultSubsystem
+          }));
+        }
+      }
+
       setQuantities(prev => ({
         ...prev,
         [equipmentId]: quantity
@@ -93,6 +124,8 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
       .map(([equipment_id, quantity]) => ({
         equipment_id,
         quantity,
+        subsystem: getSubsystemForItem(equipment_id),
+        source: sourceMap.get(equipment_id) ?? 'manual',
         notes: '',
         created_at: now,
         updated_at: now
@@ -113,6 +146,8 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
       preset_id: preset?.id || 'temp',
       equipment_id,
       quantity,
+      subsystem: getSubsystemForItem(equipment_id),
+      source: sourceMap.get(equipment_id) ?? 'manual',
       notes: '',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()

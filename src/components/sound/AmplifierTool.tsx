@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Plus, X, Repeat } from "lucide-react";
+import { FileText, Loader2, Plus, Repeat, Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { generateAmplifierPdf } from "@/utils/amplifierCalculationPdf";
+import { supabase } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
 
 const soundComponentDatabase = [
   { id: 1, name: ' K1 ', weight: 56 },
@@ -79,18 +81,23 @@ export interface AmplifierResults {
   looseAmplifiers: number;
   plmRacks: number;
   loosePLMAmps: number;
+  laAmpsTotal: number;
+  plmAmpsTotal: number;
   perSection: {
     [key: string]: {
       amps: number;
       details: string[];
       totalAmps: number;
       mirrored?: boolean;
+      laAmps?: number;
+      plmAmps?: number;
     };
   };
 }
 
 export const AmplifierTool = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [config, setConfig] = useState<Record<string, SpeakerSection>>({
     mains: { speakers: [], mirrored: false },
     outs: { speakers: [], mirrored: false },
@@ -101,6 +108,98 @@ export const AmplifierTool = () => {
   });
 
   const [results, setResults] = useState<AmplifierResults | null>(null);
+  const [presetOptions, setPresetOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState('');
+  const [ampOptions, setAmpOptions] = useState<Array<{ id: string; name: string; category: string | null }>>([]);
+  const [laAmpEquipmentId, setLaAmpEquipmentId] = useState<string | null>(null);
+  const [plmAmpEquipmentId, setPlmAmpEquipmentId] = useState<string | null>(null);
+  const [isLoadingPresets, setIsLoadingPresets] = useState(false);
+  const [isLoadingAmpOptions, setIsLoadingAmpOptions] = useState(false);
+  const [isSavingPreset, setIsSavingPreset] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadPresets = async () => {
+      setIsLoadingPresets(true);
+      try {
+        const { data, error } = await supabase
+          .from('presets')
+          .select('id, name')
+          .eq('department', 'sound')
+          .order('name');
+
+        if (error) throw error;
+        if (!isMounted) return;
+
+        const rows = (data || []) as Array<{ id: string; name: string }>;
+        setPresetOptions(rows);
+        setSelectedPresetId((current) => current || rows[0]?.id || '');
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to load sound presets for amplifier tool', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los presets de sonido.",
+          variant: "destructive",
+        });
+      } finally {
+        if (isMounted) {
+          setIsLoadingPresets(false);
+        }
+      }
+    };
+
+    const loadAmpEquipment = async () => {
+      setIsLoadingAmpOptions(true);
+      try {
+        const { data, error } = await supabase
+          .from('equipment')
+          .select('id, name, category')
+          .eq('department', 'sound')
+          .in('category', ['pa_amp', 'amplificacion']);
+
+        if (error) throw error;
+        if (!isMounted) return;
+
+        const options = (data || []) as Array<{ id: string; name: string; category: string | null }>;
+        setAmpOptions(options);
+
+        const findByName = (needle: string) =>
+          options.find((eq) => eq.name?.toLowerCase().includes(needle.toLowerCase()));
+
+        setLaAmpEquipmentId((current) => current || findByName('la12x')?.id || options[0]?.id || null);
+        setPlmAmpEquipmentId(
+          (current) =>
+            current ||
+            findByName('plm')?.id ||
+            findByName('20000')?.id ||
+            options.find((eq) => eq.name?.toLowerCase().includes('tf'))?.id ||
+            options[0]?.id ||
+            null
+        );
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to load amplifier equipment options', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar las opciones de amplificación (Flex).",
+          variant: "destructive",
+        });
+      } finally {
+        if (isMounted) {
+          setIsLoadingAmpOptions(false);
+        }
+      }
+    };
+
+    loadPresets();
+    loadAmpEquipment();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [toast]);
 
   const getAvailableSpeakers = (section: string) => {
     const allowedSpeakers = sectionSpeakers[section as keyof typeof sectionSpeakers] || [];
@@ -257,6 +356,8 @@ export const AmplifierTool = () => {
       looseAmplifiers: 0,
       plmRacks: 0,
       loosePLMAmps: 0,
+      laAmpsTotal: 0,
+      plmAmpsTotal: 0,
       perSection: {}
     };
 
@@ -308,6 +409,8 @@ export const AmplifierTool = () => {
     
     results.plmRacks = Math.floor(totalPLMAmps / 3);
     results.loosePLMAmps = totalPLMAmps % 3;
+    results.laAmpsTotal = totalLAAmps;
+    results.plmAmpsTotal = totalPLMAmps;
 
     setResults(results);
   };
@@ -344,6 +447,141 @@ export const AmplifierTool = () => {
         description: "Failed to generate PDF. Please try again.",
         variant: "destructive"
       });
+    }
+  };
+
+  const saveResultsToPreset = async () => {
+    if (!results) {
+      toast({
+        title: "Sin cálculos",
+        description: "Calcula los amplificadores antes de guardarlos en un preset.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedPresetId) {
+      toast({
+        title: "Preset requerido",
+        description: "Selecciona un preset de sonido para guardar los amplificadores.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const laQuantity = results.laAmpsTotal;
+    const plmQuantity = results.plmAmpsTotal;
+
+    if (laQuantity > 0 && !laAmpEquipmentId) {
+      toast({
+        title: "Falta seleccionar LA12X",
+        description: "Elige el equipo de LA12X para guardar los resultados.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (plmQuantity > 0 && !plmAmpEquipmentId) {
+      toast({
+        title: "Falta seleccionar PLM20000D",
+        description: "Elige el equipo de PLM20000D para guardar los resultados.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const itemsToInsert: Array<{
+      preset_id: string;
+      equipment_id: string;
+      quantity: number;
+      subsystem: 'amplification';
+      source: 'amp_calculator';
+    }> = [];
+
+    if (laQuantity > 0 && laAmpEquipmentId) {
+      itemsToInsert.push({
+        preset_id: selectedPresetId,
+        equipment_id: laAmpEquipmentId,
+        quantity: laQuantity,
+        subsystem: 'amplification',
+        source: 'amp_calculator',
+      });
+    }
+
+    if (plmQuantity > 0 && plmAmpEquipmentId) {
+      itemsToInsert.push({
+        preset_id: selectedPresetId,
+        equipment_id: plmAmpEquipmentId,
+        quantity: plmQuantity,
+        subsystem: 'amplification',
+        source: 'amp_calculator',
+      });
+    }
+
+    setIsSavingPreset(true);
+    try {
+      const { data: previousItems, error: fetchError } = await supabase
+        .from('preset_items')
+        .select('preset_id, equipment_id, quantity, subsystem, source, notes')
+        .eq('preset_id', selectedPresetId)
+        .eq('source', 'amp_calculator');
+
+      if (fetchError) throw fetchError;
+
+      const { error: deleteError } = await supabase
+        .from('preset_items')
+        .delete()
+        .eq('preset_id', selectedPresetId)
+        .eq('source', 'amp_calculator');
+
+      if (deleteError) throw deleteError;
+
+      if (itemsToInsert.length > 0) {
+        const { error: insertError } = await supabase.from('preset_items').insert(itemsToInsert);
+        if (insertError) {
+          // Attempt to restore previous items to avoid losing data
+          if (previousItems && previousItems.length > 0) {
+            const { error: restoreError } = await supabase.from('preset_items').insert(
+              previousItems.map((item) => ({
+                preset_id: item.preset_id,
+                equipment_id: item.equipment_id,
+                quantity: item.quantity,
+                subsystem: item.subsystem,
+                source: item.source,
+                notes: item.notes ?? null,
+              }))
+            );
+            if (restoreError) {
+              console.error('Failed to restore previous amp calculator items', restoreError);
+            }
+          }
+          throw insertError;
+        }
+      }
+
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey.some((key) => key === 'presets' || key === 'job-presets' || key === 'tour-presets'),
+      });
+
+      const savedUnits = itemsToInsert.reduce((sum, item) => sum + item.quantity, 0);
+      toast({
+        title: "Preset actualizado",
+        description:
+          itemsToInsert.length > 0
+            ? `Se guardaron ${savedUnits} amplificadores en el preset seleccionado.`
+            : "Se eliminaron los amplificadores anteriores calculados.",
+      });
+    } catch (error) {
+      console.error('Failed to save amplifier results to preset', error);
+      toast({
+        title: "Error al guardar",
+        description: error instanceof Error ? error.message : "No se pudieron guardar los amplificadores en el preset.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingPreset(false);
     }
   };
 
@@ -427,6 +665,8 @@ export const AmplifierTool = () => {
       </Button>
     </div>
   );
+
+  const totalCalculatedAmps = (results?.laAmpsTotal ?? 0) + (results?.plmAmpsTotal ?? 0);
 
   return (
     <Card className="w-full">
@@ -535,6 +775,116 @@ export const AmplifierTool = () => {
                   <span>Total amplifiers needed:</span>
                   <span>{results.totalAmplifiersNeeded}</span>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {results && (
+            <div className="mt-4 border rounded-lg p-4 space-y-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h4 className="font-semibold text-sm">Guardar en preset</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Inserta los amplificadores calculados como items de preset (subsystem amplification).
+                  </p>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {totalCalculatedAmps} amplificadores calculados
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Preset de sonido</Label>
+                  <Select
+                    value={selectedPresetId}
+                    onValueChange={setSelectedPresetId}
+                    disabled={isLoadingPresets || presetOptions.length === 0 || isSavingPreset}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingPresets ? "Cargando presets..." : "Selecciona un preset"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {presetOptions.map((preset) => (
+                        <SelectItem key={preset.id} value={preset.id}>
+                          {preset.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Equipo LA12X</Label>
+                  <Select
+                    value={laAmpEquipmentId || ''}
+                    onValueChange={setLaAmpEquipmentId}
+                    disabled={isLoadingAmpOptions || ampOptions.length === 0 || isSavingPreset}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingAmpOptions ? "Cargando equipos..." : "Selecciona LA12X"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ampOptions.map((eq) => (
+                        <SelectItem key={eq.id} value={eq.id}>
+                          {eq.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Cantidad calculada: {results.laAmpsTotal}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Equipo PLM20000D</Label>
+                  <Select
+                    value={plmAmpEquipmentId || ''}
+                    onValueChange={setPlmAmpEquipmentId}
+                    disabled={isLoadingAmpOptions || ampOptions.length === 0 || isSavingPreset}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={isLoadingAmpOptions ? "Cargando equipos..." : "Selecciona PLM20000D"}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ampOptions.map((eq) => (
+                        <SelectItem key={eq.id} value={eq.id}>
+                          {eq.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Cantidad calculada: {results.plmAmpsTotal}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Los items se guardan con subsystem &quot;amplification&quot; y source &quot;amp_calculator&quot;.
+                </p>
+                <Button
+                  onClick={saveResultsToPreset}
+                  disabled={
+                    isSavingPreset ||
+                    !selectedPresetId ||
+                    (results.laAmpsTotal > 0 && !laAmpEquipmentId) ||
+                    (results.plmAmpsTotal > 0 && !plmAmpEquipmentId)
+                  }
+                  className="w-full sm:w-auto gap-2"
+                >
+                  {isSavingPreset ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Guardar en preset
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           )}
