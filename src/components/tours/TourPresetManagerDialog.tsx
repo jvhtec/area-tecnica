@@ -3,14 +3,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Copy, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Pencil, Trash2, Calculator } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { PresetEditor } from '@/components/equipment/PresetEditor';
-import { PresetItem, PresetWithItems } from '@/types/equipment';
+import { PresetItem, PresetWithItems, mapPresetWithItemsRow } from '@/types/equipment';
 import { Department } from '@/types/equipment';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
+import { AmplifierTool } from '@/components/sound/AmplifierTool';
 
 interface Props {
   open: boolean;
@@ -26,6 +27,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
   const [copyingPreset, setCopyingPreset] = useState<PresetWithItems | null>(null);
   const [presetToDelete, setPresetToDelete] = useState<PresetWithItems | null>(null);
   const [department, setDepartment] = useState<Department>('sound');
+  const [showCalculator, setShowCalculator] = useState(false);
 
   const { data: presets = [] } = useQuery({
     queryKey: ['tour-presets', tourId, department],
@@ -43,7 +45,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
         .eq('department', department)
         .order('name');
       if (error) throw error;
-      return (data || []) as PresetWithItems[];
+      return (data || []).map(mapPresetWithItemsRow);
     },
     enabled: !!tourId
   });
@@ -120,7 +122,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
 
   const Manager = () => (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">Departamento</span>
           <select
@@ -133,7 +135,17 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
             <option value="video">Vídeo</option>
           </select>
         </div>
-        <Button size="sm" onClick={() => setIsCreating(true)}>Crear Nuevo Preset</Button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          {department === 'sound' && (
+            <Button variant="outline" size="sm" onClick={() => setShowCalculator(true)} className="flex-1 sm:flex-initial">
+              <Calculator className="h-4 w-4 mr-2" />
+              Crear desde Calculadora
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setIsCreating(true)} className="flex-1 sm:flex-initial">
+            Crear Nuevo Preset
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -172,27 +184,42 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-base md:text-lg">Presets de Gira</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base md:text-lg">Presets de Gira</DialogTitle>
+          </DialogHeader>
 
-        {isCreating || editingPreset || copyingPreset ? (
+          {isCreating || editingPreset || copyingPreset ? (
+            <DepartmentProvider department={department}>
+              <PresetEditor
+                preset={editingPreset || copyingPreset}
+                isCopy={!!copyingPreset}
+                onSave={handleSavePreset}
+                onCancel={() => { setIsCreating(false); setEditingPreset(null); setCopyingPreset(null); }}
+                fixedTourId={tourId}
+              />
+            </DepartmentProvider>
+          ) : (
+            <Manager />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCalculator} onOpenChange={setShowCalculator}>
+        <DialogContent className="max-w-6xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Calculadora de Amplificadores - Crear Preset</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground mb-4">
+            Configura los altavoces y calcula los amplificadores. Los resultados se guardarán como un nuevo preset para esta gira.
+          </div>
           <DepartmentProvider department={department}>
-            <PresetEditor
-              preset={editingPreset || copyingPreset}
-              isCopy={!!copyingPreset}
-              onSave={handleSavePreset}
-              onCancel={() => { setIsCreating(false); setEditingPreset(null); setCopyingPreset(null); }}
-              fixedTourId={tourId}
-            />
+            <AmplifierTool tourId={tourId} />
           </DepartmentProvider>
-        ) : (
-          <Manager />
-        )}
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
-

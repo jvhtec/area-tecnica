@@ -7,11 +7,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PresetEditor } from './PresetEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Copy, Pencil, Trash2 } from 'lucide-react';
-import { PresetWithItems, PresetItem } from '@/types/equipment';
+import { Copy, Pencil, Trash2, Calculator } from 'lucide-react';
+import { PA_PRESET_ALLOWED_CATEGORIES, PresetWithItems, PresetItem, mapPresetWithItemsRow } from '@/types/equipment';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useDepartment } from '@/contexts/DepartmentContext';
 import { endOfDay, startOfDay } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AmplifierTool } from '@/components/sound/AmplifierTool';
 
 interface PresetCreationManagerProps {
   onClose?: () => void;
@@ -27,6 +29,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
   const [copyingPreset, setCopyingPreset] = useState<PresetWithItems | null>(null);
   const [presetToDelete, setPresetToDelete] = useState<PresetWithItems | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
 
   const dayRange = useMemo(() => {
     if (!selectedDate) return null;
@@ -102,7 +105,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         .order('name');
       
       if (error) throw error;
-      return data as PresetWithItems[];
+      return (data || []).map(mapPresetWithItemsRow);
     },
     enabled: !!session?.user?.id
   });
@@ -239,7 +242,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         }}
         jobId={(editingPreset || copyingPreset)?.job_id ?? undefined}
         jobCandidates={jobCandidates}
-        allowedCategories={department === 'sound' ? ['speakers', 'amplificacion'] : undefined}
+        allowedCategories={department === 'sound' ? PA_PRESET_ALLOWED_CATEGORIES : undefined}
       />
     );
   }
@@ -248,9 +251,17 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Presets</h2>
-        <Button onClick={() => setIsCreating(true)}>
-          Create New Preset
-        </Button>
+        <div className="flex gap-2">
+          {department === 'sound' && (
+            <Button variant="outline" onClick={() => setShowCalculator(true)}>
+              <Calculator className="h-4 w-4 mr-2" />
+              Create from Calculator
+            </Button>
+          )}
+          <Button onClick={() => setIsCreating(true)}>
+            Create New Preset
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -312,7 +323,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         </CardContent>
       </Card>
 
-      <AlertDialog 
+      <AlertDialog
         open={!!presetToDelete}
         onOpenChange={(open) => !open && setPresetToDelete(null)}
       >
@@ -339,6 +350,18 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showCalculator} onOpenChange={setShowCalculator}>
+        <DialogContent className="max-w-6xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Amplifier Calculator - Create Preset</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground mb-4">
+            Configure speakers and calculate amplifiers. Results will be saved as a new preset.
+          </div>
+          <AmplifierTool />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

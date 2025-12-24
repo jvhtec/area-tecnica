@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { PA_PRESET_ALLOWED_CATEGORIES, resolveSubsystemForEquipment } from '@/types/equipment';
 
 interface PushToFlexPullsheetDialogProps {
   open: boolean;
@@ -41,10 +42,11 @@ type PresetEquipmentRow = {
 
 type PresetItemRow = {
   quantity: number | null;
+  subsystem?: string | null;
   equipment: PresetEquipmentRow | PresetEquipmentRow[] | null;
 };
 
-const PA_PRESET_CATEGORIES = new Set(['speakers', 'amplificacion']);
+const PA_PRESET_CATEGORIES = new Set(PA_PRESET_ALLOWED_CATEGORIES);
 
 export function PushToFlexPullsheetDialog({
   open,
@@ -330,7 +332,7 @@ export function PushToFlexPullsheetDialog({
       try {
         const { data, error } = await supabase
           .from('preset_items')
-          .select('quantity, equipment:equipment(id, name, category, resource_id)')
+          .select('quantity, subsystem, equipment:equipment(id, name, category, resource_id)')
           .eq('preset_id', selectedPaPresetId);
 
         if (error) throw error;
@@ -353,17 +355,21 @@ export function PushToFlexPullsheetDialog({
             return;
           }
 
-          const existing = foundByResource.get(equipmentRow.resource_id);
+          const subsystem = row.subsystem ?? resolveSubsystemForEquipment(equipmentRow);
+          const mergeKey = `${equipmentRow.resource_id}:${subsystem ?? ''}`;
+
+          const existing = foundByResource.get(mergeKey);
           if (existing) {
             existing.quantity += qty;
             return;
           }
 
-          foundByResource.set(equipmentRow.resource_id, {
+          foundByResource.set(mergeKey, {
             resourceId: equipmentRow.resource_id,
             quantity: qty,
             name: equipmentRow.name,
             category: equipmentRow.category,
+            subsystem,
           });
         });
 
@@ -401,11 +407,20 @@ export function PushToFlexPullsheetDialog({
 
     const merged = new Map<string, EquipmentItem>();
     for (const item of items) {
-      const existing = merged.get(item.resourceId);
+      const normalizedSubsystem =
+        item.subsystem ??
+        resolveSubsystemForEquipment({ category: item.category ?? null }) ??
+        item.category ??
+        '';
+      const mergeKey = `${item.resourceId}:${normalizedSubsystem}`;
+      const existing = merged.get(mergeKey);
       if (existing) {
         existing.quantity += item.quantity;
+        if (!existing.subsystem && normalizedSubsystem) {
+          existing.subsystem = normalizedSubsystem;
+        }
       } else {
-        merged.set(item.resourceId, { ...item });
+        merged.set(mergeKey, { ...item, subsystem: normalizedSubsystem || item.subsystem });
       }
     }
 
