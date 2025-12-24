@@ -116,6 +116,9 @@ export const AmplifierTool = () => {
   const [isLoadingPresets, setIsLoadingPresets] = useState(false);
   const [isLoadingAmpOptions, setIsLoadingAmpOptions] = useState(false);
   const [isSavingPreset, setIsSavingPreset] = useState(false);
+  const [speakerEquipmentMap, setSpeakerEquipmentMap] = useState<Map<string, string>>(new Map());
+  const [createNewPreset, setCreateNewPreset] = useState(false);
+  const [newPresetName, setNewPresetName] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -193,8 +196,38 @@ export const AmplifierTool = () => {
       }
     };
 
+    const loadSpeakerEquipment = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('equipment')
+          .select('id, name')
+          .eq('department', 'sound');
+
+        if (error) throw error;
+        if (!isMounted) return;
+
+        // Create mapping from speaker name (trimmed) to equipment ID
+        const map = new Map<string, string>();
+        soundComponentDatabase.forEach((speaker) => {
+          const speakerName = speaker.name.trim();
+          const matchingEquipment = data?.find((eq) =>
+            eq.name?.toLowerCase() === speakerName.toLowerCase() ||
+            eq.name?.toLowerCase().includes(speakerName.toLowerCase())
+          );
+          if (matchingEquipment) {
+            map.set(speakerName, matchingEquipment.id);
+          }
+        });
+        setSpeakerEquipmentMap(map);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to load speaker equipment mapping', error);
+      }
+    };
+
     loadPresets();
     loadAmpEquipment();
+    loadSpeakerEquipment();
 
     return () => {
       isMounted = false;
@@ -460,7 +493,17 @@ export const AmplifierTool = () => {
       return;
     }
 
-    if (!selectedPresetId) {
+    // Handle creating new preset
+    if (createNewPreset) {
+      if (!newPresetName.trim()) {
+        toast({
+          title: "Nombre requerido",
+          description: "Ingresa un nombre para el nuevo preset.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (!selectedPresetId) {
       toast({
         title: "Preset requerido",
         description: "Selecciona un preset de sonido para guardar los amplificadores.",
@@ -490,40 +533,52 @@ export const AmplifierTool = () => {
       return;
     }
 
-    const itemsToInsert: Array<{
-      preset_id: string;
-      equipment_id: string;
-      quantity: number;
-      subsystem: 'amplification';
-      source: 'amp_calculator';
-    }> = [];
-
-    if (laQuantity > 0 && laAmpEquipmentId) {
-      itemsToInsert.push({
-        preset_id: selectedPresetId,
-        equipment_id: laAmpEquipmentId,
-        quantity: laQuantity,
-        subsystem: 'amplification',
-        source: 'amp_calculator',
-      });
-    }
-
-    if (plmQuantity > 0 && plmAmpEquipmentId) {
-      itemsToInsert.push({
-        preset_id: selectedPresetId,
-        equipment_id: plmAmpEquipmentId,
-        quantity: plmQuantity,
-        subsystem: 'amplification',
-        source: 'amp_calculator',
-      });
-    }
-
     setIsSavingPreset(true);
     try {
+      let targetPresetId = selectedPresetId;
+
+      // Create new preset if in create mode
+      if (createNewPreset) {
+        const { data: session, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session?.session?.user?.id) {
+          throw new Error('Usuario no autenticado');
+        }
+
+        const { data: newPreset, error: createError } = await supabase
+          .from('presets')
+          .insert({
+            name: newPresetName.trim(),
+            created_by: session.session.user.id,
+            user_id: session.session.user.id,
+            department: 'sound',
+            is_template: false,
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        if (!newPreset) throw new Error('No se pudo crear el preset');
+
+        targetPresetId = newPreset.id;
+        setSelectedPresetId(targetPresetId);
+        setCreateNewPreset(false);
+        setNewPresetName('');
+
+        // Refresh preset list
+        const { data: updatedPresets } = await supabase
+          .from('presets')
+          .select('id, name')
+          .eq('department', 'sound')
+          .order('name');
+        if (updatedPresets) {
+          setPresetOptions(updatedPresets);
+        }
+      }
+
       const { data: previousItems, error: fetchError } = await supabase
         .from('preset_items')
         .select('preset_id, equipment_id, quantity, subsystem, source, notes')
-        .eq('preset_id', selectedPresetId)
+        .eq('preset_id', targetPresetId)
         .eq('source', 'amp_calculator');
 
       if (fetchError) throw fetchError;
@@ -531,10 +586,63 @@ export const AmplifierTool = () => {
       const { error: deleteError } = await supabase
         .from('preset_items')
         .delete()
-        .eq('preset_id', selectedPresetId)
+        .eq('preset_id', targetPresetId)
         .eq('source', 'amp_calculator');
 
       if (deleteError) throw deleteError;
+
+      // Build items to insert using targetPresetId
+      const itemsToInsert: Array<{
+        preset_id: string;
+        equipment_id: string;
+        quantity: number;
+        subsystem: 'mains' | 'outs' | 'subs' | 'fronts' | 'delays' | 'other' | 'amplification';
+        source: 'amp_calculator';
+      }> = [];
+
+      // Add speaker items from config
+      Object.entries(config).forEach(([section, { speakers, mirrored }]) => {
+        speakers.forEach((speaker) => {
+          if (speaker.quantity > 0 && speaker.speakerId) {
+            const speakerData = soundComponentDatabase.find(s => s.id.toString() === speaker.speakerId);
+            if (speakerData) {
+              const speakerName = speakerData.name.trim();
+              const equipmentId = speakerEquipmentMap.get(speakerName);
+              if (equipmentId) {
+                // Calculate final quantity (accounting for mirrored)
+                const finalQuantity = mirrored ? speaker.quantity * 2 : speaker.quantity;
+                itemsToInsert.push({
+                  preset_id: targetPresetId,
+                  equipment_id: equipmentId,
+                  quantity: finalQuantity,
+                  subsystem: section as 'mains' | 'outs' | 'subs' | 'fronts' | 'delays' | 'other',
+                  source: 'amp_calculator',
+                });
+              }
+            }
+          }
+        });
+      });
+
+      if (laQuantity > 0 && laAmpEquipmentId) {
+        itemsToInsert.push({
+          preset_id: targetPresetId,
+          equipment_id: laAmpEquipmentId,
+          quantity: laQuantity,
+          subsystem: 'amplification',
+          source: 'amp_calculator',
+        });
+      }
+
+      if (plmQuantity > 0 && plmAmpEquipmentId) {
+        itemsToInsert.push({
+          preset_id: targetPresetId,
+          equipment_id: plmAmpEquipmentId,
+          quantity: plmQuantity,
+          subsystem: 'amplification',
+          source: 'amp_calculator',
+        });
+      }
 
       if (itemsToInsert.length > 0) {
         const { error: insertError } = await supabase.from('preset_items').insert(itemsToInsert);
@@ -566,12 +674,14 @@ export const AmplifierTool = () => {
       });
 
       const savedUnits = itemsToInsert.reduce((sum, item) => sum + item.quantity, 0);
+      const speakerCount = itemsToInsert.filter(item => item.subsystem !== 'amplification').length;
+      const ampCount = itemsToInsert.filter(item => item.subsystem === 'amplification').length;
       toast({
         title: "Preset actualizado",
         description:
           itemsToInsert.length > 0
-            ? `Se guardaron ${savedUnits} amplificadores en el preset seleccionado.`
-            : "Se eliminaron los amplificadores anteriores calculados.",
+            ? `Se guardaron ${speakerCount} altavoces y ${ampCount} amplificadores (${savedUnits} unidades totales).`
+            : "Se eliminaron los equipos anteriores calculados.",
       });
     } catch (error) {
       console.error('Failed to save amplifier results to preset', error);
@@ -795,23 +905,45 @@ export const AmplifierTool = () => {
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Preset de sonido</Label>
-                  <Select
-                    value={selectedPresetId}
-                    onValueChange={setSelectedPresetId}
-                    disabled={isLoadingPresets || presetOptions.length === 0 || isSavingPreset}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={isLoadingPresets ? "Cargando presets..." : "Selecciona un preset"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {presetOptions.map((preset) => (
-                        <SelectItem key={preset.id} value={preset.id}>
-                          {preset.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center justify-between">
+                    <Label>Preset de sonido</Label>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 text-xs"
+                      onClick={() => {
+                        setCreateNewPreset(!createNewPreset);
+                        setNewPresetName('');
+                      }}
+                    >
+                      {createNewPreset ? 'Seleccionar existente' : 'Crear nuevo'}
+                    </Button>
+                  </div>
+                  {createNewPreset ? (
+                    <Input
+                      placeholder="Nombre del nuevo preset..."
+                      value={newPresetName}
+                      onChange={(e) => setNewPresetName(e.target.value)}
+                      disabled={isSavingPreset}
+                    />
+                  ) : (
+                    <Select
+                      value={selectedPresetId}
+                      onValueChange={setSelectedPresetId}
+                      disabled={isLoadingPresets || presetOptions.length === 0 || isSavingPreset}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingPresets ? "Cargando presets..." : "Selecciona un preset"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {presetOptions.map((preset) => (
+                          <SelectItem key={preset.id} value={preset.id}>
+                            {preset.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 <div className="space-y-2">
