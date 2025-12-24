@@ -210,8 +210,10 @@ export const AmplifierTool = () => {
         const map = new Map<string, string>();
         soundComponentDatabase.forEach((speaker) => {
           const speakerName = speaker.name.trim();
+          // Try exact match first, then fallback to includes
           const matchingEquipment = data?.find((eq) =>
-            eq.name?.toLowerCase() === speakerName.toLowerCase() ||
+            eq.name?.toLowerCase() === speakerName.toLowerCase()
+          ) || data?.find((eq) =>
             eq.name?.toLowerCase().includes(speakerName.toLowerCase())
           );
           if (matchingEquipment) {
@@ -536,6 +538,7 @@ export const AmplifierTool = () => {
     setIsSavingPreset(true);
     try {
       let targetPresetId = selectedPresetId;
+      let createdNewPresetId: string | null = null;
 
       // Create new preset if in create mode
       if (createNewPreset) {
@@ -560,6 +563,7 @@ export const AmplifierTool = () => {
         if (!newPreset) throw new Error('No se pudo crear el preset');
 
         targetPresetId = newPreset.id;
+        createdNewPresetId = newPreset.id;
         setSelectedPresetId(targetPresetId);
         setCreateNewPreset(false);
         setNewPresetName('');
@@ -581,7 +585,13 @@ export const AmplifierTool = () => {
         .eq('preset_id', targetPresetId)
         .eq('source', 'amp_calculator');
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        // Clean up newly created preset if fetch fails
+        if (createdNewPresetId) {
+          await supabase.from('presets').delete().eq('id', createdNewPresetId);
+        }
+        throw fetchError;
+      }
 
       const { error: deleteError } = await supabase
         .from('preset_items')
@@ -589,7 +599,13 @@ export const AmplifierTool = () => {
         .eq('preset_id', targetPresetId)
         .eq('source', 'amp_calculator');
 
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        // Clean up newly created preset if delete fails
+        if (createdNewPresetId) {
+          await supabase.from('presets').delete().eq('id', createdNewPresetId);
+        }
+        throw deleteError;
+      }
 
       // Build items to insert using targetPresetId
       const itemsToInsert: Array<{
@@ -647,6 +663,8 @@ export const AmplifierTool = () => {
       if (itemsToInsert.length > 0) {
         const { error: insertError } = await supabase.from('preset_items').insert(itemsToInsert);
         if (insertError) {
+          let errorMessage = 'No se pudieron guardar los items en el preset.';
+
           // Attempt to restore previous items to avoid losing data
           if (previousItems && previousItems.length > 0) {
             const { error: restoreError } = await supabase.from('preset_items').insert(
@@ -661,9 +679,23 @@ export const AmplifierTool = () => {
             );
             if (restoreError) {
               console.error('Failed to restore previous amp calculator items', restoreError);
+              // Show critical warning to user
+              toast({
+                title: "Advertencia crítica",
+                description: "Error al guardar items. Falló la restauración de datos anteriores - se pueden haber perdido datos previos.",
+                variant: "destructive",
+              });
+              errorMessage = 'Error al guardar items. Además, falló la restauración de datos anteriores del calculador.';
             }
           }
-          throw insertError;
+
+          // Clean up newly created preset if insertion fails
+          if (createdNewPresetId) {
+            await supabase.from('presets').delete().eq('id', createdNewPresetId);
+            errorMessage += ' El preset creado fue eliminado.';
+          }
+
+          throw new Error(errorMessage);
         }
       }
 
