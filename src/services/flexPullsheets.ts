@@ -199,7 +199,7 @@ export async function pushEquipmentToPullsheet(
   // Group equipment by resolved Flex category key
   const equipmentByCategory = new Map<string, Array<EquipmentItem & { flexCategoryKey: string }>>();
   normalizedItems.forEach(item => {
-    const category = item.flexCategoryKey || resolveFlexCategoryKey(item);
+    const category = item.flexCategoryKey;
     if (!equipmentByCategory.has(category)) {
       equipmentByCategory.set(category, []);
     }
