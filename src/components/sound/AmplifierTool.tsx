@@ -95,7 +95,12 @@ export interface AmplifierResults {
   };
 }
 
-export const AmplifierTool = () => {
+export interface AmplifierToolProps {
+  jobId?: string;
+  tourId?: string;
+}
+
+export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [config, setConfig] = useState<Record<string, SpeakerSection>>({
@@ -555,6 +560,8 @@ export const AmplifierTool = () => {
             user_id: session.session.user.id,
             department: 'sound',
             is_template: false,
+            job_id: jobId ?? null,
+            tour_id: tourId ?? null,
           })
           .select()
           .single();

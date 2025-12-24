@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Copy, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Pencil, Trash2, Calculator } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +12,7 @@ import { PA_PRESET_ALLOWED_CATEGORIES, PresetItem, PresetWithItems, Department, 
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
 import { format } from 'date-fns';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { AmplifierTool } from '@/components/sound/AmplifierTool';
 
 interface Props {
   open: boolean;
@@ -28,6 +29,7 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
   const [copyingPreset, setCopyingPreset] = useState<PresetWithItems | null>(null);
   const [presetToDelete, setPresetToDelete] = useState<PresetWithItems | null>(null);
   const [department, setDepartment] = useState<Department>('sound');
+  const [showCalculator, setShowCalculator] = useState(false);
 
   // Fetch job date range
   const { data: jobDates = [] } = useQuery({
@@ -220,9 +222,17 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
             <option value="video">Video</option>
           </select>
         </div>
-        <Button size="sm" onClick={() => setIsCreating(true)} className="w-full sm:w-auto">
-          Create New Preset
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          {department === 'sound' && (
+            <Button variant="outline" size="sm" onClick={() => setShowCalculator(true)} className="flex-1 sm:flex-initial">
+              <Calculator className="h-4 w-4 mr-2" />
+              Create from Calculator
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setIsCreating(true)} className="flex-1 sm:flex-initial">
+            Create New Preset
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -266,27 +276,43 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-base sm:text-lg">Job Presets</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Job Presets</DialogTitle>
+          </DialogHeader>
 
-        {isCreating || editingPreset || copyingPreset ? (
+          {isCreating || editingPreset || copyingPreset ? (
+            <DepartmentProvider department={department}>
+              <PresetEditor
+                preset={editingPreset || copyingPreset}
+                isCopy={!!copyingPreset}
+                onSave={handleSavePreset}
+                onCancel={() => { setIsCreating(false); setEditingPreset(null); setCopyingPreset(null); }}
+                jobId={jobId}
+                allowedCategories={department === 'sound' ? PA_PRESET_ALLOWED_CATEGORIES : undefined}
+              />
+            </DepartmentProvider>
+          ) : (
+            <Manager />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCalculator} onOpenChange={setShowCalculator}>
+        <DialogContent className="max-w-6xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Amplifier Calculator - Create Preset</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground mb-4">
+            Configure speakers and calculate amplifiers. Results will be saved as a new preset for this job.
+          </div>
           <DepartmentProvider department={department}>
-            <PresetEditor
-              preset={editingPreset || copyingPreset}
-              isCopy={!!copyingPreset}
-              onSave={handleSavePreset}
-              onCancel={() => { setIsCreating(false); setEditingPreset(null); setCopyingPreset(null); }}
-              jobId={jobId}
-              allowedCategories={department === 'sound' ? PA_PRESET_ALLOWED_CATEGORIES : undefined}
-            />
+            <AmplifierTool jobId={jobId} />
           </DepartmentProvider>
-        ) : (
-          <Manager />
-        )}
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
