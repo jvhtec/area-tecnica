@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Music2, Layout, Calendar, Printer, Loader2, FileText, Download, Eye, Clock, FolderPlus, RefreshCw, MapPin, Link as LinkIcon, Box, Upload, Trash2, Archive, RotateCw, MessageCircle, Scale, Zap, AlertCircle } from "lucide-react";
+import { Users, Music2, Layout, Calendar, Printer, Loader2, FileText, Download, Eye, Clock, FolderPlus, RefreshCw, MapPin, Link as LinkIcon, Box, Upload, Trash2, Archive, RotateCw, MessageCircle, Scale, Zap, AlertCircle, DollarSign } from "lucide-react";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,7 @@ import { resolveJobDocLocation } from "@/utils/jobDocuments";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { CreatePresupuestoDialog } from "@/components/festival/CreatePresupuestoDialog";
 
 interface FestivalJob {
   id: string;
@@ -148,6 +149,7 @@ const FestivalManagement = () => {
   const [isSendingWa, setIsSendingWa] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPresupuestoDialogOpen, setIsPresupuestoDialogOpen] = useState(false);
 
   const resolveJobDocumentLocation = useCallback((path: string) => resolveJobDocLocation(path), []);
 
@@ -1468,6 +1470,27 @@ const FestivalManagement = () => {
                   </Button>
                 </div>
 
+                {/* Create Presupuesto */}
+                {canEdit && (
+                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-green-500/5">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <DollarSign className="h-4 w-4 flex-shrink-0 text-green-500" />
+                      Crear Presupuesto
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Crea un presupuesto con el equipo del escenario seleccionado.
+                    </p>
+                    <Button
+                      onClick={() => setIsPresupuestoDialogOpen(true)}
+                      disabled={!job || !folderExists}
+                      size="sm"
+                      className="w-full"
+                    >
+                      Crear Presupuesto
+                    </Button>
+                  </div>
+                )}
+
                 {/* Upload Documents */}
                 {canEdit && (
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-blue-500/5">
@@ -1861,6 +1884,14 @@ const FestivalManagement = () => {
           onOpenChange={setIsJobDetailsOpen}
           job={job}
           department={assignmentDepartment}
+        />
+      )}
+
+      {jobId && (
+        <CreatePresupuestoDialog
+          open={isPresupuestoDialogOpen}
+          onOpenChange={setIsPresupuestoDialogOpen}
+          jobId={jobId}
         />
       )}
 
