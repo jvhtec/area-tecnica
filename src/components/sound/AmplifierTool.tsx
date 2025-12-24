@@ -116,7 +116,9 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
   const [presetOptions, setPresetOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedPresetId, setSelectedPresetId] = useState('');
   const [ampOptions, setAmpOptions] = useState<Array<{ id: string; name: string; category: string | null }>>([]);
+  const [laRakEquipmentId, setLaRakEquipmentId] = useState<string | null>(null);
   const [laAmpEquipmentId, setLaAmpEquipmentId] = useState<string | null>(null);
+  const [plmRakEquipmentId, setPlmRakEquipmentId] = useState<string | null>(null);
   const [plmAmpEquipmentId, setPlmAmpEquipmentId] = useState<string | null>(null);
   const [isLoadingPresets, setIsLoadingPresets] = useState(false);
   const [isLoadingAmpOptions, setIsLoadingAmpOptions] = useState(false);
@@ -519,22 +521,39 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
       return;
     }
 
-    const laQuantity = results.laAmpsTotal;
-    const plmQuantity = results.plmAmpsTotal;
-
-    if (laQuantity > 0 && !laAmpEquipmentId) {
+    // Validation for LA equipment
+    if (results.completeRaks > 0 && !laRakEquipmentId) {
       toast({
-        title: "Falta seleccionar LA12X",
-        description: "Elige el equipo de LA12X para guardar los resultados.",
+        title: "Falta seleccionar LA-RAK",
+        description: "Elige el equipo de LA-RAK para guardar los racks completos.",
         variant: "destructive",
       });
       return;
     }
 
-    if (plmQuantity > 0 && !plmAmpEquipmentId) {
+    if (results.looseAmplifiers > 0 && !laAmpEquipmentId) {
+      toast({
+        title: "Falta seleccionar LA12X",
+        description: "Elige el equipo de LA12X para guardar los amplificadores sueltos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validation for PLM equipment
+    if (results.plmRacks > 0 && !plmRakEquipmentId) {
+      toast({
+        title: "Falta seleccionar PLM-RAK",
+        description: "Elige el equipo de PLM-RAK para guardar los racks completos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (results.loosePLMAmps > 0 && !plmAmpEquipmentId) {
       toast({
         title: "Falta seleccionar PLM20000D",
-        description: "Elige el equipo de PLM20000D para guardar los resultados.",
+        description: "Elige el equipo de PLM20000D para guardar los amplificadores sueltos.",
         variant: "destructive",
       });
       return;
@@ -657,21 +676,45 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
         });
       });
 
-      if (laQuantity > 0 && laAmpEquipmentId) {
+      // Add LA-RAK (complete racks)
+      if (results.completeRaks > 0 && laRakEquipmentId) {
         itemsToInsert.push({
           preset_id: targetPresetId,
-          equipment_id: laAmpEquipmentId,
-          quantity: laQuantity,
+          equipment_id: laRakEquipmentId,
+          quantity: results.completeRaks,
           subsystem: 'amplification',
           source: 'amp_calculator',
         });
       }
 
-      if (plmQuantity > 0 && plmAmpEquipmentId) {
+      // Add loose LA12X amplifiers
+      if (results.looseAmplifiers > 0 && laAmpEquipmentId) {
+        itemsToInsert.push({
+          preset_id: targetPresetId,
+          equipment_id: laAmpEquipmentId,
+          quantity: results.looseAmplifiers,
+          subsystem: 'amplification',
+          source: 'amp_calculator',
+        });
+      }
+
+      // Add PLM-RAK (complete racks)
+      if (results.plmRacks > 0 && plmRakEquipmentId) {
+        itemsToInsert.push({
+          preset_id: targetPresetId,
+          equipment_id: plmRakEquipmentId,
+          quantity: results.plmRacks,
+          subsystem: 'amplification',
+          source: 'amp_calculator',
+        });
+      }
+
+      // Add loose PLM20000D amplifiers
+      if (results.loosePLMAmps > 0 && plmAmpEquipmentId) {
         itemsToInsert.push({
           preset_id: targetPresetId,
           equipment_id: plmAmpEquipmentId,
-          quantity: plmQuantity,
+          quantity: results.loosePLMAmps,
           subsystem: 'amplification',
           source: 'amp_calculator',
         });
@@ -957,7 +1000,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>Preset de sonido</Label>
@@ -1000,49 +1043,97 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Equipo LA12X</Label>
-                  <Select
-                    value={laAmpEquipmentId || ''}
-                    onValueChange={setLaAmpEquipmentId}
-                    disabled={isLoadingAmpOptions || ampOptions.length === 0 || isSavingPreset}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={isLoadingAmpOptions ? "Cargando equipos..." : "Selecciona LA12X"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ampOptions.map((eq) => (
-                        <SelectItem key={eq.id} value={eq.id}>
-                          {eq.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">Cantidad calculada: {results.laAmpsTotal}</p>
-                </div>
+                {results.completeRaks > 0 && (
+                  <div className="space-y-2">
+                    <Label>Equipo LA-RAK (racks completos)</Label>
+                    <Select
+                      value={laRakEquipmentId || ''}
+                      onValueChange={setLaRakEquipmentId}
+                      disabled={isLoadingAmpOptions || ampOptions.length === 0 || isSavingPreset}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingAmpOptions ? "Cargando equipos..." : "Selecciona LA-RAK"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ampOptions.map((eq) => (
+                          <SelectItem key={eq.id} value={eq.id}>
+                            {eq.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Racks calculados: {results.completeRaks}</p>
+                  </div>
+                )}
 
-                <div className="space-y-2">
-                  <Label>Equipo PLM20000D</Label>
-                  <Select
-                    value={plmAmpEquipmentId || ''}
-                    onValueChange={setPlmAmpEquipmentId}
-                    disabled={isLoadingAmpOptions || ampOptions.length === 0 || isSavingPreset}
-                  >
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={isLoadingAmpOptions ? "Cargando equipos..." : "Selecciona PLM20000D"}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ampOptions.map((eq) => (
-                        <SelectItem key={eq.id} value={eq.id}>
-                          {eq.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">Cantidad calculada: {results.plmAmpsTotal}</p>
-                </div>
+                {results.looseAmplifiers > 0 && (
+                  <div className="space-y-2">
+                    <Label>Equipo LA12X (amplificadores sueltos)</Label>
+                    <Select
+                      value={laAmpEquipmentId || ''}
+                      onValueChange={setLaAmpEquipmentId}
+                      disabled={isLoadingAmpOptions || ampOptions.length === 0 || isSavingPreset}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingAmpOptions ? "Cargando equipos..." : "Selecciona LA12X"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ampOptions.map((eq) => (
+                          <SelectItem key={eq.id} value={eq.id}>
+                            {eq.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Amplificadores sueltos: {results.looseAmplifiers}</p>
+                  </div>
+                )}
+
+                {results.plmRacks > 0 && (
+                  <div className="space-y-2">
+                    <Label>Equipo PLM-RAK (racks completos)</Label>
+                    <Select
+                      value={plmRakEquipmentId || ''}
+                      onValueChange={setPlmRakEquipmentId}
+                      disabled={isLoadingAmpOptions || ampOptions.length === 0 || isSavingPreset}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingAmpOptions ? "Cargando equipos..." : "Selecciona PLM-RAK"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ampOptions.map((eq) => (
+                          <SelectItem key={eq.id} value={eq.id}>
+                            {eq.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Racks calculados: {results.plmRacks}</p>
+                  </div>
+                )}
+
+                {results.loosePLMAmps > 0 && (
+                  <div className="space-y-2">
+                    <Label>Equipo PLM20000D (amplificadores sueltos)</Label>
+                    <Select
+                      value={plmAmpEquipmentId || ''}
+                      onValueChange={setPlmAmpEquipmentId}
+                      disabled={isLoadingAmpOptions || ampOptions.length === 0 || isSavingPreset}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingAmpOptions ? "Cargando equipos..." : "Selecciona PLM20000D"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ampOptions.map((eq) => (
+                          <SelectItem key={eq.id} value={eq.id}>
+                            {eq.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Amplificadores sueltos: {results.loosePLMAmps}</p>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1055,8 +1146,10 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
                     isSavingPreset ||
                     (!createNewPreset && !selectedPresetId) ||
                     (createNewPreset && !newPresetName.trim()) ||
-                    (results.laAmpsTotal > 0 && !laAmpEquipmentId) ||
-                    (results.plmAmpsTotal > 0 && !plmAmpEquipmentId)
+                    (results.completeRaks > 0 && !laRakEquipmentId) ||
+                    (results.looseAmplifiers > 0 && !laAmpEquipmentId) ||
+                    (results.plmRacks > 0 && !plmRakEquipmentId) ||
+                    (results.loosePLMAmps > 0 && !plmAmpEquipmentId)
                   }
                   className="w-full sm:w-auto gap-2"
                 >
