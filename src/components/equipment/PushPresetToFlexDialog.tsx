@@ -8,7 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle2, XCircle, AlertTriangle, Upload } from 'lucide-react';
 import { extractFlexElementId } from '@/utils/flexUrlParser';
 import { pushEquipmentToPullsheet, EquipmentItem, getJobPullsheetsWithFlexApi, JobPullsheet } from '@/services/flexPullsheets';
-import { PresetItem, Equipment } from '@/types/equipment';
+import { PresetItem, Equipment, resolveSubsystemForEquipment } from '@/types/equipment';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -231,12 +231,15 @@ export function PushPresetToFlexDialog({
       const eq = equipmentMap.get(item.equipment_id);
       if (!eq) return;
 
+      const subsystem = item.subsystem ?? resolveSubsystemForEquipment(eq);
+
       if (eq.resource_id) {
         found.push({
           resourceId: eq.resource_id,
           quantity: item.quantity,
           name: eq.name,
           category: eq.category,
+          subsystem,
         });
       } else {
         missingItems.push(eq.name);
