@@ -407,15 +407,20 @@ export function PushToFlexPullsheetDialog({
 
     const merged = new Map<string, EquipmentItem>();
     for (const item of items) {
-      const mergeKey = `${item.resourceId}:${item.subsystem ?? item.category ?? ''}`;
+      const normalizedSubsystem =
+        item.subsystem ??
+        resolveSubsystemForEquipment({ category: item.category ?? null }) ??
+        item.category ??
+        '';
+      const mergeKey = `${item.resourceId}:${normalizedSubsystem}`;
       const existing = merged.get(mergeKey);
       if (existing) {
         existing.quantity += item.quantity;
-        if (!existing.subsystem && item.subsystem) {
-          existing.subsystem = item.subsystem;
+        if (!existing.subsystem && normalizedSubsystem) {
+          existing.subsystem = normalizedSubsystem;
         }
       } else {
-        merged.set(mergeKey, { ...item });
+        merged.set(mergeKey, { ...item, subsystem: normalizedSubsystem || item.subsystem });
       }
     }
 

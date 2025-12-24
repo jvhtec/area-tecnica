@@ -199,11 +199,10 @@ export async function pushEquipmentToPullsheet(
   // Group equipment by resolved Flex category key
   const equipmentByCategory = new Map<string, Array<EquipmentItem & { flexCategoryKey: string }>>();
   normalizedItems.forEach(item => {
-    const category = item.flexCategoryKey || resolveFlexCategoryKey(item);
-    if (!equipmentByCategory.has(category)) {
-      equipmentByCategory.set(category, []);
+    if (!equipmentByCategory.has(item.flexCategoryKey)) {
+      equipmentByCategory.set(item.flexCategoryKey, []);
     }
-    equipmentByCategory.get(category)!.push(item);
+    equipmentByCategory.get(item.flexCategoryKey)!.push(item);
   });
 
   // Track category line IDs for nesting

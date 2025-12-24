@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { supabase } from "@/lib/supabase";
-import { PresetWithItems } from "@/types/equipment";
+import { PresetWithItems, mapPresetWithItemsRow } from "@/types/equipment";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, isValid } from "date-fns";
 import { Calendar, Loader2, Trash2 } from "lucide-react";
@@ -45,7 +45,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign, className }: Qui
         .order('name');
       
       if (error) throw error;
-      return (data || []) as PresetWithItems[];
+      return (data || []).map(mapPresetWithItemsRow);
     },
     enabled: !!session?.user?.id
   });

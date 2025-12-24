@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { PresetEditor } from '@/components/equipment/PresetEditor';
-import { PresetItem, PresetWithItems } from '@/types/equipment';
+import { PresetItem, PresetWithItems, mapPresetWithItemsRow } from '@/types/equipment';
 import { Department } from '@/types/equipment';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
 
@@ -43,7 +43,7 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
         .eq('department', department)
         .order('name');
       if (error) throw error;
-      return (data || []) as PresetWithItems[];
+      return (data || []).map(mapPresetWithItemsRow);
     },
     enabled: !!tourId
   });
@@ -195,4 +195,3 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
     </Dialog>
   );
 }
-

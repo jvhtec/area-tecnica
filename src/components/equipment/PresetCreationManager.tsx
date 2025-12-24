@@ -8,7 +8,7 @@ import { PresetEditor } from './PresetEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Copy, Pencil, Trash2 } from 'lucide-react';
-import { PA_PRESET_ALLOWED_CATEGORIES, PresetWithItems, PresetItem } from '@/types/equipment';
+import { PA_PRESET_ALLOWED_CATEGORIES, PresetWithItems, PresetItem, mapPresetWithItemsRow } from '@/types/equipment';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useDepartment } from '@/contexts/DepartmentContext';
 import { endOfDay, startOfDay } from 'date-fns';
@@ -102,7 +102,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         .order('name');
       
       if (error) throw error;
-      return data as PresetWithItems[];
+      return (data || []).map(mapPresetWithItemsRow);
     },
     enabled: !!session?.user?.id
   });

@@ -174,7 +174,17 @@ export const getModelCategoriesForDepartment = (department: Department) => {
   }
 };
 
-const CATEGORY_TO_SUBSYSTEM: Record<string, PresetSubsystem> = {
+const PRESET_SUBSYSTEMS: PresetSubsystem[] = [
+  'mains',
+  'outs',
+  'subs',
+  'fronts',
+  'delays',
+  'other',
+  'amplification',
+];
+
+const CATEGORY_TO_SUBSYSTEM: Partial<Record<SoundCategory, PresetSubsystem>> = {
   pa_mains: 'mains',
   pa_outfill: 'outs',
   pa_subs: 'subs',
@@ -185,10 +195,14 @@ const CATEGORY_TO_SUBSYSTEM: Record<string, PresetSubsystem> = {
   speakers: 'mains',
 };
 
+const isSoundCategory = (category: string): category is SoundCategory =>
+  (SOUND_CATEGORIES as readonly string[]).includes(category);
+
 export const resolveSubsystemForEquipment = (
   equipment?: Pick<Equipment, 'category'> | null
 ): PresetSubsystem | null => {
   if (!equipment?.category) return null;
+  if (!isSoundCategory(equipment.category)) return null;
   return CATEGORY_TO_SUBSYSTEM[equipment.category] ?? null;
 };
 
@@ -202,3 +216,41 @@ export const PA_PRESET_ALLOWED_CATEGORIES: SoundCategory[] = [
   'speakers',
   'amplificacion',
 ];
+
+type PresetItemRow = Database["public"]["Tables"]["preset_items"]["Row"] & {
+  equipment: Equipment;
+};
+
+type PresetWithItemsRow = Database["public"]["Tables"]["presets"]["Row"] & {
+  items: PresetItemRow[];
+};
+
+const normalizePresetSubsystem = (value: string | null): PresetSubsystem | null =>
+  PRESET_SUBSYSTEMS.includes(value as PresetSubsystem) ? (value as PresetSubsystem) : null;
+
+export const mapPresetItemRow = (row: PresetItemRow): PresetItem & { equipment: Equipment } => ({
+  id: row.id,
+  preset_id: row.preset_id,
+  equipment_id: row.equipment_id,
+  quantity: row.quantity,
+  subsystem: normalizePresetSubsystem(row.subsystem),
+  source: row.source ?? null,
+  notes: row.notes ?? undefined,
+  created_at: row.created_at ?? undefined,
+  updated_at: row.updated_at ?? undefined,
+  equipment: row.equipment,
+});
+
+export const mapPresetWithItemsRow = (row: PresetWithItemsRow): PresetWithItems => ({
+  id: row.id,
+  name: row.name,
+  user_id: row.user_id ?? '',
+  department: row.department,
+  created_by: row.created_by,
+  job_id: row.job_id,
+  tour_id: row.tour_id,
+  is_template: row.is_template,
+  created_at: row.created_at ?? undefined,
+  updated_at: row.updated_at ?? undefined,
+  items: (row.items || []).map(mapPresetItemRow),
+});

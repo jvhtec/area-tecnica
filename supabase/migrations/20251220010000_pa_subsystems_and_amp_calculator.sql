@@ -15,21 +15,36 @@ ALTER TABLE preset_items
   ADD COLUMN IF NOT EXISTS subsystem TEXT,
   ADD COLUMN IF NOT EXISTS source TEXT;
 
--- Enforce valid subsystem values when provided
-ALTER TABLE preset_items
-  ADD CONSTRAINT preset_items_subsystem_valid
-  CHECK (
-    subsystem IS NULL
-    OR subsystem IN (
-      'mains',
-      'outs',
-      'subs',
-      'fronts',
-      'delays',
-      'other',
-      'amplification'
-    )
-  );
+-- Enforce valid subsystem values when provided (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint c
+    JOIN pg_class t ON c.conrelid = t.oid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE c.conname = 'preset_items_subsystem_valid'
+      AND t.relname = 'preset_items'
+      AND n.nspname = 'public'
+  ) THEN
+    EXECUTE $constraint$
+      ALTER TABLE public.preset_items
+        ADD CONSTRAINT preset_items_subsystem_valid
+        CHECK (
+          subsystem IS NULL
+          OR subsystem IN (
+            'mains',
+            'outs',
+            'subs',
+            'fronts',
+            'delays',
+            'other',
+            'amplification'
+          )
+        )
+    $constraint$;
+  END IF;
+END $$;
 
 COMMENT ON COLUMN preset_items.subsystem IS 'Logical PA subsystem for this preset item (mains, outs, subs, fronts, delays, other, amplification).';
 COMMENT ON COLUMN preset_items.source IS 'Origin of the preset item (e.g., manual entry, amp_calculator).';

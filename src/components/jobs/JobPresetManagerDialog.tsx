@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { PresetEditor } from '@/components/equipment/PresetEditor';
-import { PA_PRESET_ALLOWED_CATEGORIES, PresetItem, PresetWithItems, Department } from '@/types/equipment';
+import { PA_PRESET_ALLOWED_CATEGORIES, PresetItem, PresetWithItems, Department, mapPresetWithItemsRow } from '@/types/equipment';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
 import { format } from 'date-fns';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -70,7 +70,7 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
         .eq('job_id', jobId)
         .order('name');
       if (error) throw error;
-      return (data || []) as PresetWithItems[];
+      return (data || []).map(mapPresetWithItemsRow);
     }
   });
 
