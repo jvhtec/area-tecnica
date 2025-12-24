@@ -589,6 +589,11 @@ export const AmplifierTool = () => {
         // Clean up newly created preset if fetch fails
         if (createdNewPresetId) {
           await supabase.from('presets').delete().eq('id', createdNewPresetId);
+          // Update UI state to remove deleted preset
+          setPresetOptions(prev => prev.filter(p => p.id !== createdNewPresetId));
+          setSelectedPresetId('');
+          setCreateNewPreset(false);
+          setNewPresetName('');
         }
         throw fetchError;
       }
@@ -603,6 +608,11 @@ export const AmplifierTool = () => {
         // Clean up newly created preset if delete fails
         if (createdNewPresetId) {
           await supabase.from('presets').delete().eq('id', createdNewPresetId);
+          // Update UI state to remove deleted preset
+          setPresetOptions(prev => prev.filter(p => p.id !== createdNewPresetId));
+          setSelectedPresetId('');
+          setCreateNewPreset(false);
+          setNewPresetName('');
         }
         throw deleteError;
       }
@@ -692,6 +702,11 @@ export const AmplifierTool = () => {
           // Clean up newly created preset if insertion fails
           if (createdNewPresetId) {
             await supabase.from('presets').delete().eq('id', createdNewPresetId);
+            // Update UI state to remove deleted preset
+            setPresetOptions(prev => prev.filter(p => p.id !== createdNewPresetId));
+            setSelectedPresetId('');
+            setCreateNewPreset(false);
+            setNewPresetName('');
             errorMessage += ' El preset creado fue eliminado.';
           }
 
