@@ -999,7 +999,8 @@ export const AmplifierTool = () => {
                   onClick={saveResultsToPreset}
                   disabled={
                     isSavingPreset ||
-                    !selectedPresetId ||
+                    (!createNewPreset && !selectedPresetId) ||
+                    (createNewPreset && !newPresetName.trim()) ||
                     (results.laAmpsTotal > 0 && !laAmpEquipmentId) ||
                     (results.plmAmpsTotal > 0 && !plmAmpEquipmentId)
                   }
