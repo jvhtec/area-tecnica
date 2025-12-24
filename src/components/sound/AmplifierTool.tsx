@@ -752,15 +752,15 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
   const renderSpeakerSection = (section: string, title: string) => (
     <div className="space-y-4">
       {['mains', 'outs', 'delays'].includes(section) && (
-        <div className="flex items-center space-x-2 bg-muted/50 rounded-lg p-3 border">
+        <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-3 border">
           <Checkbox
             id={`${section}-mirrored`}
             checked={config[section].mirrored}
             onCheckedChange={(checked) => handleMirroredChange(section, checked as boolean)}
           />
-          <Label htmlFor={`${section}-mirrored`} className="flex items-center space-x-2 cursor-pointer text-sm font-medium">
-            <Repeat className="h-4 w-4" />
-            <span>Mirrored Clusters</span>
+          <Label htmlFor={`${section}-mirrored`} className="flex items-center gap-2 cursor-pointer text-sm font-medium flex-1">
+            <Repeat className="h-4 w-4 flex-shrink-0" />
+            <span className="whitespace-nowrap">Mirrored Clusters</span>
           </Label>
         </div>
       )}
@@ -840,13 +840,13 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
       <ScrollArea className="h-[calc(100vh-12rem)]">
         <CardContent className="space-y-6">
           <Tabs defaultValue="mains" className="space-y-4">
-            <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 w-full">
-              <TabsTrigger value="mains" className="text-xs sm:text-sm">Mains</TabsTrigger>
-              <TabsTrigger value="outs" className="text-xs sm:text-sm">Outs</TabsTrigger>
-              <TabsTrigger value="subs" className="text-xs sm:text-sm">Subs</TabsTrigger>
-              <TabsTrigger value="fronts" className="text-xs sm:text-sm">Fronts</TabsTrigger>
-              <TabsTrigger value="delays" className="text-xs sm:text-sm">Delays</TabsTrigger>
-              <TabsTrigger value="other" className="text-xs sm:text-sm">Other</TabsTrigger>
+            <TabsList className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 w-full gap-1">
+              <TabsTrigger value="mains" className="text-xs sm:text-sm px-2">Mains</TabsTrigger>
+              <TabsTrigger value="outs" className="text-xs sm:text-sm px-2">Outs</TabsTrigger>
+              <TabsTrigger value="subs" className="text-xs sm:text-sm px-2">Subs</TabsTrigger>
+              <TabsTrigger value="fronts" className="text-xs sm:text-sm px-2">Fronts</TabsTrigger>
+              <TabsTrigger value="delays" className="text-xs sm:text-sm px-2">Delays</TabsTrigger>
+              <TabsTrigger value="other" className="text-xs sm:text-sm px-2">Other</TabsTrigger>
             </TabsList>
 
             <TabsContent value="mains">
