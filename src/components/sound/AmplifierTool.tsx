@@ -492,6 +492,14 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
     }
   };
 
+  const cleanupNewlyCreatedPreset = async (presetId: string) => {
+    await supabase.from('presets').delete().eq('id', presetId);
+    setPresetOptions(prev => prev.filter(p => p.id !== presetId));
+    setSelectedPresetId('');
+    setCreateNewPreset(false);
+    setNewPresetName('');
+  };
+
   const saveResultsToPreset = async () => {
     if (!results) {
       toast({
@@ -614,12 +622,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
       if (fetchError) {
         // Clean up newly created preset if fetch fails
         if (createdNewPresetId) {
-          await supabase.from('presets').delete().eq('id', createdNewPresetId);
-          // Update UI state to remove deleted preset
-          setPresetOptions(prev => prev.filter(p => p.id !== createdNewPresetId));
-          setSelectedPresetId('');
-          setCreateNewPreset(false);
-          setNewPresetName('');
+          await cleanupNewlyCreatedPreset(createdNewPresetId);
         }
         throw fetchError;
       }
@@ -633,12 +636,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
       if (deleteError) {
         // Clean up newly created preset if delete fails
         if (createdNewPresetId) {
-          await supabase.from('presets').delete().eq('id', createdNewPresetId);
-          // Update UI state to remove deleted preset
-          setPresetOptions(prev => prev.filter(p => p.id !== createdNewPresetId));
-          setSelectedPresetId('');
-          setCreateNewPreset(false);
-          setNewPresetName('');
+          await cleanupNewlyCreatedPreset(createdNewPresetId);
         }
         throw deleteError;
       }
@@ -751,12 +749,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
 
           // Clean up newly created preset if insertion fails
           if (createdNewPresetId) {
-            await supabase.from('presets').delete().eq('id', createdNewPresetId);
-            // Update UI state to remove deleted preset
-            setPresetOptions(prev => prev.filter(p => p.id !== createdNewPresetId));
-            setSelectedPresetId('');
-            setCreateNewPreset(false);
-            setNewPresetName('');
+            await cleanupNewlyCreatedPreset(createdNewPresetId);
             errorMessage += ' El preset creado fue eliminado.';
           }
 
