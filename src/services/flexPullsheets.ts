@@ -1,7 +1,34 @@
 import { supabase } from '@/integrations/supabase/client';
 import { FLEX_API_BASE_URL } from '@/lib/api-config';
+import type { PresetSubsystem } from '@/types/equipment';
 
 let cachedFlexToken: string | null = null;
+
+// Material de sonido is a root-only grouping in Flex and intentionally omitted here.
+export const FLEX_CATEGORY_MAP = new Map<string, string>([
+  ['foh_console', '98905ca2-b094-45bc-ad5b-67fe311a48e8'], // Control FoH
+  ['mon_console', 'aadfee39-e5e4-4a68-b7d8-03d55b3f29f8'], // Control Mon
+  ['wireless', 'a8f2e63b-55f1-4531-83a4-835232d2bd04'], // Microfonia RF
+  ['iem', '5194620b-ed50-4a31-bf6b-a986614b3d2d'], // Rack IEM
+  ['wired_mics', '9a33f593-67e9-462d-b085-e7e215f5da72'], // Microfonia
+  ['pa_mains', 'd83de363-5f9b-46e4-8e11-5bee0ef30137'], // Sistema de PA
+  ['pa_downfill', 'aeb78382-d19c-4314-bbbe-5bbe5e5d3cd4'],
+  ['pa_outfill', 'd8e2ce25-4370-469c-8980-61760569492a'],
+  ['pa_subs', '61aba524-61db-43a9-935d-147ec287888e'],
+  ['pa_frontfill', 'd9b588e6-b9a8-4327-baa5-fecf104a6775'],
+  ['pa_delays', 'e38db281-4b27-40eb-a846-e4a27db3961f'],
+  ['pa_amp', '9d463da6-40f1-4ab0-9a96-123fd0025f88'],
+]);
+
+const SUBSYSTEM_TO_FLEX_CATEGORY: Record<PresetSubsystem, string> = {
+  mains: 'pa_mains',
+  outs: 'pa_outfill',
+  subs: 'pa_subs',
+  fronts: 'pa_frontfill',
+  delays: 'pa_delays',
+  other: 'pa_mains',
+  amplification: 'pa_amp',
+};
 
 async function getFlexAuthToken(): Promise<string> {
   if (cachedFlexToken) return cachedFlexToken;
@@ -85,6 +112,53 @@ export interface EquipmentItem {
   quantity: number;
   name: string;
   category?: string;
+  subsystem?: PresetSubsystem | null;
+  flexCategoryKey?: string;
+}
+
+function resolveFlexCategoryKey(item: EquipmentItem): string {
+  if (item.flexCategoryKey) return item.flexCategoryKey;
+
+  if (item.subsystem) {
+    const subsystemKey = SUBSYSTEM_TO_FLEX_CATEGORY[item.subsystem];
+    if (subsystemKey) return subsystemKey;
+  }
+
+  if (item.category) {
+    return item.category;
+  }
+
+  return 'uncategorized';
+}
+
+function normalizeEquipmentItems(
+  equipment: EquipmentItem[]
+): Array<EquipmentItem & { flexCategoryKey: string }> {
+  const aggregated = new Map<string, EquipmentItem & { flexCategoryKey: string }>();
+
+  equipment.forEach((item) => {
+    const flexCategoryKey = resolveFlexCategoryKey(item);
+    const mergeKey = `${flexCategoryKey}:${item.resourceId}`;
+    const existing = aggregated.get(mergeKey);
+
+    if (existing) {
+      existing.quantity += item.quantity;
+      if (!existing.subsystem && item.subsystem) {
+        existing.subsystem = item.subsystem;
+      }
+      if (!existing.category && item.category) {
+        existing.category = item.category;
+      }
+      return;
+    }
+
+    aggregated.set(mergeKey, {
+      ...item,
+      flexCategoryKey,
+    });
+  });
+
+  return Array.from(aggregated.values());
 }
 
 export interface PushResult {
@@ -118,22 +192,14 @@ export async function pushEquipmentToPullsheet(
     return result;
   }
 
-  // Hardcoded category header resource IDs from Flex
-  // These are virtual/container items that serve as category headers in pullsheets
-  const categoryMap = new Map<string, string>([
-    ['foh_console', '98905ca2-b094-45bc-ad5b-67fe311a48e8'], // Control FoH
-    ['mon_console', 'aadfee39-e5e4-4a68-b7d8-03d55b3f29f8'], // Control Mon
-    ['wireless', 'a8f2e63b-55f1-4531-83a4-835232d2bd04'],    // Microfonia RF
-    ['iem', '5194620b-ed50-4a31-bf6b-a986614b3d2d'],         // Rack IEM
-    ['wired_mics', '9a33f593-67e9-462d-b085-e7e215f5da72'],  // Microfonia
-  ]);
+  const normalizedItems = normalizeEquipmentItems(equipment);
 
-  console.log('[FlexPullsheets] Using category headers:', Array.from(categoryMap.entries()));
+  console.log('[FlexPullsheets] Using category headers:', Array.from(FLEX_CATEGORY_MAP.entries()));
 
-  // Group equipment by category
-  const equipmentByCategory = new Map<string, EquipmentItem[]>();
-  equipment.forEach(item => {
-    const category = item.category || 'uncategorized';
+  // Group equipment by resolved Flex category key
+  const equipmentByCategory = new Map<string, Array<EquipmentItem & { flexCategoryKey: string }>>();
+  normalizedItems.forEach(item => {
+    const category = item.flexCategoryKey;
     if (!equipmentByCategory.has(category)) {
       equipmentByCategory.set(category, []);
     }
@@ -148,8 +214,8 @@ export async function pushEquipmentToPullsheet(
     let parentLineItemId = ''; // Default to root level
 
     // If we have a category header resource ID, create the category first
-    if (categoryMap.has(category)) {
-      const categoryResourceId = categoryMap.get(category)!;
+    if (FLEX_CATEGORY_MAP.has(category)) {
+      const categoryResourceId = FLEX_CATEGORY_MAP.get(category)!;
       console.log(`[FlexPullsheets] Creating category header: ${category}`);
 
       const categoryResponse = await addResourceLineItem({

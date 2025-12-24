@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { PresetEditor } from '@/components/equipment/PresetEditor';
-import { PresetItem, PresetWithItems, Department } from '@/types/equipment';
+import { PA_PRESET_ALLOWED_CATEGORIES, PresetItem, PresetWithItems, Department } from '@/types/equipment';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
 import { format } from 'date-fns';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -280,7 +280,7 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
               onSave={handleSavePreset}
               onCancel={() => { setIsCreating(false); setEditingPreset(null); setCopyingPreset(null); }}
               jobId={jobId}
-              allowedCategories={department === 'sound' ? ['speakers', 'amplificacion'] : undefined}
+              allowedCategories={department === 'sound' ? PA_PRESET_ALLOWED_CATEGORIES : undefined}
             />
           </DepartmentProvider>
         ) : (
