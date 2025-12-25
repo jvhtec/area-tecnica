@@ -44,10 +44,12 @@ export default function StagePlot() {
 
         if (data?.plot_data) {
           // Send plot data to iframe
-          iframeRef.current?.contentWindow?.postMessage({
-            type: 'LOAD_PLOT',
-            data: data.plot_data
-          }, '*');
+          if (iframeRef.current?.contentWindow) {
+            iframeRef.current.contentWindow.postMessage({
+              type: 'LOAD_PLOT',
+              data: data.plot_data
+            }, window.location.origin);
+          }
 
           toast({
             title: "Plano cargado",
@@ -84,9 +86,11 @@ export default function StagePlot() {
     pendingSaveJobIdRef.current = selectedJobId;
 
     // Request plot data from iframe
-    iframeRef.current?.contentWindow?.postMessage({
-      type: 'GET_PLOT_DATA'
-    }, '*');
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: 'GET_PLOT_DATA'
+      }, window.location.origin);
+    }
   };
 
   // Listen for messages from iframe
@@ -147,9 +151,11 @@ export default function StagePlot() {
     setIsGeneratingPDF(true);
 
     // Request plot data from iframe
-    iframeRef.current?.contentWindow?.postMessage({
-      type: 'GET_PLOT_DATA_FOR_PDF'
-    }, '*');
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: 'GET_PLOT_DATA_FOR_PDF'
+      }, window.location.origin);
+    }
 
     // Listen for PDF data response
     const handlePDFDataMessage = async (event: MessageEvent) => {

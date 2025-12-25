@@ -2383,7 +2383,7 @@
 
       if(e.shiftKey && ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key) && selectedIds.size){
         e.preventDefault();
-        const step = 0.25;
+        const step = 0.1;
         for(const it of selectedItems()){
           if(e.key === "ArrowLeft") it.x -= step;
           if(e.key === "ArrowRight") it.x += step;
@@ -2420,8 +2420,6 @@
         syncEditor();
       }, 80);
     });
-      });
-    }
   </script>
 
   <!-- PostMessage communication for React integration -->
