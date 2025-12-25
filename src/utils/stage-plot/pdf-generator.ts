@@ -55,7 +55,7 @@ export const generateStagePlotPDF = async (
     downloadLocal?: boolean;
     jobId?: string;
   } = { saveToDatabase: false, downloadLocal: true }
-): Promise<{ documentId?: string; filename: string }> => {
+): Promise<{ filename: string }> => {
   const pdfDoc = new PDFDocument();
   const { width: pageWidth, height: pageHeight } = pdfDoc.dimensions;
 
@@ -78,7 +78,10 @@ export const generateStagePlotPDF = async (
     try {
       const logoImg = new Image();
       logoImg.src = logoData;
-      await new Promise((resolve) => { logoImg.onload = resolve; });
+      await new Promise((resolve, reject) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = reject;
+      });
       const logoHeight = 30;
       const logoWidth = logoHeight * (logoImg.width / logoImg.height) || 60;
       pdfDoc.addImage(logoData, 'PNG', 15, 10, logoWidth, logoHeight);
@@ -165,7 +168,7 @@ export const generateStagePlotPDF = async (
 
     // Draw item box with color
     pdfDoc.document.setFillColor(r, g, b);
-    pdfDoc.document.setDrawColor(r - 30, g - 30, b - 30);
+    pdfDoc.document.setDrawColor(Math.max(0, r - 30), Math.max(0, g - 30), Math.max(0, b - 30));
     pdfDoc.document.setLineWidth(1);
 
     // Apply rotation if needed
@@ -302,25 +305,27 @@ export const generateStagePlotPDF = async (
   const filename = `${safeName}-${dateStr.replace(/\//g, '-')}.pdf`;
 
   // Generate PDF blob
-  const pdfBlob = pdfDoc.save(filename, !options.downloadLocal);
+  const pdfBlob = pdfDoc.outputBlob();
+
+  // Download locally if requested
+  if (options.downloadLocal) {
+    pdfDoc.save(filename);
+  }
 
   // Upload to database if requested
-  let documentId: string | undefined;
   if (options.saveToDatabase && (options.jobId || data.jobId)) {
     try {
-      const result = await uploadJobPdfWithCleanup(
+      await uploadJobPdfWithCleanup(
         options.jobId || data.jobId!,
         pdfBlob,
         filename,
-        'application/pdf',
-        true
+        'stage-plots'
       );
-      documentId = result.documentId;
     } catch (error) {
       console.error('Error uploading stage plot PDF:', error);
       throw error;
     }
   }
 
-  return { documentId, filename };
+  return { filename };
 };
