@@ -12,6 +12,7 @@ export default function StagePlot() {
   const { toast } = useToast();
   const { data: jobs } = useJobs();
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const pendingSaveJobIdRef = useRef<string | null>(null);
 
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
@@ -78,6 +79,7 @@ export default function StagePlot() {
     }
 
     setIsSaving(true);
+    pendingSaveJobIdRef.current = selectedJobId;
 
     // Request plot data from iframe
     iframeRef.current?.contentWindow?.postMessage({
@@ -89,11 +91,17 @@ export default function StagePlot() {
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       if (event.data.type === 'PLOT_DATA') {
+        const jobIdToSave = pendingSaveJobIdRef.current;
+        if (!jobIdToSave) {
+          setIsSaving(false);
+          return;
+        }
+
         try {
           const { data, error } = await supabase
             .from('job_stage_plots')
             .upsert({
-              job_id: selectedJobId,
+              job_id: jobIdToSave,
               plot_data: event.data.data,
               updated_at: new Date().toISOString(),
             }, {
