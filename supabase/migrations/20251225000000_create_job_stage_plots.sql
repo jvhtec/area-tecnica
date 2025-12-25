@@ -16,32 +16,84 @@ CREATE INDEX idx_job_stage_plots_job_id ON job_stage_plots(job_id);
 ALTER TABLE job_stage_plots ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for job_stage_plots
--- Allow all authenticated users to read
-CREATE POLICY "Allow authenticated users to read job stage plots"
+-- Users can read stage plots for jobs they have access to
+CREATE POLICY "Users can read stage plots for accessible jobs"
   ON job_stage_plots
   FOR SELECT
   TO authenticated
-  USING (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM jobs j
+      WHERE j.id = job_stage_plots.job_id
+      AND (
+        -- Admin and management can see all
+        auth.jwt() ->> 'user_role' IN ('admin', 'management')
+        -- Or assigned to the job
+        OR EXISTS (
+          SELECT 1 FROM job_assignments ja
+          WHERE ja.job_id = j.id
+          AND ja.technician_id = auth.uid()
+        )
+        -- Or house tech in the job's department
+        OR (
+          auth.jwt() ->> 'user_role' = 'house_tech'
+          AND EXISTS (
+            SELECT 1 FROM job_departments jd
+            WHERE jd.job_id = j.id
+            AND jd.department = (
+              SELECT department FROM profiles
+              WHERE id = auth.uid()
+            )
+          )
+        )
+      )
+    )
+  );
 
--- Allow authenticated users to insert/update their own stage plots
-CREATE POLICY "Allow authenticated users to insert job stage plots"
+-- Admin, management, and house_tech can insert stage plots
+CREATE POLICY "Authorized users can insert job stage plots"
   ON job_stage_plots
   FOR INSERT
   TO authenticated
-  WITH CHECK (true);
+  WITH CHECK (
+    auth.jwt() ->> 'user_role' IN ('admin', 'management', 'house_tech')
+  );
 
-CREATE POLICY "Allow authenticated users to update job stage plots"
+-- Users can update stage plots for jobs they have access to
+CREATE POLICY "Users can update stage plots for accessible jobs"
   ON job_stage_plots
   FOR UPDATE
   TO authenticated
-  USING (true);
+  USING (
+    auth.jwt() ->> 'user_role' IN ('admin', 'management', 'house_tech')
+    AND EXISTS (
+      SELECT 1 FROM jobs j
+      WHERE j.id = job_stage_plots.job_id
+      AND (
+        auth.jwt() ->> 'user_role' IN ('admin', 'management')
+        OR (
+          auth.jwt() ->> 'user_role' = 'house_tech'
+          AND EXISTS (
+            SELECT 1 FROM job_departments jd
+            WHERE jd.job_id = j.id
+            AND jd.department = (
+              SELECT department FROM profiles
+              WHERE id = auth.uid()
+            )
+          )
+        )
+      )
+    )
+  );
 
--- Allow authenticated users to delete
-CREATE POLICY "Allow authenticated users to delete job stage plots"
+-- Only admin and management can delete stage plots
+CREATE POLICY "Only admin and management can delete job stage plots"
   ON job_stage_plots
   FOR DELETE
   TO authenticated
-  USING (true);
+  USING (
+    auth.jwt() ->> 'user_role' IN ('admin', 'management')
+  );
 
 -- Add updated_at trigger
 CREATE OR REPLACE FUNCTION update_job_stage_plots_updated_at()
