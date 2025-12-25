@@ -707,7 +707,7 @@
       <span class="pill"><span class="dot"></span><span id="autosavePill">Autoguardado activado</span></span>
     </h1>
     <div class="right">
-      <button class="primary" id="btnPrint">Imprimir</button>
+      <!-- Print button hidden - use PDF generation from React -->
 
       <button id="btnExportProject">Exportar proyecto</button>
       <label class="pill clickable">
@@ -2463,7 +2463,17 @@
           window.parent.postMessage({
             type: 'PLOT_DATA',
             data: state
+          },      } else if (event.data.type === 'GET_PLOT_DATA_FOR_PDF') {
+        // Send complete plot data to parent for PDF generation
+        try {
+          window.parent.postMessage({
+            type: 'PLOT_DATA_FOR_PDF',
+            data: state
           }, window.location.origin);
+        } catch (error) {
+          console.error('Error sending plot data for PDF:', error);
+        }
+ window.location.origin);
         } catch (error) {
           console.error('Error sending plot data:', error);
         }

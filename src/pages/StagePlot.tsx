@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Download, Upload } from "lucide-react";
+import { ArrowLeft, Save, FileDown, Printer } from "lucide-react";
 import { useJobs } from "@/hooks/useJobs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { generateStagePlotPDF } from "@/utils/stage-plot/pdf-generator";
 
 export default function StagePlot() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function StagePlot() {
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Filter jobs to only sound department
   const soundJobs = jobs?.filter(job =>
@@ -131,6 +133,77 @@ export default function StagePlot() {
     return () => window.removeEventListener('message', handleMessage);
   }, [selectedJobId, toast]);
 
+  // Generate PDF from stage plot
+  const handleGeneratePDF = async () => {
+    if (!selectedJobId) {
+      toast({
+        title: "Selecciona un trabajo",
+        description: "Debes seleccionar un trabajo antes de generar el PDF.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+
+    // Request plot data from iframe
+    iframeRef.current?.contentWindow?.postMessage({
+      type: 'GET_PLOT_DATA_FOR_PDF'
+    }, '*');
+
+    // Listen for PDF data response
+    const handlePDFDataMessage = async (event: MessageEvent) => {
+      if (event.data.type === 'PLOT_DATA_FOR_PDF') {
+        try {
+          const selectedJob = soundJobs.find(job => job.id === selectedJobId);
+
+          await generateStagePlotPDF(
+            {
+              ...event.data.data,
+              jobId: selectedJobId,
+              jobTitle: selectedJob?.title
+            },
+            {
+              saveToDatabase: true,
+              downloadLocal: true,
+              jobId: selectedJobId
+            }
+          );
+
+          toast({
+            title: "✅ PDF generado",
+            description: "El plano de escenario se ha generado y guardado correctamente.",
+          });
+        } catch (error) {
+          console.error('Error generating PDF:', error);
+          toast({
+            title: "❌ Error al generar PDF",
+            description: "No se pudo generar el PDF del plano de escenario.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsGeneratingPDF(false);
+          window.removeEventListener('message', handlePDFDataMessage);
+        }
+      }
+    };
+
+    window.addEventListener('message', handlePDFDataMessage);
+
+    // Timeout in case iframe doesn't respond
+    setTimeout(() => {
+      window.removeEventListener('message', handlePDFDataMessage);
+      if (isGeneratingPDF) {
+        setIsGeneratingPDF(false);
+        toast({
+          title: "Error de tiempo",
+          description: "No se recibió respuesta del plano de escenario.",
+          variant: "destructive",
+        });
+      }
+    }, 10000);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
@@ -168,6 +241,15 @@ export default function StagePlot() {
           >
             <Save className="h-4 w-4 mr-2" />
             {isSaving ? "Guardando..." : "Guardar"}
+          </Button>
+
+          <Button
+            onClick={handleGeneratePDF}
+            disabled={!selectedJobId || isGeneratingPDF}
+            variant="outline"
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            {isGeneratingPDF ? "Generando..." : "Generar PDF"}
           </Button>
         </div>
       </div>
