@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AmplifierTool } from "@/components/sound/AmplifierTool";
 import { useNavigate } from "react-router-dom";
 import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
-import { IncidentReport, StagePlot } from "@/components/sound/tools";
+import { IncidentReport } from "@/components/sound/tools";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { SoundVisionAccessRequestDialog } from "@/components/soundvision/SoundVisionAccessRequestDialog";
@@ -49,7 +49,6 @@ const Sound = () => {
   const [showAmplifierTool, setShowAmplifierTool] = useState(false);
   const [showMemoriaTecnica, setShowMemoriaTecnica] = useState(false);
   const [showIncidentReport, setShowIncidentReport] = useState(false);
-  const [showStagePlot, setShowStagePlot] = useState(false);
   const [showAccessRequestDialog, setShowAccessRequestDialog] = useState(false);
   const [showJobDetails, setShowJobDetails] = useState(false);
   const [selectedJobForDetails, setSelectedJobForDetails] = useState<any>(null);
@@ -129,7 +128,7 @@ const Sound = () => {
     { label: "Amplifier", onClick: () => setShowAmplifierTool(true), icon: Zap, color: "text-orange-500" },
     { label: "Memoria", onClick: () => setShowMemoriaTecnica(true), icon: FileStack, color: "text-cyan-500" },
     { label: "Incident", onClick: () => setShowIncidentReport(true), icon: AlertTriangle, color: "text-red-500" },
-    { label: "Plano Escenario", onClick: () => setShowStagePlot(true), icon: Layout, color: "text-green-500" },
+    { label: "Plano Escenario", to: "/stage-plot", icon: Layout, color: "text-green-500" },
     {
       label: hasSoundVisionAccess ? "SoundVision" : "Request Access",
       to: hasSoundVisionAccess ? "/soundvision-files" : undefined,
@@ -353,7 +352,7 @@ const Sound = () => {
                   variant="outline"
                   size="lg"
                   className="h-auto py-2 sm:py-3"
-                  onClick={() => setShowStagePlot(true)}
+                  onClick={() => navigate('/stage-plot')}
                 >
                   <Layout className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Plano de Escenario
@@ -496,12 +495,6 @@ const Sound = () => {
             <DialogTitle>Reporte de Incidencia</DialogTitle>
           </DialogHeader>
           <IncidentReport />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showStagePlot} onOpenChange={setShowStagePlot}>
-        <DialogContent className="w-[95vw] max-w-7xl max-h-[95vh] overflow-hidden p-0">
-          <StagePlot />
         </DialogContent>
       </Dialog>
 

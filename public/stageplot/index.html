@@ -767,11 +767,8 @@
             <div class="small">
               Consejo: Shift clic o Cmd en Mac o Ctrl en Windows para selección múltiple. Arrastra en el escenario vacío para selección en caja.
               <br>
-              <center>ver 1.5.4</center>
               <br>
-              <center>
-                <a class="guideBtn" href="https://petesimple.github.io/stageplot/guide.html">GUÍA DE USUARIO</a>
-              </center>
+              <br>
             </div>
           </div>
         </div>
@@ -828,7 +825,7 @@
             <div id="printBandName" class="printOnly"></div>
 
             <div class="row">
-              <input id="bandName" placeholder="Nombre de la banda (optional)" style="width:100%" />
+              <input id="bandName" placeholder="Nombre de la banda (opcional)" style="width:100%" />
             </div>
 
             <div class="row">
@@ -894,8 +891,8 @@
               </table>
             </div>
 
-            <div class="small">Show notes</div>
-            <textarea id="showNotes" rows="6" placeholder="Show notes (parking, backline, contact, set length, etc)"></textarea>
+            <div class="small">Notas del evento</div>
+            <textarea id="showNotes" rows="6" placeholder="Notas del evento (estacionamiento, backline, contacto, duración del show, etc)"></textarea>
 
             <div class="small mono" id="notesPreview" style="white-space:pre-wrap; padding:10px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:12px;"></div>
           </div>
@@ -1546,7 +1543,7 @@
         setEditorEnabled(false);
 
         $("#fLabel").value = "";
-        $("#fType").value = "Multiple";
+        $("#fType").value = "Múltiple";
         $("#fColor").value = "#4aa3ff";
         $("#fInput").value = "";
         $("#fMix").value = "";
@@ -2433,3 +2430,74 @@
   </script>
 </body>
 </html>
+
+  <!-- PostMessage communication for React integration -->
+  <script>
+    // Listen for messages from parent window (React app)
+    window.addEventListener('message', function(event) {
+      // Only accept messages from same origin
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data.type === 'LOAD_PLOT') {
+        // Load plot data from parent
+        try {
+          const plotData = event.data.data;
+          if (plotData && typeof plotData === 'object') {
+            // Merge with defaults to ensure all required fields exist
+            state = {
+              ...deepClone(defaults),
+              ...plotData
+            };
+            
+            // Ensure items have rotation field
+            for(const it of (state.items || [])){
+              if(it.rot == null) it.rot = 0;
+            }
+            
+            clearSelection();
+            save();
+            render();
+            syncEditor();
+            updateViewUI();
+            applyViewZoom();
+          }
+        } catch (error) {
+          console.error('Error loading plot data:', error);
+        }
+      } else if (event.data.type === 'GET_PLOT_DATA') {
+        // Send current plot data to parent
+        try {
+          window.parent.postMessage({
+            type: 'PLOT_DATA',
+            data: state
+          }, window.location.origin);
+        } catch (error) {
+          console.error('Error sending plot data:', error);
+        }
+      }
+    });
+
+    // Auto-save to parent when state changes (debounced)
+    let autoSaveTimeout = null;
+    const originalSave = save;
+    save = function() {
+      originalSave();
+      
+      // Clear existing timeout
+      if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+      
+      // Set new timeout to send data to parent after 2 seconds of no changes
+      autoSaveTimeout = setTimeout(() => {
+        try {
+          if (window.parent !== window) {
+            window.parent.postMessage({
+              type: 'STATE_CHANGED',
+              data: state
+            }, window.location.origin);
+          }
+        } catch (error) {
+          console.error('Error auto-saving to parent:', error);
+        }
+      }, 2000);
+    };
+  </script>
