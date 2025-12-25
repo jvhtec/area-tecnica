@@ -1988,9 +1988,9 @@
       clearConfirms();
 
       const v = $("#stagePreset").value;
-      if(v === "small"){ $("#stageW").value = 16; $("#stageD").value = 12; }
-      if(v === "medium"){ $("#stageW").value = 24; $("#stageD").value = 16; }
-      if(v === "large"){ $("#stageW").value = 32; $("#stageD").value = 20; }
+      if(v === "small"){ $("#stageW").value = 5; $("#stageD").value = 4; }
+      if(v === "medium"){ $("#stageW").value = 7; $("#stageD").value = 5; }
+      if(v === "large"){ $("#stageW").value = 10; $("#stageD").value = 6; }
       setStageFromInputs();
     });
 
@@ -2233,18 +2233,7 @@
       requestAnimationFrame(() => render());
     }
 
-    $("#btnPrint").addEventListener("click", (e) => {
-      e.stopPropagation();
-      clearConfirms();
-
-      preparePrintLayout();
-
-      setTimeout(() => {
-        window.print();
-      }, 60);
-    });
-
-    window.addEventListener("afterprint", cleanupPrintLayout);
+    // Print button removed - using PDF generation instead
 
     $("#btnExportProject").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -2461,7 +2450,11 @@
           window.parent.postMessage({
             type: 'PLOT_DATA',
             data: state
-          },      } else if (event.data.type === 'GET_PLOT_DATA_FOR_PDF') {
+          }, window.location.origin);
+        } catch (error) {
+          console.error('Error sending plot data:', error);
+        }
+      } else if (event.data.type === 'GET_PLOT_DATA_FOR_PDF') {
         // Send complete plot data to parent for PDF generation
         try {
           window.parent.postMessage({
@@ -2470,10 +2463,6 @@
           }, window.location.origin);
         } catch (error) {
           console.error('Error sending plot data for PDF:', error);
-        }
- window.location.origin);
-        } catch (error) {
-          console.error('Error sending plot data:', error);
         }
       }
     });

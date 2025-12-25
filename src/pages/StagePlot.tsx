@@ -14,6 +14,7 @@ export default function StagePlot() {
   const { data: jobs } = useJobs();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pendingSaveJobIdRef = useRef<string | null>(null);
+  const pendingPDFRef = useRef<boolean>(false);
 
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
@@ -149,6 +150,7 @@ export default function StagePlot() {
     }
 
     setIsGeneratingPDF(true);
+    pendingPDFRef.current = true;
 
     // Request plot data from iframe
     if (iframeRef.current?.contentWindow) {
@@ -160,6 +162,7 @@ export default function StagePlot() {
     // Listen for PDF data response
     const handlePDFDataMessage = async (event: MessageEvent) => {
       if (event.data.type === 'PLOT_DATA_FOR_PDF') {
+        pendingPDFRef.current = false;
         try {
           const selectedJob = soundJobs.find(job => job.id === selectedJobId);
 
@@ -198,8 +201,9 @@ export default function StagePlot() {
 
     // Timeout in case iframe doesn't respond
     setTimeout(() => {
-      window.removeEventListener('message', handlePDFDataMessage);
-      if (isGeneratingPDF) {
+      if (pendingPDFRef.current) {
+        pendingPDFRef.current = false;
+        window.removeEventListener('message', handlePDFDataMessage);
         setIsGeneratingPDF(false);
         toast({
           title: "Error de tiempo",
