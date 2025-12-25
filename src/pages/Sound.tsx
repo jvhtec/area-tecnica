@@ -10,7 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { Calculator, PieChart, FileText, Zap, FileStack, AlertTriangle, Plus, Database, Lock, Music, Box } from 'lucide-react';
+import { Calculator, PieChart, FileText, Zap, FileStack, AlertTriangle, Plus, Database, Lock, Music, Box, Layout } from 'lucide-react';
 import type { JobType } from "@/types/job";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AmplifierTool } from "@/components/sound/AmplifierTool";
 import { useNavigate } from "react-router-dom";
 import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
-import { IncidentReport } from "@/components/sound/tools/IncidentReport";
+import { IncidentReport } from "@/components/sound/tools";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { SoundVisionAccessRequestDialog } from "@/components/soundvision/SoundVisionAccessRequestDialog";
@@ -128,6 +128,7 @@ const Sound = () => {
     { label: "Amplifier", onClick: () => setShowAmplifierTool(true), icon: Zap, color: "text-orange-500" },
     { label: "Memoria", onClick: () => setShowMemoriaTecnica(true), icon: FileStack, color: "text-cyan-500" },
     { label: "Incident", onClick: () => setShowIncidentReport(true), icon: AlertTriangle, color: "text-red-500" },
+    { label: "Plano Escenario", to: "/stage-plot", icon: Layout, color: "text-green-500" },
     {
       label: hasSoundVisionAccess ? "SoundVision" : "Request Access",
       to: hasSoundVisionAccess ? "/soundvision-files" : undefined,
@@ -345,6 +346,16 @@ const Sound = () => {
                 >
                   <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Incident Report
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-auto py-2 sm:py-3"
+                  onClick={() => navigate('/stage-plot')}
+                >
+                  <Layout className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  Plano de Escenario
                 </Button>
 
                 {hasSoundVisionAccess ? (
