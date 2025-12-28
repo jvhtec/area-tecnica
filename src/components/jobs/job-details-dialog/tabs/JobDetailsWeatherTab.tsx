@@ -19,8 +19,8 @@ export const JobDetailsWeatherTab: React.FC<JobDetailsWeatherTabProps> = ({ jobD
     if (!jobDetails?.start_time || !jobDetails?.end_time) return "";
     const start = new Date(jobDetails.start_time);
     const end = new Date(jobDetails.end_time);
-    const startStr = start.toLocaleDateString("en-GB").split("/").join("/");
-    const endStr = end.toLocaleDateString("en-GB").split("/").join("/");
+    const startStr = start.toLocaleDateString("en-GB");
+    const endStr = end.toLocaleDateString("en-GB");
     if (start.toDateString() !== end.toDateString()) {
       return `${startStr} - ${endStr}`;
     }
@@ -34,9 +34,9 @@ export const JobDetailsWeatherTab: React.FC<JobDetailsWeatherTabProps> = ({ jobD
       coordinates:
         loc?.latitude && loc?.longitude
           ? {
-              lat: typeof loc.latitude === "number" ? loc.latitude : parseFloat(loc.latitude),
-              lng: typeof loc.longitude === "number" ? loc.longitude : parseFloat(loc.longitude),
-            }
+            lat: typeof loc.latitude === "number" ? loc.latitude : parseFloat(loc.latitude),
+            lng: typeof loc.longitude === "number" ? loc.longitude : parseFloat(loc.longitude),
+          }
           : undefined,
     };
   }, [jobDetails?.locations]);

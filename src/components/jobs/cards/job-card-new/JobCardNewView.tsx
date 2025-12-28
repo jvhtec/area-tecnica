@@ -233,7 +233,7 @@ export function JobCardNewView({
     <div>
       <Card
         className={cn(
-          "mb-4 hover:shadow-md transition-all duration-200",
+          "relative mb-4 hover:shadow-md transition-all duration-200",
           !isHouseTech && !isJobBeingDeleted && "cursor-pointer",
           cardOpacity,
           pointerEvents
@@ -473,7 +473,7 @@ export function JobCardNewView({
             <JobAssignmentDialog
               isOpen={assignmentDialogOpen}
               onClose={() => setAssignmentDialogOpen(false)}
-              onAssignmentChange={() => {}}
+              onAssignmentChange={() => { }}
               jobId={job.id}
               department={department as Department}
             />

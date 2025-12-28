@@ -29,19 +29,19 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         <h2 className="text-xl font-semibold">{format(currentMonth, "MMMM yyyy")}</h2>
       </div>
       <div className="flex items-center space-x-2">
-        <Button variant="ghost" size="icon" onClick={onPreviousMonth}>
+        <Button variant="ghost" size="icon" onClick={onPreviousMonth} aria-label="Previous month">
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={onNextMonth}>
+        <Button variant="ghost" size="icon" onClick={onNextMonth} aria-label="Next month">
           <ChevronRight className="h-4 w-4" />
         </Button>
         <Button variant="ghost" size="sm" onClick={onTodayClick}>
           Today
         </Button>
-        <Button variant="ghost" size="icon" onClick={onToggleCollapse}>
+        <Button variant="ghost" size="icon" onClick={onToggleCollapse} aria-label={isCollapsed ? "Expand calendar" : "Collapse calendar"}>
           {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
         </Button>
-        <Button variant="ghost" size="icon" onClick={onPrintClick}>
+        <Button variant="ghost" size="icon" onClick={onPrintClick} aria-label="Print calendar">
           <Printer className="h-4 w-4" />
         </Button>
       </div>
