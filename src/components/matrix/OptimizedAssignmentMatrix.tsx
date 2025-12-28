@@ -12,6 +12,7 @@ import { useStaffingMatrixStatuses } from '@/features/staffing/hooks/useStaffing
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { throttle } from '@/utils/throttle';
+import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
 
 import { OptimizedAssignmentMatrixView } from './optimized-assignment-matrix/OptimizedAssignmentMatrixView';
 import type { CellAction, OptimizedAssignmentMatrixExtendedProps, TechSortMethod } from './optimized-assignment-matrix/types';
@@ -33,6 +34,16 @@ export const OptimizedAssignmentMatrix = ({
 }: OptimizedAssignmentMatrixExtendedProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+
+  // Global selected cell store for Stream Deck integration
+  const {
+    selectedCell,
+    selectCell,
+    clearSelection: clearGlobalSelection,
+    isCellSelected: isGlobalCellSelected
+  } = useSelectedCellStore();
+
+  const matrixContainerRef = useRef<HTMLDivElement>(null);
   const technicianScrollRef = useRef<HTMLDivElement>(null);
   const dateHeadersRef = useRef<HTMLDivElement>(null);
   const mainScrollRef = useRef<HTMLDivElement>(null);
@@ -482,12 +493,18 @@ export const OptimizedAssignmentMatrix = ({
 
     if (selected) {
       newSelected.add(cellKey);
+      // Update global store for single-cell selection (for Stream Deck shortcuts)
+      selectCell(technicianId, date);
     } else {
       newSelected.delete(cellKey);
+      // Clear global selection if deselecting
+      if (isGlobalCellSelected(technicianId, date)) {
+        clearGlobalSelection();
+      }
     }
 
     setSelectedCells(newSelected);
-  }, [selectedCells]);
+  }, [selectedCells, selectCell, isGlobalCellSelected, clearGlobalSelection]);
 
   const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
     console.log('🚀 OptimizedAssignmentMatrix: handleStaffingActionSelected called', {
@@ -952,6 +969,7 @@ export const OptimizedAssignmentMatrix = ({
     availabilityDialog, setAvailabilityDialog, availabilityCoverage, setAvailabilityCoverage,
     availabilitySingleDate, setAvailabilitySingleDate, availabilityMultiDates, setAvailabilityMultiDates,
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,
+    isGlobalCellSelected,
   };
 
   return <OptimizedAssignmentMatrixView {...viewProps} />;
