@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2 } from 'lucide-react';
+import { Edit2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils';
@@ -60,7 +60,7 @@ export const JobPayoutOverrideSection: React.FC<{
                 className="h-6 px-2 text-red-300 hover:text-red-200 hover:bg-red-500/20"
                 aria-label="Eliminar override"
               >
-                ×
+                {isRemoving ? <Loader2 className="h-3 w-3 animate-spin" /> : "×"}
               </Button>
             </div>
           </div>
@@ -109,4 +109,3 @@ export const JobPayoutOverrideSection: React.FC<{
       )}
     </div>
   );
-

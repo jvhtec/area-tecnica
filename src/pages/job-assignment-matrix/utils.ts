@@ -91,7 +91,7 @@ export async function fetchAssignmentsForWindow(jobIds: string[], technicianIds:
         )
         .in("job_id", jobBatch)
         .in("technician_id", technicianIds)
-        .limit(500)
+        .limit(2000)
     );
   }
 
@@ -298,4 +298,3 @@ export function parseSummaryRow(row: any): StaffingSummaryRow | null {
     roles,
   };
 }
-

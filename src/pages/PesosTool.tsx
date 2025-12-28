@@ -43,12 +43,23 @@ const soundComponentDatabase = [
 ];
 
 interface TableRow {
+  id: string;
   quantity: string;
   componentId: string;
   weight: string;
   componentName?: string;
   totalWeight?: number;
 }
+
+const createRowId = () =>
+  globalThis.crypto?.randomUUID?.() ?? `row_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+const createEmptyRow = (): TableRow => ({
+  id: createRowId(),
+  quantity: "",
+  componentId: "",
+  weight: "",
+});
 
 interface Table {
   name: string;
@@ -58,6 +69,8 @@ interface Table {
   dualMotors?: boolean;
   riggingPoints?: string; // Stores the generated SX suffix(es)
   clusterId?: string;     // New property to group tables (e.g. mirrored pair)
+  cablePick?: boolean;
+  cablePickWeight?: string;
   defaultTableId?: string;
   overrideId?: string;
   isOverride?: boolean;
@@ -102,7 +115,7 @@ const PesosTool: React.FC = () => {
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
-    rows: [{ quantity: '', componentId: '', weight: '' }],
+    rows: [createEmptyRow()],
   });
 
   const deriveBaseName = (name: string) => {
@@ -305,18 +318,20 @@ const PesosTool: React.FC = () => {
         .filter(dt => dt.table_type === 'weight')
         .map((dt, index) => ({
           name: dt.table_name,
-          rows: dt.table_data.rows || [{
+          rows: (dt.table_data?.rows || [{
             quantity: '1',
             componentId: '',
             weight: dt.total_value.toString(),
             componentName: dt.table_name,
             totalWeight: dt.total_value
-          }],
+          }]).map((row: any) => ({ ...row, id: row?.id || createRowId() })),
           totalWeight: dt.total_value,
           id: Date.now() + index,
           clusterId: dt.metadata?.clusterId,
           dualMotors: dt.metadata?.dualMotors,
           riggingPoints: dt.metadata?.riggingPoints,
+          cablePick: Boolean(dt.metadata?.cablePick ?? dt.table_data?.cablePick ?? false),
+          cablePickWeight: (dt.metadata?.cablePickWeight ?? dt.table_data?.cablePickWeight ?? "100").toString(),
           defaultTableId: dt.id,
           baseName: dt.metadata?.baseName || deriveBaseName(dt.table_name)
         }));
@@ -329,18 +344,20 @@ const PesosTool: React.FC = () => {
     if (isTourDateContext && weightOverrides.length > 0) {
       const convertedTables = weightOverrides.map((override, index) => ({
         name: override.item_name,
-        rows: override.override_data?.tableData?.rows || [{
+        rows: (override.override_data?.tableData?.rows || [{
           quantity: override.quantity.toString(),
           componentId: '',
           weight: override.weight_kg.toString(),
           componentName: override.item_name,
           totalWeight: override.weight_kg * override.quantity
-        }],
+        }]).map((row: any) => ({ ...row, id: row?.id || createRowId() })),
         totalWeight: override.weight_kg * override.quantity,
         id: Date.now() + index,
         clusterId: override.override_data?.tableData?.clusterId,
         dualMotors: override.override_data?.tableData?.dualMotors,
         riggingPoints: override.override_data?.tableData?.riggingPoints,
+        cablePick: Boolean(override.override_data?.tableData?.cablePick ?? false),
+        cablePickWeight: (override.override_data?.tableData?.cablePickWeight ?? "100").toString(),
         overrideId: override.id,
         baseName:
           override.override_data?.tableData?.baseName ||
@@ -354,7 +371,7 @@ const PesosTool: React.FC = () => {
   const addRow = () => {
     setCurrentTable((prev) => ({
       ...prev,
-      rows: [...prev.rows, { quantity: '', componentId: '', weight: '' }],
+      rows: [...prev.rows, createEmptyRow()],
     }));
   };
 
@@ -363,7 +380,7 @@ const PesosTool: React.FC = () => {
       const filteredRows = prev.rows.filter((_, i) => i !== index);
       return {
         ...prev,
-        rows: filteredRows.length > 0 ? filteredRows : [{ quantity: '', componentId: '', weight: '' }],
+        rows: filteredRows.length > 0 ? filteredRows : [createEmptyRow()],
       };
     });
   };
@@ -609,6 +626,8 @@ const PesosTool: React.FC = () => {
         id: Date.now(),
         dualMotors: useDualMotors,
         clusterId: newClusterId,
+        cablePick,
+        cablePickWeight,
       };
 
       const rightTable: Table = {
@@ -620,6 +639,8 @@ const PesosTool: React.FC = () => {
         id: Date.now() + 1,
         dualMotors: useDualMotors,
         clusterId: newClusterId,
+        cablePick,
+        cablePickWeight,
       };
 
       tablesToCreate = [leftTable, rightTable];
@@ -634,6 +655,8 @@ const PesosTool: React.FC = () => {
         id: Date.now(),
         dualMotors: useDualMotors,
         clusterId: newClusterId,
+        cablePick,
+        cablePickWeight,
       };
 
       tablesToCreate = [newTable];
@@ -669,7 +692,7 @@ const PesosTool: React.FC = () => {
   const resetCurrentTable = () => {
     setCurrentTable({
       name: '',
-      rows: [{ quantity: '', componentId: '', weight: '' }],
+      rows: [createEmptyRow()],
     });
     setTableName('');
   };
@@ -708,16 +731,16 @@ const PesosTool: React.FC = () => {
       return acc;
     }, {} as Record<string, Table[]>);
 
-    // If Cable Pick is enabled, add one cable pick summary row per cluster
-    if (cablePick) {
-      Object.values(clusters).forEach(() => {
-        summaryRows.push({
-          clusterName: 'CABLE PICK',
-          riggingPoints: 'CP01',
-          clusterWeight: parseFloat(cablePickWeight),
-        });
+    // If Cable Pick is enabled for a cluster, add one cable pick summary row per cluster
+    Object.values(clusters).forEach((clusterTables) => {
+      const tableWithCablePick = clusterTables.find((table) => table.cablePick);
+      if (!tableWithCablePick) return;
+      summaryRows.push({
+        clusterName: 'CABLE PICK',
+        riggingPoints: 'CP01',
+        clusterWeight: parseFloat(tableWithCablePick.cablePickWeight || "0") || 0,
       });
-    }
+    });
 
     try {
       let logoUrl: string | undefined = undefined;

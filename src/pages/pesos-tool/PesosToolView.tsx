@@ -300,12 +300,12 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                         <th className="w-12 px-4 py-3 text-left font-medium">&nbsp;</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {(currentTable?.rows ?? []).map((row: any, index: number) => (
-                        <tr key={index} className="border-t">
-                          <td className="p-4">
-                            <Input
-                              type="number"
+	                    <tbody>
+	                      {(currentTable?.rows ?? []).map((row: any, index: number) => (
+	                        <tr key={row.id ?? index} className="border-t">
+	                          <td className="p-4">
+	                            <Input
+	                              type="number"
                               value={row.quantity}
                               onChange={(e) => updateInput(index, "quantity", e.target.value)}
                               min="0"
@@ -455,4 +455,3 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
     </div>
   );
 };
-

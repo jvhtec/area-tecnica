@@ -190,8 +190,6 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
                       <img
                         src={preview}
                         alt={`Venue ${index + 1}`}
-                        width={500}
-                        height={300}
                         loading="lazy"
                         decoding="async"
                         className="w-full h-32 object-cover"

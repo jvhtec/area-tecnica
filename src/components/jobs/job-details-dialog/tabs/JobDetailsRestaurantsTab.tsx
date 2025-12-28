@@ -89,7 +89,7 @@ export const JobDetailsRestaurantsTab: React.FC<JobDetailsRestaurantsTabProps> =
                       )}
                       {restaurant.priceLevel !== undefined && (
                         <Badge variant="outline" className="text-xs">
-                          {"€".repeat(restaurant.priceLevel + 1)}
+                          {restaurant.priceLevel === 0 ? "Gratis" : "€".repeat(restaurant.priceLevel)}
                         </Badge>
                       )}
                       {restaurant.distance && (
@@ -136,4 +136,3 @@ export const JobDetailsRestaurantsTab: React.FC<JobDetailsRestaurantsTabProps> =
     </TabsContent>
   );
 };
-

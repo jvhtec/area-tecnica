@@ -1,5 +1,5 @@
 import React from "react";
-import { Save, Trash2 } from "lucide-react";
+import { Save } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ interface WeightTable {
     cablePick?: boolean;
     cablePickWeight?: string;
     rows: Array<{
+        id?: string;
         quantity: number;
         componentName: string;
         weight: number;
@@ -56,7 +57,7 @@ export const TableCard: React.FC<TableCardProps> = ({
                             Save as Default
                         </Button>
                     )}
-                    <Button variant="destructive" size="sm" onClick={() => table.id && removeTable(table.id)}>
+                    <Button variant="destructive" size="sm" onClick={() => removeTable(table.id)}>
                         Remove Table
                     </Button>
                 </div>
@@ -90,8 +91,8 @@ export const TableCard: React.FC<TableCardProps> = ({
                     </tr>
                 </thead>
                 <tbody>
-                    {table.rows.map((row: any, index: number) => (
-                        <tr key={index} className="border-t">
+                    {(table.rows ?? []).map((row: any, index: number) => (
+                        <tr key={row.id ?? `${row.componentName}-${index}`} className="border-t">
                             <td className="px-4 py-3">{row.quantity}</td>
                             <td className="px-4 py-3">{row.componentName}</td>
                             <td className="px-4 py-3">{row.weight} kg</td>

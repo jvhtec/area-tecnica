@@ -34,6 +34,209 @@ interface JobDetailsInfoTabProps {
   jobRatesApproved: boolean;
 }
 
+type GenerateDocumentPackArgs = {
+  resolvedJobId: string;
+  jobDetails: any;
+  job: any;
+};
+
+async function generateAndDownloadDocumentPack({ resolvedJobId, jobDetails, job }: GenerateDocumentPackArgs) {
+  // 1) Fetch approved timesheets for this job
+  const { data: ts } = await supabase
+    .from("timesheets")
+    .select("*")
+    .eq("job_id", resolvedJobId)
+    .eq("is_active", true)
+    .eq("approved_by_manager", true);
+
+  // Fallback to visibility function when RLS blocks
+  let timesheets = ts || [];
+  if (!timesheets.length) {
+    const { data: visible } = await supabase.rpc("get_timesheet_amounts_visible");
+    timesheets = (visible as any[] | null)?.filter((r) => r.job_id === resolvedJobId) || [];
+  }
+
+  const { timesheets: enrichedTimesheets, profileMap } = await enrichTimesheetsWithProfiles(supabase, timesheets as any[]);
+  timesheets = enrichedTimesheets;
+
+  // 2) Build job object for timesheet PDF
+  const jobObj = {
+    id: resolvedJobId,
+    title: jobDetails?.title || job?.title || "Job",
+    start_time: jobDetails?.start_time || job?.start_time,
+    end_time: jobDetails?.end_time || job?.end_time,
+    job_type: jobDetails?.job_type || job?.job_type,
+    created_at: jobDetails?.created_at || new Date().toISOString(),
+  } as any;
+
+  const tsDoc = await generateTimesheetPDF({
+    job: jobObj,
+    timesheets: timesheets as any,
+    date: "all-dates",
+  });
+  const tsBlob = tsDoc.output("blob") as Blob;
+
+  // 3) Build inputs for payout PDF (tourdate uses rate quotes, others use payout totals)
+  const { data: lpoRows } = await supabase
+    .from("flex_work_orders")
+    .select("technician_id, lpo_number")
+    .eq("job_id", resolvedJobId);
+  const lpoMap = new Map((lpoRows || []).map((r: any) => [r.technician_id, r.lpo_number || null]));
+
+  // Timesheet breakdowns for payout details (non-tourdate PDF section)
+  const tsByTech = new Map<string, any[]>();
+  (timesheets || []).forEach((row: any) => {
+    const b = (row.amount_breakdown || row.amount_breakdown_visible || {}) as any;
+    const line = {
+      date: row.date,
+      hours_rounded: Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0,
+      base_day_eur: b.base_day_eur != null ? Number(b.base_day_eur) : undefined,
+      plus_10_12_hours: b.plus_10_12_hours != null ? Number(b.plus_10_12_hours) : undefined,
+      plus_10_12_amount_eur: b.plus_10_12_amount_eur != null ? Number(b.plus_10_12_amount_eur) : undefined,
+      overtime_hours: b.overtime_hours != null ? Number(b.overtime_hours) : undefined,
+      overtime_hour_eur: b.overtime_hour_eur != null ? Number(b.overtime_hour_eur) : undefined,
+      overtime_amount_eur: b.overtime_amount_eur != null ? Number(b.overtime_amount_eur) : undefined,
+      total_eur: b.total_eur != null ? Number(b.total_eur) : undefined,
+    };
+    const arr = tsByTech.get(row.technician_id) || [];
+    arr.push(line);
+    tsByTech.set(row.technician_id, arr);
+  });
+
+  let payoutBlob: Blob;
+  const isTourDateJob = (jobDetails?.job_type || job?.job_type) === "tourdate";
+  if (isTourDateJob) {
+    // Compute quotes via RPC per technician for this tour date job
+    const { data: jobAssignments, error: jaErr } = await supabase
+      .from("job_assignments")
+      .select("technician_id")
+      .eq("job_id", resolvedJobId);
+    if (jaErr) {
+      console.error("[JobDetailsDialog] Failed loading job assignments for quotes", jaErr);
+    }
+    const techIdsForQuotes = Array.from(
+      new Set(((jobAssignments || []) as any[]).map((a: any) => a.technician_id).filter(Boolean))
+    );
+
+    let quotes: any[] = [];
+    if (techIdsForQuotes.length > 0) {
+      quotes = await Promise.all(
+        techIdsForQuotes.map(async (techId: string) => {
+          const { data, error } = await supabase.rpc("compute_tour_job_rate_quote_2025", {
+            _job_id: resolvedJobId,
+            _tech_id: techId,
+          });
+          if (error) {
+            console.error("[JobDetailsDialog] RPC quote error", error);
+            return {
+              job_id: resolvedJobId,
+              technician_id: techId,
+              start_time: jobObj.start_time,
+              end_time: jobObj.end_time,
+              job_type: "tourdate",
+              tour_id: jobDetails?.tour_id ?? null,
+              title: jobObj.title,
+              is_house_tech: false,
+              is_tour_team_member: false,
+              category: "",
+              base_day_eur: 0,
+              week_count: 1,
+              multiplier: 1,
+              per_job_multiplier: 1,
+              iso_year: null,
+              iso_week: null,
+              total_eur: 0,
+              extras: undefined,
+              extras_total_eur: undefined,
+              total_with_extras_eur: undefined,
+              breakdown: { error: error.message || String(error) },
+            } as any;
+          }
+          return data as any;
+        })
+      );
+    }
+
+    // Ensure we have profiles for all quoted technicians
+    const missingProfileIds = techIdsForQuotes.filter((id): id is string => typeof id === "string" && !profileMap.has(id));
+    if (missingProfileIds.length) {
+      const { data: extraProfiles, error: extraProfilesError } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, department, autonomo")
+        .in("id", missingProfileIds);
+      if (extraProfilesError) {
+        console.error("[JobDetailsDialog] Failed to load technician profiles for quotes", extraProfilesError);
+      } else {
+        (extraProfiles || []).forEach((profile: any) => {
+          if (profile?.id) profileMap.set(profile.id, profile);
+        });
+      }
+    }
+
+    const payoutProfiles = Array.from(profileMap.values());
+    const quoteBlob = (await generateRateQuotePDF(
+      quotes as any,
+      {
+        id: jobObj.id,
+        title: jobObj.title,
+        start_time: jobObj.start_time,
+        tour_id: jobDetails?.tour_id ?? null,
+        job_type: jobObj.job_type,
+      },
+      payoutProfiles as any,
+      lpoMap,
+      { download: false }
+    )) as Blob;
+    payoutBlob = quoteBlob;
+  } else {
+    // Standard jobs: use aggregated payout totals view
+    const { data: payouts } = await supabase.from("v_job_tech_payout_2025").select("*").eq("job_id", resolvedJobId);
+
+    const techIds = Array.from(new Set((payouts || []).map((p: any) => p.technician_id)));
+    const missingProfileIds = techIds.filter((id): id is string => typeof id === "string" && !profileMap.has(id));
+    if (missingProfileIds.length) {
+      const { data: extraProfiles, error: extraProfilesError } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, department, autonomo")
+        .in("id", missingProfileIds);
+      if (extraProfilesError) {
+        console.error("[JobDetailsDialog] Failed to load technician profiles for payouts", extraProfilesError);
+      } else {
+        (extraProfiles || []).forEach((profile: any) => {
+          if (profile?.id) profileMap.set(profile.id, profile);
+        });
+      }
+    }
+
+    const payoutProfiles = Array.from(profileMap.values());
+    payoutBlob = (await generateJobPayoutPDF(
+      (payouts || []) as any,
+      {
+        id: jobObj.id,
+        title: jobObj.title,
+        start_time: jobObj.start_time,
+        end_time: jobObj.end_time,
+        tour_id: jobDetails?.tour_id ?? null,
+      },
+      payoutProfiles as any,
+      lpoMap,
+      tsByTech as any,
+      { download: false }
+    )) as Blob;
+  }
+
+  // 4) Merge into a single pack and download
+  const merged = await mergePDFs([tsBlob, payoutBlob]);
+  const url = URL.createObjectURL(merged);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `pack_${(jobObj.title || "job").replace(/[^\w\s-]/g, "").replace(/\s+/g, "_")}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
   open,
   job,
@@ -52,6 +255,8 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
   const { data: approvalStatus, isLoading: approvalStatusLoading } = useJobApprovalStatus(resolvedJobId);
 
   const [isSendingPayoutEmails, setIsSendingPayoutEmails] = useState(false);
+  const [isRevokingRates, setIsRevokingRates] = useState(false);
+  const [isGeneratingDocumentPack, setIsGeneratingDocumentPack] = useState(false);
   const triggerPayoutEmails = React.useCallback(
     async (jobId: string) => {
       if (!jobId || isSendingPayoutEmails) return;
@@ -192,26 +397,38 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                   Controla la visibilidad de los pagos por trabajo para los técnicos
                 </span>
               </div>
-              <div>
-                {jobRatesApproved ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      if (!resolvedJobId) return;
-                      await supabase
-                        .from("jobs")
-                        .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
-                        .eq("id", resolvedJobId);
-                      queryClient.invalidateQueries({ queryKey: ["job-details", resolvedJobId] });
-                      queryClient.invalidateQueries({ queryKey: ["job-rates-approval", resolvedJobId] });
-                      queryClient.invalidateQueries({ queryKey: ["job-rates-approval-map"] });
-                      queryClient.invalidateQueries({ queryKey: ["job-approval-status", resolvedJobId] });
-                    }}
-                  >
-                    Revocar
-                  </Button>
-                ) : (
+	              <div>
+	                {jobRatesApproved ? (
+	                  <Button
+	                    size="sm"
+	                    variant="outline"
+	                    disabled={isRevokingRates}
+	                    onClick={async () => {
+	                      if (!resolvedJobId || isRevokingRates) return;
+	                      setIsRevokingRates(true);
+	                      try {
+	                        const { error } = await supabase
+	                          .from("jobs")
+	                          .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
+	                          .eq("id", resolvedJobId);
+	                        if (error) throw error;
+
+	                        toast.success("Tarifas revocadas");
+	                        queryClient.invalidateQueries({ queryKey: ["job-details", resolvedJobId] });
+	                        queryClient.invalidateQueries({ queryKey: ["job-rates-approval", resolvedJobId] });
+	                        queryClient.invalidateQueries({ queryKey: ["job-rates-approval-map"] });
+	                        queryClient.invalidateQueries({ queryKey: ["job-approval-status", resolvedJobId] });
+	                      } catch (err) {
+	                        console.error("[JobDetailsDialog] Failed to revoke job rates approval", err);
+	                        toast.error("No se pudieron revocar las tarifas del trabajo.");
+	                      } finally {
+	                        setIsRevokingRates(false);
+	                      }
+	                    }}
+	                  >
+	                    {isRevokingRates ? "Revocando…" : "Revocar"}
+	                  </Button>
+	                ) : (
                   <Button
                     size="sm"
                     disabled={!approvalStatusLoading && !!approvalStatus && !approvalStatus.canApprove}
@@ -356,233 +573,29 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
 
       {isManager && !isDryhire && (
         <Card className="p-3 mt-2">
-          <div className="text-sm space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="font-medium">Impresión rápida</div>
-              <Button
-                size="sm"
-                variant="default"
-                onClick={async () => {
-                  if (!resolvedJobId) return;
-                  try {
-                    // 1) Fetch approved timesheets for this job
-                    const { data: ts } = await supabase
-                      .from("timesheets")
-                      .select("*")
-                      .eq("job_id", resolvedJobId)
-                      .eq("is_active", true)
-                      .eq("approved_by_manager", true);
-
-                    // Fallback to visibility function when RLS blocks
-                    let timesheets = ts || [];
-                    if (!timesheets.length) {
-                      const { data: visible } = await supabase.rpc("get_timesheet_amounts_visible");
-                      timesheets = (visible as any[] | null)?.filter((r) => r.job_id === resolvedJobId) || [];
-                    }
-
-                    const { timesheets: enrichedTimesheets, profileMap } = await enrichTimesheetsWithProfiles(
-                      supabase,
-                      timesheets as any[]
-                    );
-
-                    timesheets = enrichedTimesheets;
-
-                    // 2) Build job object for timesheet PDF
-                    const jobObj = {
-                      id: resolvedJobId,
-                      title: jobDetails?.title || job?.title || "Job",
-                      start_time: jobDetails?.start_time || job?.start_time,
-                      end_time: jobDetails?.end_time || job?.end_time,
-                      job_type: jobDetails?.job_type || job?.job_type,
-                      created_at: jobDetails?.created_at || new Date().toISOString(),
-                    } as any;
-
-                    const tsDoc = await generateTimesheetPDF({
-                      job: jobObj,
-                      timesheets: timesheets as any,
-                      date: "all-dates",
-                    });
-                    const tsBlob = tsDoc.output("blob") as Blob;
-
-                    // 3) Build inputs for payout PDF (tourdate uses rate quotes, others use payout totals)
-                    const { data: lpoRows } = await supabase
-                      .from("flex_work_orders")
-                      .select("technician_id, lpo_number")
-                      .eq("job_id", resolvedJobId);
-                    const lpoMap = new Map((lpoRows || []).map((r: any) => [r.technician_id, r.lpo_number || null]));
-
-                    // Timesheet breakdowns for payout details (non-tourdate PDF section)
-                    const tsByTech = new Map<string, any[]>();
-                    (timesheets || []).forEach((row: any) => {
-                      const b = (row.amount_breakdown || row.amount_breakdown_visible || {}) as any;
-                      const line = {
-                        date: row.date,
-                        hours_rounded: Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0,
-                        base_day_eur: b.base_day_eur != null ? Number(b.base_day_eur) : undefined,
-                        plus_10_12_hours: b.plus_10_12_hours != null ? Number(b.plus_10_12_hours) : undefined,
-                        plus_10_12_amount_eur:
-                          b.plus_10_12_amount_eur != null ? Number(b.plus_10_12_amount_eur) : undefined,
-                        overtime_hours: b.overtime_hours != null ? Number(b.overtime_hours) : undefined,
-                        overtime_hour_eur: b.overtime_hour_eur != null ? Number(b.overtime_hour_eur) : undefined,
-                        overtime_amount_eur:
-                          b.overtime_amount_eur != null ? Number(b.overtime_amount_eur) : undefined,
-                        total_eur: b.total_eur != null ? Number(b.total_eur) : undefined,
-                      };
-                      const arr = tsByTech.get(row.technician_id) || [];
-                      arr.push(line);
-                      tsByTech.set(row.technician_id, arr);
-                    });
-
-                    let payoutBlob: Blob;
-                    const isTourDateJob = (jobDetails?.job_type || job?.job_type) === "tourdate";
-                    if (isTourDateJob) {
-                      // Compute quotes via RPC per technician for this tour date job
-                      const { data: jobAssignments, error: jaErr } = await supabase
-                        .from("job_assignments")
-                        .select("technician_id")
-                        .eq("job_id", resolvedJobId);
-                      if (jaErr) {
-                        console.error("[JobDetailsDialog] Failed loading job assignments for quotes", jaErr);
-                      }
-                      const techIdsForQuotes = Array.from(
-                        new Set(((jobAssignments || []) as any[]).map((a: any) => a.technician_id).filter(Boolean))
-                      );
-
-                      let quotes: any[] = [];
-                      if (techIdsForQuotes.length > 0) {
-                        quotes = await Promise.all(
-                          techIdsForQuotes.map(async (techId: string) => {
-                            const { data, error } = await supabase.rpc("compute_tour_job_rate_quote_2025", {
-                              _job_id: resolvedJobId,
-                              _tech_id: techId,
-                            });
-                            if (error) {
-                              console.error("[JobDetailsDialog] RPC quote error", error);
-                              return {
-                                job_id: resolvedJobId,
-                                technician_id: techId,
-                                start_time: jobObj.start_time,
-                                end_time: jobObj.end_time,
-                                job_type: "tourdate",
-                                tour_id: jobDetails?.tour_id ?? null,
-                                title: jobObj.title,
-                                is_house_tech: false,
-                                is_tour_team_member: false,
-                                category: "",
-                                base_day_eur: 0,
-                                week_count: 1,
-                                multiplier: 1,
-                                per_job_multiplier: 1,
-                                iso_year: null,
-                                iso_week: null,
-                                total_eur: 0,
-                                extras: undefined,
-                                extras_total_eur: undefined,
-                                total_with_extras_eur: undefined,
-                                breakdown: { error: error.message || String(error) },
-                              } as any;
-                            }
-                            return data as any;
-                          })
-                        );
-                      }
-
-                      // Ensure we have profiles for all quoted technicians
-                      const missingProfileIds = techIdsForQuotes.filter(
-                        (id): id is string => typeof id === "string" && !profileMap.has(id)
-                      );
-                      if (missingProfileIds.length) {
-                        const { data: extraProfiles, error: extraProfilesError } = await supabase
-                          .from("profiles")
-                          .select("id, first_name, last_name, department, autonomo")
-                          .in("id", missingProfileIds);
-                        if (extraProfilesError) {
-                          console.error("[JobDetailsDialog] Failed to load technician profiles for quotes", extraProfilesError);
-                        } else {
-                          (extraProfiles || []).forEach((profile: any) => {
-                            if (profile?.id) profileMap.set(profile.id, profile);
-                          });
-                        }
-                      }
-
-                      const payoutProfiles = Array.from(profileMap.values());
-                      const quoteBlob = (await generateRateQuotePDF(
-                        quotes as any,
-                        {
-                          id: jobObj.id,
-                          title: jobObj.title,
-                          start_time: jobObj.start_time,
-                          tour_id: jobDetails?.tour_id ?? null,
-                          job_type: jobObj.job_type,
-                        },
-                        payoutProfiles as any,
-                        lpoMap,
-                        { download: false }
-                      )) as Blob;
-                      payoutBlob = quoteBlob;
-                    } else {
-                      // Standard jobs: use aggregated payout totals view
-                      const { data: payouts } = await supabase
-                        .from("v_job_tech_payout_2025")
-                        .select("*")
-                        .eq("job_id", resolvedJobId);
-
-                      const techIds = Array.from(new Set((payouts || []).map((p: any) => p.technician_id)));
-                      const missingProfileIds = techIds.filter(
-                        (id): id is string => typeof id === "string" && !profileMap.has(id)
-                      );
-                      if (missingProfileIds.length) {
-                        const { data: extraProfiles, error: extraProfilesError } = await supabase
-                          .from("profiles")
-                          .select("id, first_name, last_name, department, autonomo")
-                          .in("id", missingProfileIds);
-                        if (extraProfilesError) {
-                          console.error("[JobDetailsDialog] Failed to load technician profiles for payouts", extraProfilesError);
-                        } else {
-                          (extraProfiles || []).forEach((profile: any) => {
-                            if (profile?.id) profileMap.set(profile.id, profile);
-                          });
-                        }
-                      }
-
-                      const payoutProfiles = Array.from(profileMap.values());
-                      payoutBlob = (await generateJobPayoutPDF(
-                        (payouts || []) as any,
-                        {
-                          id: jobObj.id,
-                          title: jobObj.title,
-                          start_time: jobObj.start_time,
-                          end_time: jobObj.end_time,
-                          tour_id: jobDetails?.tour_id ?? null,
-                        },
-                        payoutProfiles as any,
-                        lpoMap,
-                        tsByTech as any,
-                        { download: false }
-                      )) as Blob;
-                    }
-
-                    // 4) Merge into a single pack and download
-                    const merged = await mergePDFs([tsBlob, payoutBlob]);
-                    const url = URL.createObjectURL(merged);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `pack_${(jobObj.title || "job")
-                      .replace(/[^\w\s-]/g, "")
-                      .replace(/\s+/g, "_")}.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    URL.revokeObjectURL(url);
-                  } catch (e) {
-                    console.error("Failed to generate document pack", e);
-                    toast.error("No se pudo generar el pack de documentos");
-                  }
-                }}
-              >
-                Imprimir Pack (Partes + Pagos)
-              </Button>
-            </div>
+	          <div className="text-sm space-y-2">
+	            <div className="flex items-center justify-between gap-2">
+	              <div className="font-medium">Impresión rápida</div>
+	              <Button
+	                size="sm"
+	                variant="default"
+	                disabled={isGeneratingDocumentPack}
+	                onClick={async () => {
+	                  if (!resolvedJobId || isGeneratingDocumentPack) return;
+	                  setIsGeneratingDocumentPack(true);
+	                  try {
+	                    await generateAndDownloadDocumentPack({ resolvedJobId, jobDetails, job });
+	                  } catch (e) {
+	                    console.error("Failed to generate document pack", e);
+	                    toast.error("No se pudo generar el pack de documentos");
+	                  } finally {
+	                    setIsGeneratingDocumentPack(false);
+	                  }
+	                }}
+	              >
+	                {isGeneratingDocumentPack ? "Generando…" : "Imprimir Pack (Partes + Pagos)"}
+	              </Button>
+	            </div>
             <div className="flex items-center justify-between gap-2">
               <div>
                 <div className="font-medium">Mapa de LPO (depuración)</div>
@@ -649,4 +662,3 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
     </TabsContent>
   );
 };
-

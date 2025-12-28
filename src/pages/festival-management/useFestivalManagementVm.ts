@@ -41,7 +41,8 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [isMapLoading, setIsMapLoading] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
-  const { userRole } = useOptimizedAuth();
+  const { userRole, user } = useOptimizedAuth();
+  const [techName, setTechName] = useState<string | null>(null);
   const [maxStages, setMaxStages] = useState(1);
   const { flexUuid, isLoading: isFlexLoading, error: flexError, folderExists, refetch: refetchFlexUuid } = useFlexUuid(jobId || "");
   const [jobDocuments, setJobDocuments] = useState<JobDocumentEntry[]>([]);
@@ -57,6 +58,34 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [flexPickerOptions, setFlexPickerOptions] = useState<CreateFoldersOptions | undefined>(undefined);
   const [flexPickerMode, setFlexPickerMode] = useState<"create" | "add">("add");
   const [isJobPresetsOpen, setIsJobPresetsOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTechName = async () => {
+      if (!user?.id) {
+        setTechName(null);
+        return;
+      }
+
+      const { data, error } = await supabase.from("profiles").select("first_name, last_name").eq("id", user.id).maybeSingle();
+      if (cancelled) return;
+
+      if (error) {
+        console.warn("[FestivalManagement] Failed to load technician name", error);
+        setTechName(user?.email || null);
+        return;
+      }
+
+      const fullName = [data?.first_name, data?.last_name].filter(Boolean).join(" ");
+      setTechName(fullName || user?.email || null);
+    };
+
+    loadTechName();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.email, user?.id]);
 
   // New action states
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
@@ -1039,6 +1068,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
     canEdit,
     isViewOnly,
     userRole,
+    techName,
 
     venueData,
     mapPreviewUrl,
@@ -1173,4 +1203,3 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
 
   return { status: "ready", vm };
 };
-

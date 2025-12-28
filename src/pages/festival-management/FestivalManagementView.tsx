@@ -100,12 +100,13 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
     isArchiving,
 
     setIsBackfillDialogOpen,
-    isBackfilling,
+	    isBackfilling,
 
-    userRole,
-    setIsWhatsappDialogOpen,
-    setWaMessage,
-    setIsAlmacenDialogOpen,
+	    userRole,
+	    techName,
+	    setIsWhatsappDialogOpen,
+	    setWaMessage,
+	    setIsAlmacenDialogOpen,
 
     navigateToCalculator,
 
@@ -690,17 +691,17 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                   </div>
                 )}
 
-                {/* Incident Report */}
-                {userRole === "technician" && (
-                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-red-500/5">
-                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
-                      <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
-                      Reporte de Incidencia
-                    </div>
-                    <p className="text-xs md:text-sm text-muted-foreground">Crea un reporte de incidencia para este trabajo.</p>
-                    <TechnicianIncidentReportDialog job={job} techName={userRole} />
-                  </div>
-                )}
+	                {/* Incident Report */}
+	                {userRole === "technician" && (
+	                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-red-500/5">
+	                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+	                      <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
+	                      Reporte de Incidencia
+	                    </div>
+	                    <p className="text-xs md:text-sm text-muted-foreground">Crea un reporte de incidencia para este trabajo.</p>
+	                    <TechnicianIncidentReportDialog job={job} techName={techName || undefined} />
+	                  </div>
+	                )}
               </div>
             </CardContent>
           </Card>

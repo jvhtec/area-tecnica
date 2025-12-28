@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import type { Job } from "@/types/job";
 
 export interface ArchiveToFlexActionProps {
-  job: any;
+  job: Pick<Job, "id" | "job_type">;
 }
 
 export const ArchiveToFlexAction: React.FC<ArchiveToFlexActionProps> = ({ job }) => {
@@ -175,4 +176,3 @@ export const ArchiveToFlexAction: React.FC<ArchiveToFlexActionProps> = ({ job })
     </>
   );
 };
-

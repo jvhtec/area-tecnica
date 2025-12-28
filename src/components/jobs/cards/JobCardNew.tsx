@@ -277,7 +277,30 @@ export function JobCardNew({
 
   const isScheduled = (jobEvents?.length || 0) > 0;
   const hasRequest = Boolean(myTransportRequest) || (Array.isArray(allRequests) && allRequests.length > 0);
-  const isTechDept = userDepartment && ['sound', 'lights', 'video'].includes(userDepartment);
+  const isTechDept = !!userDepartment && ['sound', 'lights', 'video'].includes(userDepartment);
+
+  const handleCancelTransportRequest = React.useCallback(
+    async (requestId: string) => {
+      if (!requestId) return;
+      const { error } = await supabase.from("transport_requests").update({ status: "cancelled" }).eq("id", requestId);
+      if (error) {
+        console.error("[JobCardNew] Failed to cancel transport request:", error);
+        toast({
+          title: "No se pudo cancelar",
+          description: error.message || "Error cancelando la solicitud de transporte",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Solicitud cancelada",
+        description: "La solicitud de transporte se ha cancelado correctamente",
+      });
+      queryClient.invalidateQueries({ queryKey: ["transport-requests-all", job.id] });
+    },
+    [job.id, queryClient, toast]
+  );
 
   const transportButtonLabel = (() => {
     if (isScheduled) return 'Transport Scheduled';
@@ -865,7 +888,7 @@ export function JobCardNew({
   }
 
   return (
-    <JobCardNewView
+      <JobCardNewView
       job={job}
       department={department}
       userRole={userRole}
@@ -951,14 +974,15 @@ export function JobCardNew({
       userDepartment={userDepartment}
       myTransportRequest={myTransportRequest}
       allRequests={allRequests}
-      queryClient={queryClient}
-      checkAndFulfillRequest={checkAndFulfillRequest}
-      requirementsDialogOpen={requirementsDialogOpen}
-      flexPickerOpen={flexPickerOpen}
-      setFlexPickerOpen={setFlexPickerOpen}
-      flexPickerOptions={flexPickerOptions}
-      handleFlexPickerConfirm={handleFlexPickerConfirm}
-    />
+        queryClient={queryClient}
+        checkAndFulfillRequest={checkAndFulfillRequest}
+        handleCancelTransportRequest={handleCancelTransportRequest}
+        requirementsDialogOpen={requirementsDialogOpen}
+        flexPickerOpen={flexPickerOpen}
+        setFlexPickerOpen={setFlexPickerOpen}
+        flexPickerOptions={flexPickerOptions}
+        handleFlexPickerConfirm={handleFlexPickerConfirm}
+      />
   );
 }
 

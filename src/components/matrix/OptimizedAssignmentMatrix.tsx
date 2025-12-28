@@ -160,7 +160,7 @@ export const OptimizedAssignmentMatrix = ({
   useEffect(() => {
     startRenderTimer();
     return () => endRenderTimer();
-  }, []);
+  }, [startRenderTimer, endRenderTimer]);
 
   // Calculate matrix dimensions
   const matrixWidth = dates.length * CELL_WIDTH;

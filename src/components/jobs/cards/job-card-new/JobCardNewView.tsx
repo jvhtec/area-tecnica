@@ -19,7 +19,6 @@ import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
 import type { Department } from "@/types/department";
 
 import { JobCardActions } from "../JobCardActions";
@@ -126,6 +125,7 @@ export interface JobCardNewViewProps {
   allRequests: any[];
   queryClient: any;
   checkAndFulfillRequest: (requestId: string, dept: string) => Promise<void>;
+  handleCancelTransportRequest: (requestId: string) => Promise<void>;
 
   requirementsDialogOpen: boolean;
 
@@ -223,6 +223,7 @@ export function JobCardNewView({
   allRequests,
   queryClient,
   checkAndFulfillRequest,
+  handleCancelTransportRequest,
   requirementsDialogOpen,
   flexPickerOpen,
   setFlexPickerOpen,
@@ -529,8 +530,7 @@ export function JobCardNewView({
                                 className="px-3 py-1 text-sm rounded border hover:bg-accent"
                                 onClick={async (ev) => {
                                   ev.stopPropagation();
-                                  await supabase.from("transport_requests").update({ status: "cancelled" }).eq("id", req.id);
-                                  queryClient.invalidateQueries({ queryKey: ["transport-requests-all", job.id] });
+                                  await handleCancelTransportRequest(req.id);
                                 }}
                               >
                                 Cancel Request
@@ -608,4 +608,3 @@ export function JobCardNewView({
     </div>
   );
 }
-
