@@ -36,8 +36,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Department } from "@/types/department";
 
 import { FestivalManagementDialogs } from "./FestivalManagementDialogs";
+import type { FestivalManagementVm } from "./useFestivalManagementVm";
 
-export const FestivalManagementView = ({ vm }: { vm: any }) => {
+export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => {
   const {
     job,
     jobId,

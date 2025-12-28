@@ -55,6 +55,15 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
 export async function fetchAssignmentsForWindow(jobIds: string[], technicianIds: string[], jobs: MatrixJob[]) {
   if (!jobIds.length || !technicianIds.length) return [];
 
+  const formatErrorMessage = (err: unknown): string => {
+    if (err instanceof Error) return err.message;
+    if (typeof err === "object" && err !== null && "message" in err) {
+      const message = (err as { message?: unknown }).message;
+      if (typeof message === "string") return message;
+    }
+    return String(err);
+  };
+
   const jobsById = new Map<string, MatrixJob>();
   jobs.forEach((job) => {
     if (job?.id) jobsById.set(job.id, job);
@@ -96,13 +105,20 @@ export async function fetchAssignmentsForWindow(jobIds: string[], technicianIds:
   }
 
   const results = await Promise.all(promises);
+  const errors: unknown[] = [];
   const allData = results.flatMap((result: any) => {
     if (result.error) {
       console.error("Assignment prefetch error:", result.error);
+      errors.push(result.error);
       return [];
     }
     return result.data || [];
   });
+
+  if (errors.length > 0) {
+    const firstMessage = formatErrorMessage(errors[0]);
+    throw new Error(`No se pudieron cargar asignaciones (${errors.length} lote(s)): ${firstMessage}`);
+  }
 
   return allData
     .map((item: any) => ({
@@ -116,7 +132,7 @@ export async function fetchAssignmentsForWindow(jobIds: string[], technicianIds:
       assignment_date: item.assignment_date,
       status: item.status,
       assigned_at: item.assigned_at,
-      job: jobsById.get(item.job_id) || (Array.isArray(item.jobs) ? item.jobs[0] : item.jobs),
+      job: jobsById.get(item.job_id) || item.jobs,
     }))
     .filter((item) => !!item.job);
 }

@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { TourDateFormFields } from "./TourDateFormFields";
 import { TourDateListItem } from "./TourDateListItem";
-import { createFoldersForDate } from "./tour-date-management/createFoldersForDate";
+import { createFoldersForDate, type TourDateObject } from "./tour-date-management/createFoldersForDate";
 import { useLocationManagement, LocationDetails } from "@/hooks/useLocationManagement";
 import { useTourDateRealtime } from "@/hooks/useTourDateRealtime";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,7 +38,7 @@ interface TourDateManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tourId: string | null;
-  tourDates: any[];
+  tourDates: TourDateObject[];
   readOnly?: boolean;
 }
 
@@ -104,7 +104,15 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     enabled: tourDates.length > 0,
   });
 
-  const handleCreateFoldersForDate = async (dateObj: any) => {
+  const handleCreateFoldersForDate = async (dateObj: TourDateObject) => {
+    if (!tourId) {
+      toast({
+        title: "Missing tour ID",
+        description: "No tour selected. Please refresh and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id)) return;
 
     try {
@@ -144,6 +152,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
   const createAllFolders = async () => {
     if (isCreatingFolders) return;
+    if (!tourId) {
+      toast({
+        title: "Missing tour ID",
+        description: "No tour selected. Please refresh and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsCreatingFolders(true);
     try {
       let successCount = 0;

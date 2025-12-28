@@ -42,7 +42,7 @@ type GenerateDocumentPackArgs = {
 
 async function generateAndDownloadDocumentPack({ resolvedJobId, jobDetails, job }: GenerateDocumentPackArgs) {
   // 1) Fetch approved timesheets for this job
-  const { data: ts } = await supabase
+  const { data: ts, error: timesheetsError } = await supabase
     .from("timesheets")
     .select("*")
     .eq("job_id", resolvedJobId)
@@ -52,8 +52,16 @@ async function generateAndDownloadDocumentPack({ resolvedJobId, jobDetails, job 
   // Fallback to visibility function when RLS blocks
   let timesheets = ts || [];
   if (!timesheets.length) {
-    const { data: visible } = await supabase.rpc("get_timesheet_amounts_visible");
-    timesheets = (visible as any[] | null)?.filter((r) => r.job_id === resolvedJobId) || [];
+    const { data: visible, error: visibleError } = await supabase.rpc("get_timesheet_amounts_visible");
+    if (visibleError) {
+      if (timesheetsError) {
+        throw new Error(`No se pudieron cargar los partes aprobados: ${timesheetsError.message}`);
+      }
+      console.warn("[JobDetailsDialog] Failed loading visible timesheets", visibleError);
+      timesheets = [];
+    } else {
+      timesheets = (visible as any[] | null)?.filter((r) => r.job_id === resolvedJobId) || [];
+    }
   }
 
   const { timesheets: enrichedTimesheets, profileMap } = await enrichTimesheetsWithProfiles(supabase, timesheets as any[]);
@@ -77,10 +85,13 @@ async function generateAndDownloadDocumentPack({ resolvedJobId, jobDetails, job 
   const tsBlob = tsDoc.output("blob") as Blob;
 
   // 3) Build inputs for payout PDF (tourdate uses rate quotes, others use payout totals)
-  const { data: lpoRows } = await supabase
+  const { data: lpoRows, error: lpoError } = await supabase
     .from("flex_work_orders")
     .select("technician_id, lpo_number")
     .eq("job_id", resolvedJobId);
+  if (lpoError) {
+    throw new Error(`No se pudo cargar el mapa de LPO: ${lpoError.message}`);
+  }
   const lpoMap = new Map((lpoRows || []).map((r: any) => [r.technician_id, r.lpo_number || null]));
 
   // Timesheet breakdowns for payout details (non-tourdate PDF section)
@@ -112,11 +123,17 @@ async function generateAndDownloadDocumentPack({ resolvedJobId, jobDetails, job 
       .select("technician_id")
       .eq("job_id", resolvedJobId);
     if (jaErr) {
-      console.error("[JobDetailsDialog] Failed loading job assignments for quotes", jaErr);
+      throw new Error(`No se pudieron cargar las asignaciones del trabajo: ${jaErr.message}`);
+    }
+    if (!jobAssignments || jobAssignments.length === 0) {
+      throw new Error(`No hay asignaciones para este trabajo (${resolvedJobId})`);
     }
     const techIdsForQuotes = Array.from(
       new Set(((jobAssignments || []) as any[]).map((a: any) => a.technician_id).filter(Boolean))
     );
+    if (!techIdsForQuotes.length) {
+      throw new Error(`No se encontraron técnicos asignados para este trabajo (${resolvedJobId})`);
+    }
 
     let quotes: any[] = [];
     if (techIdsForQuotes.length > 0) {
@@ -165,11 +182,16 @@ async function generateAndDownloadDocumentPack({ resolvedJobId, jobDetails, job 
         .select("id, first_name, last_name, department, autonomo")
         .in("id", missingProfileIds);
       if (extraProfilesError) {
-        console.error("[JobDetailsDialog] Failed to load technician profiles for quotes", extraProfilesError);
-      } else {
-        (extraProfiles || []).forEach((profile: any) => {
-          if (profile?.id) profileMap.set(profile.id, profile);
-        });
+        throw new Error(`No se pudieron cargar los perfiles de técnicos (quotes): ${extraProfilesError.message}`);
+      }
+
+      (extraProfiles || []).forEach((profile: any) => {
+        if (profile?.id) profileMap.set(profile.id, profile);
+      });
+
+      const stillMissingIds = missingProfileIds.filter((id) => !profileMap.has(id));
+      if (stillMissingIds.length) {
+        throw new Error(`Faltan perfiles para ${stillMissingIds.length} técnico(s) (quotes)`);
       }
     }
 
@@ -190,9 +212,18 @@ async function generateAndDownloadDocumentPack({ resolvedJobId, jobDetails, job 
     payoutBlob = quoteBlob;
   } else {
     // Standard jobs: use aggregated payout totals view
-    const { data: payouts } = await supabase.from("v_job_tech_payout_2025").select("*").eq("job_id", resolvedJobId);
+    const { data: payouts, error: payoutsError } = await supabase
+      .from("v_job_tech_payout_2025")
+      .select("*")
+      .eq("job_id", resolvedJobId);
+    if (payoutsError) {
+      throw new Error(`No se pudieron cargar los pagos del trabajo: ${payoutsError.message}`);
+    }
+    if (!payouts || payouts.length === 0) {
+      throw new Error(`No se encontraron pagos para este trabajo (${resolvedJobId})`);
+    }
 
-    const techIds = Array.from(new Set((payouts || []).map((p: any) => p.technician_id)));
+    const techIds = Array.from(new Set((payouts || []).map((p: any) => p.technician_id))).filter(Boolean);
     const missingProfileIds = techIds.filter((id): id is string => typeof id === "string" && !profileMap.has(id));
     if (missingProfileIds.length) {
       const { data: extraProfiles, error: extraProfilesError } = await supabase
@@ -200,11 +231,16 @@ async function generateAndDownloadDocumentPack({ resolvedJobId, jobDetails, job 
         .select("id, first_name, last_name, department, autonomo")
         .in("id", missingProfileIds);
       if (extraProfilesError) {
-        console.error("[JobDetailsDialog] Failed to load technician profiles for payouts", extraProfilesError);
-      } else {
-        (extraProfiles || []).forEach((profile: any) => {
-          if (profile?.id) profileMap.set(profile.id, profile);
-        });
+        throw new Error(`No se pudieron cargar los perfiles de técnicos (pagos): ${extraProfilesError.message}`);
+      }
+
+      (extraProfiles || []).forEach((profile: any) => {
+        if (profile?.id) profileMap.set(profile.id, profile);
+      });
+
+      const stillMissingIds = missingProfileIds.filter((id) => !profileMap.has(id));
+      if (stillMissingIds.length) {
+        throw new Error(`Faltan perfiles para ${stillMissingIds.length} técnico(s) (pagos)`);
       }
     }
 
@@ -588,7 +624,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
 	                    await generateAndDownloadDocumentPack({ resolvedJobId, jobDetails, job });
 	                  } catch (e) {
 	                    console.error("Failed to generate document pack", e);
-	                    toast.error("No se pudo generar el pack de documentos");
+	                    toast.error(e instanceof Error ? e.message : "No se pudo generar el pack de documentos");
 	                  } finally {
 	                    setIsGeneratingDocumentPack(false);
 	                  }

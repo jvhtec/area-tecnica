@@ -9,11 +9,34 @@ import {
 } from "@/utils/flex-folders/constants";
 import { createFlexFolder, deleteFlexFolder } from "@/utils/flex-folders/api";
 
+export interface TourDateObject {
+  id: string;
+  date: string;
+  location?: { name?: string | null } | null;
+  is_tour_pack_only?: boolean | null;
+  flex_folders_created?: boolean | null;
+}
+
 export async function createFoldersForDate(
-  dateObj: any,
-  tourId: string | null,
+  dateObj: TourDateObject,
+  tourId: string,
   skipExistingCheck = false
 ) {
+  if (!tourId) {
+    throw new Error("tourId is required to create folders for a tour date");
+  }
+  if (!dateObj?.id) {
+    throw new Error("Tour date id is required to create folders");
+  }
+  if (!dateObj?.date) {
+    throw new Error("Tour date is required to create folders");
+  }
+
+  const dateValue = new Date(dateObj.date);
+  if (Number.isNaN(dateValue.getTime())) {
+    throw new Error(`Invalid tour date: ${dateObj.date}`);
+  }
+
   const createdFlexElementIds: string[] = [];
   const createdLocalRows: Array<{ id: string; elementId: string }> = [];
   let foldersCreationCompleted = false;
@@ -88,10 +111,10 @@ export async function createFoldersForDate(
       throw new Error("Parent tour folders not found. Please create tour folders first.");
     }
 
-    const formattedStartDate = new Date(dateObj.date).toISOString().split(".")[0] + ".000Z";
+    const formattedStartDate = dateValue.toISOString().split(".")[0] + ".000Z";
     const formattedEndDate = formattedStartDate;
-    const documentNumber = new Date(dateObj.date).toISOString().slice(2, 10).replace(/-/g, "");
-    const formattedDate = format(new Date(dateObj.date), "MMM d, yyyy");
+    const documentNumber = dateValue.toISOString().slice(2, 10).replace(/-/g, "");
+    const formattedDate = format(dateValue, "MMM d, yyyy");
     const locationName = dateObj.location?.name || "No Location";
 
     const departments: (keyof typeof DEPARTMENT_IDS)[] = ["sound", "lights", "video", "production", "personnel"];

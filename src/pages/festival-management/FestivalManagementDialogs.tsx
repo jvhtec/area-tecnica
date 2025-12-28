@@ -13,7 +13,9 @@ import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { JobPresetManagerDialog } from "@/components/jobs/JobPresetManagerDialog";
 
-export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
+import type { FestivalManagementVm } from "./useFestivalManagementVm";
+
+export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) => {
   const {
     job,
     jobId,
@@ -413,4 +415,3 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
     </>
   );
 };
-

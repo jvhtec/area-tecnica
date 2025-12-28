@@ -734,12 +734,14 @@ const PesosTool: React.FC = () => {
     }, {} as Record<string, Table[]>);
 
     // If Cable Pick is enabled for a cluster, add one cable pick summary row per cluster
+    let cablePickCounter = 0;
     Object.values(clusters).forEach((clusterTables) => {
       const tableWithCablePick = clusterTables.find((table) => table.cablePick);
       if (!tableWithCablePick) return;
+      cablePickCounter += 1;
       summaryRows.push({
         clusterName: 'CABLE PICK',
-        riggingPoints: 'CP01',
+        riggingPoints: `CP${String(cablePickCounter).padStart(2, "0")}`,
         clusterWeight: parseFloat(tableWithCablePick.cablePickWeight || "0") || 0,
       });
     });

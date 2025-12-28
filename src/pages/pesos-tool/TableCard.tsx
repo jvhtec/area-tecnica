@@ -74,7 +74,10 @@ export const TableCard: React.FC<TableCardProps> = ({
                         )}
                         {table.cablePick && (
                             <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                                Cable Pick ({table.cablePickWeight} kg)
+                                Cable Pick
+                                {table.cablePickWeight != null && String(table.cablePickWeight).trim() !== ""
+                                    ? ` (${table.cablePickWeight} kg)`
+                                    : ""}
                             </span>
                         )}
                     </div>
