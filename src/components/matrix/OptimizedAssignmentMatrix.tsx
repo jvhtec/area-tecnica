@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { throttle } from '@/utils/throttle';
+import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
 
 // Technician sorting method type
 type TechSortMethod = 'default' | 'location' | 'name-asc' | 'name-desc' | 'surname-asc' | 'surname-desc';
@@ -102,6 +103,15 @@ export const OptimizedAssignmentMatrix = ({
 }: OptimizedAssignmentMatrixExtendedProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+
+  // Global selected cell store for Stream Deck integration
+  const {
+    selectedCell,
+    selectCell,
+    clearSelection: clearGlobalSelection,
+    isCellSelected: isGlobalCellSelected
+  } = useSelectedCellStore();
+
   const matrixContainerRef = useRef<HTMLDivElement>(null);
   const technicianScrollRef = useRef<HTMLDivElement>(null);
   const dateHeadersRef = useRef<HTMLDivElement>(null);
@@ -552,12 +562,18 @@ export const OptimizedAssignmentMatrix = ({
 
     if (selected) {
       newSelected.add(cellKey);
+      // Update global store for single-cell selection (for Stream Deck shortcuts)
+      selectCell(technicianId, date);
     } else {
       newSelected.delete(cellKey);
+      // Clear global selection if deselecting
+      if (isGlobalCellSelected(technicianId, date)) {
+        clearGlobalSelection();
+      }
     }
 
     setSelectedCells(newSelected);
-  }, [selectedCells]);
+  }, [selectedCells, selectCell, isGlobalCellSelected, clearGlobalSelection]);
 
   const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
     console.log('🚀 OptimizedAssignmentMatrix: handleStaffingActionSelected called', {
@@ -1181,7 +1197,8 @@ export const OptimizedAssignmentMatrix = ({
                       const assignment = getAssignmentForCell(technician.id, date);
                       const availability = getAvailabilityForCell(technician.id, date);
                       const cellKey = `${technician.id}-${format(date, 'yyyy-MM-dd')}`;
-                      const isSelected = selectedCells.has(cellKey);
+                      // Check both local multi-select AND global single-select
+                      const isSelected = selectedCells.has(cellKey) || isGlobalCellSelected(technician.id, date);
                       const jobId = assignment?.job_id;
                       const byJobKey = jobId ? `${jobId}-${technician.id}` : '';
                       const byDateKey = `${technician.id}-${format(date, 'yyyy-MM-dd')}`;
