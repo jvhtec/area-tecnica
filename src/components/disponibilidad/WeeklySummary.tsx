@@ -43,7 +43,19 @@ interface Equipment {
 }
 
 // Component to fetch and display Flex images with proper authentication
-function FlexImage({ imageId, alt, className }: { imageId: string; alt: string; className?: string }) {
+function FlexImage({
+  imageId,
+  alt,
+  className,
+  width = 200,
+  height = 200,
+}: {
+  imageId: string;
+  alt: string;
+  className?: string;
+  width?: number;
+  height?: number;
+}) {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -102,6 +114,10 @@ function FlexImage({ imageId, alt, className }: { imageId: string; alt: string; 
     <img
       src={imageSrc}
       alt={alt}
+      width={width}
+      height={height}
+      loading="lazy"
+      decoding="async"
       className={className}
     />
   );

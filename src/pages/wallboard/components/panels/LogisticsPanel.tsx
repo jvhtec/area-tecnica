@@ -85,6 +85,10 @@ export const LogisticsPanel: React.FC<{
                     <img
                       src={TRANSPORT_PROVIDERS[ev.transport_provider as keyof typeof TRANSPORT_PROVIDERS].icon!}
                       alt={TRANSPORT_PROVIDERS[ev.transport_provider as keyof typeof TRANSPORT_PROVIDERS].label}
+                      width={192}
+                      height={192}
+                      loading="lazy"
+                      decoding="async"
                       className="w-48 h-48 object-contain"
                       onError={(e) => {
                         console.error('Logo failed to load:', e.currentTarget.src);
@@ -103,4 +107,3 @@ export const LogisticsPanel: React.FC<{
     </AutoScrollWrapper>
   );
 };
-

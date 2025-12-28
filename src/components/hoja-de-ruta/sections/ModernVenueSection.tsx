@@ -190,6 +190,10 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
                       <img
                         src={preview}
                         alt={`Venue ${index + 1}`}
+                        width={500}
+                        height={300}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-32 object-cover"
                       />
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

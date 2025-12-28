@@ -166,7 +166,15 @@ export default function SoundDisponibilidad() {
                       return (
                         <div key={job.id} className="flex items-center gap-3">
                           {logo ? (
-                            <img src={logo} alt="logo" className="h-8 w-8 rounded-md object-cover border" />
+                            <img
+                              src={logo}
+                              alt="logo"
+                              width={32}
+                              height={32}
+                              loading="lazy"
+                              decoding="async"
+                              className="h-8 w-8 rounded-md object-cover border"
+                            />
                           ) : (
                             <div className="h-8 w-8 rounded-md bg-accent flex items-center justify-center border text-xs font-semibold">
                               {String(title || '?').slice(0,1).toUpperCase()}
@@ -193,7 +201,15 @@ export default function SoundDisponibilidad() {
                         return (
                           <div key={assignment.id} className="flex items-center gap-3">
                             {logo ? (
-                              <img src={logo} alt="logo" className="h-8 w-8 rounded-md object-cover border" />
+                              <img
+                                src={logo}
+                                alt="logo"
+                                width={32}
+                                height={32}
+                                loading="lazy"
+                                decoding="async"
+                                className="h-8 w-8 rounded-md object-cover border"
+                              />
                             ) : (
                               <div className="h-8 w-8 rounded-md bg-accent flex items-center justify-center border text-xs font-semibold">
                                 {String(title || '?').slice(0,1).toUpperCase()}

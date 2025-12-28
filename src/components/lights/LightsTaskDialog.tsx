@@ -289,6 +289,10 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
             <img
               src={createFolderIcon}
               alt="Create Flex Folders"
+              width={24}
+              height={24}
+              loading="lazy"
+              decoding="async"
               className="h-6 w-6 ml-2 cursor-pointer"
               title="Create Flex Folders"
             />

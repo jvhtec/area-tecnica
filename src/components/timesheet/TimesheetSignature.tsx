@@ -54,6 +54,10 @@ export const TimesheetSignature = ({ timesheetId, currentSignature, canSign, onS
               <img 
                 src={currentSignature} 
                 alt="Signature" 
+                width={400}
+                height={150}
+                loading="lazy"
+                decoding="async"
                 className="max-w-full h-20 object-contain"
               />
             </div>

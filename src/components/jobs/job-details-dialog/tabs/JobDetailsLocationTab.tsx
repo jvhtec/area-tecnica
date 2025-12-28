@@ -112,7 +112,7 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
             </div>
 
             {isMapLoading && (
-              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+              <div className="aspect-[2/1] bg-muted rounded-lg flex items-center justify-center">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">Cargando vista previa del mapa...</p>
@@ -121,7 +121,15 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
             )}
             {!isMapLoading && mapPreviewUrl && (
               <div className="rounded-lg overflow-hidden border">
-                <img src={mapPreviewUrl} alt="Mapa del recinto" className="w-full h-auto" />
+                <img
+                  src={mapPreviewUrl}
+                  alt="Mapa del recinto"
+                  width={600}
+                  height={300}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-auto"
+                />
                 <div className="p-2 flex justify-end">
                   <Button onClick={openGoogleMaps} size="sm">
                     Ver indicaciones
@@ -130,7 +138,7 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
               </div>
             )}
             {!isMapLoading && !mapPreviewUrl && (
-              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+              <div className="aspect-[2/1] bg-muted rounded-lg flex items-center justify-center">
                 <div className="text-center">
                   <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">Vista previa del mapa no disponible</p>
@@ -174,4 +182,3 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
     </TabsContent>
   );
 };
-

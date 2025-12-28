@@ -831,7 +831,15 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                     : "hover:bg-accent/50"
                 }
               >
-                <img src={createFolderIcon} alt="Añadir carpetas Flex" className="h-4 w-4" />
+                <img
+                  src={createFolderIcon}
+                  alt="Añadir carpetas Flex"
+                  width={16}
+                  height={16}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-4 w-4"
+                />
               </Button>
             ) : null}
           </>
@@ -851,7 +859,15 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             {isCreatingFolders ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <img src={createFolderIcon} alt="Crear carpetas Flex" className="h-4 w-4" />
+              <img
+                src={createFolderIcon}
+                alt="Crear carpetas Flex"
+                width={16}
+                height={16}
+                loading="lazy"
+                decoding="async"
+                className="h-4 w-4"
+              />
             )}
           </Button>
         )

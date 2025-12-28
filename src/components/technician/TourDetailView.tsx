@@ -179,6 +179,10 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
                             <img
                                 src={logoUrl}
                                 alt={`${tourData.name} logo`}
+                                width={64}
+                                height={64}
+                                loading="lazy"
+                                decoding="async"
                                 className="w-16 h-16 object-contain rounded-lg border border-white/20 bg-black/20 backdrop-blur-sm"
                                 onError={(e) => {
                                     const target = e.target as HTMLImageElement;

@@ -102,6 +102,10 @@ export const LogisticsEventCard = ({
                 <img
                   src={TRANSPORT_PROVIDERS[event.transport_provider].icon}
                   alt={TRANSPORT_PROVIDERS[event.transport_provider].label}
+                  width={96}
+                  height={96}
+                  loading="lazy"
+                  decoding="async"
                   className="w-24 h-24 object-contain"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';

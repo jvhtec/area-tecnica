@@ -1,32 +1,45 @@
-import { useState, useEffect } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Department } from "@/types/department";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
-import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { supabase } from "@/lib/supabase";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { Badge } from "@/components/ui/badge";
-import { EditJobDialog } from "@/components/jobs/EditJobDialog";
-import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Send, Mail, Loader2 } from "lucide-react";
+import { MessageSquare, Mail, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { isJobOnDate } from "@/utils/timezoneUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useOptimizedMessagesSubscriptions } from "@/hooks/useOptimizedSubscriptions";
-import { MessagesDialog } from "@/components/dashboard/MessagesDialog";
-import { EmailComposerDialog } from "@/components/dashboard/EmailComposerDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { DashboardMobileHub } from "@/components/dashboard/DashboardMobileHub";
+
+const DashboardMobileHub = lazy(() =>
+  import("@/components/dashboard/DashboardMobileHub").then((m) => ({ default: m.DashboardMobileHub }))
+);
+const DashboardHeader = lazy(() =>
+  import("@/components/dashboard/DashboardHeader").then((m) => ({ default: m.DashboardHeader }))
+);
+const CalendarSection = lazy(() =>
+  import("@/components/dashboard/CalendarSection").then((m) => ({ default: m.CalendarSection }))
+);
+const TodaySchedule = lazy(() =>
+  import("@/components/dashboard/TodaySchedule").then((m) => ({ default: m.TodaySchedule }))
+);
+const MessagesDialog = lazy(() =>
+  import("@/components/dashboard/MessagesDialog").then((m) => ({ default: m.MessagesDialog }))
+);
+const EmailComposerDialog = lazy(() =>
+  import("@/components/dashboard/EmailComposerDialog").then((m) => ({ default: m.EmailComposerDialog }))
+);
+const EditJobDialog = lazy(() =>
+  import("@/components/jobs/EditJobDialog").then((m) => ({ default: m.EditJobDialog }))
+);
+const JobDetailsDialog = lazy(() =>
+  import("@/components/jobs/JobDetailsDialog").then((m) => ({ default: m.JobDetailsDialog }))
+);
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -44,6 +57,11 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { userRole: authUserRole, isLoading: authLoading } = useOptimizedAuth();
+  const lazyFallback = (
+    <div className="flex items-center justify-center py-6">
+      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   // Early security check: Only allow admin, management, logistics
   useEffect(() => {
@@ -219,41 +237,53 @@ const Dashboard = () => {
   if (isMobile) {
     return (
       <>
-        <DashboardMobileHub
-          jobs={jobs}
-          userRole={userRole}
-          onEditClick={handleEditClick}
-          onDeleteClick={handleDeleteClick}
-          onJobClick={handleJobClick}
-          onMessagesClick={userRole && ["admin", "management"].includes(userRole) ? () => setMessagesOpen(true) : undefined}
-          onEmailClick={userRole && ["admin", "management"].includes(userRole) ? () => setEmailComposerOpen(true) : undefined}
-        />
+        <Suspense fallback={lazyFallback}>
+          <DashboardMobileHub
+            jobs={jobs}
+            userRole={userRole}
+            onEditClick={handleEditClick}
+            onDeleteClick={handleDeleteClick}
+            onJobClick={handleJobClick}
+            onMessagesClick={userRole && ["admin", "management"].includes(userRole) ? () => setMessagesOpen(true) : undefined}
+            onEmailClick={userRole && ["admin", "management"].includes(userRole) ? () => setEmailComposerOpen(true) : undefined}
+          />
+        </Suspense>
 
         {/* Dialogs */}
         {selectedJob && (
           <>
-            <EditJobDialog
-              open={isEditDialogOpen}
-              onOpenChange={setIsEditDialogOpen}
-              job={selectedJob}
-            />
-            <JobDetailsDialog
-              open={isDetailsDialogOpen}
-              onOpenChange={setIsDetailsDialogOpen}
-              job={selectedJob}
-            />
+            <Suspense fallback={lazyFallback}>
+              <EditJobDialog
+                open={isEditDialogOpen}
+                onOpenChange={setIsEditDialogOpen}
+                job={selectedJob}
+              />
+              <JobDetailsDialog
+                open={isDetailsDialogOpen}
+                onOpenChange={setIsDetailsDialogOpen}
+                job={selectedJob}
+              />
+            </Suspense>
           </>
         )}
 
-        <MessagesDialog
-          open={messagesOpen}
-          onOpenChange={setMessagesOpen}
-        />
+        {messagesOpen ? (
+          <Suspense fallback={lazyFallback}>
+            <MessagesDialog
+              open={messagesOpen}
+              onOpenChange={setMessagesOpen}
+            />
+          </Suspense>
+        ) : null}
 
-        <EmailComposerDialog
-          open={emailComposerOpen}
-          onOpenChange={setEmailComposerOpen}
-        />
+        {emailComposerOpen ? (
+          <Suspense fallback={lazyFallback}>
+            <EmailComposerDialog
+              open={emailComposerOpen}
+              onOpenChange={setEmailComposerOpen}
+            />
+          </Suspense>
+        ) : null}
       </>
     );
   }
@@ -262,18 +292,22 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8 font-sans">
       <div className="mx-auto w-full max-w-full space-y-6">
-        <DashboardHeader timeSpan={timeSpan} onTimeSpanChange={setTimeSpan} />
+        <Suspense fallback={lazyFallback}>
+          <DashboardHeader timeSpan={timeSpan} onTimeSpanChange={setTimeSpan} />
+        </Suspense>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           {/* Main Content Area */}
           <div className="xl:col-span-8 2xl:col-span-9 space-y-6">
             <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
-              <CalendarSection
-                date={date}
-                onDateSelect={setDate}
-                jobs={jobs}
-                onDateTypeChange={handleDateTypeChange}
-              />
+              <Suspense fallback={lazyFallback}>
+                <CalendarSection
+                  date={date}
+                  onDateSelect={setDate}
+                  jobs={jobs}
+                  onDateTypeChange={handleDateTypeChange}
+                />
+              </Suspense>
             </div>
           </div>
 
@@ -357,17 +391,19 @@ const Dashboard = () => {
                 <span className="text-xs text-muted-foreground">{format(new Date(), 'd MMM')}</span>
               </div>
               <div className="p-2">
-                <TodaySchedule
-                  jobs={selectedDateJobs}
-                  onEditClick={handleEditClick}
-                  onDeleteClick={handleDeleteClick}
-                  onJobClick={handleJobClick}
-                  userRole={userRole}
-                  selectedDate={date}
-                  detailsOnlyMode
-                  hideTasks
-                  viewMode="sidebar"
-                />
+                <Suspense fallback={lazyFallback}>
+                  <TodaySchedule
+                    jobs={selectedDateJobs}
+                    onEditClick={handleEditClick}
+                    onDeleteClick={handleDeleteClick}
+                    onJobClick={handleJobClick}
+                    userRole={userRole}
+                    selectedDate={date}
+                    detailsOnlyMode
+                    hideTasks
+                    viewMode="sidebar"
+                  />
+                </Suspense>
               </div>
             </div>
           </div>
@@ -375,22 +411,32 @@ const Dashboard = () => {
 
         {/* Dialogs */}
         {selectedJob && (
-          <EditJobDialog
-            open={isEditDialogOpen}
-            onOpenChange={setIsEditDialogOpen}
-            job={selectedJob}
-          />
+          <Suspense fallback={lazyFallback}>
+            <EditJobDialog
+              open={isEditDialogOpen}
+              onOpenChange={setIsEditDialogOpen}
+              job={selectedJob}
+            />
+          </Suspense>
         )}
 
-        <MessagesDialog
-          open={messagesOpen}
-          onOpenChange={setMessagesOpen}
-        />
+        {messagesOpen ? (
+          <Suspense fallback={lazyFallback}>
+            <MessagesDialog
+              open={messagesOpen}
+              onOpenChange={setMessagesOpen}
+            />
+          </Suspense>
+        ) : null}
 
-        <EmailComposerDialog
-          open={emailComposerOpen}
-          onOpenChange={setEmailComposerOpen}
-        />
+        {emailComposerOpen ? (
+          <Suspense fallback={lazyFallback}>
+            <EmailComposerDialog
+              open={emailComposerOpen}
+              onOpenChange={setEmailComposerOpen}
+            />
+          </Suspense>
+        ) : null}
       </div>
     </div>
   );

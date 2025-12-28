@@ -280,7 +280,11 @@ export const ArtistRequirementsForm = () => {
             <img 
               src={festivalLogo} 
               alt="Festival Logo" 
-              className="h-16 object-contain"
+              width={192}
+              height={64}
+              loading="eager"
+              decoding="async"
+              className="h-16 w-48 object-contain"
             />
           )}
           
@@ -339,7 +343,11 @@ export const ArtistRequirementsForm = () => {
           <img 
             src="/sector%20pro%20logo.png" 
             alt="Company Logo" 
-            className="h-16 object-contain mt-8"
+            width={794}
+            height={100}
+            loading="lazy"
+            decoding="async"
+            className="h-16 w-48 object-contain mt-8"
           />
         </div>
       </div>

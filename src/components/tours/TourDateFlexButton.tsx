@@ -74,7 +74,15 @@ export const TourDateFlexButton = ({ tourDateId, isCreatingFolders = false }: To
       {isFlexLoading || isCreatingFolders ? (
         <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
-        <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
+        <img
+          src={createFolderIcon}
+          alt="Flex"
+          width={16}
+          height={16}
+          loading="lazy"
+          decoding="async"
+          className="h-4 w-4"
+        />
       )}
       {isCreatingFolders ? "Creating Folders..." : "Flex Folder"}
     </Button>

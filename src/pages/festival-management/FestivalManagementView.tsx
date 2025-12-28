@@ -163,7 +163,7 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
               {(venueData.address || venueData.coordinates) && (
                 <div className="mt-3">
                   {isMapLoading ? (
-                    <div className="w-full h-32 bg-muted rounded-lg flex items-center justify-center">
+                    <div className="w-full aspect-[2/1] bg-muted rounded-lg flex items-center justify-center">
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
                   ) : mapPreviewUrl ? (
@@ -176,7 +176,15 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                       }}
                       className="w-full rounded-lg overflow-hidden border hover:border-primary transition-all hover:shadow-md group relative"
                     >
-                      <img src={mapPreviewUrl} alt="Venue location" className="w-full h-auto" />
+                      <img
+                        src={mapPreviewUrl}
+                        alt="Venue location"
+                        width={600}
+                        height={300}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-auto"
+                      />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-background/90 px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-2">
                           <MapPin className="h-4 w-4" />
@@ -215,7 +223,15 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                       {isFlexLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
+                        <img
+                          src={createFolderIcon}
+                          alt="Flex"
+                          width={16}
+                          height={16}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-4 w-4"
+                        />
                       )}
                       <span className="hidden sm:inline">{isFlexLoading ? "Cargando..." : "Flex"}</span>
                     </Button>

@@ -1,20 +1,14 @@
 
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from 'sonner';
 import { queryClient } from '@/lib/react-query';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
-import Layout from '@/components/layout/Layout';
-import { RequireAuth } from '@/components/RequireAuth';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { OptimizedAuthProvider, useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { AppInit } from "@/components/AppInit";
-import { useActivityPushFallback } from '@/hooks/useActivityPushFallback';
 import { useServiceWorkerUpdate } from '@/hooks/useServiceWorkerUpdate';
 import { usePushSubscriptionRecovery } from '@/hooks/usePushSubscriptionRecovery';
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
@@ -22,6 +16,14 @@ import { ViewportProvider } from '@/hooks/use-mobile';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
+
+const ReactQueryDevtoolsLazy = import.meta.env.DEV
+  ? lazy(() =>
+      import('@tanstack/react-query-devtools').then((m) => ({
+        default: m.ReactQueryDevtools,
+      })),
+    )
+  : null;
 
 // Lazy load all pages for better initial bundle size
 const Auth = lazy(() => import('@/pages/Auth'));
@@ -72,6 +74,8 @@ const RatesCenterPage = lazy(() => import('@/pages/RatesCenterPage'));
 const ExpensesPage = lazy(() => import('@/pages/Expenses'));
 const Feedback = lazy(() => import('@/pages/Feedback'));
 const SoundVisionFiles = lazy(() => import('@/pages/SoundVisionFiles'));
+const Layout = lazy(() => import('@/components/layout/Layout'));
+const AuthenticatedShell = lazy(() => import('@/routes/AuthenticatedShell'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -79,12 +83,6 @@ const PageLoader = () => (
     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
   </div>
 );
-
-// Initialize activity push fallback within auth context
-function ActivityPushFallbackInit() {
-  useActivityPushFallback();
-  return null;
-}
 
 // Initialize service worker update detection
 function ServiceWorkerUpdateInit() {
@@ -139,32 +137,6 @@ const DisponibilidadAccessGuard = () => {
   return <Disponibilidad />;
 };
 
-// Global guard that redirects 'technician' role to tech-app (house_tech can access Layout routes)
-const TechnicianRouteGuard = () => {
-  const { userRole, isLoading } = useOptimizedAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  React.useEffect(() => {
-    // Don't redirect while still loading auth
-    if (isLoading) return;
-
-    // Only redirect 'technician' role users (NOT house_tech - they need Layout access)
-    if (userRole !== 'technician') return;
-
-    // Don't redirect if already on tech-app or auth page
-    if (location.pathname === '/tech-app' || location.pathname === '/auth' || location.pathname.startsWith('/auth')) return;
-
-    // Redirect to tech-app
-    console.log(`Technician detected on ${location.pathname}, redirecting to /tech-app`);
-    navigate('/tech-app', { replace: true });
-  }, [userRole, isLoading, location.pathname, navigate]);
-
-  return null;
-};
-
-
-
 export default function App() {
   // Initialize multi-tab coordinator
   React.useEffect(() => {
@@ -186,30 +158,37 @@ export default function App() {
                   <OptimizedAuthProvider>
                     <ServiceWorkerUpdateInit />
                     <PushSubscriptionRecoveryInit />
-                    <SubscriptionProvider>
-                      <AppInit />
-                      <ActivityPushFallbackInit />
-                      <TechnicianRouteGuard />
-                      <div className="app">
-                        <Suspense fallback={<PageLoader />}>
-                          <Routes>
-                            <Route path="/" element={<Auth />} />
-                            <Route path="/auth" element={<Auth />} />
-                            {/* Wallboard: public tokenized access (no auth required) */}
-                            <Route path="/wallboard/public/:token/:presetSlug?" element={<WallboardPublic />} />
+                    <div className="app">
+                      <Suspense fallback={<PageLoader />}>
+                        <Routes>
+                          <Route path="/" element={<Auth />} />
+                          <Route path="/auth" element={<Auth />} />
+
+                          {/* Wallboard: public tokenized access (no auth required) */}
+                          <Route path="/wallboard/public/:token/:presetSlug?" element={<WallboardPublic />} />
+
+                          {/* Public Routes */}
+                          <Route path="festival">
+                            <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
+                            <Route path="form-submitted" element={<FormSubmitted />} />
+                          </Route>
+
+                          {/* Authenticated Routes */}
+                          <Route element={<AuthenticatedShell />}>
                             {/* Wallboard: protected, full-screen (no Layout) */}
-                            <Route path="/wallboard/:presetSlug?" element={<RequireAuth><Wallboard /></RequireAuth>} />
+                            <Route path="/wallboard/:presetSlug?" element={<Wallboard />} />
                             {/* TechnicianSuperApp: full-screen mobile interface for technicians only */}
-                            <Route path="/tech-app" element={<RequireAuth><ProtectedRoute allowedRoles={['technician']}><TechnicianSuperApp /></ProtectedRoute></RequireAuth>} />
+                            <Route
+                              path="/tech-app"
+                              element={
+                                <ProtectedRoute allowedRoles={['technician']}>
+                                  <TechnicianSuperApp />
+                                </ProtectedRoute>
+                              }
+                            />
 
-                            {/* Public Routes */}
-                            <Route path="festival">
-                              <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
-                              <Route path="form-submitted" element={<FormSubmitted />} />
-                            </Route>
-
-                            {/* Protected Routes */}
-                            <Route element={<RequireAuth><Layout /></RequireAuth>}>
+                            {/* Layout Routes */}
+                            <Route element={<Layout />}>
                               <Route path="/sound" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Sound /></ProtectedRoute>} />
                               <Route path="/personal" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><Personal /></ProtectedRoute>} />
                               <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><Dashboard /></ProtectedRoute>} />
@@ -281,20 +260,24 @@ export default function App() {
                               <Route path="/festival-management/:jobId/gear" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><FestivalGearManagement /></ProtectedRoute>} />
                               <Route path="/festival-management/:jobId/scheduling" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><FestivalManagement /></ProtectedRoute>} />
                             </Route>
-                          </Routes>
-                        </Suspense>
-                        {/* Radix-based toaster (legacy) and Sonner toaster for activity + app toasts */}
-                        <Toaster />
-                        <SonnerToaster richColors position="top-right" />
-                      </div>
-                    </SubscriptionProvider>
+                          </Route>
+                        </Routes>
+                      </Suspense>
+                      {/* Radix-based toaster (legacy) and Sonner toaster for activity + app toasts */}
+                      <Toaster />
+                      <SonnerToaster richColors position="top-right" />
+                    </div>
                   </OptimizedAuthProvider>
                 </Router>
               </AppBadgeProvider>
             </TooltipProvider>
           </ThemeProvider>
         </ViewportProvider>
-        <ReactQueryDevtools initialIsOpen={false} />
+        {ReactQueryDevtoolsLazy ? (
+          <Suspense fallback={null}>
+            <ReactQueryDevtoolsLazy initialIsOpen={false} />
+          </Suspense>
+        ) : null}
       </QueryClientProvider>
     </ErrorBoundary>
   );

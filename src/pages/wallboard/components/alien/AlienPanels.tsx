@@ -222,6 +222,10 @@ export const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }> = (
               <img
                 src={TRANSPORT_PROVIDERS[ev.transport_provider].icon}
                 alt={TRANSPORT_PROVIDERS[ev.transport_provider].label}
+                width={128}
+                height={128}
+                loading="lazy"
+                decoding="async"
                 className="w-32 h-32 object-contain"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -235,4 +239,3 @@ export const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }> = (
     </div>
   </AlienShell>
 );
-

@@ -35,11 +35,14 @@ export const FooterLogo: React.FC<{ onToggle?: () => void; onMeasure?: (h: numbe
         <img
           src={src}
           alt="Logo de la Empresa"
-          className="h-12 w-auto opacity-90 cursor-pointer select-none"
+          width={192}
+          height={48}
+          loading="lazy"
+          decoding="async"
+          className="h-12 w-48 object-contain opacity-90 cursor-pointer select-none"
           onError={() => setIdx((i) => i + 1)}
           onClick={() => onToggle && onToggle()}
         />
       </div>
     );
   };
-

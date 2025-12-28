@@ -438,9 +438,10 @@ const Layout = () => {
                 <img
                   src="/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png"
                   alt="Sector Pro Logo"
-                  width="87"
-                  height="24"
-                  className="h-6 w-auto dark:invert"
+                  width={794}
+                  height={100}
+                  decoding="async"
+                  className="h-6 w-auto max-w-[190px] dark:invert"
                   draggable="false"
                 />
               </div>

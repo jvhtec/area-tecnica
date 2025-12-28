@@ -217,6 +217,10 @@ export const ModuleShowcase = () => {
                         <img
                           src={module.image}
                           alt={module.title}
+                          width={1200}
+                          height={800}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                         />
                         

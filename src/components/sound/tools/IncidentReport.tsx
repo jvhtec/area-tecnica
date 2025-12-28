@@ -236,6 +236,10 @@ export const IncidentReport = () => {
                 <img 
                   src={formData.signature} 
                   alt="Firma" 
+                  width={400}
+                  height={150}
+                  loading="lazy"
+                  decoding="async"
                   className="max-w-full h-20 object-contain mx-auto"
                 />
               </div>
