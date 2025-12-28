@@ -202,7 +202,9 @@ const PesosTool: React.FC = () => {
         if (!error && data) {
           setSelectedJob(data as unknown as JobSelection);
         }
-      } catch { }
+      } catch (err) {
+        console.error('Error applying job from URL:', err);
+      }
     };
     applyJobFromUrl();
   }, [jobIdFromUrl, jobs]);
@@ -487,8 +489,8 @@ const PesosTool: React.FC = () => {
           dualMotors: table.dualMotors,
           mirroredCluster: table.clusterId ? true : false,
           riggingPoints: table.riggingPoints,
-          cablePick: cablePick,
-          cablePickWeight: cablePickWeight,
+          cablePick: table.cablePick,
+          cablePickWeight: table.cablePickWeight,
           baseName: table.baseName
         },
         table_type: 'weight',
@@ -497,8 +499,8 @@ const PesosTool: React.FC = () => {
           dualMotors: table.dualMotors,
           riggingPoints: table.riggingPoints,
           clusterId: table.clusterId,
-          cablePick: cablePick,
-          cablePickWeight: cablePickWeight,
+          cablePick: table.cablePick,
+          cablePickWeight: table.cablePickWeight,
           baseName: table.baseName
         }
       });

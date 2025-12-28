@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface PerformanceMetrics {
   renderTime: number;
@@ -18,52 +18,52 @@ export const usePerformanceMonitor = (componentName: string) => {
   const queryStartRef = useRef<number>(0);
   const cellRenderCountRef = useRef<number>(0);
 
-  const startRenderTimer = () => {
+  const startRenderTimer = useCallback(() => {
     renderStartRef.current = performance.now();
-  };
+  }, []);
 
-  const endRenderTimer = () => {
+  const endRenderTimer = useCallback(() => {
     if (renderStartRef.current) {
       const renderTime = performance.now() - renderStartRef.current;
       setMetrics(prev => ({ ...prev, renderTime }));
       console.log(`${componentName} render time: ${renderTime.toFixed(2)}ms`);
     }
-  };
+  }, [componentName]);
 
-  const startQueryTimer = () => {
+  const startQueryTimer = useCallback(() => {
     queryStartRef.current = performance.now();
-  };
+  }, []);
 
-  const endQueryTimer = () => {
+  const endQueryTimer = useCallback(() => {
     if (queryStartRef.current) {
       const queryTime = performance.now() - queryStartRef.current;
       setMetrics(prev => ({ ...prev, queryTime }));
       console.log(`${componentName} query time: ${queryTime.toFixed(2)}ms`);
     }
-  };
+  }, [componentName]);
 
-  const incrementCellRender = () => {
+  const incrementCellRender = useCallback(() => {
     cellRenderCountRef.current += 1;
     if (cellRenderCountRef.current % 5000 === 0) { // Reduced logging frequency
       setMetrics(prev => ({ ...prev, cellRenderCount: cellRenderCountRef.current }));
       console.log(`${componentName} cells rendered: ${cellRenderCountRef.current}`);
     }
-  };
+  }, [componentName]);
 
-  const measureMemoryUsage = () => {
+  const measureMemoryUsage = useCallback(() => {
     if ('memory' in performance) {
       const memory = (performance as any).memory;
       const memoryUsage = memory.usedJSHeapSize / 1024 / 1024; // MB
       setMetrics(prev => ({ ...prev, memoryUsage }));
       console.log(`${componentName} memory usage: ${memoryUsage.toFixed(2)}MB`);
     }
-  };
+  }, [componentName]);
 
   // Auto-measure memory every 5 seconds
   useEffect(() => {
     const interval = setInterval(measureMemoryUsage, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [measureMemoryUsage]);
 
   return {
     metrics,

@@ -59,6 +59,7 @@ export const JobPayoutOverrideSection: React.FC<{
                 disabled={isRemoving}
                 className="h-6 px-2 text-red-300 hover:text-red-200 hover:bg-red-500/20"
                 aria-label="Eliminar override"
+                aria-busy={isRemoving}
               >
                 {isRemoving ? <Loader2 className="h-3 w-3 animate-spin" /> : "×"}
               </Button>

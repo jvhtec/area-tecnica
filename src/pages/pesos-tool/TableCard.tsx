@@ -13,9 +13,9 @@ interface WeightTable {
     cablePickWeight?: string;
     rows: Array<{
         id?: string;
-        quantity: number;
+        quantity: string | number;
         componentName: string;
-        weight: number;
+        weight: string | number;
         totalWeight?: number;
     }>;
     totalWeight?: number;

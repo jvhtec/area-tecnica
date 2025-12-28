@@ -431,9 +431,10 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
 	                ) : (
                   <Button
                     size="sm"
-                    disabled={!approvalStatusLoading && !!approvalStatus && !approvalStatus.canApprove}
+                    disabled={approvalStatusLoading || (!!approvalStatus && !approvalStatus.canApprove)}
                     onClick={async () => {
                       if (!resolvedJobId) return;
+                      if (approvalStatusLoading || !approvalStatus) return;
                       if (approvalStatus && !approvalStatus.canApprove) {
                         const reasons = approvalStatus.blockingReasons.join(", ");
                         toast.error(
@@ -608,30 +609,31 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
 
             {existingWorkOrders && existingWorkOrders.length > 0 ? (
               <div className="border-t pt-2 space-y-1">
-                {existingWorkOrders.map((row: any) => {
-                  const name =
-                    [row?.profiles?.first_name, row?.profiles?.last_name].filter(Boolean).join(" ") || row.technician_id;
-                  const elementId = row?.flex_element_id || row?.flex_document_id || "—";
-                  const vendorId = row?.flex_vendor_id || "—";
-                  const lpoNumber = row?.lpo_number || "—";
-                  return (
-                    <div key={`${row.technician_id}-${elementId}`} className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
+	                {existingWorkOrders.map((row: any) => {
+	                  const name =
+	                    [row?.profiles?.first_name, row?.profiles?.last_name].filter(Boolean).join(" ") || row.technician_id;
+	                  const realElementId = row?.flex_element_id || row?.flex_document_id;
+	                  const elementId = realElementId || "—";
+	                  const vendorId = row?.flex_vendor_id || "—";
+	                  const lpoNumber = row?.lpo_number || "—";
+	                  return (
+	                    <div key={`${row.technician_id}-${elementId}`} className="flex items-center justify-between gap-2">
+	                      <div className="min-w-0">
                         <div className="truncate">
                           <span className="font-medium">{name}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          LPO: {elementId}
-                          {elementId && (
-                            <a
-                              className="ml-2 text-primary hover:underline inline-flex items-center"
-                              href={`https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#fin-doc/${encodeURIComponent(
-                                elementId
-                              )}/doc-view/8238f39c-f42e-11e0-a8de-00e08175e43e/detail`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="h-3 w-3 mr-1" /> Abrir en Flex
+	                        </div>
+	                        <div className="text-xs text-muted-foreground truncate">
+	                          LPO: {elementId}
+	                          {realElementId && (
+	                            <a
+	                              className="ml-2 text-primary hover:underline inline-flex items-center"
+	                              href={`https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#fin-doc/${encodeURIComponent(
+	                                realElementId
+	                              )}/doc-view/8238f39c-f42e-11e0-a8de-00e08175e43e/detail`}
+	                              target="_blank"
+	                              rel="noopener noreferrer"
+	                            >
+	                              <ExternalLink className="h-3 w-3 mr-1" /> Abrir en Flex
                             </a>
                           )}
                         </div>

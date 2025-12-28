@@ -100,13 +100,13 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
     isArchiving,
 
     setIsBackfillDialogOpen,
-	    isBackfilling,
+    isBackfilling,
 
-	    userRole,
-	    techName,
-	    setIsWhatsappDialogOpen,
-	    setWaMessage,
-	    setIsAlmacenDialogOpen,
+    userRole,
+    techName,
+    setIsWhatsappDialogOpen,
+    setWaMessage,
+    setIsAlmacenDialogOpen,
 
     navigateToCalculator,
 
