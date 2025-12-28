@@ -1,5 +1,9 @@
+import { Suspense, lazy } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CorporateEmailComposer } from "@/components/emails/CorporateEmailComposer";
+
+const CorporateEmailComposer = lazy(() =>
+  import("@/components/emails/CorporateEmailComposer").then((m) => ({ default: m.CorporateEmailComposer }))
+);
 
 interface EmailComposerDialogProps {
     open: boolean;
@@ -14,7 +18,11 @@ export const EmailComposerDialog = ({ open, onOpenChange }: EmailComposerDialogP
                     <DialogTitle>Redactar Email Corporativo</DialogTitle>
                 </DialogHeader>
                 <div className="mt-4">
-                    <CorporateEmailComposer />
+                    {open ? (
+                      <Suspense fallback={<div className="py-8 text-center text-sm text-muted-foreground">Cargando editor…</div>}>
+                        <CorporateEmailComposer />
+                      </Suspense>
+                    ) : null}
                 </div>
             </DialogContent>
         </Dialog>

@@ -269,6 +269,10 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, duration = 8000
             src="/sector pro logo.png"
             alt="Sector-Pro"
             className="splash-logo"
+            width={794}
+            height={100}
+            loading="eager"
+            decoding="async"
             onError={(e) => {
               // Fallback to lovable-uploads if main logo fails
               const target = e.target as HTMLImageElement;

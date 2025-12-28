@@ -16,6 +16,8 @@ import { supabase } from '@/lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
+import type { Table, TableRow } from './consumos-tool/types';
+import { PowerTableCard } from './consumos-tool/components/PowerTableCard';
 
 const soundComponentDatabase = [
   { id: 1, name: 'LA12X', watts: 2000 },
@@ -30,30 +32,6 @@ const soundComponentDatabase = [
   { id: 10, name: 'Backline', watts: 2500 },
   { id: 11, name: 'Varios', watts: 1500 }
 ];
-
-interface TableRow {
-  quantity: string;
-  componentId: string;
-  watts: string;
-  componentName?: string;
-  totalWatts?: number;
-}
-
-interface Table {
-  name: string;
-  rows: TableRow[];
-  totalWatts?: number;
-  adjustedWatts?: number;
-  currentPerPhase?: number; // kept for compatibility; holds line current (per-phase if 3φ, single-line if 1φ)
-  pduType?: string;
-  customPduType?: string;
-  id?: number | string;
-  includesHoist?: boolean;
-  isDefault?: boolean;
-  isOverride?: boolean;
-  overrideId?: string;
-  defaultTableId?: string;
-}
 
 const ConsumosTool: React.FC = () => {
   const navigate = useNavigate();
@@ -953,106 +931,15 @@ const ConsumosTool: React.FC = () => {
           <div className="space-y-6">
             {/* First half of tables */}
             {tables.slice(0, Math.ceil(tables.length / 2)).map((table) => (
-              <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
-                <div className="bg-muted px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                  <h3 className="font-semibold">{table.name}</h3>
-                  <Button variant="destructive" size="sm" onClick={() => removeTable(table.id as number)}>Remove Table</Button>
-                </div>
-
-                <div className="p-4 bg-muted/50 space-y-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id={`hoist-${table.id}`}
-                        checked={table.includesHoist}
-                        onCheckedChange={(checked) => updateTableSettings(table.id as number, { includesHoist: !!checked })}
-                      />
-                      <Label htmlFor={`hoist-${table.id}`} className="text-sm">Requires additional hoist power (CEE32A 3P+N+G)</Label>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-                      <Label className="text-sm whitespace-nowrap">PDU Type Override:</Label>
-                      <Select
-                        value={table.customPduType ? (PDU_TYPES.includes(table.customPduType) ? table.customPduType : 'custom') : 'default'}
-                        onValueChange={(value) => {
-                          if (value === 'default') {
-                            updateTableSettings(table.id as number, { customPduType: undefined });
-                          } else if (value === 'custom') {
-                            updateTableSettings(table.id as number, { customPduType: '' });
-                          } else {
-                            updateTableSettings(table.id as number, { customPduType: value });
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-full sm:w-[220px]">
-                          <SelectValue placeholder="Use recommended PDU type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Use recommended ({table.pduType})</SelectItem>
-                          {PDU_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
-                          ))}
-                          <SelectItem value="custom">Custom PDU Type</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {table.customPduType !== undefined && !PDU_TYPES.includes(table.customPduType || '') && (
-                        <Input
-                          placeholder="Enter custom PDU type"
-                          value={table.customPduType || ''}
-                          onChange={(e) => updateTableSettings(table.id as number, { customPduType: e.target.value })}
-                          className="w-full sm:w-[220px]"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-medium text-sm">Quantity</th>
-                        <th className="px-4 py-3 text-left font-medium text-sm">Component</th>
-                        <th className="px-4 py-3 text-left font-medium text-sm">Watts (per unit)</th>
-                        <th className="px-4 py-3 text-left font-medium text-sm">Total Watts</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {table.rows.map((row, index) => (
-                        <tr key={index} className="border-t">
-                          <td className="px-4 py-3 text-sm">{row.quantity}</td>
-                          <td className="px-4 py-3 text-sm">{row.componentName}</td>
-                          <td className="px-4 py-3 text-sm">{row.watts}</td>
-                          <td className="px-4 py-3 text-sm">{row.totalWatts?.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                      <tr className="border-t bg-muted/50 font-medium">
-                        <td colSpan={3} className="px-4 py-3 text-right text-sm">Total Watts:</td>
-                        <td className="px-4 py-3 text-sm">{table.totalWatts?.toFixed(2)} W</td>
-                      </tr>
-                      {safetyMargin > 0 && (
-                        <tr className="border-t bg-muted/50 font-medium">
-                          <td colSpan={3} className="px-4 py-3 text-right text-sm">Adjusted Watts ({safetyMargin}% safety margin):</td>
-                          <td className="px-4 py-3 text-sm">{table.adjustedWatts?.toFixed(2)} W</td>
-                        </tr>
-                      )}
-                      <tr className="border-t bg-muted/50 font-medium">
-                        <td colSpan={3} className="px-4 py-3 text-right text-sm">{phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}</td>
-                        <td className="px-4 py-3 text-sm">{table.currentPerPhase?.toFixed(2)} A</td>
-                      </tr>
-                      <tr className="border-t bg-muted/50 font-medium">
-                        <td colSpan={3} className="px-4 py-3 text-right text-sm">PDU Type:</td>
-                        <td className="px-4 py-3 text-sm">{table.customPduType || table.pduType}</td>
-                      </tr>
-                      {table.includesHoist && (
-                        <tr className="border-t bg-muted/50 font-medium">
-                          <td colSpan={4} className="px-4 py-3 text-sm">Additional Hoist Power Required: CEE32A 3P+N+G</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <PowerTableCard
+                key={table.id}
+                table={table}
+                pduTypes={PDU_TYPES}
+                safetyMargin={safetyMargin}
+                phaseMode={phaseMode}
+                onRemove={() => removeTable(table.id as number)}
+                onUpdateSettings={(patch) => updateTableSettings(table.id as number, patch)}
+              />
             ))}
           </div>
         </div>
@@ -1062,106 +949,15 @@ const ConsumosTool: React.FC = () => {
           <div className="space-y-6">
             {/* Second half of tables */}
             {tables.slice(Math.ceil(tables.length / 2)).map((table) => (
-              <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
-                <div className="bg-muted px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                  <h3 className="font-semibold">{table.name}</h3>
-                  <Button variant="destructive" size="sm" onClick={() => removeTable(table.id as number)}>Remove Table</Button>
-                </div>
-
-                <div className="p-4 bg-muted/50 space-y-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id={`hoist-${table.id}`}
-                        checked={table.includesHoist}
-                        onCheckedChange={(checked) => updateTableSettings(table.id as number, { includesHoist: !!checked })}
-                      />
-                      <Label htmlFor={`hoist-${table.id}`} className="text-sm">Requires additional hoist power (CEE32A 3P+N+G)</Label>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-                      <Label className="text-sm whitespace-nowrap">PDU Type Override:</Label>
-                      <Select
-                        value={table.customPduType ? (PDU_TYPES.includes(table.customPduType) ? table.customPduType : 'custom') : 'default'}
-                        onValueChange={(value) => {
-                          if (value === 'default') {
-                            updateTableSettings(table.id as number, { customPduType: undefined });
-                          } else if (value === 'custom') {
-                            updateTableSettings(table.id as number, { customPduType: '' });
-                          } else {
-                            updateTableSettings(table.id as number, { customPduType: value });
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-full sm:w-[220px]">
-                          <SelectValue placeholder="Use recommended PDU type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Use recommended ({table.pduType})</SelectItem>
-                          {PDU_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
-                          ))}
-                          <SelectItem value="custom">Custom PDU Type</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {table.customPduType !== undefined && !PDU_TYPES.includes(table.customPduType || '') && (
-                        <Input
-                          placeholder="Enter custom PDU type"
-                          value={table.customPduType || ''}
-                          onChange={(e) => updateTableSettings(table.id as number, { customPduType: e.target.value })}
-                          className="w-full sm:w-[220px]"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-medium text-sm">Quantity</th>
-                        <th className="px-4 py-3 text-left font-medium text-sm">Component</th>
-                        <th className="px-4 py-3 text-left font-medium text-sm">Watts (per unit)</th>
-                        <th className="px-4 py-3 text-left font-medium text-sm">Total Watts</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {table.rows.map((row, index) => (
-                        <tr key={index} className="border-t">
-                          <td className="px-4 py-3 text-sm">{row.quantity}</td>
-                          <td className="px-4 py-3 text-sm">{row.componentName}</td>
-                          <td className="px-4 py-3 text-sm">{row.watts}</td>
-                          <td className="px-4 py-3 text-sm">{row.totalWatts?.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                      <tr className="border-t bg-muted/50 font-medium">
-                        <td colSpan={3} className="px-4 py-3 text-right text-sm">Total Watts:</td>
-                        <td className="px-4 py-3 text-sm">{table.totalWatts?.toFixed(2)} W</td>
-                      </tr>
-                      {safetyMargin > 0 && (
-                        <tr className="border-t bg-muted/50 font-medium">
-                          <td colSpan={3} className="px-4 py-3 text-right text-sm">Adjusted Watts ({safetyMargin}% safety margin):</td>
-                          <td className="px-4 py-3 text-sm">{table.adjustedWatts?.toFixed(2)} W</td>
-                        </tr>
-                      )}
-                      <tr className="border-t bg-muted/50 font-medium">
-                        <td colSpan={3} className="px-4 py-3 text-right text-sm">{phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}</td>
-                        <td className="px-4 py-3 text-sm">{table.currentPerPhase?.toFixed(2)} A</td>
-                      </tr>
-                      <tr className="border-t bg-muted/50 font-medium">
-                        <td colSpan={3} className="px-4 py-3 text-right text-sm">PDU Type:</td>
-                        <td className="px-4 py-3 text-sm">{table.customPduType || table.pduType}</td>
-                      </tr>
-                      {table.includesHoist && (
-                        <tr className="border-t bg-muted/50 font-medium">
-                          <td colSpan={4} className="px-4 py-3 text-sm">Additional Hoist Power Required: CEE32A 3P+N+G</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <PowerTableCard
+                key={table.id}
+                table={table}
+                pduTypes={PDU_TYPES}
+                safetyMargin={safetyMargin}
+                phaseMode={phaseMode}
+                onRemove={() => removeTable(table.id as number)}
+                onUpdateSettings={(patch) => updateTableSettings(table.id as number, patch)}
+              />
             ))}
           </div>
         </div>

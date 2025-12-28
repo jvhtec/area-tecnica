@@ -110,6 +110,7 @@ export function AdminPanel() {
   const [showDeleteFeatureDialog, setShowDeleteFeatureDialog] = useState(false);
   const [bugToDelete, setBugToDelete] = useState<string | null>(null);
   const [featureToDelete, setFeatureToDelete] = useState<string | null>(null);
+  const [screenshotDimensions, setScreenshotDimensions] = useState<{ width: number; height: number } | null>(null);
 
   // Fetch bug reports (excluding heavy fields for list view)
   const { data: bugReports = [], isLoading: loadingBugs } = useQuery({
@@ -152,6 +153,31 @@ export function AdminPanel() {
     },
     enabled: !!selectedBug?.id,
   });
+
+  useEffect(() => {
+    if (!fullBugDetails?.screenshot_url) {
+      setScreenshotDimensions(null);
+      return;
+    }
+
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      const width = img.naturalWidth || 0;
+      const height = img.naturalHeight || 0;
+      setScreenshotDimensions(width > 0 && height > 0 ? { width, height } : null);
+    };
+    img.onerror = () => {
+      if (cancelled) return;
+      setScreenshotDimensions(null);
+    };
+    img.src = fullBugDetails.screenshot_url;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fullBugDetails?.screenshot_url]);
 
   // Reset admin notes to DB value when full bug details load (prevent stale edits)
   useEffect(() => {
@@ -585,6 +611,10 @@ export function AdminPanel() {
                       <img
                         src={fullBugDetails.screenshot_url}
                         alt="Screenshot"
+                        width={screenshotDimensions?.width}
+                        height={screenshotDimensions?.height}
+                        loading="lazy"
+                        decoding="async"
                         className="mt-2 rounded-md border max-w-full h-auto"
                       />
                     </div>

@@ -15,12 +15,38 @@ export function ScreenshotCapture({
   currentScreenshot,
 }: ScreenshotCaptureProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentScreenshot || null);
+  const [previewDimensions, setPreviewDimensions] = useState<{ width: number; height: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync previewUrl with currentScreenshot prop to avoid stale previews
   useEffect(() => {
     setPreviewUrl(currentScreenshot || null);
   }, [currentScreenshot]);
+
+  useEffect(() => {
+    if (!previewUrl) {
+      setPreviewDimensions(null);
+      return;
+    }
+
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      const width = img.naturalWidth || 0;
+      const height = img.naturalHeight || 0;
+      setPreviewDimensions(width > 0 && height > 0 ? { width, height } : null);
+    };
+    img.onerror = () => {
+      if (cancelled) return;
+      setPreviewDimensions(null);
+    };
+    img.src = previewUrl;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewUrl]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -146,6 +172,10 @@ export function ScreenshotCapture({
           <img
             src={previewUrl}
             alt="Screenshot preview"
+            width={previewDimensions?.width}
+            height={previewDimensions?.height}
+            loading="lazy"
+            decoding="async"
             className="w-full h-auto rounded-md"
           />
         </div>

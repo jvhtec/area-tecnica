@@ -293,6 +293,10 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
           <img
             src={logoUrl}
             alt="Tour logo"
+            width={144}
+            height={144}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-contain"
             onError={(e) => {
               console.error('Image failed to load:', logoUrl);

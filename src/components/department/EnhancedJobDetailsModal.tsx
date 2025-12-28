@@ -521,7 +521,15 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                     )}
                                     {!isMapLoading && mapPreviewUrl && (
                                         <div className={`rounded-xl overflow-hidden border ${theme.divider}`}>
-                                            <img src={mapPreviewUrl} alt="Mapa del recinto" className="w-full h-auto" />
+                                            <img
+                                                src={mapPreviewUrl}
+                                                alt="Mapa del recinto"
+                                                width={600}
+                                                height={300}
+                                                loading="lazy"
+                                                decoding="async"
+                                                className="w-full h-auto"
+                                            />
                                             <div className="p-3 flex justify-end">
                                                 <Button size="sm" onClick={handleOpenMaps}>
                                                     Ver indicaciones

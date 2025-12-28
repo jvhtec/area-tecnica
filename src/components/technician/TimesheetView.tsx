@@ -615,6 +615,10 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                                   <img
                                     src={timesheet.signature_data}
                                     alt="Firma"
+                                    width={400}
+                                    height={150}
+                                    loading="lazy"
+                                    decoding="async"
                                     className="max-h-16 object-contain"
                                   />
                                   <div className="text-xs text-emerald-500 mt-1 flex items-center gap-1">

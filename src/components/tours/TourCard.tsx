@@ -522,6 +522,10 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                     <img
                       src={logoUrl}
                       alt="Tour logo"
+                      width={48}
+                      height={48}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-contain rounded"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;

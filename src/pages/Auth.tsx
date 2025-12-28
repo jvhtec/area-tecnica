@@ -239,6 +239,11 @@ const Auth = () => {
             <img
               src={BRAND_CONFIG.logo}
               alt={BRAND_CONFIG.name}
+              width={794}
+              height={100}
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
               className="h-16 w-auto mx-auto mb-4 drop-shadow-2xl"
             />
             <h1 className="text-3xl font-bold text-white mb-1">

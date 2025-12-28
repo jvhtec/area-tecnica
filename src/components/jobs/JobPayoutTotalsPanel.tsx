@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send, Edit2, Receipt } from 'lucide-react';
+import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send, Receipt } from 'lucide-react';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import {
@@ -15,7 +15,6 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
@@ -31,6 +30,7 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToggleTechnicianPayoutApproval } from '@/hooks/useToggleTechnicianPayoutApproval';
 import type { JobExpenseBreakdownItem, JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
+import { JobPayoutOverrideSection, type JobPayoutOverride } from './JobPayoutOverrideSection';
 
 interface JobPayoutTotalsPanelProps {
   jobId: string;
@@ -899,95 +899,25 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
 
             {/* Payout Override Section (Admin/Management only) */}
             {isManager && (() => {
-              const override = getTechOverride(payout.technician_id);
+              const override = getTechOverride(payout.technician_id) as JobPayoutOverride | undefined;
               const isEditing = editingTechId === payout.technician_id;
               const techName = getTechName(payout.technician_id);
 
               return (
-                <div className="space-y-2">
-                  {override && !isEditing && (
-                    <div className="text-xs bg-amber-500/10 p-2 rounded border border-amber-500/30 text-amber-200">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">Override activo:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold">{formatCurrency(override.override_amount_eur)}</span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleStartEdit(payout.technician_id, payout.total_eur)}
-                            className="h-6 px-2 text-amber-200 hover:text-amber-100 hover:bg-amber-500/20"
-                          >
-                            <Edit2 className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleRemoveOverride(payout.technician_id)}
-                            disabled={removeOverrideMutation.isPending}
-                            className="h-6 px-2 text-red-300 hover:text-red-200 hover:bg-red-500/20"
-                          >
-                            ×
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="text-xs mt-1 opacity-75">
-                        Calculado: {formatCurrency(payout.total_eur)}
-                      </div>
-                    </div>
-                  )}
-
-                  {isEditing && (
-                    <div className="bg-amber-500/10 p-3 rounded border border-amber-500/30 space-y-2">
-                      <div className="flex items-center gap-2 text-xs text-amber-200">
-                        <Edit2 className="h-3.5 w-3.5" />
-                        <span className="font-medium">Override de pago para {techName}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={editingAmount}
-                          onChange={(e) => setEditingAmount(e.target.value)}
-                          placeholder="0.00"
-                          className="flex-1 bg-white/10 border-amber-400/50 text-white placeholder:text-slate-400 h-8"
-                          autoFocus
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => handleSaveOverride(payout.technician_id, techName, payout.total_eur)}
-                          disabled={setOverrideMutation.isPending}
-                          className="bg-amber-600 hover:bg-amber-500 text-white h-8"
-                        >
-                          {setOverrideMutation.isPending ? 'Guardando...' : 'Guardar'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={handleCancelEdit}
-                          className="text-white hover:bg-white/10 h-8"
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                      <div className="text-xs text-amber-200">
-                        Calculado: {formatCurrency(payout.total_eur)}
-                      </div>
-                    </div>
-                  )}
-
-                  {!override && !isEditing && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleStartEdit(payout.technician_id, payout.total_eur)}
-                      className="w-full border-amber-500/30 text-amber-200 hover:bg-amber-500/10 hover:text-amber-100"
-                    >
-                      <Edit2 className="h-3 w-3 mr-1" />
-                      Establecer override de pago
-                    </Button>
-                  )}
-                </div>
+                <JobPayoutOverrideSection
+                  override={override}
+                  isEditing={isEditing}
+                  techName={techName}
+                  calculatedTotalEur={payout.total_eur}
+                  editingAmount={editingAmount}
+                  onEditingAmountChange={setEditingAmount}
+                  onStartEdit={() => handleStartEdit(payout.technician_id, payout.total_eur)}
+                  onSave={() => handleSaveOverride(payout.technician_id, techName, payout.total_eur)}
+                  onCancel={handleCancelEdit}
+                  onRemove={() => handleRemoveOverride(payout.technician_id)}
+                  isSaving={setOverrideMutation.isPending}
+                  isRemoving={removeOverrideMutation.isPending}
+                />
               );
             })()}
 

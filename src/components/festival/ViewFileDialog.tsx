@@ -1,4 +1,4 @@
-
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
@@ -13,6 +13,32 @@ interface ViewFileDialogProps {
 export const ViewFileDialog = ({ open, onOpenChange, file, url }: ViewFileDialogProps) => {
   const isImage = file?.file_type.startsWith('image/');
   const isPDF = file?.file_type === 'application/pdf';
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (!open || !isImage || !url) {
+      setImageDimensions(null);
+      return;
+    }
+
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      const width = img.naturalWidth || 0;
+      const height = img.naturalHeight || 0;
+      setImageDimensions(width > 0 && height > 0 ? { width, height } : null);
+    };
+    img.onerror = () => {
+      if (cancelled) return;
+      setImageDimensions(null);
+    };
+    img.src = url;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, isImage, url]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -31,6 +57,10 @@ export const ViewFileDialog = ({ open, onOpenChange, file, url }: ViewFileDialog
             <img
               src={url}
               alt={file?.file_name}
+              width={imageDimensions?.width}
+              height={imageDimensions?.height}
+              loading="lazy"
+              decoding="async"
               className="max-w-full max-h-[70vh] object-contain mx-auto"
             />
           )}
