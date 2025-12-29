@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Area Técnica - Navigate</title>
+  <link rel="stylesheet" href="sdpi.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 16px;
+      background: #2d2d2d;
+      color: #d4d4d4;
+    }
+    .sdpi-item {
+      margin-bottom: 16px;
+    }
+    .sdpi-item-label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    select, input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #464646;
+      border-radius: 4px;
+      background: #3c3c3c;
+      color: #d4d4d4;
+      font-size: 13px;
+    }
+    select:focus, input:focus {
+      outline: none;
+      border-color: #0e639c;
+    }
+    .info {
+      font-size: 11px;
+      color: #858585;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="sdpi-wrapper">
+    <div class="sdpi-item">
+      <label class="sdpi-item-label">Route</label>
+      <select id="route">
+        <option value="/dashboard">Dashboard</option>
+        <option value="/technician-dashboard">Technician Dashboard</option>
+        <option value="/sound">Sound</option>
+        <option value="/lights">Lights</option>
+        <option value="/video">Video</option>
+        <option value="/logistics">Logistics</option>
+        <option value="/tours">Tours</option>
+        <option value="/festivals">Festivals</option>
+        <option value="/personal">Personal</option>
+        <option value="/project-management">Project Management</option>
+        <option value="/job-assignment-matrix">Job Assignment Matrix</option>
+        <option value="/management/rates">Rates</option>
+        <option value="/gastos">Expenses</option>
+        <option value="/timesheets">Timesheets</option>
+        <option value="/tech-app">Tech App</option>
+        <option value="/hoja-de-ruta">Hoja de Ruta</option>
+        <option value="/profile">Profile</option>
+        <option value="/settings">Settings</option>
+      </select>
+      <div class="info">Select the page to navigate to</div>
+    </div>
+
+    <div class="sdpi-item">
+      <label class="sdpi-item-label">Button Label (optional)</label>
+      <input type="text" id="routeLabel" placeholder="Label to show on button" />
+      <div class="info">Leave empty to use route name</div>
+    </div>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+    let websocket = null;
+    let uuid = null;
+    let actionInfo = {};
+    let settings = {};
+
+    function connectElgatoStreamDeckSocket(inPort, inUUID, inRegisterEvent, inInfo, inActionInfo) {
+      uuid = inUUID;
+      actionInfo = JSON.parse(inActionInfo);
+      settings = actionInfo.payload.settings;
+
+      websocket = new WebSocket('ws://127.0.0.1:' + inPort);
+
+      websocket.onopen = function () {
+        const json = { event: inRegisterEvent, uuid: uuid };
+        websocket.send(JSON.stringify(json));
+
+        // Load settings
+        document.getElementById('route').value = settings.route || '/dashboard';
+        document.getElementById('routeLabel').value = settings.routeLabel || '';
+      };
+
+      // Listen for changes
+      document.getElementById('route').addEventListener('change', function (e) {
+        settings.route = e.target.value;
+        saveSettings();
+      });
+
+      document.getElementById('routeLabel').addEventListener('input', function (e) {
+        settings.routeLabel = e.target.value;
+        saveSettings();
+      });
+    }
+
+    function saveSettings() {
+      if (websocket && websocket.readyState === 1) {
+        const json = {
+          event: 'setSettings',
+          context: uuid,
+          payload: settings
+        };
+        websocket.send(JSON.stringify(json));
+      }
+    }
+  </script>
+</body>
+</html>

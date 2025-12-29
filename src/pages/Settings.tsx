@@ -28,6 +28,7 @@ import { usePushDebug } from '@/hooks/usePushDebug'
 import { PushNotificationMatrix } from '@/components/settings/PushNotificationMatrix'
 import { PushNotificationSchedule } from '@/components/settings/PushNotificationSchedule'
 import { MorningSummarySubscription } from '@/components/settings/MorningSummarySubscription'
+import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown } from "lucide-react"
 import { VersionDisplay } from "@/components/VersionDisplay"
@@ -206,6 +207,7 @@ const Settings = () => {
     'push-matrix': false,
     'push-schedule': false,
     'morning-summary': false,
+    'shortcuts': false,
     'users': false,
     'company-settings': false,
     'equipment-models': false,
@@ -383,6 +385,16 @@ const Settings = () => {
                 <PushNotificationSchedule />
               </CollapsibleCard>
             )}
+
+            <CollapsibleCard
+              id="shortcuts"
+              title="Keyboard shortcuts & Stream Deck"
+              description="Manage keyboard shortcuts and Stream Deck button integration"
+              isOpen={collapsibleStates['shortcuts']}
+              onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'shortcuts': open }))}
+            >
+              <ShortcutsSettings />
+            </CollapsibleCard>
           </div>
 
           <div className="space-y-4 md:space-y-6">

@@ -135,6 +135,12 @@ export const OptimizedMatrixCell = memo(({
   const handleCellClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
 
+    // Ctrl+Click or Alt+Click to toggle cell selection (for Stream Deck shortcuts)
+    if (e.ctrlKey || e.altKey || e.metaKey) {
+      onSelect(!isSelected);
+      return;
+    }
+
     if (hasAssignment) {
       if (allowDirectAssign) {
         onClick('assign'); // Edit existing assignment
@@ -148,7 +154,7 @@ export const OptimizedMatrixCell = memo(({
       } else {
       }
     }
-  }, [hasAssignment, isUnavailable, onClick, technician, date, assignment, allowDirectAssign]);
+  }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, technician, date, assignment, allowDirectAssign]);
 
   const handleStatusClick = useCallback((e: React.MouseEvent, action: 'confirm' | 'decline') => {
     e.stopPropagation();
@@ -161,7 +167,7 @@ export const OptimizedMatrixCell = memo(({
   }, [onClick, onOptimisticUpdate]);
 
   const getCellBackground = () => {
-    if (isSelected) return 'bg-blue-100 dark:bg-blue-900/30';
+    if (isSelected) return 'bg-blue-200 dark:bg-blue-800/50';
     // Assignment present
     if (hasAssignment) {
       const status = assignment.status;
@@ -191,7 +197,7 @@ export const OptimizedMatrixCell = memo(({
   };
 
   const getBorderColor = () => {
-    if (isSelected) return 'border-blue-500';
+    if (isSelected) return 'border-blue-600 border-2 ring-2 ring-blue-400 ring-offset-1';
     if (hasAssignment) {
       if (assignment.job?.color) return 'border-l-4';
       return 'border-yellow-300';
@@ -235,6 +241,15 @@ export const OptimizedMatrixCell = memo(({
           onClick={handleCellClick}
           onMouseEnter={handleMouseEnter}
         >
+          {/* Selection indicator */}
+          {isSelected && (
+            <div className="absolute top-0 right-0 z-20" title="Celda seleccionada para shortcuts">
+              <div className="bg-blue-600 text-white px-1.5 py-0.5 text-[10px] font-bold rounded-bl">
+                ✓ SELECTED
+              </div>
+            </div>
+          )}
+
           {/* Fridge indicator */}
           {isFridge && (
             <div className="absolute top-1 left-1 z-10" title="En la nevera: no asignable">

@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { useFolderExistence } from "@/hooks/useFolderExistence";
 import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useDeletionState } from '@/hooks/useDeletionState';
+import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
 import { supabase } from "@/lib/supabase";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
@@ -83,6 +84,10 @@ export function JobCardNew({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
+
+  // Stream Deck integration: selected job state
+  const { selectJob, clearSelection, isJobSelected } = useSelectedJobStore();
+  const isSelected = isJobSelected(job.id);
   const [routeSheetOpen, setRouteSheetOpen] = useState(false);
   const [taskManagerOpen, setTaskManagerOpen] = useState(false);
 
@@ -846,11 +851,30 @@ export function JobCardNew({
     }
   };
 
-  const handleJobCardClick = () => {
+  const handleJobCardClick = (e?: React.MouseEvent) => {
     if (isHouseTech || isJobBeingDeleted) {
       return;
     }
-    // On project management pages, do not open tasks on card click
+
+    // Ctrl+Click / Alt+Click: Toggle job selection for Stream Deck shortcuts
+    if (e && (e.ctrlKey || e.altKey || e.metaKey)) {
+      if (isSelected) {
+        clearSelection();
+      } else {
+        selectJob({
+          id: job.id,
+          title: job.title,
+          department: department,
+          job_type: job.job_type,
+          start_time: job.start_time,
+          end_time: job.end_time,
+          color: job.color,
+        });
+      }
+      return;
+    }
+
+    // Normal click: open job details
     if (!isProjectManagementPage) {
       if (userRole !== "logistics" && onJobClick) {
         onJobClick(job.id);
@@ -966,10 +990,12 @@ export function JobCardNew({
     <div>
       <Card
         className={cn(
-          "mb-4 hover:shadow-md transition-all duration-200",
+          "mb-4 hover:shadow-md transition-all duration-200 relative",
           !isHouseTech && !isJobBeingDeleted && "cursor-pointer",
           cardOpacity,
-          pointerEvents
+          pointerEvents,
+          // Selected job card styles
+          isSelected && "ring-4 ring-blue-500 ring-offset-2 shadow-lg"
         )}
         onClick={handleJobCardClick}
         style={{
@@ -978,6 +1004,15 @@ export function JobCardNew({
           backgroundColor: appliedBgColor
         }}
       >
+        {/* Selected badge indicator */}
+        {isSelected && (
+          <div className="absolute top-2 right-2 z-20">
+            <Badge className="bg-blue-600 text-white font-bold text-xs">
+              ✓ SELECTED
+            </Badge>
+          </div>
+        )}
+
         {isJobBeingDeleted && (
           <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 rounded">
             <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-md shadow-lg">
