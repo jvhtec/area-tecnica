@@ -1,0 +1,58 @@
+{
+  "Actions": [
+    {
+      "Icon": "images/action",
+      "Name": "Execute Shortcut",
+      "States": [
+        {
+          "Image": "images/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": true
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Execute a keyboard shortcut from Area Técnica",
+      "UUID": "com.jvhtec.areatecnica.executeshortcut",
+      "PropertyInspectorPath": "propertyinspector.html"
+    },
+    {
+      "Icon": "images/action",
+      "Name": "Navigate",
+      "States": [
+        {
+          "Image": "images/nav",
+          "TitleAlignment": "middle",
+          "ShowTitle": true
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Navigate to a page in Area Técnica",
+      "UUID": "com.jvhtec.areatecnica.navigate",
+      "PropertyInspectorPath": "propertyinspector_nav.html"
+    }
+  ],
+  "Author": "JVHTEC",
+  "CodePath": "plugin.js",
+  "Description": "Control Area Técnica app with keyboard shortcuts and navigation",
+  "Name": "Area Técnica Controller",
+  "Icon": "images/plugin",
+  "URL": "https://github.com/jvhtec/area-tecnica",
+  "Version": "1.0.0",
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "10.14"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Software": {
+    "MinimumVersion": "6.0"
+  },
+  "Category": "Area Técnica",
+  "CategoryIcon": "images/category",
+  "SDKVersion": 2,
+  "UUID": "com.jvhtec.areatecnica"
+}
