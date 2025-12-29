@@ -125,6 +125,9 @@ GRANT EXECUTE ON FUNCTION public.get_timesheet_amounts_visible() TO authenticate
 -- 3) Profiles-with-skills RPC (fix broken auth check; limit PII)
 -- -----------------------------------------------------------------------------
 
+-- Drop existing function first since return type changed
+DROP FUNCTION IF EXISTS public.get_profiles_with_skills();
+
 CREATE OR REPLACE FUNCTION public.get_profiles_with_skills()
 RETURNS TABLE(
   id uuid,
