@@ -13,6 +13,7 @@ import { useFolderExistence } from "@/hooks/useFolderExistence";
 import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useDeletionState } from '@/hooks/useDeletionState';
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
 import { supabase } from "@/lib/supabase";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
@@ -94,6 +95,10 @@ function JobCardNewFull({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
+
+  // Stream Deck integration: selected job state
+  const { selectJob, clearSelection, isJobSelected } = useSelectedJobStore();
+  const isSelected = isJobSelected(job.id);
   const [routeSheetOpen, setRouteSheetOpen] = useState(false);
   const [taskManagerOpen, setTaskManagerOpen] = useState(false);
 
@@ -892,11 +897,30 @@ function JobCardNewFull({
     }
   };
 
-  const handleJobCardClick = () => {
+  const handleJobCardClick = (e?: React.MouseEvent) => {
     if (isHouseTech || isJobBeingDeleted) {
       return;
     }
-    // On project management pages, do not open tasks on card click
+
+    // Ctrl+Click / Alt+Click: Toggle job selection for Stream Deck shortcuts
+    if (e && (e.ctrlKey || e.altKey || e.metaKey)) {
+      if (isSelected) {
+        clearSelection();
+      } else {
+        selectJob({
+          id: job.id,
+          title: job.title,
+          department: department,
+          job_type: job.job_type,
+          start_time: job.start_time,
+          end_time: job.end_time,
+          color: job.color,
+        });
+      }
+      return;
+    }
+
+    // Normal click: open job details
     if (!isProjectManagementPage) {
       if (userRole !== "logistics" && onJobClick) {
         onJobClick(job.id);
@@ -1009,6 +1033,7 @@ function JobCardNewFull({
       setFlexPickerOpen={setFlexPickerOpen}
       flexPickerOptions={flexPickerOptions}
       handleFlexPickerConfirm={handleFlexPickerConfirm}
+      isSelected={isSelected}
     />
   );
 }
