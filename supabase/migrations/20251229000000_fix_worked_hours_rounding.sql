@@ -1,6 +1,6 @@
--- Fix worked hours rounding to always round UP to nearest whole hour
+-- Fix worked hours rounding from nearest 0.5 to nearest whole hour
 -- Previously: 12.7h rounded to 12.5h (nearest 0.5)
--- Now: 12.7h rounds UP to 13h (CEILING)
+-- Now: 12.0-12.49h -> 12h, 12.5-12.99h -> 13h (standard ROUND)
 
 CREATE OR REPLACE FUNCTION compute_timesheet_amount_2025(
   _timesheet_id UUID,
@@ -92,8 +92,9 @@ BEGIN
     )) / 3600.0 - (COALESCE(v_timesheet.break_minutes, 0) / 60.0);
   END IF;
 
-  -- FIXED: Round UP to nearest whole hour (12.7h -> 13h, not 12.5h)
-  v_worked_hours := CEILING(v_worked_hours);
+  -- FIXED: Round to nearest whole hour (12.0-12.49 -> 12h, 12.5-12.99 -> 13h)
+  -- Previously: Rounded to nearest 0.5 (12.7 -> 12.5)
+  v_worked_hours := ROUND(v_worked_hours);
 
   -- **EVENTO SPECIAL LOGIC**: Locked rate = base_day + plus_10_12 (not time-based)
   -- ALL categories (responsable, especialista, tecnico) use the same logic
@@ -187,4 +188,4 @@ GRANT EXECUTE ON FUNCTION compute_timesheet_amount_2025(UUID, BOOLEAN) TO servic
 
 -- Add comment
 COMMENT ON FUNCTION compute_timesheet_amount_2025 IS
-'Calculates timesheet amounts based on rate cards. Checks custom_tech_rates first for any custom overrides (works for both house_tech and technician roles), then falls back to standard rate_cards_2025 by category. Worked hours are rounded UP to whole hours (CEILING). Rate tiers: (1) 0-10.5h: base only, (2) 10.5-12.5h: base + fixed €30 premium, (3) >12.5h: base + €30 + overtime (rounded UP to whole hours using CEILING). For evento jobs, always uses fixed base + premium regardless of hours. Automatically handles overnight shifts by detecting when end_time < start_time or when ends_next_day flag is set.';
+'Calculates timesheet amounts based on rate cards. Checks custom_tech_rates first for any custom overrides (works for both house_tech and technician roles), then falls back to standard rate_cards_2025 by category. Worked hours are rounded to nearest whole hour (ROUND). Rate tiers: (1) 0-10.5h: base only, (2) 10.5-12.5h: base + fixed €30 premium, (3) >12.5h: base + €30 + overtime (rounded UP to whole hours using CEILING). For evento jobs, always uses fixed base + premium regardless of hours. Automatically handles overnight shifts by detecting when end_time < start_time or when ends_next_day flag is set.';

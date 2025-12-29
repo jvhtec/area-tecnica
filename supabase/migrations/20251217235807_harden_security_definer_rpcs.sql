@@ -1012,8 +1012,9 @@ BEGIN
     )) / 3600.0 - (COALESCE(v_timesheet.break_minutes, 0) / 60.0);
   END IF;
 
-  -- FIXED: Round UP to nearest whole hour (12.7h -> 13h, not 12.5h)
-  v_worked_hours := CEILING(v_worked_hours);
+  -- FIXED: Round to nearest whole hour (12.0-12.49 -> 12h, 12.5-12.99 -> 13h)
+  -- Previously: Rounded to nearest 0.5 (12.7 -> 12.5)
+  v_worked_hours := ROUND(v_worked_hours);
 
   IF v_job_type = 'evento' THEN
     v_billable_hours := 12.0;
