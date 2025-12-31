@@ -379,6 +379,10 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                 <img
                   src={tourLogoUrl}
                   alt={`${tour.name} logo`}
+                  width={64}
+                  height={64}
+                  loading="lazy"
+                  decoding="async"
                   className="w-16 h-16 object-contain rounded-lg border border-border"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -530,6 +534,10 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
               <img 
                 src={tourLogoUrl} 
                 alt={`${tour.name} logo`}
+                width={64}
+                height={64}
+                loading="lazy"
+                decoding="async"
                 className="w-16 h-16 object-contain rounded-lg border border-border"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
@@ -600,7 +608,15 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                 {isFlexLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
+                  <img
+                    src={createFolderIcon}
+                    alt="Flex"
+                    width={16}
+                    height={16}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-4 w-4"
+                  />
                 )}
                 {isFlexLoading ? 'Cargando...' : 'Flex'}
               </Button>

@@ -30,6 +30,15 @@ export default defineConfig(({ mode }) => ({
       rollupOptions: {
         output: {
           manualChunks: (id) => {
+            // Ensure Vite/rollup helper modules don't get bundled into "big libs" chunks
+            // (otherwise they can become render-blocking preloads on every page).
+            if (id.includes('\0vite/preload-helper') || id.includes('vite/preload-helper')) {
+              return 'vite-preload-helper';
+            }
+            if (id.includes('\0commonjsHelpers') || id.includes('commonjsHelpers')) {
+              return 'commonjs-helpers';
+            }
+
             if (id.includes('node_modules/jspdf') || id.includes('node_modules/pdf-lib')) {
               return 'pdf-libs';
             }

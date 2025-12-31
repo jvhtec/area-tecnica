@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
 
 // File System Access API types
@@ -16,32 +14,13 @@ import { useDeletionState } from '@/hooks/useDeletionState';
 import { supabase } from "@/lib/supabase";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
-import { Eye, Download, ChevronRight, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
-import { JobCardHeader } from './JobCardHeader';
-import { JobCardActions } from './JobCardActions';
-import { JobCardAssignments } from './JobCardAssignments';
-import { JobCardDocuments, JobDocument } from './JobCardDocuments';
-import { JobCardProgress } from './JobCardProgress';
-import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
-import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
-import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
-import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
-import { EditJobDialog } from "@/components/jobs/EditJobDialog";
-import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
-import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
-import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
+import type { JobDocument } from './JobCardDocuments';
+import { JobCardNewDetailsOnly } from "./job-card-new/JobCardNewDetailsOnly";
+import { JobCardNewView } from "./job-card-new/JobCardNewView";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
-import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
-import { LogisticsEventDialog } from "@/components/logistics/LogisticsEventDialog";
-import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { CreateFoldersOptions } from "@/utils/flex-folders";
 
 export interface JobCardNewProps {
@@ -298,7 +277,30 @@ export function JobCardNew({
 
   const isScheduled = (jobEvents?.length || 0) > 0;
   const hasRequest = Boolean(myTransportRequest) || (Array.isArray(allRequests) && allRequests.length > 0);
-  const isTechDept = userDepartment && ['sound', 'lights', 'video'].includes(userDepartment);
+  const isTechDept = !!userDepartment && ['sound', 'lights', 'video'].includes(userDepartment);
+
+  const handleCancelTransportRequest = React.useCallback(
+    async (requestId: string) => {
+      if (!requestId) return;
+      const { error } = await supabase.from("transport_requests").update({ status: "cancelled" }).eq("id", requestId);
+      if (error) {
+        console.error("[JobCardNew] Failed to cancel transport request:", error);
+        toast({
+          title: "No se pudo cancelar",
+          description: error.message || "Error cancelando la solicitud de transporte",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Solicitud cancelada",
+        description: "La solicitud de transporte se ha cancelado correctamente",
+      });
+      queryClient.invalidateQueries({ queryKey: ["transport-requests-all", job.id] });
+    },
+    [job.id, queryClient, toast]
+  );
 
   const transportButtonLabel = (() => {
     if (isScheduled) return 'Transport Scheduled';
@@ -871,495 +873,116 @@ export function JobCardNew({
 
   // Simplified details-only mode for Dashboard, Sound, Light, Video pages
   if (detailsOnlyMode) {
-    const jobName = job.title || job.name || job.job_name || 'Unnamed Job';
-    const startDate = job.start_time ? format(new Date(job.start_time), 'dd/MM/yyyy HH:mm') : '';
-    const endDate = job.end_time ? format(new Date(job.end_time), 'dd/MM/yyyy HH:mm') : '';
-
-    // Handle location - it can be a string or an object with {id, name, formatted_address}
-    let location = 'No location';
-    if (typeof job.location === 'string') {
-      location = job.location;
-    } else if (job.location && typeof job.location === 'object') {
-      location = job.location.name || job.location.formatted_address || 'No location';
-    } else if (job.location_data) {
-      location = job.location_data.name || job.location_data.formatted_address || 'No location';
-    } else if (job.venue_name) {
-      location = job.venue_name;
-    }
-
     return (
-      <div className="p-2 bg-gray-50 dark:bg-gray-900">
-        <Card
-          className={cn(
-            "hover:shadow-md transition-all duration-200",
-            cardOpacity,
-            pointerEvents
-          )}
-          style={{
-            borderLeftColor: appliedBorderColor,
-            borderLeftWidth: '4px',
-          }}
-        >
-          {isJobBeingDeleted && (
-            <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 rounded">
-              <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-md shadow-lg">
-                <span className="text-sm font-medium">Deleting job...</span>
-              </div>
-            </div>
-          )}
-
-          <div className="p-4 space-y-3">
-            {/* Job Name */}
-            <h3 className="font-semibold text-lg truncate" title={jobName}>
-              {jobName}
-            </h3>
-
-            {/* Dates */}
-            <div className="text-sm text-muted-foreground">
-              <div className="flex flex-col gap-1">
-                {startDate && (
-                  <div>
-                    <span className="font-medium">Start:</span> {startDate}
-                  </div>
-                )}
-                {endDate && (
-                  <div>
-                    <span className="font-medium">End:</span> {endDate}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Location */}
-            <div className="text-sm">
-              <span className="font-medium">Location:</span>{' '}
-              <span className="text-muted-foreground">{location}</span>
-            </div>
-
-            {/* View Details Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                setJobDetailsDialogOpen(true);
-              }}
-            >
-              View Details
-            </Button>
-          </div>
-        </Card>
-
-        {/* Job Details Dialog */}
-        <JobDetailsDialog
-          job={job}
-          open={jobDetailsDialogOpen}
-          onOpenChange={setJobDetailsDialogOpen}
-          department={department}
-        />
-      </div>
+      <JobCardNewDetailsOnly
+        job={job}
+        department={department}
+        appliedBorderColor={appliedBorderColor}
+        isJobBeingDeleted={isJobBeingDeleted}
+        cardOpacity={cardOpacity}
+        pointerEvents={pointerEvents}
+        jobDetailsDialogOpen={jobDetailsDialogOpen}
+        setJobDetailsDialogOpen={setJobDetailsDialogOpen}
+      />
     );
   }
 
   return (
-    <div>
-      <Card
-        className={cn(
-          "mb-4 hover:shadow-md transition-all duration-200",
-          !isHouseTech && !isJobBeingDeleted && "cursor-pointer",
-          cardOpacity,
-          pointerEvents
-        )}
-        onClick={handleJobCardClick}
-        style={{
-          borderLeftColor: appliedBorderColor,
-          borderLeftWidth: '4px',
-          backgroundColor: appliedBgColor
-        }}
-      >
-        {isJobBeingDeleted && (
-          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 rounded">
-            <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-md shadow-lg">
-              <span className="text-sm font-medium">Deleting job...</span>
-            </div>
-          </div>
-        )}
-
-        <JobCardHeader
-          job={job}
-          collapsed={collapsed}
-          onToggleCollapse={toggleCollapse}
-          appliedBorderColor={appliedBorderColor}
-          appliedBgColor={appliedBgColor}
-          dateTypes={job.job_date_types || {}}
-          department={department}
-          isProjectManagementPage={isProjectManagementPage}
-          userRole={userRole}
-        />
-
-        <div className="flex items-center justify-between px-6">
-          <div className="flex items-center gap-2">
-            {isProjectManagementPage && job.job_type !== 'dryhire' && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setRouteSheetOpen(true); }}
-                className="text-xs px-3 py-1 border rounded-md hover:bg-secondary"
-                title="Abrir Hoja de Ruta"
-              >
-                Hoja de Ruta
-              </button>
-            )}
-            {job.job_type === 'dryhire' && (
-              <Badge variant="destructive">RECOGIDA CLIENTE</Badge>
-            )}
-            <div className="flex-1" />
-          </div>
-          <JobCardActions
-            job={job}
-            userRole={userRole || null}
-            foldersAreCreated={foldersAreCreated}
-            folderStateLoading={isFoldersLoading}
-            isProjectManagementPage={isProjectManagementPage}
-            isHouseTech={isHouseTech}
-            showUpload={showUpload}
-            canEditJobs={canEditJobs}
-            canCreateFlexFolders={canCreateFlexFolders}
-            canUploadDocuments={canUploadDocuments}
-            canManageArtists={canManageArtists}
-            department={department}
-            isCreatingFolders={isCreatingFolders}
-            isCreatingLocalFolders={isCreatingLocalFolders}
-            techName={personnel?.find(p => p.id === assignments.find(a => a.technician_id)?.technician_id)?.display_name || ''}
-            onRefreshData={refreshData}
-            onEditButtonClick={handleEditButtonClick}
-            onDeleteClick={handleDeleteClick}
-            onCreateFlexFolders={createFlexFoldersHandler}
-            onAddFlexFolders={addFlexFoldersHandler}
-            onCreateLocalFolders={createLocalFoldersHandler}
-            onFestivalArtistsClick={handleFestivalArtistsClick}
-            onAssignmentDialogOpen={(e) => {
-              e.stopPropagation();
-              if (!isJobBeingDeleted) {
-                setAssignmentDialogOpen(true);
-              }
-            }}
-            handleFileUpload={handleFileUpload}
-            onJobDetailsClick={() => setJobDetailsDialogOpen(true)}
-            onOpenTasks={(e) => { e.stopPropagation(); setTaskManagerOpen(true); }}
-            canSyncFlex={['admin', 'management', 'logistics'].includes(userRole || '')}
-            onSyncFlex={syncStatusToFlex}
-            onOpenFlexLogs={(e) => { e.stopPropagation(); setFlexLogDialogOpen(true); }}
-            transportButtonLabel={job.job_type === 'dryhire' ? undefined : transportButtonLabel}
-            transportButtonTone={transportButtonTone as any}
-            onTransportClick={handleTransportClick}
-            onCreateWhatsappGroup={handleCreateWhatsappGroup}
-            whatsappDisabled={!!waGroup || !!waRequest}
-          />
-        </div>
-
-        {/* Required vs Assigned summary per department */}
-        {job.job_type !== 'dryhire' && Array.isArray(job.job_departments) && job.job_departments.length > 0 && (
-          <div className="px-6 mt-2 flex items-center justify-between">
-            <div className="flex gap-3 flex-wrap text-sm">
-              {job.job_departments.map((d: any) => {
-                const dept = d.department as 'sound' | 'lights' | 'video'
-                const stats = (requiredVsAssigned as any)[dept] || { required: 0, assigned: 0 }
-                const need = stats.required || 0
-                const have = stats.assigned || 0
-                const cls = need === 0 ? 'bg-muted text-muted-foreground' : (have >= need ? 'bg-green-500/20 text-green-700 dark:text-green-300' : (have > 0 ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300' : 'bg-red-500/20 text-red-700 dark:text-red-300'))
-                return (
-                  <div key={dept} className={`px-2 py-1 rounded ${cls}`}>
-                    <span className="capitalize">{dept}</span>: <span className="tabular-nums">{have}/{need}</span>
-                  </div>
-                )
-              })}
-            </div>
-            {['admin', 'management', 'logistics'].includes(userRole || '') && (
-              <button
-                type="button"
-                className="text-xs px-2 py-1 border rounded-md hover:bg-secondary"
-                onClick={(e) => { e.stopPropagation(); setRequirementsDialogOpen(true) }}
-              >
-                Edit requirements
-              </button>
-            )}
-          </div>
-        )}
-
-        <div className="px-6 pb-6">
-          <div className="space-y-2 text-sm">
-            {job.job_type !== "dryhire" && (
-              <>
-                {assignments.length > 0 && (
-                  <JobCardAssignments
-                    assignments={assignments}
-                    department={department}
-                    jobTimesheets={jobTimesheets || []}
-                  />
-                )}
-
-                {documents.length > 0 && (
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      className="w-full flex items-center justify-between text-left px-2 py-1 rounded hover:bg-accent/40"
-                      onClick={(e) => { e.stopPropagation(); setDocsCollapsed(prev => !prev); }}
-                    >
-                      <span className="text-sm font-medium">Documents ({documents.length})</span>
-                      {docsCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
-                    {!docsCollapsed && (
-                      <div className="mt-1">
-                        <JobCardDocuments
-                          documents={documents}
-                          userRole={userRole}
-                          onDeleteDocument={handleDeleteDocument}
-                          showTitle={false}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {riderFiles.length > 0 && (
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      className="w-full flex items-center justify-between text-left px-2 py-1 rounded hover:bg-accent/40"
-                      onClick={(e) => { e.stopPropagation(); setRidersCollapsed(prev => !prev); }}
-                    >
-                      <span className="text-sm font-medium">Artist Riders ({riderFiles.length})</span>
-                      {ridersCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
-                    {!ridersCollapsed && (
-                      <div className="mt-1 space-y-2">
-                        {riderFiles.map((file) => (
-                          <div key={file.id} className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">{file.file_name}</span>
-                              <span className="text-xs text-muted-foreground">Artist: {cardArtistNameMap.get(file.artist_id) || 'Unknown'}</span>
-                            </div>
-                            <div className="flex gap-2">
-                              <button className="p-1 hover:bg-accent rounded" title="View" onClick={() => viewRider(file)}>
-                                <Eye className="h-4 w-4" />
-                              </button>
-                              <button className="p-1 hover:bg-accent rounded" title="Download" onClick={() => downloadRider(file)}>
-                                <Download className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {!collapsed && job.job_type !== "dryhire" && !hideTasks && (
-            <JobCardProgress
-              soundTasks={soundTasks}
-              roleSummary={reqSummary}
-            />
-          )}
-        </div>
-      </Card>
-
-      {!isHouseTech && !isJobBeingDeleted && (
-        <>
-          {taskManagerOpen && (
-            <TaskManagerDialog
-              open={taskManagerOpen}
-              onOpenChange={setTaskManagerOpen}
-              userRole={userRole}
-              jobId={job.id}
-            />
-          )}
-          {soundTaskDialogOpen && (
-            <SoundTaskDialog
-              open={soundTaskDialogOpen}
-              onOpenChange={setSoundTaskDialogOpen}
-              jobId={job.id}
-            />
-          )}
-          {lightsTaskDialogOpen && (
-            <LightsTaskDialog
-              open={lightsTaskDialogOpen}
-              onOpenChange={setLightsTaskDialogOpen}
-              jobId={job.id}
-            />
-          )}
-          {videoTaskDialogOpen && (
-            <VideoTaskDialog
-              open={videoTaskDialogOpen}
-              onOpenChange={setVideoTaskDialogOpen}
-              jobId={job.id}
-            />
-          )}
-          {editJobDialogOpen && (
-            <EditJobDialog
-              open={editJobDialogOpen}
-              onOpenChange={setEditJobDialogOpen}
-              job={job}
-            />
-          )}
-          {assignmentDialogOpen && job.job_type !== "dryhire" && (
-            <JobAssignmentDialog
-              isOpen={assignmentDialogOpen}
-              onClose={() => setAssignmentDialogOpen(false)}
-              onAssignmentChange={() => { }}
-              jobId={job.id}
-              department={department as Department}
-            />
-          )}
-
-          {/* Job Details Dialog */}
-          <JobDetailsDialog
-            open={jobDetailsDialogOpen}
-            onOpenChange={setJobDetailsDialogOpen}
-            job={job}
-            department={department}
-          />
-          {/* Flex Sync Logs Dialog */}
-          <FlexSyncLogDialog
-            jobId={job.id}
-            open={flexLogDialogOpen}
-            onOpenChange={setFlexLogDialogOpen}
-          />
-
-          {/* Hoja de Ruta Dialog (Project Management only) */}
-          {isProjectManagementPage && (
-            <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
-              <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] p-0 overflow-hidden">
-                <div className="h-full overflow-auto">
-                  <ModernHojaDeRuta jobId={job.id} />
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
-
-          {/* Transport Request / Logistics Dialogs */}
-          {transportDialogOpen && isTechDept && userDepartment && (
-            <TransportRequestDialog
-              open={transportDialogOpen}
-              onOpenChange={setTransportDialogOpen}
-              jobId={job.id}
-              department={userDepartment}
-              requestId={myTransportRequest?.id || null}
-              onSubmitted={() => {
-                queryClient.invalidateQueries({ queryKey: ['transport-request', job.id, userDepartment] });
-                queryClient.invalidateQueries({ queryKey: ['transport-requests-all', job.id] });
-              }}
-            />
-          )}
-
-          {transportDialogOpen && ((userDepartment === 'logistics') || ((userRole === 'management' || userRole === 'admin') && !isTechDept)) && (
-            <Dialog open={transportDialogOpen} onOpenChange={setTransportDialogOpen}>
-              <DialogContent className="max-w-xl">
-                <div className="space-y-4">
-                  <div className="text-lg font-semibold">Transport Requests</div>
-                  {allRequests.length === 0 ? (
-                    <div className="text-muted-foreground">No pending requests for this job.</div>) : (
-                    <div className="space-y-2">
-                      {allRequests.map((req: any) => (
-                        <div key={req.id} className="border rounded p-2 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium capitalize">{req.department}</div>
-                              {req.description && <div className="text-sm">{req.description}</div>}
-                              {req.note && <div className="text-xs text-muted-foreground italic">{req.note}</div>}
-                            </div>
-                            <button
-                              className="px-3 py-1 text-sm rounded border hover:bg-accent"
-                              onClick={async (ev) => {
-                                ev.stopPropagation();
-                                await supabase.from('transport_requests').update({ status: 'cancelled' }).eq('id', req.id);
-                                queryClient.invalidateQueries({ queryKey: ['transport-requests-all', job.id] });
-                              }}
-                            >
-                              Cancel Request
-                            </button>
-                          </div>
-                          <div className="space-y-1">
-                            {(req.items || []).map((it: any) => (
-                              <div key={it.id} className="flex items-center justify-between pl-2">
-                                <div className="text-sm text-muted-foreground">
-                                  {it.transport_type.replace('_', ' ')}
-                                  {typeof it.leftover_space_meters === 'number' && (
-                                    <span className="ml-2">· Leftover: {it.leftover_space_meters} m</span>
-                                  )}
-                                </div>
-                                <button
-                                  className="px-3 py-1 text-sm rounded border hover:bg-accent"
-                                  onClick={(ev) => {
-                                    ev.stopPropagation();
-                                    setSelectedTransportRequest({ ...req, selectedItem: it });
-                                    setLogisticsInitialEventType('load');
-                                    setTransportDialogOpen(false);
-                                    setLogisticsDialogOpen(true);
-                                  }}
-                                >
-                                  Create Event
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
-
-          {logisticsDialogOpen && selectedTransportRequest && (
-            <LogisticsEventDialog
-              open={logisticsDialogOpen}
-              onOpenChange={(open) => {
-                setLogisticsDialogOpen(open);
-                if (!open) {
-                  // Refresh data when dialog closes
-                  queryClient.invalidateQueries({ queryKey: ['logistics-events-for-job', job.id] });
-                  queryClient.invalidateQueries({ queryKey: ['today-logistics'] });
-                }
-              }}
-              selectedDate={new Date(job.start_time)}
-              initialJobId={job.id}
-              initialDepartments={[selectedTransportRequest.department]}
-              initialTransportType={selectedTransportRequest.selectedItem?.transport_type}
-              initialEventType={logisticsInitialEventType}
-              onCreated={(_details) => {
-                // Attempt auto-fulfill; dialog can optionally auto-create unload itself
-                if (selectedTransportRequest?.id && selectedTransportRequest?.department) {
-                  void checkAndFulfillRequest(selectedTransportRequest.id, selectedTransportRequest.department);
-                }
-                setLogisticsInitialEventType(undefined);
-              }}
-            />
-          )}
-
-          {requirementsDialogOpen && (
-            <JobRequirementsEditor
-              open={requirementsDialogOpen}
-              onOpenChange={setRequirementsDialogOpen}
-              jobId={job.id}
-              departments={(job.job_departments || []).map((d: any) => d.department)}
-            />
-          )}
-
-          <FlexFolderPicker
-            open={flexPickerOpen}
-            onOpenChange={setFlexPickerOpen}
-            onConfirm={handleFlexPickerConfirm}
-            initialOptions={flexPickerOptions}
-          />
-
-        </>
-      )}
-    </div>
+      <JobCardNewView
+      job={job}
+      department={department}
+      userRole={userRole}
+      isProjectManagementPage={isProjectManagementPage}
+      hideTasks={hideTasks}
+      isHouseTech={isHouseTech}
+      isJobBeingDeleted={isJobBeingDeleted}
+      cardOpacity={cardOpacity}
+      pointerEvents={pointerEvents}
+      appliedBorderColor={appliedBorderColor}
+      appliedBgColor={appliedBgColor}
+      collapsed={collapsed}
+      toggleCollapse={toggleCollapse}
+      handleJobCardClick={handleJobCardClick}
+      routeSheetOpen={routeSheetOpen}
+      setRouteSheetOpen={setRouteSheetOpen}
+      foldersAreCreated={foldersAreCreated}
+      isFoldersLoading={isFoldersLoading}
+      showUpload={showUpload}
+      canEditJobs={canEditJobs}
+      canCreateFlexFolders={canCreateFlexFolders}
+      canUploadDocuments={canUploadDocuments}
+      canManageArtists={canManageArtists}
+      isCreatingFolders={isCreatingFolders}
+      isCreatingLocalFolders={isCreatingLocalFolders}
+      personnel={personnel}
+      assignments={assignments}
+      jobTimesheets={jobTimesheets || []}
+      documents={documents}
+      docsCollapsed={docsCollapsed}
+      setDocsCollapsed={setDocsCollapsed}
+      handleDeleteDocument={handleDeleteDocument}
+      riderFiles={riderFiles}
+      cardArtistNameMap={cardArtistNameMap}
+      ridersCollapsed={ridersCollapsed}
+      setRidersCollapsed={setRidersCollapsed}
+      viewRider={viewRider}
+      downloadRider={downloadRider}
+      soundTasks={soundTasks}
+      reqSummary={reqSummary}
+      requiredVsAssigned={requiredVsAssigned}
+      setRequirementsDialogOpen={setRequirementsDialogOpen}
+      refreshData={refreshData}
+      handleEditButtonClick={handleEditButtonClick}
+      handleDeleteClick={handleDeleteClick}
+      createFlexFoldersHandler={createFlexFoldersHandler}
+      addFlexFoldersHandler={addFlexFoldersHandler}
+      createLocalFoldersHandler={createLocalFoldersHandler}
+      handleFestivalArtistsClick={handleFestivalArtistsClick}
+      handleFileUpload={handleFileUpload}
+      syncStatusToFlex={syncStatusToFlex}
+      transportButtonLabel={transportButtonLabel}
+      transportButtonTone={transportButtonTone}
+      handleTransportClick={handleTransportClick}
+      handleCreateWhatsappGroup={handleCreateWhatsappGroup}
+      waGroup={waGroup}
+      waRequest={waRequest}
+      setTaskManagerOpen={setTaskManagerOpen}
+      taskManagerOpen={taskManagerOpen}
+      soundTaskDialogOpen={soundTaskDialogOpen}
+      setSoundTaskDialogOpen={setSoundTaskDialogOpen}
+      lightsTaskDialogOpen={lightsTaskDialogOpen}
+      setLightsTaskDialogOpen={setLightsTaskDialogOpen}
+      videoTaskDialogOpen={videoTaskDialogOpen}
+      setVideoTaskDialogOpen={setVideoTaskDialogOpen}
+      editJobDialogOpen={editJobDialogOpen}
+      setEditJobDialogOpen={setEditJobDialogOpen}
+      assignmentDialogOpen={assignmentDialogOpen}
+      setAssignmentDialogOpen={setAssignmentDialogOpen}
+      jobDetailsDialogOpen={jobDetailsDialogOpen}
+      setJobDetailsDialogOpen={setJobDetailsDialogOpen}
+      flexLogDialogOpen={flexLogDialogOpen}
+      setFlexLogDialogOpen={setFlexLogDialogOpen}
+      transportDialogOpen={transportDialogOpen}
+      setTransportDialogOpen={setTransportDialogOpen}
+      logisticsDialogOpen={logisticsDialogOpen}
+      setLogisticsDialogOpen={setLogisticsDialogOpen}
+      selectedTransportRequest={selectedTransportRequest}
+      setSelectedTransportRequest={setSelectedTransportRequest}
+      logisticsInitialEventType={logisticsInitialEventType}
+      setLogisticsInitialEventType={setLogisticsInitialEventType}
+      isTechDept={isTechDept}
+      userDepartment={userDepartment}
+      myTransportRequest={myTransportRequest}
+      allRequests={allRequests}
+        queryClient={queryClient}
+        checkAndFulfillRequest={checkAndFulfillRequest}
+        handleCancelTransportRequest={handleCancelTransportRequest}
+        requirementsDialogOpen={requirementsDialogOpen}
+        flexPickerOpen={flexPickerOpen}
+        setFlexPickerOpen={setFlexPickerOpen}
+        flexPickerOptions={flexPickerOptions}
+        handleFlexPickerConfirm={handleFlexPickerConfirm}
+      />
   );
 }
 

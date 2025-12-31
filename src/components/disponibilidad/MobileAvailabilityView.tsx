@@ -208,7 +208,15 @@ export function MobileAvailabilityView({
                                     className="bg-[#0f1219] border border-[#1f232e] rounded-lg p-3 flex items-start gap-3 shadow-sm"
                                 >
                                     {logo ? (
-                                        <img src={logo} alt="logo" className="h-10 w-10 rounded-md object-cover border border-[#2a2e3b]" />
+                                        <img
+                                            src={logo}
+                                            alt="logo"
+                                            width={40}
+                                            height={40}
+                                            loading="lazy"
+                                            decoding="async"
+                                            className="h-10 w-10 rounded-md object-cover border border-[#2a2e3b]"
+                                        />
                                     ) : (
                                         <div className="h-10 w-10 rounded-md bg-[#1a1d24] flex items-center justify-center border border-[#2a2e3b] text-base font-bold text-slate-500">
                                             {String(job.title || '?').slice(0, 1).toUpperCase()}
@@ -248,7 +256,15 @@ export function MobileAvailabilityView({
                                     className="bg-[#0f1219] border border-[#1f232e] rounded-lg p-3 flex items-start gap-3 shadow-sm"
                                 >
                                     {logo ? (
-                                        <img src={logo} alt="logo" className="h-10 w-10 rounded-md object-cover border border-[#2a2e3b]" />
+                                        <img
+                                            src={logo}
+                                            alt="logo"
+                                            width={40}
+                                            height={40}
+                                            loading="lazy"
+                                            decoding="async"
+                                            className="h-10 w-10 rounded-md object-cover border border-[#2a2e3b]"
+                                        />
                                     ) : (
                                         <div className="h-10 w-10 rounded-md bg-[#1a1d24] flex items-center justify-center border border-[#2a2e3b] text-base font-bold text-slate-500">
                                             {String(title || '?').slice(0, 1).toUpperCase()}

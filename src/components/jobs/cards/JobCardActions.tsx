@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
-import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle, ExternalLink, Info, ListChecks, Settings, ScrollText, Archive, RotateCw } from "lucide-react";
+import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle, ExternalLink, Info, ListChecks, Settings, ScrollText } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -15,70 +15,16 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
 import { getMainFlexElementIdSync, resolveTourFolderForTourdate } from "@/utils/flexMainFolderId";
+import { ArchiveToFlexAction } from "./job-card-actions/ArchiveToFlexAction";
+import { BackfillDocTecnicaAction } from "./job-card-actions/BackfillDocTecnicaAction";
+import { mapViewHintToIntent } from "./job-card-actions/mapViewHintToIntent";
 import {
   FLEX_FOLDER_IDS,
   createTourdateFilterPredicate,
   getElementTree,
   openFlexElement,
   type FlatElementNode,
-  type FlexLinkIntent,
 } from "@/utils/flex-folders";
-
-function mapViewHintToIntent(viewHint?: string | null): FlexLinkIntent | "auto" | undefined {
-  if (!viewHint || typeof viewHint !== "string") {
-    return undefined;
-  }
-
-  const normalized = viewHint.trim().toLowerCase();
-  if (!normalized) {
-    return undefined;
-  }
-
-  if (normalized === "auto") {
-    return "auto";
-  }
-
-  const canonical = normalized.replace(/[\s_]+/g, "-");
-
-  switch (canonical) {
-    case "contact-list":
-    case "contactlist":
-    case "crew-call":
-    case "crewcall":
-    case "crew-list":
-    case "crewlist":
-      return "contact-list";
-    case "equipment-list":
-    case "equipmentlist":
-    case "pull-sheet":
-    case "pullsheet":
-    case "pull-list":
-    case "pulllist":
-      return "equipment-list";
-    case "remote-file-list":
-    case "remotefilelist":
-    case "remote-files":
-    case "remotefiles":
-    case "remote-files-list":
-      return "remote-file-list";
-    case "expense-sheet":
-    case "expensesheet":
-    case "expense":
-      return "expense-sheet";
-    case "fin-doc":
-    case "financial-document":
-    case "financial-doc":
-    case "financialdoc":
-    case "presupuesto":
-      return "fin-doc";
-    case "simple-element":
-    case "folder":
-    case "element":
-      return "simple-element";
-    default:
-      return undefined;
-  }
-}
 
 interface JobCardActionsProps {
   job: any;
@@ -169,27 +115,6 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     filterDate: string;
   } | null>(null);
   const dryHirePresupuestoElementRef = React.useRef<string | null>(null);
-  // Archive to Flex state
-  const [archiveOpen, setArchiveOpen] = React.useState(false);
-  const [archiving, setArchiving] = React.useState(false);
-  const [archiveResult, setArchiveResult] = React.useState<any | null>(null);
-  const [archiveError, setArchiveError] = React.useState<string | null>(null);
-  const [archiveMode, setArchiveMode] = React.useState<'by-prefix' | 'all-tech'>('by-prefix');
-  const [archiveIncludeTemplates, setArchiveIncludeTemplates] = React.useState(false);
-  const [archiveDryRun, setArchiveDryRun] = React.useState(false);
-  // Backfill state
-  const [backfillOpen, setBackfillOpen] = React.useState(false);
-  const [backfilling, setBackfilling] = React.useState(false);
-  const [backfillMsg, setBackfillMsg] = React.useState<string | null>(null);
-  const [backfillResult, setBackfillResult] = React.useState<any | null>(null);
-  const [bfSound, setBfSound] = React.useState(true);
-  const [bfLights, setBfLights] = React.useState(true);
-  const [bfVideo, setBfVideo] = React.useState(true);
-  const [bfProduction, setBfProduction] = React.useState(true);
-  const [uuidSound, setUuidSound] = React.useState('');
-  const [uuidLights, setUuidLights] = React.useState('');
-  const [uuidVideo, setUuidVideo] = React.useState('');
-  const [uuidProduction, setUuidProduction] = React.useState('');
 
   React.useEffect(() => {
     if (job?.job_type !== "dryhire") {
@@ -244,66 +169,6 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   const handleTimesheetClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigate(`/timesheets?jobId=${job.id}`);
-  };
-
-  const handleArchiveToFlex = async () => {
-    setArchiving(true);
-    setArchiveError(null);
-    setArchiveResult(null);
-    try {
-      const { data, error } = await supabase.functions.invoke('archive-to-flex', {
-        body: {
-          job_id: job.id,
-          mode: archiveMode,
-          include_templates: archiveIncludeTemplates,
-          dry_run: archiveDryRun,
-        }
-      });
-      if (error) throw error;
-      setArchiveResult(data);
-      toast({
-        title: archiveDryRun ? 'Dry run complete' : 'Archive complete',
-        description: `${data?.uploaded ?? 0} uploaded, ${data?.failed ?? 0} failed`,
-      });
-    } catch (err: any) {
-      console.error('[JobCardActions] ArchiveToFlex error', err);
-      setArchiveError(err?.message || 'Failed to archive');
-      toast({ title: 'Archive failed', description: err?.message || 'Failed to archive', variant: 'destructive' });
-    } finally {
-      setArchiving(false);
-    }
-  };
-
-  const runBackfill = async () => {
-    setBackfilling(true);
-    setBackfillMsg(null);
-    setBackfillResult(null);
-    try {
-      const depts: string[] = [];
-      if (bfSound) depts.push('sound');
-      if (bfLights) depts.push('lights');
-      if (bfVideo) depts.push('video');
-      if (bfProduction) depts.push('production');
-      const body: any = { job_id: job.id };
-      if (depts.length) body.departments = depts;
-      const manual: Array<{ dept: string; element_id: string }> = [];
-      if (uuidSound.trim()) manual.push({ dept: 'sound', element_id: uuidSound.trim() });
-      if (uuidLights.trim()) manual.push({ dept: 'lights', element_id: uuidLights.trim() });
-      if (uuidVideo.trim()) manual.push({ dept: 'video', element_id: uuidVideo.trim() });
-      if (uuidProduction.trim()) manual.push({ dept: 'production', element_id: uuidProduction.trim() });
-      if (manual.length) body.manual = manual;
-      const { data, error } = await supabase.functions.invoke('backfill-flex-doc-tecnica', { body });
-      if (error) throw error;
-      setBackfillResult(data);
-      setBackfillMsg(`Inserted ${data?.inserted ?? 0}, already ${data?.already ?? 0}`);
-      toast({ title: 'Backfill complete', description: `Inserted ${data?.inserted ?? 0}, already ${data?.already ?? 0}` });
-    } catch (err: any) {
-      console.error('[JobCardActions] Backfill error', err);
-      setBackfillMsg(err?.message || 'Backfill failed');
-      toast({ title: 'Backfill failed', description: err?.message || 'Backfill failed', variant: 'destructive' });
-    } finally {
-      setBackfilling(false);
-    }
   };
 
   const canViewCalculators = isProjectManagementPage && (userRole === 'management' || userRole === 'admin');
@@ -966,7 +831,15 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                     : "hover:bg-accent/50"
                 }
               >
-                <img src={createFolderIcon} alt="Añadir carpetas Flex" className="h-4 w-4" />
+                <img
+                  src={createFolderIcon}
+                  alt="Añadir carpetas Flex"
+                  width={16}
+                  height={16}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-4 w-4"
+                />
               </Button>
             ) : null}
           </>
@@ -986,7 +859,15 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             {isCreatingFolders ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <img src={createFolderIcon} alt="Crear carpetas Flex" className="h-4 w-4" />
+              <img
+                src={createFolderIcon}
+                alt="Crear carpetas Flex"
+                width={16}
+                height={16}
+                loading="lazy"
+                decoding="async"
+                className="h-4 w-4"
+              />
             )}
           </Button>
         )
@@ -1009,30 +890,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           <FolderPlus className="h-4 w-4" />
         )}
       </Button>
-      {/* Archive to Flex */}
-      {job.job_type !== 'dryhire' && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={(e) => { e.stopPropagation(); setArchiveOpen(true); }}
-          className="gap-2"
-          title="Archivar documentos en Flex"
-        >
-          <Archive className="h-4 w-4" />
-          <span className="hidden sm:inline">Archivar</span>
-        </Button>
-      )}
-      {/* Backfill Doc Técnica */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={(e) => { e.stopPropagation(); setBackfillOpen(true); }}
-        disabled={backfilling}
-        title={backfilling ? 'Rellenando…' : 'Rellenar Doc Técnica'}
-        className={backfilling ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/50'}
-      >
-        {backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
-      </Button>
+      <ArchiveToFlexAction job={job} />
+      <BackfillDocTecnicaAction job={job} />
       {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (
         <div className="relative">
           <input
@@ -1046,81 +905,6 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           </Button>
         </div>
       )}
-
-      {/* Archive to Flex Dialog */}
-      {archiveOpen && (
-        <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Archive documents to Flex</DialogTitle>
-              <DialogDescription>
-                Uploads all job documents to each department's Documentación Técnica in Flex and removes them from Supabase.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Mode</label>
-                  {/* Simple select without our custom select to keep dependencies light here */}
-                  <select
-                    className="w-full h-9 rounded-md border bg-background px-3 text-sm"
-                    value={archiveMode}
-                    onChange={(e) => setArchiveMode(e.target.value as 'by-prefix' | 'all-tech')}
-                  >
-                    <option value="by-prefix">By prefix (default)</option>
-                    <option value="all-tech">All technical depts</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-2 mt-6 sm:mt-[30px]">
-                  <input id="includeTemplatesA" type="checkbox" checked={archiveIncludeTemplates} onChange={(e) => setArchiveIncludeTemplates(e.target.checked)} />
-                  <label htmlFor="includeTemplatesA" className="text-sm">Include templates</label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input id="dryRunA" type="checkbox" checked={archiveDryRun} onChange={(e) => setArchiveDryRun(e.target.checked)} />
-                  <label htmlFor="dryRunA" className="text-sm">Dry run (no delete)</label>
-                </div>
-              </div>
-
-              {archiving && (
-                <div className="flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Archiving...</div>
-              )}
-
-              {archiveError && (
-                <div className="text-sm text-red-600">{archiveError}</div>
-              )}
-
-              {archiveResult && (
-                <div className="space-y-3">
-                  <div className="text-sm">Summary</div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>Attempted: <span className="font-medium">{archiveResult.attempted ?? 0}</span></div>
-                    <div>Uploaded: <span className="font-medium">{archiveResult.uploaded ?? 0}</span></div>
-                    <div>Skipped: <span className="font-medium">{archiveResult.skipped ?? 0}</span></div>
-                    <div>Failed: <span className="font-medium">{archiveResult.failed ?? 0}</span></div>
-                  </div>
-                  {archiveResult.details && Array.isArray(archiveResult.details) && (
-                    <div className="max-h-48 overflow-auto border rounded p-2 text-xs">
-                      {archiveResult.details.map((d: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between py-0.5">
-                          <div className="truncate mr-2" title={d.file}>{d.file}</div>
-                          <div className="text-muted-foreground">{d.status}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={archiving}>Cerrar</Button>
-              <Button onClick={handleArchiveToFlex} disabled={archiving}>
-                {archiving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {archiveDryRun ? 'Prueba' : 'Iniciar'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
       {isProjectManagementPage && canSyncFlex && showFlexButtons && (
         <Button
           variant="outline"
@@ -1132,80 +916,6 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           <ScrollText className="h-4 w-4" />
           <span className="hidden sm:inline">Registros</span>
         </Button>
-      )}
-
-      {/* Backfill Dialog */}
-      {backfillOpen && (
-        <Dialog open={backfillOpen} onOpenChange={setBackfillOpen}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Backfill Documentación Técnica</DialogTitle>
-              <DialogDescription>
-                Finds and persists missing Documentación Técnica elements for this job so archiving can target them reliably.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-2 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={bfSound} onChange={(e) => setBfSound(e.target.checked)} /> Sound
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={bfLights} onChange={(e) => setBfLights(e.target.checked)} /> Lights
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={bfVideo} onChange={(e) => setBfVideo(e.target.checked)} /> Video
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={bfProduction} onChange={(e) => setBfProduction(e.target.checked)} /> Production
-                </label>
-              </div>
-              <div className="mt-2">
-                <div className="text-xs text-muted-foreground mb-1">Manual UUIDs (optional)</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs">Sound UUID</label>
-                    <input className="w-full h-8 rounded border px-2 text-xs" value={uuidSound} onChange={(e) => setUuidSound(e.target.value)} placeholder="paste elementId" />
-                  </div>
-                  <div>
-                    <label className="text-xs">Lights UUID</label>
-                    <input className="w-full h-8 rounded border px-2 text-xs" value={uuidLights} onChange={(e) => setUuidLights(e.target.value)} placeholder="paste elementId" />
-                  </div>
-                  <div>
-                    <label className="text-xs">Video UUID</label>
-                    <input className="w-full h-8 rounded border px-2 text-xs" value={uuidVideo} onChange={(e) => setUuidVideo(e.target.value)} placeholder="paste elementId" />
-                  </div>
-                  <div>
-                    <label className="text-xs">Production UUID</label>
-                    <input className="w-full h-8 rounded border px-2 text-xs" value={uuidProduction} onChange={(e) => setUuidProduction(e.target.value)} placeholder="paste elementId" />
-                  </div>
-                </div>
-              </div>
-
-              {backfilling && (
-                <div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Backfilling…</div>
-              )}
-              {backfillMsg && <div className="text-muted-foreground">{backfillMsg}</div>}
-              {backfillResult?.details && (
-                <div className="max-h-48 overflow-auto border rounded p-2 text-xs">
-                  {backfillResult.details.map((d: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between py-0.5">
-                      <div className="truncate mr-2">{d.dept}</div>
-                      <div className="truncate mr-2" title={d.elementId}>{d.elementId}</div>
-                      <div className="text-muted-foreground">{d.status}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setBackfillOpen(false)} disabled={backfilling}>Cerrar</Button>
-              <Button onClick={runBackfill} disabled={backfilling}>
-                {backfilling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Iniciar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       )}
 
       {/* Send to Almacén sonido dialog */}

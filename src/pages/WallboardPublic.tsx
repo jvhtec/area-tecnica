@@ -91,6 +91,10 @@ export default function WallboardPublic() {
             <img
               src="/sector pro logo.png"
               alt="Sector-Pro"
+              width={794}
+              height={100}
+              loading="eager"
+              decoding="async"
               className="w-48 mx-auto mb-6"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;

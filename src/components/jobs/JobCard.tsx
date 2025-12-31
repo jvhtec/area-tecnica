@@ -121,7 +121,11 @@ export const JobCard = ({
             <img 
               src={festivalLogo} 
               alt={`${job.title} logo`} 
-              className="max-h-full max-w-full object-contain"
+              width={512}
+              height={512}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-contain"
             />
           </div>
         )}

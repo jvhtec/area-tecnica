@@ -239,7 +239,13 @@ export const TechnicianIncidentReportDialog = ({
                 <label className={`text-xs font-bold mb-1.5 block ml-1 ${t.textMuted}`}>Firma del Técnico *</label>
                 {formData.signature ? (
                   <div className={`border rounded-xl p-4 ${isDark ? 'bg-white/5' : 'bg-slate-50'} border-dashed ${t.divider} flex flex-col items-center`}>
-                    <img src={formData.signature} alt="Firma" className={`max-w-xs h-20 object-contain mb-3 ${isDark ? 'filter invert' : ''}`} />
+	                    <img
+	                      src={formData.signature}
+	                      alt="Firma"
+	                      loading="lazy"
+	                      decoding="async"
+	                      className={`w-full max-w-[320px] h-20 object-contain mb-3 ${isDark ? 'filter invert' : ''}`}
+	                    />
                     <Button
                       variant="outline"
                       size="sm"

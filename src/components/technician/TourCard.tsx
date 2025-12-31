@@ -83,7 +83,11 @@ export const TourCard = ({ tour, theme, isDark, onNavigate }: TourCardProps) => 
                         <img
                             src={logoUrl}
                             alt={`${tour.name} logo`}
-                            className="h-16 w-auto object-contain opacity-90"
+                            width={192}
+                            height={64}
+                            loading="lazy"
+                            decoding="async"
+                            className="h-16 w-48 object-contain opacity-90"
                             onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = 'none';

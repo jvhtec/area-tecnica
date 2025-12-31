@@ -58,3 +58,27 @@ export async function createFlexFolder(payload: FlexFolderPayload): Promise<Flex
   console.log("Created Flex folder:", data);
   return data;
 }
+
+export async function deleteFlexFolder(elementId: string): Promise<void> {
+  const token = await getFlexAuthToken();
+  const apiBaseUrl = getFlexApiBaseUrl();
+
+  const response = await fetch(`${apiBaseUrl}/element/${encodeURIComponent(elementId)}`, {
+    method: "DELETE",
+    headers: {
+      "X-Auth-Token": token,
+      "apikey": token,
+    },
+  });
+
+  if (!response.ok) {
+    let errorData: any = null;
+    try {
+      errorData = await response.json();
+    } catch {
+      // ignore non-JSON response
+    }
+    console.error("Flex folder deletion error:", errorData);
+    throw new Error(errorData?.exceptionMessage || `Failed to delete folder in Flex (${response.status})`);
+  }
+}
