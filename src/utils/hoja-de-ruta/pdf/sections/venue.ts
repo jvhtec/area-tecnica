@@ -51,7 +51,8 @@ export class VenueSection {
       imagesToRender = venueImagePreviews.slice(0, 2);
     } else if (eventData.venue?.name || eventData.venue?.address) {
       const q = eventData.venue?.name || eventData.venue?.address || '';
-      imagesToRender = await PlacesImageService.getPhotosForQuery(q, 2, 500, 300);
+      // Reduced from 2 to 1 to minimize API costs
+      imagesToRender = await PlacesImageService.getPhotosForQuery(q, 1, 500, 300);
     }
 
     if (imagesToRender.length > 0) {

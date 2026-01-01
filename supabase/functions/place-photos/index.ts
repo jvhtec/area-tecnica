@@ -34,7 +34,8 @@ Deno.serve(async (req) => {
     }
 
     const apiKey = secretData.GOOGLE_MAPS_API_KEY;
-    const { query, maxPhotos = 2, maxWidthPx = 400, maxHeightPx = 300 } = await req.json();
+    // Reduced default maxPhotos from 2 to 1 to minimize API costs
+    const { query, maxPhotos = 1, maxWidthPx = 400, maxHeightPx = 300 } = await req.json();
 
     if (!query) {
       return new Response(

@@ -70,7 +70,8 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
     (async () => {
       try {
         console.log('📸 Fetching venue suggestion photos for:', query);
-        const photos = await PlacesImageService.getPhotosForQuery(query, 2, 500, 300);
+        // Reduced from 2 to 1 to minimize API costs
+        const photos = await PlacesImageService.getPhotosForQuery(query, 1, 500, 300);
         if (!cancelled && photos && photos.length) {
           appendVenuePreviews(photos);
           fetchedQueriesRef.current.add(key);

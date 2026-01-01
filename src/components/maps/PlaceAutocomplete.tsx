@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { rateLimiter, apiCache } from '@/lib/rate-limiter';
 
 interface PlaceAutocompleteResult {
   name: string;
@@ -96,9 +97,21 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
 
     console.log('PlacesAutocomplete: Searching for:', query);
 
+    // Check memory cache first
     if (cacheRef.current[query]) {
-      console.log('PlacesAutocomplete: Using cached results for:', query);
+      console.log('PlacesAutocomplete: Using memory cached results for:', query);
       setSuggestions(cacheRef.current[query]);
+      setShowSuggestions(true);
+      return;
+    }
+
+    // Check persistent cache
+    const cacheKey = `autocomplete:${query.toLowerCase().trim()}`;
+    const cached = apiCache.get(cacheKey);
+    if (cached) {
+      console.log('PlacesAutocomplete: Using persistent cached results for:', query);
+      cacheRef.current[query] = cached;
+      setSuggestions(cached);
       setShowSuggestions(true);
       return;
     }
@@ -109,73 +122,87 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
 
     try {
       // Try Places Text Search first (good for establishments)
-      console.log('PlacesAutocomplete: Trying text search...');
-      const textSearchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
-        },
-        body: JSON.stringify({
-          textQuery: query,
-          maxResultCount: 6,
-        }),
-      });
+      if (rateLimiter.canMakeRequest('text-search')) {
+        console.log('PlacesAutocomplete: Trying text search...');
+        rateLimiter.recordRequest('text-search');
+        const textSearchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': key,
+            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
+          },
+          body: JSON.stringify({
+            textQuery: query,
+            maxResultCount: 5, // Reduced from 6
+          }),
+        });
 
-      console.log('PlacesAutocomplete: Text search response status:', textSearchRes.status);
+        console.log('PlacesAutocomplete: Text search response status:', textSearchRes.status);
 
-      if (textSearchRes.ok) {
-        const data = await textSearchRes.json();
-        console.log('PlacesAutocomplete: Text search data:', data);
-        if (data.places && data.places.length > 0) {
-          const results: PredictionItem[] = data.places.map((p: any) => ({
-            place_id: p.id,
-            name: p.displayName?.text || p.formattedAddress,
-            formatted_address: p.formattedAddress || '',
-          }));
-          console.log('PlacesAutocomplete: Text search results:', results);
-          cacheRef.current[query] = results;
-          setSuggestions(results);
-          setShowSuggestions(true);
-          setIsLoading(false);
-          return;
+        if (textSearchRes.ok) {
+          const data = await textSearchRes.json();
+          console.log('PlacesAutocomplete: Text search data:', data);
+          if (data.places && data.places.length > 0) {
+            const results: PredictionItem[] = data.places.map((p: any) => ({
+              place_id: p.id,
+              name: p.displayName?.text || p.formattedAddress,
+              formatted_address: p.formattedAddress || '',
+            }));
+            console.log('PlacesAutocomplete: Text search results:', results);
+            cacheRef.current[query] = results;
+            apiCache.set(cacheKey, results);
+            setSuggestions(results);
+            setShowSuggestions(true);
+            setIsLoading(false);
+            return;
+          }
         }
+      } else {
+        console.warn('PlacesAutocomplete: Text search rate limit reached, skipping');
       }
 
       // Fallback to Autocomplete API for broader matches (establishments + addresses)
-      console.log('PlacesAutocomplete: Trying autocomplete...');
-      const acRes = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
-        },
-          body: JSON.stringify({
-            input: query,
-            maxResultCount: 6,
-          }),
-      });
+      if (rateLimiter.canMakeRequest('autocomplete')) {
+        console.log('PlacesAutocomplete: Trying autocomplete...');
+        rateLimiter.recordRequest('autocomplete');
+        const acRes = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': key,
+            'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
+          },
+            body: JSON.stringify({
+              input: query,
+              maxResultCount: 5, // Reduced from 6
+            }),
+        });
 
-      console.log('PlacesAutocomplete: Autocomplete response status:', acRes.status);
+        console.log('PlacesAutocomplete: Autocomplete response status:', acRes.status);
 
-      if (acRes.ok) {
-        const data = await acRes.json();
-        console.log('PlacesAutocomplete: Autocomplete data:', data);
-        const results: PredictionItem[] = (data.suggestions || [])
-          .filter((s: any) => s.placePrediction)
-          .map((s: any) => ({
-            place_id: s.placePrediction.placeId,
-            name: s.placePrediction.structuredFormat?.mainText?.text || s.placePrediction.text?.text,
-            formatted_address: s.placePrediction.structuredFormat?.secondaryText?.text || '',
-          }));
-        console.log('PlacesAutocomplete: Autocomplete results:', results);
-        cacheRef.current[query] = results;
-        setSuggestions(results);
-        setShowSuggestions(results.length > 0);
+        if (acRes.ok) {
+          const data = await acRes.json();
+          console.log('PlacesAutocomplete: Autocomplete data:', data);
+          const results: PredictionItem[] = (data.suggestions || [])
+            .filter((s: any) => s.placePrediction)
+            .map((s: any) => ({
+              place_id: s.placePrediction.placeId,
+              name: s.placePrediction.structuredFormat?.mainText?.text || s.placePrediction.text?.text,
+              formatted_address: s.placePrediction.structuredFormat?.secondaryText?.text || '',
+            }));
+          console.log('PlacesAutocomplete: Autocomplete results:', results);
+          cacheRef.current[query] = results;
+          apiCache.set(cacheKey, results);
+          setSuggestions(results);
+          setShowSuggestions(results.length > 0);
+        } else {
+          console.error('Places Autocomplete API error:', acRes.status);
+          setSuggestions([]);
+          setShowSuggestions(false);
+        }
       } else {
-        console.error('Places Autocomplete API error:', acRes.status);
+        console.warn('PlacesAutocomplete: Autocomplete rate limit reached, showing no results');
         setSuggestions([]);
         setShowSuggestions(false);
       }
@@ -191,41 +218,66 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
 
   const getPlaceDetails = async (placeId: string, fallbackName: string, fallbackAddress?: string) => {
     console.log('PlacesAutocomplete: Getting place details for:', { placeId, fallbackName, fallbackAddress });
-    
+
+    // Check cache first
+    const cacheKey = `place-details:${placeId}`;
+    const cached = apiCache.get(cacheKey);
+    if (cached) {
+      console.log('PlacesAutocomplete: Using cached place details');
+      onSelect(cached);
+      setInputValue(cached.name);
+      setShowSuggestions(false);
+      return;
+    }
+
     const key = apiKey || (await fetchApiKey());
     if (!key) {
       console.log('PlacesAutocomplete: No API key after retry, using fallback data');
       onSelect({ name: fallbackName, address: fallbackAddress || '', place_id: placeId });
       return;
     }
-    
+
+    // Check rate limit
+    if (!rateLimiter.canMakeRequest('place-details')) {
+      console.warn('PlacesAutocomplete: Place details rate limit reached, using fallback');
+      const fallbackResult = { name: fallbackName, address: fallbackAddress || '', place_id: placeId };
+      onSelect(fallbackResult);
+      setInputValue(fallbackName);
+      setShowSuggestions(false);
+      return;
+    }
+
     try {
       onBusyChange?.(true);
+      rateLimiter.recordRequest('place-details');
       const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
         headers: {
           'X-Goog-Api-Key': key,
           'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
         },
       });
-      
+
       console.log('PlacesAutocomplete: Place details response status:', res.status);
-      
+
       if (!res.ok) throw new Error(`Place Details API error: ${res.status}`);
-      
+
       const place = await res.json();
       console.log('PlacesAutocomplete: Place details data:', place);
-      
+
       const coordinates = place.location
         ? { lat: place.location.latitude, lng: place.location.longitude }
         : undefined;
-        
+
       const result: PlaceAutocompleteResult = {
         name: place.displayName?.text || fallbackName,
         address: place.formattedAddress || fallbackAddress || '',
         coordinates,
         place_id: placeId,
       };
-      
+
+      // Cache the result
+      apiCache.set(cacheKey, result);
+
       console.log('PlacesAutocomplete: Calling onSelect with:', result);
       onSelect(result);
       setInputValue(result.name);
@@ -247,9 +299,9 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     console.log('PlacesAutocomplete: Input changed:', v);
     setInputValue(v);
     onInputChange?.(v);
-    // Debounce
+    // Debounce - increased to 800ms to reduce API calls
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(() => searchPlaces(v), 400);
+    debounceRef.current = window.setTimeout(() => searchPlaces(v), 800);
   };
 
   const handleSelect = (item: PredictionItem) => {
