@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { JobType } from "@/types/job";
+import { JobType, InvoicingCompany } from "@/types/job";
 import { utcToLocalInput, localInputToUTC } from "@/utils/timezoneUtils";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
@@ -44,6 +44,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const [color, setColor] = useState(job.color || "#7E69AB");
   const [jobType, setJobType] = useState<JobType>(job.job_type || "single");
   const [timezone, setTimezone] = useState(job.timezone || "Europe/Madrid");
+  const [invoicingCompany, setInvoicingCompany] = useState<InvoicingCompany | null>(job.invoicing_company || null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const [isVenueBusy, setIsVenueBusy] = useState(false);
@@ -70,6 +71,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         setColor(job.color || "#7E69AB");
         setJobType(job.job_type || "single");
         setTimezone(job.timezone || "Europe/Madrid");
+        setInvoicingCompany(job.invoicing_company || null);
 
         // Convert UTC times to local input format using job's timezone
         if (job.start_time && job.end_time) {
@@ -195,6 +197,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           job_type: jobType,
           timezone,
           location_id: locationId,
+          invoicing_company: invoicingCompany,
         })
         .eq("id", job.id);
 
@@ -401,6 +404,26 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                   <SelectItem value="evento">Evento</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Invoicing Company</Label>
+              <Select
+                value={invoicingCompany || ""}
+                onValueChange={(value) => setInvoicingCompany(value === "" ? null : value as InvoicingCompany)}
+              >
+                <SelectTrigger className={fieldClass}>
+                  <SelectValue placeholder="Select invoicing company (optional)" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
+                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="Production Sector">Production Sector</SelectItem>
+                  <SelectItem value="Sharecable">Sharecable</SelectItem>
+                  <SelectItem value="MFO">MFO</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-400">
+                If set, technicians will be instructed to invoice this company
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Departments</Label>

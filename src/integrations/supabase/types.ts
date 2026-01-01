@@ -3908,6 +3908,7 @@ export type Database = {
           end_time: string
           flex_folders_created: boolean | null
           id: string
+          invoicing_company: Database["public"]["Enums"]["invoicing_company"] | null
           job_type: Database["public"]["Enums"]["job_type"]
           location_id: string | null
           rates_approved: boolean
@@ -3928,6 +3929,7 @@ export type Database = {
           end_time: string
           flex_folders_created?: boolean | null
           id?: string
+          invoicing_company?: Database["public"]["Enums"]["invoicing_company"] | null
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
           rates_approved?: boolean
@@ -3948,6 +3950,7 @@ export type Database = {
           end_time?: string
           flex_folders_created?: boolean | null
           id?: string
+          invoicing_company?: Database["public"]["Enums"]["invoicing_company"] | null
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
           rates_approved?: boolean
@@ -8630,6 +8633,7 @@ export type Database = {
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
       job_extra_type: "travel_half" | "travel_full" | "day_off"
       job_rate_extras_status: "pending" | "approved" | "rejected"
+      invoicing_company: "Production Sector" | "Sharecable" | "MFO"
       job_status: "Tentativa" | "Confirmado" | "Completado" | "Cancelado"
       job_type: "single" | "tour" | "festival" | "dryhire" | "tourdate" | "evento"
       logistics_event_type: "load" | "unload"
@@ -8951,6 +8955,7 @@ export const Constants = {
       job_date_type: ["travel", "setup", "show", "off", "rehearsal"],
       job_extra_type: ["travel_half", "travel_full", "day_off"],
       job_rate_extras_status: ["pending", "approved", "rejected"],
+      invoicing_company: ["Production Sector", "Sharecable", "MFO"],
       job_status: ["Tentativa", "Confirmado", "Completado", "Cancelado"],
       job_type: ["single", "tour", "festival", "dryhire", "tourdate", "evento"],
       logistics_event_type: ["load", "unload"],

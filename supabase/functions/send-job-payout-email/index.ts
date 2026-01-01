@@ -14,6 +14,7 @@ interface JobMetadata {
   title: string;
   start_time?: string;
   tour_id?: string | null;
+  invoicing_company?: string | null;
 }
 
 interface TechnicianPayload {
@@ -128,6 +129,7 @@ serve(async (req) => {
       const deductionAmount = tech.totals?.deduction_eur ?? 0;
       const deductionFormatted = formatCurrency(deductionAmount);
       const hasDeduction = deductionAmount > 0;
+      const invoicingCompany = body.job.invoicing_company;
 
       const htmlContent = `<!DOCTYPE html>
       <html lang="es">
@@ -181,6 +183,18 @@ serve(async (req) => {
                     </div>
                   </td>
                 </tr>
+                ${invoicingCompany ? `
+                <tr>
+                  <td style="padding:12px 24px 0 24px;">
+                    <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;color:#1e40af;font-size:14px;">
+                      <b>Nota de facturación:</b>
+                      <p style="margin:8px 0 0 0;line-height:1.55;">
+                        Por favor emite tu factura para este trabajo a: <b>${invoicingCompany}</b>
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+                ` : ''}
                 <tr>
                   <td style="padding:16px 24px 8px 24px;">
                     <p style="margin:0;color:#374151;line-height:1.55;">

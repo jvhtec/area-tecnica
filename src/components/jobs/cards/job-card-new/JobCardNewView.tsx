@@ -282,6 +282,11 @@ export function JobCardNewView({
               </button>
             )}
             {job.job_type === "dryhire" && <Badge variant="destructive">RECOGIDA CLIENTE</Badge>}
+            {isProjectManagementPage && job.invoicing_company && (
+              <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-300 border-blue-500/30" title="Empresa de facturación">
+                {job.invoicing_company}
+              </Badge>
+            )}
             <div className="flex-1" />
           </div>
           <JobCardActions

@@ -31,6 +31,7 @@ export interface JobDetails {
   end_time?: string;
   tour_id?: string | null;
   job_type?: string | null;
+  invoicing_company?: string | null;
 }
 
 interface TourSummaryJob {
@@ -812,8 +813,19 @@ export async function generateJobPayoutPDF(
   doc.text(`Nombre: ${jobDetails.title}`, 14, yPos);
   yPos += 5;
   doc.text(`Fecha: ${formatJobDate(jobDetails.start_time)}`, 14, yPos);
-  yPos += 10;
+  yPos += 5;
 
+  // Display invoicing company note if set
+  if (jobDetails.invoicing_company) {
+    yPos += 3;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175); // Blue color for emphasis
+    doc.text(`Facturar a: ${jobDetails.invoicing_company}`, 14, yPos);
+    doc.setFont('helvetica', 'normal');
+    yPos += 5;
+  }
+
+  yPos += 5;
   doc.setTextColor(...TEXT_PRIMARY);
 
   const getTechName = getTechNameFactory(profiles);
