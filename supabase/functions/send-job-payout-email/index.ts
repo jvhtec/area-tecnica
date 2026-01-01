@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -8,40 +9,6 @@ const corsHeaders: Record<string, string> = {
 const BREVO_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
 const BREVO_FROM = Deno.env.get("BREVO_FROM") ?? "";
 const ADMIN_BCC = Deno.env.get("PAYOUT_EMAIL_BCC") ?? "";
-
-// Invoicing company data
-interface InvoicingCompanyDetails {
-  name: string;
-  legalName: string;
-  cif: string;
-  address: string;
-}
-
-const INVOICING_COMPANY_DATA: Record<string, InvoicingCompanyDetails> = {
-  "Production Sector": {
-    name: "Production Sector",
-    legalName: "Production Sector S.L.",
-    cif: "B86964673",
-    address: "Calle Puerto Rico, 6, Griñón, 28971, Madrid",
-  },
-  "Sharecable": {
-    name: "Sharecable",
-    legalName: "Share Cable S.L.",
-    cif: "B87287603",
-    address: "Calle Puerto Rico, 6, Griñón, 28971, Madrid",
-  },
-  "MFO": {
-    name: "MFO",
-    legalName: "Montajes Festivales Y Organizaciones S.L.",
-    cif: "B91808691",
-    address: "Calle Puerto Rico, 6, Griñón, 28971, Madrid",
-  },
-};
-
-function getInvoicingCompanyDetails(companyName: string | null | undefined): InvoicingCompanyDetails | null {
-  if (!companyName) return null;
-  return INVOICING_COMPANY_DATA[companyName] ?? null;
-}
 
 interface JobMetadata {
   id: string;

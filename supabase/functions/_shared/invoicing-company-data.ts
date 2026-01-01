@@ -1,8 +1,9 @@
 /**
- * Invoicing company data for payout documents and emails
+ * Shared invoicing company data for payout documents and emails
+ * Used by edge functions (Deno runtime)
  *
- * NOTE: This file is duplicated in supabase/functions/_shared/invoicing-company-data.ts
- * for use by edge functions. Keep both files in sync when making changes.
+ * NOTE: This file is duplicated in src/utils/invoicing-company-data.ts
+ * for use by the frontend app. Keep both files in sync when making changes.
  */
 
 export interface InvoicingCompanyDetails {
