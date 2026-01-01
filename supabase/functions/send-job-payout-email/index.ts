@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,7 @@ interface JobMetadata {
   title: string;
   start_time?: string;
   tour_id?: string | null;
+  invoicing_company?: string | null;
 }
 
 interface TechnicianPayload {
@@ -128,6 +130,7 @@ serve(async (req) => {
       const deductionAmount = tech.totals?.deduction_eur ?? 0;
       const deductionFormatted = formatCurrency(deductionAmount);
       const hasDeduction = deductionAmount > 0;
+      const invoicingCompany = body.job.invoicing_company;
 
       const htmlContent = `<!DOCTYPE html>
       <html lang="es">
@@ -181,6 +184,27 @@ serve(async (req) => {
                     </div>
                   </td>
                 </tr>
+                ${(() => {
+                  const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
+                  if (!companyDetails) return '';
+                  return `
+                <tr>
+                  <td style="padding:12px 24px 0 24px;">
+                    <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;color:#1e40af;font-size:14px;">
+                      <b>Nota de facturación:</b>
+                      <p style="margin:8px 0 0 0;line-height:1.55;">
+                        Por favor emite tu factura para este trabajo a:
+                      </p>
+                      <p style="margin:8px 0 0 0;line-height:1.55;">
+                        <b>${companyDetails.legalName}</b><br/>
+                        CIF: ${companyDetails.cif}<br/>
+                        ${companyDetails.address}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+                `;
+                })()}
                 <tr>
                   <td style="padding:16px 24px 8px 24px;">
                     <p style="margin:0;color:#374151;line-height:1.55;">

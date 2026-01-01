@@ -140,7 +140,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
         .select('id, full_name, role')
         .eq('is_active', true)
         .order('full_name');
-      
+
       const { data, error } = result;
 
       if (error) throw error;
@@ -667,14 +667,14 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
                       <div className="space-y-2">
                         <Label className="text-xs">Personal 1</Label>
                         <Select
-                          value={room.staff_member_1 || ""}
-                          onValueChange={(value) => updateRoom(room.id, 'staff_member_1', value)}
+                          value={room.staff_member_1 || "none"}
+                          onValueChange={(value) => updateRoom(room.id, 'staff_member_1', value === "none" ? undefined : value)}
                         >
                           <SelectTrigger className="dark:border-gray-600 dark:bg-gray-900">
                             <SelectValue placeholder="Seleccionar" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Sin asignar</SelectItem>
+                            <SelectItem value="none">Sin asignar</SelectItem>
                             {staff.map((s) => (
                               <SelectItem key={s.id} value={s.id}>
                                 {s.full_name}
@@ -688,14 +688,14 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
                         <div className="space-y-2">
                           <Label className="text-xs">Personal 2</Label>
                           <Select
-                            value={room.staff_member_2 || ""}
-                            onValueChange={(value) => updateRoom(room.id, 'staff_member_2', value)}
+                            value={room.staff_member_2 || "none"}
+                            onValueChange={(value) => updateRoom(room.id, 'staff_member_2', value === "none" ? undefined : value)}
                           >
                             <SelectTrigger className="dark:border-gray-600 dark:bg-gray-900">
                               <SelectValue placeholder="Seleccionar" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">Sin asignar</SelectItem>
+                              <SelectItem value="none">Sin asignar</SelectItem>
                               {staff.map((s) => (
                                 <SelectItem key={s.id} value={s.id}>
                                   {s.full_name}
