@@ -45,15 +45,16 @@ export class VenueSection {
       yPosition = this.pdfDoc.getLastAutoTableY() + 15;
     }
 
-    // Add venue images: use previews if present; otherwise, fetch via Places API
+    // Add venue images: ONLY use manually uploaded previews (no auto-fetch to avoid €15/month API costs)
     let imagesToRender: string[] = [];
     if (venueImagePreviews && venueImagePreviews.length > 0) {
       imagesToRender = venueImagePreviews.slice(0, 2);
-    } else if (eventData.venue?.name || eventData.venue?.address) {
-      const q = eventData.venue?.name || eventData.venue?.address || '';
-      // Reduced from 2 to 1 to minimize API costs
-      imagesToRender = await PlacesImageService.getPhotosForQuery(q, 1, 500, 300);
     }
+    // DISABLED: Auto-fetch from Google Places API to keep costs at €0
+    // else if (eventData.venue?.name || eventData.venue?.address) {
+    //   const q = eventData.venue?.name || eventData.venue?.address || '';
+    //   imagesToRender = await PlacesImageService.getPhotosForQuery(q, 1, 500, 300);
+    // }
 
     if (imagesToRender.length > 0) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 90);
