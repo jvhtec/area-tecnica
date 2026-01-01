@@ -27,36 +27,38 @@ export class AccommodationSection {
     yPosition += 15;
 
   for (const accommodation of validAccommodations) {
-      // Try to add a hotel image automatically via Places API above map
-      try {
-        if (accommodation.hotel_name || accommodation.address) {
-          const q = accommodation.hotel_name || accommodation.address || '';
-          const photos = await (await import('../services/places-image-service')).PlacesImageService.getPhotosForQuery(q, 1, 500, 300);
-          if (photos.length > 0) {
-            yPosition = this.pdfDoc.checkPageBreak(yPosition, 80);
-            const leftMargin = 20;
-            const rightMargin = 20;
-            const { width: pageWidth } = this.pdfDoc.dimensions;
-            const availableWidth = pageWidth - leftMargin - rightMargin;
-            const imgHeight = 60;
-            try {
-              this.pdfDoc.addImage(photos[0], 'JPEG', leftMargin, yPosition, availableWidth, imgHeight);
-            } catch {
-              try {
-                this.pdfDoc.addImage(photos[0], 'PNG', leftMargin, yPosition, availableWidth, imgHeight);
-              } catch (e) {
-                // ignore
-              }
-            }
-            this.pdfDoc.document.setDrawColor(210, 210, 210);
-            this.pdfDoc.document.setLineWidth(0.3);
-            this.pdfDoc.document.rect(leftMargin, yPosition, availableWidth, imgHeight);
-            yPosition += imgHeight + 10;
-          }
-        }
-      } catch (e) {
-        // ignore photo errors
-      }
+      // DISABLED: Auto-fetch hotel images via Places API to avoid €15/month API costs
+      // Users should manually upload accommodation photos to keep costs at €0
+      // Original code (disabled):
+      // try {
+      //   if (accommodation.hotel_name || accommodation.address) {
+      //     const q = accommodation.hotel_name || accommodation.address || '';
+      //     const photos = await (await import('../services/places-image-service')).PlacesImageService.getPhotosForQuery(q, 1, 500, 300);
+      //     if (photos.length > 0) {
+      //       yPosition = this.pdfDoc.checkPageBreak(yPosition, 80);
+      //       const leftMargin = 20;
+      //       const rightMargin = 20;
+      //       const { width: pageWidth } = this.pdfDoc.dimensions;
+      //       const availableWidth = pageWidth - leftMargin - rightMargin;
+      //       const imgHeight = 60;
+      //       try {
+      //         this.pdfDoc.addImage(photos[0], 'JPEG', leftMargin, yPosition, availableWidth, imgHeight);
+      //       } catch {
+      //         try {
+      //           this.pdfDoc.addImage(photos[0], 'PNG', leftMargin, yPosition, availableWidth, imgHeight);
+      //         } catch (e) {
+      //           // ignore
+      //         }
+      //       }
+      //       this.pdfDoc.document.setDrawColor(210, 210, 210);
+      //       this.pdfDoc.document.setLineWidth(0.3);
+      //       this.pdfDoc.document.rect(leftMargin, yPosition, availableWidth, imgHeight);
+      //       yPosition += imgHeight + 10;
+      //     }
+      //   }
+      // } catch (e) {
+      //   // ignore photo errors
+      // }
       if (DataValidators.hasData(accommodation.hotel_name)) {
         this.pdfDoc.setText(12, [125, 1, 1]);
         this.pdfDoc.addText(accommodation.hotel_name!, 30, yPosition);
