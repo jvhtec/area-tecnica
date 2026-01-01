@@ -23,6 +23,7 @@ import {
   type JobPayoutEmailContextResult,
   type TechnicianProfileWithEmail,
 } from '@/lib/job-payout-email';
+import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 import { sendTourJobEmails } from '@/lib/tour-payout-email';
 import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-export';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
@@ -54,7 +55,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, title, start_time, tour_id, rates_approved, job_type')
+        .select('id, title, start_time, tour_id, rates_approved, job_type, invoicing_company')
         .eq('id', jobId)
         .maybeSingle();
       if (error) throw error;
@@ -65,6 +66,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         tour_id: string | null;
         rates_approved: boolean | null;
         job_type: string | null;
+        invoicing_company: string | null;
       };
     },
     staleTime: 60_000,
@@ -701,6 +703,23 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         </div>
       </CardHeader>
       <CardContent className="space-y-4 text-white w-full overflow-hidden">
+        {/* Invoicing Company Note */}
+        {jobMeta?.invoicing_company && (() => {
+          const companyDetails = getInvoicingCompanyDetails(jobMeta.invoicing_company);
+          if (!companyDetails) return null;
+          return (
+            <div className="flex items-start gap-2 text-sm bg-blue-500/10 p-3 rounded border border-blue-500/30 w-full">
+              <Receipt className="h-4 w-4 mt-0.5 shrink-0 text-blue-300" />
+              <div className="break-words leading-snug w-full text-blue-200">
+                <p className="mb-2"><b>Nota de facturación:</b> Por favor emite tu factura para este trabajo a:</p>
+                <p className="font-semibold">{companyDetails.legalName}</p>
+                <p>CIF: {companyDetails.cif}</p>
+                <p>{companyDetails.address}</p>
+              </div>
+            </div>
+          );
+        })()}
+
         {payoutTotals.map((payout) => (
           <div
             key={payout.technician_id}

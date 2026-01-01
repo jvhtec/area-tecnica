@@ -10,6 +10,8 @@ export interface JobDocument {
 
 export type JobType = "single" | "multi_day" | "tour" | "tourdate" | "festival" | "dryhire" | "evento";
 
+export type InvoicingCompany = "Production Sector" | "Sharecable" | "MFO";
+
 export interface Location {
   id: string;
   name: string;
@@ -47,6 +49,7 @@ export interface Job {
   created_at: string;
   job_type: JobType;
   flex_folders_created?: boolean;
+  invoicing_company?: InvoicingCompany | null;
 }
 
 export interface JobWithLocationAndDocs extends Job {

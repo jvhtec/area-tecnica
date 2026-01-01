@@ -11,6 +11,7 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { fetchJobLogo, fetchTourLogo, getCompanyLogo } from '@/utils/pdf/logoUtils';
 import { appendAutonomoLabel } from '@/utils/autonomo';
+import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
 const DEDUCTION_DISCLAIMER_TEXT = '* Se ha aplicado una deducción de 30€/día en concepto de IRPF por condición de no autónomo.';
@@ -31,6 +32,7 @@ export interface JobDetails {
   end_time?: string;
   tour_id?: string | null;
   job_type?: string | null;
+  invoicing_company?: string | null;
 }
 
 interface TourSummaryJob {
@@ -812,8 +814,28 @@ export async function generateJobPayoutPDF(
   doc.text(`Nombre: ${jobDetails.title}`, 14, yPos);
   yPos += 5;
   doc.text(`Fecha: ${formatJobDate(jobDetails.start_time)}`, 14, yPos);
-  yPos += 10;
+  yPos += 5;
 
+  // Display invoicing company note if set
+  if (jobDetails.invoicing_company) {
+    const companyDetails = getInvoicingCompanyDetails(jobDetails.invoicing_company);
+    if (companyDetails) {
+      yPos += 3;
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 64, 175); // Blue color for emphasis
+      doc.text('Facturar a:', 14, yPos);
+      yPos += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.text(companyDetails.legalName, 14, yPos);
+      yPos += 4;
+      doc.text(`CIF: ${companyDetails.cif}`, 14, yPos);
+      yPos += 4;
+      doc.text(companyDetails.address, 14, yPos);
+      yPos += 5;
+    }
+  }
+
+  yPos += 5;
   doc.setTextColor(...TEXT_PRIMARY);
 
   const getTechName = getTechNameFactory(profiles);
