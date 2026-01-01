@@ -136,8 +136,8 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     setShowPrintDialog(false);
   };
 
-  const handleGenerateXLS = (range: "month" | "quarter" | "year") => {
-    generatePersonalCalendarXLS(range, {
+  const handleGenerateXLS = async (range: "month" | "quarter" | "year") => {
+    await generatePersonalCalendarXLS(range, {
       houseTechs,
       assignments,
       getAvailabilityStatus,

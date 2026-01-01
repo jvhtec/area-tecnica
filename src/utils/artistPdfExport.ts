@@ -1,6 +1,5 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 export interface ArtistTechnicalInfo {
   fohTech: boolean;
@@ -129,6 +128,7 @@ const loadImageSafely = async (src: string, description: string): Promise<HTMLIm
 };
 
 export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;

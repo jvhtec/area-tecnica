@@ -13,6 +13,21 @@ export const connectionRecovery = {
   recoveryInProgress: false,
   consecutiveFailures: 0,
   maxRetryDelay: 30000, // 30 seconds maximum backoff
+
+  pauseHealthCheck() {
+    if (this.recoveryInterval) {
+      clearInterval(this.recoveryInterval);
+      this.recoveryInterval = null;
+    }
+  },
+
+  resumeHealthCheck() {
+    if (this.recoveryInterval) {
+      return;
+    }
+
+    this.recoveryInterval = setInterval(() => this.performHealthCheck(), 60000); // Every minute
+  },
   
   startRecovery() {
     if (this.isActive) return;
@@ -28,7 +43,9 @@ export const connectionRecovery = {
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
     
     // Setup periodic health check
-    this.recoveryInterval = setInterval(() => this.performHealthCheck(), 60000); // Every minute
+    if (!document.hidden) {
+      this.resumeHealthCheck();
+    }
     
     // Perform initial health check
     setTimeout(() => this.performHealthCheck(), 5000);
@@ -45,10 +62,7 @@ export const connectionRecovery = {
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     
     // Clear interval
-    if (this.recoveryInterval) {
-      clearInterval(this.recoveryInterval);
-      this.recoveryInterval = null;
-    }
+    this.pauseHealthCheck();
     
     this.isActive = false;
   },
@@ -69,11 +83,15 @@ export const connectionRecovery = {
   },
   
   handleVisibilityChange() {
-    if (document.visibilityState === 'visible') {
-      console.log('Tab became visible, checking connection health');
-      // Schedule health check with a slight delay to ensure everything is loaded
-      setTimeout(() => connectionRecovery.performHealthCheck(), 1000);
+    if (document.hidden) {
+      connectionRecovery.pauseHealthCheck();
+      return;
     }
+
+    console.log('Tab became visible, checking connection health');
+    connectionRecovery.resumeHealthCheck();
+    // Schedule health check with a slight delay to ensure everything is loaded
+    setTimeout(() => connectionRecovery.performHealthCheck(), 1000);
   },
   
   async performHealthCheck() {

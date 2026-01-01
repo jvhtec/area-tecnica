@@ -85,25 +85,25 @@ export const PrintDialog: React.FC<PrintDialogProps> = ({
           </div>
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold text-base">Print to PDF</h3>
-            <Button onClick={() => generatePDF("month")}>
+            <Button onClick={() => { void generatePDF("month"); }}>
               <Printer className="h-4 w-4 mr-2" /> Current Month ({format(currentMonth, "MMMM yyyy")})
             </Button>
-            <Button onClick={() => generatePDF("quarter")}>
+            <Button onClick={() => { void generatePDF("quarter"); }}>
               <Printer className="h-4 w-4 mr-2" /> Next Quarter
             </Button>
-            <Button onClick={() => generatePDF("year")}>
+            <Button onClick={() => { void generatePDF("year"); }}>
               <Printer className="h-4 w-4 mr-2" /> Whole Year ({format(currentMonth, "yyyy")})
             </Button>
           </div>
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold text-base">Export to Excel</h3>
-            <Button onClick={() => generateXLS("month")} variant="outline">
+            <Button onClick={() => { void generateXLS("month"); }} variant="outline">
               <FileSpreadsheet className="h-4 w-4 mr-2" /> Current Month ({format(currentMonth, "MMMM yyyy")})
             </Button>
-            <Button onClick={() => generateXLS("quarter")} variant="outline">
+            <Button onClick={() => { void generateXLS("quarter"); }} variant="outline">
               <FileSpreadsheet className="h-4 w-4 mr-2" /> Next Quarter
             </Button>
-            <Button onClick={() => generateXLS("year")} variant="outline">
+            <Button onClick={() => { void generateXLS("year"); }} variant="outline">
               <FileSpreadsheet className="h-4 w-4 mr-2" /> Whole Year ({format(currentMonth, "yyyy")})
             </Button>
           </div>

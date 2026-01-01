@@ -1,10 +1,10 @@
 
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 export const exportTourPDF = async (tour: any) => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;
@@ -184,6 +184,7 @@ export const exportTourPDF = async (tour: any) => {
 
 // Build the same Tour Schedule PDF, but return as a Blob for uploads
 export const buildTourSchedulePdfBlob = async (tour: any): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;

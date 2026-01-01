@@ -1,7 +1,10 @@
-import * as XLSX from "xlsx";
+import type * as XLSXTypes from "xlsx";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { EventData, TravelArrangement, Accommodation, Transport } from "@/types/hoja-de-ruta";
+import { loadXlsx } from "@/utils/lazyXlsx";
+
+let XLSX: any;
 
 interface ExportData {
   eventData: EventData;
@@ -40,13 +43,13 @@ const createCellStyle = (options: {
   };
 };
 
-const applyCellStyle = (ws: XLSX.WorkSheet, cell: string, style: any) => {
+const applyCellStyle = (ws: XLSXTypes.WorkSheet, cell: string, style: any) => {
   if (!ws[cell]) ws[cell] = { t: "s", v: "" };
   ws[cell].s = style;
 };
 
 // Event Information Sheet
-const createEventSheet = (data: ExportData): XLSX.WorkSheet => {
+const createEventSheet = (data: ExportData): XLSXTypes.WorkSheet => {
   const sheetData: any[][] = [
     ["INFORMACIÓN DEL EVENTO"],
     [],
@@ -91,7 +94,7 @@ const createEventSheet = (data: ExportData): XLSX.WorkSheet => {
 };
 
 // Venue Information Sheet
-const createVenueSheet = (data: ExportData): XLSX.WorkSheet => {
+const createVenueSheet = (data: ExportData): XLSXTypes.WorkSheet => {
   const sheetData: any[][] = [
     ["INFORMACIÓN DEL LUGAR"],
     [],
@@ -139,7 +142,7 @@ const createVenueSheet = (data: ExportData): XLSX.WorkSheet => {
 };
 
 // Contacts Sheet
-const createContactsSheet = (data: ExportData): XLSX.WorkSheet => {
+const createContactsSheet = (data: ExportData): XLSXTypes.WorkSheet => {
   const sheetData: any[][] = [
     ["CONTACTOS"],
     [],
@@ -186,7 +189,7 @@ const createContactsSheet = (data: ExportData): XLSX.WorkSheet => {
 };
 
 // Staff Sheet
-const createStaffSheet = (data: ExportData): XLSX.WorkSheet => {
+const createStaffSheet = (data: ExportData): XLSXTypes.WorkSheet => {
   const sheetData: any[][] = [
     ["PERSONAL"],
     [],
@@ -237,7 +240,7 @@ const createStaffSheet = (data: ExportData): XLSX.WorkSheet => {
 };
 
 // Travel Sheet
-const createTravelSheet = (data: ExportData): XLSX.WorkSheet => {
+const createTravelSheet = (data: ExportData): XLSXTypes.WorkSheet => {
   const sheetData: any[][] = [
     ["VIAJES"],
     [],
@@ -297,7 +300,7 @@ const createTravelSheet = (data: ExportData): XLSX.WorkSheet => {
 };
 
 // Accommodation Sheet
-const createAccommodationSheet = (data: ExportData): XLSX.WorkSheet => {
+const createAccommodationSheet = (data: ExportData): XLSXTypes.WorkSheet => {
   const sheetData: any[][] = [
     ["ALOJAMIENTO"],
     [],
@@ -383,7 +386,7 @@ const createAccommodationSheet = (data: ExportData): XLSX.WorkSheet => {
 };
 
 // Logistics/Transport Sheet
-const createLogisticsSheet = (data: ExportData): XLSX.WorkSheet => {
+const createLogisticsSheet = (data: ExportData): XLSXTypes.WorkSheet => {
   const transports = data.eventData.logistics?.transport || [];
 
   const sheetData: any[][] = [
@@ -481,7 +484,7 @@ const createLogisticsSheet = (data: ExportData): XLSX.WorkSheet => {
 };
 
 // Schedule Sheet
-const createScheduleSheet = (data: ExportData): XLSX.WorkSheet => {
+const createScheduleSheet = (data: ExportData): XLSXTypes.WorkSheet => {
   const sheetData: any[][] = [
     ["PROGRAMA / HORARIO"],
     [],
@@ -583,7 +586,7 @@ const createScheduleSheet = (data: ExportData): XLSX.WorkSheet => {
 };
 
 // Weather Sheet
-const createWeatherSheet = (data: ExportData): XLSX.WorkSheet => {
+const createWeatherSheet = (data: ExportData): XLSXTypes.WorkSheet => {
   const sheetData: any[][] = [
     ["PREVISIÓN METEOROLÓGICA"],
     [],
@@ -631,7 +634,7 @@ const createWeatherSheet = (data: ExportData): XLSX.WorkSheet => {
 };
 
 // Restaurants Sheet
-const createRestaurantsSheet = (data: ExportData): XLSX.WorkSheet => {
+const createRestaurantsSheet = (data: ExportData): XLSXTypes.WorkSheet => {
   const sheetData: any[][] = [
     ["RESTAURANTES"],
     [],
@@ -686,7 +689,8 @@ const createRestaurantsSheet = (data: ExportData): XLSX.WorkSheet => {
 };
 
 // Main export function
-export const generateHojaDeRutaXLS = (data: ExportData) => {
+export const generateHojaDeRutaXLS = async (data: ExportData) => {
+  XLSX ??= await loadXlsx();
   const wb = XLSX.utils.book_new();
 
   // Create sheets

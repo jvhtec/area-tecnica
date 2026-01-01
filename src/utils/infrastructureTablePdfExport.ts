@@ -1,6 +1,4 @@
-
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 export interface InfrastructureItemData {
   type: 'cat6' | 'hma' | 'coax' | 'opticalcon_duo' | 'analog';
@@ -27,6 +25,7 @@ export interface InfrastructureTablePdfData {
 }
 
 export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfData): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   // Group artists by stage
   const artistsByStage = data.artists.reduce((acc, artist) => {
     const stageNum = artist.stage;

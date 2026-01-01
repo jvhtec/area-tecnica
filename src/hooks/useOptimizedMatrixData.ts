@@ -257,8 +257,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       const techBatches: string[][] = [];
       for (let i = 0; i < technicianIds.length; i += batchSize) techBatches.push(technicianIds.slice(i, i + batchSize));
 
-      const endIso = dateRange.end.toISOString();
-      const startIso = dateRange.start.toISOString();
+      const dateStart = format(dateRange.start, 'yyyy-MM-dd');
+      const dateEnd = format(dateRange.end, 'yyyy-MM-dd');
 
       // Build per-day unavailable marks in the visible range
       const perDay: Map<string, { user_id: string; date: string; status: string; notes?: string }> = new Map();
@@ -267,45 +267,79 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       const endDay = new Date(dateRange.end);
       endDay.setHours(0,0,0,0);
 
+      const runBatches = async <T,>(
+        batches: string[][],
+        worker: (batch: string[]) => Promise<T[]>,
+        concurrency = 3
+      ): Promise<T[]> => {
+        if (batches.length === 0) return [];
+        const results: T[] = [];
+        let nextIndex = 0;
+
+        const workers = Array.from({ length: Math.min(concurrency, batches.length) }, async () => {
+          while (nextIndex < batches.length) {
+            const batchIndex = nextIndex++;
+            const batch = batches[batchIndex];
+            const rows = await worker(batch);
+            results.push(...rows);
+          }
+        });
+
+        await Promise.all(workers);
+        return results;
+      };
+
       // 1) Per-day schedules (availability_schedules), includes approved vacations (source='vacation')
       //    We consider any status 'unavailable' regardless of source to cover manual and warehouse blocks too.
       // Include rows sourced from vacations or explicitly marked unavailable.
       // Some historical data may store status='vacation' instead of 'unavailable'.
-      for (const batch of techBatches) {
-        const { data: schedRows, error: schedErr } = await supabase
-          .from('availability_schedules')
-          .select('user_id, date, status, notes, source')
-          .in('user_id', batch)
-          .gte('date', format(dateRange.start, 'yyyy-MM-dd'))
-          .lte('date', format(dateRange.end, 'yyyy-MM-dd'))
-          .or(`status.eq.unavailable,source.eq.vacation`);
-        if (schedErr) throw schedErr;
-        (schedRows || []).forEach((row: any) => {
-          const key = `${row.user_id}-${row.date}`;
-          // If interval already marked the day, keep it; otherwise add schedule mark
-          if (!perDay.has(key)) {
-            perDay.set(key, { user_id: row.user_id, date: row.date, status: 'unavailable', notes: row.notes || undefined });
-          } else {
-            // Merge notes if present and not set yet
-            const cur = perDay.get(key)!;
-            if (!cur.notes && row.notes) perDay.set(key, { ...cur, notes: row.notes });
-          }
-        });
-      }
+      const schedRows = await runBatches(
+        techBatches,
+        async (batch) => {
+          const { data, error } = await supabase
+            .from('availability_schedules')
+            .select('user_id, date, status, notes, source')
+            .in('user_id', batch)
+            .gte('date', dateStart)
+            .lte('date', dateEnd)
+            .or(`status.eq.unavailable,source.eq.vacation`);
+          if (error) throw error;
+          return (data || []) as any[];
+        },
+        3
+      );
+
+      schedRows.forEach((row: any) => {
+        const key = `${row.user_id}-${row.date}`;
+        // If interval already marked the day, keep it; otherwise add schedule mark
+        if (!perDay.has(key)) {
+          perDay.set(key, { user_id: row.user_id, date: row.date, status: 'unavailable', notes: row.notes || undefined });
+        } else {
+          // Merge notes if present and not set yet
+          const cur = perDay.get(key)!;
+          if (!cur.notes && row.notes) perDay.set(key, { ...cur, notes: row.notes });
+        }
+      });
 
       // 2) Legacy per-day table (technician_availability) – treat vacation/travel/sick/day_off as unavailable
       try {
-        const { data: legacyRows, error: legacyErr } = await supabase
-          .from('technician_availability')
-          .select('technician_id, date, status')
-          .in('technician_id', technicianIds)
-          .gte('date', format(dateRange.start, 'yyyy-MM-dd'))
-          .lte('date', format(dateRange.end, 'yyyy-MM-dd'))
-          .in('status', ['vacation','travel','sick','day_off']);
-        if (legacyErr) {
-          if (legacyErr.code !== '42P01') throw legacyErr; // ignore missing-table
-        }
-        (legacyRows || []).forEach((row: any) => {
+        const legacyRows = await runBatches(
+          techBatches,
+          async (batch) => {
+            const { data, error } = await supabase
+              .from('technician_availability')
+              .select('technician_id, date, status')
+              .in('technician_id', batch)
+              .gte('date', dateStart)
+              .lte('date', dateEnd)
+              .in('status', ['vacation','travel','sick','day_off']);
+            if (error) throw error;
+            return (data || []) as any[];
+          },
+          3
+        );
+
+        legacyRows.forEach((row: any) => {
           const key = `${row.technician_id}-${row.date}`;
           if (!perDay.has(key)) perDay.set(key, { user_id: row.technician_id, date: row.date, status: 'unavailable' });
         });
@@ -320,29 +354,32 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         const techBatchesForVac: string[][] = [];
         for (let i = 0; i < technicianIds.length; i += vacBatchSize) techBatchesForVac.push(technicianIds.slice(i, i + vacBatchSize));
 
-        for (const batch of techBatchesForVac) {
-          const { data: vacs, error: vacErr } = await supabase
-            .from('vacation_requests')
-            .select('technician_id, start_date, end_date, status')
-            .eq('status', 'approved')
-            .in('technician_id', batch)
-            .lte('start_date', format(dateRange.end, 'yyyy-MM-dd'))
-            .gte('end_date', format(dateRange.start, 'yyyy-MM-dd'));
-          if (vacErr) {
-            // table may be protected or not present in some envs; ignore non-existence
-            if (vacErr.code !== '42P01') throw vacErr;
+        const vacs = await runBatches(
+          techBatchesForVac,
+          async (batch) => {
+            const { data, error } = await supabase
+              .from('vacation_requests')
+              .select('technician_id, start_date, end_date, status')
+              .eq('status', 'approved')
+              .in('technician_id', batch)
+              .lte('start_date', dateEnd)
+              .gte('end_date', dateStart);
+            if (error) throw error;
+            return (data || []) as any[];
+          },
+          3
+        );
+
+        vacs.forEach((r: any) => {
+          const s = new Date(r.start_date);
+          const e = new Date(r.end_date);
+          const clampStart = new Date(Math.max(startDay.getTime(), new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime()));
+          const clampEnd = new Date(Math.min(endDay.getTime(), new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime()));
+          for (let d = new Date(clampStart); d.getTime() <= clampEnd.getTime(); d.setDate(d.getDate() + 1)) {
+            const key = `${r.technician_id}-${format(d, 'yyyy-MM-dd')}`;
+            if (!perDay.has(key)) perDay.set(key, { user_id: r.technician_id, date: format(d, 'yyyy-MM-dd'), status: 'unavailable' });
           }
-          (vacs || []).forEach((r: any) => {
-            const s = new Date(r.start_date);
-            const e = new Date(r.end_date);
-            const clampStart = new Date(Math.max(startDay.getTime(), new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime()));
-            const clampEnd = new Date(Math.min(endDay.getTime(), new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime()));
-            for (let d = new Date(clampStart); d.getTime() <= clampEnd.getTime(); d.setDate(d.getDate() + 1)) {
-              const key = `${r.technician_id}-${format(d, 'yyyy-MM-dd')}`;
-              if (!perDay.has(key)) perDay.set(key, { user_id: r.technician_id, date: format(d, 'yyyy-MM-dd'), status: 'unavailable' });
-            }
-          });
-        }
+        });
       } catch (e: any) {
         if (e?.code && e.code !== '42P01') throw e;
       }

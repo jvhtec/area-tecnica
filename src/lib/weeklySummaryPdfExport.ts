@@ -1,9 +1,9 @@
 
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import type jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { categoryLabels } from '@/types/equipment';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 interface DailyUsage {
   used: number;
@@ -28,6 +28,7 @@ export const exportWeeklySummaryPDF = async (
   selectedCategories: string[],
   shortagesOnly: boolean = false
 ): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   return new Promise((resolve, reject) => {
     try {
       const doc = new jsPDF({ orientation: 'landscape' });

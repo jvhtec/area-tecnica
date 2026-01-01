@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, FolderPlus, Image, HardDrive, XCircle, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
-import { useState, useEffect } from "react";
+import { memo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TourManagementDialog } from "./TourManagementDialog";
 import { supabase } from "@/lib/supabase";
@@ -31,7 +31,7 @@ interface TourCardProps {
   onPrint: () => void;
 }
 
-export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCardProps) => {
+export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDates, onPrint }: TourCardProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -727,4 +727,4 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
       />
     </>
   );
-};
+});

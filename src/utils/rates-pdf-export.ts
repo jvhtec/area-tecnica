@@ -1,5 +1,3 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { TourJobRateQuote } from '@/types/tourRates';
@@ -11,6 +9,7 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { fetchJobLogo, fetchTourLogo, getCompanyLogo } from '@/utils/pdf/logoUtils';
 import { appendAutonomoLabel } from '@/utils/autonomo';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
 const DEDUCTION_DISCLAIMER_TEXT = '* Se ha aplicado una deducción de 30€/día en concepto de IRPF por condición de no autónomo.';
@@ -273,6 +272,7 @@ export async function generateRateQuotePDF(
   lpoMap?: Map<string, string | null>,
   options?: { download?: boolean; timesheetMap?: Map<string, Set<string>> }
 ): Promise<Blob | void> {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
   const tourIdFromQuotes = quotes.find((quote) => quote.tour_id)?.tour_id;
   const [headerLogo, companyLogo] = await Promise.all([
@@ -499,6 +499,7 @@ export async function generateTourRatesSummaryPDF(
   jobsWithQuotes: TourSummaryJob[],
   profiles: TechnicianProfile[]
 ) {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
   const tourId = jobsWithQuotes.find((job) => job.quotes.length)?.quotes[0]?.tour_id;
   const [headerLogo, companyLogo] = await Promise.all([
@@ -782,6 +783,7 @@ export async function generateJobPayoutPDF(
   timesheetMap?: Map<string, TimesheetLine[]>,
   options?: { download?: boolean }
 ): Promise<Blob | void> {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
   const [headerLogo, companyLogo] = await Promise.all([
     resolveHeaderLogo({

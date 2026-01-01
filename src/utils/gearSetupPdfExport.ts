@@ -1,8 +1,6 @@
-
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 export const generateStageGearPDF = async (
   jobId: string,
@@ -11,6 +9,7 @@ export const generateStageGearPDF = async (
 ): Promise<Blob> => {
   return new Promise(async (resolve, reject) => {
     try {
+      const { jsPDF, autoTable } = await loadPdfLibs();
       console.log(`Starting PDF generation for stage ${stageNumber} (${stageName})`);
       
       // Fetch stage name from database if not provided

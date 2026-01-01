@@ -51,7 +51,8 @@ export function useServiceWorkerUpdate() {
     }
 
     const isIOSPWA = isIOS() && isStandalone;
-    let updateCheckInterval: NodeJS.Timeout | null = null;
+    let updateCheckInterval: number | null = null;
+    const UPDATE_CHECK_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes (avoid battery drain)
 
     const handleUpdate = (registration: ServiceWorkerRegistration) => {
       setWaitingWorker(registration.waiting);
@@ -129,12 +130,15 @@ export function useServiceWorkerUpdate() {
       // iOS PWA: Set up aggressive update checking
       // iOS doesn't reliably check for updates on launch or via the standard 24h cycle
       if (isIOSPWA) {
-        // Check for updates every 30 seconds when the app is visible
-        updateCheckInterval = setInterval(() => {
-          if (!document.hidden) {
-            checkForUpdates();
-          }
-        }, 30000); // 30 seconds
+        // Start/stop polling based on visibility (mobile-friendly)
+        if (!document.hidden) {
+          checkForUpdates();
+          updateCheckInterval = window.setInterval(() => {
+            if (!document.hidden) {
+              checkForUpdates();
+            }
+          }, UPDATE_CHECK_INTERVAL_MS);
+        }
       }
     });
 
@@ -161,9 +165,25 @@ export function useServiceWorkerUpdate() {
 
     // iOS PWA: Check for updates when app comes to foreground
     const handleVisibilityChange = () => {
-      if (!document.hidden && isIOSPWA) {
-        console.log('[SW Update] App became visible, checking for updates...');
-        checkForUpdates();
+      if (!isIOSPWA) return;
+
+      if (document.hidden) {
+        if (updateCheckInterval !== null) {
+          clearInterval(updateCheckInterval);
+          updateCheckInterval = null;
+        }
+        return;
+      }
+
+      console.log('[SW Update] App became visible, checking for updates...');
+      checkForUpdates();
+
+      if (updateCheckInterval === null) {
+        updateCheckInterval = window.setInterval(() => {
+          if (!document.hidden) {
+            checkForUpdates();
+          }
+        }, UPDATE_CHECK_INTERVAL_MS);
       }
     };
 
@@ -182,8 +202,9 @@ export function useServiceWorkerUpdate() {
       }
 
       // Clear interval if it exists
-      if (updateCheckInterval) {
+      if (updateCheckInterval !== null) {
         clearInterval(updateCheckInterval);
+        updateCheckInterval = null;
       }
 
       // Dismiss the toast when component unmounts

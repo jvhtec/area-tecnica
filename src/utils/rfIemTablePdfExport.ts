@@ -1,6 +1,4 @@
-
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 export interface RfIemSystemData {
   model: string;
@@ -38,6 +36,7 @@ const getProviderSummary = (systems: RfIemSystemData[]): string => {
 };
 
 export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const pdf = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',

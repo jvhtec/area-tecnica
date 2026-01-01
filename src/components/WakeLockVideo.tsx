@@ -29,9 +29,9 @@ export const WakeLockVideo: React.FC = () => {
                     window.removeEventListener('keydown', onInteraction);
                     window.removeEventListener('touchstart', onInteraction);
                 };
-                window.addEventListener('click', onInteraction);
-                window.addEventListener('keydown', onInteraction);
-                window.addEventListener('touchstart', onInteraction);
+                window.addEventListener('click', onInteraction, { once: true });
+                window.addEventListener('keydown', onInteraction, { once: true });
+                window.addEventListener('touchstart', onInteraction, { passive: true, once: true });
             }
         };
 

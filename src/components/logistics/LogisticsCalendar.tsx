@@ -106,8 +106,8 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
     setShowPrintDialog(false);
   };
 
-  const handleGenerateXLS = (range: "current_week" | "next_week" | "month") => {
-    generateLogisticsCalendarXLS(range, {
+  const handleGenerateXLS = async (range: "current_week" | "next_week" | "month") => {
+    await generateLogisticsCalendarXLS(range, {
       events: events || [],
       currentDate: currentMonth,
     });

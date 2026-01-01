@@ -1,6 +1,4 @@
-
-import jsPDF from 'jspdf';
-import { autoTable } from 'jspdf-autotable';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 export interface WiredMicrophoneMatrixData {
   jobTitle: string;  
@@ -9,6 +7,7 @@ export interface WiredMicrophoneMatrixData {
 }
 
 export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrixData): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const pdf = new jsPDF('landscape', 'pt', 'a4');
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;

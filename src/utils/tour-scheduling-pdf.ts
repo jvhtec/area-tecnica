@@ -1,11 +1,11 @@
 // @ts-nocheck
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import type jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { getWeatherForJob } from '@/utils/weather/weatherApi';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 const CORPORATE_RED: [number, number, number] = [125, 1, 1];
 const HEADER_HEIGHT = 30;
@@ -120,6 +120,7 @@ export const generateTourDaySheet = async (
   tourData: any,
   tourDate: any
 ) => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.width;
   let currentY = 40;
@@ -388,6 +389,7 @@ export const generateTourBook = async (
   tourData: any,
   tourDates: any[]
 ) => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.width;
   let pageNum = 1;

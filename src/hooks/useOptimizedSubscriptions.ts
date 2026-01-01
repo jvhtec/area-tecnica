@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import { useOptimizedSubscription } from '@/providers/OptimizedSubscriptionProvider';
+import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { createQueryKey } from '@/lib/optimized-react-query';
 
 /**
@@ -13,22 +13,20 @@ export const useOptimizedTableSubscriptions = (
     priority?: 'high' | 'medium' | 'low';
   }>
 ) => {
-  const { batchSubscribe, connectionStatus } = useOptimizedSubscription();
+  const { forceSubscribe, connectionStatus } = useSubscriptionContext();
 
   useEffect(() => {
     if (tables.length === 0) return;
 
     // Prepare subscriptions with optimized query keys
-    const subscriptions = tables.map(({ table, queryKey, filter, priority }) => ({
+    const subscriptions = tables.map(({ table, queryKey, priority }) => ({
       table,
       queryKey: queryKey || [table],
-      filter,
-      priority: priority || 'medium' as const
+      priority: priority || 'medium' as const,
     }));
 
-    // Batch subscribe to all tables at once
-    batchSubscribe(subscriptions);
-  }, [tables, batchSubscribe]);
+    forceSubscribe(subscriptions);
+  }, [tables, forceSubscribe]);
 
   return {
     isConnected: connectionStatus === 'connected',
@@ -70,7 +68,7 @@ export const useOptimizedJobSubscriptions = (jobId: string) => {
  * Optimized hook for messages subscriptions (reduces notification check frequency)
  */
 export const useOptimizedMessagesSubscriptions = (userId: string) => {
-  const { batchSubscribe } = useOptimizedSubscription();
+  const { forceSubscribe } = useSubscriptionContext();
 
   const subscribeToMessages = useCallback(() => {
     const subscriptions = [
@@ -78,8 +76,8 @@ export const useOptimizedMessagesSubscriptions = (userId: string) => {
       { table: 'direct_messages', queryKey: ['direct_messages', userId], priority: 'medium' as const },
     ];
 
-    batchSubscribe(subscriptions);
-  }, [userId, batchSubscribe]);
+    forceSubscribe(subscriptions);
+  }, [userId, forceSubscribe]);
 
   useEffect(() => {
     subscribeToMessages();

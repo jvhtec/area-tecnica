@@ -1,6 +1,5 @@
-import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { loadPdfLibs } from "@/utils/pdf/lazyPdf";
+import { loadXlsx } from "@/utils/lazyXlsx";
 import {
   format,
   startOfWeek,
@@ -75,7 +74,7 @@ const getJobTitle = (event: LogisticsEvent): string => {
   return "-";
 };
 
-export const generateLogisticsCalendarXLS = (
+export const generateLogisticsCalendarXLS = async (
   range: "current_week" | "next_week" | "month",
   data: LogisticsExportData
 ) => {
@@ -167,6 +166,7 @@ export const generateLogisticsCalendarXLS = (
   }
 
   // Create workbook and worksheet
+  const XLSX = await loadXlsx();
   const workbook = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
@@ -274,6 +274,7 @@ export const generateLogisticsCalendarPDF = async (
   range: "current_week" | "next_week" | "month",
   data: LogisticsExportData
 ) => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const { events, currentDate } = data;
 
   let startDate: Date, endDate: Date, rangeLabel: string;

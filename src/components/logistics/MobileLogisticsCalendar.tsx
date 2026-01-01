@@ -20,10 +20,13 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   date,
   onDateSelect,
 }) => {
+  const DEFAULT_VISIBLE_EVENTS = 10;
+
   const [currentDate, setCurrentDate] = useState(date);
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [visibleEventsCount, setVisibleEventsCount] = useState(DEFAULT_VISIBLE_EVENTS);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -70,6 +73,14 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   }, [events]);
 
   const currentDateEvents = getEventsForDate(currentDate);
+  const visibleEvents = React.useMemo(
+    () => currentDateEvents.slice(0, visibleEventsCount),
+    [currentDateEvents, visibleEventsCount],
+  );
+
+  useEffect(() => {
+    setVisibleEventsCount(DEFAULT_VISIBLE_EVENTS);
+  }, [currentDate]);
 
   // PDF export handler
   const handleGeneratePDF = async (range: "current_week" | "next_week" | "month") => {
@@ -80,8 +91,8 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
     setShowPrintDialog(false);
   };
 
-  const handleGenerateXLS = (range: "current_week" | "next_week" | "month") => {
-    generateLogisticsCalendarXLS(range, {
+  const handleGenerateXLS = async (range: "current_week" | "next_week" | "month") => {
+    await generateLogisticsCalendarXLS(range, {
       events: events || [],
       currentDate,
     });
@@ -167,14 +178,26 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
             Cargando eventos...
           </div>
         ) : currentDateEvents.length > 0 ? (
-          currentDateEvents.map((event) => (
-            <LogisticsEventCard
-              key={event.id}
-              event={event}
-              onClick={(e) => handleEventClick(e, event)}
-              className="w-full rounded-2xl"
-            />
-          ))
+          <>
+            {visibleEvents.map((event) => (
+              <LogisticsEventCard
+                key={event.id}
+                event={event}
+                onClick={(e) => handleEventClick(e, event)}
+                className="w-full rounded-2xl"
+              />
+            ))}
+            {currentDateEvents.length > visibleEventsCount ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full rounded-2xl"
+                onClick={() => setVisibleEventsCount((prev) => prev + DEFAULT_VISIBLE_EVENTS)}
+              >
+                Cargar más ({currentDateEvents.length - visibleEventsCount} restantes)
+              </Button>
+            ) : null}
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center rounded-2xl border bg-card">
             <Calendar className="h-8 w-8 mb-2" />

@@ -1,12 +1,9 @@
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import { supabase } from "@/lib/supabase";
 import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
 import { Formatters } from "@/utils/hoja-de-ruta/pdf/utils/formatters";
+import { loadPdfLibs } from "@/utils/pdf/lazyPdf";
 
-interface AutoTableJsPDF extends jsPDF {
-  lastAutoTable: { finalY: number };
-}
+type AutoTableJsPDF = any & { lastAutoTable: { finalY: number } };
 
 // Helper function to format datetime for PDF display
 // Uses empty string instead of 'N/A' for cleaner table output
@@ -54,7 +51,7 @@ export const uploadPdfToJob = async (
   }
 };
 
-export const generatePDF = (
+export const generatePDF = async (
   eventData: EventData,
   travelArrangements: TravelArrangement[],
   roomAssignments: RoomAssignment[],
@@ -64,6 +61,7 @@ export const generatePDF = (
   jobs: any[],
   toast: any
 ) => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   if (!selectedJobId) {
     toast({
       title: "Error",

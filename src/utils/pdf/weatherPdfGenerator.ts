@@ -1,8 +1,7 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { getWeatherForJob } from '@/utils/weather/weatherApi';
 import { supabase } from '@/lib/supabase';
 import { WeatherData } from '@/types/hoja-de-ruta';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 export interface WeatherPdfData {
   jobTitle: string;
@@ -18,6 +17,7 @@ export interface WeatherPdfData {
 }
 
 export const generateWeatherPDF = async (data: WeatherPdfData): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.width;
   

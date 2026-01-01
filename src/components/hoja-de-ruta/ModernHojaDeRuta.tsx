@@ -253,7 +253,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
   };
 
   // Excel export handler
-  const handleGenerateXLS = () => {
+  const handleGenerateXLS = async () => {
     if (!selectedJobId) {
       toast({
         title: "Error",
@@ -266,7 +266,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     try {
       const jobDetails = jobs?.find(job => job.id === selectedJobId);
 
-      generateHojaDeRutaXLS({
+      await generateHojaDeRutaXLS({
         eventData,
         travelArrangements,
         accommodations,

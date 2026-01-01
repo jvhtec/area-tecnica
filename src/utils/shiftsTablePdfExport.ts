@@ -1,8 +1,6 @@
-
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { ShiftWithAssignments } from '@/types/festival-scheduling';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 export interface ShiftsTablePdfData {
   jobTitle: string;
@@ -12,7 +10,8 @@ export interface ShiftsTablePdfData {
   logoUrl?: string; // Logo URL option
 }
 
-export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> => {
+export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   return new Promise((resolve, reject) => {
     try {
       // Create PDF in landscape

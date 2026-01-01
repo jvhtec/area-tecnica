@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { PerformanceOptimizedSubscriptionManager } from '@/lib/performance-optimized-subscription-manager';
+import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 
 interface UseOptimizedRealtimeOptions {
   enabled?: boolean;
@@ -36,7 +36,7 @@ export function useOptimizedRealtime(
   const stableQueryKey = useMemo(() => queryKey, [serializedQueryKey]);
   
   const queryClient = useQueryClient();
-  const subscriptionManager = PerformanceOptimizedSubscriptionManager.getInstance(queryClient);
+  const subscriptionManager = UnifiedSubscriptionManager.getInstance(queryClient);
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   
   const [status, setStatus] = useState<RealtimeStatus>({
@@ -55,7 +55,7 @@ export function useOptimizedRealtime(
     
     try {
       // Subscribe to table
-      subscriptionRef.current = subscriptionManager.subscribeToTable(table, stableQueryKey, priority);
+      subscriptionRef.current = subscriptionManager.subscribeToTable(table, stableQueryKey, undefined, priority);
       
       setStatus(prev => ({
         ...prev,
@@ -101,7 +101,7 @@ export function useOptimizedRealtime(
   return {
     ...status,
     retry,
-    stats: subscriptionManager.getStats()
+    stats: subscriptionManager.getSnapshot()
   };
 }
 
@@ -110,12 +110,12 @@ export function useOptimizedRealtime(
  */
 export function useSubscriptionStats() {
   const queryClient = useQueryClient();
-  const subscriptionManager = PerformanceOptimizedSubscriptionManager.getInstance(queryClient);
-  const [stats, setStats] = useState(subscriptionManager.getStats());
+  const subscriptionManager = UnifiedSubscriptionManager.getInstance(queryClient);
+  const [stats, setStats] = useState(subscriptionManager.getSnapshot());
   
   useEffect(() => {
     const interval = setInterval(() => {
-      setStats(subscriptionManager.getStats());
+      setStats(subscriptionManager.getSnapshot());
     }, 5000); // Update every 5 seconds
     
     return () => clearInterval(interval);

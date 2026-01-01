@@ -40,30 +40,30 @@ export const LogisticsCalendarPrintDialog: React.FC<LogisticsCalendarPrintDialog
         <div className="space-y-4">
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold text-base">Imprimir a PDF</h3>
-            <Button onClick={() => onGeneratePDF("current_week")}>
+            <Button onClick={() => { void onGeneratePDF("current_week"); }}>
               <Printer className="h-4 w-4 mr-2" />
               Semana Actual ({format(currentWeekStart, "d MMM", { locale: es })} - {format(currentWeekEnd, "d MMM", { locale: es })})
             </Button>
-            <Button onClick={() => onGeneratePDF("next_week")}>
+            <Button onClick={() => { void onGeneratePDF("next_week"); }}>
               <Printer className="h-4 w-4 mr-2" />
               Próxima Semana ({format(nextWeekStart, "d MMM", { locale: es })} - {format(nextWeekEnd, "d MMM", { locale: es })})
             </Button>
-            <Button onClick={() => onGeneratePDF("month")}>
+            <Button onClick={() => { void onGeneratePDF("month"); }}>
               <Printer className="h-4 w-4 mr-2" />
               Mes Completo ({format(currentMonth, "MMMM yyyy", { locale: es })})
             </Button>
           </div>
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold text-base">Exportar a Excel</h3>
-            <Button onClick={() => onGenerateXLS("current_week")}>
+            <Button onClick={() => { void onGenerateXLS("current_week"); }}>
               <Table className="h-4 w-4 mr-2" />
               Semana Actual ({format(currentWeekStart, "d MMM", { locale: es })} - {format(currentWeekEnd, "d MMM", { locale: es })})
             </Button>
-            <Button onClick={() => onGenerateXLS("next_week")}>
+            <Button onClick={() => { void onGenerateXLS("next_week"); }}>
               <Table className="h-4 w-4 mr-2" />
               Próxima Semana ({format(nextWeekStart, "d MMM", { locale: es })} - {format(nextWeekEnd, "d MMM", { locale: es })})
             </Button>
-            <Button onClick={() => onGenerateXLS("month")}>
+            <Button onClick={() => { void onGenerateXLS("month"); }}>
               <Table className="h-4 w-4 mr-2" />
               Mes Completo ({format(currentMonth, "MMMM yyyy", { locale: es })})
             </Button>

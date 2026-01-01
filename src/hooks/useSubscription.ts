@@ -2,7 +2,7 @@
 // Re-export from the unified table subscription hook
 import { useTableSubscription } from './useTableSubscription';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 
 // Export the useTableSubscription hook
 export { useTableSubscription };
@@ -16,7 +16,9 @@ export function useRelatedTablesSubscription(
   schema: string = 'public',
   priority: 'high' | 'medium' | 'low' = 'medium'
 ) {
-  const { forceSubscribe } = useSubscriptionContext();
+  const { forceSubscribe, subscriptionsByTable, connectionStatus, lastRefreshTime } = useSubscriptionContext();
+  const stableTables = useMemo(() => JSON.stringify(tables), [tables]);
+  const stableQueryKey = useMemo(() => JSON.stringify(queryKey), [queryKey]);
 
   // Ensure subscriptions are established for the given tables with the right invalidation key
   useEffect(() => {
@@ -27,28 +29,24 @@ export function useRelatedTablesSubscription(
       console.warn('useRelatedTablesSubscription: forceSubscribe not available:', e);
     }
     // We only want to run when tables or key/priority changes
-  }, [JSON.stringify(tables), JSON.stringify(queryKey), priority, forceSubscribe]);
+  }, [forceSubscribe, priority, stableQueryKey, stableTables]);
 
-  // Create an array of table configurations
-  const tableConfigs = tables.map(table => ({
-    table,
-    queryKey
-  }));
-  
-  // Use individual table subscriptions for each table
-  const results = tableConfigs.map(config => 
-    useTableSubscription(config.table, config.queryKey)
-  );
-  
-  // Determine overall subscription status
-  const isSubscribed = results.every(result => result.isSubscribed);
-  const isStale = results.some(result => result.isStale);
-  
-  // Create a mapping of table statuses
-  const tableStatuses = tables.reduce((acc, table, index) => {
-    acc[table] = results[index];
-    return acc;
-  }, {} as Record<string, any>);
+  const tableStatuses = useMemo(() => {
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+    return tables.reduce((acc, table) => {
+      const isSubscribed = (subscriptionsByTable[table]?.length ?? 0) > 0 && connectionStatus === 'connected';
+      acc[table] = {
+        isSubscribed,
+        isStale: now - lastRefreshTime > fiveMinutes,
+        lastActivity: lastRefreshTime,
+      };
+      return acc;
+    }, {} as Record<string, any>);
+  }, [connectionStatus, lastRefreshTime, subscriptionsByTable, tables]);
+
+  const isSubscribed = tables.every((table) => (subscriptionsByTable[table]?.length ?? 0) > 0) && connectionStatus === 'connected';
+  const isStale = Date.now() - lastRefreshTime > 5 * 60 * 1000;
   
   return {
     isSubscribed,
@@ -66,15 +64,49 @@ export function useRelatedTablesSubscription(
 export function useMultiTableSubscription(
   tables: Array<{ 
     table: string, 
-    queryKey: string | string[]
+    queryKey: string | string[],
+    priority?: 'high' | 'medium' | 'low'
   }>
 ) {
-  // Convert tables array to format expected by useRelatedTablesSubscription
-  const tableNames = tables.map(t => t.table);
-  const queryKey = tables.length > 0 ? tables[0].queryKey : 'defaultKey';
-  
-  // Use the related tables subscription hook
-  const result = useRelatedTablesSubscription(queryKey, tableNames);
-  
-  return result;
+  const { forceSubscribe, subscriptionsByTable, connectionStatus, lastRefreshTime } = useSubscriptionContext();
+
+  const stableTables = useMemo(() => JSON.stringify(tables), [tables]);
+
+  useEffect(() => {
+    try {
+      const entries = tables.map(({ table, queryKey, priority }) => ({
+        table,
+        queryKey,
+        priority,
+      }));
+      forceSubscribe(entries);
+    } catch (e) {
+      console.warn('useMultiTableSubscription: forceSubscribe not available:', e);
+    }
+  }, [forceSubscribe, stableTables]);
+
+  const tableStatuses = useMemo(() => {
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+    return tables.reduce((acc, { table }) => {
+      const isSubscribed = (subscriptionsByTable[table]?.length ?? 0) > 0 && connectionStatus === 'connected';
+      acc[table] = {
+        isSubscribed,
+        isStale: now - lastRefreshTime > fiveMinutes,
+        lastActivity: lastRefreshTime,
+      };
+      return acc;
+    }, {} as Record<string, any>);
+  }, [connectionStatus, lastRefreshTime, subscriptionsByTable, tables]);
+
+  const isSubscribed =
+    connectionStatus === 'connected' && tables.every(({ table }) => (subscriptionsByTable[table]?.length ?? 0) > 0);
+  const isStale = Date.now() - lastRefreshTime > 5 * 60 * 1000;
+
+  return {
+    isSubscribed,
+    isStale,
+    tableStatuses,
+    refreshSubscription: async () => true,
+  };
 }

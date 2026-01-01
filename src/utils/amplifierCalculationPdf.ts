@@ -1,14 +1,13 @@
-
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { SpeakerConfig, SpeakerSection, AmplifierResults } from '../components/sound/AmplifierTool';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 export const generateAmplifierPdf = async (
   config: Record<string, SpeakerSection>,
   results: AmplifierResults,
   soundComponentDatabase: Array<{ id: number; name: string; weight: number }>,
 ): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   return new Promise((resolve, reject) => {
     try {
       const doc = new jsPDF();

@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { EnhancedSubscriptionManager } from '@/lib/enhanced-subscription-manager';
+import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 
 export function useResetSubscriptions() {
   const [isResetting, setIsResetting] = useState(false);
@@ -11,8 +11,9 @@ export function useResetSubscriptions() {
     setIsResetting(true);
     try {
       console.log('Resetting all subscriptions...');
-      const manager = EnhancedSubscriptionManager.getInstance(queryClient);
-      manager.resetAllSubscriptions();
+      const manager = UnifiedSubscriptionManager.getInstance(queryClient);
+      manager.reestablishSubscriptions();
+      manager.markRefreshed();
       
       // Invalidate all queries to refresh data after resetting subscriptions
       await queryClient.invalidateQueries();

@@ -75,7 +75,10 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
                 department
               )
             `)
-            .eq("job_id", jobId);
+            .eq("job_id", jobId)
+            .eq("is_active", true)
+            // Include false/null, exclude true
+            .not("is_schedule_only", "is", true);
 
           // RLS-safe fallback mirroring JobDetailsDialog to avoid gaps for non-manager roles
           let visibleTimesheets: any[] = [];
@@ -105,8 +108,26 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
             }
           }
 
-          // Get unique technician IDs from timesheets
-          const techIds = [...new Set(combinedTimesheets.map((t: any) => t.technician_id))];
+          const normalizeProfile = (p: any) => (Array.isArray(p) ? p[0] : p);
+
+          // Group timesheets by technician once (avoids O(n²) find/filter)
+          const timesheetsByTech = new Map<string, { profile: any | null; dates: Set<string> }>();
+          for (const row of combinedTimesheets) {
+            const techId = row?.technician_id;
+            if (!techId) continue;
+            if (!timesheetsByTech.has(techId)) {
+              timesheetsByTech.set(techId, { profile: normalizeProfile(row?.profiles) ?? null, dates: new Set() });
+            }
+            const entry = timesheetsByTech.get(techId)!;
+            if (!entry.profile && row?.profiles) {
+              entry.profile = normalizeProfile(row.profiles);
+            }
+            if (row?.date) {
+              entry.dates.add(row.date);
+            }
+          }
+
+          const techIds = Array.from(timesheetsByTech.keys());
 
           if (techIds.length === 0) {
             console.log(`No timesheets found for job ${jobId}`);
@@ -117,7 +138,15 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           const { data: assignmentData, error: assignError } = await supabase
             .from("job_assignments")
             .select(`
-              *,
+              technician_id,
+              sound_role,
+              lights_role,
+              video_role,
+              status,
+              single_day,
+              assignment_date,
+              assigned_at,
+              assigned_by,
               profiles (
                 first_name,
                 last_name,
@@ -133,17 +162,18 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           }
 
           // Merge: timesheets for presence, job_assignments for roles
-          const assignmentMap = new Map((assignmentData || []).map((a: any) => [a.technician_id, a]));
-          const mergedAssignments = techIds.map(techId => {
+          const assignmentMap = new Map(
+            (assignmentData || []).map((a: any) => [a.technician_id, { ...a, profiles: normalizeProfile(a?.profiles) }]),
+          );
+
+          const mergedAssignments = techIds.map((techId) => {
             const assignment = assignmentMap.get(techId);
-            const tsRow = combinedTimesheets.find((t: any) => t.technician_id === techId);
-            const tsDates = combinedTimesheets
-              .filter((t: any) => t.technician_id === techId)
-              .map((t: any) => t.date);
+            const ts = timesheetsByTech.get(techId);
+            const tsDates = ts ? Array.from(ts.dates).sort() : [];
             return {
               job_id: jobId,
               technician_id: techId,
-              profiles: assignment?.profiles || tsRow?.profiles,
+              profiles: assignment?.profiles || ts?.profile,
               sound_role: assignment?.sound_role,
               lights_role: assignment?.lights_role,
               video_role: assignment?.video_role,
@@ -152,8 +182,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
               assignment_date: assignment?.assignment_date,
               assigned_at: assignment?.assigned_at,
               assigned_by: assignment?.assigned_by,
-              // Include dates from timesheets for per-day info
-              _timesheet_dates: Array.from(new Set(tsDates)).sort(),
+              _timesheet_dates: tsDates,
             } as unknown as Assignment;
           });
 
@@ -201,8 +230,6 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           console.log(`Timesheet change detected for job ${jobId}:`, payload);
           // Force immediate refresh
           manualRefresh();
-          // Also invalidate jobs to update JobCard lists that depend on job relations
-          queryClient.invalidateQueries({ queryKey: ["jobs"] });
         }
       )
       .on(
@@ -217,7 +244,6 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           console.log(`Assignment metadata change detected for job ${jobId}:`, payload);
           // Force immediate refresh (for role/status updates)
           manualRefresh();
-          queryClient.invalidateQueries({ queryKey: ["jobs"] });
         }
       )
       .subscribe();

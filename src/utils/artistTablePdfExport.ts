@@ -1,6 +1,5 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { GearMismatch, EquipmentNeeds } from './gearComparisonService';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 // Local interfaces for internal PDF generation use
 interface WirelessSystemDetail {
@@ -444,6 +443,7 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
 export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
   console.log('exportArtistTablePDF called with data:', data);
   
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF('landscape');
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;

@@ -1,5 +1,5 @@
-import jsPDF from "jspdf";
-import * as XLSX from "xlsx";
+import { loadJsPDF } from "@/utils/pdf/lazyPdf";
+import { loadXlsx } from "@/utils/lazyXlsx";
 import {
   format,
   startOfMonth,
@@ -163,6 +163,7 @@ export const generatePersonalCalendarPDF = async (
   range: "month" | "quarter" | "year",
   data: PersonalCalendarExportData
 ) => {
+  const jsPDF = await loadJsPDF();
   const { houseTechs, assignments, getAvailabilityStatus, currentDate, selectedDepartments, madridHolidays = [] } = data;
 
   const doc = new jsPDF("landscape", "mm", [420, 297]); // A3 dimensions
@@ -462,10 +463,11 @@ export const generatePersonalCalendarPDF = async (
   doc.save(`personal-calendar-${range}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
 };
 
-export const generatePersonalCalendarXLS = (
+export const generatePersonalCalendarXLS = async (
   range: "month" | "quarter" | "year",
   data: PersonalCalendarExportData
 ) => {
+  const XLSX = await loadXlsx();
   const { houseTechs, assignments, getAvailabilityStatus, currentDate, selectedDepartments, madridHolidays = [] } = data;
 
   let startDate: Date, endDate: Date;

@@ -1,9 +1,9 @@
-
 import { Badge } from "@/components/ui/badge";
 import { Package, PackageCheck, Truck, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
+import { memo } from "react";
 
 interface LogisticsEventCardProps {
   event: any;
@@ -13,13 +13,13 @@ interface LogisticsEventCardProps {
   className?: string;
 }
 
-export const LogisticsEventCard = ({
+export const LogisticsEventCard = memo(function LogisticsEventCard({
   event,
   onClick,
   variant = "detailed",
   compact = false,
   className
-}: LogisticsEventCardProps) => {
+}: LogisticsEventCardProps) {
   // Default colors based on event type
   const defaultColor = event.event_type === 'load' ? 'rgb(191, 219, 254)' : 'rgb(187, 247, 208)';
   const borderColor = event.color || defaultColor;
@@ -150,4 +150,4 @@ export const LogisticsEventCard = ({
       )}
     </div>
   );
-};
+});

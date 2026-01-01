@@ -1,5 +1,4 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 interface ExportTableRow {
   quantity?: string;
@@ -40,7 +39,7 @@ export interface SummaryRow {
   clusterWeight: number;
 }
 
-export const exportToPDF = (
+export const exportToPDF = async (
   projectName: string,
   tables: ExportTable[],
   type: 'weight' | 'power' | 'rigging',
@@ -52,6 +51,7 @@ export const exportToPDF = (
   customLogoUrl?: string,
   fohSchukoRequired?: boolean
 ): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   return new Promise<Blob>((resolve) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;

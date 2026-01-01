@@ -1,10 +1,9 @@
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { useUnifiedSubscriptions } from "@/hooks/useUnifiedSubscriptions";
+import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { Department } from "@/types/department";
 import { sanitizeLogData } from "@/lib/enhanced-security-config";
-import { aggregateJobTimesheets, TimesheetRowWithTechnician, AggregatedTimesheetAssignment } from "@/utils/timesheetAssignments";
 
 /**
  * Optimized jobs hook that consolidates multiple queries and subscriptions
@@ -17,25 +16,16 @@ export const useOptimizedJobs = (
   endDate?: Date,
   includeDryhire: boolean = false
 ) => {
-  const queryClient = useQueryClient();
-
-  // Consolidated subscription for all job-related tables
-  useUnifiedSubscriptions([
-    'jobs',
-    'job_assignments', 
-    'job_departments',
-    'job_documents',
-    'timesheets',
-    'job_date_types',
-    'sound_job_tasks',
-    'lights_job_tasks', 
-    'video_job_tasks',
-    'sound_job_personnel',
-    'lights_job_personnel',
-    'video_job_personnel',
-    'flex_folders',
-    'locations'
-  ], ['optimized-jobs']);
+  // Subscribe only to tables that affect this hook's query results
+  useMultiTableSubscription([
+    { table: 'jobs', queryKey: ['optimized-jobs'], priority: 'high' },
+    { table: 'job_assignments', queryKey: ['optimized-jobs'], priority: 'high' },
+    { table: 'job_departments', queryKey: ['optimized-jobs'], priority: 'medium' },
+    { table: 'job_documents', queryKey: ['optimized-jobs'], priority: 'low' },
+    { table: 'flex_folders', queryKey: ['optimized-jobs'], priority: 'low' },
+    { table: 'locations', queryKey: ['optimized-jobs'], priority: 'low' },
+    { table: 'tours', queryKey: ['optimized-jobs'], priority: 'low' },
+  ]);
 
   const fetchOptimizedJobs = async () => {
     const startTime = Date.now();
@@ -117,76 +107,11 @@ export const useOptimizedJobs = (
     }
 
     const jobs = data || [];
-    const jobIds = jobs.map(job => job.id).filter(Boolean);
-    const assignmentLookup = jobs.reduce<Record<string, any[]>>((acc, job) => {
-      acc[job.id] = job.job_assignments || [];
-      return acc;
-    }, {});
-
-    let timesheetAssignments: Record<string, AggregatedTimesheetAssignment[]> = {};
-    if (jobIds.length > 0) {
-      // Batch job IDs to avoid URL length limits (max ~100 UUIDs per request)
-      const BATCH_SIZE = 100;
-      const batches: string[][] = [];
-
-      for (let i = 0; i < jobIds.length; i += BATCH_SIZE) {
-        batches.push(jobIds.slice(i, i + BATCH_SIZE));
-      }
-
-      // Execute all batches in parallel for better performance
-      const batchPromises = batches.map(batchIds =>
-        supabase
-          .from('timesheets')
-          .select(`
-            job_id,
-            technician_id,
-            date,
-            is_schedule_only,
-            technician:profiles!fk_timesheets_technician_id(
-              id,
-              first_name,
-              last_name,
-              nickname,
-              department
-            )
-          `)
-          .eq('is_schedule_only', false)
-          .eq('is_active', true)
-          .in('job_id', batchIds)
-      );
-
-      const batchResults = await Promise.all(batchPromises);
-
-      // Check for errors and collect all rows
-      const allTimesheetRows: TimesheetRowWithTechnician[] = [];
-      for (const { data: timesheetRows, error: timesheetError } of batchResults) {
-        if (timesheetError) {
-          console.error('useOptimizedJobs: Error fetching timesheet rows', sanitizeLogData(timesheetError));
-          throw timesheetError;
-        }
-        if (timesheetRows) {
-          // Fix: technician comes as an array from Supabase join, need to extract the first item
-          const rows = (timesheetRows as any[]).map(row => ({
-            ...row,
-            technician: Array.isArray(row.technician) ? row.technician[0] : row.technician
-          }));
-          allTimesheetRows.push(...(rows as TimesheetRowWithTechnician[]));
-        }
-      }
-
-      timesheetAssignments = aggregateJobTimesheets(
-        allTimesheetRows,
-        assignmentLookup
-      );
-    }
-
     // Process the data to match expected format with optimized processing
     const processedJobs = jobs.map(job => ({
       ...job,
       job_documents: job.job_documents || [],
       flex_folders_exist: (job.flex_folders?.length || 0) > 0,
-      assignments: timesheetAssignments[job.id] || [],
-      timesheet_assignments: timesheetAssignments[job.id] || []
     }));
 
     // Load tour metadata so cancelled tours can be hidden from calendars and lists

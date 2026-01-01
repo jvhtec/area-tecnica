@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 import { useJobs } from "@/hooks/useJobs";
 import { isWithinInterval, startOfDay, endOfDay } from "date-fns";
@@ -120,22 +120,41 @@ const Sound = () => {
     }
   };
 
+  const openReportGenerator = useCallback(() => setShowReportGenerator(true), []);
+  const openAmplifierTool = useCallback(() => setShowAmplifierTool(true), []);
+  const openMemoriaTecnica = useCallback(() => setShowMemoriaTecnica(true), []);
+  const openIncidentReport = useCallback(() => setShowIncidentReport(true), []);
+  const openSoundVisionAccessRequest = useCallback(() => setShowAccessRequestDialog(true), []);
+  const goToPesosTool = useCallback(() => navigate('/pesos-tool'), [navigate]);
+  const goToConsumosTool = useCallback(() => navigate('/consumos-tool'), [navigate]);
+  const goToSoundVisionFiles = useCallback(() => navigate('/soundvision-files'), [navigate]);
+
   // Comprehensive tools array with dialogs and routes (no Festivals)
-  const allTools = [
-    { label: "Pesos", to: "/pesos-tool", icon: Box, color: "text-pink-500" },
-    { label: "Consumos", to: "/consumos-tool", icon: Calculator, color: "text-purple-500" },
-    { label: "SV Report", onClick: () => setShowReportGenerator(true), icon: FileText, color: "text-blue-500" },
-    { label: "Amplifier", onClick: () => setShowAmplifierTool(true), icon: Zap, color: "text-orange-500" },
-    { label: "Memoria", onClick: () => setShowMemoriaTecnica(true), icon: FileStack, color: "text-cyan-500" },
-    { label: "Incident", onClick: () => setShowIncidentReport(true), icon: AlertTriangle, color: "text-red-500" },
-    {
-      label: hasSoundVisionAccess ? "SoundVision" : "Request Access",
-      to: hasSoundVisionAccess ? "/soundvision-files" : undefined,
-      onClick: !hasSoundVisionAccess ? () => setShowAccessRequestDialog(true) : undefined,
-      icon: hasSoundVisionAccess ? Database : Lock,
-      color: "text-indigo-500"
-    },
-  ];
+  const allTools = useMemo(
+    () => [
+      { label: "Pesos", to: "/pesos-tool", icon: Box, color: "text-pink-500" },
+      { label: "Consumos", to: "/consumos-tool", icon: Calculator, color: "text-purple-500" },
+      { label: "SV Report", onClick: openReportGenerator, icon: FileText, color: "text-blue-500" },
+      { label: "Amplifier", onClick: openAmplifierTool, icon: Zap, color: "text-orange-500" },
+      { label: "Memoria", onClick: openMemoriaTecnica, icon: FileStack, color: "text-cyan-500" },
+      { label: "Incident", onClick: openIncidentReport, icon: AlertTriangle, color: "text-red-500" },
+      {
+        label: hasSoundVisionAccess ? "SoundVision" : "Request Access",
+        to: hasSoundVisionAccess ? "/soundvision-files" : undefined,
+        onClick: !hasSoundVisionAccess ? openSoundVisionAccessRequest : undefined,
+        icon: hasSoundVisionAccess ? Database : Lock,
+        color: "text-indigo-500",
+      },
+    ],
+    [
+      hasSoundVisionAccess,
+      openAmplifierTool,
+      openIncidentReport,
+      openMemoriaTecnica,
+      openReportGenerator,
+      openSoundVisionAccessRequest,
+    ]
+  );
 
   // Keyboard shortcut: Cmd/Ctrl+N to open create job dialog
   useEffect(() => {
@@ -291,7 +310,7 @@ const Sound = () => {
                   variant="outline"
                   size="lg"
                   className="h-auto py-2 sm:py-3"
-                  onClick={() => navigate('/pesos-tool')}
+                  onClick={goToPesosTool}
                 >
                   <Calculator className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Weight Calculator
@@ -301,7 +320,7 @@ const Sound = () => {
                   variant="outline"
                   size="lg"
                   className="h-auto py-2 sm:py-3"
-                  onClick={() => navigate('/consumos-tool')}
+                  onClick={goToConsumosTool}
                 >
                   <PieChart className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Power Calculator
@@ -311,7 +330,7 @@ const Sound = () => {
                   variant="outline"
                   size="lg"
                   className="h-auto py-2 sm:py-3"
-                  onClick={() => setShowReportGenerator(true)}
+                  onClick={openReportGenerator}
                 >
                   <FileText className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   SV Report
@@ -321,7 +340,7 @@ const Sound = () => {
                   variant="outline"
                   size="lg"
                   className="h-auto py-2 sm:py-3"
-                  onClick={() => setShowAmplifierTool(true)}
+                  onClick={openAmplifierTool}
                 >
                   <Zap className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Amplifier
@@ -331,7 +350,7 @@ const Sound = () => {
                   variant="outline"
                   size="lg"
                   className="h-auto py-2 sm:py-3"
-                  onClick={() => setShowMemoriaTecnica(true)}
+                  onClick={openMemoriaTecnica}
                 >
                   <FileStack className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Memoria Técnica
@@ -341,7 +360,7 @@ const Sound = () => {
                   variant="outline"
                   size="lg"
                   className="h-auto py-2 sm:py-3"
-                  onClick={() => setShowIncidentReport(true)}
+                  onClick={openIncidentReport}
                 >
                   <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Incident Report
@@ -352,7 +371,7 @@ const Sound = () => {
                     variant="outline"
                     size="lg"
                     className="h-auto py-2 sm:py-3"
-                    onClick={() => navigate('/soundvision-files')}
+                    onClick={goToSoundVisionFiles}
                   >
                     <Database className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                     SoundVision
@@ -362,7 +381,7 @@ const Sound = () => {
                     variant="outline"
                     size="lg"
                     className="h-auto py-2 sm:py-3"
-                    onClick={() => setShowAccessRequestDialog(true)}
+                    onClick={openSoundVisionAccessRequest}
                   >
                     <Lock className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                     Request Access

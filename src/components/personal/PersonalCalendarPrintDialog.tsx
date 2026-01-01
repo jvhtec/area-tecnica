@@ -69,25 +69,25 @@ export const PersonalCalendarPrintDialog: React.FC<PersonalCalendarPrintDialogPr
 
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold text-base">Imprimir a PDF</h3>
-            <Button onClick={() => onGeneratePDF("month")}>
+            <Button onClick={() => { void onGeneratePDF("month"); }}>
               <Printer className="h-4 w-4 mr-2" /> Mes Actual ({format(currentMonth, "MMMM yyyy")})
             </Button>
-            <Button onClick={() => onGeneratePDF("quarter")}>
+            <Button onClick={() => { void onGeneratePDF("quarter"); }}>
               <Printer className="h-4 w-4 mr-2" /> Próximo Trimestre
             </Button>
-            <Button onClick={() => onGeneratePDF("year")}>
+            <Button onClick={() => { void onGeneratePDF("year"); }}>
               <Printer className="h-4 w-4 mr-2" /> Año Completo ({format(currentMonth, "yyyy")})
             </Button>
           </div>
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold text-base">Exportar a XLS</h3>
-            <Button onClick={() => onGenerateXLS("month")}>
+            <Button onClick={() => { void onGenerateXLS("month"); }}>
               <Table className="h-4 w-4 mr-2" /> Mes Actual ({format(currentMonth, "MMMM yyyy")})
             </Button>
-            <Button onClick={() => onGenerateXLS("quarter")}>
+            <Button onClick={() => { void onGenerateXLS("quarter"); }}>
               <Table className="h-4 w-4 mr-2" /> Próximo Trimestre
             </Button>
-            <Button onClick={() => onGenerateXLS("year")}>
+            <Button onClick={() => { void onGenerateXLS("year"); }}>
               <Table className="h-4 w-4 mr-2" /> Año Completo ({format(currentMonth, "yyyy")})
             </Button>
           </div>

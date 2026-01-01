@@ -32,14 +32,14 @@ export const HojaDeRutaPrintDialog: React.FC<HojaDeRutaPrintDialogProps> = ({
         <div className="space-y-4">
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold text-base">Imprimir a PDF</h3>
-            <Button onClick={onGeneratePDF} disabled={isGenerating}>
+            <Button onClick={() => { void onGeneratePDF(); }} disabled={isGenerating}>
               <Printer className="h-4 w-4 mr-2" />
               Documento Completo PDF
             </Button>
           </div>
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold text-base">Exportar a Excel</h3>
-            <Button onClick={onGenerateXLS} disabled={isGenerating}>
+            <Button onClick={() => { void onGenerateXLS(); }} disabled={isGenerating}>
               <Table className="h-4 w-4 mr-2" />
               Hoja de Ruta Excel (Una pestaña por sección)
             </Button>

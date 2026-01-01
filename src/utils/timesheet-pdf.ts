@@ -1,9 +1,8 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { Timesheet } from '@/types/timesheet';
 import { Job } from '@/types/job';
 import { format, parseISO } from 'date-fns';
 import { fetchJobLogo } from '@/utils/pdf/logoUtils';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 interface GenerateTimesheetPDFOptions {
   job: Job;
@@ -72,6 +71,7 @@ const loadImageSafely = (src: string, description: string): Promise<HTMLImageEle
 };
 
 export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTimesheetPDFOptions) => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;

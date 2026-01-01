@@ -1,7 +1,7 @@
-import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import { VacationRequest } from '@/lib/vacation-requests';
 import { supabase } from '@/integrations/supabase/client';
+import { loadJsPDF } from '@/utils/pdf/lazyPdf';
 
 interface VacationRequestPDFOptions {
   request: VacationRequest;
@@ -78,6 +78,7 @@ const getTechnicianInfo = async (technicianId: string): Promise<{ name: string; 
 
 // Main PDF generation function
 export const generateVacationRequestPDF = async ({ request, approverName }: VacationRequestPDFOptions): Promise<Blob> => {
+  const jsPDF = await loadJsPDF();
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();

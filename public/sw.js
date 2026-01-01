@@ -4,13 +4,18 @@ const BUILD_VERSION = '__BUILD_TIMESTAMP__' // Will be replaced at build time
 
 // Dynamic cache version that changes with each SW update
 // This ensures old caches are cleared when deploying new versions
-const CACHE_VERSION = 'v2-' + self.registration.scope
+const CACHE_VERSION = 'v3-' + BUILD_VERSION + '-' + self.registration.scope
 const APP_SHELL_CACHE = `app-shell-${CACHE_VERSION}`
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`
 
 const APP_SHELL_FILES = [
+  '/',
   '/manifest.json',
-  '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png'
+  '/favicon.ico',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/icon-maskable-192.png',
+  '/icon-maskable-512.png'
 ]
 
 const hostname = new URL(self.location.href).hostname
@@ -18,6 +23,18 @@ const isDevHost =
   hostname === 'localhost' ||
   hostname === '127.0.0.1' ||
   hostname.endsWith('.github.dev')
+
+const HTML_TIMEOUT_MS = 3000
+
+self.fetchWithTimeout = async (request, timeoutMs) => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(request, { signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -91,29 +108,44 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Network-first strategy for HTML/navigation requests
-  // This ensures users always get the latest HTML after deployment
+  // Stale-while-revalidate strategy for HTML/navigation requests, with timeout.
+  // This avoids hangs on poor networks while still keeping HTML fresh.
   if (request.mode === 'navigate' || request.destination === 'document' || url.pathname.endsWith('.html')) {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Clone the response to cache it
-          const responseToCache = response.clone()
-          caches.open(RUNTIME_CACHE).then((cache) => {
-            cache.put(request, responseToCache).catch((e) => {
-              console.warn('[sw] Failed to cache HTML response:', e)
-            })
-          }).catch((e) => {
-            console.warn('[sw] Failed to open cache for HTML:', e)
+      (async () => {
+        const cache = await caches.open(RUNTIME_CACHE)
+        const cached = await cache.match(request)
+
+        const networkFetch = self.fetchWithTimeout(request, HTML_TIMEOUT_MS)
+          .then((response) => {
+            if (response && response.ok) {
+              cache.put(request, response.clone()).catch((e) => {
+                console.warn('[sw] Failed to cache HTML response:', e)
+              })
+            }
+            return response
           })
-          return response
-        })
-        .catch(() => {
-          // Offline fallback: serve cached HTML if available
-          return caches.match(request).then((cached) => {
-            return cached || caches.match('/')
+          .catch(() => null)
+
+        if (cached) {
+          event.waitUntil(networkFetch)
+          return cached
+        }
+
+        const networkResponse = await networkFetch
+        if (networkResponse) {
+          return networkResponse
+        }
+
+        // Offline fallback: serve cached app shell if available
+        return caches.match('/').then((shell) => {
+          return shell || new Response('Offline', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain' }
           })
         })
+      })()
     )
     return
   }

@@ -180,6 +180,7 @@ export function useEnhancedRouteSubscriptions() {
   const manager = UnifiedSubscriptionManager.getInstance(queryClient);
   const lastActiveTimestamp = useRef<number>(Date.now());
   const wasInactive = useRef<boolean>(false);
+  const currentRouteKey = useRef<string | null>(null);
   const multiTabCoordinator = MultiTabCoordinator.getInstance(queryClient);
   const [isLeader, setIsLeader] = useState(true);
 
@@ -290,12 +291,16 @@ export function useEnhancedRouteSubscriptions() {
     
     const pathname = location.pathname;
     const routeKey = findRoutePath(pathname);
+    const previousRouteKey = currentRouteKey.current;
     
     console.log('Configuring subscriptions for route:', pathname);
     console.log('Using route key for subscriptions:', routeKey);
     
     // Clean up subscriptions from previous routes
-    manager.cleanupRouteDependentSubscriptions(pathname);
+    if (previousRouteKey && previousRouteKey !== routeKey) {
+      manager.cleanupRouteDependentSubscriptions(previousRouteKey);
+    }
+    currentRouteKey.current = routeKey;
     
     // Get required tables for this route
     const routeTables = ROUTE_SUBSCRIPTIONS[routeKey] || [];
@@ -326,8 +331,8 @@ export function useEnhancedRouteSubscriptions() {
     if (isLeader) {
       allTables.forEach(({ table, priority }) => {
         console.log(`Subscribing to ${table} with priority ${priority}`);
-        manager.subscribeToTable(table, table, undefined, priority);
-        manager.registerRouteSubscription(pathname, `${table}::${table}`);
+        const subscription = manager.subscribeToTable(table, table, undefined, priority);
+        manager.registerRouteSubscription(routeKey, subscription.key);
       });
     } else {
       // If we're a follower, request the leader to handle subscriptions

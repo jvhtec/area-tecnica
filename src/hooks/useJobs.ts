@@ -1,22 +1,20 @@
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase-client"; // Updated import path
 import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { trackError } from "@/lib/errorTracking";
-import { aggregateJobTimesheets, TimesheetRowWithTechnician, AggregatedTimesheetAssignment } from "@/utils/timesheetAssignments";
 
 export const useJobs = () => {
-  const queryClient = useQueryClient();
-
   // Set up multi-table subscriptions using our enhanced hooks
   useMultiTableSubscription([
-    { table: 'jobs', queryKey: 'jobs' },
-    { table: 'job_date_types', queryKey: 'jobs' },
-    { table: 'job_assignments', queryKey: 'jobs' },
-    { table: 'job_departments', queryKey: 'jobs' },
-    { table: 'job_documents', queryKey: 'jobs' },
-    { table: 'timesheets', queryKey: 'jobs' },
+    { table: 'jobs', queryKey: ['jobs'], priority: 'high' },
+    { table: 'job_assignments', queryKey: ['jobs'], priority: 'medium' },
+    { table: 'job_departments', queryKey: ['jobs'], priority: 'medium' },
+    // Documents and tour dates change less frequently; keep lower priority
+    { table: 'job_documents', queryKey: ['jobs'], priority: 'low' },
+    { table: 'tour_dates', queryKey: ['jobs'], priority: 'low' },
+    { table: 'tours', queryKey: ['jobs'], priority: 'low' },
   ]);
 
   return useQuery({
@@ -51,8 +49,29 @@ export const useJobs = () => {
                   department
                 )
               ),
-              job_documents(*),
-              tour_date:tour_dates(*)
+              job_documents(
+                id,
+                file_name,
+                file_path,
+                uploaded_at,
+                visible_to_tech,
+                read_only,
+                template_type
+              ),
+              tour_date:tour_dates(
+                id,
+                date,
+                start_date,
+                end_date,
+                is_tour_pack_only,
+                tour: tours(
+                  id,
+                  name,
+                  status,
+                  deleted
+                ),
+                location:locations(name)
+              )
             `)
             .order("start_time", { ascending: true });
 
@@ -65,91 +84,15 @@ export const useJobs = () => {
 
           const allJobs = jobs || [];
 
-          const jobIds = allJobs.map(j => j.id).filter(Boolean);
-          const assignmentLookup = allJobs.reduce<Record<string, any[]>>((acc, job) => {
-            acc[job.id] = job.job_assignments || [];
-            return acc;
-          }, {});
-
-          let timesheetAssignments: Record<string, AggregatedTimesheetAssignment[]> = {};
-          if (jobIds.length > 0) {
-            // Batch job IDs to avoid URL length limits (max ~100 UUIDs per request)
-            const BATCH_SIZE = 100;
-            const batches: string[][] = [];
-
-            for (let i = 0; i < jobIds.length; i += BATCH_SIZE) {
-              batches.push(jobIds.slice(i, i + BATCH_SIZE));
-            }
-
-            // Execute all batches in parallel for better performance
-            const batchPromises = batches.map(batchIds =>
-              supabase
-                .from('timesheets')
-                .select(`
-                  job_id,
-                  technician_id,
-                  date,
-                  is_schedule_only,
-                  technician:profiles!fk_timesheets_technician_id(
-                    id,
-                    first_name,
-                    last_name,
-                    nickname,
-                    department
-                  )
-                `)
-                .eq('is_schedule_only', false)
-                .eq('is_active', true)
-                .in('job_id', batchIds)
-            );
-
-            const batchResults = await Promise.all(batchPromises);
-
-            // Check for errors and collect all rows
-            const allTimesheetRows: TimesheetRowWithTechnician[] = [];
-            for (const { data: timesheetRows, error: timesheetError } of batchResults) {
-              if (timesheetError) {
-                console.error('useJobs: Error fetching timesheets', timesheetError);
-                throw timesheetError;
-              }
-              if (timesheetRows) {
-                allTimesheetRows.push(...(timesheetRows as TimesheetRowWithTechnician[]));
-              }
-            }
-
-            timesheetAssignments = aggregateJobTimesheets(
-              allTimesheetRows,
-              assignmentLookup
-            );
-          }
-
-          const jobsWithTimesheets = allJobs.map(job => ({
-            ...job,
-            timesheet_assignments: timesheetAssignments[job.id] || [],
-          }));
-
-          // Load tour metadata to hide cancelled/deleted tours
-          const tourIds = Array.from(new Set(jobsWithTimesheets.map(j => j.tour_id).filter(Boolean)));
-          const tourMeta: Record<string, { status: string | null; deleted: boolean | null }> = {};
-          if (tourIds.length > 0) {
-            const { data: toursData, error: toursError } = await supabase
-              .from('tours')
-              .select('id, status, deleted')
-              .in('id', tourIds as string[]);
-            if (!toursError) {
-              for (const t of (toursData || [])) {
-                tourMeta[t.id] = { status: t.status ?? null, deleted: (t.deleted as any) ?? null };
-              }
-            } else {
-              console.warn('useJobs: Failed to load tour metadata', toursError);
-            }
-          }
-
           // Filter out jobs from cancelled/deleted tours and explicitly cancelled jobs
-          const filteredJobs = jobsWithTimesheets.filter(j => {
-            if (j.status === 'Cancelado') return false;
-            const meta = j.tour_id ? tourMeta[j.tour_id] : null;
-            if (meta && (meta.status === 'cancelled' || meta.deleted === true)) return false;
+          const filteredJobs = allJobs.filter((job: any) => {
+            if (job.status === 'Cancelado') return false;
+
+            const tourMeta = job?.tour_date?.tour;
+            if (tourMeta && (tourMeta.status === 'cancelled' || tourMeta.deleted === true)) {
+              return false;
+            }
+
             return true;
           });
 

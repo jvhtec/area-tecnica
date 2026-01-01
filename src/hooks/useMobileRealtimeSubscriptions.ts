@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useMultiTableSubscription } from './useUnifiedSubscription';
+import { useMultiTableSubscription } from '@/hooks/useSubscription';
 
 /**
  * Specialized hook for mobile components that need comprehensive realtime subscriptions

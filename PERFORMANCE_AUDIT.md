@@ -3,7 +3,7 @@
 **Audit Date:** January 1, 2026
 **Auditor:** Claude (AI Assistant)
 **Repository:** jvhtec/area-tecnica
-**Branch:** claude/audit-performance-improvements-4g0Xl
+**Branch:** dev
 
 ---
 
@@ -26,6 +26,39 @@ This comprehensive performance audit covers **frontend**, **mobile/PWA**, and **
 - **Page load time**: Improve by 50-70%
 - **Mobile battery life**: Improve by 30-40%
 - **Real-time update latency**: Improve by 20-30%
+
+---
+
+## Remediation Status (Implemented in `dev`)
+
+This section tracks what has been implemented since the audit was generated.
+
+| ID | Area | Status | Notes (implementation) |
+|---:|------|--------|------------------------|
+| 1.1 | Frontend | Partially addressed | Added memoization for key card components: `src/components/tours/TourCard.tsx`, `src/components/logistics/LogisticsEventCard.tsx`. |
+| 1.2 | Frontend | Partially addressed | Stabilized high-impact inline handlers/arrays (e.g. `Sound` tools list): `src/pages/Sound.tsx`. |
+| 1.3 | Frontend | Mostly addressed | Large pages already use `useMemo`/`useCallback` in hotspots (example: `src/pages/JobAssignmentMatrix.tsx`). |
+| 1.4 | Frontend | Fixed | Subscription provider no longer causes app-wide re-renders (moved to `useSyncExternalStore`) and duplicate managers/providers removed: `src/providers/SubscriptionProvider.tsx`, `src/lib/unified-subscription-manager.ts`. |
+| 1.5 | Frontend | Partially addressed | Pagination exists where needed (e.g. `src/components/users/UsersList.tsx`); mobile logistics event list now paginated: `src/components/logistics/MobileLogisticsCalendar.tsx`. |
+| 1.6 | Frontend | Fixed | Heavy libs are lazy-loaded and split into separate chunks: jsPDF/XLSX/Mapbox (`src/utils/pdf/lazyPdf.ts`, `src/utils/lazyXlsx.ts`, map components, calendar exports). |
+| 1.7 | Frontend | Deferred | Cache policy standardization requires product decisions; existing per-hook values were preserved. |
+| 1.8 | Frontend | Deferred | No targeted refactor performed beyond the areas above. |
+| 1.9 | Frontend | Partially addressed | Targeted prefetch exists in matrix flow: `src/hooks/useOptimizedMatrixData.ts`. |
+| 2.1 | Mobile/PWA | Fixed | Timers/heartbeats pause when backgrounded: `src/lib/multitab-coordinator.ts`, `src/hooks/useServiceWorkerUpdate.ts`, `src/hooks/useConnectionStatus.ts`. |
+| 2.2 | Mobile/PWA | Fixed | Large image assets reduced in size: `public/og-image.png`, `public/8067C0A4-0C71-4CDF-952B-0E699DA25A74.png`. |
+| 2.3 | Mobile/PWA | Fixed | Touch listeners made passive: `src/components/WakeLockVideo.tsx`. |
+| 2.4 | Mobile/PWA | Fixed | Removed/paused infinite landing animations and respected reduced-motion: `src/components/landing/HeroSection.tsx`. |
+| 2.5 | Mobile/PWA | Mostly addressed | Manifest icons/shortcuts improved: `public/manifest.json`, new icons in `public/`, `index.html`. |
+| 2.6 | Mobile/PWA | Fixed | Service worker caching strategy/versioning improved: `public/sw.js`. |
+| 2.7 | Mobile/PWA | Fixed | Mobile logistics list pagination added: `src/components/logistics/MobileLogisticsCalendar.tsx`. |
+| 3.1 | Backend | Fixed | N+1 patterns removed and queries narrowed: `src/hooks/useJobs.ts`, `src/hooks/useJobAssignmentsRealtime.ts`. |
+| 3.2 | Backend | Fixed | Subscriptions deduped and invalidation made selective/batched: `src/lib/unified-subscription-manager.ts`. |
+| 3.3 | Backend | Partially addressed | Reduced DB payloads + backgrounded activity logging; full async queue/separation deferred: `supabase/functions/manage-flex-crew-assignments/index.ts`. |
+| 3.4 | Backend | Fixed | Removed `select('*')` in the critical path: `supabase/functions/manage-flex-crew-assignments/index.ts`. |
+| 3.5 | Backend | Fixed | Consolidated to a single manager implementation: `src/lib/unified-subscription-manager.ts` and removed duplicates. |
+| 3.6 | Backend | Fixed | Reconnect refresh invalidates only stale queries (prevents refetch spikes): `src/lib/unified-subscription-manager.ts`. |
+| 3.7 | Backend | Fixed | Added missing composite indexes: `supabase/migrations/20260101000000_add_missing_performance_indexes.sql`. |
+| 3.8 | Backend | Partially addressed | Availability batching parallelized to reduce sequential latency: `src/hooks/useOptimizedMatrixData.ts`. |
 
 ---
 

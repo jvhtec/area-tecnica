@@ -19,6 +19,8 @@ export function useConnectionStatus() {
   
   // Update status every 10 seconds
   useEffect(() => {
+    let interval: number | null = null;
+
     const checkConnection = () => {
       const rtStatus = getRealtimeConnectionStatus();
       const newStatus = rtStatus === 'CONNECTED' 
@@ -31,14 +33,34 @@ export function useConnectionStatus() {
         setLastConnected(Date.now());
       }
     };
-    
-    // Initial check
-    checkConnection();
-    
-    // Setup interval for checking connection
-    const interval = setInterval(checkConnection, 10000);
-    
-    return () => clearInterval(interval);
+
+    const start = () => {
+      if (interval) return;
+      interval = window.setInterval(checkConnection, 10000);
+    };
+
+    const stop = () => {
+      if (!interval) return;
+      clearInterval(interval);
+      interval = null;
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stop();
+        return;
+      }
+      checkConnection();
+      start();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility, { passive: true });
+    handleVisibility();
+
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
   
   // Listen for online/offline events

@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { jsPDF } from "jspdf";
 import { useJobSelection } from "@/hooks/useJobSelection";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +13,7 @@ import { format } from "date-fns";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FolderOpen, Check, X, Upload } from "lucide-react";
+import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 
 const reportSections = [
   {
@@ -261,6 +261,7 @@ export const ReportGenerator = () => {
       ? format(new Date(selectedJob.start_time), "MMMM dd, yyyy")
       : format(new Date(), "MMMM dd, yyyy");
 
+    const jsPDF = await loadJsPDF();
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",

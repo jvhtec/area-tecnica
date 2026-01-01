@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { jsPDF } from "jspdf";
+import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 
 interface ArtistFormSubmissionDialogProps {
   open: boolean;
@@ -73,6 +73,7 @@ export const ArtistFormSubmissionDialog = ({
 
     try {
       // Create PDF
+      const jsPDF = await loadJsPDF();
       const doc = new jsPDF();
 
       // Add title

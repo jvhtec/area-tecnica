@@ -1,6 +1,35 @@
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 
+export type SubscriptionSnapshot = {
+  connectionStatus: 'connected' | 'disconnected' | 'connecting';
+  activeSubscriptions: string[];
+  subscriptionCount: number;
+  subscriptionsByTable: Record<string, string[]>;
+  lastRefreshTime: number;
+};
+
+export type RealtimeSubscriptionFilter = {
+  event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
+  schema?: string;
+  filter?: string;
+};
+
+type SubscriptionPriority = 'high' | 'medium' | 'low';
+
+type SubscriptionOptions = {
+  table: string;
+  queryKey: string | string[];
+  filter?: RealtimeSubscriptionFilter;
+  priority: SubscriptionPriority;
+};
+
+type ManagedSubscription = {
+  key: string;
+  unsubscribe: () => void;
+  options: SubscriptionOptions;
+};
+
 /**
  * Enhanced subscription manager that centralizes all Supabase realtime subscriptions
  * and coordinates them with React Query cache invalidation
@@ -8,15 +37,18 @@ import { supabase } from "./supabase";
 export class UnifiedSubscriptionManager {
   private static instance: UnifiedSubscriptionManager;
   private queryClient: QueryClient;
-  private subscriptions: Map<string, { unsubscribe: () => void, options: any }>;
+  private subscriptions: Map<string, ManagedSubscription>;
   private pendingSubscriptions: Map<string, any>;
   private routeSubscriptions: Map<string, Set<string>>;
   private lastReconnectAttempt: number;
   private connectionStatus: 'connected' | 'disconnected' | 'connecting';
-  private pingChannelId: string | null;
+  private pingChannel: any | null;
   private tableLastActivity: Map<string, number>;
-  private visibilityChangeHandler: () => void;
-  private networkStatusHandler: () => void;
+  private visibilityChangeHandler?: () => void;
+  private networkStatusHandler?: () => void;
+  private invalidationTimers: Map<string, number>;
+  private listeners: Set<() => void>;
+  private snapshot: SubscriptionSnapshot;
 
   private constructor(queryClient: QueryClient) {
     this.queryClient = queryClient;
@@ -26,7 +58,16 @@ export class UnifiedSubscriptionManager {
     this.tableLastActivity = new Map();
     this.lastReconnectAttempt = 0;
     this.connectionStatus = 'connecting';
-    this.pingChannelId = null;
+    this.pingChannel = null;
+    this.invalidationTimers = new Map();
+    this.listeners = new Set();
+    this.snapshot = {
+      connectionStatus: 'connecting',
+      activeSubscriptions: [],
+      subscriptionCount: 0,
+      subscriptionsByTable: {},
+      lastRefreshTime: Date.now(),
+    };
     
     // Initialize connection
     this.setupPingChannel();
@@ -44,53 +85,165 @@ export class UnifiedSubscriptionManager {
     }
     return UnifiedSubscriptionManager.instance;
   }
+
+  public subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  public getSnapshot(): SubscriptionSnapshot {
+    return this.snapshot;
+  }
+
+  public markRefreshed() {
+    this.updateSnapshot({ lastRefreshTime: Date.now() });
+  }
+
+  private notify() {
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (error) {
+        console.warn('[UnifiedSubscriptionManager] subscriber threw', error);
+      }
+    });
+  }
+
+  private normalizeQueryKey(queryKey: string | string[]) {
+    return Array.isArray(queryKey) ? queryKey : [queryKey];
+  }
+
+  private getSubscriptionKey(table: string, queryKey: string | string[], filter?: RealtimeSubscriptionFilter) {
+    const normalizedQueryKey = this.normalizeQueryKey(queryKey);
+    const normalizedFilter = {
+      event: filter?.event ?? '*',
+      schema: filter?.schema ?? 'public',
+      filter: filter?.filter ?? '',
+    };
+
+    return `${table}::${JSON.stringify(normalizedQueryKey)}::${normalizedFilter.event}::${normalizedFilter.schema}::${normalizedFilter.filter}`;
+  }
+  
+  private updateSnapshot(partial: Partial<SubscriptionSnapshot>) {
+    this.snapshot = { ...this.snapshot, ...partial };
+    this.notify();
+  }
+
+  private refreshSnapshotFromState() {
+    this.snapshot = {
+      ...this.snapshot,
+      connectionStatus: this.connectionStatus,
+      activeSubscriptions: this.getActiveSubscriptions(),
+      subscriptionCount: this.getSubscriptionCount(),
+      subscriptionsByTable: this.getSubscriptionsByTable(),
+    };
+    this.notify();
+  }
   
   /**
    * Setup a ping channel to monitor connection status
    */
   private setupPingChannel() {
-    if (this.pingChannelId) {
-      // Find and remove channel by ID if it exists
-      const channels = supabase.getChannels();
-      const existingChannel = channels.find(ch => ch.subscribe.toString().includes(this.pingChannelId!));
-      if (existingChannel) {
-        supabase.removeChannel(existingChannel);
+    if (this.pingChannel) {
+      try {
+        supabase.removeChannel(this.pingChannel);
+      } catch (error) {
+        console.warn('[UnifiedSubscriptionManager] Failed removing ping channel', error);
       }
-      this.pingChannelId = null;
+      this.pingChannel = null;
     }
 
     try {
       const pingChannel = supabase.channel('ping');
-      this.pingChannelId = 'ping'; // Store channel name instead of ID
+      this.pingChannel = pingChannel;
       
       pingChannel
         .on('presence', { event: 'sync' }, () => {
           this.connectionStatus = 'connected';
           console.log('Ping channel sync event - connection active');
+          this.updateSnapshot({ connectionStatus: 'connected' });
         })
         .on('system', { event: 'disconnect' }, () => {
           this.connectionStatus = 'disconnected';
           console.log('Ping channel disconnect event - connection lost');
+          this.updateSnapshot({ connectionStatus: 'disconnected' });
         })
         .on('system', { event: 'reconnected' }, () => {
           this.connectionStatus = 'connected';
           console.log('Ping channel reconnected - connection restored');
+          this.updateSnapshot({ connectionStatus: 'connected' });
           this.reestablishSubscriptions();
         })
         .subscribe((status) => {
           console.log(`Ping channel status: ${status}`);
           if (status === 'SUBSCRIBED') {
             this.connectionStatus = 'connected';
+            this.updateSnapshot({ connectionStatus: 'connected' });
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             this.connectionStatus = 'disconnected';
+            this.updateSnapshot({ connectionStatus: 'disconnected' });
           } else {
             this.connectionStatus = 'connecting';
+            this.updateSnapshot({ connectionStatus: 'connecting' });
           }
         });
     } catch (error) {
       console.error('Error setting up ping channel:', error);
       this.connectionStatus = 'disconnected';
+      this.updateSnapshot({ connectionStatus: 'disconnected' });
     }
+  }
+
+  private scheduleInvalidation(queryKey: string | string[], priority: 'high' | 'medium' | 'low') {
+    const normalizedQueryKey = this.normalizeQueryKey(queryKey);
+    const key = JSON.stringify(normalizedQueryKey);
+
+    const existing = this.invalidationTimers.get(key);
+    if (existing) {
+      clearTimeout(existing);
+    }
+
+    const delay = priority === 'high' ? 50 : priority === 'medium' ? 200 : 500;
+    const timeout = window.setTimeout(() => {
+      try {
+        this.queryClient.invalidateQueries({ queryKey: normalizedQueryKey });
+      } finally {
+        this.invalidationTimers.delete(key);
+      }
+    }, delay);
+
+    this.invalidationTimers.set(key, timeout);
+  }
+
+  private invalidateStaleQueries(maxAgeMs: number) {
+    const now = Date.now();
+    const queryKeysToInvalidate = new Set<string>();
+
+    this.subscriptions.forEach((subscription, subscriptionKey) => {
+      const lastActivity = this.tableLastActivity.get(subscriptionKey) ?? 0;
+      if (!lastActivity) return;
+      if (now - lastActivity <= maxAgeMs) return;
+
+      const normalized = this.normalizeQueryKey(subscription.options.queryKey);
+      queryKeysToInvalidate.add(JSON.stringify(normalized));
+    });
+
+    if (!queryKeysToInvalidate.size) {
+      return;
+    }
+
+    queryKeysToInvalidate.forEach((serialized) => {
+      try {
+        const parsed = JSON.parse(serialized) as string[];
+        this.queryClient.invalidateQueries({ queryKey: parsed });
+      } catch (error) {
+        console.warn('[UnifiedSubscriptionManager] Failed to invalidate stale queryKey', error);
+      }
+    });
+
+    this.updateSnapshot({ lastRefreshTime: Date.now() });
   }
 
   /**
@@ -124,10 +277,14 @@ export class UnifiedSubscriptionManager {
       this.pendingSubscriptions.delete(key);
     });
     
-    // Perform a full query invalidation to refresh data
-    this.queryClient.invalidateQueries();
+    // Invalidate only queries that were idle for a while to prevent load spikes
+    this.invalidateStaleQueries(5 * 60 * 1000);
     
     this.connectionStatus = 'connected';
+    this.updateSnapshot({
+      connectionStatus: 'connected',
+      lastRefreshTime: Date.now(),
+    });
     console.log('Supabase subscriptions reestablished');
     
     return true;
@@ -181,29 +338,21 @@ export class UnifiedSubscriptionManager {
   public subscribeToTable(
     table: string, 
     queryKey: string | string[], 
-    filter?: {
-      event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*',
-      schema?: string,
-      filter?: string
-    },
-    priority: 'high' | 'medium' | 'low' = 'medium'
+    filter?: RealtimeSubscriptionFilter,
+    priority: SubscriptionPriority = 'medium'
   ) {
-    const normalizedQueryKey = Array.isArray(queryKey) 
-      ? JSON.stringify(queryKey) 
-      : queryKey;
-      
-    const subscriptionKey = `${table}::${normalizedQueryKey}`;
+    const subscriptionKey = this.getSubscriptionKey(table, queryKey, filter);
     
     // Check if we already have this subscription (deduplication)
     if (this.subscriptions.has(subscriptionKey)) {
       if (priority === 'high') {
-        console.log(`Already subscribed to ${table} with query key ${normalizedQueryKey}`);
+        console.log(`Already subscribed to ${table} with query key ${subscriptionKey}`);
       }
       return this.subscriptions.get(subscriptionKey);
     }
     
     if (priority === 'high') {
-      console.log(`Subscribing to ${table} with query key ${normalizedQueryKey} (priority: ${priority})`);
+      console.log(`Subscribing to ${table} (priority: ${priority})`);
     }
     
     try {
@@ -238,11 +387,7 @@ export class UnifiedSubscriptionManager {
           this.tableLastActivity.set(subscriptionKey, Date.now());
           
           // Invalidate React Query cache based on the query key
-          if (Array.isArray(queryKey)) {
-            this.queryClient.invalidateQueries({ queryKey });
-          } else {
-            this.queryClient.invalidateQueries({ queryKey: [queryKey] });
-          }
+          this.scheduleInvalidation(queryKey, priority);
         })
         .subscribe((status) => {
           console.log(`Channel ${channelName} status:`, status);
@@ -274,14 +419,19 @@ export class UnifiedSubscriptionManager {
         });
       
       // Create an object with unsubscribe function
-      const subscription = {
+      const subscription: ManagedSubscription = {
+        key: subscriptionKey,
         unsubscribe: () => {
-          console.log(`Unsubscribing from ${table} with query key ${normalizedQueryKey}`);
+          console.log(`Unsubscribing from ${subscriptionKey}`);
           try {
             supabase.removeChannel(channel);
           } catch (error) {
             console.error(`Error removing channel for ${table}:`, error);
           }
+
+          this.subscriptions.delete(subscriptionKey);
+          this.tableLastActivity.delete(subscriptionKey);
+          this.refreshSnapshotFromState();
         },
         options: { table, queryKey, filter, priority }
       };
@@ -291,11 +441,13 @@ export class UnifiedSubscriptionManager {
       
       // Initialize last activity timestamp
       this.tableLastActivity.set(subscriptionKey, Date.now());
+
+      this.refreshSnapshotFromState();
       
       return subscription;
     } catch (error) {
       console.error(`Error subscribing to ${table}:`, error);
-      return { unsubscribe: () => {} };
+      return { key: subscriptionKey, unsubscribe: () => {}, options: { table, queryKey, filter, priority } };
     }
   }
 
@@ -317,12 +469,8 @@ export class UnifiedSubscriptionManager {
     tableConfigs: Array<{
       table: string, 
       queryKey: string | string[],
-      filter?: {
-        event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*',
-        schema?: string,
-        filter?: string
-      },
-      priority?: 'high' | 'medium' | 'low'
+      filter?: RealtimeSubscriptionFilter,
+      priority?: SubscriptionPriority
     }>
   ) {
     const subscriptions = tableConfigs.map(config => 
@@ -356,6 +504,8 @@ export class UnifiedSubscriptionManager {
     });
     
     this.subscriptions.clear();
+    this.tableLastActivity.clear();
+    this.refreshSnapshotFromState();
     
     if (clearPending) {
       this.pendingSubscriptions.clear();
@@ -367,34 +517,23 @@ export class UnifiedSubscriptionManager {
    */
   public setupVisibilityBasedRefetching() {
     // Clean up existing handler if it exists
-    if (this.visibilityChangeHandler) {
-      document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
-    }
+    this.teardownVisibilityBasedRefetching();
     
     // Create new handler
     this.visibilityChangeHandler = () => {
       if (document.visibilityState === 'visible') {
         console.log('Tab became visible, checking for stale data...');
-        const now = Date.now();
-        let hasStaleData = false;
-        
-        // Check if any subscription has stale data
-        this.tableLastActivity.forEach((lastActivity, key) => {
-          if (now - lastActivity > 5 * 60 * 1000) { // 5 minutes
-            console.log(`Stale data detected for ${key}`);
-            hasStaleData = true;
-          }
-        });
-        
-        // If we have stale data, invalidate all queries
-        if (hasStaleData) {
-          console.log('Refreshing stale data...');
-          this.queryClient.invalidateQueries();
-        }
+        this.invalidateStaleQueries(5 * 60 * 1000);
       }
     };
     
     document.addEventListener('visibilitychange', this.visibilityChangeHandler);
+  }
+
+  public teardownVisibilityBasedRefetching() {
+    if (!this.visibilityChangeHandler) return;
+    document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
+    this.visibilityChangeHandler = undefined;
   }
 
   /**
@@ -402,18 +541,21 @@ export class UnifiedSubscriptionManager {
    */
   public setupNetworkStatusRefetching() {
     // Clean up existing handler if it exists
-    if (this.networkStatusHandler) {
-      window.removeEventListener('online', this.networkStatusHandler);
-    }
+    this.teardownNetworkStatusRefetching();
     
     // Create new handler
     this.networkStatusHandler = () => {
       console.log('Network connection restored, refreshing data...');
       this.reestablishSubscriptions();
-      this.queryClient.invalidateQueries();
     };
     
     window.addEventListener('online', this.networkStatusHandler);
+  }
+
+  public teardownNetworkStatusRefetching() {
+    if (!this.networkStatusHandler) return;
+    window.removeEventListener('online', this.networkStatusHandler);
+    this.networkStatusHandler = undefined;
   }
 
   /**
@@ -458,8 +600,7 @@ export class UnifiedSubscriptionManager {
    * Get subscription status for a specific table
    */
   public getSubscriptionStatus(table: string, queryKey: string | string[]): { isConnected: boolean, lastActivity: number } {
-    const normalizedQueryKey = Array.isArray(queryKey) ? JSON.stringify(queryKey) : queryKey;
-    const subscriptionKey = `${table}::${normalizedQueryKey}`;
+    const subscriptionKey = this.getSubscriptionKey(table, queryKey);
     
     const isConnected = this.subscriptions.has(subscriptionKey) && this.connectionStatus === 'connected';
     const lastActivity = this.tableLastActivity.get(subscriptionKey) || 0;
@@ -502,7 +643,24 @@ export class UnifiedSubscriptionManager {
       });
       
       // Invalidate queries related to this table
-      this.queryClient.invalidateQueries({ queryKey: [table] });
+      // Prefer invalidating the actual query keys used by the subscription(s).
+      // Fall back to invalidating by table name when we can't determine it.
+      const keysForTable = Array.from(this.subscriptions.values())
+        .filter((sub) => sub.options?.table === table)
+        .map((sub) => JSON.stringify(this.normalizeQueryKey(sub.options?.queryKey ?? table)));
+      if (keysForTable.length) {
+        keysForTable.forEach((k) => {
+          try {
+            this.queryClient.invalidateQueries({ queryKey: JSON.parse(k) });
+          } catch {
+            this.queryClient.invalidateQueries({ queryKey: [table] });
+          }
+        });
+      } else {
+        this.queryClient.invalidateQueries({ queryKey: [table] });
+      }
     });
+
+    this.updateSnapshot({ lastRefreshTime: Date.now() });
   }
 }

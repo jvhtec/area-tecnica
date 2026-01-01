@@ -8,8 +8,8 @@ import { CalendarJobCard } from "./calendar-section/CalendarJobCard";
 import { PrintDialog } from "./calendar-section/PrintDialog";
 import type { CalendarExportRange, PrintSettings } from "./calendar-section/types";
 import { supabase } from "@/lib/supabase";
-import jsPDF from "jspdf";
-import * as XLSX from 'xlsx'; // Import xlsx library
+import { loadJsPDF } from "@/utils/pdf/lazyPdf";
+import { loadXlsx } from "@/utils/lazyXlsx";
 import {
   format,
   startOfMonth,
@@ -255,6 +255,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       return jobType && printSettings.jobTypes[jobType] === true;
     });
 
+    const jsPDF = await loadJsPDF();
     const doc = new jsPDF("landscape", "mm", [420, 297]); // A3 dimensions explicitly
     const currentDate = date || new Date();
     let startDate: Date, endDate: Date;
@@ -559,6 +560,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       return jobType && printSettings.jobTypes[jobType] === true;
     });
 
+    const XLSX = await loadXlsx();
     const currentDate = date || new Date();
     let startDate: Date, endDate: Date;
 

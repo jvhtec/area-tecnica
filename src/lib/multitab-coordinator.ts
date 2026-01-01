@@ -28,6 +28,11 @@ export class MultiTabCoordinator {
   private broadcastChannel: BroadcastChannel;
   private leaderElectionInterval: number | null = null;
   private heartbeatInterval: number | null = null;
+  private visibilityListener: (() => void) | null = null;
+  private queryCacheUnsubscribe: (() => void) | null = null;
+  private lastBroadcastedUpdatedAt: Map<string, number> = new Map();
+  private pendingBroadcasts: Map<string, { queryKey: any; data: any; updatedAt: number }> = new Map();
+  private broadcastFlushTimeout: number | null = null;
   private lockAcquired: boolean = false;
   private lastLeaderSeen: number = Date.now();
   
@@ -37,6 +42,7 @@ export class MultiTabCoordinator {
     this.broadcastChannel = new BroadcastChannel('sector-pro-tabs');
     
     this.setupBroadcastChannel();
+    this.setupVisibilityHandling();
     this.startLeaderElection();
     this.setupQueryClientSync();
     
@@ -67,16 +73,17 @@ export class MultiTabCoordinator {
       
       switch (type) {
         case 'cache-update':
-          if (queryKey && data) {
+          if (queryKey) {
             this.queryClient.setQueryData(queryKey, data);
           }
           break;
           
         case 'invalidate':
+          const refetchType = this.isLeader ? 'active' : 'none';
           if (queryKey) {
-            this.queryClient.invalidateQueries({ queryKey });
+            this.queryClient.invalidateQueries({ queryKey, refetchType } as any);
           } else {
-            this.queryClient.invalidateQueries();
+            this.queryClient.invalidateQueries({ refetchType } as any);
           }
           break;
           
@@ -135,6 +142,10 @@ export class MultiTabCoordinator {
   }
 
   private fallbackLeaderElection() {
+    if (document.hidden) {
+      return;
+    }
+
     // Fallback leader election using localStorage and timestamps
     const checkLeader = () => {
       const leaderInfo = localStorage.getItem('sector-pro-leader');
@@ -167,6 +178,64 @@ export class MultiTabCoordinator {
     checkLeader();
   }
 
+  private setupVisibilityHandling() {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        this.pauseIntervals();
+      } else {
+        this.resumeIntervals();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility, { passive: true });
+    this.visibilityListener = handleVisibility;
+
+    // Ensure we start in the correct state.
+    handleVisibility();
+  }
+
+  private pauseIntervals() {
+    if (this.leaderElectionInterval) {
+      clearInterval(this.leaderElectionInterval);
+      this.leaderElectionInterval = null;
+    }
+
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  private resumeIntervals() {
+    if (this.isLeader && !this.heartbeatInterval) {
+      this.startHeartbeat();
+    }
+
+    if (!('locks' in navigator) && !this.leaderElectionInterval) {
+      this.fallbackLeaderElection();
+    }
+  }
+
+  private startHeartbeat() {
+    // Start heartbeat
+    this.heartbeatInterval = window.setInterval(() => {
+      this.broadcast({
+        type: 'heartbeat',
+        tabId: this.tabId,
+        timestamp: Date.now()
+      });
+
+      // Update localStorage for fallback election
+      if (!('locks' in navigator)) {
+        const leaderInfo = {
+          tabId: this.tabId,
+          timestamp: Date.now()
+        };
+        localStorage.setItem('sector-pro-leader', JSON.stringify(leaderInfo));
+      }
+    }, 3000);
+  }
+
   private claimLeadership() {
     const leaderInfo = {
       tabId: this.tabId,
@@ -189,23 +258,9 @@ export class MultiTabCoordinator {
       timestamp: Date.now()
     });
     
-    // Start heartbeat
-    this.heartbeatInterval = window.setInterval(() => {
-      this.broadcast({
-        type: 'heartbeat',
-        tabId: this.tabId,
-        timestamp: Date.now()
-      });
-      
-      // Update localStorage for fallback election
-      if (!('locks' in navigator)) {
-        const leaderInfo = {
-          tabId: this.tabId,
-          timestamp: Date.now()
-        };
-        localStorage.setItem('sector-pro-leader', JSON.stringify(leaderInfo));
-      }
-    }, 3000);
+    if (!document.hidden) {
+      this.startHeartbeat();
+    }
     
     // Dispatch custom event for the app to know about leadership change
     window.dispatchEvent(new CustomEvent('tab-leader-elected', { detail: { isLeader: true } }));
@@ -228,24 +283,56 @@ export class MultiTabCoordinator {
   }
 
   private setupQueryClientSync() {
-    // Subscribe to React Query's cache changes only if we're the leader
-    const originalSetQueryData = this.queryClient.setQueryData.bind(this.queryClient);
-    
-    this.queryClient.setQueryData = (queryKey: any, updater: any, options?: any) => {
-      const result = originalSetQueryData(queryKey, updater, options);
-      
-      // Only broadcast cache updates if we're the leader
-      if (this.isLeader) {
+    // Clean up previous subscription if we ever recreate the coordinator.
+    if (this.queryCacheUnsubscribe) {
+      this.queryCacheUnsubscribe();
+      this.queryCacheUnsubscribe = null;
+    }
+
+    // Broadcast successful query results from the leader to followers.
+    // This reduces redundant refetching across tabs.
+    this.queryCacheUnsubscribe = this.queryClient.getQueryCache().subscribe((event) => {
+      if (!this.isLeader) return;
+      if (event.type !== 'updated') return;
+
+      const query = event.query;
+      if (query.state.status !== 'success') return;
+
+      const queryKey = query.queryKey as any;
+      const serializedKey = JSON.stringify(queryKey);
+      const updatedAt = (query.state as any).dataUpdatedAt ?? 0;
+      const last = this.lastBroadcastedUpdatedAt.get(serializedKey) ?? 0;
+      if (updatedAt <= last) return;
+
+      this.lastBroadcastedUpdatedAt.set(serializedKey, updatedAt);
+      this.pendingBroadcasts.set(serializedKey, {
+        queryKey,
+        data: query.state.data,
+        updatedAt,
+      });
+
+      this.scheduleBroadcastFlush();
+    });
+  }
+
+  private scheduleBroadcastFlush() {
+    if (this.broadcastFlushTimeout) {
+      return;
+    }
+
+    this.broadcastFlushTimeout = window.setTimeout(() => {
+      this.broadcastFlushTimeout = null;
+      const items = Array.from(this.pendingBroadcasts.values());
+      this.pendingBroadcasts.clear();
+      items.forEach(({ queryKey, data }) => {
         this.broadcast({
           type: 'cache-update',
           queryKey,
-          data: this.queryClient.getQueryData(queryKey),
-          tabId: this.tabId
+          data,
+          tabId: this.tabId,
         });
-      }
-      
-      return result;
-    };
+      });
+    }, 75);
   }
 
   private handleSubscriptionRequest(tables: string[]) {
@@ -268,10 +355,11 @@ export class MultiTabCoordinator {
 
   public invalidateQueries(queryKey?: any) {
     // Always invalidate locally first
+    const refetchType = this.isLeader ? 'active' : 'none';
     if (queryKey) {
-      this.queryClient.invalidateQueries({ queryKey });
+      this.queryClient.invalidateQueries({ queryKey, refetchType } as any);
     } else {
-      this.queryClient.invalidateQueries();
+      this.queryClient.invalidateQueries({ refetchType } as any);
     }
     
     // If we're the leader, broadcast to other tabs
@@ -302,6 +390,21 @@ export class MultiTabCoordinator {
     
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
+    }
+
+    if (this.visibilityListener) {
+      document.removeEventListener('visibilitychange', this.visibilityListener);
+      this.visibilityListener = null;
+    }
+
+    if (this.queryCacheUnsubscribe) {
+      this.queryCacheUnsubscribe();
+      this.queryCacheUnsubscribe = null;
+    }
+
+    if (this.broadcastFlushTimeout) {
+      clearTimeout(this.broadcastFlushTimeout);
+      this.broadcastFlushTimeout = null;
     }
     
     this.broadcastChannel.close();

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import type { Map as MapboxMap, Marker as MapboxMarker } from 'mapbox-gl';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
@@ -19,8 +18,9 @@ interface VenueGroup {
 
 export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markers = useRef<mapboxgl.Marker[]>([]);
+  const mapboxglRef = useRef<any>(null);
+  const map = useRef<MapboxMap | null>(null);
+  const markers = useRef<MapboxMarker[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -38,6 +38,14 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
         setIsLoading(true);
         setError(null);
         hasShownError.current = false;
+
+        const [{ default: mapboxgl }] = await Promise.all([
+          import('mapbox-gl'),
+          import('mapbox-gl/dist/mapbox-gl.css'),
+        ]);
+
+        if (!isMounted) return;
+        mapboxglRef.current = mapboxgl;
 
         const { data, error: tokenError } = await supabase.functions.invoke('get-mapbox-token');
 
@@ -121,11 +129,14 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
       markers.current = [];
       map.current?.remove();
       map.current = null;
+      mapboxglRef.current = null;
     };
   }, []);
 
   useEffect(() => {
     if (!mapLoaded || !map.current) return;
+    const mapboxgl = mapboxglRef.current;
+    if (!mapboxgl) return;
 
     const venueMap = new Map<string, VenueGroup>();
 

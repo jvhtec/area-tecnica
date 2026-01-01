@@ -1,15 +1,19 @@
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useSyncExternalStore,
+} from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { TokenManager } from "@/lib/token-manager";
+import { UnifiedSubscriptionManager, type SubscriptionSnapshot } from "@/lib/unified-subscription-manager";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { PerformanceOptimizedSubscriptionManager } from '@/lib/performance-optimized-subscription-manager';
-import { toast } from 'sonner';
-import { TokenManager } from '@/lib/token-manager';
-import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-
-// Context for providing subscription manager state
 interface SubscriptionContextType {
-  connectionStatus: 'connected' | 'disconnected' | 'connecting';
+  connectionStatus: "connected" | "disconnected" | "connecting";
   activeSubscriptions: string[];
   subscriptionCount: number;
   subscriptionsByTable: Record<string, string[]>;
@@ -17,22 +21,71 @@ interface SubscriptionContextType {
   invalidateQueries: (queryKey?: string | string[]) => void;
   lastRefreshTime: number;
   forceRefresh: (tables?: string[]) => void;
-  forceSubscribe: (tables: Array<{ table: string; queryKey: string | string[]; priority?: 'high' | 'medium' | 'low' }>) => void;
+  forceSubscribe: (
+    tables: Array<{ table: string; queryKey: string | string[]; priority?: "high" | "medium" | "low" }>,
+  ) => void;
 }
 
-const SubscriptionContext = createContext<SubscriptionContextType>({
-  connectionStatus: 'connecting',
+type SubscriptionContextInternal = {
+  manager: Pick<
+    UnifiedSubscriptionManager,
+    "subscribe" | "getSnapshot" | "reestablishSubscriptions" | "forceRefreshSubscriptions" | "subscribeToTable" | "markRefreshed"
+  >;
+  refreshSubscriptions: SubscriptionContextType["refreshSubscriptions"];
+  invalidateQueries: SubscriptionContextType["invalidateQueries"];
+  forceRefresh: SubscriptionContextType["forceRefresh"];
+  forceSubscribe: SubscriptionContextType["forceSubscribe"];
+};
+
+const noopSnapshot: SubscriptionSnapshot = {
+  connectionStatus: "connecting",
   activeSubscriptions: [],
   subscriptionCount: 0,
   subscriptionsByTable: {},
+  lastRefreshTime: 0,
+};
+
+const noopManager = {
+  subscribe: () => () => {},
+  getSnapshot: () => noopSnapshot,
+  reestablishSubscriptions: () => false,
+  forceRefreshSubscriptions: () => {},
+  subscribeToTable: () => ({ unsubscribe: () => {} }),
+  markRefreshed: () => {},
+} satisfies SubscriptionContextInternal["manager"];
+
+const SubscriptionContext = createContext<SubscriptionContextInternal>({
+  manager: noopManager,
   refreshSubscriptions: () => {},
   invalidateQueries: () => {},
-  lastRefreshTime: 0,
   forceRefresh: () => {},
-  forceSubscribe: () => {}
+  forceSubscribe: () => {},
 });
 
-export const useSubscriptionContext = () => useContext(SubscriptionContext);
+export const useSubscriptionContext = (): SubscriptionContextType => {
+  const ctx = useContext(SubscriptionContext);
+
+  const snapshot = useSyncExternalStore(
+    ctx.manager.subscribe.bind(ctx.manager),
+    ctx.manager.getSnapshot.bind(ctx.manager),
+    ctx.manager.getSnapshot.bind(ctx.manager),
+  );
+
+  return useMemo(
+    () => ({
+      connectionStatus: snapshot.connectionStatus,
+      activeSubscriptions: snapshot.activeSubscriptions,
+      subscriptionCount: snapshot.subscriptionCount,
+      subscriptionsByTable: snapshot.subscriptionsByTable,
+      lastRefreshTime: snapshot.lastRefreshTime,
+      refreshSubscriptions: ctx.refreshSubscriptions,
+      invalidateQueries: ctx.invalidateQueries,
+      forceRefresh: ctx.forceRefresh,
+      forceSubscribe: ctx.forceSubscribe,
+    }),
+    [ctx.forceRefresh, ctx.forceSubscribe, ctx.invalidateQueries, ctx.refreshSubscriptions, snapshot],
+  );
+};
 
 interface SubscriptionProviderProps {
   children: React.ReactNode;
@@ -41,193 +94,90 @@ interface SubscriptionProviderProps {
 export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   const queryClient = useQueryClient();
   const { userRole } = useOptimizedAuth();
-  const isAdmin = userRole === 'admin';
+  const isAdmin = userRole === "admin";
 
-  const [state, setState] = useState<SubscriptionContextType>({
-    connectionStatus: 'connecting',
-    activeSubscriptions: [],
-    subscriptionCount: 0,
-    subscriptionsByTable: {},
-    refreshSubscriptions: () => {},
-    invalidateQueries: () => {},
-    lastRefreshTime: Date.now(),
-    forceRefresh: () => {},
-    forceSubscribe: () => {}
-  });
+  const manager = useMemo(() => UnifiedSubscriptionManager.getInstance(queryClient), [queryClient]);
 
-  // Track last connection status to notify on changes
-  const lastConnectionStatusRef = React.useRef<string>(state.connectionStatus);
-  const tokenManager = TokenManager.getInstance();
-  const connectionCheckIntervalRef = React.useRef<number | null>(null);
-  const lastStatsRef = React.useRef<{ status: 'connected' | 'disconnected' | 'connecting'; count: number }>({ status: 'connecting', count: 0 });
-  const [isLeader, setIsLeader] = useState(true);
-  const multiTabCoordinator = MultiTabCoordinator.getInstance(queryClient);
-
-  // Listen for tab role changes
   useEffect(() => {
-    const handleTabRoleChange = (event: CustomEvent) => {
-      setIsLeader(event.detail.isLeader);
-    };
-    
-    window.addEventListener('tab-leader-elected', handleTabRoleChange as EventListener);
-    
-    return () => {
-      window.removeEventListener('tab-leader-elected', handleTabRoleChange as EventListener);
-    };
-  }, []);
-
-  // Initialize the performance-optimized subscription manager
-  useEffect(() => {
-    const manager = PerformanceOptimizedSubscriptionManager.getInstance(queryClient);
-    
-    // Performance optimization: Only leader handles heavy operations
-    
-    // Subscribe to token refreshes to update subscriptions
+    const tokenManager = TokenManager.getInstance();
     const unsubscribe = tokenManager.subscribe(() => {
       console.log("Token refreshed, updating subscriptions");
-      
-      // Force refresh all subscriptions with the optimized manager
-      manager.forceRefresh();
-      setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
+      manager.reestablishSubscriptions();
+      manager.markRefreshed();
     });
-    
-    // Define refresh function with performance optimization
-    const refreshSubscriptions = () => {
-      console.log("Manually refreshing subscriptions...");
 
-      manager.forceRefresh();
-      setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
-
-      // Only show toasts to admin users
-      if (isAdmin) {
-        toast.success("Subscriptions refreshed");
-      }
+    return () => {
+      unsubscribe();
     };
-    
-    // Define invalidate function with optional specific query key
-    const invalidateQueries = (queryKey?: string | string[]) => {
+  }, [manager]);
+
+  const refreshSubscriptions = useCallback(() => {
+    manager.reestablishSubscriptions();
+    manager.markRefreshed();
+
+    if (isAdmin) {
+      toast.success("Subscriptions refreshed");
+    }
+  }, [isAdmin, manager]);
+
+  const invalidateQueries = useCallback(
+    (queryKey?: string | string[]) => {
       if (queryKey) {
         const key = Array.isArray(queryKey) ? queryKey : [queryKey];
         queryClient.invalidateQueries({ queryKey: key });
       } else {
         queryClient.invalidateQueries();
       }
-      setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
-    };
-    
-    // Define force refresh function - simplified for performance
-    const forceRefresh = (tables?: string[]) => {
-      manager.forceRefresh();
+      manager.markRefreshed();
+    },
+    [manager, queryClient],
+  );
 
-      // Only show toasts to admin users
-      if (isAdmin) {
-        if (tables && tables.length > 0) {
-          toast.success(`Refreshed ${tables.join(', ')} tables`);
-        } else {
-          toast.success('All subscriptions refreshed');
-        }
+  const forceRefresh = useCallback(
+    (tables?: string[]) => {
+      if (tables && tables.length > 0) {
+        manager.forceRefreshSubscriptions(tables);
+      } else {
+        manager.reestablishSubscriptions();
       }
 
-      setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
-    };
-    
-    // Define force subscribe function - simplified for performance
-    const forceSubscribe = (tables: Array<{ table: string; queryKey: string | string[]; priority?: 'high' | 'medium' | 'low' }>) => {
+      manager.markRefreshed();
+
+      if (isAdmin) {
+        if (tables && tables.length > 0) {
+          toast.success(`Refreshed ${tables.join(", ")} tables`);
+        } else {
+          toast.success("All subscriptions refreshed");
+        }
+      }
+    },
+    [isAdmin, manager],
+  );
+
+  const forceSubscribe = useCallback(
+    (tables: Array<{ table: string; queryKey: string | string[]; priority?: "high" | "medium" | "low" }>) => {
       if (!tables || tables.length === 0) return;
-      const names = tables.map(t => t.table).join(', ');
+      const names = tables.map((t) => t.table).join(", ");
       console.log(`Ensuring subscriptions for tables: ${names}`);
-      // Subscribe to each table with correct invalidation key
+
       tables.forEach(({ table, queryKey, priority }) => {
-        manager.subscribeToTable(table, queryKey, priority ?? 'medium');
+        manager.subscribeToTable(table, queryKey, undefined, priority ?? "medium");
       });
-      
-      // Update state with current stats
-      const stats = manager.getStats();
-      setState(prev => ({ 
-        ...prev, 
-        subscriptionCount: stats.subscriptionCount,
-        activeSubscriptions: [] // Simplified for performance
-      }));
-    };
-    
-    // Update state with functions and initial connection status in a single update
-    setState(prev => ({
-      ...prev,
+    },
+    [manager],
+  );
+
+  const value = useMemo<SubscriptionContextInternal>(
+    () => ({
+      manager,
       refreshSubscriptions,
       invalidateQueries,
       forceRefresh,
       forceSubscribe,
-      lastRefreshTime: Date.now(),
-      connectionStatus: 'connecting',
-    }));
-    
-    // Clear any existing interval
-    if (connectionCheckIntervalRef.current) {
-      clearInterval(connectionCheckIntervalRef.current);
-    }
-    
-    // Update state periodically to reflect current subscription status
-    // Reduce frequency for followers to save resources
-    const intervalTime = isLeader ? 2000 : 5000; // 2s for leader, 5s for followers
-    
-    connectionCheckIntervalRef.current = window.setInterval(() => {
-      const stats = manager.getStats();
-      
-      // Only notify admin users of critical issues if we're the leader
-      if (isLeader && isAdmin && stats.circuitBreakerOpen && !lastConnectionStatusRef.current.includes('circuit')) {
-        toast.error('Database connection issues detected', {
-          description: 'Performance may be degraded. We\'re working to resolve this.',
-          duration: 8000,
-        });
-        lastConnectionStatusRef.current = 'circuit-open';
-      } else if (isLeader && isAdmin && !stats.circuitBreakerOpen && lastConnectionStatusRef.current.includes('circuit')) {
-        toast.success('Database performance restored', {
-          description: 'All systems are operating normally.'
-        });
-        lastConnectionStatusRef.current = 'connected';
-      }
-      
-      const nextStatus: 'connected' | 'disconnected' = stats.circuitBreakerOpen ? 'disconnected' : 'connected';
-      const nextCount = stats.subscriptionCount;
-      // Only update state if something actually changed to avoid render loops
-      if (lastStatsRef.current.status !== nextStatus || lastStatsRef.current.count !== nextCount) {
-        lastStatsRef.current = { status: nextStatus, count: nextCount };
-        setState(prev => ({
-          ...prev,
-          connectionStatus: nextStatus,
-          subscriptionCount: nextCount,
-          activeSubscriptions: [], // Simplified for performance
-          subscriptionsByTable: {}, // Simplified for performance
-        }));
-      }
-    }, intervalTime);
-    
-    return () => {
-      if (connectionCheckIntervalRef.current) {
-        clearInterval(connectionCheckIntervalRef.current);
-      }
-      unsubscribe();
-    };
-  }, [queryClient, isLeader, isAdmin]);
-
-  // Setup core tables subscription with performance optimization
-  useEffect(() => {
-    if (isLeader) {
-      const manager = PerformanceOptimizedSubscriptionManager.getInstance(queryClient);
-      
-      // Set up only essential core tables with high priority
-      manager.subscribeToTable('profiles', 'profiles', 'high');
-      manager.subscribeToTable('jobs', 'jobs', 'high');
-    }
-    
-    return () => {
-      // Cleanup handled by the manager
-    };
-  }, [queryClient, isLeader]);
-
-  return (
-    <SubscriptionContext.Provider value={state}>
-      {children}
-    </SubscriptionContext.Provider>
+    }),
+    [forceRefresh, forceSubscribe, invalidateQueries, manager, refreshSubscriptions],
   );
+
+  return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 }
+

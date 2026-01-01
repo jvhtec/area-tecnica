@@ -1,7 +1,5 @@
-
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 export interface MissingRiderArtist {
   name: string;
@@ -20,6 +18,7 @@ export interface MissingRiderReportData {
 }
 
 export const exportMissingRiderReportPDF = async (data: MissingRiderReportData): Promise<Blob> => {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
   
   // Set up fonts and colors

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { checkNetworkConnection, getRealtimeConnectionStatus, ensureRealtimeConnection } from "@/lib/enhanced-supabase-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
@@ -20,12 +20,11 @@ const calculateBackoff = (attempt: number, baseMs: number = 1000, maxMs: number 
 function AppInitWithRouter() {
   const queryClient = useQueryClient();
   const location = useLocation();
-  const isInitialized = useRef(false);
+  const multiTabCoordinator = useMemo(() => MultiTabCoordinator.getInstance(queryClient), [queryClient]);
+  const manager = useMemo(() => UnifiedSubscriptionManager.getInstance(queryClient), [queryClient]);
   const lastConnectionCheck = useRef(0);
-  const connectionCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const connectionAttempts = useRef(0);
-  const [isLeader, setIsLeader] = useState(true);
-  const multiTabCoordinator = MultiTabCoordinator.getInstance(queryClient);
+  const [isLeader, setIsLeader] = useState(() => multiTabCoordinator.getIsLeader());
   
   // Listen for tab role changes
   useEffect(() => {
@@ -46,31 +45,17 @@ function AppInitWithRouter() {
     };
   }, [queryClient]);
 
-  // Initialize app services once
+  // Enable subscription health checks only for the leader and only while visible.
   useEffect(() => {
-    if (isInitialized.current) return;
-    isInitialized.current = true;
-    
-    console.log('Initializing core services...');
-    
-    // Initialize token manager
-    const tokenManager = TokenManager.getInstance();
-    
-    // Initialize the subscription manager only if we're the leader
-    const manager = UnifiedSubscriptionManager.getInstance(queryClient);
-    
-    // Only setup these if we're the leader
-    if (isLeader) {
-      manager.setupVisibilityBasedRefetching();
-      manager.setupNetworkStatusRefetching();
+    if (!isLeader) {
+      return;
     }
-    
-    // Subscribe to token refresh events
-    tokenManager.subscribe(() => {
-      console.log("Token refreshed, updating subscriptions");
-      manager.reestablishSubscriptions();
-    });
-    
+
+    console.log('Initializing leader health checks...');
+
+    const tokenManager = TokenManager.getInstance();
+    let intervalId: number | null = null;
+
     // Set up periodic connection health check with exponential backoff (only for leader)
     const checkConnectionHealth = async () => {
       // Only run health checks if we're the leader
@@ -116,22 +101,53 @@ function AppInitWithRouter() {
       }
     };
     
-    // Set up health check interval with longer intervals for followers
-    const intervalTime = isLeader ? 60000 : 120000; // 1 min for leader, 2 min for followers
-    connectionCheckIntervalRef.current = setInterval(() => {
+    const start = () => {
+      if (intervalId) return;
+      intervalId = window.setInterval(() => {
+        checkConnectionHealth().catch(err => {
+          console.error('Error in connection health check:', err);
+        });
+      }, 60000);
+    };
+
+    const stop = () => {
+      if (!intervalId) return;
+      clearInterval(intervalId);
+      intervalId = null;
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stop();
+        return;
+      }
       checkConnectionHealth().catch(err => {
         console.error('Error in connection health check:', err);
       });
-    }, intervalTime);
+      start();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility, { passive: true });
+    handleVisibility();
     
     // Return cleanup
     return () => {
-      if (connectionCheckIntervalRef.current) {
-        clearInterval(connectionCheckIntervalRef.current);
-        connectionCheckIntervalRef.current = null;
-      }
+      stop();
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [queryClient, isLeader]);
+  }, [isLeader, manager]);
+
+  // Only the leader should attach global invalidation/refetch triggers.
+  useEffect(() => {
+    if (isLeader) {
+      manager.setupVisibilityBasedRefetching();
+      manager.setupNetworkStatusRefetching();
+      return;
+    }
+
+    manager.teardownVisibilityBasedRefetching();
+    manager.teardownNetworkStatusRefetching();
+  }, [isLeader, manager]);
   
   // Use the enhanced route subscriptions hook to manage subscriptions
   const subscriptionStatus = useEnhancedRouteSubscriptions();
@@ -148,16 +164,6 @@ function AppInitWithRouter() {
       });
     }
   }, [subscriptionStatus.isStale, isLeader]);
-  
-  // Handle subscription refresh when coming back after inactivity (only for leader)
-  useEffect(() => {
-    if (subscriptionStatus.wasInactive && isLeader) {
-      console.log('Page was inactive, refreshing subscriptions');
-      
-      // Force a refresh of all queries
-      queryClient.invalidateQueries();
-    }
-  }, [subscriptionStatus.wasInactive, queryClient, isLeader]);
   
   // Handle route changes with improved subscription management (only for leader)
   useEffect(() => {
@@ -212,7 +218,7 @@ function AppInitWithRouter() {
     return () => {
       window.removeEventListener('online', handleOnline);
     };
-  }, [queryClient, isLeader, multiTabCoordinator]);
+  }, [isLeader, multiTabCoordinator]);
   
   // This component doesn't render anything
   return null;
@@ -225,39 +231,5 @@ function AppInitWithRouter() {
  * Safely handles router context availability
  */
 export function AppInit() {
-  const queryClient = useQueryClient();
-  
-  // Initialize core services that don't require router context
-  useEffect(() => {
-    console.log('Initializing basic core services...');
-    
-    // Initialize token manager
-    const tokenManager = TokenManager.getInstance();
-    
-    // Initialize the subscription manager
-    const manager = UnifiedSubscriptionManager.getInstance(queryClient);
-    manager.setupVisibilityBasedRefetching();
-    manager.setupNetworkStatusRefetching();
-    
-    // Subscribe to token refresh events
-    tokenManager.subscribe(() => {
-      console.log("Token refreshed, updating subscriptions");
-      manager.reestablishSubscriptions();
-    });
-  }, [queryClient]);
-
-  // Check if we're in a router context
-  const [hasRouterContext, setHasRouterContext] = useState(false);
-  
-  useEffect(() => {
-    // Delay checking for router context to allow it to initialize
-    const timeout = setTimeout(() => {
-      setHasRouterContext(true);
-    }, 100);
-    
-    return () => clearTimeout(timeout);
-  }, []);
-
-  // Only render router-dependent initialization if router context is available
-  return hasRouterContext ? <AppInitWithRouter /> : null;
+  return <AppInitWithRouter />;
 }

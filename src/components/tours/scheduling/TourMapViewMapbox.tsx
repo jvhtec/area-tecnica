@@ -3,8 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Map, MapPin, Home, Loader2, AlertCircle, Hotel } from "lucide-react";
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import type { Map as MapboxMap, Marker as MapboxMarker } from "mapbox-gl";
 
 interface TourMapViewMapboxProps {
   tourData: any;
@@ -21,8 +20,9 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
 }) => {
   const { toast } = useToast();
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markers = useRef<mapboxgl.Marker[]>([]);
+  const mapboxglRef = useRef<any>(null);
+  const map = useRef<MapboxMap | null>(null);
+  const markers = useRef<MapboxMarker[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -41,6 +41,14 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
       try {
         setIsLoading(true);
         setError(null);
+
+        const [{ default: mapboxgl }] = await Promise.all([
+          import("mapbox-gl"),
+          import("mapbox-gl/dist/mapbox-gl.css"),
+        ]);
+
+        if (!isMounted) return;
+        mapboxglRef.current = mapboxgl;
 
         console.log('Initializing map with pre-fetched token');
         mapboxgl.accessToken = mapboxToken;
@@ -106,6 +114,7 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
       markers.current = [];
       map.current?.remove();
       map.current = null;
+      mapboxglRef.current = null;
     };
   }, []); // Only run once on mount - token is guaranteed to be provided
 
@@ -117,6 +126,8 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
 
   const renderMapContent = () => {
     if (!map.current) return;
+    const mapboxgl = mapboxglRef.current;
+    if (!mapboxgl) return;
 
     // Clear existing markers
     markers.current.forEach((marker) => marker.remove());

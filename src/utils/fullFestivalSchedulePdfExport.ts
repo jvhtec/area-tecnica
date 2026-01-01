@@ -1,6 +1,5 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 // Artist data interface for full schedule export
 export interface FullScheduleArtist {
@@ -53,6 +52,7 @@ const loadImageSafely = async (src: string, description: string): Promise<HTMLIm
 export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePdfData): Promise<Blob> => {
   console.log('exportFullFestivalSchedulePDF called with data:', data);
   
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF('portrait');
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;

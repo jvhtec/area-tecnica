@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Play, Star } from "lucide-react";
@@ -15,13 +15,45 @@ const heroImages = [
 
 export const HeroSection = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const prefersReducedMotion = useReducedMotion();
+  const imageCount = heroImages.length;
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
+    if (imageCount <= 1) {
+      return;
+    }
+
+    let intervalId: number | null = null;
+
+    const start = () => {
+      if (intervalId) return;
+      intervalId = window.setInterval(() => {
+        setCurrentImageIndex((prev) => (prev + 1) % imageCount);
+      }, 4000);
+    };
+
+    const stop = () => {
+      if (!intervalId) return;
+      clearInterval(intervalId);
+      intervalId = null;
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        start();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility, { passive: true });
+    handleVisibility();
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [imageCount]);
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -32,27 +64,17 @@ export const HeroSection = () => {
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
           className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-primary/10 to-transparent rounded-full"
-          animate={{
-            rotate: 360,
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear"
-          }}
+          initial={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.95 }}
+          animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          style={{ willChange: "transform" }}
         />
         <motion.div
           className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-secondary/10 to-transparent rounded-full"
-          animate={{
-            rotate: -360,
-            scale: [1.2, 1, 1.2],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "linear"
-          }}
+          initial={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.95 }}
+          animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+          style={{ willChange: "transform" }}
         />
       </div>
 
@@ -121,15 +143,15 @@ export const HeroSection = () => {
               className="flex items-center gap-6 text-sm text-muted-foreground"
             >
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <div className="w-2 h-2 bg-green-500 rounded-full" />
                 Real-time Collaboration
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                <div className="w-2 h-2 bg-blue-500 rounded-full" />
                 10+ Specialized Modules
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                <div className="w-2 h-2 bg-purple-500 rounded-full" />
                 PDF Report Generation
               </div>
             </motion.div>
@@ -182,27 +204,17 @@ export const HeroSection = () => {
               {/* Floating Elements */}
               <motion.div
                 className="absolute -top-4 -right-4 w-24 h-24 bg-gradient-to-br from-primary to-secondary rounded-full opacity-20"
-                animate={{
-                  y: [0, -10, 0],
-                  rotate: [0, 180, 360],
-                }}
-                transition={{
-                  duration: 6,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
+                initial={prefersReducedMotion ? undefined : { opacity: 0, y: 8 }}
+                animate={prefersReducedMotion ? undefined : { opacity: 0.2, y: 0 }}
+                transition={{ duration: 0.8, ease: "easeOut", delay: 0.35 }}
+                style={{ willChange: "transform" }}
               />
               <motion.div
                 className="absolute -bottom-4 -left-4 w-16 h-16 bg-gradient-to-br from-secondary to-primary rounded-full opacity-20"
-                animate={{
-                  y: [0, 10, 0],
-                  rotate: [360, 180, 0],
-                }}
-                transition={{
-                  duration: 8,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
+                initial={prefersReducedMotion ? undefined : { opacity: 0, y: -8 }}
+                animate={prefersReducedMotion ? undefined : { opacity: 0.2, y: 0 }}
+                transition={{ duration: 0.8, ease: "easeOut", delay: 0.45 }}
+                style={{ willChange: "transform" }}
               />
             </div>
           </motion.div>
@@ -210,19 +222,11 @@ export const HeroSection = () => {
       </div>
 
       {/* Scroll Indicator */}
-      <motion.div
-        className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
-        animate={{ y: [0, 10, 0] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
         <div className="w-6 h-10 border-2 border-primary rounded-full flex justify-center">
-          <motion.div
-            className="w-1 h-3 bg-primary rounded-full mt-2"
-            animate={{ opacity: [0.3, 1, 0.3] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
+          <div className="w-1 h-3 bg-primary rounded-full mt-2" />
         </div>
-      </motion.div>
+      </div>
     </section>
   );
 };

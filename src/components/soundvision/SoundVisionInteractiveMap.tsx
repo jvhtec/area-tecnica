@@ -34,8 +34,7 @@ import { SoundVisionReviewDialog } from '@/components/soundvision/SoundVisionRev
 import { useVenues } from '@/hooks/useVenues';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import type { Map as MapboxMap, Marker as MapboxMarker } from 'mapbox-gl';
 import { Theme } from '@/components/technician/types';
 
 export interface SoundVisionInteractiveMapProps {
@@ -72,8 +71,9 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
 
     // Map state
     const mapContainer = useRef<HTMLDivElement>(null);
-    const map = useRef<mapboxgl.Map | null>(null);
-    const markers = useRef<mapboxgl.Marker[]>([]);
+    const mapboxglRef = useRef<any>(null);
+    const map = useRef<MapboxMap | null>(null);
+    const markers = useRef<MapboxMarker[]>([]);
     const [mapLoading, setMapLoading] = useState(true);
     const [mapError, setMapError] = useState<string | null>(null);
     const [mapLoaded, setMapLoaded] = useState(false);
@@ -174,6 +174,14 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                     throw new Error('No se encontró el token de Mapbox en la respuesta');
                 }
 
+                const [{ default: mapboxgl }] = await Promise.all([
+                    import('mapbox-gl'),
+                    import('mapbox-gl/dist/mapbox-gl.css'),
+                ]);
+
+                if (!isMounted) return;
+                mapboxglRef.current = mapboxgl;
+
                 mapboxgl.accessToken = data.token;
 
                 const mapInstance = new mapboxgl.Map({
@@ -232,6 +240,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
             markers.current = [];
             map.current?.remove();
             map.current = null;
+            mapboxglRef.current = null;
         };
     }, []);
 
@@ -275,6 +284,9 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
         // Clear existing markers
         markers.current.forEach((marker) => marker.remove());
         markers.current = [];
+
+        const mapboxgl = mapboxglRef.current;
+        if (!mapboxgl) return;
 
         const bounds = new mapboxgl.LngLatBounds();
 

@@ -80,7 +80,7 @@ serve(async (req) => {
     // Get crew call for this job and department
     const { data: crewCall, error: crewCallError } = await supabase
       .from('flex_crew_calls')
-      .select('*')
+      .select('id, flex_element_id')
       .eq('job_id', job_id)
       .eq('department', department)
       .single();
@@ -106,7 +106,7 @@ serve(async (req) => {
       // Check if assignment already exists
       const { data: existingAssignment } = await supabase
         .from('flex_crew_assignments')
-        .select('*')
+        .select('id, flex_line_item_id')
         .eq('crew_call_id', crewCall.id)
         .eq('technician_id', technician_id)
         .maybeSingle();
@@ -264,19 +264,27 @@ serve(async (req) => {
       }
 
       try {
-        await supabase.rpc('log_activity_as', {
-          _actor_id: actorId,
-          _code: 'flex.crew.updated',
-          _job_id: job_id,
-          _entity_type: 'flex',
-          _entity_id: crewCall.id,
-          _payload: {
-            action: 'add',
-            department,
-            technician_id,
-          },
-          _visibility: null,
-        });
+        const logActivity = async () => {
+          await supabase.rpc('log_activity_as', {
+            _actor_id: actorId,
+            _code: 'flex.crew.updated',
+            _job_id: job_id,
+            _entity_type: 'flex',
+            _entity_id: crewCall.id,
+            _payload: {
+              action: 'add',
+              department,
+              technician_id,
+            },
+            _visibility: null,
+          });
+        };
+
+        if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
+          EdgeRuntime.waitUntil(logActivity());
+        } else {
+          await logActivity();
+        }
       } catch (activityError) {
         console.warn('[manage-flex-crew-assignments] Failed to log add activity', activityError);
       }
@@ -290,7 +298,7 @@ serve(async (req) => {
       // Get existing assignment
       const { data: assignment, error: assignmentError } = await supabase
         .from('flex_crew_assignments')
-        .select('*')
+        .select('id, flex_line_item_id')
         .eq('crew_call_id', crewCall.id)
         .eq('technician_id', technician_id)
         .single();
@@ -342,19 +350,27 @@ serve(async (req) => {
       }
 
       try {
-        await supabase.rpc('log_activity_as', {
-          _actor_id: actorId,
-          _code: 'flex.crew.updated',
-          _job_id: job_id,
-          _entity_type: 'flex',
-          _entity_id: crewCall.id,
-          _payload: {
-            action: 'remove',
-            department,
-            technician_id,
-          },
-          _visibility: null,
-        });
+        const logActivity = async () => {
+          await supabase.rpc('log_activity_as', {
+            _actor_id: actorId,
+            _code: 'flex.crew.updated',
+            _job_id: job_id,
+            _entity_type: 'flex',
+            _entity_id: crewCall.id,
+            _payload: {
+              action: 'remove',
+              department,
+              technician_id,
+            },
+            _visibility: null,
+          });
+        };
+
+        if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
+          EdgeRuntime.waitUntil(logActivity());
+        } else {
+          await logActivity();
+        }
       } catch (activityError) {
         console.warn('[manage-flex-crew-assignments] Failed to log remove activity', activityError);
       }
