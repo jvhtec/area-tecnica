@@ -9,6 +9,40 @@ const BREVO_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
 const BREVO_FROM = Deno.env.get("BREVO_FROM") ?? "";
 const ADMIN_BCC = Deno.env.get("PAYOUT_EMAIL_BCC") ?? "";
 
+// Invoicing company data
+interface InvoicingCompanyDetails {
+  name: string;
+  legalName: string;
+  cif: string;
+  address: string;
+}
+
+const INVOICING_COMPANY_DATA: Record<string, InvoicingCompanyDetails> = {
+  "Production Sector": {
+    name: "Production Sector",
+    legalName: "Production Sector S.L.",
+    cif: "B86964673",
+    address: "Calle Puerto Rico, 6, Griñón, 28971, Madrid",
+  },
+  "Sharecable": {
+    name: "Sharecable",
+    legalName: "Share Cable S.L.",
+    cif: "B87287603",
+    address: "Calle Puerto Rico, 6, Griñón, 28971, Madrid",
+  },
+  "MFO": {
+    name: "MFO",
+    legalName: "Montajes Festivales Y Organizaciones S.L.",
+    cif: "B91808691",
+    address: "Calle Puerto Rico, 6, Griñón, 28971, Madrid",
+  },
+};
+
+function getInvoicingCompanyDetails(companyName: string | null | undefined): InvoicingCompanyDetails | null {
+  if (!companyName) return null;
+  return INVOICING_COMPANY_DATA[companyName] ?? null;
+}
+
 interface JobMetadata {
   id: string;
   title: string;
@@ -183,18 +217,27 @@ serve(async (req) => {
                     </div>
                   </td>
                 </tr>
-                ${invoicingCompany ? `
+                ${(() => {
+                  const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
+                  if (!companyDetails) return '';
+                  return `
                 <tr>
                   <td style="padding:12px 24px 0 24px;">
                     <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;color:#1e40af;font-size:14px;">
                       <b>Nota de facturación:</b>
                       <p style="margin:8px 0 0 0;line-height:1.55;">
-                        Por favor emite tu factura para este trabajo a: <b>${invoicingCompany}</b>
+                        Por favor emite tu factura para este trabajo a:
+                      </p>
+                      <p style="margin:8px 0 0 0;line-height:1.55;">
+                        <b>${companyDetails.legalName}</b><br/>
+                        CIF: ${companyDetails.cif}<br/>
+                        ${companyDetails.address}
                       </p>
                     </div>
                   </td>
                 </tr>
-                ` : ''}
+                `;
+                })()}
                 <tr>
                   <td style="padding:16px 24px 8px 24px;">
                     <p style="margin:0;color:#374151;line-height:1.55;">
