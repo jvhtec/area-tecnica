@@ -32,8 +32,9 @@ export class PlacesImageService {
 
   /**
    * Returns up to maxPhotos data URLs for the given query using Places Text Search and Photo media API.
+   * Reduced default maxPhotos to 1 to minimize API costs
    */
-  static async getPhotosForQuery(query: string, maxPhotos: number = 2, maxWidthPx: number = 400, maxHeightPx: number = 300): Promise<string[]> {
+  static async getPhotosForQuery(query: string, maxPhotos: number = 1, maxWidthPx: number = 400, maxHeightPx: number = 300): Promise<string[]> {
     try {
       const cacheKey = `${query.trim().toLowerCase()}::${maxPhotos}::${maxWidthPx}x${maxHeightPx}`;
       const cached = this.photoCache.get(cacheKey);
