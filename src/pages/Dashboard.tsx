@@ -417,11 +417,6 @@ const Dashboard = () => {
               onOpenChange={setIsEditDialogOpen}
               job={selectedJob}
             />
-            <JobDetailsDialog
-              open={isDetailsDialogOpen}
-              onOpenChange={setIsDetailsDialogOpen}
-              job={selectedJob}
-            />
           </Suspense>
         )}
 

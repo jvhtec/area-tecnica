@@ -36,9 +36,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Department } from "@/types/department";
 
 import { FestivalManagementDialogs } from "./FestivalManagementDialogs";
-import type { FestivalManagementVm } from "./useFestivalManagementVm";
 
-export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => {
+export const FestivalManagementView = ({ vm }: { vm: any }) => {
   const {
     job,
     jobId,
@@ -104,7 +103,6 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
     isBackfilling,
 
     userRole,
-    techName,
     setIsWhatsappDialogOpen,
     setWaMessage,
     setIsAlmacenDialogOpen,
@@ -692,17 +690,17 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                   </div>
                 )}
 
-	                {/* Incident Report */}
-	                {userRole === "technician" && (
-	                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-red-500/5">
-	                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
-	                      <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
-	                      Reporte de Incidencia
-	                    </div>
-	                    <p className="text-xs md:text-sm text-muted-foreground">Crea un reporte de incidencia para este trabajo.</p>
-	                    <TechnicianIncidentReportDialog job={job} techName={techName || undefined} />
-	                  </div>
-	                )}
+                {/* Incident Report */}
+                {userRole === "technician" && (
+                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-red-500/5">
+                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
+                      Reporte de Incidencia
+                    </div>
+                    <p className="text-xs md:text-sm text-muted-foreground">Crea un reporte de incidencia para este trabajo.</p>
+                    <TechnicianIncidentReportDialog job={job} techName={userRole} />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

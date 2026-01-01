@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useMemo, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
-import { useParams, useNavigate, useLocation, type NavigateFunction } from "react-router-dom";
+import { useEffect, useState, useCallback, useMemo, type ChangeEvent } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 
 import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
@@ -16,173 +16,11 @@ import { format, isValid } from "date-fns";
 
 import type { ArtistRiderFile, FestivalJob, JobDocumentEntry } from "./types";
 
-export interface ArchiveToFlexResult {
-  attempted?: number;
-  uploaded?: number;
-  skipped?: number;
-  failed?: number;
-}
-
-export interface GroupedRiderFilesEntry {
-  artistId: string;
-  artistName: string;
-  files: ArtistRiderFile[];
-}
-
-export interface FestivalManagementVm {
-  job: FestivalJob;
-  jobId: string;
-  navigate: NavigateFunction;
-
-  isSingleJobMode: boolean;
-  isSchedulingRoute: boolean;
-  isArtistRoute: boolean;
-  isGearRoute: boolean;
-
-  canEdit: boolean;
-  isViewOnly: boolean;
-  userRole: string | null;
-  techName: string | null;
-
-  venueData: {
-    address?: string;
-    coordinates?: { lat: number; lng: number };
-  };
-  mapPreviewUrl: string | null;
-  isMapLoading: boolean;
-
-  isLoading: boolean;
-  isLoadingDocuments: boolean;
-  artistCount: number;
-  jobDates: Date[];
-  maxStages: number;
-
-  jobDocuments: JobDocumentEntry[];
-  groupedRiderFiles: GroupedRiderFilesEntry[];
-
-  assignmentDepartment: Department;
-  setAssignmentDepartment: Dispatch<SetStateAction<Department>>;
-  departmentOptions: Department[];
-  humanizeDepartment: (dep: Department) => string;
-
-  handleRefreshAll: () => void;
-  handleRefreshDocuments: () => void;
-
-  handleJobDocumentView: (docEntry: JobDocumentEntry) => Promise<void>;
-  handleJobDocumentDownload: (docEntry: JobDocumentEntry) => Promise<void>;
-  handleRiderView: (file: ArtistRiderFile) => Promise<void>;
-  handleRiderDownload: (file: ArtistRiderFile) => Promise<void>;
-  formatDateLabel: (value?: string | null) => string;
-
-  isAssignmentDialogOpen: boolean;
-  setIsAssignmentDialogOpen: Dispatch<SetStateAction<boolean>>;
-  handleAssignmentChange: () => void;
-  handleOpenAssignments: () => void;
-
-  handleNavigateTimesheets: () => void;
-
-  isRouteSheetOpen: boolean;
-  setIsRouteSheetOpen: Dispatch<SetStateAction<boolean>>;
-  handleOpenRouteSheet: () => void;
-
-  isJobDetailsOpen: boolean;
-  setIsJobDetailsOpen: Dispatch<SetStateAction<boolean>>;
-  handleOpenJobDetails: () => void;
-
-  isFlexLogOpen: boolean;
-  setIsFlexLogOpen: Dispatch<SetStateAction<boolean>>;
-  handleOpenFlexLogs: () => void;
-
-  flexUuid: string | null;
-  isFlexLoading: boolean;
-  flexError: string | null;
-  folderExists: boolean | null;
-  flexStatus: { label: string; variant: "outline" | "destructive" | "secondary" };
-
-  isFlexPickerOpen: boolean;
-  setIsFlexPickerOpen: Dispatch<SetStateAction<boolean>>;
-  flexPickerOptions: CreateFoldersOptions | undefined;
-  handleFlexPickerConfirm: (options?: CreateFoldersOptions) => Promise<void>;
-  handleOpenFlexPicker: () => void;
-  handleCreateFlexFolders: () => void;
-  isCreatingFlexFolders: boolean;
-
-  handleFlexClick: () => Promise<void>;
-
-  isPrinting: boolean;
-  handlePrintButtonClick: () => void;
-  isPrintDialogOpen: boolean;
-  setIsPrintDialogOpen: Dispatch<SetStateAction<boolean>>;
-  handlePrintAllDocumentation: (options: PrintOptions, filename: string) => Promise<void>;
-
-  isJobPresetsOpen: boolean;
-  setIsJobPresetsOpen: Dispatch<SetStateAction<boolean>>;
-
-  isArchiveDialogOpen: boolean;
-  setIsArchiveDialogOpen: Dispatch<SetStateAction<boolean>>;
-  archiveMode: "by-prefix" | "all-tech";
-  setArchiveMode: Dispatch<SetStateAction<"by-prefix" | "all-tech">>;
-  archiveIncludeTemplates: boolean;
-  setArchiveIncludeTemplates: Dispatch<SetStateAction<boolean>>;
-  archiveDryRun: boolean;
-  setArchiveDryRun: Dispatch<SetStateAction<boolean>>;
-  isArchiving: boolean;
-  archiveResult: ArchiveToFlexResult | null;
-  archiveError: string | null;
-  handleArchiveToFlex: () => Promise<void>;
-
-  isBackfillDialogOpen: boolean;
-  setIsBackfillDialogOpen: Dispatch<SetStateAction<boolean>>;
-  bfSound: boolean;
-  setBfSound: Dispatch<SetStateAction<boolean>>;
-  bfLights: boolean;
-  setBfLights: Dispatch<SetStateAction<boolean>>;
-  bfVideo: boolean;
-  setBfVideo: Dispatch<SetStateAction<boolean>>;
-  bfProduction: boolean;
-  setBfProduction: Dispatch<SetStateAction<boolean>>;
-  uuidSound: string;
-  setUuidSound: Dispatch<SetStateAction<string>>;
-  uuidLights: string;
-  setUuidLights: Dispatch<SetStateAction<string>>;
-  uuidVideo: string;
-  setUuidVideo: Dispatch<SetStateAction<string>>;
-  uuidProduction: string;
-  setUuidProduction: Dispatch<SetStateAction<string>>;
-  isBackfilling: boolean;
-  backfillMessage: string | null;
-  handleBackfill: () => Promise<void>;
-
-  isWhatsappDialogOpen: boolean;
-  setIsWhatsappDialogOpen: Dispatch<SetStateAction<boolean>>;
-  isSendingWa: boolean;
-  handleCreateWhatsappGroup: () => Promise<void>;
-
-  isAlmacenDialogOpen: boolean;
-  setIsAlmacenDialogOpen: Dispatch<SetStateAction<boolean>>;
-  waMessage: string;
-  setWaMessage: Dispatch<SetStateAction<string>>;
-  handleSendToAlmacen: () => Promise<void>;
-
-  isDeleteDialogOpen: boolean;
-  setIsDeleteDialogOpen: Dispatch<SetStateAction<boolean>>;
-  isDeleting: boolean;
-  handleDeleteJob: () => Promise<void>;
-
-  handleDocumentUpload: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
-  isUploadingDocument: boolean;
-
-  handleCreateLocalFolders: () => Promise<void>;
-  isCreatingLocalFolders: boolean;
-
-  navigateToCalculator: (type: "pesos" | "consumos") => void;
-}
-
 export type FestivalManagementVmResult =
   | { status: "missing_job_id" }
   | { status: "loading" }
   | { status: "not_found" }
-  | { status: "ready"; vm: FestivalManagementVm };
+  | { status: "ready"; vm: any };
 
 export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const { jobId } = useParams();
@@ -203,8 +41,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [isMapLoading, setIsMapLoading] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
-  const { userRole, user } = useOptimizedAuth();
-  const [techName, setTechName] = useState<string | null>(null);
+  const { userRole } = useOptimizedAuth();
   const [maxStages, setMaxStages] = useState(1);
   const { flexUuid, isLoading: isFlexLoading, error: flexError, folderExists, refetch: refetchFlexUuid } = useFlexUuid(jobId || "");
   const [jobDocuments, setJobDocuments] = useState<JobDocumentEntry[]>([]);
@@ -221,40 +58,12 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [flexPickerMode, setFlexPickerMode] = useState<"create" | "add">("add");
   const [isJobPresetsOpen, setIsJobPresetsOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadTechName = async () => {
-      if (!user?.id) {
-        setTechName(null);
-        return;
-      }
-
-      const { data, error } = await supabase.from("profiles").select("first_name, last_name").eq("id", user.id).maybeSingle();
-      if (cancelled) return;
-
-      if (error) {
-        console.warn("[FestivalManagement] Failed to load technician name", error);
-        setTechName(user?.email || null);
-        return;
-      }
-
-      const fullName = [data?.first_name, data?.last_name].filter(Boolean).join(" ");
-      setTechName(fullName || user?.email || null);
-    };
-
-    loadTechName();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.email, user?.id]);
-
   // New action states
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
-  const [archiveResult, setArchiveResult] = useState<ArchiveToFlexResult | null>(null);
+  const [archiveResult, setArchiveResult] = useState<any | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [archiveMode, setArchiveMode] = useState<"by-prefix" | "all-tech">("by-prefix");
   const [archiveIncludeTemplates, setArchiveIncludeTemplates] = useState(false);
@@ -262,7 +71,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [isBackfillDialogOpen, setIsBackfillDialogOpen] = useState(false);
   const [isBackfilling, setIsBackfilling] = useState(false);
   const [backfillMessage, setBackfillMessage] = useState<string | null>(null);
-  const [backfillResult, setBackfillResult] = useState<unknown | null>(null);
+  const [backfillResult, setBackfillResult] = useState<any | null>(null);
   const [bfSound, setBfSound] = useState(true);
   const [bfLights, setBfLights] = useState(true);
   const [bfVideo, setBfVideo] = useState(true);
@@ -1230,7 +1039,6 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
     canEdit,
     isViewOnly,
     userRole,
-    techName,
 
     venueData,
     mapPreviewUrl,
@@ -1365,3 +1173,4 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
 
   return { status: "ready", vm };
 };
+

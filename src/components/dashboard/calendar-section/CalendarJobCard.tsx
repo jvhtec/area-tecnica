@@ -1,10 +1,21 @@
 import React from "react";
 import { format } from "date-fns";
-import { Clock, Lightbulb, MapPin, Music2, Users, Video } from "lucide-react";
+import {
+  Clock,
+  Lightbulb,
+  MapPin,
+  Mic,
+  Moon,
+  Music2,
+  Plane,
+  Star,
+  Users,
+  Video,
+  Wrench,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getDateTypeIcon } from "@/pages/wallboard/utils";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
 
 import { DateTypeContextMenu } from "../DateTypeContextMenu";
@@ -16,26 +27,23 @@ export interface CalendarJobCardProps {
 }
 
 export const CalendarJobCard: React.FC<CalendarJobCardProps> = ({ job, date, dateTypes }) => {
-  const getDateTypeIconForJob = (jobId: string, date: Date) => {
+  const getDateTypeIcon = (jobId: string, date: Date) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
     const dateType = dateTypes[key]?.type;
-    const icon = getDateTypeIcon(dateType ?? null);
-    if (!icon) return null;
-
-    const colorClass =
-      dateType === "travel"
-        ? "text-blue-500"
-        : dateType === "setup"
-          ? "text-yellow-500"
-          : dateType === "show"
-            ? "text-green-500"
-            : dateType === "off"
-              ? "text-gray-500"
-              : dateType === "rehearsal"
-                ? "text-violet-500"
-                : "";
-
-    return React.cloneElement(icon, { className: `h-3 w-3 ${colorClass}`.trim() });
+    switch (dateType) {
+      case "travel":
+        return <Plane className="h-3 w-3 text-blue-500" />;
+      case "setup":
+        return <Wrench className="h-3 w-3 text-yellow-500" />;
+      case "show":
+        return <Star className="h-3 w-3 text-green-500" />;
+      case "off":
+        return <Moon className="h-3 w-3 text-gray-500" />;
+      case "rehearsal":
+        return <Mic className="h-3 w-3 text-violet-500" />;
+      default:
+        return null;
+    }
   };
 
   const getDepartmentIcon = (dept: string) => {
@@ -80,7 +88,7 @@ export const CalendarJobCard: React.FC<CalendarJobCardProps> = ({ job, date, dat
   const totalRequired = getTotalRequiredPersonnel(job);
   const currentlyAssigned = job.job_assignments?.length || 0;
   const jobTimezone = job.timezone || "Europe/Madrid";
-  const dateTypeIcon = getDateTypeIconForJob(job.id, date);
+  const dateTypeIcon = getDateTypeIcon(job.id, date);
 
   return (
     <DateTypeContextMenu
@@ -126,7 +134,7 @@ export const CalendarJobCard: React.FC<CalendarJobCardProps> = ({ job, date, dat
               <div className="space-y-1">
                 <div className="text-sm font-medium">Departments:</div>
                 <div className="flex flex-wrap gap-1">
-                  {job.job_departments?.map((dept: any) => (
+                  {job.job_departments.map((dept: any) => (
                     <Badge key={dept.department} variant="secondary" className="flex items-center gap-1">
                       {getDepartmentIcon(dept.department)}
                       <span className="capitalize">{dept.department}</span>
@@ -147,3 +155,4 @@ export const CalendarJobCard: React.FC<CalendarJobCardProps> = ({ job, date, dat
     </DateTypeContextMenu>
   );
 };
+

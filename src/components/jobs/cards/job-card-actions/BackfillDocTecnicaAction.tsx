@@ -12,10 +12,9 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import type { Job } from "@/types/job";
 
 export interface BackfillDocTecnicaActionProps {
-  job: Pick<Job, "id">;
+  job: any;
 }
 
 export const BackfillDocTecnicaAction: React.FC<BackfillDocTecnicaActionProps> = ({ job }) => {
@@ -190,3 +189,4 @@ export const BackfillDocTecnicaAction: React.FC<BackfillDocTecnicaActionProps> =
     </>
   );
 };
+

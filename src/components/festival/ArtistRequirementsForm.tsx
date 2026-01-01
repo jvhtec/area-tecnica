@@ -340,17 +340,19 @@ export const ArtistRequirementsForm = () => {
             </CardContent>
           </Card>
 
-	          <img
-	            src="/sector%20pro%20logo.png"
-	            alt="Company Logo"
-	            loading="lazy"
-	            decoding="async"
-	            className="h-16 w-full max-w-[508px] object-contain mt-8 mx-auto"
-	          />
-	        </div>
-	      </div>
-	    </div>
-	  );
+          <img 
+            src="/sector%20pro%20logo.png" 
+            alt="Company Logo" 
+            width={794}
+            height={100}
+            loading="lazy"
+            decoding="async"
+            className="h-16 w-48 object-contain mt-8"
+          />
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default ArtistRequirementsForm;

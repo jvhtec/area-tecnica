@@ -6,10 +6,6 @@ export interface FestivalJob {
   end_time: string;
 }
 
-export type ArtistTechnicalInfo = Record<string, unknown>;
-export type ArtistInfrastructureInfo = Record<string, unknown>;
-export type ArtistExtras = Record<string, unknown>;
-
 export interface Artist {
   id: string;
   name: string;
@@ -20,9 +16,9 @@ export interface Artist {
   soundcheck_end?: string;
   show_start: string;
   show_end: string;
-  technical_info: ArtistTechnicalInfo;
-  infrastructure_info: ArtistInfrastructureInfo;
-  extras: ArtistExtras;
+  technical_info: any;
+  infrastructure_info: any;
+  extras: any;
   notes?: string;
 }
 
@@ -52,3 +48,4 @@ export interface ArtistRiderFile {
     name: string;
   } | null;
 }
+

@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { TourDateFormFields } from "./TourDateFormFields";
 import { TourDateListItem } from "./TourDateListItem";
-import { createFoldersForDate, type TourDateObject } from "./tour-date-management/createFoldersForDate";
+import { createFoldersForDate } from "./tour-date-management/createFoldersForDate";
 import { useLocationManagement, LocationDetails } from "@/hooks/useLocationManagement";
 import { useTourDateRealtime } from "@/hooks/useTourDateRealtime";
 import { Checkbox } from "@/components/ui/checkbox";

@@ -46,7 +46,7 @@ export function JobCardNewDetailsOnly({
   return (
     <div className="p-2 bg-gray-50 dark:bg-gray-900">
       <Card
-        className={cn("relative hover:shadow-md transition-all duration-200", cardOpacity, pointerEvents)}
+        className={cn("hover:shadow-md transition-all duration-200", cardOpacity, pointerEvents)}
         style={{
           borderLeftColor: appliedBorderColor,
           borderLeftWidth: "4px",

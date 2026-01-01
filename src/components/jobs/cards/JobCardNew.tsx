@@ -888,7 +888,7 @@ export function JobCardNew({
   }
 
   return (
-      <JobCardNewView
+    <JobCardNewView
       job={job}
       department={department}
       userRole={userRole}
@@ -974,15 +974,14 @@ export function JobCardNew({
       userDepartment={userDepartment}
       myTransportRequest={myTransportRequest}
       allRequests={allRequests}
-        queryClient={queryClient}
-        checkAndFulfillRequest={checkAndFulfillRequest}
-        handleCancelTransportRequest={handleCancelTransportRequest}
-        requirementsDialogOpen={requirementsDialogOpen}
-        flexPickerOpen={flexPickerOpen}
-        setFlexPickerOpen={setFlexPickerOpen}
-        flexPickerOptions={flexPickerOptions}
-        handleFlexPickerConfirm={handleFlexPickerConfirm}
-      />
+      queryClient={queryClient}
+      checkAndFulfillRequest={checkAndFulfillRequest}
+      requirementsDialogOpen={requirementsDialogOpen}
+      flexPickerOpen={flexPickerOpen}
+      setFlexPickerOpen={setFlexPickerOpen}
+      flexPickerOptions={flexPickerOptions}
+      handleFlexPickerConfirm={handleFlexPickerConfirm}
+    />
   );
 }
 

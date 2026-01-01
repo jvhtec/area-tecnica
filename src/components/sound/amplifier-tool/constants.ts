@@ -1,20 +1,20 @@
 export const soundComponentDatabase = [
-  { id: 1, name: "K1", weight: 56 },
-  { id: 2, name: "K2", weight: 43 },
-  { id: 3, name: "K3", weight: 35 },
-  { id: 4, name: "KARA II", weight: 26 },
-  { id: 5, name: "KIVA", weight: 13 },
-  { id: 6, name: "KS28", weight: 79 },
-  { id: 7, name: "SB28", weight: 93 },
-  { id: 8, name: "K1-SB", weight: 83 },
-  { id: 9, name: "KS21", weight: 49 },
-  { id: 10, name: "X15", weight: 21 },
-  { id: 11, name: "115HiQ", weight: 35 },
-  { id: 12, name: "TFS900H", weight: 45 },
-  { id: 13, name: "TFS600A", weight: 35 },
-  { id: 14, name: "TFS550H", weight: 28 },
-  { id: 15, name: "TFS900B", weight: 65 },
-  { id: 16, name: "TFS550L", weight: 42 },
+  { id: 1, name: " K1 ", weight: 56 },
+  { id: 2, name: " K2 ", weight: 43 },
+  { id: 3, name: " K3 ", weight: 35 },
+  { id: 4, name: " KARA II ", weight: 26 },
+  { id: 5, name: " KIVA ", weight: 13 },
+  { id: 6, name: " KS28 ", weight: 79 },
+  { id: 7, name: " SB28 ", weight: 93 },
+  { id: 8, name: " K1-SB ", weight: 83 },
+  { id: 9, name: " KS21 ", weight: 49 },
+  { id: 10, name: " X15 ", weight: 21 },
+  { id: 11, name: " 115HiQ ", weight: 35 },
+  { id: 12, name: " TFS900H ", weight: 45 },
+  { id: 13, name: " TFS600A ", weight: 35 },
+  { id: 14, name: " TFS550H ", weight: 28 },
+  { id: 15, name: " TFS900B ", weight: 65 },
+  { id: 16, name: " TFS550L ", weight: 42 },
 ];
 
 export const sectionSpeakers = {
@@ -51,3 +51,4 @@ export const speakerAmplifierConfig: Record<
 export const isTFSpeaker = (speakerName: string): boolean => {
   return speakerName.trim().startsWith("TFS");
 };
+

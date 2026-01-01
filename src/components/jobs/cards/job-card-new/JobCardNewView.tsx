@@ -19,6 +19,7 @@ import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import type { Department } from "@/types/department";
 
 import { JobCardActions } from "../JobCardActions";
@@ -125,7 +126,6 @@ export interface JobCardNewViewProps {
   allRequests: any[];
   queryClient: any;
   checkAndFulfillRequest: (requestId: string, dept: string) => Promise<void>;
-  handleCancelTransportRequest: (requestId: string) => Promise<void>;
 
   requirementsDialogOpen: boolean;
 
@@ -223,7 +223,6 @@ export function JobCardNewView({
   allRequests,
   queryClient,
   checkAndFulfillRequest,
-  handleCancelTransportRequest,
   requirementsDialogOpen,
   flexPickerOpen,
   setFlexPickerOpen,
@@ -234,7 +233,7 @@ export function JobCardNewView({
     <div>
       <Card
         className={cn(
-          "relative mb-4 hover:shadow-md transition-all duration-200",
+          "mb-4 hover:shadow-md transition-all duration-200",
           !isHouseTech && !isJobBeingDeleted && "cursor-pointer",
           cardOpacity,
           pointerEvents
@@ -474,7 +473,7 @@ export function JobCardNewView({
             <JobAssignmentDialog
               isOpen={assignmentDialogOpen}
               onClose={() => setAssignmentDialogOpen(false)}
-              onAssignmentChange={() => { }}
+              onAssignmentChange={() => {}}
               jobId={job.id}
               department={department as Department}
             />
@@ -530,7 +529,8 @@ export function JobCardNewView({
                                 className="px-3 py-1 text-sm rounded border hover:bg-accent"
                                 onClick={async (ev) => {
                                   ev.stopPropagation();
-                                  await handleCancelTransportRequest(req.id);
+                                  await supabase.from("transport_requests").update({ status: "cancelled" }).eq("id", req.id);
+                                  queryClient.invalidateQueries({ queryKey: ["transport-requests-all", job.id] });
                                 }}
                               >
                                 Cancel Request
@@ -608,3 +608,4 @@ export function JobCardNewView({
     </div>
   );
 }
+

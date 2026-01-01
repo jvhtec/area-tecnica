@@ -7,71 +7,13 @@ import {
   FLEX_FOLDER_IDS,
   RESPONSIBLE_PERSON_IDS,
 } from "@/utils/flex-folders/constants";
-import { createFlexFolder, deleteFlexFolder } from "@/utils/flex-folders/api";
-
-export interface TourDateObject {
-  id: string;
-  date: string;
-  location?: { name?: string | null } | null;
-  is_tour_pack_only?: boolean | null;
-  flex_folders_created?: boolean | null;
-}
+import { createFlexFolder } from "@/utils/flex-folders/api";
 
 export async function createFoldersForDate(
-  dateObj: TourDateObject,
-  tourId: string,
+  dateObj: any,
+  tourId: string | null,
   skipExistingCheck = false
 ) {
-  if (!tourId) {
-    throw new Error("tourId is required to create folders for a tour date");
-  }
-  if (!dateObj?.id) {
-    throw new Error("Tour date id is required to create folders");
-  }
-  if (!dateObj?.date) {
-    throw new Error("Tour date is required to create folders");
-  }
-
-  const dateValue = new Date(dateObj.date);
-  if (Number.isNaN(dateValue.getTime())) {
-    throw new Error(`Invalid tour date: ${dateObj.date}`);
-  }
-
-  const createdFlexElementIds: string[] = [];
-  const createdLocalRows: Array<{ id: string; elementId: string }> = [];
-  let foldersCreationCompleted = false;
-
-  const insertFlexFolderRow = async (payload: any) => {
-    const { data, error } = await supabase.from("flex_folders").insert(payload).select("id, element_id");
-    if (error) throw error;
-    const insertedRow = Array.isArray(data) ? data[0] : data;
-    if (insertedRow?.id && insertedRow?.element_id) {
-      createdLocalRows.push({ id: insertedRow.id, elementId: insertedRow.element_id });
-    }
-  };
-
-  const rollbackCreatedFolders = async () => {
-    if (!createdFlexElementIds.length && !createdLocalRows.length) return;
-
-    const deletedElementIds = new Set<string>();
-    for (const elementId of [...createdFlexElementIds].reverse()) {
-      try {
-        await deleteFlexFolder(elementId);
-        deletedElementIds.add(elementId);
-      } catch (err) {
-        console.error("[createFoldersForDate] Rollback failed deleting Flex element:", elementId, err);
-      }
-    }
-
-    const rowIdsToDelete = createdLocalRows.filter((row) => deletedElementIds.has(row.elementId)).map((row) => row.id);
-    if (rowIdsToDelete.length) {
-      const { error } = await supabase.from("flex_folders").delete().in("id", rowIdsToDelete);
-      if (error) {
-        console.error("[createFoldersForDate] Rollback failed deleting local flex_folders rows:", error);
-      }
-    }
-  };
-
   try {
     console.log("Creating folders for tour date:", dateObj);
 
@@ -111,10 +53,10 @@ export async function createFoldersForDate(
       throw new Error("Parent tour folders not found. Please create tour folders first.");
     }
 
-    const formattedStartDate = dateValue.toISOString().split(".")[0] + ".000Z";
+    const formattedStartDate = new Date(dateObj.date).toISOString().split(".")[0] + ".000Z";
     const formattedEndDate = formattedStartDate;
-    const documentNumber = dateValue.toISOString().slice(2, 10).replace(/-/g, "");
-    const formattedDate = format(dateValue, "MMM d, yyyy");
+    const documentNumber = new Date(dateObj.date).toISOString().slice(2, 10).replace(/-/g, "");
+    const formattedDate = format(new Date(dateObj.date), "MMM d, yyyy");
     const locationName = dateObj.location?.name || "No Location";
 
     const departments: (keyof typeof DEPARTMENT_IDS)[] = ["sound", "lights", "video", "production", "personnel"];
@@ -158,9 +100,8 @@ export async function createFoldersForDate(
       console.log(`Creating main tour date folder for ${dept}:`, mainFolderPayload);
       const mainFolderResponse = await createFlexFolder(mainFolderPayload);
       const mainFolderElementId = mainFolderResponse.elementId;
-      createdFlexElementIds.push(mainFolderElementId);
 
-      await insertFlexFolderRow({
+      await supabase.from("flex_folders").insert({
         tour_date_id: dateObj.id,
         parent_id: parentRow.id,
         element_id: mainFolderElementId,
@@ -198,13 +139,12 @@ export async function createFoldersForDate(
             locationId: FLEX_FOLDER_IDS.location,
             departmentId: DEPARTMENT_IDS[dept],
             documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
-            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept]
           };
           console.log(`Creating subfolder ${sf.name} for ${dept}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
           const subFolderElementId = subResponse.elementId;
-          createdFlexElementIds.push(subFolderElementId);
-          await insertFlexFolderRow({
+          await supabase.from("flex_folders").insert({
             tour_date_id: dateObj.id,
             parent_id: parentRow.id,
             element_id: subFolderElementId,
@@ -240,8 +180,7 @@ export async function createFoldersForDate(
         };
 
         console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
-        const hojaInfoResponse = await createFlexFolder(hojaInfoPayload);
-        createdFlexElementIds.push(hojaInfoResponse.elementId);
+        await createFlexFolder(hojaInfoPayload);
       }
 
       if (dept === "sound") {
@@ -271,8 +210,7 @@ export async function createFoldersForDate(
           console.log(`Creating sound extra subfolder ${sf.name}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
           const subFolderElementId = subResponse.elementId;
-          createdFlexElementIds.push(subFolderElementId);
-          await insertFlexFolderRow({
+          await supabase.from("flex_folders").insert({
             tour_date_id: dateObj.id,
             parent_id: parentRow.id,
             element_id: subFolderElementId,
@@ -302,8 +240,7 @@ export async function createFoldersForDate(
           console.log(`Creating personnel subfolder ${sf.name}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
           const subFolderElementId = subResponse.elementId;
-          createdFlexElementIds.push(subFolderElementId);
-          await insertFlexFolderRow({
+          await supabase.from("flex_folders").insert({
             tour_date_id: dateObj.id,
             parent_id: parentRow.id,
             element_id: subFolderElementId,
@@ -332,8 +269,7 @@ export async function createFoldersForDate(
           console.log(`Creating personnel crew call subfolder ${sf.name}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
           const subFolderElementId = subResponse.elementId;
-          createdFlexElementIds.push(subFolderElementId);
-          await insertFlexFolderRow({
+          await supabase.from("flex_folders").insert({
             tour_date_id: dateObj.id,
             parent_id: parentRow.id,
             element_id: subFolderElementId,
@@ -343,7 +279,6 @@ export async function createFoldersForDate(
         }
       }
     }
-    foldersCreationCompleted = true;
 
     const { error: updateError } = await supabase
       .from("tour_dates")
@@ -356,9 +291,7 @@ export async function createFoldersForDate(
     return true;
   } catch (error: any) {
     console.error("Error creating folders for tour date:", error);
-    if (!foldersCreationCompleted) {
-      await rollbackCreatedFolders();
-    }
     throw error;
   }
 }
+
