@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Department } from "@/types/department";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, Copy, RefreshCcw } from "lucide-react";
+import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, Copy, RefreshCcw, Shield, ExternalLink } from "lucide-react";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
@@ -667,6 +667,53 @@ export const Profile = () => {
                     'Actualizar contraseña'
                   )}
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Data & Privacy */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Datos y Privacidad
+              </CardTitle>
+              <CardDescription>
+                Gestiona tus datos personales y preferencias de privacidad.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <Link
+                  to="/privacy"
+                  target="_blank"
+                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted transition-colors"
+                >
+                  <span className="text-sm font-medium">Politica de Privacidad</span>
+                  <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                </Link>
+
+                <a
+                  href="mailto:info@sector-pro.com?subject=Solicitud%20de%20datos%20personales"
+                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted transition-colors"
+                >
+                  <div>
+                    <span className="text-sm font-medium block">Solicitar mis datos</span>
+                    <span className="text-xs text-muted-foreground">Recibe una copia de tus datos personales</span>
+                  </div>
+                  <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                </a>
+
+                <a
+                  href="mailto:info@sector-pro.com?subject=Solicitud%20de%20eliminacion%20de%20cuenta"
+                  className="flex items-center justify-between p-3 rounded-lg border border-destructive/30 hover:bg-destructive/10 transition-colors text-destructive"
+                >
+                  <div>
+                    <span className="text-sm font-medium block">Eliminar mi cuenta</span>
+                    <span className="text-xs opacity-80">Solicita la eliminacion permanente de tus datos</span>
+                  </div>
+                  <ExternalLink className="h-4 w-4" />
+                </a>
               </div>
             </CardContent>
           </Card>

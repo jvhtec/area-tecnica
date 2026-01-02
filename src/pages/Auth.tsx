@@ -440,9 +440,19 @@ const Auth = () => {
           </div>
 
           {/* Footer */}
-          <p className="text-center text-slate-500 text-xs mt-6">
-            © {new Date().getFullYear()} {BRAND_CONFIG.name}. Todos los derechos reservados.
-          </p>
+          <div className="text-center text-slate-500 text-xs mt-6 space-y-2">
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-slate-300 transition-colors"
+            >
+              Politica de Privacidad
+            </a>
+            <p>
+              © {new Date().getFullYear()} {BRAND_CONFIG.name}. Todos los derechos reservados.
+            </p>
+          </div>
         </div>
       </div>
 

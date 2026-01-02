@@ -76,6 +76,7 @@ const Feedback = lazy(() => import('@/pages/Feedback'));
 const SoundVisionFiles = lazy(() => import('@/pages/SoundVisionFiles'));
 const Layout = lazy(() => import('@/components/layout/Layout'));
 const AuthenticatedShell = lazy(() => import('@/routes/AuthenticatedShell'));
+const Privacy = lazy(() => import('@/pages/Privacy'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -168,6 +169,7 @@ export default function App() {
                           <Route path="/wallboard/public/:token/:presetSlug?" element={<WallboardPublic />} />
 
                           {/* Public Routes */}
+                          <Route path="/privacy" element={<Privacy />} />
                           <Route path="festival">
                             <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
                             <Route path="form-submitted" element={<FormSubmitted />} />
