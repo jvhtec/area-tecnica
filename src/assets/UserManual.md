@@ -24,7 +24,6 @@ This manual provides an overview of the application's features and workflows.
    - [LightsMemoriaTecnica](#lightsmemoratecnica)
    - [LightsPesosTool](#lightspesostool)
    - [Logistics](#logistics)
-   - [Operaciones](#operaciones)
    - [Personal](#personal)
    - [PesosTool](#pesostool)
    - [Profile](#profile)
@@ -187,12 +186,6 @@ This application is designed to streamline various aspects of event management, 
 - **Workflow**:
     1. Access the Logistics page.
     2. Organize and manage transportation, scheduling, and other logistical details.
-
-### Operaciones
-- **Purpose**: Likely for managing operational tasks or data.
-- **Workflow**:
-    1. Navigate to the Operaciones page.
-    2. Perform or track operational tasks.
 
 ### Personal
 - **Purpose**: Manages personnel information and assignments.

@@ -157,6 +157,21 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
   ],
 };
 
+const ROUTE_QUERY_KEY_OVERRIDES: Record<string, string | string[]> = {
+  jobs: ['optimized-jobs'],
+  job_assignments: ['optimized-jobs'],
+  job_departments: ['optimized-jobs'],
+  job_documents: ['optimized-jobs'],
+  flex_folders: ['optimized-jobs'],
+  locations: ['optimized-jobs'],
+  job_date_types: ['date-types'],
+  messages: ['messages'],
+  direct_messages: ['direct_messages'],
+};
+
+const getRouteQueryKeyForTable = (table: string): string | string[] =>
+  ROUTE_QUERY_KEY_OVERRIDES[table] ?? [table];
+
 // Default tables that should be monitored on all routes
 const GLOBAL_TABLES: Array<{ table: string, priority: 'high' | 'medium' | 'low' }> = [
   { table: 'profiles', priority: 'medium' }
@@ -331,7 +346,8 @@ export function useEnhancedRouteSubscriptions() {
     if (isLeader) {
       allTables.forEach(({ table, priority }) => {
         console.log(`Subscribing to ${table} with priority ${priority}`);
-        const subscription = manager.subscribeToTable(table, table, undefined, priority);
+        const queryKey = getRouteQueryKeyForTable(table);
+        const subscription = manager.subscribeToTable(table, queryKey, undefined, priority);
         manager.registerRouteSubscription(routeKey, subscription.key);
       });
     } else {

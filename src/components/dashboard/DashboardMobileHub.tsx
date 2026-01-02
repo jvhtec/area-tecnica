@@ -22,6 +22,8 @@ import { Badge } from "@/components/ui/badge";
 
 interface DashboardMobileHubProps {
   jobs: any[];
+  date: Date | undefined;
+  onDateSelect: (date: Date | undefined) => void;
   userRole: string | null;
   onEditClick: (job: any) => void;
   onDeleteClick: (jobId: string) => void;
@@ -43,6 +45,8 @@ const themeTokens = {
 
 export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   jobs,
+  date,
+  onDateSelect,
   userRole,
   onEditClick,
   onDeleteClick,
@@ -51,7 +55,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   onEmailClick,
 }) => {
   const isMobile = useIsMobile();
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const selectedDate = date ?? new Date();
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
   const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([]);
@@ -181,9 +185,9 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }, [jobs, selectedDate, selectedJobTypes, selectedJobStatuses]);
 
-  const handlePrevDay = () => setSelectedDate(prev => subDays(prev, 1));
-  const handleNextDay = () => setSelectedDate(prev => addDays(prev, 1));
-  const handleToday = () => setSelectedDate(new Date());
+  const handlePrevDay = () => onDateSelect(subDays(selectedDate, 1));
+  const handleNextDay = () => onDateSelect(addDays(selectedDate, 1));
+  const handleToday = () => onDateSelect(new Date());
 
   if (!isMobile) return null;
 
@@ -365,7 +369,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                   selected={selectedDate}
                   onSelect={(date) => {
                     if (date) {
-                      setSelectedDate(date);
+                      onDateSelect(date);
                       setCalendarOpen(false);
                     }
                   }}

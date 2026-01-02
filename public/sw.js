@@ -11,7 +11,6 @@ const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`
 const APP_SHELL_FILES = [
   '/',
   '/manifest.json',
-  '/favicon.ico',
   '/icon-192.png',
   '/icon-512.png',
   '/icon-maskable-192.png',

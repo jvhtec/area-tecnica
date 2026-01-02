@@ -177,6 +177,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
         queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
         queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
         queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
+        queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
         queryClient.invalidateQueries({ queryKey: ['jobs'] });
     };
 

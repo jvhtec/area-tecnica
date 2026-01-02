@@ -37,10 +37,10 @@ interface JobPayoutTotalsPanelProps {
   technicianId?: string;
 }
 
-const cardBase = "bg-[#0f1219] border-[#1f232e] text-white overflow-hidden";
-const surface = "bg-[#151820] border-[#2a2e3b]";
-const subtleText = "text-slate-300";
-const controlButton = "bg-white/5 border-white/10 text-white hover:bg-white/10";
+const cardBase = "bg-card border-border text-card-foreground overflow-hidden";
+const surface = "bg-muted/30 border-border";
+const subtleText = "text-muted-foreground";
+const controlButton = "variant-outline border-border";
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
 
 export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPanelProps) {
@@ -617,7 +617,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     return (
       <Card className={`${cardBase} w-full`}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg text-white">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Euro className="h-5 w-5" />
             Pagos del trabajo
           </CardTitle>
@@ -633,7 +633,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     return (
       <Card className={`${cardBase} w-full`}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg text-white">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Euro className="h-5 w-5" />
             Pagos del trabajo
           </CardTitle>
@@ -656,7 +656,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     return (
       <Card className={`${cardBase} w-full`}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg text-white">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Euro className="h-5 w-5" />
             Pagos del trabajo
           </CardTitle>
@@ -672,7 +672,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     <Card className={`${cardBase} w-full`}>
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <CardTitle className="flex items-center gap-2 text-lg text-white">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Euro className="h-5 w-5" />
             Pagos del trabajo
           </CardTitle>
@@ -700,7 +700,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 text-white w-full overflow-hidden">
+      <CardContent className="space-y-4 w-full overflow-hidden">
         {payoutTotals.map((payout) => (
           <div
             key={payout.technician_id}
@@ -715,7 +715,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
               <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h4 className="font-medium text-base text-white">{getTechName(payout.technician_id)}</h4>
+                  <h4 className="font-medium text-base">{getTechName(payout.technician_id)}</h4>
                   {(() => {
                     const label = getAutonomoBadgeLabel(autonomoMap.get(payout.technician_id));
                     if (!label) return null;
@@ -730,27 +730,27 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                     );
                   })()}
                 </div>
-                <div className="flex flex-col gap-1 text-xs text-slate-300 break-words">
+                <div className="flex flex-col gap-1 text-xs text-foreground/70 dark:text-muted-foreground break-words">
                   <span>Trabajo: {payout.job_id}</span>
                   <span>
                     Correo:{' '}
                     {profileMap.get(payout.technician_id)?.email ? (
                       profileMap.get(payout.technician_id)?.email
                     ) : (
-                      <span className="text-amber-300 font-medium">Sin correo configurado</span>
+                      <span className="text-amber-700 dark:text-amber-300 font-medium">Sin correo configurado</span>
                     )}
                   </span>
                 </div>
                 {!profileMap.get(payout.technician_id)?.email && (
                   <Badge
                     variant="outline"
-                    className="mt-2 text-amber-300 border-amber-500/40 bg-amber-500/10"
+                    className="mt-2 text-amber-600 border-amber-500/40 bg-amber-500/10 dark:text-amber-300"
                   >
                     Sin correo
                   </Badge>
                 )}
                 {lpoMap.has(payout.technician_id) && (
-                  <div className="text-xs text-slate-300 flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground flex items-center gap-2">
                     <span>LPO Nº: {lpoMap.get(payout.technician_id) || '—'}</span>
                     {(() => {
                       const elId = flexElementMap.get(payout.technician_id) || null;
@@ -773,8 +773,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
               </div>
               <div className="text-right flex flex-col items-end gap-2 sm:min-w-[140px]">
                 {!isTourDate && (
-                  <div className="flex items-center gap-2 mb-1 bg-black/20 p-1.5 rounded-md border border-white/5">
-                    <label htmlFor={`approve-${payout.technician_id}`} className="text-xs text-slate-300 cursor-pointer select-none">
+                  <div className="flex items-center gap-2 mb-1 bg-muted p-1.5 rounded-md border border-border">
+                    <label htmlFor={`approve-${payout.technician_id}`} className="text-xs text-muted-foreground cursor-pointer select-none">
                       {payout.payout_approved ? 'Aprobado' : 'Pendiente'}
                     </label>
                     <Switch
@@ -789,7 +789,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                     />
                   </div>
                 )}
-                <div className="text-xl font-bold text-white leading-tight">
+                <div className="text-xl font-bold leading-tight">
                   {(() => {
                     const isNonAutonomo = autonomoMap.get(payout.technician_id) === false;
                     let deduction = 0;
@@ -842,7 +842,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-slate-400" />
+                  <Clock className="h-4 w-4 text-muted-foreground" />
                   <span>Partes aprobados:</span>
                 </div>
                 <Badge variant={payout.timesheets_total_eur > 0 ? 'default' : 'secondary'}>
@@ -855,7 +855,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                 <>
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-slate-400" />
+                      <CheckCircle className="h-4 w-4 text-muted-foreground" />
                       <span>Extras del trabajo:</span>
                     </div>
                     <Badge variant="outline">
@@ -867,7 +867,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                   {payout.extras_breakdown?.items && payout.extras_breakdown.items.length > 0 && (
                     <div className="ml-6 space-y-1">
                       {payout.extras_breakdown.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-xs text-slate-300">
+                        <div key={idx} className="flex justify-between text-xs text-muted-foreground">
                           <span>
                             {item.extra_type.replace('_', ' ')} × {item.quantity}
                           </span>
@@ -883,9 +883,9 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             {/* Vehicle disclaimer */}
             {payout.vehicle_disclaimer && payout.vehicle_disclaimer_text && (
               <>
-                <Separator className="border-white/10" />
-                <div className="flex items-start gap-2 text-sm text-amber-200 bg-amber-500/10 p-3 rounded border border-amber-500/30 w-full">
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-300" />
+                <Separator className="border-border" />
+                <div className="flex items-start gap-2 text-sm text-yellow-800 bg-yellow-500/10 p-3 rounded border border-yellow-500/30 dark:text-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30 w-full">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-yellow-600 dark:text-amber-300" />
                   <span className="break-words whitespace-pre-wrap leading-snug w-full">
                     {payout.vehicle_disclaimer_text.includes('Fuel/drive compensation')
                       ? 'Puede aplicarse compensación de combustible/conducción al usar vehículo propio. Coordina con RR. HH. por cada trabajo.'
@@ -895,7 +895,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
               </>
             )}
 
-            <Separator className="border-white/10" />
+            <Separator className="border-border" />
 
             {/* Payout Override Section (Admin/Management only) */}
             {isManager && (() => {
@@ -921,10 +921,10 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
               );
             })()}
 
-            <Separator className="border-white/10" />
+            <Separator className="border-border" />
 
             {/* Final total */}
-            <div className="flex items-center justify-between font-medium text-white">
+            <div className="flex items-center justify-between font-medium">
               <span>Total final:</span>
               <Badge variant="default" className="text-base px-3 py-1">
                 {formatCurrency(getTechOverride(payout.technician_id)?.override_amount_eur ?? payout.total_eur)}
@@ -935,21 +935,21 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
 
         {/* Grand total if multiple technicians */}
         {payoutTotals.length > 1 && (
-          <div className="mt-6 p-4 bg-white/5 rounded-lg border border-white/10 text-white">
+          <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border">
             <div className="flex justify-between items-center text-lg font-bold">
               <span>Total global del trabajo:</span>
               <div className="flex items-center gap-2">
-                <span className="text-blue-300">
+                <span className="text-blue-600 dark:text-blue-300">
                   {formatCurrency(calculatedGrandTotal)}
                 </span>
                 {payoutOverrides.length > 0 && (
-                  <Badge variant="outline" className="text-amber-300 border-amber-500/40 bg-amber-500/10">
+                  <Badge variant="outline" className="text-amber-700 border-amber-500/30 bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/40 dark:bg-amber-500/10">
                     {payoutOverrides.length} override{payoutOverrides.length > 1 ? 's' : ''}
                   </Badge>
                 )}
               </div>
             </div>
-            <div className="text-sm text-slate-300 mt-2 space-y-1">
+            <div className="text-sm text-foreground/70 dark:text-muted-foreground mt-2 space-y-1">
               <div className="flex justify-between">
                 <span>Total partes:</span>
                 <span>

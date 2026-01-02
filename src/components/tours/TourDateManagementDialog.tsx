@@ -341,6 +341,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
         queryClient.invalidateQueries({ queryKey: ["tours"] }),
+        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
         queryClient.invalidateQueries({ queryKey: ["job-assignments"] }),
         queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] }),
@@ -501,6 +502,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
         queryClient.invalidateQueries({ queryKey: ["tours"] }),
+        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
       ]);
 
@@ -680,6 +682,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
         queryClient.invalidateQueries({ queryKey: ["tours"] }),
         queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] }),
+        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
         queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] }),
       ]);

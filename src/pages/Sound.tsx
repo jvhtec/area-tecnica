@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
-import { useJobs } from "@/hooks/useJobs";
-import { isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
+import { addDays, endOfDay, endOfMonth, isWithinInterval, startOfDay, startOfMonth, subDays } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -15,12 +15,8 @@ import type { JobType } from "@/types/job";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ReportGenerator } from "../components/sound/ReportGenerator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AmplifierTool } from "@/components/sound/AmplifierTool";
 import { useNavigate } from "react-router-dom";
-import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
-import { IncidentReport } from "@/components/sound/tools/IncidentReport";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { SoundVisionAccessRequestDialog } from "@/components/soundvision/SoundVisionAccessRequestDialog";
@@ -32,6 +28,25 @@ import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDetailsModal";
 import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
 import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
+
+const ReportGenerator = lazy(() =>
+  import("@/components/sound/ReportGenerator").then((m) => ({ default: m.ReportGenerator }))
+);
+const AmplifierTool = lazy(() =>
+  import("@/components/sound/AmplifierTool").then((m) => ({ default: m.AmplifierTool }))
+);
+const MemoriaTecnica = lazy(() =>
+  import("@/components/sound/MemoriaTecnica").then((m) => ({ default: m.MemoriaTecnica }))
+);
+const IncidentReport = lazy(() =>
+  import("@/components/sound/tools/IncidentReport").then((m) => ({ default: m.IncidentReport }))
+);
+
+const dialogLazyFallback = (
+  <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+    Cargando…
+  </div>
+);
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -56,7 +71,10 @@ const Sound = () => {
   const [showMobileAssignments, setShowMobileAssignments] = useState(false);
 
   const currentDepartment = "sound";
-  const { data: jobs } = useJobs();
+  const monthAnchor = date ?? new Date();
+  const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
+  const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
+  const { data: jobs = [] } = useOptimizedJobs(currentDepartment as any, jobsRangeStart, jobsRangeEnd);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { userRole, hasSoundVisionAccess, userDepartment } = useOptimizedAuth();
@@ -128,6 +146,18 @@ const Sound = () => {
   const goToPesosTool = useCallback(() => navigate('/pesos-tool'), [navigate]);
   const goToConsumosTool = useCallback(() => navigate('/consumos-tool'), [navigate]);
   const goToSoundVisionFiles = useCallback(() => navigate('/soundvision-files'), [navigate]);
+  const handleDateTypeChange = useCallback(() => { }, []);
+
+  const handleCreateJob = useCallback((preset?: JobType) => {
+    setPresetJobType(preset);
+    setIsJobDialogOpen(true);
+  }, []);
+
+  const openCreateJob = useCallback(() => {
+    handleCreateJob(undefined);
+  }, [handleCreateJob]);
+
+  const goToStaff = useCallback(() => navigate('/personal'), [navigate]);
 
   // Comprehensive tools array with dialogs and routes (no Festivals)
   const allTools = useMemo(
@@ -178,25 +208,17 @@ const Sound = () => {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const getDepartmentJobs = () => {
-    if (!jobs) return [];
-    return jobs.filter(job => {
-      if (job.job_type === 'tour') return false;
-
-      const isInDepartment = job.job_departments?.some(dept =>
-        dept.department === currentDepartment
-      );
-      if (job.tour_date_id) {
-        return isInDepartment && job.tour_date;
-      }
-      return isInDepartment;
+  const departmentJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      if (job.job_type === "tour") return false;
+      return job.job_departments?.some((dept: any) => dept.department === currentDepartment);
     });
-  };
+  }, [jobs, currentDepartment]);
 
-  const getSelectedDateJobs = () => {
-    if (!date || !jobs) return [];
+  const selectedDateJobs = useMemo(() => {
+    if (!date) return [];
     const selectedDate = startOfDay(date);
-    return getDepartmentJobs().filter(job => {
+    return departmentJobs.filter((job) => {
       const jobStartDate = startOfDay(new Date(job.start_time));
       const jobEndDate = endOfDay(new Date(job.end_time));
 
@@ -205,11 +227,11 @@ const Sound = () => {
         end: jobEndDate
       });
     });
-  };
+  }, [date, departmentJobs]);
 
-  const handleJobClick = (jobId: string) => {
+  const handleJobClick = useCallback((jobId: string) => {
     if (isMobile) {
-      const jobData = jobs?.find(j => j.id === jobId) || null;
+      const jobData = departmentJobs.find((job) => job.id === jobId) || null;
       setSelectedJobForAssignments(jobData);
       setShowMobileAssignments(true);
       setSelectedJobId(jobId);
@@ -217,14 +239,14 @@ const Sound = () => {
     }
     setSelectedJobId(jobId);
     setIsAssignmentDialogOpen(true);
-  };
+  }, [departmentJobs, isMobile]);
 
-  const handleEditClick = (job: any) => {
+  const handleEditClick = useCallback((job: any) => {
     setSelectedJob(job);
     setIsEditDialogOpen(true);
-  };
+  }, []);
 
-  const handleDeleteClick = async (jobId: string) => {
+  const handleDeleteClick = useCallback(async (jobId: string) => {
     if (!["admin", "management"].includes(userRole || "")) {
       toast({
         title: "Permission denied",
@@ -244,7 +266,7 @@ const Sound = () => {
           title: "Job deleted",
           description: result.details || "The job has been removed and cleanup is running in background."
         });
-        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
@@ -256,7 +278,53 @@ const Sound = () => {
         variant: "destructive"
       });
     }
-  };
+  }, [queryClient, toast, userRole]);
+
+  const handleViewDetails = useCallback((job: any) => {
+    setSelectedJobForDetails(job);
+    setShowJobDetails(true);
+  }, []);
+
+  const handleManageAssignments = useCallback((job: any) => {
+    setSelectedJobForAssignments(job);
+    setSelectedJobId(job?.id || null);
+    setShowMobileAssignments(true);
+  }, []);
+
+  const handleJobCreated = useCallback((job: any) => {
+    setSelectedJobId(job.id);
+    if (isMobile) {
+      setSelectedJobForAssignments(job);
+      setShowMobileAssignments(true);
+    } else {
+      setIsAssignmentDialogOpen(true);
+    }
+  }, [isMobile]);
+
+  const handleJobDetailsOpenChange = useCallback((open: boolean) => {
+    setShowJobDetails(open);
+    if (!open) {
+      setSelectedJobForDetails(null);
+    }
+  }, []);
+
+  const handleCloseJobDetails = useCallback(() => {
+    setShowJobDetails(false);
+    setSelectedJobForDetails(null);
+  }, []);
+
+  const handleAssignmentDialogClose = useCallback(() => {
+    setIsAssignmentDialogOpen(false);
+  }, []);
+
+  const handleAssignmentChange = useCallback(() => { }, []);
+
+  const handleEditDialogOpenChange = useCallback((open: boolean) => {
+    setIsEditDialogOpen(open);
+    if (!open) {
+      setSelectedJob(null);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -268,22 +336,18 @@ const Sound = () => {
             title="Departamento de sonido"
             icon={Music}
             tools={allTools}
+            jobs={jobs}
+            date={date ?? new Date()}
+            onDateSelect={(nextDate) => setDate(nextDate)}
             canCreateJob={userRole ? ["admin", "management"].includes(userRole) : false}
-            onCreateJob={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
+            onCreateJob={openCreateJob}
             userRole={userRole}
             onEditJob={handleEditClick}
             onDeleteJob={handleDeleteClick}
             onJobClick={handleJobClick}
-            onViewDetails={(job) => {
-              setSelectedJobForDetails(job);
-              setShowJobDetails(true);
-            }}
-            onManageAssignments={(job) => {
-              setSelectedJobForAssignments(job);
-              setSelectedJobId(job?.id || null);
-              setShowMobileAssignments(true);
-            }}
-            onStaffClick={() => navigate('/personal')}
+            onViewDetails={handleViewDetails}
+            onManageAssignments={handleManageAssignments}
+            onStaffClick={goToStaff}
           />
           <MobileNavBar
             primaryItems={primaryItems}
@@ -299,7 +363,7 @@ const Sound = () => {
         <div className="p-4 md:p-8">
           <div className="mx-auto w-full max-w-full space-y-6">
             <LightsHeader
-              onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
+              onCreateJob={handleCreateJob}
               department="Sound"
               canCreate={userRole ? ["admin", "management"].includes(userRole) : true}
             />
@@ -397,9 +461,9 @@ const Sound = () => {
                     <CalendarSection
                       date={date}
                       onDateSelect={setDate}
-                      jobs={getDepartmentJobs()}
+                      jobs={departmentJobs}
                       department={currentDepartment}
-                      onDateTypeChange={() => { }}
+                      onDateTypeChange={handleDateTypeChange}
                     />
                   </CardContent>
                 </Card>
@@ -407,7 +471,7 @@ const Sound = () => {
               <div className="xl:col-span-4 2xl:col-span-3">
                 <div className="bg-card rounded-xl border border-border shadow-sm">
                   <TodaySchedule
-                    jobs={getSelectedDateJobs()}
+                    jobs={selectedDateJobs}
                     onEditClick={handleEditClick}
                     onDeleteClick={handleDeleteClick}
                     onJobClick={handleJobClick}
@@ -424,7 +488,7 @@ const Sound = () => {
             {/* Desktop FAB */}
             <Button
               className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
-              onClick={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
+              onClick={openCreateJob}
             >
               <Plus className="h-6 w-6" />
             </Button>
@@ -440,98 +504,105 @@ const Sound = () => {
           currentDepartment={currentDepartment}
           initialDate={date}
           initialJobType={presetJobType}
-          onCreated={(job) => {
-            setSelectedJobId(job.id);
-            if (isMobile) {
-              setSelectedJobForAssignments(job);
-              setShowMobileAssignments(true);
-            } else {
-              setIsAssignmentDialogOpen(true);
-            }
-          }}
+          onCreated={handleJobCreated}
         />
       )}
 
-      {!isMobile && selectedJobId && (
+      {!isMobile && selectedJobId && isAssignmentDialogOpen ? (
         <JobAssignmentDialog
           isOpen={isAssignmentDialogOpen}
-          onClose={() => setIsAssignmentDialogOpen(false)}
-          onAssignmentChange={() => { }}
+          onClose={handleAssignmentDialogClose}
+          onAssignmentChange={handleAssignmentChange}
           jobId={selectedJobId}
           department={currentDepartment}
         />
-      )}
+      ) : null}
 
-      {selectedJob && (
+      {selectedJob && isEditDialogOpen ? (
         <EditJobDialog
           open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
+          onOpenChange={handleEditDialogOpenChange}
           job={selectedJob}
         />
-      )}
+      ) : null}
 
-      <Dialog open={showReportGenerator} onOpenChange={setShowReportGenerator}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Generador de Reportes</DialogTitle>
-          </DialogHeader>
-          <ReportGenerator />
-        </DialogContent>
-      </Dialog>
+      {showReportGenerator ? (
+        <Dialog open={showReportGenerator} onOpenChange={setShowReportGenerator}>
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Generador de Reportes</DialogTitle>
+            </DialogHeader>
+            <Suspense fallback={dialogLazyFallback}>
+              <ReportGenerator />
+            </Suspense>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
-      <Dialog open={showAmplifierTool} onOpenChange={setShowAmplifierTool}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Calculadora de Amplificadores</DialogTitle>
-          </DialogHeader>
-          <AmplifierTool />
-        </DialogContent>
-      </Dialog>
+      {showAmplifierTool ? (
+        <Dialog open={showAmplifierTool} onOpenChange={setShowAmplifierTool}>
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Calculadora de Amplificadores</DialogTitle>
+            </DialogHeader>
+            <Suspense fallback={dialogLazyFallback}>
+              <AmplifierTool />
+            </Suspense>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
-      <Dialog open={showMemoriaTecnica} onOpenChange={setShowMemoriaTecnica}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Memoria Técnica</DialogTitle>
-          </DialogHeader>
-          <MemoriaTecnica />
-        </DialogContent>
-      </Dialog>
+      {showMemoriaTecnica ? (
+        <Dialog open={showMemoriaTecnica} onOpenChange={setShowMemoriaTecnica}>
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Memoria Técnica</DialogTitle>
+            </DialogHeader>
+            <Suspense fallback={dialogLazyFallback}>
+              <MemoriaTecnica />
+            </Suspense>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
-      <Dialog open={showIncidentReport} onOpenChange={setShowIncidentReport}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Reporte de Incidencia</DialogTitle>
-          </DialogHeader>
-          <IncidentReport />
-        </DialogContent>
-      </Dialog>
+      {showIncidentReport ? (
+        <Dialog open={showIncidentReport} onOpenChange={setShowIncidentReport}>
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Reporte de Incidencia</DialogTitle>
+            </DialogHeader>
+            <Suspense fallback={dialogLazyFallback}>
+              <IncidentReport />
+            </Suspense>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
-      <SoundVisionAccessRequestDialog
-        open={showAccessRequestDialog}
-        onOpenChange={setShowAccessRequestDialog}
-      />
+      {showAccessRequestDialog ? (
+        <SoundVisionAccessRequestDialog
+          open={showAccessRequestDialog}
+          onOpenChange={setShowAccessRequestDialog}
+        />
+      ) : null}
 
       {isMobile && selectedJobForDetails && showJobDetails && (
         <EnhancedJobDetailsModal
           theme={mobileTheme}
           isDark
           job={selectedJobForDetails}
-          onClose={() => {
-            setShowJobDetails(false);
-            setSelectedJobForDetails(null);
-          }}
+          onClose={handleCloseJobDetails}
           userRole={userRole}
           department={currentDepartment}
         />
       )}
-      {!isMobile && selectedJobForDetails && (
+      {!isMobile && selectedJobForDetails && showJobDetails ? (
         <JobDetailsDialog
           open={showJobDetails}
-          onOpenChange={setShowJobDetails}
+          onOpenChange={handleJobDetailsOpenChange}
           job={selectedJobForDetails}
           department={currentDepartment}
         />
-      )}
+      ) : null}
 
       {isMobile && selectedJobForAssignments && (
         <MobileAssignmentsDialog

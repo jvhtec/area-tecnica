@@ -57,7 +57,7 @@ export interface JobCardNewViewProps {
   isCreatingFolders: boolean;
   isCreatingLocalFolders: boolean;
 
-  personnel: any[];
+  techName?: string;
   assignments: any[];
   jobTimesheets?: any[];
   documents: any[];
@@ -161,7 +161,7 @@ export function JobCardNewView({
   canManageArtists,
   isCreatingFolders,
   isCreatingLocalFolders,
-  personnel,
+  techName,
   assignments,
   jobTimesheets,
   documents,
@@ -298,10 +298,7 @@ export function JobCardNewView({
             department={department}
             isCreatingFolders={isCreatingFolders}
             isCreatingLocalFolders={isCreatingLocalFolders}
-            techName={
-              personnel?.find((p) => p.id === assignments.find((a) => a.technician_id)?.technician_id)?.display_name ||
-              ""
-            }
+            techName={techName || ""}
             onRefreshData={refreshData}
             onEditButtonClick={handleEditButtonClick}
             onDeleteClick={handleDeleteClick}
@@ -608,4 +605,3 @@ export function JobCardNewView({
     </div>
   );
 }
-

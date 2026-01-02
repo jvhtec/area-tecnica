@@ -29,11 +29,14 @@ export const useOptimizedJobs = (
 
   const fetchOptimizedJobs = async () => {
     const startTime = Date.now();
-    console.log("useOptimizedJobs: Fetching optimized jobs data", sanitizeLogData({
-      department,
-      startDate: startDate?.toISOString(),
-      endDate: endDate?.toISOString()
-    }));
+    const debug = import.meta.env.DEV;
+    if (debug) {
+      console.log("useOptimizedJobs: Fetching optimized jobs data", sanitizeLogData({
+        department,
+        startDate: startDate?.toISOString(),
+        endDate: endDate?.toISOString()
+      }));
+    }
     
     let query = supabase
       .from('jobs')
@@ -91,8 +94,9 @@ export const useOptimizedJobs = (
       query = query.eq('job_departments.department', department);
     }
 
+    // Date-range filtering should include jobs that overlap the window (multi-day jobs).
     if (startDate) {
-      query = query.gte('start_time', startDate.toISOString());
+      query = query.gte('end_time', startDate.toISOString());
     }
 
     if (endDate) {
@@ -162,7 +166,9 @@ export const useOptimizedJobs = (
       });
 
     const duration = Date.now() - startTime;
-    console.log(`useOptimizedJobs: Successfully fetched ${filteredJobs.length} jobs in ${duration}ms`);
+    if (debug) {
+      console.log(`useOptimizedJobs: Successfully fetched ${filteredJobs.length} jobs in ${duration}ms`);
+    }
 
     // Log performance warning if query is slow
     if (duration > 2000) {

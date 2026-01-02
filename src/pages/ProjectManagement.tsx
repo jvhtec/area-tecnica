@@ -64,14 +64,14 @@ const ProjectManagement = () => {
   }, [authLoading, userDepartment]);
 
   // Use custom hook to keep the "jobs" tab active/visible.
-  useTabVisibility(["jobs"]);
+  useTabVisibility(["optimized-jobs"]);
   
   // Force subscription to required tables
   useEffect(() => {
     forceSubscribe([
-      { table: 'jobs', queryKey: 'jobs' },
-      { table: 'job_assignments', queryKey: 'job_assignments' },
-      { table: 'job_departments', queryKey: 'job_departments' }
+      { table: 'jobs', queryKey: ['optimized-jobs'], priority: 'high' },
+      { table: 'job_assignments', queryKey: ['optimized-jobs'], priority: 'medium' },
+      { table: 'job_departments', queryKey: ['optimized-jobs'], priority: 'medium' }
     ]);
   }, [forceSubscribe]);
 

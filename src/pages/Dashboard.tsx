@@ -1,7 +1,7 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
-import { format } from "date-fns";
+import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
@@ -56,7 +56,8 @@ const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
 const Dashboard = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { userRole: authUserRole, isLoading: authLoading } = useOptimizedAuth();
+  const { userRole, user, isLoading: authLoading } = useOptimizedAuth();
+  const userId = user?.id ?? "";
   const lazyFallback = (
     <div className="flex items-center justify-center py-6">
       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -67,15 +68,11 @@ const Dashboard = () => {
   useEffect(() => {
     if (authLoading) return;
 
-    if (authUserRole && !['admin', 'management', 'logistics'].includes(authUserRole)) {
-      const redirectPath = getDashboardPath(authUserRole as any);
+    if (userRole && !['admin', 'management', 'logistics'].includes(userRole)) {
+      const redirectPath = getDashboardPath(userRole as any);
       navigate(redirectPath, { replace: true });
     }
-  }, [authUserRole, authLoading, navigate]);
-
-  // User data & preferences
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  }, [userRole, authLoading, navigate]);
 
   // Dashboard state
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -91,15 +88,18 @@ const Dashboard = () => {
   const [emailComposerOpen, setEmailComposerOpen] = useState(false);
 
   // Data fetching with optimized hook
-  const { data: jobs, isLoading } = useOptimizedJobs();
+  const monthAnchor = date ?? new Date();
+  const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
+  const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
+  const { data: jobs = [], isLoading } = useOptimizedJobs(undefined, jobsRangeStart, jobsRangeEnd);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   // Ensure realtime updates for messages are wired
-  useOptimizedMessagesSubscriptions(userId || '');
+  useOptimizedMessagesSubscriptions(userId);
 
   const { data: pendingExpensesSummary, isLoading: isLoadingPendingExpenses } = useQuery({
     queryKey: ['dashboard-expenses-summary'],
-    enabled: !!authUserRole && ['admin', 'management', 'logistics'].includes(authUserRole),
+    enabled: !!userRole && ['admin', 'management', 'logistics'].includes(userRole),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('job_expenses')
@@ -126,67 +126,36 @@ const Dashboard = () => {
     staleTime: 15_000,
   });
 
-  // Fetch user data
+  // Parse optional deep-link params (e.g. open messages dialog)
   useEffect(() => {
-    const fetchUserRoleAndPrefs = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id) {
-        setUserId(session.user.id);
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
+    if (authLoading) return;
+    if (!userRole || !["admin", "management"].includes(userRole)) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("showMessages") === "true") {
+      setMessagesOpen(true);
+    }
+  }, [authLoading, userRole]);
 
-        if (error) {
-          console.error("Error fetching user role:", error);
-          return;
-        }
+  const canManage = userRole === "admin" || userRole === "management";
 
-        if (data) {
-          setUserRole(data.role);
-
-          const params = new URLSearchParams(window.location.search);
-          if (params.get("showMessages") === "true") {
-            setMessagesOpen(true);
-          }
-        }
-      }
-    };
-
-    fetchUserRoleAndPrefs();
-  }, []);
-
-  // Show loading state while checking authorization
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900 dark:border-white" />
-      </div>
-    );
-  }
-
-  // Don't render anything if user is unauthorized (they'll be redirected)
-  if (!authUserRole || !['admin', 'management', 'logistics'].includes(authUserRole)) {
-    return null;
-  }
+  const openMessages = useCallback(() => setMessagesOpen(true), []);
+  const openEmailComposer = useCallback(() => setEmailComposerOpen(true), []);
 
   // Event handlers
-  const handleJobClick = (jobId: string) => {
-    const job = jobs.find(j => j.id === jobId);
-    if (job) {
-      setSelectedJob(job);
-      setIsDetailsDialogOpen(true);
-    }
-  };
+  const handleJobClick = useCallback((jobId: string) => {
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job) return;
+    setSelectedJob(job);
+    setIsDetailsDialogOpen(true);
+  }, [jobs]);
 
-  const handleEditClick = (job: any) => {
+  const handleEditClick = useCallback((job: any) => {
     if (userRole === "logistics") return;
     setSelectedJob(job);
     setIsEditDialogOpen(true);
-  };
+  }, [userRole]);
 
-  const handleDeleteClick = async (jobId: string) => {
+  const handleDeleteClick = useCallback(async (jobId: string) => {
     // Check permissions
     if (!["admin", "management"].includes(userRole || "")) {
       toast({
@@ -200,8 +169,6 @@ const Dashboard = () => {
     if (!window.confirm("Are you sure you want to delete this job? This action cannot be undone and will remove all related data.")) return;
 
     try {
-      console.log("Dashboard: Starting optimistic job deletion for:", jobId);
-
       // Call optimistic deletion service
       const result = await deleteJobOptimistically(jobId);
 
@@ -212,7 +179,7 @@ const Dashboard = () => {
         });
 
         // Invalidate queries to refresh the list
-        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
@@ -224,14 +191,25 @@ const Dashboard = () => {
         variant: "destructive"
       });
     }
-  };
+  }, [queryClient, toast, userRole]);
 
-  const handleDateTypeChange = () => {
-    console.log("Date type change called from Dashboard");
-    // This is handled by the CalendarSection component
-  };
+  const handleDateTypeChange = useCallback(() => {}, []);
 
-  const selectedDateJobs = getSelectedDateJobs(date, jobs);
+  const selectedDateJobs = useMemo(() => getSelectedDateJobs(date, jobs), [date, jobs]);
+
+  // Show loading state while checking authorization
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900 dark:border-white" />
+      </div>
+    );
+  }
+
+  // Don't render anything if user is unauthorized (they'll be redirected)
+  if (!userRole || !['admin', 'management', 'logistics'].includes(userRole)) {
+    return null;
+  }
 
   // Mobile view - use DashboardMobileHub
   if (isMobile) {
@@ -240,32 +218,37 @@ const Dashboard = () => {
         <Suspense fallback={lazyFallback}>
           <DashboardMobileHub
             jobs={jobs}
+            date={date}
+            onDateSelect={setDate}
             userRole={userRole}
             onEditClick={handleEditClick}
             onDeleteClick={handleDeleteClick}
             onJobClick={handleJobClick}
-            onMessagesClick={userRole && ["admin", "management"].includes(userRole) ? () => setMessagesOpen(true) : undefined}
-            onEmailClick={userRole && ["admin", "management"].includes(userRole) ? () => setEmailComposerOpen(true) : undefined}
+            onMessagesClick={canManage ? openMessages : undefined}
+            onEmailClick={canManage ? openEmailComposer : undefined}
           />
         </Suspense>
 
         {/* Dialogs */}
-        {selectedJob && (
-          <>
-            <Suspense fallback={lazyFallback}>
-              <EditJobDialog
-                open={isEditDialogOpen}
-                onOpenChange={setIsEditDialogOpen}
-                job={selectedJob}
-              />
-              <JobDetailsDialog
-                open={isDetailsDialogOpen}
-                onOpenChange={setIsDetailsDialogOpen}
-                job={selectedJob}
-              />
-            </Suspense>
-          </>
-        )}
+        {selectedJob && isEditDialogOpen ? (
+          <Suspense fallback={lazyFallback}>
+            <EditJobDialog
+              open={isEditDialogOpen}
+              onOpenChange={setIsEditDialogOpen}
+              job={selectedJob}
+            />
+          </Suspense>
+        ) : null}
+
+        {selectedJob && isDetailsDialogOpen ? (
+          <Suspense fallback={lazyFallback}>
+            <JobDetailsDialog
+              open={isDetailsDialogOpen}
+              onOpenChange={setIsDetailsDialogOpen}
+              job={selectedJob}
+            />
+          </Suspense>
+        ) : null}
 
         {messagesOpen ? (
           <Suspense fallback={lazyFallback}>
@@ -314,12 +297,12 @@ const Dashboard = () => {
           {/* Sidebar Area */}
           <div className="space-y-6 xl:col-span-4 2xl:col-span-3">
             {/* Quick Actions */}
-            {userRole && ["admin", "management"].includes(userRole) && (
+            {canManage && (
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   variant="outline"
                   className="bg-card border-border hover:bg-accent hover:text-accent-foreground text-foreground/80 h-auto py-4 flex flex-col gap-2"
-                  onClick={() => setMessagesOpen(true)}
+                  onClick={openMessages}
                 >
                   <MessageSquare className="w-5 h-5 text-blue-500" />
                   <span className="text-xs font-medium">Mensajes</span>
@@ -327,7 +310,7 @@ const Dashboard = () => {
                 <Button
                   variant="outline"
                   className="bg-card border-border hover:bg-accent hover:text-accent-foreground text-foreground/80 h-auto py-4 flex flex-col gap-2"
-                  onClick={() => setEmailComposerOpen(true)}
+                  onClick={openEmailComposer}
                 >
                   <Mail className="w-5 h-5 text-emerald-500" />
                   <span className="text-xs font-medium">Email</span>
@@ -336,7 +319,7 @@ const Dashboard = () => {
             )}
 
             {/* Pending expenses summary */}
-            {authUserRole && ["admin", "management", "logistics"].includes(authUserRole) && (
+            {["admin", "management", "logistics"].includes(userRole) && (
               <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
                 <div className="p-4 border-b border-border flex items-center justify-between">
                   <div>
@@ -410,7 +393,7 @@ const Dashboard = () => {
         </div>
 
         {/* Dialogs */}
-        {selectedJob && (
+        {selectedJob && isEditDialogOpen ? (
           <Suspense fallback={lazyFallback}>
             <EditJobDialog
               open={isEditDialogOpen}
@@ -418,7 +401,7 @@ const Dashboard = () => {
               job={selectedJob}
             />
           </Suspense>
-        )}
+        ) : null}
 
         {messagesOpen ? (
           <Suspense fallback={lazyFallback}>

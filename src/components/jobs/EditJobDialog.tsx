@@ -36,7 +36,7 @@ interface EditJobDialogProps {
 }
 
 export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) => {
-  const fieldClass = "bg-[#0a0c10] border-[#1f232e] text-white placeholder:text-slate-500";
+  const fieldClass = "bg-background border-input text-foreground placeholder:text-muted-foreground";
   const [title, setTitle] = useState(job.title);
   const [description, setDescription] = useState(job.description || "");
   const [startTime, setStartTime] = useState("");
@@ -269,6 +269,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       });
 
       // Refresh jobs and Hoja de Ruta that depends on the job location
+      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["hoja-de-ruta", job.id] });
       onOpenChange(false);
@@ -289,7 +290,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible bg-[#05070a] text-white border-[#1f232e]">
+        <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
           <DialogHeader>
             <DialogTitle>Edit Job</DialogTitle>
           </DialogHeader>
@@ -316,7 +317,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             </div>
 
             {/* Venue Section */}
-            <div className="space-y-4 p-4 border rounded-lg bg-[#0f1219] border-[#1f232e]">
+            <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
               <Label className="text-base font-semibold">Venue Information</Label>
               <div className="grid gap-4">
                 <PlaceAutocomplete
@@ -349,7 +350,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                 <SelectTrigger className={fieldClass}>
                   <SelectValue placeholder="Select timezone" />
                 </SelectTrigger>
-                <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
+                <SelectContent>
                   <SelectItem value="Europe/Madrid">Europe/Madrid</SelectItem>
                   <SelectItem value="Europe/London">Europe/London</SelectItem>
                   <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
@@ -414,14 +415,14 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                 <SelectTrigger className={fieldClass}>
                   <SelectValue placeholder="Select invoicing company (optional)" />
                 </SelectTrigger>
-                <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
+                <SelectContent>
                   <SelectItem value="none">None</SelectItem>
                   <SelectItem value="Production Sector">Production Sector</SelectItem>
                   <SelectItem value="Sharecable">Sharecable</SelectItem>
                   <SelectItem value="MFO">MFO</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 If set, technicians will be instructed to invoice this company
               </p>
             </div>
@@ -447,7 +448,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                     type="button"
                     variant="outline"
                     onClick={() => setRequirementsOpen(true)}
-                    className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                    className="border-border"
                   >
                     Manage Requirements
                   </Button>
@@ -459,7 +460,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                className="border-border"
               >
                 Cancel
               </Button>

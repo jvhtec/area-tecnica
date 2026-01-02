@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 
-import { useJobs } from "@/hooks/useJobs";
-import { format } from "date-fns";
+import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
+import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { Scale, Zap, Calendar, FileText, Plus, Calculator, Lightbulb } from "lucide-react";
@@ -30,42 +30,24 @@ const Lights = () => {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [userRole, setUserRole] = useState<string | null>(null);
   const currentDepartment = "lights";
+  const { userRole } = useOptimizedAuth();
 
-  const mobileTools = [
-    { label: "Pesos", to: "/lights-pesos-tool", icon: Scale },
-    { label: "Consumos", to: "/lights-consumos-tool", icon: Calculator },
-    { label: "Memoria técnica", to: "/lights-memoria-tecnica", icon: FileText },
-  ];
+  const mobileTools = useMemo(
+    () => [
+      { label: "Pesos", to: "/lights-pesos-tool", icon: Scale },
+      { label: "Consumos", to: "/lights-consumos-tool", icon: Calculator },
+      { label: "Memoria técnica", to: "/lights-memoria-tecnica", icon: FileText },
+    ],
+    [],
+  );
   
-  const { data: jobs, isLoading } = useJobs();
+  const monthAnchor = date ?? new Date();
+  const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
+  const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
+  const { data: jobs, isLoading } = useOptimizedJobs(currentDepartment as any, jobsRangeStart, jobsRangeEnd);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user role:', error);
-        return;
-      }
-
-      if (data) {
-        setUserRole(data.role);
-      }
-    };
-
-    fetchUserRole();
-  }, []);
 
   // Keyboard shortcut: Cmd/Ctrl+N to open (disable plain 'c')
   useEffect(() => {
@@ -89,39 +71,38 @@ const Lights = () => {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const getDepartmentJobs = () => {
+  const departmentJobs = useMemo(() => {
     if (!jobs) return [];
-    return jobs.filter(job => {
+    return jobs.filter((job) => {
       const isInDepartment = job.job_departments?.some(dept => 
         dept.department === currentDepartment
       );
-      if (job.tour_date_id) {
-        return isInDepartment && job.tour_date;
-      }
       return isInDepartment;
     });
-  };
+  }, [jobs, currentDepartment]);
 
-  const getSelectedDateJobs = () => {
-    if (!date || !jobs) return [];
-    const selectedDate = format(date, 'yyyy-MM-dd');
-    return getDepartmentJobs().filter(job => {
-      const jobDate = format(new Date(job.start_time), 'yyyy-MM-dd');
+  const selectedDateJobs = useMemo(() => {
+    if (!date) return [];
+    const selectedDate = format(date, "yyyy-MM-dd");
+    return departmentJobs.filter((job) => {
+      const jobDate = format(new Date(job.start_time), "yyyy-MM-dd");
       return jobDate === selectedDate;
     });
-  };
+  }, [date, departmentJobs]);
 
-  const handleJobClick = (jobId: string) => {
+  const handleDateTypeChange = useCallback(() => {}, []);
+
+  const handleJobClick = useCallback((jobId: string) => {
     setSelectedJobId(jobId);
     setIsAssignmentDialogOpen(true);
-  };
+  }, []);
 
-  const handleEditClick = (job: any) => {
+  const handleEditClick = useCallback((job: any) => {
     setSelectedJob(job);
     setIsEditDialogOpen(true);
-  };
+  }, []);
 
-  const handleDeleteClick = async (jobId: string) => {
+  const handleDeleteClick = useCallback(async (jobId: string) => {
     // Check permissions
     if (!["admin", "management"].includes(userRole || "")) {
       toast({
@@ -140,40 +121,68 @@ const Lights = () => {
       // Call optimistic deletion service
       const result = await deleteJobOptimistically(jobId);
       
-      if (result.success) {
+        if (result.success) {
+          toast({
+            title: "Trabajo eliminado",
+            description: result.details || "El trabajo se ha eliminado con éxito."
+          });
+          
+          // Invalidate queries to refresh the list
+          await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+        } else {
+          throw new Error(result.error || "Unknown deletion error");
+        }
+      } catch (error: any) {
+        console.error("Lights page: Error in optimistic job deletion:", error);
         toast({
-          title: "Trabajo eliminado",
-          description: result.details || "El trabajo se ha eliminado con éxito."
+          title: "Error al eliminar el trabajo",
+          description: error.message,
+          variant: "destructive"
         });
-        
-        // Invalidate queries to refresh the list
-        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      } else {
-        throw new Error(result.error || "Unknown deletion error");
       }
-    } catch (error: any) {
-      console.error("Lights page: Error in optimistic job deletion:", error);
-      toast({
-        title: "Error al eliminar el trabajo",
-        description: error.message,
-        variant: "destructive"
-      });
+  }, [queryClient, toast, userRole]);
+
+  const handleAssignmentDialogClose = useCallback(() => {
+    setIsAssignmentDialogOpen(false);
+  }, []);
+
+  const handleAssignmentChange = useCallback(() => {}, []);
+
+  const handleEditDialogOpenChange = useCallback((open: boolean) => {
+    setIsEditDialogOpen(open);
+    if (!open) {
+      setSelectedJob(null);
     }
-  };
+  }, []);
+
+  const handleCreateJob = useCallback((preset?: JobType) => {
+    setPresetJobType(preset);
+    setIsJobDialogOpen(true);
+  }, []);
+
+  const goToDisponibilidad = useCallback(() => navigate("/lights-disponibilidad"), [navigate]);
+  const goToPesosTool = useCallback(() => navigate("/lights-pesos-tool"), [navigate]);
+  const goToConsumosTool = useCallback(() => navigate("/lights-consumos-tool"), [navigate]);
+  const goToMemoriaTecnica = useCallback(() => navigate("/lights-memoria-tecnica"), [navigate]);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
       <div className="mx-auto w-full max-w-full space-y-6">
-        <DepartmentMobileHub
-          department={currentDepartment}
-          title="Departamento de iluminación"
-          icon={Lightbulb}
-          tools={mobileTools}
-        />
+        {isMobile && (
+          <DepartmentMobileHub
+            department={currentDepartment}
+            title="Departamento de iluminación"
+            icon={Lightbulb}
+            tools={mobileTools}
+            jobs={departmentJobs}
+            date={date ?? new Date()}
+            onDateSelect={(nextDate) => setDate(nextDate)}
+          />
+        )}
         {!isMobile && (
           <>
             <LightsHeader
-              onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
+              onCreateJob={handleCreateJob}
               department="Luces"
               canCreate={userRole ? ["admin","management"].includes(userRole) : true}
             />
@@ -182,7 +191,7 @@ const Lights = () => {
               <div className="flex flex-wrap gap-3 sm:gap-4 items-center justify-end">
                 <Button
                   variant="outline"
-                  onClick={() => navigate('/lights-disponibilidad')}
+                  onClick={goToDisponibilidad}
                   className="flex items-center gap-2"
                 >
                   <Calendar className="h-4 w-4" />
@@ -190,7 +199,7 @@ const Lights = () => {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => navigate('/lights-pesos-tool')}
+                  onClick={goToPesosTool}
                   className="flex items-center gap-2"
                 >
                   <Scale className="h-4 w-4" />
@@ -198,7 +207,7 @@ const Lights = () => {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => navigate('/lights-consumos-tool')}
+                  onClick={goToConsumosTool}
                   className="flex items-center gap-2"
                 >
                   <Zap className="h-4 w-4" />
@@ -206,7 +215,7 @@ const Lights = () => {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => navigate('/lights-memoria-tecnica')}
+                  onClick={goToMemoriaTecnica}
                   className="flex items-center gap-2"
                 >
                   <FileText className="h-4 w-4" />
@@ -223,16 +232,16 @@ const Lights = () => {
               <CalendarSection 
                 date={date} 
                 onDateSelect={setDate}
-                jobs={getDepartmentJobs()}
+                jobs={departmentJobs}
                 department={currentDepartment}
-                onDateTypeChange={() => {}} // Add empty handler as it's required
+                onDateTypeChange={handleDateTypeChange}
               />
             </div>
           </div>
           <div className="xl:col-span-4 2xl:col-span-3 hidden md:block">
             <div className="bg-card rounded-xl border border-border shadow-sm">
               <TodaySchedule
-                jobs={getSelectedDateJobs()}
+                jobs={selectedDateJobs}
                 onEditClick={handleEditClick}
                 onDeleteClick={handleDeleteClick}
                 onJobClick={handleJobClick}
@@ -247,41 +256,43 @@ const Lights = () => {
         </div>
       </div>
 
-      <CreateJobDialog
-        open={isJobDialogOpen}
-        onOpenChange={setIsJobDialogOpen}
-        currentDepartment={currentDepartment}
-        initialDate={date}
-        initialJobType={presetJobType}
-        onCreated={(job) => {
-          setSelectedJobId(job.id);
-          setIsAssignmentDialogOpen(true);
-        }}
-      />
+      {isJobDialogOpen ? (
+        <CreateJobDialog
+          open={isJobDialogOpen}
+          onOpenChange={setIsJobDialogOpen}
+          currentDepartment={currentDepartment}
+          initialDate={date}
+          initialJobType={presetJobType}
+          onCreated={(job) => {
+            setSelectedJobId(job.id);
+            setIsAssignmentDialogOpen(true);
+          }}
+        />
+      ) : null}
       
 
-      {selectedJobId && (
+      {selectedJobId && isAssignmentDialogOpen ? (
         <JobAssignmentDialog
           isOpen={isAssignmentDialogOpen}
-          onClose={() => setIsAssignmentDialogOpen(false)}
-          onAssignmentChange={() => {}}
+          onClose={handleAssignmentDialogClose}
+          onAssignmentChange={handleAssignmentChange}
           jobId={selectedJobId}
           department={currentDepartment}
         />
-      )}
+      ) : null}
 
-      {selectedJob && (
+      {selectedJob && isEditDialogOpen ? (
         <EditJobDialog
           open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
+          onOpenChange={handleEditDialogOpenChange}
           job={selectedJob}
         />
-      )}
+      ) : null}
 
       {/* Mobile FAB */}
       <Button 
         className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
-        onClick={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
+        onClick={() => handleCreateJob(undefined)}
       >
         <Plus className="h-6 w-6" />
       </Button>

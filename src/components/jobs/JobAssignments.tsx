@@ -70,6 +70,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
       // Refresh both assignments and jobs data
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["job-assignments", jobId] }),
+        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
         queryClient.invalidateQueries({ queryKey: ["available-technicians"] })
       ]);

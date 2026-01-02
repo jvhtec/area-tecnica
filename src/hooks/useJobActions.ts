@@ -136,6 +136,7 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
         description: "Flex folders have been created successfully."
       });
 
+      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
 

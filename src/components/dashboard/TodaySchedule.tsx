@@ -28,7 +28,9 @@ export const TodaySchedule = ({
   department,
   viewMode = "grid"
 }: TodayScheduleProps) => {
-  console.log("TodaySchedule received jobs:", jobs);
+  if (import.meta.env.DEV) {
+    console.log("TodaySchedule received jobs:", jobs);
+  }
 
   if (isLoading) {
     if (viewMode === "sidebar") {
@@ -115,12 +117,16 @@ export const TodaySchedule = ({
       <CardContent className="p-1">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {jobs.map(job => {
-            console.log("Rendering job in TodaySchedule:", job);
+            if (import.meta.env.DEV) {
+              console.log("Rendering job in TodaySchedule:", job);
+            }
             const jobData = job.jobs || job;
             const jobId = job.id || job.job_id || (jobData && (jobData.id || job.job_id));
 
             if (!jobId) {
-              console.warn("Job is missing ID:", job);
+              if (import.meta.env.DEV) {
+                console.warn("Job is missing ID:", job);
+              }
               return null;
             }
 
@@ -133,11 +139,13 @@ export const TodaySchedule = ({
               }
             }
 
-            console.log("Is festival job check for:", {
-              jobId,
-              isFestivalJob,
-              jobType: jobData?.job_type
-            });
+            if (import.meta.env.DEV) {
+              console.log("Is festival job check for:", {
+                jobId,
+                isFestivalJob,
+                jobType: jobData?.job_type
+              });
+            }
 
             return (
               <JobCardNew

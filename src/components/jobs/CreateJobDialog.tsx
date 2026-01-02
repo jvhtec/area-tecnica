@@ -38,7 +38,7 @@ const formSchema = z.object({
   }),
   start_time: z.string().min(1, "Start time is required"),
   end_time: z.string().min(1, "End time is required"),
-  job_type: z.enum(["single", "tour", "festival", "dryhire", "tourdate"] as const),
+  job_type: z.enum(["single", "multi_day", "tour", "festival", "dryhire", "tourdate", "evento"] as const),
   departments: z.array(z.string()).min(1, "At least one department is required"),
   color: z.string().min(1, "Color is required"),
   timezone: z.string().min(1, "Timezone is required"),
@@ -68,7 +68,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
   const [locationInput, setLocationInput] = useState("");
   const [requirements, setRequirements] = useState<Record<string, Array<{ role_code: string; quantity: number }>>>({});
   const navigate = useNavigate();
-  const fieldClass = "bg-[#0a0c10] border-[#1f232e] text-white placeholder:text-slate-500";
+  const fieldClass = "bg-background border-input text-foreground placeholder:text-muted-foreground";
 
   const formatInput = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -248,11 +248,9 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         }
       }
 
-      // Optimistically update the cache instead of invalidating
-      queryClient.setQueryData(["jobs"], (oldData: any) => {
-        if (!oldData) return oldData;
-        return [...oldData, { ...job, job_departments: departmentInserts }];
-      });
+      // Refresh job queries (new job may fall into multiple cached ranges)
+      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
 
       toast({
         title: "Success",
@@ -303,7 +301,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible bg-[#05070a] text-white border-[#1f232e]">
+      <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
         <DialogHeader>
           <DialogTitle>Create New Job</DialogTitle>
         </DialogHeader>
@@ -335,7 +333,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
               }}
               placeholder="Enter venue location"
               label="Location"
-              className="text-white"
+              className=""
             />
             {errors.location && (
               <p className="text-sm text-destructive">
@@ -362,7 +360,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
               <SelectTrigger className={fieldClass}>
                 <SelectValue placeholder="Select timezone" />
               </SelectTrigger>
-              <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
+              <SelectContent>
                 <SelectItem value="Europe/Madrid">Europe/Madrid</SelectItem>
                 <SelectItem value="Europe/London">Europe/London</SelectItem>
                 <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
@@ -409,13 +407,13 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           <div className="space-y-2">
             <Label>Job Type</Label>
             <Select
-              onValueChange={(value) => setValue("job_type", value as JobType)}
+              onValueChange={(value) => setValue("job_type", value as any)}
               defaultValue={watch("job_type")}
             >
               <SelectTrigger className={fieldClass}>
                 <SelectValue placeholder="Select job type" />
               </SelectTrigger>
-              <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
+              <SelectContent>
                 <SelectItem value="single">Single</SelectItem>
                 <SelectItem value="tour">Tour</SelectItem>
                 <SelectItem value="festival">Festival</SelectItem>
@@ -453,7 +451,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                   className={
                     selectedDepartments.includes(department)
                       ? "bg-blue-600 hover:bg-blue-500 text-white"
-                      : "bg-white/5 border-white/10 text-white hover:bg-white/10"
+                      : "border-border"
                   }
                 >
                   {department}
@@ -491,7 +489,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                             <SelectTrigger className={fieldClass}>
                               <SelectValue placeholder="Select role" />
                             </SelectTrigger>
-                            <SelectContent className="bg-[#0f1219] text-white border-[#1f232e]">
+                            <SelectContent>
                               {roleOptionsForDiscipline(dept).map((opt) => (
                                 <SelectItem key={opt.code} value={opt.code}>{opt.label}</SelectItem>
                               ))}
@@ -540,7 +538,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                           list.push({ role_code: first, quantity: 1 })
                           return { ...prev, [dept]: list }
                         })}
-                        className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                        className="border-border"
                       >
                         Add role
                       </Button>

@@ -8,16 +8,24 @@ import { createQueryKey } from '@/lib/optimized-react-query';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
 
+type UseOptimizedJobCardOptions = {
+  enableRoleSummary?: boolean;
+  enableSoundTasks?: boolean;
+};
+
 export const useOptimizedJobCard = (
   job: any,
   department: string,
   userRole: string | null,
   onEditClick: (job: any) => void,
   onDeleteClick: (jobId: string) => void,
-  onJobClick: (jobId: string) => void
+  onJobClick: (jobId: string) => void,
+  options?: UseOptimizedJobCardOptions
 ) => {
   const { theme } = useTheme();
   const queryClient = useQueryClient();
+  const enableRoleSummary = options?.enableRoleSummary ?? true;
+  const enableSoundTasks = options?.enableSoundTasks ?? true;
   
   // Memoized styling calculations
   const { appliedBorderColor, appliedBgColor } = useMemo(() => {
@@ -54,28 +62,20 @@ export const useOptimizedJobCard = (
   const refreshAssignments = useCallback(async () => {
     if (!job?.id) return;
     try {
-      const [{ data: assignmentData, error: assignError }, { data: directTimesheets, error: tsError }] = await Promise.all([
-        supabase
-          .from('job_assignments')
-          .select(`*, profiles!job_assignments_technician_id_fkey(first_name, nickname, last_name, department)`)
-          .eq('job_id', job.id),
-        supabase
-          .from('timesheets')
-          .select(`
-            job_id,
-            technician_id,
-            date,
-            profiles!fk_timesheets_technician_id (first_name, nickname, last_name, department)
-          `)
-          .eq('job_id', job.id)
-          .eq('is_active', true)
-      ]);
+      const baseAssignments: any[] = Array.isArray(job?.job_assignments) ? job.job_assignments : [];
+
+      const { data: directTimesheets, error: tsError } = await supabase
+        .from('timesheets')
+        .select(`
+          technician_id,
+          date,
+          profiles!fk_timesheets_technician_id (first_name, nickname, last_name, department)
+        `)
+        .eq('job_id', job.id)
+        .eq('is_active', true);
 
       if (tsError) {
         console.warn('Error fetching timesheets for job card:', tsError);
-      }
-      if (assignError) {
-        console.warn('Error fetching job_assignments metadata:', assignError);
       }
 
       // Fallback to visibility function to avoid RLS gaps (mirrors JobDetailsDialog)
@@ -114,14 +114,14 @@ export const useOptimizedJobCard = (
         normalizedTimesheetsByTech.set(techId, uniqueSorted);
       });
 
-      const mergedAssignments: any[] = (assignmentData || []).map((a: any) => ({
+      const mergedAssignments: any[] = (baseAssignments || []).map((a: any) => ({
         ...a,
         profiles: normalizeProfile(a.profiles),
         _timesheet_dates: normalizedTimesheetsByTech.get(a.technician_id) || [],
       }));
 
       // If timesheets exist for technicians not in job_assignments (edge cases), include them so badges still appear
-      const assignmentTechIds = new Set((assignmentData || []).map((a: any) => a.technician_id));
+      const assignmentTechIds = new Set((baseAssignments || []).map((a: any) => a.technician_id));
       normalizedTimesheetsByTech.forEach((dates, techId) => {
         if (assignmentTechIds.has(techId)) return;
         mergedAssignments.push({
@@ -143,17 +143,23 @@ export const useOptimizedJobCard = (
     } catch (err) {
       console.warn('Error refreshing assignments', err);
     }
-  }, [job?.id]);
+  }, [job?.id, job?.job_assignments]);
 
   // Keep local state in sync with incoming job prop updates for instant UI
   useEffect(() => {
     setAssignments(job.job_assignments || []);
-    refreshAssignments();
-  }, [job.job_assignments, refreshAssignments]);
+  }, [job.job_assignments]);
+
+  const shouldEnrichAssignments = assignmentDialogOpen || !collapsed;
+  useEffect(() => {
+    if (!shouldEnrichAssignments) return;
+    void refreshAssignments();
+  }, [refreshAssignments, shouldEnrichAssignments]);
 
   // Realtime: subscribe to timesheet changes for this job (source of truth) and refresh local state instantly
   useEffect(() => {
     if (!job?.id) return;
+    if (!shouldEnrichAssignments) return;
     const channel = supabase
       .channel(`job-card-timesheets-${job.id}`)
       .on('postgres_changes', {
@@ -162,27 +168,6 @@ export const useOptimizedJobCard = (
         table: 'timesheets',
         filter: `job_id=eq.${job.id}`,
       }, async () => { await refreshAssignments(); })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'job_assignments',
-        filter: `job_id=eq.${job.id}`,
-      }, async () => { await refreshAssignments(); }) // Also listen to job_assignments for role/status updates
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'job_documents',
-        filter: `job_id=eq.${job.id}`,
-      }, async () => {
-        try {
-          const { data, error } = await supabase
-            .from('job_documents')
-            .select('*')
-            .eq('job_id', job.id)
-            .order('uploaded_at', { ascending: false });
-          if (!error) setDocuments(data || []);
-        } catch {}
-      })
       .subscribe();
 
     // Also listen to global assignment-updated events as a safety net (manual actions)
@@ -193,7 +178,7 @@ export const useOptimizedJobCard = (
       window.removeEventListener('assignment-updated', handler);
       supabase.removeChannel(channel);
     };
-  }, [job?.id, refreshAssignments]);
+  }, [job?.id, refreshAssignments, shouldEnrichAssignments]);
 
   // Memoized permission checks
   const permissions = useMemo(() => {
@@ -213,7 +198,7 @@ export const useOptimizedJobCard = (
   }, [userRole]);
 
   // Required roles summary for this job
-  const { data: reqSummary = [], byDepartment: reqByDept } = useRequiredRoleSummary(job?.id);
+  const { data: reqSummary = [], byDepartment: reqByDept } = useRequiredRoleSummary(job?.id, enableRoleSummary);
 
   // Compute assigned counts per department and per role code (for comparisons)
   const assignedMetrics = useMemo(() => {
@@ -288,29 +273,8 @@ export const useOptimizedJobCard = (
       if (error) throw error;
       return data;
     },
-    enabled: department === 'sound',
+    enabled: enableSoundTasks && department === 'sound' && (soundTaskDialogOpen || !collapsed),
     staleTime: 2 * 60 * 1000, // 2 minutes
-  });
-
-  // Optimized personnel query - get actual personnel/profiles data
-  const { data: personnel } = useQuery({
-    queryKey: ['personnel', job.id, department],
-    queryFn: async () => {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .order('last_name', { ascending: true })
-        .order('first_name', { ascending: true });
-      
-      if (error) throw error;
-      // Add a computed display_name to keep existing consumers working
-      const withDisplay = (profiles || []).map((p: any) => ({
-        ...p,
-        display_name: [p.first_name, p.last_name].filter(Boolean).join(' ').trim()
-      }));
-      return withDisplay;
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes for personnel data
   });
 
   // Memoized event handlers
@@ -417,19 +381,14 @@ export const useOptimizedJobCard = (
         setDocuments(data || []);
       }
 
+      void refreshAssignments();
+
       // Invalidate broader queries so the card and list re-fetch
       queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['personnel', job.id, department] });
     } catch (err) {
       console.error('Refresh error:', err);
     }
-  }, [job.id, department, queryClient]);
-
-  // Memoized deletion state check
-  const isJobBeingDeleted = useMemo(() => {
-    // This would connect to deletion state context
-    return false;
-  }, [job.id]);
+  }, [job.id, queryClient, refreshAssignments]);
 
   return {
     // Styling
@@ -447,11 +406,9 @@ export const useOptimizedJobCard = (
     videoTaskDialogOpen,
     editJobDialogOpen,
     assignmentDialogOpen,
-    isJobBeingDeleted,
     
     // Data
     soundTasks,
-    personnel,
     
     // Permissions
     ...permissions,

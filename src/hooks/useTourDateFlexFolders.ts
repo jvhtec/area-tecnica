@@ -59,6 +59,7 @@ export const useTourDateFlexFolders = (tourId: string) => {
     },
     onSuccess: (data) => {
       toast.success(`Flex folders created successfully for ${new Date(data.tourDate.date).toLocaleDateString()}`);
+      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       queryClient.invalidateQueries({ queryKey: ['tour-dates', tourId] });
     },

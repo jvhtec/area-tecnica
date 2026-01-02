@@ -22,10 +22,10 @@ interface JobAssignment {
   } | null;
 }
 
-const cardBase = "bg-[#0f1219] border-[#1f232e] text-white";
-const surface = "bg-[#151820] border-[#2a2e3b]";
-const subtle = "text-slate-300";
-const pill = "bg-white/5 border-white/10 text-white";
+const cardBase = "bg-card border-border text-card-foreground";
+const surface = "bg-muted/30 border-border";
+const subtle = "text-muted-foreground";
+const pill = "bg-primary/5 border-primary/10 text-primary dark:text-primary-foreground";
 
 export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: JobExtrasManagementProps) => {
   const { data: assignments, isLoading: assignmentsLoading } = useQuery({
@@ -59,7 +59,7 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
     return (
       <Card className={cardBase}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
+          <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
             Job Extras & Rates
           </CardTitle>
@@ -84,7 +84,7 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
     return (
       <Card className={cardBase}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
+          <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
             Job Extras & Rates
           </CardTitle>
@@ -103,12 +103,12 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
   return (
     <Card className={cardBase}>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-white">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
           <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
           Job Extras & Rates
         </CardTitle>
         {isManager && (
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-slate-300">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-foreground/70 dark:text-muted-foreground">
             <div className="flex items-center gap-1">
               <Users className="h-4 w-4" />
               {visibleAssignments.length} technician{visibleAssignments.length !== 1 ? 's' : ''}
@@ -121,29 +121,29 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
           </div>
         )}
       </CardHeader>
-      <CardContent className="space-y-4 sm:space-y-6 text-white">
+      <CardContent className="space-y-4 sm:space-y-6">
         {visibleAssignments.map((assignment, index) => {
           const technicianName = (
             `${assignment.profiles?.first_name ?? ''} ${assignment.profiles?.last_name ?? ''}`
           ).trim() || 'Unnamed Technician';
           const technicianPayout = payoutTotals?.find(p => p.technician_id === assignment.technician_id);
-          
+
           return (
             <div key={assignment.technician_id} className={surface + " rounded-xl p-4 sm:p-5"}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-                <h3 className="font-semibold text-white">{technicianName}</h3>
+                <h3 className="font-semibold">{technicianName}</h3>
                 {technicianPayout && (
-                  <div className="flex items-center gap-2 text-sm text-slate-300">
+                  <div className="flex items-center gap-2 text-sm text-foreground/70 dark:text-muted-foreground">
                     <span>Extras: {formatCurrency(technicianPayout.extras_total_eur || 0)}</span>
                     {technicianPayout.vehicle_disclaimer && (
-                      <Badge variant="outline" className="text-xs bg-amber-500/10 border-amber-500/40 text-amber-200">
+                      <Badge variant="outline" className="text-xs text-amber-700 border-amber-500/30 bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/40 dark:bg-amber-500/10">
                         Vehicle
                       </Badge>
                     )}
                   </div>
                 )}
               </div>
-              
+
               <JobExtrasEditor
                 jobId={jobId}
                 technicianId={assignment.technician_id}
@@ -151,8 +151,8 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
                 isManager={isManager}
                 showVehicleDisclaimer={technicianPayout?.vehicle_disclaimer || false}
               />
-              
-              {index < assignments.length - 1 && <Separator className="mt-4 sm:mt-6 border-[#1f232e]" />}
+
+              {index < assignments.length - 1 && <Separator className="mt-4 sm:mt-6" />}
             </div>
           );
         })}

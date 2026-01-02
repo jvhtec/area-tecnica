@@ -88,6 +88,7 @@ export const useTourCreation = (
       await createTour();
       console.log("Tour created successfully");
 
+      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
 

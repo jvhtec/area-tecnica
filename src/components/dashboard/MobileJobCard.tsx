@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useJobActions } from '@/hooks/useJobActions';
 import { useFolderExistence } from "@/hooks/useFolderExistence";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
 import { 
@@ -72,41 +73,21 @@ export function MobileJobCard({
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const { userRole } = useOptimizedAuth();
   const [dateTypeDialogOpen, setDateTypeDialogOpen] = useState(false);
   const [selectedDateType, setSelectedDateType] = useState<string>('show');
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
   const isMobile = useIsMobile();
   const { uuid: flexUuid, isLoading: isLoadingFlexUuid, error: flexError, hasChecked, fetchFlexUuid } = useFlexUuidLazy();
 
-  // Get user role
-  React.useEffect(() => {
-    const fetchUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        setUserRole(profile?.role || null);
-      }
-    };
-    fetchUserRole();
-  }, []);
-
   const {
     appliedBorderColor,
     appliedBgColor,
-    assignments,
-    documents,
     soundTaskDialogOpen,
     lightsTaskDialogOpen,
     videoTaskDialogOpen,
     editJobDialogOpen,
     assignmentDialogOpen,
-    soundTasks,
-    personnel,
     isHouseTech,
     canEditJobs,
     canManageArtists,
@@ -114,14 +95,15 @@ export function MobileJobCard({
     canCreateFlexFolders,
     handleEditButtonClick,
     handleFileUpload,
-    handleDeleteDocument,
-    refreshData,
     setSoundTaskDialogOpen,
     setLightsTaskDialogOpen,
     setVideoTaskDialogOpen,
     setEditJobDialogOpen,
     setAssignmentDialogOpen
-  } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick);
+  } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick, {
+    enableRoleSummary: false,
+    enableSoundTasks: false,
+  });
 
   const {
     handleDeleteClick,
@@ -133,7 +115,7 @@ export function MobileJobCard({
   } = useJobActions(job, userRole, onDeleteClick);
 
   // Check folder existence
-  const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
+  const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id, job.tour_date_id);
   const foldersAreCreated = foldersExist === true;
 
   // Get current date type for this job on the selected date using the key format

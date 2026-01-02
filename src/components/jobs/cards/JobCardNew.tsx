@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Department } from "@/types/department";
+import { useTheme } from "next-themes";
 
 // File System Access API types
 declare global {
@@ -11,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { useFolderExistence } from "@/hooks/useFolderExistence";
 import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useDeletionState } from '@/hooks/useDeletionState';
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { supabase } from "@/lib/supabase";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
@@ -41,7 +43,38 @@ export interface JobCardNewProps {
   onHojaDeRutaOpened?: () => void;
 }
 
-export function JobCardNew({
+function JobCardNewDetailsOnlyCard({
+  job,
+  department = "sound",
+}: JobCardNewProps) {
+  const { theme } = useTheme();
+  const isJobBeingDeleted = useDeletionState((state) => state.deletingJobs.has(job.id));
+  const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
+
+  const appliedBorderColor = React.useMemo(() => {
+    const isDark = theme === "dark";
+    const borderColor = job.color || "#7E69AB";
+    return isDark ? (job.darkColor || borderColor) : borderColor;
+  }, [job.color, job.darkColor, theme]);
+
+  const cardOpacity = isJobBeingDeleted ? "opacity-50" : "";
+  const pointerEvents = isJobBeingDeleted ? "pointer-events-none" : "";
+
+  return (
+    <JobCardNewDetailsOnly
+      job={job}
+      department={department}
+      appliedBorderColor={appliedBorderColor}
+      isJobBeingDeleted={isJobBeingDeleted}
+      cardOpacity={cardOpacity}
+      pointerEvents={pointerEvents}
+      jobDetailsDialogOpen={jobDetailsDialogOpen}
+      setJobDetailsDialogOpen={setJobDetailsDialogOpen}
+    />
+  );
+}
+
+function JobCardNewFull({
   job,
   onEditClick,
   onDeleteClick,
@@ -54,7 +87,6 @@ export function JobCardNew({
   showManageArtists = false,
   isProjectManagementPage = false,
   hideTasks = false,
-  detailsOnlyMode = false,
   openHojaDeRuta = false,
   onHojaDeRutaOpened
 }: JobCardNewProps) {
@@ -85,18 +117,18 @@ export function JobCardNew({
       return;
     }
     // Only "consume" the URL param when we can actually show the modal
-    if (!isProjectManagementPage || detailsOnlyMode) return;
+    if (!isProjectManagementPage) return;
     if (openedFromParamRef.current) return;
 
     openedFromParamRef.current = true;
     setRouteSheetOpen(true);
     onHojaDeRutaOpened?.();
-  }, [openHojaDeRuta, isProjectManagementPage, detailsOnlyMode]);
+  }, [openHojaDeRuta, isProjectManagementPage, onHojaDeRutaOpened]);
 
   // Load artists then rider files (2-step RLS-friendly)
   const { data: cardArtists = [] } = useQuery({
     queryKey: ['jobcard-artists', job.id],
-    enabled: !!job?.id,
+    enabled: !!job?.id && job.job_type === 'festival',
     queryFn: async () => {
       const { data, error } = await supabase
         .from('festival_artists')
@@ -104,7 +136,8 @@ export function JobCardNew({
         .eq('job_id', job.id);
       if (error) throw error;
       return (data || []) as Array<{ id: string; name: string }>;
-    }
+    },
+    staleTime: 5 * 60_000,
   });
   const cardArtistIds = React.useMemo(() => cardArtists.map(a => a.id), [cardArtists]);
   const cardArtistNameMap = React.useMemo(() => new Map(cardArtists.map(a => [a.id, a.name])), [cardArtists]);
@@ -156,7 +189,7 @@ export function JobCardNew({
   const [requirementsDialogOpen, setRequirementsDialogOpen] = useState(false);
   const [selectedTransportRequest, setSelectedTransportRequest] = useState<any | null>(null);
   const [logisticsInitialEventType, setLogisticsInitialEventType] = useState<'load' | 'unload' | undefined>(undefined);
-  const [userDepartment, setUserDepartment] = useState<string | null>(null);
+  const { user, userDepartment: currentUserDepartment } = useOptimizedAuth();
 
   const {
     appliedBorderColor,
@@ -171,9 +204,7 @@ export function JobCardNew({
     videoTaskDialogOpen,
     editJobDialogOpen,
     assignmentDialogOpen,
-    isJobBeingDeleted,
     soundTasks,
-    personnel,
     isHouseTech,
     canEditJobs,
     canManageArtists,
@@ -189,17 +220,43 @@ export function JobCardNew({
     setVideoTaskDialogOpen,
     setEditJobDialogOpen,
     setAssignmentDialogOpen
-  } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick);
+  } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick, {
+    enableRoleSummary: true,
+    enableSoundTasks: !hideTasks,
+  });
 
-  // Check folder existence with proper loading state handling
-  const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
+  const isJobBeingDeleted = isDeletingJob(job.id);
 
-  // Updated logic: prioritize actual folder existence over database flags
+  const techName = React.useMemo(() => {
+    const currentUserId = user?.id;
+    if (!currentUserId) return "";
+
+    const match =
+      (Array.isArray(assignments) ? assignments : []).find((a: any) => a?.technician_id === currentUserId && a?.profiles) ||
+      (Array.isArray(assignments) ? assignments : []).find((a: any) => a?.profiles);
+
+    const profile = match?.profiles ? (Array.isArray(match.profiles) ? match.profiles[0] : match.profiles) : null;
+    if (!profile) return "";
+
+    return [profile.first_name, profile.nickname, profile.last_name].filter(Boolean).join(" ").trim();
+  }, [assignments, user?.id]);
+
+  const systemThinksFoldersExist = Boolean(job.flex_folders_created || job.flex_folders_exist);
+  const shouldCheckFolders = canCreateFlexFolders;
+
+  // Check folder existence only when folder actions are available (avoids N+1 queries for tech-only views)
+  const folderExistenceJobId = shouldCheckFolders ? job.id : "";
+  const folderExistenceTourDateId = shouldCheckFolders ? job.tour_date_id : null;
+  const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(
+    folderExistenceJobId,
+    folderExistenceTourDateId
+  );
+
   const actualFoldersExist = foldersExist === true;
-  const systemThinksFoldersExist = job.flex_folders_created || job.flex_folders_exist;
+  const foldersAreCreated = shouldCheckFolders ? actualFoldersExist : systemThinksFoldersExist;
 
-  // Detect inconsistency for logging/debugging
-  const hasInconsistency = systemThinksFoldersExist && !actualFoldersExist;
+  // Detect inconsistency for logging/debugging (only when we actually checked)
+  const hasInconsistency = shouldCheckFolders && systemThinksFoldersExist && foldersExist === false;
   if (hasInconsistency) {
     console.warn("JobCardNew: Folder state inconsistency detected for job", job.id, {
       systemThinks: systemThinksFoldersExist,
@@ -209,42 +266,23 @@ export function JobCardNew({
     });
   }
 
-  // Final decision: only consider folders created if they actually exist
-  const foldersAreCreated = actualFoldersExist;
-
-  // Load current user's department
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('department')
-          .eq('id', user.id)
-          .single();
-        if (!error) setUserDepartment(data?.department || null);
-      } catch { }
-    })();
-  }, []);
-
   // Queries for transport requests and logistics events
   const { data: myTransportRequest } = useQuery({
-    queryKey: ['transport-request', job.id, userDepartment],
+    queryKey: ['transport-request', job.id, currentUserDepartment],
     queryFn: async () => {
-      if (!userDepartment || !['sound', 'lights', 'video'].includes(userDepartment)) return null;
+      if (!currentUserDepartment || !['sound', 'lights', 'video'].includes(currentUserDepartment)) return null;
       const { data, error } = await supabase
         .from('transport_requests')
         .select('id, department, status, note, description, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
         .eq('job_id', job.id)
-        .eq('department', userDepartment)
+        .eq('department', currentUserDepartment)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) return null;
       return data;
     },
-    enabled: !!job?.id && !!userDepartment,
+    enabled: !!job?.id && !!currentUserDepartment,
   });
 
   const { data: allRequests = [] } = useQuery({
@@ -259,7 +297,7 @@ export function JobCardNew({
       if (error) return [];
       return data || [];
     },
-    enabled: !!job?.id && ((userDepartment === 'logistics') || ['admin', 'management'].includes(userRole || '')),
+    enabled: !!job?.id && ((currentUserDepartment === 'logistics') || ['admin', 'management'].includes(userRole || '')),
   });
 
   const { data: jobEvents = [] } = useQuery({
@@ -272,12 +310,12 @@ export function JobCardNew({
       if (error) return [];
       return data || [];
     },
-    enabled: !!job?.id,
+    enabled: !!job?.id && job.job_type !== 'dryhire',
   });
 
   const isScheduled = (jobEvents?.length || 0) > 0;
   const hasRequest = Boolean(myTransportRequest) || (Array.isArray(allRequests) && allRequests.length > 0);
-  const isTechDept = !!userDepartment && ['sound', 'lights', 'video'].includes(userDepartment);
+  const isTechDept = !!currentUserDepartment && ['sound', 'lights', 'video'].includes(currentUserDepartment);
 
   const handleCancelTransportRequest = React.useCallback(
     async (requestId: string) => {
@@ -304,7 +342,7 @@ export function JobCardNew({
 
   const transportButtonLabel = (() => {
     if (isScheduled) return 'Transport Scheduled';
-    if ((userDepartment === 'logistics') || ((userRole === 'management' || userRole === 'admin') && !isTechDept)) {
+    if ((currentUserDepartment === 'logistics') || ((userRole === 'management' || userRole === 'admin') && !isTechDept)) {
       return allRequests.length > 0 ? `Requests (${allRequests.length})` : 'Logistics';
     }
     if (isTechDept) {
@@ -317,9 +355,9 @@ export function JobCardNew({
 
   const handleTransportClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if ((userDepartment === 'logistics') || ((userRole === 'management' || userRole === 'admin') && !isTechDept)) {
+    if ((currentUserDepartment === 'logistics') || ((userRole === 'management' || userRole === 'admin') && !isTechDept)) {
       setTransportDialogOpen(true); // open requests manager
-    } else if (isTechDept && userDepartment) {
+    } else if (isTechDept && currentUserDepartment) {
       setTransportDialogOpen(true); // open request creator
     }
   };
@@ -355,6 +393,11 @@ export function JobCardNew({
     }
   });
 
+  const hasAssignedTechnicians = React.useMemo(
+    () => Array.isArray(assignments) && assignments.some((a: any) => !!a?.technician_id),
+    [assignments]
+  );
+
   // Fetch timesheet statuses per technician for this job (for badge color coding)
   const { data: jobTimesheets } = useQuery({
     queryKey: ["job-timesheets-status", job.id],
@@ -367,12 +410,13 @@ export function JobCardNew({
       if (error) throw error;
       return data as { technician_id: string; status: string }[];
     },
-    enabled: job.job_type !== 'dryhire' && job.job_type !== 'tourdate',
+    enabled: hasAssignedTechnicians && job.job_type !== 'dryhire' && job.job_type !== 'tourdate',
     staleTime: 60_000
   });
 
   // Realtime invalidation when timesheets change
   useEffect(() => {
+    if (!hasAssignedTechnicians) return;
     if (job.job_type === 'dryhire' || job.job_type === 'tourdate') return;
 
     const channel = supabase
@@ -386,7 +430,7 @@ export function JobCardNew({
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [job.id, job.job_type, queryClient]);
+  }, [hasAssignedTechnicians, job.id, job.job_type, queryClient]);
 
   const handleCreateWhatsappGroup = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -871,22 +915,6 @@ export function JobCardNew({
   const cardOpacity = isJobBeingDeleted ? "opacity-50" : "";
   const pointerEvents = isJobBeingDeleted ? "pointer-events-none" : "";
 
-  // Simplified details-only mode for Dashboard, Sound, Light, Video pages
-  if (detailsOnlyMode) {
-    return (
-      <JobCardNewDetailsOnly
-        job={job}
-        department={department}
-        appliedBorderColor={appliedBorderColor}
-        isJobBeingDeleted={isJobBeingDeleted}
-        cardOpacity={cardOpacity}
-        pointerEvents={pointerEvents}
-        jobDetailsDialogOpen={jobDetailsDialogOpen}
-        setJobDetailsDialogOpen={setJobDetailsDialogOpen}
-      />
-    );
-  }
-
   return (
     <JobCardNewView
       job={job}
@@ -914,7 +942,7 @@ export function JobCardNew({
       canManageArtists={canManageArtists}
       isCreatingFolders={isCreatingFolders}
       isCreatingLocalFolders={isCreatingLocalFolders}
-      personnel={personnel}
+      techName={techName}
       assignments={assignments}
       jobTimesheets={jobTimesheets || []}
       documents={documents}
@@ -971,7 +999,7 @@ export function JobCardNew({
       logisticsInitialEventType={logisticsInitialEventType}
       setLogisticsInitialEventType={setLogisticsInitialEventType}
       isTechDept={isTechDept}
-      userDepartment={userDepartment}
+      userDepartment={currentUserDepartment}
       myTransportRequest={myTransportRequest}
       allRequests={allRequests}
       queryClient={queryClient}
@@ -983,6 +1011,14 @@ export function JobCardNew({
       handleFlexPickerConfirm={handleFlexPickerConfirm}
     />
   );
+}
+
+export function JobCardNew(props: JobCardNewProps) {
+  if (props.detailsOnlyMode) {
+    return <JobCardNewDetailsOnlyCard {...props} />;
+  }
+
+  return <JobCardNewFull {...props} />;
 }
 
 export type { JobDocument } from './JobCardDocuments';

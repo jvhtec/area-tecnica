@@ -177,9 +177,17 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
             </div>
           </div>
 
-          <div>
-            <p className="text-sm font-medium mb-2">Tipo de trabajo</p>
-            <Badge variant="outline">{jobDetails?.job_type}</Badge>
+          <div className="flex items-center gap-4 flex-wrap">
+            <div>
+              <p className="text-sm font-medium mb-2">Tipo de trabajo</p>
+              <Badge variant="outline">{jobDetails?.job_type}</Badge>
+            </div>
+            {jobDetails?.invoicing_company && (
+              <div>
+                <p className="text-sm font-medium mb-2">Empresa facturadora</p>
+                <Badge variant="secondary">{jobDetails.invoicing_company}</Badge>
+              </div>
+            )}
           </div>
 
           {isManager && !isDryhire && (
@@ -188,7 +196,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                 <Badge variant={jobRatesApproved ? "default" : "secondary"}>
                   {jobRatesApproved ? "Tarifas aprobadas" : "Aprobación necesaria"}
                 </Badge>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                   Controla la visibilidad de los pagos por trabajo para los técnicos
                 </span>
               </div>
@@ -266,12 +274,12 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                             description: "¿Quieres enviar los resúmenes de pagos por correo ahora?",
                             action: resolvedJobId
                               ? {
-                                  label: "Enviar ahora",
-                                  onClick: () => {
-                                    if (isSendingPayoutEmails) return;
-                                    triggerPayoutEmails(resolvedJobId);
-                                  },
-                                }
+                                label: "Enviar ahora",
+                                onClick: () => {
+                                  if (isSendingPayoutEmails) return;
+                                  triggerPayoutEmails(resolvedJobId);
+                                },
+                              }
                               : undefined,
                           });
                         }
@@ -298,7 +306,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
           )}
 
           {approvalStatus && approvalStatus.blockingReasons.length > 0 && (
-            <div className="mt-2 text-xs text-muted-foreground">Pendiente: {approvalStatus.blockingReasons.join(", ")}</div>
+            <div className="mt-2 text-xs text-foreground/70 dark:text-muted-foreground">Pendiente: {approvalStatus.blockingReasons.join(", ")}</div>
           )}
 
           {jobDetails?.locations && (

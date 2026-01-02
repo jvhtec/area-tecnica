@@ -6,10 +6,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useJobs } from "@/hooks/useJobs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { format, addDays, subDays, isWithinInterval, startOfDay, endOfDay, isToday } from "date-fns";
+import { addDays, endOfDay, format, isToday, isWithinInterval, startOfDay, subDays } from "date-fns";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +33,9 @@ interface DepartmentMobileHubProps {
   title: string;
   icon: React.ElementType;
   tools: ToolDefinition[];
+  jobs: any[];
+  date: Date;
+  onDateSelect: (date: Date) => void;
   canCreateJob?: boolean;
   onCreateJob?: () => void;
   userRole?: string | null;
@@ -78,6 +80,9 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   title,
   icon: Icon,
   tools,
+  jobs,
+  date,
+  onDateSelect,
   canCreateJob = false,
   onCreateJob,
   userRole,
@@ -90,14 +95,13 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   onStaffClick,
 }) => {
   const isMobile = useIsMobile();
-  const { data: jobs } = useJobs();
   const navigate = useNavigate();
   const [isDark, setIsDark] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
   const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([]);
   const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
+  const selectedDate = date;
 
   const t = isDark ? themeTokens.dark : themeTokens.light;
 
@@ -181,9 +185,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
         if (job.job_type === 'tour') return false;
 
         const isInDepartment = job.job_departments?.some((d: any) => d.department === department);
-        if (job.tour_date_id) {
-          if (!(isInDepartment && job.tour_date)) return false;
-        } else if (!isInDepartment) {
+        if (!isInDepartment) {
           return false;
         }
 
@@ -234,9 +236,9 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
     });
   }, [filteredJobs, selectedDate]);
 
-  const handlePrevDay = () => setSelectedDate(prev => subDays(prev, 1));
-  const handleNextDay = () => setSelectedDate(prev => addDays(prev, 1));
-  const handleToday = () => setSelectedDate(new Date());
+  const handlePrevDay = () => onDateSelect(subDays(selectedDate, 1));
+  const handleNextDay = () => onDateSelect(addDays(selectedDate, 1));
+  const handleToday = () => onDateSelect(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   if (!isMobile) return null;
@@ -429,7 +431,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                   selected={selectedDate}
                   onSelect={(date) => {
                     if (date) {
-                      setSelectedDate(date);
+                      onDateSelect(date);
                       setCalendarOpen(false);
                     }
                   }}

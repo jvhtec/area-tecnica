@@ -82,7 +82,7 @@ export function useJobRequiredRoles(jobId: string) {
   })
 }
 
-export function useRequiredRoleSummary(jobId: string) {
+export function useRequiredRoleSummary(jobId: string, enabled: boolean = true) {
   const q = useQuery<RequiredRoleSummaryItem[]>({
     queryKey: ['job-required-summary', jobId],
     queryFn: async () => {
@@ -95,7 +95,7 @@ export function useRequiredRoleSummary(jobId: string) {
       const rows = (data || []).map(parseSummaryRow).filter(Boolean) as RequiredRoleSummaryItem[]
       return rows
     },
-    enabled: !!jobId,
+    enabled: enabled && !!jobId,
     staleTime: 30_000,
   })
 
@@ -235,6 +235,7 @@ export function useSaveJobRequirements() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['job-required-roles', result.jobId] })
       queryClient.invalidateQueries({ queryKey: ['job-required-summary', result.jobId] })
+      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] })
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
 
       void broadcastJobRequirementsUpdate(result.jobId, result)
@@ -291,4 +292,3 @@ export function useDeleteJobRequiredRole() {
     },
   })
 }
-

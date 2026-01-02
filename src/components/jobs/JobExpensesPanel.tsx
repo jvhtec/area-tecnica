@@ -127,22 +127,22 @@ interface ExpenseCategory {
 const STATUS_LABELS: Record<ExpenseStatus, { label: string; tone: string; description: string }> = {
   draft: {
     label: 'Borradores',
-    tone: 'text-slate-300 border-slate-600',
+    tone: 'text-foreground/70 dark:text-slate-300 border-border',
     description: 'Visible para el técnico antes de enviar',
   },
   submitted: {
     label: 'Pendientes',
-    tone: 'text-amber-300 border-amber-500',
+    tone: 'text-amber-700 dark:text-amber-300 border-amber-500',
     description: 'Requieren revisión y aprobación',
   },
   approved: {
     label: 'Aprobados',
-    tone: 'text-emerald-300 border-emerald-500',
+    tone: 'text-emerald-700 dark:text-emerald-300 border-emerald-500',
     description: 'Incluidos en pagos y resúmenes',
   },
   rejected: {
     label: 'Rechazados',
-    tone: 'text-rose-300 border-rose-500',
+    tone: 'text-rose-700 dark:text-rose-300 border-rose-500',
     description: 'Devueltos al técnico con comentarios',
   },
 };
@@ -470,33 +470,33 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
 
   return (
     <div className="space-y-6">
-      <Card className="bg-[#0f1219] border-[#1f232e] text-white">
+      <Card className="bg-card border-border text-card-foreground">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-blue-300" />
+            <Receipt className="h-5 w-5 text-blue-600 dark:text-blue-300" />
             Gestión de gastos {jobTitle ? `— ${jobTitle}` : ''}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-slate-200">
+        <CardContent className="space-y-3 text-sm text-foreground/80 dark:text-slate-200">
           {isLoadingAny ? (
-            <div className="flex items-center gap-2 text-slate-400">
+            <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Cargando datos de gastos…
             </div>
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-3">
-                <Badge variant="outline" className="border-white/20">
+                <Badge variant="outline" className="border-border">
                   Total: {aggregatedTotals.count} registros · {formatCurrency(aggregatedTotals.amount)}
                 </Badge>
-                <Badge variant="outline" className="border-amber-500/40 text-amber-200">
+                <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-200">
                   Pendientes: {aggregatedTotals.pendingCount} · {formatCurrency(aggregatedTotals.pendingAmount)}
                 </Badge>
-                <Badge variant="outline" className="border-emerald-500/40 text-emerald-200">
+                <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-200">
                   Aprobados: {formatCurrency(aggregatedTotals.approvedAmount)}
                 </Badge>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Los importes aprobados se incluyen automáticamente en las nóminas, emails y PDFs de pago.
               </p>
             </>
@@ -505,10 +505,10 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
       </Card>
 
       {canManage && (
-        <Card className="bg-[#0f1219] border-[#1f232e] text-white">
+        <Card className="bg-card border-border text-card-foreground">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-emerald-300" />
+              <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
               Permisos por categoría
             </CardTitle>
           </CardHeader>
@@ -520,7 +520,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                   value={permissionForm.technicianId}
                   onValueChange={(value) => setPermissionForm((prev) => ({ ...prev, technicianId: value }))}
                 >
-                  <SelectTrigger id="expense-tech" className="bg-[#151820] border-[#1f232e]">
+                  <SelectTrigger id="expense-tech" className="bg-background border-input">
                     <SelectValue placeholder="Selecciona un técnico" />
                   </SelectTrigger>
                   <SelectContent>
@@ -540,7 +540,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                   onValueChange={(value) => setPermissionForm((prev) => ({ ...prev, categorySlug: value }))}
                   disabled={isLoadingCategories}
                 >
-                  <SelectTrigger id="expense-category" className="bg-[#151820] border-[#1f232e]">
+                  <SelectTrigger id="expense-category" className="bg-background border-input">
                     <SelectValue placeholder="Selecciona una categoría" />
                   </SelectTrigger>
                   <SelectContent>
@@ -560,7 +560,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                   type="date"
                   value={permissionForm.validFrom}
                   onChange={(event) => setPermissionForm((prev) => ({ ...prev, validFrom: event.target.value }))}
-                  className="bg-[#151820] border-[#1f232e]"
+                  className="bg-background border-input"
                 />
               </div>
 
@@ -571,7 +571,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                   type="date"
                   value={permissionForm.validTo}
                   onChange={(event) => setPermissionForm((prev) => ({ ...prev, validTo: event.target.value }))}
-                  className="bg-[#151820] border-[#1f232e]"
+                  className="bg-background border-input"
                 />
               </div>
 
@@ -584,7 +584,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                   step="0.01"
                   value={permissionForm.dailyCap}
                   onChange={(event) => setPermissionForm((prev) => ({ ...prev, dailyCap: event.target.value }))}
-                  className="bg-[#151820] border-[#1f232e]"
+                  className="bg-background border-input"
                 />
               </div>
 
@@ -597,7 +597,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                   step="0.01"
                   value={permissionForm.totalCap}
                   onChange={(event) => setPermissionForm((prev) => ({ ...prev, totalCap: event.target.value }))}
-                  className="bg-[#151820] border-[#1f232e]"
+                  className="bg-background border-input"
                 />
               </div>
 
@@ -608,7 +608,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                   rows={2}
                   value={permissionForm.notes}
                   onChange={(event) => setPermissionForm((prev) => ({ ...prev, notes: event.target.value }))}
-                  className="bg-[#151820] border-[#1f232e]"
+                  className="bg-background border-input"
                   placeholder="Indicaciones para aprobación, justificantes requeridos, etc."
                 />
               </div>
@@ -619,7 +619,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                     type="button"
                     variant="ghost"
                     onClick={resetPermissionForm}
-                    className="text-slate-300"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     Cancelar edición
                   </Button>
@@ -631,25 +631,25 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
               </div>
             </form>
 
-            <Separator className="border-white/10" />
+            <Separator />
 
             <div className="space-y-3">
-              <h4 className="font-semibold text-sm text-slate-100">Permisos actuales</h4>
+              <h4 className="font-semibold text-sm">Permisos actuales</h4>
               {permissions.length === 0 ? (
-                <p className="text-xs text-slate-400">Todavía no hay permisos configurados para este trabajo.</p>
+                <p className="text-xs text-muted-foreground">Todavía no hay permisos configurados para este trabajo.</p>
               ) : (
                 <div className="space-y-2">
                   {permissions.map((permission) => (
                     <div
                       key={permission.id}
-                      className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 p-3 rounded-lg border border-white/10 bg-white/5"
+                      className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 p-3 rounded-lg border border-border bg-muted/30"
                     >
                       <div className="text-sm">
-                        <div className="font-medium text-slate-100">
+                        <div className="font-medium">
                           {technicianDisplayName(permission.technician_id)} ·{' '}
                           {permission.category?.label_es || permission.category_slug}
                         </div>
-                        <div className="text-xs text-slate-400 space-x-2">
+                        <div className="text-xs text-muted-foreground space-x-2">
                           {permission.valid_from && (
                             <span>Desde {format(new Date(permission.valid_from), 'PPP', { locale: es })}</span>
                           )}
@@ -663,7 +663,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                           )}
                         </div>
                         {permission.notes && (
-                          <div className="text-xs text-slate-300 mt-1">{permission.notes}</div>
+                          <div className="text-xs text-foreground/70 dark:text-slate-300 mt-1">{permission.notes}</div>
                         )}
                       </div>
                       <Button
@@ -683,10 +683,10 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
         </Card>
       )}
 
-      <Card className="bg-[#0f1219] border-[#1f232e] text-white">
+      <Card className="bg-card border-border text-card-foreground">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Clock className="h-5 w-5 text-amber-200" />
+            <Clock className="h-5 w-5 text-amber-600 dark:text-amber-200" />
             Registro de gastos
           </CardTitle>
         </CardHeader>
@@ -700,53 +700,53 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className={`font-semibold text-base ${statusMeta.tone}`}>{statusMeta.label}</h3>
-                    <p className="text-xs text-slate-400">{statusMeta.description}</p>
+                    <p className="text-xs text-muted-foreground">{statusMeta.description}</p>
                   </div>
-                  <Badge variant="outline" className="border-white/10 text-xs">
+                  <Badge variant="outline" className="border-border text-xs">
                     {entries.length} gasto{entries.length === 1 ? '' : 's'}
                   </Badge>
                 </div>
 
                 {entries.length === 0 ? (
-                  <div className="text-xs text-slate-500 border border-dashed border-white/10 rounded p-3">
+                  <div className="text-xs text-muted-foreground border border-dashed border-border rounded p-3">
                     No hay gastos en este estado.
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {Array.from(groups.entries()).map(([technicianId, rows]) => (
-                      <div key={`${status}-${technicianId}`} className="border border-white/10 rounded-lg overflow-hidden">
-                        <div className="px-3 py-2 bg-white/5 flex items-center justify-between">
+                      <div key={`${status}-${technicianId}`} className="border border-border rounded-lg overflow-hidden">
+                        <div className="px-3 py-2 bg-muted/50 flex items-center justify-between">
                           <div className="font-medium text-sm">
                             {technicianDisplayName(technicianId, rows[0])}
                           </div>
-                          <div className="text-xs text-slate-300">
+                          <div className="text-xs text-foreground/70 dark:text-slate-300">
                             Total: {formatCurrency(rows.reduce((sum, row) => sum + row.amount_eur, 0))}
                           </div>
                         </div>
-                        <div className="divide-y divide-white/5">
+                        <div className="divide-y divide-border">
                           {rows.map((row) => (
                             <div key={row.id} className="px-3 py-3 text-sm space-y-2">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div className="flex flex-col">
-                                  <span className="font-medium text-slate-100">
+                                  <span className="font-medium">
                                     {row.category?.label_es || row.category_slug}
                                   </span>
-                                  <span className="text-xs text-slate-400">
+                                  <span className="text-xs text-muted-foreground">
                                     {format(new Date(row.expense_date), 'PPP', { locale: es })}
                                   </span>
                                 </div>
-                                <Badge variant="outline" className="border-white/20">
+                                <Badge variant="outline" className="border-border">
                                   {formatCurrency(row.amount_eur)}
                                 </Badge>
                               </div>
 
                               {row.description && (
-                                <div className="text-xs text-slate-300 bg-white/5 rounded p-2">
+                                <div className="text-xs text-foreground/70 dark:text-slate-300 bg-muted/30 rounded p-2">
                                   {row.description}
                                 </div>
                               )}
 
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                 <span>
                                   Original: {row.amount_original.toFixed(2)} {row.currency_code}
                                 </span>
@@ -770,7 +770,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                                     Ver recibo
                                   </Button>
                                 ) : (
-                                  <Badge variant="outline" className="border-amber-500/40 text-amber-300">
+                                  <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300 bg-amber-500/5">
                                     Sin recibo
                                   </Badge>
                                 )}
@@ -801,9 +801,9 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                                 )}
                               </div>
 
-                              <div className="flex flex-wrap gap-2 text-xs text-slate-400">
+                              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                                 {row.status_history?.map((entry, idx) => (
-                                  <span key={`${row.id}-hist-${idx}`} className="px-2 py-1 bg-white/5 rounded">
+                                  <span key={`${row.id}-hist-${idx}`} className="px-2 py-1 bg-muted rounded">
                                     {entry.status}: {entry.changed_at ? format(new Date(entry.changed_at), 'dd/MM HH:mm') : '—'}
                                   </span>
                                 ))}
@@ -823,7 +823,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
 
       {/* Reject dialog */}
       <Dialog open={Boolean(rejectDialog)} onOpenChange={(open) => !open && setRejectDialog(null)}>
-        <DialogContent className="bg-[#0f1219] border-[#1f232e] text-white max-w-md">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Rechazar gasto</DialogTitle>
           </DialogHeader>
@@ -837,7 +837,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
                   value={rejectDialog.reason}
                   onChange={(event) => setRejectDialog((prev) => prev ? { ...prev, reason: event.target.value } : prev)}
                   placeholder="Motivo del rechazo"
-                  className="bg-[#151820] border-[#1f232e]"
+                  className="bg-background border-input"
                   rows={3}
                 />
               </>

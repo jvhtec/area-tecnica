@@ -137,6 +137,8 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
     }
   });
@@ -192,6 +194,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
         });
       } catch {}
 
+      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
 
       toast({
@@ -267,6 +270,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     e.stopPropagation();
     if (isJobBeingDeleted) return; // Don't refresh if job is being deleted
     
+    await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
     await queryClient.invalidateQueries({ queryKey: ["jobs"] });
     await queryClient.invalidateQueries({ queryKey: ["sound-tasks", job.id] });
     await queryClient.invalidateQueries({ queryKey: ["sound-personnel", job.id] });

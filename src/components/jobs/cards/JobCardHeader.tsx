@@ -33,7 +33,7 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
   userRole
 }) => {
   const isMobile = useIsMobile();
-  
+
   const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
     const dateType = dateTypes[key]?.type;
@@ -80,6 +80,11 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
             {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
             <h3 className={cn("font-medium break-words leading-tight", isMobile ? "text-base" : "text-lg")}>{job.title}</h3>
             {getBadgeForJobType(job.job_type)}
+            {job.invoicing_company && (
+              <Badge variant="outline" className={cn("ml-2", isMobile && "text-xs")}>
+                {job.invoicing_company}
+              </Badge>
+            )}
             {isProjectManagementPage && (
               <JobStatusSelector
                 jobId={job.id}

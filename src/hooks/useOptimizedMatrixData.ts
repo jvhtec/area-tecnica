@@ -508,6 +508,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] }),
       queryClient.invalidateQueries({ queryKey: ['matrix-assignments'] }),
       queryClient.invalidateQueries({ queryKey: ['job-assignments'] }),
+      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] }),
       queryClient.invalidateQueries({ queryKey: ['jobs'] }) // Also invalidate jobs to refresh the matrix
     ]);
     console.log('Assignment queries invalidated');
