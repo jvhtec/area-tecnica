@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Capacitor
+ios/App/App/public
+ios/App/Pods
+ios/App/Podfile.lock
+ios/App/.DS_Store
+android/app/src/main/assets/public
+android/.gradle
+android/.idea
+android/build
+android/app/build
