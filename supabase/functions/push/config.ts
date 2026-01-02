@@ -16,6 +16,7 @@ export const EVENT_TYPES = {
   JOB_CALLTIME_UPDATED: 'job.calltime.updated',
   JOB_TYPE_CHANGED: 'job.type.changed',
   JOB_REQUIREMENTS_UPDATED: 'job.requirements.updated',
+  JOB_INVOICING_COMPANY_CHANGED: 'job.invoicing_company.changed',
 
   // Assignment events
   JOB_ASSIGNMENT_CONFIRMED: 'job.assignment.confirmed',

@@ -45,6 +45,7 @@ const FALLBACK_EVENTS: EventInfo[] = [
   { code: 'job.deleted', label: '🗑️ Job deleted (CRITICAL)' },
   { code: 'job.status.confirmed', label: 'Job confirmed' },
   { code: 'job.status.cancelled', label: 'Job cancelled' },
+  { code: 'job.invoicing_company.changed', label: 'Invoicing company changed' },
 
   // Assignment events
   { code: 'job.assignment.confirmed', label: 'Assignment confirmed' },

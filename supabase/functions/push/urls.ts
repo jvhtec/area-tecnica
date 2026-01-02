@@ -89,6 +89,7 @@ export function resolveNotificationUrl(
            type === EVENT_TYPES.JOB_STATUS_CANCELLED ||
            type === EVENT_TYPES.JOB_CALLTIME_UPDATED ||
            type === EVENT_TYPES.JOB_REQUIREMENTS_UPDATED ||
+           type === EVENT_TYPES.JOB_INVOICING_COMPANY_CHANGED ||
            type?.startsWith('job.type.changed')) {
     if (!jobId) return '/project-management';
     // Festival jobs go to /festival-management/{jobId}, others add ?singleJob=true

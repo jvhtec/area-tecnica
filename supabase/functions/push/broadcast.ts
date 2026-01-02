@@ -227,6 +227,17 @@ export async function handleBroadcast(
     addNaturalRecipients(Array.from(mgmt));
     addNaturalRecipients(Array.from(participants));
 
+  } else if (type === EVENT_TYPES.JOB_INVOICING_COMPANY_CHANGED) {
+    // Invoicing company change notification
+    const changes = body.changes as Record<string, { from?: unknown; to?: unknown }> | undefined;
+    const oldCompany = changes?.invoicing_company?.from || '(ninguna)';
+    const newCompany = changes?.invoicing_company?.to || '(ninguna)';
+
+    title = 'Empresa de facturación modificada';
+    text = `${actor} cambió la empresa de facturación de "${jobTitle || 'Trabajo'}" de ${oldCompany} a ${newCompany}.`;
+
+    addNaturalRecipients(Array.from(mgmt));
+
   // ========================================================================
   // DOCUMENT EVENTS (4 events)
   // ========================================================================
