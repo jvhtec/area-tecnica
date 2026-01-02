@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useMemo, memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users, Warehouse, Briefcase, Sun, CalendarOff, Car, Thermometer, Printer } from "lucide-react";
@@ -29,7 +29,7 @@ interface PersonalCalendarProps {
   readOnly?: boolean;
 }
 
-export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
+export const PersonalCalendar = memo<PersonalCalendarProps>(({
   date,
   onDateSelect,
   readOnly = false,
@@ -70,12 +70,6 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   } = useTechnicianAvailability(currentMonth);
   const { isWorkingDay, getHolidayName, holidays, loading: holidaysLoading, error: holidaysError } = useMadridHolidays();
 
-  console.log('PersonalCalendar: Render state', {
-    isLoading,
-    isAvailabilityLoading,
-    houseTechsCount: houseTechs.length,
-    assignmentsCount: assignments.length
-  });
 
   // Extract unique departments
   const uniqueDepartments = Array.from(
@@ -130,13 +124,13 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     });
   };
 
-  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => {
+  const handleAvailabilityChange = useCallback((techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => {
     updateAvailability(techId, status, date);
-  };
+  }, [updateAvailability]);
 
-  const handleAvailabilityRemove = (techId: string, date: Date) => {
+  const handleAvailabilityRemove = useCallback((techId: string, date: Date) => {
     removeAvailability(techId, date);
-  };
+  }, [removeAvailability]);
 
   const handleGeneratePDF = async (range: "month" | "quarter" | "year") => {
     await generatePersonalCalendarPDF(range, {
@@ -163,7 +157,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   };
 
   // Personnel summary for selected date
-  const getPersonnelSummary = () => {
+  const personnelSummary = useMemo(() => {
     const targetDate = selectedDate;
     const targetAssignments = getAssignmentsForDate(targetDate);
     const isMadridWorkingDay = isWorkingDay(targetDate);
@@ -215,9 +209,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     }>);
 
     return departmentSummary;
-  };
-
-  const personnelSummary = getPersonnelSummary();
+  }, [selectedDate, houseTechs, assignments, getAvailabilityStatus, isWorkingDay]);
 
   // Helper function to determine if tech should be shown on a given day
   const shouldShowTechOnDay = (tech: any, day: Date) => {
@@ -240,7 +232,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     return true;
   };
 
-  const getPersonnelTotals = () => {
+  const personnelTotals = useMemo(() => {
     const targetDate = selectedDate;
     const targetAssignments = getAssignmentsForDate(targetDate);
     const isMadridWorkingDay = isWorkingDay(targetDate);
@@ -292,12 +284,10 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
       techsTravelling,
       techsSick,
     };
-  };
-
-  const personnelTotals = getPersonnelTotals();
+  }, [selectedDate, houseTechs, assignments, getAvailabilityStatus, isWorkingDay]);
 
   // Helper function to render badges in rows
-  const renderBadgesInRows = (techs: any[], day: Date, maxPerRow: number = 5) => { // Changed maxPerRow to 5
+  const renderBadgesInRows = useCallback((techs: any[], day: Date, maxPerRow: number = 5) => { // Changed maxPerRow to 5
     const visibleTechs = techs.filter(tech => shouldShowTechOnDay(tech, day));
     const dayAssignments = getAssignmentsForDate(day);
     const maxDisplay = 10; // Still limit total display for performance/UI
@@ -358,7 +348,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
         )}
       </>
     );
-  };
+  }, [selectedDepartment, assignments, getAvailabilityStatus, handleAvailabilityChange, handleAvailabilityRemove, readOnly, isWorkingDay]);
 
   // Show error if Madrid holidays failed to load
   if (holidaysError) {
@@ -621,4 +611,4 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
       </Card>
     </div>
   );
-};
+});

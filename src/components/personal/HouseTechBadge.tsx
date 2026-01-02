@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, memo, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { TechDetailModal } from './TechDetailModal';
 import { labelForCode } from '@/utils/roles';
+import { useAvailabilityStatus } from './hooks/useTechnicianAvailability';
 
 interface HouseTechBadgeProps {
   technician: {
@@ -37,16 +38,31 @@ interface HouseTechBadgeProps {
   onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
-export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
+export const HouseTechBadge = memo<HouseTechBadgeProps>(({
   technician,
   assignment,
   date,
   compact = false,
-  availabilityStatus = null,
+  availabilityStatus: _availabilityStatusProp = null, // Keep for backwards compat but don't use
   onAvailabilityChange,
   onAvailabilityRemove,
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
+  // Local optimistic state for instant UI feedback
+  const [optimisticStatus, setOptimisticStatus] = useState<'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | null>(null);
+
+  // Subscribe to this badge's status from global store - only THIS badge rerenders when its status changes
+  const storeStatus = useAvailabilityStatus(technician.id, date);
+
+  // Clear optimistic status when store confirms the update
+  useEffect(() => {
+    if (optimisticStatus !== null && storeStatus === optimisticStatus) {
+      setOptimisticStatus(null);
+    }
+  }, [storeStatus, optimisticStatus]);
+
+  // Use optimistic status if set (user just clicked), otherwise use store status
+  const currentStatus = optimisticStatus ?? storeStatus;
 
   const getInitials = () => {
     const first = technician.first_name?.[0] || '';
@@ -64,8 +80,8 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
 
   const getBadgeColor = () => {
     // Handle unavailable status first
-    if (availabilityStatus) {
-      switch (availabilityStatus) {
+    if (currentStatus) {
+      switch (currentStatus) {
         case 'vacation':
           return '#fbbf24'; // amber
         case 'travel':
@@ -78,7 +94,7 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
           return '#f97316'; // orange
       }
     }
-    
+
     if (assignment && assignment.job.color) {
       return assignment.job.color;
     }
@@ -86,8 +102,8 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
   };
 
   const getAvailabilityIcon = () => {
-    if (!availabilityStatus) return null;
-    switch (availabilityStatus) {
+    if (!currentStatus) return null;
+    switch (currentStatus) {
       case 'vacation':
         return '🏖️';
       case 'travel':
@@ -104,7 +120,7 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
   };
 
   const badgeColor = getBadgeColor();
-  const isUnavailable = !!availabilityStatus;
+  const isUnavailable = !!currentStatus;
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -113,12 +129,18 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
   };
 
   const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => {
+    // Optimistic update - only this badge rerenders
+    setOptimisticStatus(status);
+
     if (onAvailabilityChange) {
       onAvailabilityChange(techId, status, date);
     }
   };
 
   const handleAvailabilityRemove = (techId: string, date: Date) => {
+    // Optimistic update - only this badge rerenders
+    setOptimisticStatus(null);
+
     if (onAvailabilityRemove) {
       onAvailabilityRemove(techId, date);
     }
@@ -175,10 +197,10 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
         technician={technician}
         assignment={assignment}
         date={date}
-        availabilityStatus={availabilityStatus}
+        availabilityStatus={currentStatus}
         onAvailabilityChange={handleAvailabilityChange}
         onAvailabilityRemove={handleAvailabilityRemove}
       />
     </>
   );
-};
+});

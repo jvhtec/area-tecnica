@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -28,15 +28,51 @@ interface AvailabilitySchedule {
   updated_at: string;
 }
 
+type AvailabilityStatus = 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | 'warehouse';
+
+// Global store for availability data - prevents parent rerenders
+const availabilityStore = {
+  data: {} as Record<string, AvailabilityStatus>,
+  listeners: new Set<() => void>(),
+
+  subscribe(listener: () => void) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  },
+
+  getSnapshot() {
+    return this.data;
+  },
+
+  setData(newData: Record<string, AvailabilityStatus>) {
+    this.data = newData;
+    this.listeners.forEach(listener => listener());
+  },
+
+  updateKey(key: string, status: AvailabilityStatus | null) {
+    if (status === null) {
+      const { [key]: _, ...rest } = this.data;
+      this.data = rest;
+    } else {
+      this.data = { ...this.data, [key]: status };
+    }
+    this.listeners.forEach(listener => listener());
+  }
+};
+
 export const useTechnicianAvailability = (currentMonth: Date) => {
-  const [availabilityData, setAvailabilityData] = useState<Record<string, 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | 'warehouse'>>({});
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`; // Keep effect stable within same month
+  const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`;
 
   useEffect(() => {
+    let isInitialFetch = true;
+
     const fetchAvailability = async () => {
-      setIsLoading(true);
+      // Only set loading on initial fetch, not on real-time updates
+      if (isInitialFetch) {
+        setIsLoading(true);
+      }
       console.log('TechnicianAvailability: Fetching availability data for month:', currentMonth);
       
       try {
@@ -71,7 +107,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         console.log('TechnicianAvailability: Fetched availability data:', availabilityDataRaw);
         console.log('TechnicianAvailability: Fetched schedules data:', schedulesData);
 
-        const availabilityMap: Record<string, 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | 'warehouse'> = {};
+        const availabilityMap: Record<string, AvailabilityStatus> = {};
 
         // Process legacy technician_availability data
         availabilityDataRaw?.forEach((item: TechnicianAvailability) => {
@@ -94,11 +130,15 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
           }
         });
 
-        setAvailabilityData(availabilityMap);
+        // Update global store instead of local state - no parent rerender
+        availabilityStore.setData(availabilityMap);
       } catch (error) {
         console.error('TechnicianAvailability: Error in fetchAvailability:', error);
       } finally {
-        setIsLoading(false);
+        if (isInitialFetch) {
+          setIsLoading(false);
+          isInitialFetch = false;
+        }
       }
     };
 
@@ -171,16 +211,12 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthKey]); // Only refetch when month boundary changes
 
-  const updateAvailability = async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', date: Date) => {
+  const updateAvailability = useCallback(async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const key = `${techId}-${dateStr}`;
 
     try {
-      // Optimistic update
-      setAvailabilityData(prev => ({
-        ...prev,
-        [key]: status
-      }));
+      // No optimistic update here - handled in HouseTechBadge component
 
       // Handle warehouse status by inserting into availability_schedules
       if (status === 'warehouse') {
@@ -206,13 +242,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
 
         if (scheduleError) {
           console.error('TechnicianAvailability: Error updating warehouse status:', scheduleError);
-          // Revert optimistic update
-          setAvailabilityData(prev => {
-            const newState = { ...prev };
-            delete newState[key];
-            return newState;
-          });
-          
+
           toast({
             title: "Error",
             description: "Failed to update warehouse status",
@@ -235,13 +265,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
 
         if (error) {
           console.error('TechnicianAvailability: Error updating availability:', error);
-          // Revert optimistic update
-          setAvailabilityData(prev => {
-            const newState = { ...prev };
-            delete newState[key];
-            return newState;
-          });
-          
+
           toast({
             title: "Error",
             description: "Failed to update availability status",
@@ -262,32 +286,20 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
       });
     } catch (error) {
       console.error('TechnicianAvailability: Error in updateAvailability:', error);
-      // Revert optimistic update
-      setAvailabilityData(prev => {
-        const newState = { ...prev };
-        delete newState[key];
-        return newState;
-      });
-      
+
       toast({
         title: "Error",
         description: "Failed to update availability status",
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
-  const removeAvailability = async (techId: string, date: Date) => {
+  const removeAvailability = useCallback(async (techId: string, date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const key = `${techId}-${dateStr}`;
 
     try {
-      // Optimistic update
-      setAvailabilityData(prev => {
-        const newState = { ...prev };
-        delete newState[key];
-        return newState;
-      });
+      // No optimistic update here - handled in HouseTechBadge component
 
       // Remove from both tables to ensure cleanup
       const { error: legacyError } = await supabase
@@ -325,18 +337,35 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
-  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | 'warehouse' | null => {
+  // Stable function that reads from store - never changes reference
+  const getAvailabilityStatus = useCallback((techId: string, date: Date): AvailabilityStatus | null => {
     const key = `${techId}-${format(date, 'yyyy-MM-dd')}`;
-    return availabilityData[key] || null;
-  };
+    return availabilityStore.data[key] || null;
+  }, []);
 
   return {
-    availabilityData,
+    availabilityData: availabilityStore.data,
     isLoading,
     updateAvailability,
     removeAvailability,
     getAvailabilityStatus
   };
+};
+
+// Hook for individual badges to subscribe to their specific availability status
+// Only rerenders when THIS badge's status changes
+export const useAvailabilityStatus = (techId: string, date: Date): AvailabilityStatus | null => {
+  const key = `${techId}-${format(date, 'yyyy-MM-dd')}`;
+
+  const subscribe = useCallback((callback: () => void) => {
+    return availabilityStore.subscribe(callback);
+  }, []);
+
+  const getSnapshot = useCallback(() => {
+    return availabilityStore.data[key] || null;
+  }, [key]);
+
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };

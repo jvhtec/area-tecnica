@@ -291,27 +291,13 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
       )
       .subscribe();
 
-    const availabilityChannel = supabase
-      .channel('personal-calendar-availability')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'availability_schedules'
-        },
-        () => {
-          console.log('PersonalCalendar: Real-time update received from availability_schedules, refetching data');
-          fetchData();
-        }
-      )
-      .subscribe();
+    // Note: availability_schedules subscription removed to prevent duplicate refetching
+    // useTechnicianAvailability hook already handles availability updates
 
     return () => {
       isMounted = false;
       supabase.removeChannel(timesheetChannel);
       supabase.removeChannel(assignmentChannel);
-      supabase.removeChannel(availabilityChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthKey]); // Only refetch when the month changes, not every day selection
