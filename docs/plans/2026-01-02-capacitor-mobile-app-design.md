@@ -91,6 +91,57 @@ Use `@capacitor/assets generate` to auto-generate all required sizes from source
 | Apple Developer Program | $99/year | developer.apple.com |
 | Google Play Console | $25 one-time | play.google.com/console |
 
+## Privacy Policy (GDPR + App Store Requirement)
+
+Both Apple and Google require a privacy policy URL. GDPR requires it to be accessible.
+
+### Route
+
+- **URL:** `/privacy`
+- **Auth:** None required (public page - Apple reviewers must access it)
+- **Purpose:** Legal compliance, user transparency
+
+### Placement (Required)
+
+1. **Login page footer** - Link below login form
+2. **Profile/Settings page** - Under "Data & Privacy" section
+
+### Page Structure
+
+```
+/privacy
+├── Header: "Privacy Policy" + last updated date
+├── How we collect data
+├── What data we store
+├── How we use your data
+├── Your rights (view, download, delete)
+├── Contact information
+└── No auth required
+```
+
+### Login Page Footer
+
+```
+┌─ Login Page ──────────────────┐
+│  [Username]                   │
+│  [Password]                   │
+│  [Login]                      │
+│  ─────────────────────        │
+│  Privacy Policy | Contact     │
+└───────────────────────────────┘
+```
+
+### Profile Settings Section
+
+```
+┌─ Profile Settings ────────────┐
+│  Data & Privacy               │
+│  → Privacy Policy             │
+│  → Download My Data           │
+│  → Delete Account             │
+└───────────────────────────────┘
+```
+
 ## Implementation Phases
 
 ### Phase 1: Setup
@@ -99,6 +150,12 @@ Use `@capacitor/assets generate` to auto-generate all required sizes from source
 - Initialize native projects (`ios/` and `android/` folders)
 - Add build scripts to package.json
 - Test local build opens in Xcode and Android Studio
+
+### Phase 1.5: Privacy Policy
+- Create `/privacy` route (public, no auth)
+- Add privacy policy content page
+- Add link to login page footer
+- Add "Data & Privacy" section to Profile page with link
 
 ### Phase 2: Assets
 - Create 1024x1024 source icon
@@ -113,7 +170,7 @@ Use `@capacitor/assets generate` to auto-generate all required sizes from source
 
 ### Phase 4: Store Submission
 - Prepare app description and keywords
-- Create privacy policy (required by both stores)
+- Provide privacy policy URL to App Store Connect and Google Play Console
 - Capture screenshots from simulators
 - Build release versions and submit for review
 
