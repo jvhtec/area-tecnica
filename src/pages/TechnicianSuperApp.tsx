@@ -143,7 +143,7 @@ export default function TechnicianSuperApp() {
       if (!user?.id) return null;
       const { data, error } = await supabase
         .from('profiles')
-        .select('first_name, last_name, role, department')
+        .select('first_name, last_name, nickname, phone, residencia, dni, bg_color, profile_picture_url, role, department')
         .eq('id', user.id)
         .single();
       if (error) throw error;

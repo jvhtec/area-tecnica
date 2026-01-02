@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Save, User, Phone, MapPin, CreditCard, Calendar as CalendarIcon, Lock, ChevronRight, LogOut, Camera, X, Bell, BellOff, AlertTriangle } from 'lucide-react';
+import { Loader2, Save, User, Phone, MapPin, CreditCard, Calendar as CalendarIcon, Lock, ChevronRight, LogOut, X, Bell, BellOff, AlertTriangle, Shield, ExternalLink, UserX } from 'lucide-react';
 import { Theme } from './types';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { ProfilePictureUpload } from '@/components/profile/ProfilePictureUpload';
@@ -20,9 +20,9 @@ interface UserProfile {
     first_name?: string;
     last_name?: string;
     phone?: string;
-    city?: string;
     dni?: string;
-    profile_color?: string;
+    residencia?: string;
+    bg_color?: string;
     profile_picture_url?: string;
     role?: string;
     department?: string;
@@ -39,7 +39,7 @@ interface ProfileViewProps {
 export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: ProfileViewProps) => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    const [selectedColor, setSelectedColor] = useState(userProfile?.profile_color || '#3b82f6');
+    const [selectedColor, setSelectedColor] = useState(userProfile?.bg_color || '#3b82f6');
 
     // Push notifications hook
     const {
@@ -68,7 +68,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
     const [firstName, setFirstName] = useState(userProfile?.first_name || '');
     const [lastName, setLastName] = useState(userProfile?.last_name || '');
     const [phone, setPhone] = useState(userProfile?.phone || '');
-    const [city, setCity] = useState(userProfile?.city || '');
+    const [residencia, setResidencia] = useState(userProfile?.residencia || '');
     const [dni, setDni] = useState(userProfile?.dni || '');
 
     // Update form when profile loads
@@ -77,9 +77,9 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
             setFirstName(userProfile.first_name || '');
             setLastName(userProfile.last_name || '');
             setPhone(userProfile.phone || '');
-            setCity(userProfile.city || '');
+            setResidencia(userProfile.residencia || '');
             setDni(userProfile.dni || '');
-            setSelectedColor(userProfile.profile_color || '#3b82f6');
+            setSelectedColor(userProfile.bg_color || '#3b82f6');
         }
     }, [userProfile]);
 
@@ -193,16 +193,16 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                     first_name: firstName,
                     last_name: lastName,
                     phone,
-                    city,
                     dni,
-                    profile_color: selectedColor,
+                    residencia,
+                    bg_color: selectedColor,
                 })
                 .eq('id', user.id);
             if (error) throw error;
         },
         onSuccess: () => {
             toast.success('Perfil actualizado');
-            queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+            queryClient.invalidateQueries({ queryKey: ['user-profile', user?.id] });
         },
         onError: (err: unknown) => {
             const message = err instanceof Error ? err.message : 'Error desconocido';
@@ -235,14 +235,14 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                             currentPictureUrl={userProfile?.profile_picture_url}
                             userInitials={userInitials}
                             onUploadComplete={(url) => {
-                                queryClient.setQueryData(['user-profile'], (old: any) => ({
-                                    ...old,
+                                queryClient.setQueryData(['user-profile', user.id], (old: any) => ({
+                                    ...(old ?? {}),
                                     profile_picture_url: url
                                 }));
                             }}
                             onRemove={() => {
-                                queryClient.setQueryData(['user-profile'], (old: any) => ({
-                                    ...old,
+                                queryClient.setQueryData(['user-profile', user.id], (old: any) => ({
+                                    ...(old ?? {}),
                                     profile_picture_url: null
                                 }));
                             }}
@@ -302,8 +302,8 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                         <div className="relative">
                             <MapPin size={16} className={`absolute left-3 top-3 ${theme.textMuted}`} />
                             <Input
-                                value={city}
-                                onChange={(e) => setCity(e.target.value)}
+                                value={residencia}
+                                onChange={(e) => setResidencia(e.target.value)}
                                 className={`pl-10 ${theme.input}`}
                             />
                         </div>
@@ -441,6 +441,43 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                     <ChevronRight size={18} className={theme.textMuted} />
                 </div>
 
+            </div>
+
+            {/* Data & Privacy */}
+            <div>
+                <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 mt-6 px-1 ${theme.textMuted}`}>
+                    Datos y Privacidad
+                </h3>
+
+                <a
+                    href="/privacy"
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`p-4 rounded-xl border mb-3 flex items-center justify-between ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400"><Shield size={18} /></div>
+                        <div>
+                            <div className={`font-bold text-sm ${theme.textMain}`}>Política de Privacidad</div>
+                            <div className={`text-xs ${theme.textMuted}`}>Consulta cómo tratamos tus datos</div>
+                        </div>
+                    </div>
+                    <ExternalLink size={18} className={theme.textMuted} />
+                </a>
+
+                <a
+                    href="mailto:info@sector-pro.com?subject=Solicitud%20de%20eliminacion%20de%20cuenta"
+                    className={`p-4 rounded-xl border mb-3 flex items-center justify-between hover:bg-red-500/5 transition-colors ${theme.card} border-red-500/20`}
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-red-500/10 rounded-lg text-red-400"><UserX size={18} /></div>
+                        <div>
+                            <div className="font-bold text-sm text-red-500">Eliminar mi cuenta</div>
+                            <div className={`text-xs ${theme.textMuted}`}>Solicita la eliminación permanente de tus datos</div>
+                        </div>
+                    </div>
+                    <ExternalLink size={18} className="text-red-400" />
+                </a>
             </div>
 
             {/* 5. Sign Out */}
