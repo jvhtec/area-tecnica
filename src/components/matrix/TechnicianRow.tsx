@@ -280,9 +280,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
               <div className="h-full flex flex-col items-center justify-center">
                 <div className="relative">
                   <Avatar className="h-8 w-8">
-                    {technician.profile_picture_url && (
-                      <AvatarImage src={technician.profile_picture_url} alt={displayName} />
-                    )}
+                    <AvatarImage src={technician.profile_picture_url || undefined} alt={displayName} />
                     <AvatarFallback className="text-xs">
                       {getInitials()}
                     </AvatarFallback>
@@ -296,9 +294,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
             ) : (
               <div className="flex items-center gap-3 h-full">
                 <Avatar className="h-8 w-8">
-                  {technician.profile_picture_url && (
-                    <AvatarImage src={technician.profile_picture_url} alt={displayName} />
-                  )}
+                  <AvatarImage src={technician.profile_picture_url || undefined} alt={displayName} />
                   <AvatarFallback className="text-xs">
                     {getInitials()}
                   </AvatarFallback>
@@ -335,9 +331,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12">
-                {technician.profile_picture_url && (
-                  <AvatarImage src={technician.profile_picture_url} alt={displayName} />
-                )}
+                <AvatarImage src={technician.profile_picture_url || undefined} alt={displayName} />
                 <AvatarFallback>
                   {getInitials()}
                 </AvatarFallback>

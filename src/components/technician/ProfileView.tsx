@@ -187,21 +187,31 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
     const saveProfileMutation = useMutation({
         mutationFn: async () => {
             if (!user?.id) throw new Error('No user');
-            const { error } = await supabase
+            const updateData = {
+                first_name: firstName,
+                last_name: lastName,
+                phone,
+                dni,
+                residencia,
+                bg_color: selectedColor,
+            };
+            const { data, error } = await supabase
                 .from('profiles')
-                .update({
-                    first_name: firstName,
-                    last_name: lastName,
-                    phone,
-                    dni,
-                    residencia,
-                    bg_color: selectedColor,
-                })
-                .eq('id', user.id);
+                .update(updateData)
+                .eq('id', user.id)
+                .select()
+                .single();
             if (error) throw error;
+            return data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             toast.success('Perfil actualizado');
+            // Update cache directly with returned data
+            queryClient.setQueryData(['user-profile', user?.id], (old: any) => ({
+                ...old,
+                ...data,
+            }));
+            // Also invalidate to ensure consistency
             queryClient.invalidateQueries({ queryKey: ['user-profile', user?.id] });
         },
         onError: (err: unknown) => {
