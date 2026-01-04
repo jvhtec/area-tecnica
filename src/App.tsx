@@ -22,6 +22,7 @@ import { ViewportProvider } from '@/hooks/use-mobile';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { GlobalCreateJobDialog } from '@/components/jobs/GlobalCreateJobDialog';
 
 // Lazy load all pages for better initial bundle size
 const Auth = lazy(() => import('@/pages/Auth'));
@@ -283,6 +284,8 @@ export default function App() {
                             </Route>
                           </Routes>
                         </Suspense>
+                        {/* Global Create Job Dialog - accessible from anywhere via shortcuts */}
+                        <GlobalCreateJobDialog />
                         {/* Radix-based toaster (legacy) and Sonner toaster for activity + app toasts */}
                         <Toaster />
                         <SonnerToaster richColors position="top-right" />

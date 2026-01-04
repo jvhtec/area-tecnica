@@ -12,6 +12,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { registerNavigationShortcuts } from '@/lib/shortcuts/navigation-shortcuts';
 import { registerJobCardShortcuts } from '@/lib/shortcuts/job-card-shortcuts';
+import { registerGlobalShortcuts } from '@/lib/shortcuts/global-shortcuts';
 import { initializeStreamDeck, getStreamDeckClient } from '@/lib/streamdeck/websocket-server';
 import { useShortcutStore } from '@/stores/useShortcutStore';
 
@@ -29,6 +30,7 @@ export function useShortcutInitialization() {
     // Register all shortcuts
     registerNavigationShortcuts(navigate);
     registerJobCardShortcuts();
+    registerGlobalShortcuts();
 
     // Initialize Stream Deck connection
     const streamDeckClient = initializeStreamDeck();

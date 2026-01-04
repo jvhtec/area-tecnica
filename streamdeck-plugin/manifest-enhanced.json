@@ -31,6 +31,19 @@
       "PropertyInspectorPath": "propertyinspector_nav.html"
     },
     {
+      "Icon": "images/action",
+      "Name": "Crear Trabajo",
+      "States": [
+        {
+          "Image": "images/action",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Create a new job (works from anywhere)",
+      "UUID": "com.jvhtec.areatecnica.action.createjob"
+    },
+    {
       "Icon": "images/panel",
       "Name": "Panel",
       "States": [
