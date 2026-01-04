@@ -68,8 +68,15 @@ export class StreamDeckWebSocketClient {
         console.error('Stream Deck WebSocket error:', error);
       };
 
-      this.ws.onmessage = (event) => {
-        this.handleMessage(event.data);
+      this.ws.onmessage = async (event) => {
+        let data = event.data;
+        
+        // Handle Blob data from WebSocket
+        if (data instanceof Blob) {
+          data = await data.text();
+        }
+        
+        this.handleMessage(data);
       };
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
@@ -105,6 +112,7 @@ export class StreamDeckWebSocketClient {
 
   private handleMessage(data: string) {
     try {
+      console.log('📨 Stream Deck message received:', data);
       const message: StreamDeckMessage = JSON.parse(data);
 
       switch (message.type) {

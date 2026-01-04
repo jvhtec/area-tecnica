@@ -59,6 +59,7 @@ export function useShortcutInitialization() {
           if (shortcut.enabled) {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation();
             shortcutStore.executeShortcut(shortcut.id);
           }
           break;
@@ -66,7 +67,8 @@ export function useShortcutInitialization() {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    // Capture phase to intercept before browser default handlers
+    window.addEventListener('keydown', handleKeyDown, true);
 
     // Listen for navigation events from Stream Deck
     const handleStreamDeckNavigate = (event: Event) => {
@@ -82,7 +84,7 @@ export function useShortcutInitialization() {
     console.log('✅ Shortcut system initialized');
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('streamdeck-navigate', handleStreamDeckNavigate);
       streamDeckClient.disconnect();
     };
