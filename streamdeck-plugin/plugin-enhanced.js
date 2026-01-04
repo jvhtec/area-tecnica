@@ -22,6 +22,9 @@ const ACTION_MAP = {
   'com.jvhtec.areatecnica.nav.video': { type: 'navigate', route: '/video', label: 'Video' },
   'com.jvhtec.areatecnica.nav.logistics': { type: 'navigate', route: '/logistics', label: 'Logística' },
   'com.jvhtec.areatecnica.nav.matrix': { type: 'navigate', route: '/job-assignment-matrix', label: 'Matriz' },
+  'com.jvhtec.areatecnica.nav.tours': { type: 'navigate', route: '/tours', label: 'Tours' },
+  'com.jvhtec.areatecnica.nav.festivals': { type: 'navigate', route: '/festivals', label: 'Festivales' },
+  'com.jvhtec.areatecnica.nav.timesheets': { type: 'navigate', route: '/timesheets', label: 'Timesheets' },
 
   // Direct job actions
   'com.jvhtec.areatecnica.action.assign': { type: 'shortcut', id: 'job-assign', label: 'Asignar' },
