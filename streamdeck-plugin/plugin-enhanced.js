@@ -29,6 +29,9 @@ const ACTION_MAP = {
   'com.jvhtec.areatecnica.action.whatsapp': { type: 'shortcut', id: 'job-whatsapp-group', label: 'WhatsApp' },
   'com.jvhtec.areatecnica.action.pesos': { type: 'shortcut', id: 'job-pesos-calculator', label: 'Pesos' },
   'com.jvhtec.areatecnica.action.consumos': { type: 'shortcut', id: 'job-consumos-calculator', label: 'Consumos' },
+
+  // Global actions
+  'com.jvhtec.areatecnica.action.createjob': { type: 'shortcut', id: 'global-create-job', label: 'Crear' },
 };
 
 // Connect to the Area Técnica WebSocket server

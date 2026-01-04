@@ -16,6 +16,7 @@ import { ViewportProvider } from '@/hooks/use-mobile';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { GlobalCreateJobDialog } from '@/components/jobs/GlobalCreateJobDialog';
 
 const ReactQueryDevtoolsLazy = import.meta.env.DEV
   ? lazy(() =>
@@ -265,6 +266,8 @@ export default function App() {
                           </Route>
                         </Routes>
                       </Suspense>
+                      {/* Global Create Job Dialog - accessible from anywhere via shortcuts */}
+                      <GlobalCreateJobDialog />
                       {/* Radix-based toaster (legacy) and Sonner toaster for activity + app toasts */}
                       <Toaster />
                       <SonnerToaster richColors position="top-right" />
