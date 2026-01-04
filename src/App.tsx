@@ -17,6 +17,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { GlobalCreateJobDialog } from '@/components/jobs/GlobalCreateJobDialog';
+import { useShortcutInitialization } from '@/hooks/useShortcutInitialization';
 
 const ReactQueryDevtoolsLazy = import.meta.env.DEV
   ? lazy(() =>
@@ -98,6 +99,12 @@ function PushSubscriptionRecoveryInit() {
   return null;
 }
 
+// Initialize global keyboard shortcuts and Stream Deck integration
+function ShortcutSystemInit() {
+  useShortcutInitialization();
+  return null;
+}
+
 const SOUND_DEPARTMENT = "sound";
 const LIGHTS_DEPARTMENT = "lights";
 
@@ -160,6 +167,7 @@ export default function App() {
                   <OptimizedAuthProvider>
                     <ServiceWorkerUpdateInit />
                     <PushSubscriptionRecoveryInit />
+                    <ShortcutSystemInit />
                     <div className="app">
                       <Suspense fallback={<PageLoader />}>
                         <Routes>
