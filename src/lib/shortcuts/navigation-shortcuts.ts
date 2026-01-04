@@ -177,6 +177,7 @@ export function registerNavigationShortcuts(navigate: NavigateFunction) {
       description: `Navegar a ${navShortcut.label}`,
       defaultKeybind: navShortcut.keybind,
       action: () => {
+        console.log(`[Navigation] Executing shortcut: ${navShortcut.id} → ${navShortcut.route}`);
         navigate(navShortcut.route);
       },
     });

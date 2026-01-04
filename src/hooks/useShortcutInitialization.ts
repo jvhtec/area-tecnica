@@ -19,16 +19,25 @@ import { useShortcutStore } from '@/stores/useShortcutStore';
 export function useShortcutInitialization() {
   const navigate = useNavigate();
   const initialized = useRef(false);
+  const navigateRef = useRef(navigate);
+
+  // Keep navigate ref up to date
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
 
   useEffect(() => {
     // Only initialize once
-    if (initialized.current) return;
+    if (initialized.current) {
+      console.log('⚠️ Shortcut system already initialized, skipping');
+      return;
+    }
     initialized.current = true;
 
     console.log('🚀 Initializing shortcut system...');
 
-    // Register all shortcuts
-    registerNavigationShortcuts(navigate);
+    // Register all shortcuts using current navigate
+    registerNavigationShortcuts(navigateRef.current);
     registerJobCardShortcuts();
     registerGlobalShortcuts();
 
@@ -72,23 +81,31 @@ export function useShortcutInitialization() {
 
     // Listen for navigation events from Stream Deck
     const handleStreamDeckNavigate = (event: Event) => {
+      console.log('[ShortcutInit] Received streamdeck-navigate event:', event);
       const customEvent = event as CustomEvent;
       const route = customEvent.detail?.route;
+      console.log('[ShortcutInit] Navigating to route:', route);
       if (route) {
-        navigate(route);
+        // Use the ref to get current navigate function
+        navigateRef.current(route);
+        console.log('[ShortcutInit] Navigation called');
+      } else {
+        console.warn('[ShortcutInit] No route in event detail');
       }
     };
 
     window.addEventListener('streamdeck-navigate', handleStreamDeckNavigate);
 
     console.log('✅ Shortcut system initialized');
+    console.log('✅ Event listener registered for streamdeck-navigate');
 
     return () => {
+      console.log('🧹 Cleaning up shortcut system (this should only happen on unmount)');
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('streamdeck-navigate', handleStreamDeckNavigate);
       streamDeckClient.disconnect();
     };
-  }, [navigate]);
+  }, []); // Empty deps - only run once on mount
 }
 
 /**

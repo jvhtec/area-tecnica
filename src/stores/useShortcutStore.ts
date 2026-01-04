@@ -53,9 +53,13 @@ export const useShortcutStore = create<ShortcutStore>()(
       registerShortcut: (shortcut) => {
         set((state) => {
           const newShortcuts = new Map(state.shortcuts);
+          const existingShortcut = newShortcuts.get(shortcut.id);
           newShortcuts.set(shortcut.id, {
             ...shortcut,
-            enabled: true,
+            // Preserve enabled state if shortcut already exists
+            enabled: existingShortcut?.enabled ?? true,
+            // Preserve custom keybind if it exists
+            customKeybind: existingShortcut?.customKeybind ?? shortcut.customKeybind,
           });
           return { shortcuts: newShortcuts };
         });
@@ -71,13 +75,26 @@ export const useShortcutStore = create<ShortcutStore>()(
 
       executeShortcut: async (id) => {
         const shortcut = get().shortcuts.get(id);
+        console.log(`[ShortcutStore] Executing shortcut: ${id}`, {
+          found: !!shortcut,
+          enabled: shortcut?.enabled,
+          hasAction: !!shortcut?.action,
+          category: shortcut?.category
+        });
+
         if (!shortcut || !shortcut.enabled) {
           console.warn(`Shortcut ${id} not found or disabled`);
           return false;
         }
 
+        if (!shortcut.action) {
+          console.error(`Shortcut ${id} has no action function!`);
+          return false;
+        }
+
         try {
           await shortcut.action();
+          console.log(`[ShortcutStore] Successfully executed: ${id}`);
           return true;
         } catch (error) {
           console.error(`Failed to execute shortcut ${id}:`, error);
@@ -184,6 +201,32 @@ export const useShortcutStore = create<ShortcutStore>()(
           },
         ]),
       }),
+      // Custom merge to properly restore Map from persisted array
+      merge: (persistedState: any, currentState: ShortcutStore) => {
+        console.log('[ShortcutStore] Rehydrating from localStorage...');
+
+        // If no persisted state, return current state
+        if (!persistedState || !persistedState.shortcuts) {
+          console.log('[ShortcutStore] No persisted state, using empty Map');
+          return currentState;
+        }
+
+        // Convert persisted array back to Map
+        const restoredMap = new Map();
+
+        if (Array.isArray(persistedState.shortcuts)) {
+          persistedState.shortcuts.forEach(([id, config]: [string, any]) => {
+            // Store config without action (action will be added during registration)
+            restoredMap.set(id, config);
+          });
+          console.log(`[ShortcutStore] Restored ${restoredMap.size} shortcuts from localStorage`);
+        }
+
+        return {
+          ...currentState,
+          shortcuts: restoredMap,
+        };
+      },
     }
   )
 );

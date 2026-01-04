@@ -32,7 +32,7 @@
     }
   ],
   "Author": "JVHTEC",
-  "CodePath": "plugin.js",
+  "CodePath": "plugin.html",
   "Description": "Control Area Técnica app with keyboard shortcuts and navigation",
   "Name": "Area Técnica Controller",
   "Icon": "images/plugin",

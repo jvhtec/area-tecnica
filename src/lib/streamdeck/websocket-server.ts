@@ -151,10 +151,14 @@ export class StreamDeckWebSocketClient {
   }
 
   private handleNavigate(route: string) {
+    console.log('[StreamDeck] handleNavigate called with route:', route);
+
     if (!route) {
-      console.error('No route provided');
+      console.error('[StreamDeck] No route provided');
       return;
     }
+
+    console.log('[StreamDeck] Dispatching streamdeck-navigate event for route:', route);
 
     // Dispatch navigation event
     window.dispatchEvent(
@@ -162,6 +166,8 @@ export class StreamDeckWebSocketClient {
         detail: { route },
       })
     );
+
+    console.log('[StreamDeck] Event dispatched successfully');
   }
 
   private send(data: any) {
