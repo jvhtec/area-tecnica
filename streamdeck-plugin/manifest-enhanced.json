@@ -1,0 +1,201 @@
+{
+  "Actions": [
+    {
+      "Icon": "images/action",
+      "Name": "Execute Shortcut",
+      "States": [
+        {
+          "Image": "images/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": true
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Execute a keyboard shortcut from Area Técnica",
+      "UUID": "com.jvhtec.areatecnica.executeshortcut",
+      "PropertyInspectorPath": "propertyinspector.html"
+    },
+    {
+      "Icon": "images/action",
+      "Name": "Navigate",
+      "States": [
+        {
+          "Image": "images/nav",
+          "TitleAlignment": "middle",
+          "ShowTitle": true
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Navigate to a page in Area Técnica",
+      "UUID": "com.jvhtec.areatecnica.navigate",
+      "PropertyInspectorPath": "propertyinspector_nav.html"
+    },
+    {
+      "Icon": "images/panel",
+      "Name": "Panel",
+      "States": [
+        {
+          "Image": "images/panel",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Navigate to Panel/Dashboard",
+      "UUID": "com.jvhtec.areatecnica.nav.panel"
+    },
+    {
+      "Icon": "images/sonido",
+      "Name": "Sonido",
+      "States": [
+        {
+          "Image": "images/sonido",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Navigate to Sound page",
+      "UUID": "com.jvhtec.areatecnica.nav.sound"
+    },
+    {
+      "Icon": "images/luces",
+      "Name": "Luces",
+      "States": [
+        {
+          "Image": "images/luces",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Navigate to Lights page",
+      "UUID": "com.jvhtec.areatecnica.nav.lights"
+    },
+    {
+      "Icon": "images/video",
+      "Name": "Video",
+      "States": [
+        {
+          "Image": "images/video",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Navigate to Video page",
+      "UUID": "com.jvhtec.areatecnica.nav.video"
+    },
+    {
+      "Icon": "images/logistica",
+      "Name": "Logística",
+      "States": [
+        {
+          "Image": "images/logistica",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Navigate to Logistics page",
+      "UUID": "com.jvhtec.areatecnica.nav.logistics"
+    },
+    {
+      "Icon": "images/matriz",
+      "Name": "Matriz",
+      "States": [
+        {
+          "Image": "images/matriz",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Navigate to Assignment Matrix",
+      "UUID": "com.jvhtec.areatecnica.nav.matrix"
+    },
+    {
+      "Icon": "images/asignar",
+      "Name": "Asignar",
+      "States": [
+        {
+          "Image": "images/asignar",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Assign technicians to selected job",
+      "UUID": "com.jvhtec.areatecnica.action.assign"
+    },
+    {
+      "Icon": "images/tareas",
+      "Name": "Tareas",
+      "States": [
+        {
+          "Image": "images/tareas",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Open tasks for selected job",
+      "UUID": "com.jvhtec.areatecnica.action.tasks"
+    },
+    {
+      "Icon": "images/whatsapp",
+      "Name": "WhatsApp",
+      "States": [
+        {
+          "Image": "images/whatsapp",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Create WhatsApp group for selected job",
+      "UUID": "com.jvhtec.areatecnica.action.whatsapp"
+    },
+    {
+      "Icon": "images/pesos",
+      "Name": "Pesos",
+      "States": [
+        {
+          "Image": "images/pesos",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Open weight calculator",
+      "UUID": "com.jvhtec.areatecnica.action.pesos"
+    },
+    {
+      "Icon": "images/consumos",
+      "Name": "Consumos",
+      "States": [
+        {
+          "Image": "images/consumos",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Open power consumption calculator",
+      "UUID": "com.jvhtec.areatecnica.action.consumos"
+    }
+  ],
+  "Author": "JVHTEC",
+  "CodePath": "plugin.js",
+  "Description": "Control Area Técnica app with keyboard shortcuts and navigation",
+  "Name": "Area Técnica Controller",
+  "Icon": "images/plugin",
+  "URL": "https://github.com/jvhtec/area-tecnica",
+  "Version": "1.0.0",
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "10.14"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Software": {
+    "MinimumVersion": "6.0"
+  },
+  "Category": "Area Técnica",
+  "CategoryIcon": "images/category",
+  "SDKVersion": 2,
+  "UUID": "com.jvhtec.areatecnica"
+}
