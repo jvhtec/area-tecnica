@@ -898,15 +898,30 @@ function JobCardNewFull({
   };
 
   const handleJobCardClick = (e?: React.MouseEvent) => {
+    console.log('[JobCard] Click detected:', {
+      hasEvent: !!e,
+      ctrlKey: e?.ctrlKey,
+      altKey: e?.altKey,
+      metaKey: e?.metaKey,
+      isHouseTech,
+      isJobBeingDeleted,
+      isSelected,
+      jobId: job.id
+    });
+
     if (isHouseTech || isJobBeingDeleted) {
+      console.log('[JobCard] Click ignored - houseTech or being deleted');
       return;
     }
 
     // Ctrl+Click / Alt+Click: Toggle job selection for Stream Deck shortcuts
     if (e && (e.ctrlKey || e.altKey || e.metaKey)) {
+      console.log('[JobCard] Ctrl/Alt/Meta click detected - toggling selection');
       if (isSelected) {
+        console.log('[JobCard] Clearing selection');
         clearSelection();
       } else {
+        console.log('[JobCard] Selecting job:', job.id);
         selectJob({
           id: job.id,
           title: job.title,

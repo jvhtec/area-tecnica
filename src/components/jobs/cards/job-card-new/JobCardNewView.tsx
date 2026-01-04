@@ -42,7 +42,8 @@ export interface JobCardNewViewProps {
   appliedBgColor: string;
   collapsed: boolean;
   toggleCollapse: () => void;
-  handleJobCardClick: () => void;
+  handleJobCardClick: (e?: React.MouseEvent) => void;
+  isSelected: boolean;
 
   routeSheetOpen: boolean;
   setRouteSheetOpen: (open: boolean) => void;
@@ -148,6 +149,7 @@ export function JobCardNewView({
   appliedBorderColor,
   appliedBgColor,
   collapsed,
+  isSelected,
   toggleCollapse,
   handleJobCardClick,
   routeSheetOpen,
@@ -236,7 +238,8 @@ export function JobCardNewView({
           "mb-4 hover:shadow-md transition-all duration-200",
           !isHouseTech && !isJobBeingDeleted && "cursor-pointer",
           cardOpacity,
-          pointerEvents
+          pointerEvents,
+          isSelected && "ring-2 ring-primary ring-offset-2 shadow-lg"
         )}
         onClick={handleJobCardClick}
         style={{
