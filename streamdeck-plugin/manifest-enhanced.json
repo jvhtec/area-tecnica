@@ -31,11 +31,11 @@
       "PropertyInspectorPath": "propertyinspector_nav.html"
     },
     {
-      "Icon": "images/action",
+      "Icon": "images/crear",
       "Name": "Crear Trabajo",
       "States": [
         {
-          "Image": "images/action",
+          "Image": "images/crear",
           "TitleAlignment": "bottom"
         }
       ],
@@ -185,6 +185,45 @@
       "SupportedInMultiActions": true,
       "Tooltip": "Open power consumption calculator",
       "UUID": "com.jvhtec.areatecnica.action.consumos"
+    },
+    {
+      "Icon": "images/tours",
+      "Name": "Tours",
+      "States": [
+        {
+          "Image": "images/tours",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Navigate to Tours page",
+      "UUID": "com.jvhtec.areatecnica.nav.tours"
+    },
+    {
+      "Icon": "images/festivales",
+      "Name": "Festivales",
+      "States": [
+        {
+          "Image": "images/festivales",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Navigate to Festivals page",
+      "UUID": "com.jvhtec.areatecnica.nav.festivals"
+    },
+    {
+      "Icon": "images/timesheets",
+      "Name": "Timesheets",
+      "States": [
+        {
+          "Image": "images/timesheets",
+          "TitleAlignment": "bottom"
+        }
+      ],
+      "SupportedInMultiActions": true,
+      "Tooltip": "Navigate to Timesheets page",
+      "UUID": "com.jvhtec.areatecnica.nav.timesheets"
     }
   ],
   "Author": "JVHTEC",
