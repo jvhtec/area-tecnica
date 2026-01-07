@@ -114,6 +114,33 @@ function endOfDay(d: Date) {
   return x;
 }
 
+// Filter out jobs whose parent tour is cancelled ("not happening")
+async function filterCancelledTourJobs<T extends { tour_id?: string | null }>(
+  sb: ReturnType<typeof createClient>,
+  jobs: T[]
+): Promise<T[]> {
+  const tourIds = Array.from(new Set(jobs.map((j) => j.tour_id).filter(Boolean))) as string[];
+  if (tourIds.length === 0) return jobs;
+
+  const { data: tours, error } = await sb
+    .from("tours")
+    .select("id, status")
+    .in("id", tourIds);
+
+  if (error) {
+    console.warn("Error fetching tours for cancelled filter:", error);
+    return jobs; // Return unfiltered if we can't check tours
+  }
+
+  const cancelledTourIds = new Set(
+    (tours ?? []).filter((t: any) => t.status === "cancelled").map((t: any) => t.id)
+  );
+
+  if (cancelledTourIds.size === 0) return jobs;
+
+  return jobs.filter((j) => !j.tour_id || !cancelledTourIds.has(j.tour_id));
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders() });
@@ -153,6 +180,7 @@ serve(async (req) => {
           end_time,
           color,
           job_type,
+          tour_id,
           locations(id, name),
           job_departments(department),
           job_assignments(technician_id, sound_role, lights_role, video_role)
@@ -165,8 +193,11 @@ serve(async (req) => {
 
       if (error) throw error;
 
+      // Filter out jobs from cancelled tours
+      const filteredJobs = await filterCancelledTourJobs(sb, jobs ?? []);
+
       const result = {
-        jobs: (jobs ?? []).map((j: any) => {
+        jobs: filteredJobs.map((j: any) => {
           const depts: Dept[] = Array.from(
             new Set((j.job_departments ?? []).map((d: any) => d.department).filter(Boolean))
           );
@@ -232,6 +263,7 @@ serve(async (req) => {
           end_time,
           job_type,
           color,
+          tour_id,
           locations(id, name),
           job_departments(department),
           job_assignments(technician_id, sound_role, lights_role, video_role)
@@ -244,8 +276,11 @@ serve(async (req) => {
 
       if (error) throw error;
 
+      // Filter out jobs from cancelled tours
+      const filteredJobs = await filterCancelledTourJobs(sb, jobs ?? []);
+
       const result = {
-        jobs: (jobs ?? []).map((j: any) => {
+        jobs: filteredJobs.map((j: any) => {
           const depts = Array.from(
             new Set((j.job_departments ?? []).map((d: any) => d.department).filter(Boolean))
           );
@@ -306,6 +341,7 @@ serve(async (req) => {
           end_time,
           color,
           job_type,
+          tour_id,
           job_assignments(
             technician_id,
             sound_role,
@@ -322,7 +358,8 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      const jobsArr = jobs ?? [];
+      // Filter out jobs from cancelled tours
+      const jobsArr = await filterCancelledTourJobs(sb, jobs ?? []);
       const jobIds = jobsArr.map((j: any) => j.id);
       const timesheetsByJob = new Map<string, any[]>();
 
@@ -384,6 +421,7 @@ serve(async (req) => {
         .select(`
           id,
           title,
+          tour_id,
           job_departments(department)
         `)
         .in("job_type", ["single", "festival", "tourdate"])
@@ -394,8 +432,11 @@ serve(async (req) => {
 
       if (error) throw error;
 
+      // Filter out jobs from cancelled tours
+      const filteredJobs = await filterCancelledTourJobs(sb, jobs ?? []);
+
       const payload = {
-        jobs: (jobs ?? []).map((j: any) => ({
+        jobs: filteredJobs.map((j: any) => ({
           id: j.id,
           title: j.title,
           departments: Array.from(new Set((j.job_departments ?? []).map((d: any) => d.department))).map((dept: Dept) => ({
@@ -424,6 +465,7 @@ serve(async (req) => {
           id,
           title,
           end_time,
+          tour_id,
           job_departments(department),
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
@@ -434,9 +476,12 @@ serve(async (req) => {
 
       if (error) throw error;
 
+      // Filter out jobs from cancelled tours
+      const filteredJobs = await filterCancelledTourJobs(sb, jobs ?? []);
+
       const items: { severity: "red" | "yellow"; text: string }[] = [];
 
-      (jobs ?? []).forEach((j: any) => {
+      filteredJobs.forEach((j: any) => {
         const depts: Dept[] = Array.from(new Set((j.job_departments ?? []).map((d: any) => d.department)));
         const counts = { sound: 0, lights: 0, video: 0 } as Record<Dept, number>;
         (j.job_assignments ?? []).forEach((a: any) => {
@@ -453,7 +498,7 @@ serve(async (req) => {
       });
 
       // Timesheets overdue: jobs ended more than 24h ago among considered set
-      const overdueJobs = (jobs ?? []).filter((j: any) => new Date(j.end_time).getTime() < Date.now() - 24 * 3600 * 1000);
+      const overdueJobs = filteredJobs.filter((j: any) => new Date(j.end_time).getTime() < Date.now() - 24 * 3600 * 1000);
       if (overdueJobs.length > 0) {
         const jobIds = overdueJobs.map((j: any) => j.id);
         const { data: ts } = await sb
