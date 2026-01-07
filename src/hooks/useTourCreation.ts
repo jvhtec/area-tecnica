@@ -1,6 +1,6 @@
-
 import { useState } from "react";
 import { Department } from "@/types/department";
+import { InvoicingCompany } from "@/types/job";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ export const useTourCreation = (
   const [departments, setDepartments] = useState<Department[]>([currentDepartment]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [invoicingCompany, setInvoicingCompany] = useState<InvoicingCompany | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -45,6 +46,7 @@ export const useTourCreation = (
         color,
         start_date: startDate || null,
         end_date: endDate || null,
+        invoicing_company: invoicingCompany,
       })
       .select()
       .single();
@@ -106,6 +108,7 @@ export const useTourCreation = (
       setDepartments([currentDepartment]);
       setStartDate("");
       setEndDate("");
+      setInvoicingCompany(null);
     } catch (error: any) {
       console.error("Error creating tour:", error);
       toast({
@@ -132,6 +135,8 @@ export const useTourCreation = (
     endDate,
     handleStartDateChange,
     handleEndDateChange,
+    invoicingCompany,
+    setInvoicingCompany,
     isCreating,
   };
 };

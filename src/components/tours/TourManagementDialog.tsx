@@ -32,7 +32,7 @@ export const TourManagementDialog = ({
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { handleColorChange, handleNameChange, handleDescriptionChange, handleDelete } = useTourManagement(tour, () => onOpenChange(false));
+  const { handleColorChange, handleNameChange, handleDescriptionChange, handleInvoicingCompanyChange, handleDelete } = useTourManagement(tour, () => onOpenChange(false));
   const [defaultsManagerOpen, setDefaultsManagerOpen] = useState(false);
   const [isUpdatingTourPack, setIsUpdatingTourPack] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -43,11 +43,11 @@ export const TourManagementDialog = ({
       tourId: tour.id,
       mode: tourDateId ? 'override' : 'defaults'
     });
-    
+
     if (tourDateId) {
       params.append('tourDateId', tourDateId);
     }
-    
+
     navigate(`/sound/consumos?${params.toString()}`);
     onOpenChange(false);
   };
@@ -58,11 +58,11 @@ export const TourManagementDialog = ({
       tourId: tour.id,
       mode: tourDateId ? 'override' : 'defaults'
     });
-    
+
     if (tourDateId) {
       params.append('tourDateId', tourDateId);
     }
-    
+
     navigate(`/sound/pesos?${params.toString()}`);
     onOpenChange(false);
   };
@@ -104,7 +104,7 @@ export const TourManagementDialog = ({
   const handleToggleTourStatus = async () => {
     const newStatus = tour.status === 'active' ? 'cancelled' : 'active';
     const actionWord = newStatus === 'cancelled' ? 'cancel' : 'reactivate';
-    
+
     setIsUpdatingStatus(true);
     try {
       const { error } = await supabase
@@ -213,13 +213,15 @@ export const TourManagementDialog = ({
             </div>
 
             <div className="border-b pb-4">
-              <TourColorSection 
-                color={tour.color} 
+              <TourColorSection
+                color={tour.color}
                 tourName={tour.name}
                 tourDescription={tour.description}
+                invoicingCompany={tour.invoicing_company}
                 onColorChange={handleColorChange}
                 onNameChange={handleNameChange}
                 onDescriptionChange={handleDescriptionChange}
+                onInvoicingCompanyChange={handleInvoicingCompanyChange}
               />
             </div>
 
@@ -289,7 +291,7 @@ export const TourManagementDialog = ({
                 </div>
               </div>
             </div>
-            
+
             <TourDeleteSection onDelete={handleDelete} />
           </div>
         </DialogContent>
