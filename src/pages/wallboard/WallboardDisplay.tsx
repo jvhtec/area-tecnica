@@ -573,70 +573,9 @@ export function WallboardDisplay({
           color: e.color ?? null,
         };
       });
-      // Also include confirmed dry-hire jobs as client pickups
-      // Helper to format ISO to date/time strings in the job's timezone
-      const toTZParts = (iso: string, tz?: string): { date: string; time: string } => {
-        try {
-          const d = new Date(iso);
-          const zone = tz || 'Europe/Madrid';
-          const dateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' });
-          const timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', hour12: false });
-          const date = dateFmt.format(d); // YYYY-MM-DD for en-CA
-          const time = timeFmt.format(d); // HH:mm for en-GB
-          return { date, time };
-        } catch {
-          return { date: (iso || '').slice(0, 10), time: (iso || '').slice(11, 16) };
-        }
-      };
-
-      const dryHireItems: LogisticsItem[] = jobArr
-        .filter((j: any) => j.job_type === 'dryhire' && j.status === 'Confirmado')
-        .flatMap((j: any) => {
-          const nowParts = toTZParts(new Date().toISOString(), j.timezone);
-          const pickupParts = toTZParts(j.start_time, j.timezone);
-          const returnParts = j.end_time ? toTZParts(j.end_time, j.timezone) : null;
-          const nowKey = `${nowParts.date}${nowParts.time}`;
-          const pickupKey = `${pickupParts.date}${pickupParts.time}`;
-          const weekWindowParts = toTZParts(weekEnd.toISOString(), j.timezone);
-          const weekWindowKey = `${weekWindowParts.date}${weekWindowParts.time}`;
-          const items: LogisticsItem[] = [];
-
-          if (pickupKey >= nowKey && pickupKey <= weekWindowKey) {
-            items.push({
-              id: `dryhire-${j.id}`,
-              date: pickupParts.date,
-              time: pickupParts.time,
-              title: j.title || 'Dry Hire',
-              transport_type: 'recogida cliente',
-              plate: null,
-              job_title: j.title || null,
-              procedure: 'load',
-              loadingBay: null,
-              departments: [],
-            });
-          }
-
-          if (returnParts) {
-            const returnKey = `${returnParts.date}${returnParts.time}`;
-            if (returnKey >= nowKey && returnKey <= weekWindowKey) {
-              items.push({
-                id: `dryhire-return-${j.id}`,
-                date: returnParts.date,
-                time: returnParts.time,
-                title: j.title || 'Dry Hire',
-                transport_type: 'devolución cliente',
-                plate: null,
-                job_title: j.title || null,
-                procedure: 'unload',
-                loadingBay: null,
-                departments: [],
-              });
-            }
-          }
-
-          return items;
-        });
-      const logisticsItems: LogisticsItem[] = [...logisticsItemsBase, ...dryHireItems].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      // Filter to only show logistics items that have been explicitly configured
+      // (removed auto-generation of dry-hire pickup/return events to prevent showing unconfigured logistics)
+      const logisticsItems: LogisticsItem[] = logisticsItemsBase.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
       if (!cancelled) {
         setLogistics(logisticsItems);
         if (isFirstLoad) {
@@ -657,6 +596,7 @@ export function WallboardDisplay({
     const channel = supabase
       .channel('wallboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tours' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_departments' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_documents' }, scheduleRefresh)
@@ -726,6 +666,7 @@ export function WallboardDisplay({
     const channel = supabase
       .channel('wallboard-realtime-api')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tours' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_departments' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_documents' }, scheduleRefresh)
