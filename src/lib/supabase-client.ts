@@ -27,18 +27,24 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 /**
- * Checks if we have a network connection by using a simple fetch
- * to the Supabase health endpoint
+ * Checks if we have a network connection
+ * Uses navigator.onLine as primary check (no HTTP requests = no error logs)
+ * Falls back to fetch only if navigator.onLine is unreliable
  */
 export const checkNetworkConnection = async (): Promise<boolean> => {
+  // Primary: use navigator.onLine (instant, no network request, no error logs)
+  if (typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean') {
+    return navigator.onLine;
+  }
+
+  // Fallback: make a HEAD request (lighter than GET, still may log 401)
   try {
-    const response = await fetch(`${SUPABASE_URL}/health`, {
-      method: 'GET',
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+      method: 'HEAD',
       headers: { 'Cache-Control': 'no-cache' },
     });
-    // Consider any HTTP response as network available (401 is common here)
     return !!response.status;
-  } catch (error) {
+  } catch {
     return false;
   }
 };
