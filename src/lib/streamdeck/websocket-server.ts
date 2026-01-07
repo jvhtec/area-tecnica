@@ -213,8 +213,9 @@ export function getStreamDeckClient(): StreamDeckWebSocketClient {
 }
 
 export function initializeStreamDeck() {
-  // Skip Stream Deck initialization on wallboard routes (not needed and causes noise)
-  if (window.location.pathname.startsWith('/wallboard')) {
+  // Skip Stream Deck initialization on public routes (not needed and causes noise)
+  const publicRoutes = ['/wallboard', '/auth', '/privacy'];
+  if (publicRoutes.some(route => window.location.pathname.startsWith(route))) {
     return getStreamDeckClient(); // Return client without connecting
   }
 

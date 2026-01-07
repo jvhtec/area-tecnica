@@ -236,6 +236,7 @@ const Auth = () => {
         <div className="w-full max-w-md">
           {/* Logo and branding */}
           <div className="text-center mb-8">
+            {/* eslint-disable-next-line react/no-unknown-property */}
             <img
               src={BRAND_CONFIG.logo}
               alt={BRAND_CONFIG.name}
@@ -243,7 +244,8 @@ const Auth = () => {
               height={100}
               loading="eager"
               decoding="async"
-              fetchPriority="high"
+              // @ts-expect-error fetchpriority is valid HTML but React types don't include it yet
+              fetchpriority="high"
               className="h-16 w-auto mx-auto mb-4 drop-shadow-2xl"
             />
             <h1 className="text-3xl font-bold text-white mb-1">
