@@ -600,13 +600,18 @@ export function WallboardDisplay({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_departments' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_documents' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_required_roles' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'timesheets' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_events' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_event_departments' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, scheduleRefresh)
-      .subscribe();
+      .subscribe((status) => {
+        if (import.meta.env.DEV) {
+          console.log('📡 [Wallboard] Realtime status (direct):', status);
+        }
+      });
 
     fetchAll();
 
@@ -670,13 +675,18 @@ export function WallboardDisplay({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_departments' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_documents' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_required_roles' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'timesheets' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_events' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_event_departments' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, scheduleRefresh)
-      .subscribe();
+      .subscribe((status) => {
+        if (import.meta.env.DEV) {
+          console.log('📡 [Wallboard] Realtime status (public/API):', status);
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -815,4 +825,3 @@ export function WallboardDisplay({
     </div>
   );
 }
-
