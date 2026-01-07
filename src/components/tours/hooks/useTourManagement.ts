@@ -2,6 +2,7 @@
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { InvoicingCompany } from "@/types/job";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 export const useTourManagement = (tour: any, onClose: () => void) => {
@@ -111,6 +112,61 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
       console.error("Error updating tour description:", error);
       toast({
         title: "Error updating tour description",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleInvoicingCompanyChange = async (invoicingCompany: InvoicingCompany | null) => {
+    try {
+      console.log("Updating invoicing company for tour:", tour.id);
+      
+      // Update the tour's invoicing_company
+      const { error: tourError } = await supabase
+        .from("tours")
+        .update({ invoicing_company: invoicingCompany })
+        .eq("id", tour.id);
+
+      if (tourError) {
+        console.error("Error updating tour invoicing company:", tourError);
+        throw tourError;
+      }
+
+      // Get all tour dates for this tour
+      const { data: tourDates, error: tourDatesError } = await supabase
+        .from("tour_dates")
+        .select("id")
+        .eq("tour_id", tour.id);
+
+      if (tourDatesError) {
+        console.error("Error fetching tour dates:", tourDatesError);
+        throw tourDatesError;
+      }
+
+      // Update all jobs associated with these tour dates
+      if (tourDates && tourDates.length > 0) {
+        const { error: jobsError } = await supabase
+          .from("jobs")
+          .update({ invoicing_company: invoicingCompany })
+          .in("tour_date_id", tourDates.map(td => td.id));
+
+        if (jobsError) {
+          console.error("Error updating jobs invoicing company:", jobsError);
+          throw jobsError;
+        }
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] });
+      await queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      
+      toast({ title: "Invoicing company updated successfully" });
+    } catch (error: any) {
+      console.error("Error updating invoicing company:", error);
+      toast({
+        title: "Error updating invoicing company",
         description: error.message,
         variant: "destructive",
       });
@@ -236,6 +292,7 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
     handleColorChange,
     handleNameChange,
     handleDescriptionChange,
+    handleInvoicingCompanyChange,
     handleDelete,
   };
 };

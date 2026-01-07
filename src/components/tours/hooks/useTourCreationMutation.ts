@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
+import { InvoicingCompany } from "@/types/job";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { 
   FLEX_FOLDER_IDS, 
@@ -16,6 +17,7 @@ interface TourCreationData {
   departments: Department[];
   startDate?: string;
   endDate?: string;
+  invoicingCompany?: InvoicingCompany | null;
 }
 
 export const useTourCreationMutation = () => {
@@ -230,6 +232,7 @@ export const useTourCreationMutation = () => {
     departments,
     startDate,
     endDate,
+    invoicingCompany,
   }: TourCreationData) => {
     console.log("Starting tour creation process...");
     
@@ -251,6 +254,7 @@ export const useTourCreationMutation = () => {
         start_date: startDate || validDates[0].date,
         end_date: endDate || validDates[validDates.length - 1].date,
         color,
+        invoicing_company: invoicingCompany,
       })
       .select()
       .single();
@@ -304,6 +308,7 @@ export const useTourCreationMutation = () => {
             tour_date_id: tourDate.id,
             tour_id: tour.id,
             color,
+            invoicing_company: invoicingCompany,
           })
           .select()
           .single();

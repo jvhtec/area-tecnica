@@ -5,6 +5,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
 import { TourDepartmentSelector } from "./TourDepartmentSelector";
 import { Department } from "@/types/department";
+import { InvoicingCompany } from "@/types/job";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TourFormFieldsProps {
   title: string;
@@ -21,6 +29,8 @@ interface TourFormFieldsProps {
   endDate: string;
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
+  invoicingCompany: InvoicingCompany | null;
+  setInvoicingCompany: (company: InvoicingCompany | null) => void;
 }
 
 export const TourFormFields = ({
@@ -38,6 +48,8 @@ export const TourFormFields = ({
   endDate,
   onStartDateChange,
   onEndDateChange,
+  invoicingCompany,
+  setInvoicingCompany,
 }: TourFormFieldsProps) => {
   return (
     <div className="space-y-4">
@@ -85,6 +97,27 @@ export const TourFormFields = ({
       <p className="text-sm text-muted-foreground">
         💡 Tour dates (shows, rehearsals, travel days) can be added after creation from the tour management dialog.
       </p>
+
+      <div className="space-y-2">
+        <Label>Invoicing Company</Label>
+        <Select
+          value={invoicingCompany || "none"}
+          onValueChange={(value) => setInvoicingCompany(value === "none" ? null : value as InvoicingCompany)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select invoicing company (optional)" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            <SelectItem value="Production Sector">Production Sector</SelectItem>
+            <SelectItem value="Sharecable">Sharecable</SelectItem>
+            <SelectItem value="MFO">MFO</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          If set, all tour date jobs will inherit this invoicing company
+        </p>
+      </div>
 
       <TourDepartmentSelector
         departments={departments}

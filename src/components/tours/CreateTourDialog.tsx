@@ -31,6 +31,8 @@ const CreateTourDialog = ({
     endDate,
     handleStartDateChange,
     handleEndDateChange,
+    invoicingCompany,
+    setInvoicingCompany,
     isCreating,
   } = useTourCreation(currentDepartment, () => onOpenChange(false));
 
@@ -63,6 +65,8 @@ const CreateTourDialog = ({
               endDate={endDate}
               onStartDateChange={handleStartDateChange}
               onEndDateChange={handleEndDateChange}
+              invoicingCompany={invoicingCompany}
+              setInvoicingCompany={setInvoicingCompany}
             />
 
             <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 md:gap-3 pt-4 border-t">
