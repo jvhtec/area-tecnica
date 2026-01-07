@@ -59,13 +59,12 @@ export class StreamDeckWebSocketClient {
       };
 
       this.ws.onclose = () => {
-        console.log('❌ Stream Deck WebSocket disconnected');
         this.isConnected = false;
         this.scheduleReconnect();
       };
 
-      this.ws.onerror = (error) => {
-        console.error('Stream Deck WebSocket error:', error);
+      this.ws.onerror = () => {
+        // Silently ignore - Stream Deck server not running is expected
       };
 
       this.ws.onmessage = async (event) => {
@@ -97,7 +96,6 @@ export class StreamDeckWebSocketClient {
     if (this.reconnectTimer) return;
 
     this.reconnectTimer = setTimeout(() => {
-      console.log('🔄 Attempting to reconnect to Stream Deck...');
       this.reconnectTimer = null;
       this.connect();
     }, this.reconnectInterval);
