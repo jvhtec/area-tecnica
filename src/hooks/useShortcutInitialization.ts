@@ -118,8 +118,8 @@ function buildKeybind(e: KeyboardEvent): string {
   if (e.shiftKey) parts.push('Shift');
   if (e.altKey) parts.push('Alt');
 
-  // Handle special keys
-  let key = e.key;
+  // Handle special keys (guard against synthetic events without key property)
+  let key = e.key ?? '';
   if (key === ' ') key = 'Space';
   if (key === 'Delete') key = 'Delete';
   if (key === 'Escape') key = 'Escape';

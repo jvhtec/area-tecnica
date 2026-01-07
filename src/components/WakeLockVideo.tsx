@@ -20,11 +20,15 @@ export const WakeLockVideo: React.FC = () => {
             try {
                 await video.play();
                 console.log('WakeLockVideo: playing successfully');
-            } catch (err) {
-                console.warn('WakeLockVideo: play failed, retrying on interaction', err);
+            } catch (err: any) {
+                // NotSupportedError means the video format isn't supported - this is expected on some browsers
+                if (err?.name === 'NotSupportedError') {
+                    // Silently ignore - wake lock video is optional and only works on specific devices
+                    return;
+                }
                 // Add a one-time listener to play on first interaction if autoplay is blocked
                 const onInteraction = () => {
-                    video.play().catch(e => console.error('WakeLockVideo: retry failed', e));
+                    video.play().catch(() => { /* Silently ignore retry failures */ });
                     window.removeEventListener('click', onInteraction);
                     window.removeEventListener('keydown', onInteraction);
                     window.removeEventListener('touchstart', onInteraction);

@@ -213,6 +213,11 @@ export function getStreamDeckClient(): StreamDeckWebSocketClient {
 }
 
 export function initializeStreamDeck() {
+  // Skip Stream Deck initialization on wallboard routes (not needed and causes noise)
+  if (window.location.pathname.startsWith('/wallboard')) {
+    return getStreamDeckClient(); // Return client without connecting
+  }
+
   const client = getStreamDeckClient();
   client.connect();
 

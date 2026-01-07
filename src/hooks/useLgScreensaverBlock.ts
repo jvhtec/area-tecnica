@@ -35,7 +35,8 @@ export const useLgScreensaverBlock = () => {
     // === Fallback – simulate activity every 40 seconds (works everywhere) ===
     const fakeActivity = () => {
       window.dispatchEvent(new Event('mousemove'));
-      window.dispatchEvent(new Event('keydown'));
+      // Use a proper KeyboardEvent with a key that won't trigger shortcuts
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F24', code: 'F24' }));
     };
 
     const interval = setInterval(fakeActivity, 40_000);
