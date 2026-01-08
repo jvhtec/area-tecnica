@@ -3,6 +3,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin, Refrigerator, Edit, Save, X, Medal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -262,6 +263,50 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     }
   };
 
+  const getRandomSnarkyComment = (rank: 'gold' | 'silver' | 'bronze'): string => {
+    const comments = {
+      gold: [
+        '¡El campeón indiscutible! ¿Será que no tiene vida fuera del trabajo?',
+        'Oro puro. Probablemente duerme con el móvil debajo de la almohada.',
+        'El número uno. Los demás técnicos lloran en la esquina.',
+        '¡Medalla de oro! ¿Seguro que no eres un robot?',
+        'Primer puesto. Tu cuenta bancaria debe estar feliz.',
+        '¡Oro! Los demás están tomando notas furiosamente.',
+        'Rey o reina de los bolos. ¿Cuándo descansas?',
+        'Medalla dorada. Hasta tu sombra trabaja más que los demás.',
+        '¡Campeón! Probablemente rechazas vacaciones por diversión.',
+        'Número uno con bala. Los otros técnicos necesitan un plan.',
+      ],
+      silver: [
+        'Plata. Cerca pero no lo suficiente. ¿Quizás el próximo mes?',
+        'Segundo lugar. El primer perdedor, como dicen por ahí.',
+        'Medalla de plata. Al menos no eres bronce.',
+        '¡Subcampeón! Tan cerca y tan lejos a la vez.',
+        'Plata reluciente. El oro te mira desde arriba.',
+        'Número dos. Como Pepsi, siempre detrás de Coca-Cola.',
+        'Medalla plateada. Tu esfuerzo es... respetable.',
+        '¡Plata! Casi oro, pero casi no cuenta.',
+        'Segundo puesto. El primero de los perdedores.',
+        'Plata brillante. El oro te envía saludos desde el podio.',
+      ],
+      bronze: [
+        'Bronce. Al menos estás en el podio... apenas.',
+        'Tercer lugar. Mejor que nada, ¿no?',
+        'Medalla de bronce. Los demás te miran con lástima.',
+        '¡Bronce! Felicidades por ser el último en el podio.',
+        'Tercero. Es como decir "casi competente".',
+        'Medalla de bronce. Al menos no eres cuarto.',
+        '¡Bronce! Tu mamá está orgullosa, probablemente.',
+        'Tercer puesto. Los otros dos te saludan desde arriba.',
+        'Bronce resplandeciente. Bueno, más o menos resplandeciente.',
+        'Número tres. Podría ser peor... o mejor.',
+      ]
+    };
+
+    const list = comments[rank];
+    return list[Math.floor(Math.random() * list.length)];
+  };
+
   const getMedalIcon = (rank?: 'gold' | 'silver' | 'bronze', size: 'sm' | 'md' = 'sm') => {
     if (!rank) return null;
     const sizeClass = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
@@ -270,7 +315,22 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
       silver: '#C0C0C0',
       bronze: '#CD7F32'
     };
-    return <Medal className={sizeClass} style={{ color: colorMap[rank] }} />;
+
+    // Generate a random comment on each render
+    const comment = getRandomSnarkyComment(rank);
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Medal className={sizeClass} style={{ color: colorMap[rank], cursor: 'help' }} />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="max-w-xs">{comment}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
   };
 
   const deptAbbrev = (technician.department || '').slice(0, 3).toUpperCase();
