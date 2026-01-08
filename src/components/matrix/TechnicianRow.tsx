@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin, Refrigerator, Edit, Save, X, Medal } from 'lucide-react';
+import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin, Refrigerator, Edit, Save, X, Medal, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,7 @@ import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { formatUserName } from '@/utils/userName';
 import { CityAutocomplete } from '@/components/maps/CityAutocomplete';
@@ -49,12 +49,15 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
   const [togglingFridge, setTogglingFridge] = React.useState(false);
 
   const [metricsLoading, setMetricsLoading] = React.useState(false);
+  const [metricsExpanded, setMetricsExpanded] = React.useState(false);
   const [metrics, setMetrics] = React.useState<{
     monthCompleted: number;
     yearCompleted: number;
     monthUpcoming: number;
     yearUpcoming: number;
-  }>({ monthCompleted: 0, yearCompleted: 0, monthUpcoming: 0, yearUpcoming: 0 });
+    lastYearCompleted: number;
+    lastYearUpcoming: number;
+  }>({ monthCompleted: 0, yearCompleted: 0, monthUpcoming: 0, yearUpcoming: 0, lastYearCompleted: 0, lastYearUpcoming: 0 });
   const [residencia, setResidencia] = React.useState<string | null>(null);
   const [residenciaLoading, setResidenciaLoading] = React.useState(false);
   const [sendingOnboarding, setSendingOnboarding] = React.useState(false);
@@ -80,10 +83,14 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     try {
       setMetricsLoading(true);
       const now = new Date();
+      const lastYear = subYears(now, 1);
+
       const mStart = startOfMonth(now).toISOString().split('T')[0];
       const mEnd = endOfMonth(now).toISOString().split('T')[0];
       const yStart = startOfYear(now).toISOString().split('T')[0];
       const yEnd = endOfYear(now).toISOString().split('T')[0];
+      const lyStart = startOfYear(lastYear).toISOString().split('T')[0];
+      const lyEnd = endOfYear(lastYear).toISOString().split('T')[0];
 
       // Count approved timesheets (completed work - source of truth for historic jobs)
       const countCompletedInRange = async (fromDate: string, toDate: string) => {
@@ -119,18 +126,22 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
         return count || 0;
       };
 
-      const [mCompleted, yCompleted, mUpcoming, yUpcoming] = await Promise.all([
+      const [mCompleted, yCompleted, lyCompleted, mUpcoming, yUpcoming, lyUpcoming] = await Promise.all([
         countCompletedInRange(mStart, mEnd),
         countCompletedInRange(yStart, yEnd),
+        countCompletedInRange(lyStart, lyEnd),
         countUpcomingInRange(startOfMonth(now).toISOString(), endOfMonth(now).toISOString()),
-        countUpcomingInRange(startOfYear(now).toISOString(), endOfYear(now).toISOString())
+        countUpcomingInRange(startOfYear(now).toISOString(), endOfYear(now).toISOString()),
+        countUpcomingInRange(startOfYear(lastYear).toISOString(), endOfYear(lastYear).toISOString())
       ]);
 
       setMetrics({
         monthCompleted: mCompleted,
         yearCompleted: yCompleted,
+        lastYearCompleted: lyCompleted,
         monthUpcoming: mUpcoming,
-        yearUpcoming: yUpcoming
+        yearUpcoming: yUpcoming,
+        lastYearUpcoming: lyUpcoming
       });
     } finally {
       setMetricsLoading(false);
@@ -722,7 +733,27 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
 
                 {/* Metrics */}
                 <div className="pt-2 border-t">
-                  <div className="text-sm font-medium mb-1">Actividad</div>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-sm font-medium">Actividad</div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setMetricsExpanded(!metricsExpanded)}
+                    >
+                      {metricsExpanded ? (
+                        <>
+                          <ChevronUp className="h-3 w-3 mr-1" />
+                          Menos
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3 w-3 mr-1" />
+                          Más
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   {metricsLoading ? (
                     <div className="text-xs text-muted-foreground">Cargando...</div>
                   ) : (
@@ -755,6 +786,25 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                           </Badge>
                         </div>
                       </div>
+                      {metricsExpanded && (
+                        <div className="pt-2 border-t">
+                          <div className="text-xs text-muted-foreground mb-1">Año pasado (2025)</div>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Badge variant="default" className="text-xs">
+                              {metrics.lastYearCompleted + metrics.lastYearUpcoming} total
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              {metrics.lastYearCompleted} completados
+                            </Badge>
+                            <Badge variant="outline" className="text-xs opacity-50">
+                              {metrics.lastYearUpcoming} programados*
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1 italic">
+                            *Datos históricos de programación
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
