@@ -49,8 +49,8 @@ serve(async (req) => {
       .eq('id', requestingUser.id)
       .single();
 
-    if (!requestingProfile || requestingProfile.role !== 'management') {
-      throw new Error('Unauthorized - management role required');
+    if (!requestingProfile || !['admin', 'management'].includes(requestingProfile.role)) {
+      throw new Error('Unauthorized - admin or management role required');
     }
 
     console.log('Deleting user:', userId);
