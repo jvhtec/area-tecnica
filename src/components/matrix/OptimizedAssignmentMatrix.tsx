@@ -148,7 +148,7 @@ export const OptimizedAssignmentMatrix = ({
     gcTime: 300_000, // 5 minutes
   });
 
-  // Fetch current year timesheet counts for all technicians for default sorting and medals
+  // Fetch current year timesheet counts for all technicians for medals and sorting
   // Counts this year's active timesheets including scheduled gigs (draft status)
   const { data: techConfirmedCounts } = useQuery({
     queryKey: ['tech-confirmed-counts', allTechIds.join(',')],
@@ -182,7 +182,7 @@ export const OptimizedAssignmentMatrix = ({
 
       return countMap;
     },
-    enabled: allTechIds.length > 0 && techSortMethod === 'default' && !sortJobId,
+    enabled: allTechIds.length > 0,
     staleTime: 60_000, // 1 minute
     gcTime: 300_000, // 5 minutes
   });
@@ -223,7 +223,7 @@ export const OptimizedAssignmentMatrix = ({
 
       return countMap;
     },
-    enabled: allTechIds.length > 0 && techSortMethod === 'default' && !sortJobId,
+    enabled: allTechIds.length > 0,
     staleTime: 60_000, // 1 minute
     gcTime: 300_000, // 5 minutes
   });
@@ -955,7 +955,7 @@ export const OptimizedAssignmentMatrix = ({
   const techLastYearMedalRankings = useMemo(() => {
     const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
 
-    if (!techLastYearCounts || techSortMethod !== 'default' || sortJobId) {
+    if (!techLastYearCounts) {
       return rankings;
     }
 
@@ -964,7 +964,7 @@ export const OptimizedAssignmentMatrix = ({
       .map(t => ({ id: t.id, count: techLastYearCounts.get(t.id) || 0 }))
       .sort((a, b) => b.count - a.count);
 
-    // Assign last year's medals to top 3
+    // Assign last year's medals to top 3 (always, regardless of sort state)
     if (allTechs.length > 0 && allTechs[0].count > 0) {
       rankings.set(allTechs[0].id, 'gold');
     }
@@ -976,7 +976,7 @@ export const OptimizedAssignmentMatrix = ({
     }
 
     return rankings;
-  }, [technicians, techLastYearCounts, techSortMethod, sortJobId]);
+  }, [technicians, techLastYearCounts]);
 
   const visibleTechIds = useMemo(() => {
     const start = Math.max(0, visibleRows.start - 10);
