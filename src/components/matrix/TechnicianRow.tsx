@@ -49,7 +49,12 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
   const [togglingFridge, setTogglingFridge] = React.useState(false);
 
   const [metricsLoading, setMetricsLoading] = React.useState(false);
-  const [metrics, setMetrics] = React.useState<{ monthConfirmed: number; yearConfirmed: number }>({ monthConfirmed: 0, yearConfirmed: 0 });
+  const [metrics, setMetrics] = React.useState<{
+    monthCompleted: number;
+    yearCompleted: number;
+    monthUpcoming: number;
+    yearUpcoming: number;
+  }>({ monthCompleted: 0, yearCompleted: 0, monthUpcoming: 0, yearUpcoming: 0 });
   const [residencia, setResidencia] = React.useState<string | null>(null);
   const [residenciaLoading, setResidenciaLoading] = React.useState(false);
   const [sendingOnboarding, setSendingOnboarding] = React.useState(false);
@@ -80,9 +85,8 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
       const yStart = startOfYear(now).toISOString().split('T')[0];
       const yEnd = endOfYear(now).toISOString().split('T')[0];
 
-      // Count approved timesheets within a date range using actual work dates
-      // This is the source of truth for completed work (historic confirmed jobs)
-      const countInRange = async (fromDate: string, toDate: string) => {
+      // Count approved timesheets (completed work - source of truth for historic jobs)
+      const countCompletedInRange = async (fromDate: string, toDate: string) => {
         const { count, error } = await supabase
           .from('timesheets')
           .select('*', { count: 'exact', head: true })
@@ -92,17 +96,42 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
           .gte('date', fromDate)
           .lte('date', toDate);
         if (error) {
-          console.warn('Metrics count error', error);
+          console.warn('Completed metrics count error', error);
           return 0;
         }
         return count || 0;
       };
 
-      const [m, y] = await Promise.all([
-        countInRange(mStart, mEnd),
-        countInRange(yStart, yEnd)
+      // Count confirmed assignments (upcoming scheduled work)
+      const countUpcomingInRange = async (fromISO: string, toISO: string) => {
+        const { count, error } = await supabase
+          .from('job_assignments')
+          .select('job_id,jobs!inner(id)', { count: 'exact' })
+          .eq('technician_id', technician.id)
+          .eq('status', 'confirmed')
+          .gte('jobs.start_time', fromISO)
+          .lte('jobs.end_time', toISO)
+          .limit(1);
+        if (error) {
+          console.warn('Upcoming metrics count error', error);
+          return 0;
+        }
+        return count || 0;
+      };
+
+      const [mCompleted, yCompleted, mUpcoming, yUpcoming] = await Promise.all([
+        countCompletedInRange(mStart, mEnd),
+        countCompletedInRange(yStart, yEnd),
+        countUpcomingInRange(startOfMonth(now).toISOString(), endOfMonth(now).toISOString()),
+        countUpcomingInRange(startOfYear(now).toISOString(), endOfYear(now).toISOString())
       ]);
-      setMetrics({ monthConfirmed: m, yearConfirmed: y });
+
+      setMetrics({
+        monthCompleted: mCompleted,
+        yearCompleted: yCompleted,
+        monthUpcoming: mUpcoming,
+        yearUpcoming: yUpcoming
+      });
     } finally {
       setMetricsLoading(false);
     }
@@ -697,9 +726,35 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                   {metricsLoading ? (
                     <div className="text-xs text-muted-foreground">Cargando...</div>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">Bolos/Mes: {metrics.monthConfirmed}</Badge>
-                      <Badge variant="outline" className="text-xs">Bolos/Año: {metrics.yearConfirmed}</Badge>
+                    <div className="space-y-2">
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Este mes</div>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Badge variant="default" className="text-xs">
+                            {metrics.monthCompleted + metrics.monthUpcoming} total
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            {metrics.monthCompleted} completados
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {metrics.monthUpcoming} programados
+                          </Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Este año</div>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Badge variant="default" className="text-xs">
+                            {metrics.yearCompleted + metrics.yearUpcoming} total
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            {metrics.yearCompleted} completados
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {metrics.yearUpcoming} programados
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
