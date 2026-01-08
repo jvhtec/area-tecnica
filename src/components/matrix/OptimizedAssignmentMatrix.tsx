@@ -148,27 +148,25 @@ export const OptimizedAssignmentMatrix = ({
     gcTime: 300_000, // 5 minutes
   });
 
-  // Fetch completed work counts for all technicians for default sorting
-  // Counts approved timesheets OR schedule-only timesheets (tourdate/dryhire)
-  // Counts individual work dates, not jobs
+  // Fetch total timesheet counts for all technicians for default sorting
+  // Counts all active timesheets (individual work dates)
   const { data: techConfirmedCounts } = useQuery({
     queryKey: ['tech-confirmed-counts', allTechIds.join(',')],
     queryFn: async () => {
       if (!allTechIds.length) return new Map<string, number>();
-      // Get all completed timesheets (approved OR schedule-only)
+      // Get all active timesheets
       const { data, error } = await supabase
         .from('timesheets')
         .select('technician_id')
         .eq('is_active', true)
-        .or('status.eq.approved,is_schedule_only.eq.true')
         .in('technician_id', allTechIds);
 
       if (error) {
-        console.warn('Failed to fetch completed timesheet counts', error);
+        console.warn('Failed to fetch timesheet counts', error);
         return new Map<string, number>();
       }
 
-      // Count completed work dates per technician
+      // Count timesheets per technician
       const countMap = new Map<string, number>();
       allTechIds.forEach(id => countMap.set(id, 0));
       (data || []).forEach((timesheet: any) => {
@@ -878,7 +876,7 @@ export const OptimizedAssignmentMatrix = ({
     return techs;
   }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses, techConfirmedCounts]);
 
-  // Calculate medal rankings (top 3 technicians by approved timesheets, including house techs)
+  // Calculate medal rankings (top 3 technicians by total timesheets, including house techs)
   const techMedalRankings = useMemo(() => {
     const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
 
@@ -886,12 +884,12 @@ export const OptimizedAssignmentMatrix = ({
       return rankings;
     }
 
-    // Include all technicians (both regular and house techs) and sort by approved timesheet count
+    // Include all technicians (both regular and house techs) and sort by total timesheet count
     const allTechs = technicians
       .map(t => ({ id: t.id, count: techConfirmedCounts.get(t.id) || 0 }))
       .sort((a, b) => b.count - a.count);
 
-    // Assign medals to top 3 (only if they have approved timesheets)
+    // Assign medals to top 3 (only if they have timesheets)
     if (allTechs.length > 0 && allTechs[0].count > 0) {
       rankings.set(allTechs[0].id, 'gold');
     }

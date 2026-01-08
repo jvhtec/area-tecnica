@@ -51,13 +51,10 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
   const [metricsLoading, setMetricsLoading] = React.useState(false);
   const [metricsExpanded, setMetricsExpanded] = React.useState(false);
   const [metrics, setMetrics] = React.useState<{
-    monthCompleted: number;
-    yearCompleted: number;
-    monthUpcoming: number;
-    yearUpcoming: number;
-    lastYearCompleted: number;
-    lastYearUpcoming: number;
-  }>({ monthCompleted: 0, yearCompleted: 0, monthUpcoming: 0, yearUpcoming: 0, lastYearCompleted: 0, lastYearUpcoming: 0 });
+    monthTotal: number;
+    yearTotal: number;
+    lastYearTotal: number;
+  }>({ monthTotal: 0, yearTotal: 0, lastYearTotal: 0 });
   const [residencia, setResidencia] = React.useState<string | null>(null);
   const [residenciaLoading, setResidenciaLoading] = React.useState(false);
   const [sendingOnboarding, setSendingOnboarding] = React.useState(false);
@@ -92,57 +89,32 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
       const lyStart = startOfYear(lastYear).toISOString().split('T')[0];
       const lyEnd = endOfYear(lastYear).toISOString().split('T')[0];
 
-      // Count completed work: approved timesheets OR schedule-only timesheets (tourdate/dryhire)
-      // Counts individual work dates, not jobs
-      const countCompletedInRange = async (fromDate: string, toDate: string) => {
+      // Count all active timesheets (individual work dates)
+      const countInRange = async (fromDate: string, toDate: string) => {
         const { count, error } = await supabase
           .from('timesheets')
           .select('*', { count: 'exact', head: true })
           .eq('technician_id', technician.id)
           .eq('is_active', true)
-          .or('status.eq.approved,is_schedule_only.eq.true')
           .gte('date', fromDate)
           .lte('date', toDate);
         if (error) {
-          console.warn('Completed metrics count error', error);
+          console.warn('Metrics count error', error);
           return 0;
         }
         return count || 0;
       };
 
-      // Count upcoming scheduled work: count future timesheet dates
-      const countUpcomingInRange = async (fromDate: string, toDate: string) => {
-        const { count, error } = await supabase
-          .from('timesheets')
-          .select('*', { count: 'exact', head: true })
-          .eq('technician_id', technician.id)
-          .eq('is_active', true)
-          .eq('status', 'draft')
-          .gte('date', fromDate)
-          .lte('date', toDate);
-        if (error) {
-          console.warn('Upcoming metrics count error', error);
-          return 0;
-        }
-        return count || 0;
-      };
-
-      const [mCompleted, yCompleted, lyCompleted, mUpcoming, yUpcoming, lyUpcoming] = await Promise.all([
-        countCompletedInRange(mStart, mEnd),
-        countCompletedInRange(yStart, yEnd),
-        countCompletedInRange(lyStart, lyEnd),
-        countUpcomingInRange(mStart, mEnd),
-        countUpcomingInRange(yStart, yEnd),
-        countUpcomingInRange(lyStart, lyEnd)
+      const [mTotal, yTotal, lyTotal] = await Promise.all([
+        countInRange(mStart, mEnd),
+        countInRange(yStart, yEnd),
+        countInRange(lyStart, lyEnd)
       ]);
 
       setMetrics({
-        monthCompleted: mCompleted,
-        yearCompleted: yCompleted,
-        lastYearCompleted: lyCompleted,
-        monthUpcoming: mUpcoming,
-        yearUpcoming: yUpcoming,
-        lastYearUpcoming: lyUpcoming
+        monthTotal: mTotal,
+        yearTotal: yTotal,
+        lastYearTotal: lyTotal
       });
     } finally {
       setMetricsLoading(false);
@@ -763,13 +735,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                         <div className="text-xs text-muted-foreground mb-1">Este mes</div>
                         <div className="flex items-center gap-1 flex-wrap">
                           <Badge variant="default" className="text-xs">
-                            {metrics.monthCompleted + metrics.monthUpcoming} total
-                          </Badge>
-                          <Badge variant="secondary" className="text-xs">
-                            {metrics.monthCompleted} completados
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {metrics.monthUpcoming} programados
+                            {metrics.monthTotal} bolos
                           </Badge>
                         </div>
                       </div>
@@ -777,32 +743,19 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                         <div className="text-xs text-muted-foreground mb-1">Este año</div>
                         <div className="flex items-center gap-1 flex-wrap">
                           <Badge variant="default" className="text-xs">
-                            {metrics.yearCompleted + metrics.yearUpcoming} total
-                          </Badge>
-                          <Badge variant="secondary" className="text-xs">
-                            {metrics.yearCompleted} completados
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {metrics.yearUpcoming} programados
+                            {metrics.yearTotal} bolos
                           </Badge>
                         </div>
                       </div>
                       {metricsExpanded && (
                         <div className="pt-2 border-t">
-                          <div className="text-xs text-muted-foreground mb-1">Año pasado (2025)</div>
+                          <div className="text-xs text-muted-foreground mb-1">
+                            Año pasado ({subYears(new Date(), 1).getFullYear()})
+                          </div>
                           <div className="flex items-center gap-1 flex-wrap">
                             <Badge variant="default" className="text-xs">
-                              {metrics.lastYearCompleted + metrics.lastYearUpcoming} total
+                              {metrics.lastYearTotal} bolos
                             </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              {metrics.lastYearCompleted} completados
-                            </Badge>
-                            <Badge variant="outline" className="text-xs opacity-50">
-                              {metrics.lastYearUpcoming} programados*
-                            </Badge>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1 italic">
-                            *Datos históricos de programación
                           </div>
                         </div>
                       )}
