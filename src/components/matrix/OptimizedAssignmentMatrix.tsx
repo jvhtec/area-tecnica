@@ -148,13 +148,13 @@ export const OptimizedAssignmentMatrix = ({
     gcTime: 300_000, // 5 minutes
   });
 
-  // Fetch total timesheet counts for all technicians for default sorting
-  // Counts all active timesheets (individual work dates)
+  // Fetch total timesheet counts for all technicians for default sorting and medals
+  // Counts all active timesheets including scheduled gigs (draft status)
   const { data: techConfirmedCounts } = useQuery({
     queryKey: ['tech-confirmed-counts', allTechIds.join(',')],
     queryFn: async () => {
       if (!allTechIds.length) return new Map<string, number>();
-      // Get all active timesheets
+      // Get all active timesheets (includes both completed and scheduled work)
       const { data, error } = await supabase
         .from('timesheets')
         .select('technician_id')
@@ -876,7 +876,7 @@ export const OptimizedAssignmentMatrix = ({
     return techs;
   }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses, techConfirmedCounts]);
 
-  // Calculate medal rankings (top 3 technicians by total timesheets, including house techs)
+  // Calculate medal rankings (top 3 technicians by total activity including scheduled gigs)
   const techMedalRankings = useMemo(() => {
     const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
 
@@ -884,12 +884,13 @@ export const OptimizedAssignmentMatrix = ({
       return rankings;
     }
 
-    // Include all technicians (both regular and house techs) and sort by total timesheet count
+    // Include all technicians (both regular and house techs) and sort by total activity
+    // Counts both completed and scheduled (draft) timesheets
     const allTechs = technicians
       .map(t => ({ id: t.id, count: techConfirmedCounts.get(t.id) || 0 }))
       .sort((a, b) => b.count - a.count);
 
-    // Assign medals to top 3 (only if they have timesheets)
+    // Assign medals to top 3 (only if they have activity)
     if (allTechs.length > 0 && allTechs[0].count > 0) {
       rankings.set(allTechs[0].id, 'gold');
     }
