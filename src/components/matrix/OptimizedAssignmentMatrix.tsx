@@ -931,10 +931,10 @@ export const OptimizedAssignmentMatrix = ({
       return rankings;
     }
 
-    // Include all technicians (both regular and house techs) and sort by this year's activity
-    // Counts both completed and scheduled (draft) timesheets from current year
-    const allTechs = technicians
-      .map(t => ({ id: t.id, count: techConfirmedCounts.get(t.id) || 0 }))
+    // Get ALL technicians from the count map, not just filtered ones
+    // This ensures medals are based on everyone, not just who's currently visible
+    const allTechs = Array.from(techConfirmedCounts.entries())
+      .map(([id, count]) => ({ id, count }))
       .sort((a, b) => b.count - a.count);
 
     // Assign medals to top 3 (only if they have activity)
@@ -949,7 +949,7 @@ export const OptimizedAssignmentMatrix = ({
     }
 
     return rankings;
-  }, [technicians, techConfirmedCounts, techSortMethod, sortJobId]);
+  }, [techConfirmedCounts, techSortMethod, sortJobId]);
 
   // Calculate last year's medal rankings (for nostalgia and snarky comments)
   const techLastYearMedalRankings = useMemo(() => {
@@ -959,9 +959,9 @@ export const OptimizedAssignmentMatrix = ({
       return rankings;
     }
 
-    // Sort technicians by last year's activity
-    const allTechs = technicians
-      .map(t => ({ id: t.id, count: techLastYearCounts.get(t.id) || 0 }))
+    // Get ALL technicians from the count map, not just filtered ones
+    const allTechs = Array.from(techLastYearCounts.entries())
+      .map(([id, count]) => ({ id, count }))
       .sort((a, b) => b.count - a.count);
 
     // Assign last year's medals to top 3 (always, regardless of sort state)
@@ -976,7 +976,7 @@ export const OptimizedAssignmentMatrix = ({
     }
 
     return rankings;
-  }, [technicians, techLastYearCounts]);
+  }, [techLastYearCounts]);
 
   const visibleTechIds = useMemo(() => {
     const start = Math.max(0, visibleRows.start - 10);
