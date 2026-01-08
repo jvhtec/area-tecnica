@@ -1037,7 +1037,7 @@ export const OptimizedAssignmentMatrix = ({
     availabilityDialog, setAvailabilityDialog, availabilityCoverage, setAvailabilityCoverage,
     availabilitySingleDate, setAvailabilitySingleDate, availabilityMultiDates, setAvailabilityMultiDates,
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,
-    isGlobalCellSelected, techMedalRankings,
+    techMedalRankings,
   };
 
   return <OptimizedAssignmentMatrixView {...viewProps} />;
