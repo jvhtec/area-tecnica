@@ -88,6 +88,8 @@ export interface OptimizedAssignmentMatrixViewProps {
   handleEmailError: (error: any, payload: any) => void;
   conflictDialog: any;
   setConflictDialog: (value: any) => void;
+  isGlobalCellSelected: (technicianId: string, date: Date) => boolean;
+  techMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
 }
 
 export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixViewProps> = ({
@@ -159,6 +161,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   handleEmailError,
   conflictDialog,
   setConflictDialog,
+  isGlobalCellSelected,
+  techMedalRankings,
 }: OptimizedAssignmentMatrixViewProps) => {
   return (
     <div className="matrix-layout relative">
@@ -293,6 +297,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 isFridge={fridgeSet?.has(technician.id) || false}
                 // @ts-ignore – optional prop for compact rendering
                 compact={mobile}
+                medalRank={techMedalRankings.get(technician.id)}
               />
             ))}
           </div>

@@ -148,6 +148,38 @@ export const OptimizedAssignmentMatrix = ({
     gcTime: 300_000, // 5 minutes
   });
 
+  // Fetch confirmed job counts for all technicians for default sorting
+  const { data: techConfirmedCounts } = useQuery({
+    queryKey: ['tech-confirmed-counts', allTechIds.join(',')],
+    queryFn: async () => {
+      if (!allTechIds.length) return new Map<string, number>();
+      // Get all confirmed assignments for all technicians
+      const { data, error } = await supabase
+        .from('job_assignments')
+        .select('technician_id')
+        .eq('status', 'confirmed')
+        .in('technician_id', allTechIds);
+
+      if (error) {
+        console.warn('Failed to fetch confirmed job counts', error);
+        return new Map<string, number>();
+      }
+
+      // Count assignments per technician
+      const countMap = new Map<string, number>();
+      allTechIds.forEach(id => countMap.set(id, 0));
+      (data || []).forEach((assignment: any) => {
+        const current = countMap.get(assignment.technician_id) || 0;
+        countMap.set(assignment.technician_id, current + 1);
+      });
+
+      return countMap;
+    },
+    enabled: allTechIds.length > 0 && techSortMethod === 'default' && !sortJobId,
+    staleTime: 60_000, // 1 minute
+    gcTime: 300_000, // 5 minutes
+  });
+
   // Listen for assignment updates and refresh data
   useEffect(() => {
     const handleAssignmentUpdate = () => {
@@ -820,20 +852,56 @@ export const OptimizedAssignmentMatrix = ({
         break;
       case 'default':
       default:
-        // House techs first, then maintain original order
+        // House techs first, then sort by confirmed job count (descending)
         techs.sort((a, b) => {
           const aIsHouse = a.role === 'house_tech';
           const bIsHouse = b.role === 'house_tech';
           if (aIsHouse && !bIsHouse) return -1;
           if (!aIsHouse && bIsHouse) return 1;
-          // Maintain original order for same type
+
+          // Within regular techs, sort by confirmed job count (descending)
+          if (!aIsHouse && !bIsHouse && techConfirmedCounts) {
+            const aCount = techConfirmedCounts.get(a.id) || 0;
+            const bCount = techConfirmedCounts.get(b.id) || 0;
+            if (bCount !== aCount) return bCount - aCount;
+          }
+
+          // Maintain original order as tiebreaker
           return 0;
         });
         break;
     }
 
     return techs;
-  }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses]);
+  }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses, techConfirmedCounts]);
+
+  // Calculate medal rankings (top 3 non-house techs by confirmed jobs)
+  const techMedalRankings = useMemo(() => {
+    const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
+
+    if (!techConfirmedCounts || techSortMethod !== 'default' || sortJobId) {
+      return rankings;
+    }
+
+    // Filter out house techs and sort by confirmed count
+    const regularTechs = technicians
+      .filter(t => t.role !== 'house_tech')
+      .map(t => ({ id: t.id, count: techConfirmedCounts.get(t.id) || 0 }))
+      .sort((a, b) => b.count - a.count);
+
+    // Assign medals to top 3 (only if they have confirmed jobs)
+    if (regularTechs.length > 0 && regularTechs[0].count > 0) {
+      rankings.set(regularTechs[0].id, 'gold');
+    }
+    if (regularTechs.length > 1 && regularTechs[1].count > 0) {
+      rankings.set(regularTechs[1].id, 'silver');
+    }
+    if (regularTechs.length > 2 && regularTechs[2].count > 0) {
+      rankings.set(regularTechs[2].id, 'bronze');
+    }
+
+    return rankings;
+  }, [technicians, techConfirmedCounts, techSortMethod, sortJobId]);
 
   const visibleTechIds = useMemo(() => {
     const start = Math.max(0, visibleRows.start - 10);
@@ -969,7 +1037,7 @@ export const OptimizedAssignmentMatrix = ({
     availabilityDialog, setAvailabilityDialog, availabilityCoverage, setAvailabilityCoverage,
     availabilitySingleDate, setAvailabilitySingleDate, availabilityMultiDates, setAvailabilityMultiDates,
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,
-    isGlobalCellSelected,
+    isGlobalCellSelected, techMedalRankings,
   };
 
   return <OptimizedAssignmentMatrixView {...viewProps} />;

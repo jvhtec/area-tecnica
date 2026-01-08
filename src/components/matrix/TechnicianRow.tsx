@@ -3,7 +3,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin, Refrigerator, Edit, Save, X } from 'lucide-react';
+import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin, Refrigerator, Edit, Save, X, Medal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,9 +35,10 @@ interface TechnicianRowProps {
   height: number;
   isFridge?: boolean;
   compact?: boolean;
+  medalRank?: 'gold' | 'silver' | 'bronze';
 }
 
-const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false }: TechnicianRowProps) => {
+const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false, medalRank }: TechnicianRowProps) => {
   const { userRole } = useOptimizedAuth();
   const isAdmin = userRole === 'admin';
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
@@ -261,6 +262,17 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     }
   };
 
+  const getMedalIcon = (rank?: 'gold' | 'silver' | 'bronze', size: 'sm' | 'md' = 'sm') => {
+    if (!rank) return null;
+    const sizeClass = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
+    const colorMap = {
+      gold: '#FFD700',
+      silver: '#C0C0C0',
+      bronze: '#CD7F32'
+    };
+    return <Medal className={sizeClass} style={{ color: colorMap[rank] }} />;
+  };
+
   const deptAbbrev = (technician.department || '').slice(0, 3).toUpperCase();
 
   return (
@@ -288,6 +300,11 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                   {isFridge && (
                     <Refrigerator className="absolute -top-1 -right-1 h-3.5 w-3.5 text-sky-600" />
                   )}
+                  {medalRank && !isFridge && (
+                    <div className="absolute -top-1 -right-1">
+                      {getMedalIcon(medalRank, 'sm')}
+                    </div>
+                  )}
                 </div>
                 <div className="mt-1 text-[10px] leading-none text-muted-foreground">{deptAbbrev}</div>
               </div>
@@ -301,10 +318,11 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                 </Avatar>
 
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm truncate">
-                    {displayName}
+                  <div className="font-medium text-sm truncate flex items-center gap-1">
+                    <span>{displayName}</span>
+                    {medalRank && !isFridge && getMedalIcon(medalRank, 'sm')}
                     {isFridge && (
-                      <Refrigerator className="inline-block h-3.5 w-3.5 ml-1 text-sky-600" />
+                      <Refrigerator className="inline-block h-3.5 w-3.5 text-sky-600" />
                     )}
                   </div>
                   <div className="flex gap-1 mt-1 flex-wrap">
@@ -337,8 +355,9 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <div className="font-semibold">
-                  {displayName}
+                <div className="font-semibold flex items-center gap-2">
+                  <span>{displayName}</span>
+                  {medalRank && getMedalIcon(medalRank, 'md')}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {technician.role === 'house_tech' ? 'Técnico de Casa' : 'Técnico'}
