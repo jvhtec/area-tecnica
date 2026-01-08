@@ -148,24 +148,22 @@ export const OptimizedAssignmentMatrix = ({
     gcTime: 300_000, // 5 minutes
   });
 
-  // Fetch current year timesheet counts for all technicians for medals and sorting
+  // Fetch current year timesheet counts for ALL technicians (not just filtered ones)
+  // This ensures medals are calculated fairly across everyone in the system
   // Counts this year's active timesheets including scheduled gigs (draft status)
   const { data: techConfirmedCounts } = useQuery({
-    queryKey: ['tech-confirmed-counts', allTechIds.join(',')],
+    queryKey: ['tech-confirmed-counts-all'],
     queryFn: async () => {
-      if (!allTechIds.length) return new Map<string, number>();
-
       // Get start of current year
       const now = new Date();
       const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
 
-      // Get active timesheets from this year (includes both completed and scheduled work)
+      // Get active timesheets from this year for ALL technicians (no filter)
       const { data, error } = await supabase
         .from('timesheets')
         .select('technician_id')
         .eq('is_active', true)
-        .gte('date', yearStart)
-        .in('technician_id', allTechIds);
+        .gte('date', yearStart);
 
       if (error) {
         console.warn('Failed to fetch timesheet counts', error);
@@ -174,7 +172,6 @@ export const OptimizedAssignmentMatrix = ({
 
       // Count timesheets per technician
       const countMap = new Map<string, number>();
-      allTechIds.forEach(id => countMap.set(id, 0));
       (data || []).forEach((timesheet: any) => {
         const current = countMap.get(timesheet.technician_id) || 0;
         countMap.set(timesheet.technician_id, current + 1);
@@ -182,31 +179,29 @@ export const OptimizedAssignmentMatrix = ({
 
       return countMap;
     },
-    enabled: allTechIds.length > 0,
+    enabled: true,
     staleTime: 60_000, // 1 minute
     gcTime: 300_000, // 5 minutes
   });
 
-  // Fetch last year's timesheet counts for last year medal rankings
+  // Fetch last year's timesheet counts for ALL technicians (not just filtered ones)
+  // This ensures last year's medals are calculated fairly across everyone
   const { data: techLastYearCounts } = useQuery({
-    queryKey: ['tech-last-year-counts', allTechIds.join(',')],
+    queryKey: ['tech-last-year-counts-all'],
     queryFn: async () => {
-      if (!allTechIds.length) return new Map<string, number>();
-
       // Get last year's date range
       const now = new Date();
       const lastYear = now.getFullYear() - 1;
       const yearStart = new Date(lastYear, 0, 1).toISOString().split('T')[0];
       const yearEnd = new Date(lastYear, 11, 31).toISOString().split('T')[0];
 
-      // Get active timesheets from last year
+      // Get active timesheets from last year for ALL technicians (no filter)
       const { data, error } = await supabase
         .from('timesheets')
         .select('technician_id')
         .eq('is_active', true)
         .gte('date', yearStart)
-        .lte('date', yearEnd)
-        .in('technician_id', allTechIds);
+        .lte('date', yearEnd);
 
       if (error) {
         console.warn('Failed to fetch last year timesheet counts', error);
@@ -215,7 +210,6 @@ export const OptimizedAssignmentMatrix = ({
 
       // Count timesheets per technician
       const countMap = new Map<string, number>();
-      allTechIds.forEach(id => countMap.set(id, 0));
       (data || []).forEach((timesheet: any) => {
         const current = countMap.get(timesheet.technician_id) || 0;
         countMap.set(timesheet.technician_id, current + 1);
@@ -223,7 +217,7 @@ export const OptimizedAssignmentMatrix = ({
 
       return countMap;
     },
-    enabled: allTechIds.length > 0,
+    enabled: true,
     staleTime: 60_000, // 1 minute
     gcTime: 300_000, // 5 minutes
   });
