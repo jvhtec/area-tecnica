@@ -148,17 +148,23 @@ export const OptimizedAssignmentMatrix = ({
     gcTime: 300_000, // 5 minutes
   });
 
-  // Fetch total timesheet counts for all technicians for default sorting and medals
-  // Counts all active timesheets including scheduled gigs (draft status)
+  // Fetch current year timesheet counts for all technicians for default sorting and medals
+  // Counts this year's active timesheets including scheduled gigs (draft status)
   const { data: techConfirmedCounts } = useQuery({
     queryKey: ['tech-confirmed-counts', allTechIds.join(',')],
     queryFn: async () => {
       if (!allTechIds.length) return new Map<string, number>();
-      // Get all active timesheets (includes both completed and scheduled work)
+
+      // Get start of current year
+      const now = new Date();
+      const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+
+      // Get active timesheets from this year (includes both completed and scheduled work)
       const { data, error } = await supabase
         .from('timesheets')
         .select('technician_id')
         .eq('is_active', true)
+        .gte('date', yearStart)
         .in('technician_id', allTechIds);
 
       if (error) {
@@ -876,7 +882,7 @@ export const OptimizedAssignmentMatrix = ({
     return techs;
   }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses, techConfirmedCounts]);
 
-  // Calculate medal rankings (top 3 technicians by total activity including scheduled gigs)
+  // Calculate medal rankings (top 3 technicians by current year activity)
   const techMedalRankings = useMemo(() => {
     const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
 
@@ -884,8 +890,8 @@ export const OptimizedAssignmentMatrix = ({
       return rankings;
     }
 
-    // Include all technicians (both regular and house techs) and sort by total activity
-    // Counts both completed and scheduled (draft) timesheets
+    // Include all technicians (both regular and house techs) and sort by this year's activity
+    // Counts both completed and scheduled (draft) timesheets from current year
     const allTechs = technicians
       .map(t => ({ id: t.id, count: techConfirmedCounts.get(t.id) || 0 }))
       .sort((a, b) => b.count - a.count);
