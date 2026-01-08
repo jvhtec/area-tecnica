@@ -54,7 +54,10 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     monthTotal: number;
     yearTotal: number;
     lastYearTotal: number;
-  }>({ monthTotal: 0, yearTotal: 0, lastYearTotal: 0 });
+    monthUpcoming: number;
+    yearUpcoming: number;
+    lastYearUpcoming: number;
+  }>({ monthTotal: 0, yearTotal: 0, lastYearTotal: 0, monthUpcoming: 0, yearUpcoming: 0, lastYearUpcoming: 0 });
   const [residencia, setResidencia] = React.useState<string | null>(null);
   const [residenciaLoading, setResidenciaLoading] = React.useState(false);
   const [sendingOnboarding, setSendingOnboarding] = React.useState(false);
@@ -90,7 +93,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
       const lyEnd = endOfYear(lastYear).toISOString().split('T')[0];
 
       // Count all active timesheets (individual work dates)
-      const countInRange = async (fromDate: string, toDate: string) => {
+      const countTotalInRange = async (fromDate: string, toDate: string) => {
         const { count, error } = await supabase
           .from('timesheets')
           .select('*', { count: 'exact', head: true })
@@ -99,22 +102,45 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
           .gte('date', fromDate)
           .lte('date', toDate);
         if (error) {
-          console.warn('Metrics count error', error);
+          console.warn('Total metrics count error', error);
           return 0;
         }
         return count || 0;
       };
 
-      const [mTotal, yTotal, lyTotal] = await Promise.all([
-        countInRange(mStart, mEnd),
-        countInRange(yStart, yEnd),
-        countInRange(lyStart, lyEnd)
+      // Count upcoming/draft timesheets
+      const countUpcomingInRange = async (fromDate: string, toDate: string) => {
+        const { count, error } = await supabase
+          .from('timesheets')
+          .select('*', { count: 'exact', head: true })
+          .eq('technician_id', technician.id)
+          .eq('is_active', true)
+          .eq('status', 'draft')
+          .gte('date', fromDate)
+          .lte('date', toDate);
+        if (error) {
+          console.warn('Upcoming metrics count error', error);
+          return 0;
+        }
+        return count || 0;
+      };
+
+      const [mTotal, yTotal, lyTotal, mUpcoming, yUpcoming, lyUpcoming] = await Promise.all([
+        countTotalInRange(mStart, mEnd),
+        countTotalInRange(yStart, yEnd),
+        countTotalInRange(lyStart, lyEnd),
+        countUpcomingInRange(mStart, mEnd),
+        countUpcomingInRange(yStart, yEnd),
+        countUpcomingInRange(lyStart, lyEnd)
       ]);
 
       setMetrics({
         monthTotal: mTotal,
         yearTotal: yTotal,
-        lastYearTotal: lyTotal
+        lastYearTotal: lyTotal,
+        monthUpcoming: mUpcoming,
+        yearUpcoming: yUpcoming,
+        lastYearUpcoming: lyUpcoming
       });
     } finally {
       setMetricsLoading(false);
@@ -735,7 +761,10 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                         <div className="text-xs text-muted-foreground mb-1">Este mes</div>
                         <div className="flex items-center gap-1 flex-wrap">
                           <Badge variant="default" className="text-xs">
-                            {metrics.monthTotal} bolos
+                            {metrics.monthTotal} total
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {metrics.monthUpcoming} programados
                           </Badge>
                         </div>
                       </div>
@@ -743,7 +772,10 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                         <div className="text-xs text-muted-foreground mb-1">Este año</div>
                         <div className="flex items-center gap-1 flex-wrap">
                           <Badge variant="default" className="text-xs">
-                            {metrics.yearTotal} bolos
+                            {metrics.yearTotal} total
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {metrics.yearUpcoming} programados
                           </Badge>
                         </div>
                       </div>
@@ -754,8 +786,14 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                           </div>
                           <div className="flex items-center gap-1 flex-wrap">
                             <Badge variant="default" className="text-xs">
-                              {metrics.lastYearTotal} bolos
+                              {metrics.lastYearTotal} total
                             </Badge>
+                            <Badge variant="outline" className="text-xs opacity-50">
+                              {metrics.lastYearUpcoming} programados*
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1 italic">
+                            *Datos históricos de programación
                           </div>
                         </div>
                       )}
