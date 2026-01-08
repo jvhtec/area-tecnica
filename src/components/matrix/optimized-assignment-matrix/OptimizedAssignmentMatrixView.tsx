@@ -88,6 +88,8 @@ export interface OptimizedAssignmentMatrixViewProps {
   handleEmailError: (error: any, payload: any) => void;
   conflictDialog: any;
   setConflictDialog: (value: any) => void;
+  // TODO: isGlobalCellSelected is intended for future Stream Deck integration
+  // Will be used to highlight/indicate selected cells for external control
   isGlobalCellSelected: (technicianId: string, date: Date) => boolean;
   techMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
 }
@@ -161,9 +163,12 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   handleEmailError,
   conflictDialog,
   setConflictDialog,
-  isGlobalCellSelected,
+  isGlobalCellSelected, // TODO: Will be used for Stream Deck integration - reserved for future use
   techMedalRankings,
 }: OptimizedAssignmentMatrixViewProps) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _unusedIsGlobalCellSelected = isGlobalCellSelected; // Reserved for Stream Deck integration
+
   return (
     <div className="matrix-layout relative">
       {isFetching && !isInitialLoading && (
