@@ -148,26 +148,27 @@ export const OptimizedAssignmentMatrix = ({
     gcTime: 300_000, // 5 minutes
   });
 
-  // Fetch approved timesheet counts for all technicians for default sorting
-  // Uses timesheets as source of truth for actual completed work
+  // Fetch completed work counts for all technicians for default sorting
+  // Counts approved timesheets OR schedule-only timesheets (tourdate/dryhire)
+  // Counts individual work dates, not jobs
   const { data: techConfirmedCounts } = useQuery({
     queryKey: ['tech-confirmed-counts', allTechIds.join(',')],
     queryFn: async () => {
       if (!allTechIds.length) return new Map<string, number>();
-      // Get all approved timesheets for all technicians (source of truth for completed work)
+      // Get all completed timesheets (approved OR schedule-only)
       const { data, error } = await supabase
         .from('timesheets')
         .select('technician_id')
-        .eq('status', 'approved')
         .eq('is_active', true)
+        .or('status.eq.approved,is_schedule_only.eq.true')
         .in('technician_id', allTechIds);
 
       if (error) {
-        console.warn('Failed to fetch approved timesheet counts', error);
+        console.warn('Failed to fetch completed timesheet counts', error);
         return new Map<string, number>();
       }
 
-      // Count approved timesheets per technician
+      // Count completed work dates per technician
       const countMap = new Map<string, number>();
       allTechIds.forEach(id => countMap.set(id, 0));
       (data || []).forEach((timesheet: any) => {

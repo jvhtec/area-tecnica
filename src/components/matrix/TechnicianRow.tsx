@@ -92,14 +92,15 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
       const lyStart = startOfYear(lastYear).toISOString().split('T')[0];
       const lyEnd = endOfYear(lastYear).toISOString().split('T')[0];
 
-      // Count approved timesheets (completed work - source of truth for historic jobs)
+      // Count completed work: approved timesheets OR schedule-only timesheets (tourdate/dryhire)
+      // Counts individual work dates, not jobs
       const countCompletedInRange = async (fromDate: string, toDate: string) => {
         const { count, error } = await supabase
           .from('timesheets')
           .select('*', { count: 'exact', head: true })
           .eq('technician_id', technician.id)
-          .eq('status', 'approved')
           .eq('is_active', true)
+          .or('status.eq.approved,is_schedule_only.eq.true')
           .gte('date', fromDate)
           .lte('date', toDate);
         if (error) {
@@ -109,16 +110,16 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
         return count || 0;
       };
 
-      // Count confirmed assignments (upcoming scheduled work)
-      const countUpcomingInRange = async (fromISO: string, toISO: string) => {
+      // Count upcoming scheduled work: count future timesheet dates
+      const countUpcomingInRange = async (fromDate: string, toDate: string) => {
         const { count, error } = await supabase
-          .from('job_assignments')
-          .select('job_id,jobs!inner(id)', { count: 'exact' })
+          .from('timesheets')
+          .select('*', { count: 'exact', head: true })
           .eq('technician_id', technician.id)
-          .eq('status', 'confirmed')
-          .gte('jobs.start_time', fromISO)
-          .lte('jobs.end_time', toISO)
-          .limit(1);
+          .eq('is_active', true)
+          .eq('status', 'draft')
+          .gte('date', fromDate)
+          .lte('date', toDate);
         if (error) {
           console.warn('Upcoming metrics count error', error);
           return 0;
@@ -130,9 +131,9 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
         countCompletedInRange(mStart, mEnd),
         countCompletedInRange(yStart, yEnd),
         countCompletedInRange(lyStart, lyEnd),
-        countUpcomingInRange(startOfMonth(now).toISOString(), endOfMonth(now).toISOString()),
-        countUpcomingInRange(startOfYear(now).toISOString(), endOfYear(now).toISOString()),
-        countUpcomingInRange(startOfYear(lastYear).toISOString(), endOfYear(lastYear).toISOString())
+        countUpcomingInRange(mStart, mEnd),
+        countUpcomingInRange(yStart, yEnd),
+        countUpcomingInRange(lyStart, lyEnd)
       ]);
 
       setMetrics({
