@@ -75,21 +75,22 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     try {
       setMetricsLoading(true);
       const now = new Date();
-      const mStart = startOfMonth(now).toISOString();
-      const mEnd = endOfMonth(now).toISOString();
-      const yStart = startOfYear(now).toISOString();
-      const yEnd = endOfYear(now).toISOString();
+      const mStart = startOfMonth(now).toISOString().split('T')[0];
+      const mEnd = endOfMonth(now).toISOString().split('T')[0];
+      const yStart = startOfYear(now).toISOString().split('T')[0];
+      const yEnd = endOfYear(now).toISOString().split('T')[0];
 
-      // Count confirmed assignments within a date range via inner join to jobs; avoid HEAD to prevent 400s
-      const countInRange = async (fromISO: string, toISO: string) => {
+      // Count approved timesheets within a date range using actual work dates
+      // This is the source of truth for completed work (historic confirmed jobs)
+      const countInRange = async (fromDate: string, toDate: string) => {
         const { count, error } = await supabase
-          .from('job_assignments')
-          .select('job_id,jobs!inner(id)', { count: 'exact' })
+          .from('timesheets')
+          .select('*', { count: 'exact', head: true })
           .eq('technician_id', technician.id)
-          .eq('status', 'confirmed')
-          .gte('jobs.start_time', fromISO)
-          .lte('jobs.end_time', toISO)
-          .limit(1);
+          .eq('status', 'approved')
+          .eq('is_active', true)
+          .gte('date', fromDate)
+          .lte('date', toDate);
         if (error) {
           console.warn('Metrics count error', error);
           return 0;
