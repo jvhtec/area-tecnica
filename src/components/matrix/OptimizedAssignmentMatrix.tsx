@@ -875,7 +875,7 @@ export const OptimizedAssignmentMatrix = ({
     return techs;
   }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses, techConfirmedCounts]);
 
-  // Calculate medal rankings (top 3 non-house techs by confirmed jobs)
+  // Calculate medal rankings (top 3 technicians by confirmed jobs, including house techs)
   const techMedalRankings = useMemo(() => {
     const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
 
@@ -883,21 +883,20 @@ export const OptimizedAssignmentMatrix = ({
       return rankings;
     }
 
-    // Filter out house techs and sort by confirmed count
-    const regularTechs = technicians
-      .filter(t => t.role !== 'house_tech')
+    // Include all technicians (both regular and house techs) and sort by confirmed count
+    const allTechs = technicians
       .map(t => ({ id: t.id, count: techConfirmedCounts.get(t.id) || 0 }))
       .sort((a, b) => b.count - a.count);
 
     // Assign medals to top 3 (only if they have confirmed jobs)
-    if (regularTechs.length > 0 && regularTechs[0].count > 0) {
-      rankings.set(regularTechs[0].id, 'gold');
+    if (allTechs.length > 0 && allTechs[0].count > 0) {
+      rankings.set(allTechs[0].id, 'gold');
     }
-    if (regularTechs.length > 1 && regularTechs[1].count > 0) {
-      rankings.set(regularTechs[1].id, 'silver');
+    if (allTechs.length > 1 && allTechs[1].count > 0) {
+      rankings.set(allTechs[1].id, 'silver');
     }
-    if (regularTechs.length > 2 && regularTechs[2].count > 0) {
-      rankings.set(regularTechs[2].id, 'bronze');
+    if (allTechs.length > 2 && allTechs[2].count > 0) {
+      rankings.set(allTechs[2].id, 'bronze');
     }
 
     return rankings;
