@@ -187,6 +187,47 @@ export const OptimizedAssignmentMatrix = ({
     gcTime: 300_000, // 5 minutes
   });
 
+  // Fetch last year's timesheet counts for last year medal rankings
+  const { data: techLastYearCounts } = useQuery({
+    queryKey: ['tech-last-year-counts', allTechIds.join(',')],
+    queryFn: async () => {
+      if (!allTechIds.length) return new Map<string, number>();
+
+      // Get last year's date range
+      const now = new Date();
+      const lastYear = now.getFullYear() - 1;
+      const yearStart = new Date(lastYear, 0, 1).toISOString().split('T')[0];
+      const yearEnd = new Date(lastYear, 11, 31).toISOString().split('T')[0];
+
+      // Get active timesheets from last year
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('technician_id')
+        .eq('is_active', true)
+        .gte('date', yearStart)
+        .lte('date', yearEnd)
+        .in('technician_id', allTechIds);
+
+      if (error) {
+        console.warn('Failed to fetch last year timesheet counts', error);
+        return new Map<string, number>();
+      }
+
+      // Count timesheets per technician
+      const countMap = new Map<string, number>();
+      allTechIds.forEach(id => countMap.set(id, 0));
+      (data || []).forEach((timesheet: any) => {
+        const current = countMap.get(timesheet.technician_id) || 0;
+        countMap.set(timesheet.technician_id, current + 1);
+      });
+
+      return countMap;
+    },
+    enabled: allTechIds.length > 0 && techSortMethod === 'default' && !sortJobId,
+    staleTime: 60_000, // 1 minute
+    gcTime: 300_000, // 5 minutes
+  });
+
   // Listen for assignment updates and refresh data
   useEffect(() => {
     const handleAssignmentUpdate = () => {
@@ -910,6 +951,33 @@ export const OptimizedAssignmentMatrix = ({
     return rankings;
   }, [technicians, techConfirmedCounts, techSortMethod, sortJobId]);
 
+  // Calculate last year's medal rankings (for nostalgia and snarky comments)
+  const techLastYearMedalRankings = useMemo(() => {
+    const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
+
+    if (!techLastYearCounts || techSortMethod !== 'default' || sortJobId) {
+      return rankings;
+    }
+
+    // Sort technicians by last year's activity
+    const allTechs = technicians
+      .map(t => ({ id: t.id, count: techLastYearCounts.get(t.id) || 0 }))
+      .sort((a, b) => b.count - a.count);
+
+    // Assign last year's medals to top 3
+    if (allTechs.length > 0 && allTechs[0].count > 0) {
+      rankings.set(allTechs[0].id, 'gold');
+    }
+    if (allTechs.length > 1 && allTechs[1].count > 0) {
+      rankings.set(allTechs[1].id, 'silver');
+    }
+    if (allTechs.length > 2 && allTechs[2].count > 0) {
+      rankings.set(allTechs[2].id, 'bronze');
+    }
+
+    return rankings;
+  }, [technicians, techLastYearCounts, techSortMethod, sortJobId]);
+
   const visibleTechIds = useMemo(() => {
     const start = Math.max(0, visibleRows.start - 10);
     const end = Math.min(orderedTechnicians.length - 1, visibleRows.end + 10);
@@ -1044,7 +1112,7 @@ export const OptimizedAssignmentMatrix = ({
     availabilityDialog, setAvailabilityDialog, availabilityCoverage, setAvailabilityCoverage,
     availabilitySingleDate, setAvailabilitySingleDate, availabilityMultiDates, setAvailabilityMultiDates,
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,
-    isGlobalCellSelected, techMedalRankings,
+    isGlobalCellSelected, techMedalRankings, techLastYearMedalRankings,
   };
 
   return <OptimizedAssignmentMatrixView {...viewProps} />;

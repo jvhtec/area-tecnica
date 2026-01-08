@@ -37,9 +37,10 @@ interface TechnicianRowProps {
   isFridge?: boolean;
   compact?: boolean;
   medalRank?: 'gold' | 'silver' | 'bronze';
+  lastYearMedalRank?: 'gold' | 'silver' | 'bronze';
 }
 
-const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false, medalRank }: TechnicianRowProps) => {
+const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false, medalRank, lastYearMedalRank }: TechnicianRowProps) => {
   const { userRole } = useOptimizedAuth();
   const isAdmin = userRole === 'admin';
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
@@ -340,6 +341,50 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
         'Tercer puesto. Los otros dos te saludan desde arriba.',
         'Bronce resplandeciente. Bueno, más o menos resplandeciente.',
         'Número tres. Podría ser peor... o mejor.',
+      ]
+    };
+
+    const list = comments[rank];
+    return list[Math.floor(Math.random() * list.length)];
+  };
+
+  const getLastYearSnarkyComment = (rank: 'gold' | 'silver' | 'bronze'): string => {
+    const comments = {
+      gold: [
+        'Fuiste oro el año pasado. ¿Qué pasó? ¿Te jubilaste?',
+        'Campeón del año pasado. Ahora... no tanto. ¿Nostalgia?',
+        'Oro en 2025. ¿Dónde quedó esa energía?',
+        'Eras el número uno. Pasado perfecto, presente... dudoso.',
+        '¡Medalla de oro histórica! Énfasis en "histórica".',
+        'Top del año pasado. Las glorias pasadas no pagan facturas.',
+        'Fuiste el rey. Ahora más bien... plebeyo.',
+        'Eras imparable. ¿Te pararon?',
+        'Oro 2025. ¿Ya te cansaste o simplemente te dio pereza?',
+        'Campeón que fue. La clave está en "fue".',
+      ],
+      silver: [
+        'Plata el año pasado. Ni oro entonces, ni ahora.',
+        'Segundo en 2025. Al menos eres consistente... en no ganar.',
+        'Medalla plateada histórica. ¿Sigues casi ganando?',
+        'Subcampeón del pasado. ¿Cuándo será tu año de verdad?',
+        'Plata en 2025. Eternamente segundo, ¿no?',
+        'Casi ganaste el año pasado. Casi. Como siempre.',
+        'Segundo puesto histórico. ¿Te suena familiar?',
+        'Plata vintage. Tu zona de confort es el segundo lugar.',
+        'Fuiste plata. Sorpresa: sigues sin ser oro.',
+        'Subcampeón perenne. El oro te envía saludos del pasado.',
+      ],
+      bronze: [
+        'Bronce el año pasado. ¿Bajaste o ya estabas abajo?',
+        'Tercero en 2025. ¿Vas pa bajo o qué?',
+        'Medalla de bronce histórica. Última del podio... qué logro.',
+        'Tercer puesto del pasado. ¿Al menos mantienes el ritmo?',
+        'Bronce 2025. Podio por los pelos, como siempre.',
+        'Último en el podio el año pasado. ¿Sigues ahí?',
+        'Bronce vintage. Sigues siendo el tercero más motivado.',
+        'Tercer lugar histórico. Los otros dos no te extrañan.',
+        'Fuiste bronce. ¿Fuiste, eres o vas para allá?',
+        'Podio del año pasado. Énfasis en "último del podio".',
       ]
     };
 
@@ -781,8 +826,30 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                       </div>
                       {metricsExpanded && (
                         <div className="pt-2 border-t">
-                          <div className="text-xs text-muted-foreground mb-1">
-                            Año pasado ({subYears(new Date(), 1).getFullYear()})
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="text-xs text-muted-foreground">
+                              Año pasado ({subYears(new Date(), 1).getFullYear()})
+                            </div>
+                            {lastYearMedalRank && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Medal
+                                      className="h-4 w-4"
+                                      style={{
+                                        color: lastYearMedalRank === 'gold' ? '#FFD700' :
+                                               lastYearMedalRank === 'silver' ? '#C0C0C0' : '#CD7F32',
+                                        cursor: 'help',
+                                        opacity: 0.7
+                                      }}
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs">{getLastYearSnarkyComment(lastYearMedalRank)}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                           </div>
                           <div className="flex items-center gap-1 flex-wrap">
                             <Badge variant="default" className="text-xs">
