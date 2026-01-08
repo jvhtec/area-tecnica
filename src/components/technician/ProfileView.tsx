@@ -10,6 +10,7 @@ import { Loader2, Save, User, Phone, MapPin, CreditCard, Calendar as CalendarIco
 import { Theme } from './types';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { ProfilePictureUpload } from '@/components/profile/ProfilePictureUpload';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/api-config';
 
 interface ProfileUser {
     id: string;
@@ -26,6 +27,7 @@ interface UserProfile {
     profile_picture_url?: string;
     role?: string;
     department?: string;
+    calendar_ics_token?: string;
 }
 
 interface ProfileViewProps {
@@ -64,6 +66,9 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
     });
     const [passwordLoading, setPasswordLoading] = useState(false);
 
+    // Calendar token state
+    const [calendarToken, setCalendarToken] = useState(userProfile?.calendar_ics_token || '');
+
     // Form state
     const [firstName, setFirstName] = useState(userProfile?.first_name || '');
     const [lastName, setLastName] = useState(userProfile?.last_name || '');
@@ -80,6 +85,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
             setResidencia(userProfile.residencia || '');
             setDni(userProfile.dni || '');
             setSelectedColor(userProfile.bg_color || '#3b82f6');
+            setCalendarToken(userProfile.calendar_ics_token || '');
         }
     }, [userProfile]);
 
@@ -154,12 +160,18 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
         }
     };
 
-    // Handle calendar sync - show instructions
+    // Calendar ICS URL - use webcal:// protocol for direct calendar app integration
+    const icsUrl = calendarToken && user?.id
+        ? `webcal://${SUPABASE_URL.replace(/^https?:\/\//, '')}/functions/v1/tech-calendar-ics?tid=${user.id}&token=${calendarToken}&apikey=${SUPABASE_ANON_KEY}&back=90&fwd=365`
+        : '';
+
+    // Handle calendar sync - open webcal:// link directly
     const handleCalendarSync = () => {
-        toast.info('Función de sincronización de calendario disponible próximamente', {
-            description: 'Podrás exportar tus turnos a Google Calendar o Apple Calendar',
-            duration: 4000,
-        });
+        if (!icsUrl) {
+            toast.error('No tienes un enlace de calendario configurado');
+            return;
+        }
+        window.location.href = icsUrl;
     };
 
     // Handle push notifications enable/disable
@@ -583,6 +595,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                     </div>
                 </div>
             )}
+
         </div>
     );
 };

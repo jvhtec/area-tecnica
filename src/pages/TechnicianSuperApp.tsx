@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useMyTours } from '@/hooks/useMyTours';
 import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
@@ -24,7 +24,7 @@ import {
   Download, Send, RefreshCw, UploadCloud, Play, Sliders,
   Radio, Mic2, Speaker, ListMusic, Save, ArrowLeft, Activity,
   Search, Filter, Map as MapIcon, Layers, Globe, LayoutList, LayoutGrid,
-  Loader2, Eye, Briefcase, Shuffle, Lightbulb, Sparkles, Users, Euro
+  Loader2, Eye, Briefcase, Shuffle, Lightbulb, Sparkles, Users, Euro, Info
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,7 @@ import { SoundVisionModal } from '@/components/technician/SoundVisionModal';
 import { ObliqueStrategyModal } from '@/components/technician/ObliqueStrategyModal';
 import { TimesheetView } from '@/components/technician/TimesheetView';
 import { DetailsModal } from '@/components/technician/DetailsModal';
+import { AboutModal } from '@/components/technician/AboutModal';
 
 // --- TYPE DEFINITIONS ---
 interface TechnicianJobData {
@@ -113,6 +114,7 @@ export default function TechnicianSuperApp() {
   const { theme: nextTheme, setTheme } = useTheme();
   const { user, hasSoundVisionAccess } = useOptimizedAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Determine if dark mode (guard for SSR/test environments)
   const isDark = nextTheme === 'dark' || (
@@ -132,6 +134,17 @@ export default function TechnicianSuperApp() {
   const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
   const [showRatesModal, setShowRatesModal] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+
+  // Handle deeplink to open About modal via URL param
+  useEffect(() => {
+    if (searchParams.get('showAbout') === '1') {
+      setShowAboutModal(true);
+      // Remove the param from URL after opening
+      searchParams.delete('showAbout');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Set up real-time subscriptions
   useTechnicianDashboardSubscriptions();
@@ -143,7 +156,7 @@ export default function TechnicianSuperApp() {
       if (!user?.id) return null;
       const { data, error } = await supabase
         .from('profiles')
-        .select('first_name, last_name, nickname, phone, residencia, dni, bg_color, profile_picture_url, role, department')
+        .select('first_name, last_name, nickname, phone, residencia, dni, bg_color, profile_picture_url, role, department, calendar_ics_token')
         .eq('id', user.id)
         .single();
       if (error) throw error;
@@ -419,6 +432,13 @@ export default function TechnicianSuperApp() {
               setActiveModal('details');
             }
           }}
+        />
+      )}
+      {showAboutModal && (
+        <AboutModal
+          theme={t}
+          isDark={isDark}
+          onClose={() => setShowAboutModal(false)}
         />
       )}
     </div>

@@ -6,7 +6,8 @@ import {
 } from "@/components/ui/hover-card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Info, Edit3, Save, X, Clock, Plus, Trash2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Info, Edit3, Save, X, Clock, Plus, Trash2, Bell } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 
@@ -48,6 +49,8 @@ interface ChangelogEntry {
 interface AboutCardProps {
   userRole?: string
   userEmail?: string
+  autoOpen?: boolean
+  onAutoOpenHandled?: () => void
 }
 
 const filterRecentEntries = (entries: ChangelogEntry[]) => {
@@ -66,8 +69,16 @@ const filterRecentEntries = (entries: ChangelogEntry[]) => {
   })
 }
 
-export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
+export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: AboutCardProps) => {
   const [isOpen, setIsOpen] = useState(false)
+
+  // Handle autoOpen prop
+  useEffect(() => {
+    if (autoOpen && !isOpen) {
+      setIsOpen(true)
+      onAutoOpenHandled?.()
+    }
+  }, [autoOpen, isOpen, onAutoOpenHandled])
   const [currentImage, setCurrentImage] = useState<(typeof images)[number]>(images[0])
   const [changelog, setChangelog] = useState<ChangelogEntry[]>([])
   const [displayVersion, setDisplayVersion] = useState(defaultVersion)
@@ -75,6 +86,7 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
   const [editContent, setEditContent] = useState("")
   const [editVersion, setEditVersion] = useState("")
   const [editDate, setEditDate] = useState("")
+  const [sendBroadcast, setSendBroadcast] = useState(false)
   const [hasRecentUpdate, setHasRecentUpdate] = useState(false)
   const { toast } = useToast()
 
@@ -151,6 +163,7 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
     setEditVersion(currentVersion)
     const isoDate = /\d{4}-\d{2}-\d{2}/.test(currentDate) ? currentDate : new Date(currentDate).toISOString().slice(0,10)
     setEditDate(isoDate)
+    setSendBroadcast(false)
   }
 
   // Save changelog entry (persist)
@@ -176,21 +189,24 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
             : entry
         )))
 
-        // Send push notification about changelog update
-        void supabase.functions.invoke('push', {
-          body: {
-            action: 'broadcast',
-            type: 'changelog.updated',
-            version: data.version,
-            content: data.content
-          }
-        })
+        // Send push notification about changelog update if broadcast is enabled
+        if (sendBroadcast) {
+          void supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: 'changelog.updated',
+              version: data.version,
+              content: data.content
+            }
+          })
+        }
       }
       setEditingEntry(null)
       setEditContent("")
       setEditVersion("")
       setEditDate("")
-      toast({ title: 'Changelog updated' })
+      setSendBroadcast(false)
+      toast({ title: sendBroadcast ? 'Changelog updated & broadcast sent' : 'Changelog updated' })
     } catch (e: any) {
       toast({ title: 'Failed to save', description: e?.message || String(e), variant: 'destructive' })
     }
@@ -250,6 +266,7 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
   const cancelEditing = () => {
     setEditingEntry(null)
     setEditContent("")
+    setSendBroadcast(false)
   }
 
   // Format date for display
@@ -378,6 +395,20 @@ export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
                         rows={3}
                         placeholder="Enter changelog content..."
                       />
+                      <div className="flex items-center gap-2 py-1 border-t border-dashed">
+                        <Checkbox
+                          id={`broadcast-${entry.id}`}
+                          checked={sendBroadcast}
+                          onCheckedChange={(checked) => setSendBroadcast(checked === true)}
+                        />
+                        <label
+                          htmlFor={`broadcast-${entry.id}`}
+                          className="text-[10px] text-muted-foreground cursor-pointer flex items-center gap-1"
+                        >
+                          <Bell className="h-3 w-3" />
+                          Broadcast push notification
+                        </label>
+                      </div>
                       <div className="flex gap-1">
                         <Button
                           variant="ghost"

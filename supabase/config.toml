@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.wallboard-feed]
 verify_jwt = true
+
+[functions.tech-calendar-ics]
+verify_jwt = false

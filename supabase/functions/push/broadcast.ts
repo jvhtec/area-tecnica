@@ -1023,7 +1023,8 @@ export async function handleBroadcast(
       text = 'Se han publicado cambios importantes. Actualiza la aplicación.';
     }
 
-    url = body.url || '/';
+    // Deeplink to open About modal - works for both tech-app and regular layout
+    url = body.url || '/?showAbout=1';
     // Broadcast to all authenticated users
     clearAllRecipients();
     const { data: allUsers } = await client

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Department } from "@/types/department";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, Copy, RefreshCcw, Shield, ExternalLink } from "lucide-react";
+import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, RefreshCcw, Shield, ExternalLink } from "lucide-react";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
@@ -172,7 +172,7 @@ export const Profile = () => {
   };
 
   const icsUrl = profile?.calendar_ics_token
-    ? `${SUPABASE_URL}/functions/v1/tech-calendar-ics?tid=${profile.id}&token=${profile.calendar_ics_token}&apikey=${SUPABASE_ANON_KEY}&back=90&fwd=365`
+    ? `webcal://${SUPABASE_URL.replace(/^https?:\/\//, '')}/functions/v1/tech-calendar-ics?tid=${profile.id}&token=${profile.calendar_ics_token}&apikey=${SUPABASE_ANON_KEY}&back=90&fwd=365`
     : '';
 
   const handlePasswordChange = async () => {
@@ -574,39 +574,26 @@ export const Profile = () => {
                   Calendario (ICS)
                 </CardTitle>
                 <CardDescription>
-                  Suscríbete desde Google/Apple Calendar para ver tus trabajos confirmados.
+                  Añade tus trabajos confirmados a Google Calendar, Apple Calendar u Outlook.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <Label>URL del calendario</Label>
-                  <div className="flex gap-2">
-                    <Input readOnly value={icsUrl} placeholder="Se generará un enlace…" />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={!icsUrl}
-                      onClick={() => {
-                        if (!icsUrl) return;
-                        void navigator.clipboard.writeText(icsUrl).then(() =>
-                          toast({ title: 'Copiado', description: 'URL copiada al portapapeles.' })
-                        );
-                      }}
-                      title="Copiar URL"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {!icsUrl && (
-                    <p className="text-sm text-muted-foreground">Pulsa “Rotar enlace” para generar tu URL secreta.</p>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={handleRotateIcsToken}>
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    Rotar enlace
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  disabled={!icsUrl}
+                  onClick={() => icsUrl && (window.location.href = icsUrl)}
+                  className="w-full"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  Suscribirse al calendario
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleRotateIcsToken}>
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                  Rotar enlace
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Si cambias de enlace, tendrás que volver a suscribirte.
+                </p>
               </CardContent>
             </Card>
           )}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { Outlet, useLocation, useNavigate, Navigate } from "react-router-dom"
+import { Outlet, useLocation, useNavigate, Navigate, useSearchParams } from "react-router-dom"
 import { LogOut } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -156,11 +156,23 @@ const Layout = () => {
   const location = useLocation()
   const queryClient = useQueryClient()
   const isMobile = useIsMobile()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [showPendingTasksModal, setShowPendingTasksModal] = useState(false)
   const [showSingleTaskPopup, setShowSingleTaskPopup] = useState(false)
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
+  const [aboutAutoOpen, setAboutAutoOpen] = useState(false)
+
+  // Handle deeplink to open About card via URL param
+  useEffect(() => {
+    if (searchParams.get('showAbout') === '1') {
+      setAboutAutoOpen(true)
+      // Remove the param from URL after triggering
+      searchParams.delete('showAbout')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const {
     session,
@@ -173,8 +185,11 @@ const Layout = () => {
   } = useOptimizedAuth()
 
   // Synchronous redirect for technician users - prevent any Layout rendering
+  // Preserve showAbout query param for deeplinks
   if (!isLoading && userRole === 'technician') {
-    return <Navigate to="/tech-app" replace />;
+    const showAboutParam = searchParams.get('showAbout')
+    const redirectPath = showAboutParam ? `/tech-app?showAbout=${showAboutParam}` : '/tech-app'
+    return <Navigate to={redirectPath} replace />;
   }
 
   const { requiredTables } = useRouteSubscriptions()
@@ -432,6 +447,8 @@ const Layout = () => {
               <AboutCard
                 userRole={userRole ?? undefined}
                 userEmail={session.user?.email ?? undefined}
+                autoOpen={aboutAutoOpen}
+                onAutoOpenHandled={() => setAboutAutoOpen(false)}
               />
               <SidebarSeparator />
               <div className="px-2 py-4">

@@ -441,9 +441,9 @@ serve(async (req) => {
         const requesterEmail = (reqRow.tech?.email || "").trim();
         if (requesterEmail) {
           toList.push({ email: requesterEmail, name: `${reqRow.tech?.first_name ?? ''} ${reqRow.tech?.last_name ?? ''}`.trim() });
-          bccList.push({ email: "administracion@sector-pro.com", name: "Administración" });
+          bccList.push({ email: "administracion@mfo-producciones.com", name: "Administración" });
         } else {
-          toList.push({ email: "administracion@sector-pro.com", name: "Administración" });
+          toList.push({ email: "administracion@mfo-producciones.com", name: "Administración" });
         }
 
         const subject = reqRow.status === 'approved'
