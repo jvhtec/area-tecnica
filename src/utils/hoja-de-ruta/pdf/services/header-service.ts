@@ -57,7 +57,8 @@ export class HeaderService {
     }
   }
 
-  private static formatJobDate(raw: string): string | null {
+  private static formatJobDate(raw: string | undefined | null): string | null {
+    if (!raw) return null;
     try {
       const d = new Date(raw);
       if (!isNaN(d.getTime())) {
@@ -68,7 +69,7 @@ export class HeaderService {
         return `${dd}/${mm}/${yyyy}`;
       }
       // Fallback for ISO date only strings (YYYY-MM-DD)
-      if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}/.test(raw)) {
         const [y, m, rest] = raw.split('-');
         const d2 = rest?.slice(0, 2) || '01';
         return `${d2}/${m}/${y}`;
