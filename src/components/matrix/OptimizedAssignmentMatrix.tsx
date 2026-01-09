@@ -148,46 +148,65 @@ export const OptimizedAssignmentMatrix = ({
     gcTime: 300_000, // 5 minutes
   });
 
-  // Fetch current year timesheet counts for ALL technicians (not just filtered ones)
-  // This ensures medals are calculated fairly across everyone in the system
+  // Fetch current year timesheet counts for ALL technicians with their departments
+  // This ensures medals are calculated per department fairly
   // Counts this year's active timesheets including scheduled gigs (draft status)
   const { data: techConfirmedCounts } = useQuery({
-    queryKey: ['tech-confirmed-counts-all'],
+    queryKey: ['tech-confirmed-counts-all-with-dept'],
     queryFn: async () => {
       // Get start of current year
       const now = new Date();
       const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
 
-      // Get active timesheets from this year for ALL technicians (no filter)
-      const { data, error } = await supabase
+      // Get active timesheets from this year for ALL technicians
+      const { data: timesheetData, error: timesheetError } = await supabase
         .from('timesheets')
         .select('technician_id')
         .eq('is_active', true)
         .gte('date', yearStart);
 
-      if (error) {
-        console.warn('Failed to fetch timesheet counts', error);
-        return new Map<string, number>();
+      if (timesheetError) {
+        console.warn('Failed to fetch timesheet counts', timesheetError);
+        return { counts: new Map<string, number>(), departments: new Map<string, string>() };
       }
 
       // Count timesheets per technician
       const countMap = new Map<string, number>();
-      (data || []).forEach((timesheet: any) => {
+      (timesheetData || []).forEach((timesheet: any) => {
         const current = countMap.get(timesheet.technician_id) || 0;
         countMap.set(timesheet.technician_id, current + 1);
       });
 
-      return countMap;
+      // Fetch departments for all technicians who have timesheets
+      const techIds = Array.from(countMap.keys());
+      const departmentMap = new Map<string, string>();
+
+      if (techIds.length > 0) {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, department')
+          .in('id', techIds);
+
+        if (!profileError && profileData) {
+          profileData.forEach((profile: any) => {
+            if (profile.department) {
+              departmentMap.set(profile.id, profile.department);
+            }
+          });
+        }
+      }
+
+      return { counts: countMap, departments: departmentMap };
     },
     enabled: true,
     staleTime: 60_000, // 1 minute
     gcTime: 300_000, // 5 minutes
   });
 
-  // Fetch last year's timesheet counts for ALL technicians (not just filtered ones)
-  // This ensures last year's medals are calculated fairly across everyone
+  // Fetch last year's timesheet counts for ALL technicians with their departments
+  // This ensures last year's medals are calculated per department fairly
   const { data: techLastYearCounts } = useQuery({
-    queryKey: ['tech-last-year-counts-all'],
+    queryKey: ['tech-last-year-counts-all-with-dept'],
     queryFn: async () => {
       // Get last year's date range
       const now = new Date();
@@ -195,27 +214,46 @@ export const OptimizedAssignmentMatrix = ({
       const yearStart = new Date(lastYear, 0, 1).toISOString().split('T')[0];
       const yearEnd = new Date(lastYear, 11, 31).toISOString().split('T')[0];
 
-      // Get active timesheets from last year for ALL technicians (no filter)
-      const { data, error } = await supabase
+      // Get active timesheets from last year for ALL technicians
+      const { data: timesheetData, error: timesheetError } = await supabase
         .from('timesheets')
         .select('technician_id')
         .eq('is_active', true)
         .gte('date', yearStart)
         .lte('date', yearEnd);
 
-      if (error) {
-        console.warn('Failed to fetch last year timesheet counts', error);
-        return new Map<string, number>();
+      if (timesheetError) {
+        console.warn('Failed to fetch last year timesheet counts', timesheetError);
+        return { counts: new Map<string, number>(), departments: new Map<string, string>() };
       }
 
       // Count timesheets per technician
       const countMap = new Map<string, number>();
-      (data || []).forEach((timesheet: any) => {
+      (timesheetData || []).forEach((timesheet: any) => {
         const current = countMap.get(timesheet.technician_id) || 0;
         countMap.set(timesheet.technician_id, current + 1);
       });
 
-      return countMap;
+      // Fetch departments for all technicians who have timesheets
+      const techIds = Array.from(countMap.keys());
+      const departmentMap = new Map<string, string>();
+
+      if (techIds.length > 0) {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, department')
+          .in('id', techIds);
+
+        if (!profileError && profileData) {
+          profileData.forEach((profile: any) => {
+            if (profile.department) {
+              departmentMap.set(profile.id, profile.department);
+            }
+          });
+        }
+      }
+
+      return { counts: countMap, departments: departmentMap };
     },
     enabled: true,
     staleTime: 60_000, // 1 minute
@@ -902,9 +940,9 @@ export const OptimizedAssignmentMatrix = ({
           if (!aIsHouse && bIsHouse) return 1;
 
           // Within regular techs, sort by confirmed job count (descending)
-          if (!aIsHouse && !bIsHouse && techConfirmedCounts) {
-            const aCount = techConfirmedCounts.get(a.id) || 0;
-            const bCount = techConfirmedCounts.get(b.id) || 0;
+          if (!aIsHouse && !bIsHouse && techConfirmedCounts?.counts) {
+            const aCount = techConfirmedCounts.counts.get(a.id) || 0;
+            const bCount = techConfirmedCounts.counts.get(b.id) || 0;
             if (bCount !== aCount) return bCount - aCount;
           }
 
@@ -917,57 +955,84 @@ export const OptimizedAssignmentMatrix = ({
     return techs;
   }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses, techConfirmedCounts]);
 
-  // Calculate medal rankings (top 3 technicians by current year activity)
+  // Calculate medal rankings (top 3 technicians per department by current year activity)
   const techMedalRankings = useMemo(() => {
     const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
 
-    if (!techConfirmedCounts || techSortMethod !== 'default' || sortJobId) {
+    if (!techConfirmedCounts?.counts || !techConfirmedCounts?.departments || techSortMethod !== 'default' || sortJobId) {
       return rankings;
     }
 
-    // Get ALL technicians from the count map, not just filtered ones
-    // This ensures medals are based on everyone, not just who's currently visible
-    const allTechs = Array.from(techConfirmedCounts.entries())
-      .map(([id, count]) => ({ id, count }))
-      .sort((a, b) => b.count - a.count);
+    // Group technicians by department
+    const techsByDepartment = new Map<string, Array<{ id: string; count: number }>>();
 
-    // Assign medals to top 3 (only if they have activity)
-    if (allTechs.length > 0 && allTechs[0].count > 0) {
-      rankings.set(allTechs[0].id, 'gold');
-    }
-    if (allTechs.length > 1 && allTechs[1].count > 0) {
-      rankings.set(allTechs[1].id, 'silver');
-    }
-    if (allTechs.length > 2 && allTechs[2].count > 0) {
-      rankings.set(allTechs[2].id, 'bronze');
-    }
+    Array.from(techConfirmedCounts.counts.entries()).forEach(([id, count]) => {
+      const department = techConfirmedCounts.departments.get(id);
+      if (!department) return; // Skip technicians without department
+
+      if (!techsByDepartment.has(department)) {
+        techsByDepartment.set(department, []);
+      }
+      techsByDepartment.get(department)!.push({ id, count });
+    });
+
+    // Award medals per department (top 3 in each department)
+    techsByDepartment.forEach((techs, department) => {
+      // Sort by count descending
+      techs.sort((a, b) => b.count - a.count);
+
+      // Assign medals to top 3 in this department (only if they have activity)
+      if (techs.length > 0 && techs[0].count > 0) {
+        rankings.set(techs[0].id, 'gold');
+      }
+      if (techs.length > 1 && techs[1].count > 0) {
+        rankings.set(techs[1].id, 'silver');
+      }
+      if (techs.length > 2 && techs[2].count > 0) {
+        rankings.set(techs[2].id, 'bronze');
+      }
+    });
 
     return rankings;
   }, [techConfirmedCounts, techSortMethod, sortJobId]);
 
-  // Calculate last year's medal rankings (for nostalgia and snarky comments)
+  // Calculate last year's medal rankings per department (for nostalgia and snarky comments)
   const techLastYearMedalRankings = useMemo(() => {
     const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
 
-    if (!techLastYearCounts) {
+    if (!techLastYearCounts?.counts || !techLastYearCounts?.departments) {
       return rankings;
     }
 
-    // Get ALL technicians from the count map, not just filtered ones
-    const allTechs = Array.from(techLastYearCounts.entries())
-      .map(([id, count]) => ({ id, count }))
-      .sort((a, b) => b.count - a.count);
+    // Group technicians by department
+    const techsByDepartment = new Map<string, Array<{ id: string; count: number }>>();
 
-    // Assign last year's medals to top 3 (always, regardless of sort state)
-    if (allTechs.length > 0 && allTechs[0].count > 0) {
-      rankings.set(allTechs[0].id, 'gold');
-    }
-    if (allTechs.length > 1 && allTechs[1].count > 0) {
-      rankings.set(allTechs[1].id, 'silver');
-    }
-    if (allTechs.length > 2 && allTechs[2].count > 0) {
-      rankings.set(allTechs[2].id, 'bronze');
-    }
+    Array.from(techLastYearCounts.counts.entries()).forEach(([id, count]) => {
+      const department = techLastYearCounts.departments.get(id);
+      if (!department) return; // Skip technicians without department
+
+      if (!techsByDepartment.has(department)) {
+        techsByDepartment.set(department, []);
+      }
+      techsByDepartment.get(department)!.push({ id, count });
+    });
+
+    // Award last year's medals per department (top 3 in each department)
+    techsByDepartment.forEach((techs, department) => {
+      // Sort by count descending
+      techs.sort((a, b) => b.count - a.count);
+
+      // Assign last year's medals to top 3 in this department (only if they have activity)
+      if (techs.length > 0 && techs[0].count > 0) {
+        rankings.set(techs[0].id, 'gold');
+      }
+      if (techs.length > 1 && techs[1].count > 0) {
+        rankings.set(techs[1].id, 'silver');
+      }
+      if (techs.length > 2 && techs[2].count > 0) {
+        rankings.set(techs[2].id, 'bronze');
+      }
+    });
 
     return rankings;
   }, [techLastYearCounts]);
