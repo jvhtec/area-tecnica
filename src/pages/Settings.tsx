@@ -29,6 +29,7 @@ import { PushNotificationMatrix } from '@/components/settings/PushNotificationMa
 import { PushNotificationSchedule } from '@/components/settings/PushNotificationSchedule'
 import { MorningSummarySubscription } from '@/components/settings/MorningSummarySubscription'
 import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
+import { DryHireFolderManager } from '@/components/settings/DryHireFolderManager'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown } from "lucide-react"
 import { VersionDisplay } from "@/components/VersionDisplay"
@@ -211,6 +212,7 @@ const Settings = () => {
     'users': false,
     'company-settings': false,
     'equipment-models': false,
+    'dryhire-folders': false,
     'version-info': false,
   });
 
@@ -474,6 +476,18 @@ const Settings = () => {
                     <EquipmentModelsList />
                   </DepartmentProvider>
                 </div>
+              </CollapsibleCard>
+            )}
+
+            {isManagementUser && (
+              <CollapsibleCard
+                id="dryhire-folders"
+                title="Dry hire folders"
+                description="Manage Flex folder structure for dry hire jobs"
+                isOpen={collapsibleStates['dryhire-folders']}
+                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'dryhire-folders': open }))}
+              >
+                <DryHireFolderManager />
               </CollapsibleCard>
             )}
 

@@ -976,20 +976,31 @@ export const OptimizedAssignmentMatrix = ({
       techsByDepartment.get(department)!.push({ id, count });
     });
 
-    // Award medals per department (top 3 in each department)
+    // Award medals per department (top 3 in each department) with Olympic-style tie handling
     techsByDepartment.forEach((techs, department) => {
       // Sort by count descending
       techs.sort((a, b) => b.count - a.count);
 
-      // Assign medals to top 3 in this department (only if they have activity)
-      if (techs.length > 0 && techs[0].count > 0) {
-        rankings.set(techs[0].id, 'gold');
-      }
-      if (techs.length > 1 && techs[1].count > 0) {
-        rankings.set(techs[1].id, 'silver');
-      }
-      if (techs.length > 2 && techs[2].count > 0) {
-        rankings.set(techs[2].id, 'bronze');
+      // Olympic-style medal assignment: ties get same medal, next rank is skipped
+      let medalIndex = 0; // Track which medal position we're at
+      let i = 0;
+
+      while (i < techs.length && medalIndex < 3) {
+        const currentCount = techs[i].count;
+        if (currentCount === 0) break; // No medals for zero activity
+
+        const medal = medalIndex === 0 ? 'gold' : medalIndex === 1 ? 'silver' : 'bronze';
+
+        // Find all technicians tied at this count
+        let tiedCount = 0;
+        while (i + tiedCount < techs.length && techs[i + tiedCount].count === currentCount) {
+          rankings.set(techs[i + tiedCount].id, medal);
+          tiedCount++;
+        }
+
+        // Skip medal positions equal to number of people who got this medal
+        medalIndex += tiedCount;
+        i += tiedCount;
       }
     });
 
@@ -1000,7 +1011,8 @@ export const OptimizedAssignmentMatrix = ({
   const techLastYearMedalRankings = useMemo(() => {
     const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
 
-    if (!techLastYearCounts?.counts || !techLastYearCounts?.departments) {
+    // Hide last year medals when sorting (consistent with current year behavior)
+    if (!techLastYearCounts?.counts || !techLastYearCounts?.departments || techSortMethod !== 'default' || sortJobId) {
       return rankings;
     }
 
@@ -1017,25 +1029,34 @@ export const OptimizedAssignmentMatrix = ({
       techsByDepartment.get(department)!.push({ id, count });
     });
 
-    // Award last year's medals per department (top 3 in each department)
+    // Award last year's medals per department with Olympic-style tie handling
     techsByDepartment.forEach((techs, department) => {
       // Sort by count descending
       techs.sort((a, b) => b.count - a.count);
 
-      // Assign last year's medals to top 3 in this department (only if they have activity)
-      if (techs.length > 0 && techs[0].count > 0) {
-        rankings.set(techs[0].id, 'gold');
-      }
-      if (techs.length > 1 && techs[1].count > 0) {
-        rankings.set(techs[1].id, 'silver');
-      }
-      if (techs.length > 2 && techs[2].count > 0) {
-        rankings.set(techs[2].id, 'bronze');
+      // Olympic-style medal assignment: ties get same medal, next rank is skipped
+      let medalIndex = 0;
+      let i = 0;
+
+      while (i < techs.length && medalIndex < 3) {
+        const currentCount = techs[i].count;
+        if (currentCount === 0) break;
+
+        const medal = medalIndex === 0 ? 'gold' : medalIndex === 1 ? 'silver' : 'bronze';
+
+        let tiedCount = 0;
+        while (i + tiedCount < techs.length && techs[i + tiedCount].count === currentCount) {
+          rankings.set(techs[i + tiedCount].id, medal);
+          tiedCount++;
+        }
+
+        medalIndex += tiedCount;
+        i += tiedCount;
       }
     });
 
     return rankings;
-  }, [techLastYearCounts]);
+  }, [techLastYearCounts, techSortMethod, sortJobId]);
 
   const visibleTechIds = useMemo(() => {
     const start = Math.max(0, visibleRows.start - 10);

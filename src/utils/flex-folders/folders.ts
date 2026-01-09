@@ -12,11 +12,11 @@ import {
 import { createFlexFolder } from "./api";
 import {
   FLEX_FOLDER_IDS,
-  DRYHIRE_PARENT_IDS,
   DEPARTMENT_IDS,
   RESPONSIBLE_PERSON_IDS,
   DEPARTMENT_SUFFIXES
 } from "./constants";
+import { getDryhireParentFolderId } from "./dryhireFolderService";
 
 /**
  * Format date string for Flex API (ISO format with milliseconds)
@@ -467,11 +467,12 @@ export async function createAllFoldersForJob(
     }
 
     const startDate = new Date(job.start_time);
+    const year = startDate.getFullYear();
     const monthKey = startDate.toISOString().slice(5, 7);
-    const parentFolderId = DRYHIRE_PARENT_IDS[department as "sound" | "lights"][monthKey];
+    const parentFolderId = await getDryhireParentFolderId(year, department as "sound" | "lights", monthKey);
 
     if (!parentFolderId) {
-      throw new Error(`No parent folder found for month ${monthKey}`);
+      throw new Error(`No parent folder found for ${year}/${monthKey}. Please create dryhire folders for ${year} in Settings.`);
     }
 
     const parentDocumentNumber = `${documentNumber}${DEPARTMENT_SUFFIXES[department as Department]}`;
