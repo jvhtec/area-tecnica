@@ -1,0 +1,1 @@
+import{u as i,c as n,r as c,g as d}from"./index-NZ6jJLfQ.js";function h(a,o){const{userRole:e,userDepartment:r,isLoading:s}=i(),t=n();c.useEffect(()=>{if(s)return;if(!(e&&a.includes(e))){const u=d(e);t(u,{replace:!0})}},[e,r,s,a,o,t])}export{h as u};

@@ -183,7 +183,7 @@ export default function Announcements() {
         </div>
       </div>
 
-      <div className="border rounded-md">
+      <div className="border rounded-md overflow-x-auto w-full max-w-full">
         <Table>
           <TableHeader>
             <TableRow>
@@ -201,7 +201,9 @@ export default function Announcements() {
                   {editingId === r.id ? (
                     <Input value={editMsg} onChange={e => setEditMsg(e.target.value)} />
                   ) : (
-                    <div className="truncate max-w-[600px]" title={r.message}>{r.message}</div>
+                    <div className="truncate max-w-[240px] sm:max-w-[420px] lg:max-w-[600px]" title={r.message}>
+                      {r.message}
+                    </div>
                   )}
                 </TableCell>
                 <TableCell>
@@ -253,4 +255,3 @@ export default function Announcements() {
     </div>
   );
 }
-

@@ -1,0 +1,1 @@
+import{j as o,r as e}from"./index-NZ6jJLfQ.js";const r=e.createContext(void 0);function a({department:t,children:n}){return o.jsx(r.Provider,{value:{department:t},children:n})}function u(){const t=e.useContext(r);if(!t)throw new Error("useDepartment must be used within DepartmentProvider");return t}export{a as D,u};

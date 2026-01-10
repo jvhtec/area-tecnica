@@ -1,0 +1,1 @@
+import{c6 as s,r as t}from"./index-NZ6jJLfQ.js";const o=(a,e)=>{const{updateBadgeSource:r}=s(),u=t.useMemo(()=>{if(!e||e.enabled===!1)return null;const{enabled:l,...n}=e;return n},[e]);t.useEffect(()=>(r(a,u),()=>{r(a,null)}),[a,u,r])};export{o as u};

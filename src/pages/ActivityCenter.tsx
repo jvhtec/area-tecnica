@@ -40,7 +40,7 @@ export default function ActivityCenter() {
   }
 
   return (
-    <div className="p-4 max-w-3xl mx-auto">
+    <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">Activity</h1>
         <button className="text-sm underline" onClick={() => refetch()}>Refresh</button>
@@ -67,4 +67,3 @@ export default function ActivityCenter() {
     </div>
   );
 }
-

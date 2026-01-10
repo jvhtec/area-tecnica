@@ -9,14 +9,12 @@ This manual provides an overview of the application's features and workflows.
    - [ConsumosTool](#consumostool)
    - [Dashboard](#dashboard)
    - [EquipmentManagement](#equipmentmanagement)
-   - [ExcelTool](#exceltool)
    - [FestivalArtistManagement](#festivalartistmanagement)
    - [FestivalGearManagement](#festivalgearmanagement)
    - [FestivalManagement](#festivalmanagement)
    - [Festivals](#festivals)
    - [HojaDeRuta](#hojaderuta)
    - [JobAssignmentMatrix](#jobassignmentmatrix)
-   - [LaborPOForm](#laborpoform)
    - [Landing](#landing)
    - [Lights](#lights)
    - [LightsConsumosTool](#lightsconsumostool)
@@ -75,13 +73,6 @@ This application is designed to streamline various aspects of event management, 
     4. Users can update inventory quantities.
     5. The page includes error handling for loading inventory data.
 
-### ExcelTool
-- **Purpose**: Enables data import/export using Excel files.
-- **Workflow**:
-    1. Go to the ExcelTool page.
-    2. Choose to import data from an Excel file or export data to an Excel file.
-    3. Follow the on-screen prompts for file selection and data mapping.
-
 ### FestivalArtistManagement
 - **Purpose**: Manages artist information for festivals.
 - **Workflow**:
@@ -137,13 +128,6 @@ This application is designed to streamline various aspects of event management, 
 - **Workflow**:
     1. Navigate to the JobAssignmentMatrix page.
     2. View how jobs are assigned to personnel or resources.
-
-### LaborPOForm
-- **Purpose**: Handles the creation and management of Labor Purchase Orders.
-- **Workflow**:
-    1. Access the LaborPOForm page.
-    2. Fill out the form to create a new Labor PO.
-    3. Submit or manage existing POs.
 
 ### Landing
 - **Purpose**: The initial landing page of the application, likely for unauthenticated users or a general introduction.

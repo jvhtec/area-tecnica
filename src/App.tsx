@@ -48,9 +48,7 @@ const VideoPesosTool = lazy(() => import('@/pages/VideoPesosTool'));
 const ConsumosTool = lazy(() => import('@/pages/ConsumosTool'));
 const LightsConsumosTool = lazy(() => import('@/pages/LightsConsumosTool'));
 const VideoConsumosTool = lazy(() => import('@/pages/VideoConsumosTool'));
-const ExcelTool = lazy(() => import('@/pages/ExcelTool'));
 const ModernHojaDeRuta = lazy(() => import('@/components/hoja-de-ruta/ModernHojaDeRuta').then(m => ({ default: m.ModernHojaDeRuta })));
-const LaborPOForm = lazy(() => import('@/pages/LaborPOForm'));
 const Logistics = lazy(() => import('@/pages/Logistics'));
 const FestivalManagement = lazy(() => import('@/pages/FestivalManagement'));
 const FestivalArtistManagement = lazy(() => import('@/pages/FestivalArtistManagement'));
@@ -242,9 +240,7 @@ export default function App() {
                               <Route path="/video-consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoConsumosTool /></ProtectedRoute>} />
                               <Route path="/lights-memoria-tecnica" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsMemoriaTecnica /></ProtectedRoute>} />
                               <Route path="/video-memoria-tecnica" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoMemoriaTecnica /></ProtectedRoute>} />
-                              <Route path="/excel-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ExcelTool /></ProtectedRoute>} />
                               <Route path="/hoja-de-ruta" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ModernHojaDeRuta /></ProtectedRoute>} />
-                              <Route path="/labor-po-form" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LaborPOForm /></ProtectedRoute>} />
 
                               {/* Tour-specific tool routes */}
                               <Route path="/tours/:tourId/sound/pesos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><PesosTool /></ProtectedRoute>} />

@@ -24,8 +24,31 @@ import { channelEs, fmtFieldEs, summarizeTaskChanges } from "./format.ts";
 import { jsonResponse } from "./http.ts";
 import { applyRoutingOverrides, getPushNotificationRoutes } from "./routing.ts";
 import { resolveNotificationUrl, validateInternalUrl } from "./urls.ts";
+import { sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
-import type { BroadcastBody, DepartmentRoleSummary, PushPayload } from "./types.ts";
+import type { BroadcastBody, DepartmentRoleSummary, NativePushTokenRow, PushPayload } from "./types.ts";
+
+const loadNativeTokens = async (
+  client: ReturnType<typeof createClient>,
+  userIds: string[],
+): Promise<NativePushTokenRow[]> => {
+  if (userIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await client
+    .from("push_device_tokens")
+    .select("user_id, device_token, platform")
+    .in("user_id", userIds)
+    .returns<NativePushTokenRow[]>();
+
+  if (error) {
+    console.error("push broadcast fetch native tokens error", error);
+    return [];
+  }
+
+  return data ?? [];
+};
 
 export async function handleBroadcast(
   client: ReturnType<typeof createClient>,
@@ -457,8 +480,10 @@ export async function handleBroadcast(
         .select('endpoint, p256dh, auth, user_id')
         .eq('user_id', assignedTechId);
 
-      if (techSubs && techSubs.length > 0) {
-        techSubsCount = techSubs.length;
+      const techTokens = await loadNativeTokens(client, [assignedTechId]);
+
+      if ((techSubs && techSubs.length > 0) || techTokens.length > 0) {
+        techSubsCount = (techSubs?.length || 0) + techTokens.length;
         const techPayload: PushPayload = {
           title: techTitle,
           body: techText,
@@ -467,9 +492,14 @@ export async function handleBroadcast(
           meta: baseMeta,
         };
 
-        await Promise.all(techSubs.map(async (sub: any) => {
-          await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, techPayload);
-        }));
+        await Promise.all([
+          ...(techSubs || []).map(async (sub: any) => {
+            await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, techPayload);
+          }),
+          ...techTokens.map(async (tokenRow) => {
+            await sendNativePushNotification(client, tokenRow.device_token, techPayload);
+          }),
+        ]);
       }
     }
 
@@ -495,8 +525,10 @@ export async function handleBroadcast(
       .select('endpoint, p256dh, auth, user_id')
       .in('user_id', Array.from(mgmt));
 
-    if (mgmtSubs && mgmtSubs.length > 0) {
-      mgmtSubsCount = mgmtSubs.length;
+    const mgmtTokens = await loadNativeTokens(client, Array.from(mgmt));
+
+    if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
+      mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
       const mgmtPayload: PushPayload = {
         title: mgmtTitle,
         body: mgmtText,
@@ -505,9 +537,14 @@ export async function handleBroadcast(
         meta: baseMeta,
       };
 
-      await Promise.all(mgmtSubs.map(async (sub: any) => {
-        await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
-      }));
+      await Promise.all([
+        ...(mgmtSubs || []).map(async (sub: any) => {
+          await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
+        }),
+        ...mgmtTokens.map(async (tokenRow) => {
+          await sendNativePushNotification(client, tokenRow.device_token, mgmtPayload);
+        }),
+      ]);
     }
 
     // Return early since we've already sent the notifications
@@ -536,8 +573,10 @@ export async function handleBroadcast(
         .select('endpoint, p256dh, auth, user_id')
         .eq('user_id', removedTechId);
 
-      if (techSubs && techSubs.length > 0) {
-        techSubsCount = techSubs.length;
+      const techTokens = await loadNativeTokens(client, [removedTechId]);
+
+      if ((techSubs && techSubs.length > 0) || techTokens.length > 0) {
+        techSubsCount = (techSubs?.length || 0) + techTokens.length;
         const techPayload: PushPayload = {
           title: techTitle,
           body: techText,
@@ -553,9 +592,14 @@ export async function handleBroadcast(
           },
         };
 
-        await Promise.all(techSubs.map(async (sub: any) => {
-          await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, techPayload);
-        }));
+        await Promise.all([
+          ...(techSubs || []).map(async (sub: any) => {
+            await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, techPayload);
+          }),
+          ...techTokens.map(async (tokenRow) => {
+            await sendNativePushNotification(client, tokenRow.device_token, techPayload);
+          }),
+        ]);
       }
     }
 
@@ -570,8 +614,10 @@ export async function handleBroadcast(
       .select('endpoint, p256dh, auth, user_id')
       .in('user_id', Array.from(mgmt));
 
-    if (mgmtSubs && mgmtSubs.length > 0) {
-      mgmtSubsCount = mgmtSubs.length;
+    const mgmtTokens = await loadNativeTokens(client, Array.from(mgmt));
+
+    if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
+      mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
       const mgmtPayload: PushPayload = {
         title: mgmtTitle,
         body: mgmtText,
@@ -587,9 +633,14 @@ export async function handleBroadcast(
         },
       };
 
-      await Promise.all(mgmtSubs.map(async (sub: any) => {
-        await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
-      }));
+      await Promise.all([
+        ...(mgmtSubs || []).map(async (sub: any) => {
+          await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
+        }),
+        ...mgmtTokens.map(async (tokenRow) => {
+          await sendNativePushNotification(client, tokenRow.device_token, mgmtPayload);
+        }),
+      ]);
     }
 
     console.log('🚫 Assignment removal notification sent');
@@ -1071,15 +1122,17 @@ export async function handleBroadcast(
     return jsonResponse({ status: 'skipped', reason: 'No recipients' });
   }
 
+  const recipientIds = Array.from(recipients);
   const { data: subs, error: subsErr } = await client
     .from('push_subscriptions')
     .select('endpoint, p256dh, auth, user_id')
-    .in('user_id', Array.from(recipients));
+    .in('user_id', recipientIds);
   if (subsErr) {
     console.error('push broadcast fetch subs error', subsErr);
     return jsonResponse({ error: 'Failed to load subscriptions' }, 500);
   }
-  if (!subs || subs.length === 0) {
+  const nativeTokens = await loadNativeTokens(client, recipientIds);
+  if ((!subs || subs.length === 0) && nativeTokens.length === 0) {
     return jsonResponse({ status: 'skipped', reason: 'No subscriptions for recipients' });
   }
 
@@ -1114,11 +1167,16 @@ export async function handleBroadcast(
   };
 
   const results: Array<{ endpoint: string; ok: boolean; status?: number; skipped?: boolean }> = [];
-  await Promise.all(subs.map(async (sub: any) => {
-    const result = await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, payload);
-    results.push({ endpoint: sub.endpoint, ok: result.ok, status: 'status' in result ? (result as any).status : undefined, skipped: 'skipped' in result ? (result as any).skipped : undefined });
-  }));
+  await Promise.all([
+    ...(subs || []).map(async (sub: any) => {
+      const result = await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, payload);
+      results.push({ endpoint: sub.endpoint, ok: result.ok, status: 'status' in result ? (result as any).status : undefined, skipped: 'skipped' in result ? (result as any).skipped : undefined });
+    }),
+    ...nativeTokens.map(async (tokenRow) => {
+      const result = await sendNativePushNotification(client, tokenRow.device_token, payload);
+      results.push({ endpoint: `apns:${tokenRow.device_token}`, ok: result.ok, status: 'status' in result ? (result as any).status : undefined, skipped: 'skipped' in result ? (result as any).skipped : undefined });
+    }),
+  ]);
 
   return jsonResponse({ status: 'sent', results, count: results.length });
 }
-

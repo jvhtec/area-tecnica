@@ -13,6 +13,7 @@ import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
 const DEDUCTION_DISCLAIMER_TEXT = '* Se ha aplicado una deducción de 30€/día en concepto de IRPF por condición de no autónomo.';
+const TOUR_DEDUCTION_DISCLAIMER_TEXT = '* Deducción de 30€ en concepto de IRPF por condición de no autónomo ya aplicada a la tarifa base antes de multiplicadores.';
 
 export interface TechnicianProfile {
   id: string;
@@ -62,6 +63,10 @@ interface PayoutData {
   }>;
   vehicle_disclaimer?: boolean;
   vehicle_disclaimer_text?: string;
+  // Payout override fields (when manual override is set)
+  has_override?: boolean; // True if override_amount_eur is set
+  override_amount_eur?: number; // Manual override amount (if set)
+  calculated_total_eur?: number; // Original calculated amount (before override)
 }
 
 export interface TimesheetLine {
@@ -327,28 +332,10 @@ export async function generateRateQuotePDF(
 
     // Check if timesheet exists for this date
     // Note: TourJobRateQuote.start_time is the date. TimesheetLine.date is YYYY-MM-DD.
-    // Need to match them.
-    const quoteDate = quote.start_time ? quote.start_time.split('T')[0] : null;
-    let hasTimesheet = false;
-    if (options?.timesheetMap && quoteDate) {
-        const techDates = options.timesheetMap.get(quote.technician_id);
-        if (techDates && techDates.has(quoteDate)) {
-            hasTimesheet = true;
-        }
-    } else {
-        // Fallback or default? If no map provided, maybe assume true? 
-        // User said timesheet is source of truth. If map not provided, we can't verify.
-        // But existing behavior was 'deduct if non-autonomo'.
-        // Let's assume if map provided, use it. If not, maybe safe default (deduct) or not?
-        // Actually, safer to NOT deduct if we can't verify timesheet, to avoid over-deducting.
-        // But for backward compatibility with calls that don't pass calculation, we might need a flag.
-        // Let's rely on the caller passing the map.
-        hasTimesheet = true; // Default to true if map not passed (legacy behavior), but caller should pass map.
-        if (options?.timesheetMap) hasTimesheet = false; // If map passed but not found, then false.
-    }
-
-    const deduction = (!autonomo && hasTimesheet) ? NON_AUTONOMO_DEDUCTION_EUR : 0;
-    const effectiveTotal = effectiveBase + extrasTotal - deduction;
+    // For tour rate quotes, server already applies autonomo discount to base before multipliers
+    // No additional client-side deduction needed
+    const deduction = 0;
+    const effectiveTotal = effectiveBase + extrasTotal;
 
     let baseCell: string;
     if (hasError) {
@@ -366,11 +353,17 @@ export async function generateRateQuotePDF(
     } else {
       baseCell = formatCurrency(effectiveBase);
     }
-    
-    // Append deduction note to name if applicable
+
+    // Show autonomo discount from server breakdown if applicable
     let nameCellContent = withLpo(nameWithStatus, lpo);
-    if (deduction > 0) {
-      nameCellContent += `\n(Deducción IRPF: -${formatCurrency(deduction)})`;
+    const autonomoDiscount = quote.autonomo_discount_eur;
+    if (autonomoDiscount && autonomoDiscount > 0) {
+      nameCellContent += `\n(Deducción IRPF ya aplicada: -${formatCurrency(autonomoDiscount)})`;
+    }
+
+    // Show override info if applicable
+    if (quote.has_override && quote.override_amount_eur != null && quote.calculated_total_eur != null) {
+      nameCellContent += `\n⚠️ OVERRIDE: ${formatCurrency(quote.override_amount_eur)} (calc: ${formatCurrency(quote.calculated_total_eur)})`;
     }
 
     return [
@@ -419,37 +412,21 @@ export async function generateRateQuotePDF(
     0
   );
   
-  // Grand total must account for deductions
+  // Grand total - no client-side deduction needed (server applies discount to base before multipliers)
   const grandTotal = quotesWithComputed.reduce(
     (sum, { quote, computed }) => {
-      const { autonomo } = getTechName(quote.technician_id);
-      
-      const quoteDate = quote.start_time ? quote.start_time.split('T')[0] : null;
-      let hasTimesheet = false;
-      if (options?.timesheetMap) {
-          if (quoteDate) {
-             const techDates = options.timesheetMap.get(quote.technician_id);
-             if (techDates && techDates.has(quoteDate)) hasTimesheet = true;
-          }
-      } else {
-          hasTimesheet = true;
-      }
-
-      const deduction = (!autonomo && hasTimesheet) ? NON_AUTONOMO_DEDUCTION_EUR : 0;
-      return sum + computed.effectiveBase + computed.extrasTotal - deduction;
+      return sum + computed.effectiveBase + computed.extrasTotal;
     },
     0
   );
-  
+
+  // Check if any quotes have autonomo discount applied by server
   const anyDeductionApplied = quotesWithComputed.some(({ quote }) => {
-      const { autonomo } = getTechName(quote.technician_id);
-      if (autonomo) return false;
-      const quoteDate = quote.start_time ? quote.start_time.split('T')[0] : null;
-      if (options?.timesheetMap) {
-          return !!quoteDate && !!options.timesheetMap.get(quote.technician_id)?.has(quoteDate);
-      }
-      return true;
+      return quote.autonomo_discount_eur && quote.autonomo_discount_eur > 0;
   });
+
+  // Check if any quotes have manual override
+  const anyOverride = quotes.some(quote => quote.has_override);
 
   doc.setFillColor(...SUMMARY_BACKGROUND);
   doc.roundedRect(14, finalY, summaryWidth, 32, 3, 3, 'F');
@@ -472,11 +449,20 @@ export async function generateRateQuotePDF(
   const totalWidth = doc.getTextWidth(totalText);
   doc.text(totalText, 14 + summaryWidth - totalWidth - 6, finalY + 22);
 
+  let disclaimerY = finalY + 38;
   if (anyDeductionApplied) {
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
     doc.setTextColor(...CORPORATE_RED);
-    doc.text(DEDUCTION_DISCLAIMER_TEXT, 14, finalY + 38);
+    doc.text(TOUR_DEDUCTION_DISCLAIMER_TEXT, 14, disclaimerY);
+    disclaimerY += 6;
+  }
+
+  if (anyOverride) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(...CORPORATE_RED);
+    doc.text('⚠️ Algunos pagos tienen override manual aplicado (ver detalles en tabla).', 14, disclaimerY);
   }
 
   const footerLogo = companyLogo ?? headerLogo;
@@ -850,6 +836,11 @@ export async function generateJobPayoutPDF(
       nameCellContent += `\n(Deducción IRPF ${daysCount}d: -${formatCurrency(deduction)})`;
     }
 
+    // Show override info if applicable
+    if (payout.has_override && payout.override_amount_eur != null && payout.calculated_total_eur != null) {
+      nameCellContent += `\n⚠️ OVERRIDE: ${formatCurrency(payout.override_amount_eur)} (calc: ${formatCurrency(payout.calculated_total_eur)})`;
+    }
+
     return [
       nameCellContent,
       formatCurrency(payout.timesheets_total_eur),
@@ -863,6 +854,8 @@ export async function generateJobPayoutPDF(
       const { autonomo } = getTechName(p.technician_id);
       return !autonomo;
   });
+
+  const anyOverride = payouts.some(p => p.has_override);
 
   autoTable(doc, {
     startY: yPos,
@@ -886,15 +879,24 @@ export async function generateJobPayoutPDF(
     },
   });
   
+  let disclaimerY = ((doc as any).lastAutoTable?.finalY ?? yPos) + 8;
   if (anyDeductionApplied) {
-      const finalY = (doc as any).lastAutoTable?.finalY ?? yPos;
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
       doc.setTextColor(...CORPORATE_RED);
-      doc.text(DEDUCTION_DISCLAIMER_TEXT, 14, finalY + 8);
+      doc.text(DEDUCTION_DISCLAIMER_TEXT, 14, disclaimerY);
+      disclaimerY += 6;
   }
 
-  let currentY = ((doc as any).lastAutoTable?.finalY ?? yPos) + 12;
+  if (anyOverride) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(...CORPORATE_RED);
+      doc.text('⚠️ Algunos pagos tienen override manual aplicado (ver detalles en tabla).', 14, disclaimerY);
+      disclaimerY += 6;
+  }
+
+  let currentY = disclaimerY + 4;
   const pageHeight = doc.internal.pageSize.getHeight();
 
   const payoutsWithExtras = payouts.filter(

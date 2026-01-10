@@ -209,7 +209,7 @@ export default function MorningSummary() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8 px-4">
+      <div className="space-y-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -219,7 +219,7 @@ export default function MorningSummary() {
 
   if (error) {
     return (
-      <div className="container mx-auto py-8 px-4">
+      <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-destructive">Error</CardTitle>
@@ -237,7 +237,7 @@ export default function MorningSummary() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-4xl">
+    <div className="space-y-6">
       {/* Header */}
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate('/personal')} className="mb-4">

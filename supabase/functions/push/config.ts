@@ -4,6 +4,11 @@ export const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 export const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
 export const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 export const CONTACT_EMAIL = Deno.env.get("PUSH_CONTACT_EMAIL") ?? "mailto:dev@sectorpro.com";
+export const APNS_AUTH_KEY = Deno.env.get("APNS_AUTH_KEY") ?? "";
+export const APNS_KEY_ID = Deno.env.get("APNS_KEY_ID") ?? "";
+export const APNS_TEAM_ID = Deno.env.get("APNS_TEAM_ID") ?? "";
+export const APNS_BUNDLE_ID = Deno.env.get("APNS_BUNDLE_ID") ?? "";
+export const APNS_ENV = Deno.env.get("APNS_ENV") ?? "production";
 
 // Event type constants for type safety and consistency
 export const EVENT_TYPES = {
@@ -94,4 +99,3 @@ export const PUSH_CONFIG = {
   DEFAULT_ICON: '/icon-192.png',
   DEFAULT_BADGE: '/badge-72.png',
 };
-

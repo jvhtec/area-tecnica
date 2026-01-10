@@ -1,0 +1,1 @@
+const a={overview:["rates","overview"],extrasCatalog:["rates","catalog","extras"],baseRates:["rates","catalog","base"],houseTechList:["rates","house-tech","list"],houseTechRate:e=>["rates","house-tech","rate",e],approvals:["rates","approvals"]};export{a as R};

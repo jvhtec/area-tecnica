@@ -465,7 +465,7 @@ const Layout = () => {
             </SidebarFooter>
           </Sidebar>
         )}
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 min-w-0 flex-col">
           {!suppressChrome && !mobileFullscreenRoutes && (
             <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 px-3 pb-2 pt-[max(0.75rem,calc(env(safe-area-inset-top)+0.75rem))] shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur sm:px-6">
               <div className="flex items-center justify-between gap-3">
@@ -501,7 +501,7 @@ const Layout = () => {
           )}
           <main
             className={cn(
-              "flex-1 overflow-y-auto px-3 pt-4 sm:px-6 sm:pt-6",
+              "flex-1 min-w-0 w-full overflow-y-auto px-3 pt-4 sm:px-6 sm:pt-6",
               suppressChrome || mobileFullscreenRoutes
                 ? "pb-6"
                 : isMobile

@@ -1,18 +1,14 @@
 import { createClient } from "./deps.ts";
-import { VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY } from "./config.ts";
 import { jsonResponse } from "./http.ts";
+import { apnsConfigCheck, sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
-import type { PushSubscriptionRow, TestBody } from "./types.ts";
+import type { NativePushTokenRow, PushSubscriptionRow, TestBody } from "./types.ts";
 
 export async function handleTest(
   client: ReturnType<typeof createClient>,
   userId: string,
   body: TestBody,
 ) {
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    return jsonResponse({ error: "VAPID keys are not configured" }, 500);
-  }
-
   const { data, error } = await client
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
@@ -24,7 +20,18 @@ export async function handleTest(
     return jsonResponse({ error: "Failed to load subscriptions" }, 500);
   }
 
-  if (!data?.length) {
+  const { data: nativeTokens, error: nativeErr } = await client
+    .from("push_device_tokens")
+    .select("user_id, device_token, platform")
+    .eq("user_id", userId)
+    .returns<NativePushTokenRow[]>();
+
+  if (nativeErr) {
+    console.error("native push test fetch error", nativeErr);
+    return jsonResponse({ error: "Failed to load native tokens" }, 500);
+  }
+
+  if (!data?.length && !nativeTokens?.length) {
     return jsonResponse({ status: "skipped", reason: "No subscriptions found" });
   }
 
@@ -36,18 +43,38 @@ export async function handleTest(
 
   const results: Array<{ endpoint: string; ok: boolean; status?: number; skipped?: boolean }> = [];
 
-  await Promise.all(
-    data.map(async (sub) => {
-      const result = await sendPushNotification(client, sub, payload);
-      results.push({
-        endpoint: sub.endpoint,
-        ok: result.ok,
-        status: "status" in result ? result.status : undefined,
-        skipped: "skipped" in result ? result.skipped : undefined,
-      });
-    }),
-  );
+  if (data?.length) {
+    await Promise.all(
+      data.map(async (sub) => {
+        const result = await sendPushNotification(client, sub, payload);
+        results.push({
+          endpoint: sub.endpoint,
+          ok: result.ok,
+          status: "status" in result ? result.status : undefined,
+          skipped: "skipped" in result ? result.skipped : undefined,
+        });
+      }),
+    );
+  }
+
+  if (nativeTokens?.length) {
+    const apnsCheck = apnsConfigCheck();
+    if (apnsCheck) {
+      return apnsCheck;
+    }
+
+    await Promise.all(
+      nativeTokens.map(async (tokenRow) => {
+        const result = await sendNativePushNotification(client, tokenRow.device_token, payload);
+        results.push({
+          endpoint: `apns:${tokenRow.device_token}`,
+          ok: result.ok,
+          status: "status" in result ? result.status : undefined,
+          skipped: "skipped" in result ? result.skipped : undefined,
+        });
+      }),
+    );
+  }
 
   return jsonResponse({ status: "sent", results });
 }
-

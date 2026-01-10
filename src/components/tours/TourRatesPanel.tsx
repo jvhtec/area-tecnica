@@ -105,28 +105,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
     staleTime: 30 * 1000,
   });
 
-  // Fetch timesheet unique days count / existence check
-  const { data: techDaysMap = new Map<string, Set<string>>() } = useQuery({
-    queryKey: ['job-tech-days-set', jobId],
-    enabled: !!jobId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('timesheets')
-        .select('technician_id, date')
-        .eq('job_id', jobId)
-        .eq('approved_by_manager', true);
-      if (error) throw error;
-
-      const map = new Map<string, Set<string>>();
-      data?.forEach(row => {
-        if (!row.technician_id || !row.date) return;
-        if (!map.has(row.technician_id)) map.set(row.technician_id, new Set());
-        map.get(row.technician_id)!.add(row.date);
-      });
-      return map;
-    },
-    staleTime: 60_000,
-  });
+  // Note: techDaysMap query removed - not needed since server applies autonomo discount to base before multipliers
 
   const getIsApproved = React.useCallback((jobId: string, techId: string) =>
     approvalMap.get(`${jobId}-${techId}`) ?? false
@@ -341,13 +320,8 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                         <div className="font-semibold text-lg">
                           {(() => {
                             const total = calculateQuoteTotal(quote);
-                            const profile = profileMap.get(quote.technician_id);
-                            // Deduct only if timesheet exists
-                            const quoteDate = quote.start_time ? quote.start_time.split('T')[0] : null;
-                            const hasTimesheet = quoteDate ? techDaysMap.get(quote.technician_id)?.has(quoteDate) : false;
-
-                            const deduction = (profile?.autonomo === false && hasTimesheet) ? NON_AUTONOMO_DEDUCTION_EUR : 0;
-                            return formatCurrency(total - deduction);
+                            // No client-side deduction needed - server already applies autonomo discount to base before multipliers
+                            return formatCurrency(total);
                           })()}
                         </div>
                         <div className="text-xs text-muted-foreground">
@@ -366,15 +340,13 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                               +{formatCurrency(quote.extras_total_eur)} extras
                             </div>
                           )}
-                          {/* Deduction Disclaimer - only show if actually deducted */}
+                          {/* Show discount info from server breakdown if non-autonomo */}
                           {(() => {
-                            const profile = profileMap.get(quote.technician_id);
-                            const quoteDate = quote.start_time ? quote.start_time.split('T')[0] : null;
-                            const hasTimesheet = quoteDate ? techDaysMap.get(quote.technician_id)?.has(quoteDate) : false;
-                            if (profile?.autonomo === false && hasTimesheet) {
+                            const autonomoDiscount = quote.autonomo_discount_eur;
+                            if (autonomoDiscount && autonomoDiscount > 0) {
                               return (
                                 <div className="text-red-400 mt-1 text-[11px]">
-                                  -30,00€ IRPF por alta obligatoria
+                                  (-{formatCurrency(autonomoDiscount)} IRPF por alta obligatoria - ya aplicado)
                                 </div>
                               );
                             }
@@ -494,13 +466,8 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                 <span className="text-lg">
                   {formatCurrency(weekQuotes.reduce((sum, quote) => {
                     const total = calculateQuoteTotal(quote);
-                    const profile = profileMap.get(quote.technician_id);
-
-                    const quoteDate = quote.start_time ? quote.start_time.split('T')[0] : null;
-                    const hasTimesheet = quoteDate ? techDaysMap.get(quote.technician_id)?.has(quoteDate) : false;
-
-                    const deduction = (profile?.autonomo === false && hasTimesheet) ? NON_AUTONOMO_DEDUCTION_EUR : 0;
-                    return sum + (total - deduction);
+                    // No client-side deduction - server already applied discount to base before multipliers
+                    return sum + total;
                   }, 0))}
                 </span>
               </div>
@@ -531,13 +498,8 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
             <span className="text-xl">
               {formatCurrency(quotes.reduce((sum, quote) => {
                 const total = calculateQuoteTotal(quote);
-                const profile = profileMap.get(quote.technician_id);
-
-                const quoteDate = quote.start_time ? quote.start_time.split('T')[0] : null;
-                const hasTimesheet = quoteDate ? techDaysMap.get(quote.technician_id)?.has(quoteDate) : false;
-
-                const deduction = (profile?.autonomo === false && hasTimesheet) ? NON_AUTONOMO_DEDUCTION_EUR : 0;
-                return sum + (total - deduction);
+                // No client-side deduction - server already applied discount to base before multipliers
+                return sum + total;
               }, 0))}
             </span>
           </div>

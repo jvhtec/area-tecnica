@@ -1,4 +1,11 @@
-export type Action = "subscribe" | "unsubscribe" | "test" | "broadcast" | "check_scheduled";
+export type Action =
+  | "subscribe"
+  | "unsubscribe"
+  | "subscribe_native"
+  | "unsubscribe_native"
+  | "test"
+  | "broadcast"
+  | "check_scheduled";
 
 export type SubscribeBody = {
   action: "subscribe";
@@ -12,6 +19,20 @@ export type SubscribeBody = {
 export type UnsubscribeBody = {
   action: "unsubscribe";
   endpoint: string;
+};
+
+export type SubscribeNativeBody = {
+  action: "subscribe_native";
+  token: string;
+  platform?: string;
+  device_id?: string;
+  device_name?: string;
+};
+
+export type UnsubscribeNativeBody = {
+  action: "unsubscribe_native";
+  token?: string;
+  platform?: string;
 };
 
 export type TestBody = {
@@ -72,12 +93,25 @@ export type CheckScheduledBody = {
   force?: boolean; // For testing: skip time check
 };
 
-export type RequestBody = SubscribeBody | UnsubscribeBody | TestBody | BroadcastBody | CheckScheduledBody;
+export type RequestBody =
+  | SubscribeBody
+  | UnsubscribeBody
+  | SubscribeNativeBody
+  | UnsubscribeNativeBody
+  | TestBody
+  | BroadcastBody
+  | CheckScheduledBody;
 
 export type PushSubscriptionRow = {
   endpoint: string;
   p256dh: string | null;
   auth: string | null;
+};
+
+export type NativePushTokenRow = {
+  user_id: string;
+  device_token: string;
+  platform: string;
 };
 
 export type PushPayload = {
@@ -105,4 +139,3 @@ export type DepartmentRoleSummary = {
   total_required: number;
   roles: Array<{ role_code: string; quantity: number; notes?: string | null }>;
 };
-
