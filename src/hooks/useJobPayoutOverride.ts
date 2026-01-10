@@ -31,6 +31,13 @@ interface TechnicianPayoutOverrideResult {
   timestamp: string;
 }
 
+/**
+ * Creates a mutation that sets a technician's payout override for a job, triggers a silent notification on success, and refreshes related job payout data.
+ *
+ * On successful mutation the hook invalidates related job payout queries and shows a success toast; on failure it logs the error and shows localized error toasts.
+ *
+ * @returns A React Query mutation object that accepts `SetTechnicianPayoutOverrideParams` and resolves to `TechnicianPayoutOverrideResult`.
+ */
 export function useSetTechnicianPayoutOverride() {
   const queryClient = useQueryClient();
 
@@ -106,6 +113,13 @@ export function useSetTechnicianPayoutOverride() {
   });
 }
 
+/**
+ * Creates a React Query mutation that removes a technician's payout override for a specific job.
+ *
+ * On success the mutation invalidates job payout queries, shows a success toast, and (silently) invokes a notification function; notification failures are logged but do not fail the mutation.
+ *
+ * @returns A mutation object whose mutate/mutateAsync function accepts `{ jobId, technicianId }` and resolves to a `TechnicianPayoutOverrideResult` describing the outcome of the removal.
+ */
 export function useRemoveTechnicianPayoutOverride() {
   const queryClient = useQueryClient();
 
@@ -164,7 +178,12 @@ export function useRemoveTechnicianPayoutOverride() {
   });
 }
 
-// Hook to fetch overrides for a job
+/**
+ * Fetches technician payout override records for a specific job.
+ *
+ * @param jobId - The job identifier to fetch overrides for
+ * @returns A React Query result whose `data` is an array of override records with fields: `job_id`, `technician_id`, `override_amount_eur`, `set_by`, `set_at`, and `updated_at`
+ */
 export function useJobTechnicianPayoutOverrides(jobId: string) {
   return useQuery({
     queryKey: ['job-tech-payout-overrides', jobId],
