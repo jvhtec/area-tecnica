@@ -4,16 +4,44 @@ This document provides essential information for developers working on Area Tecn
 
 ## Quick Start
 
+### First Time Setup
+
 ```bash
-# Install dependencies (ALWAYS use --legacy-peer-deps)
+# 1. Copy environment template
+cp .env.example .env
+
+# 2. Edit .env and add your Supabase credentials
+# Get them from: https://supabase.com/dashboard/project/YOUR_PROJECT_ID/settings/api
+nano .env  # or use your preferred editor
+
+# 3. Install dependencies (ALWAYS use --legacy-peer-deps)
 npm install --legacy-peer-deps
 
-# Start development server (runs on localhost:8080)
+# 4. Start development server (runs on localhost:8080)
+npm run dev
+```
+
+### Daily Development
+
+```bash
+# Start development server
 npm run dev
 
 # Build for production
 npm run build
+
+# Run tests
+npm test
+
+# Lint code
+npm run lint
 ```
+
+**Important**: If you see "Missing required environment variable" errors, restart your dev server:
+1. Stop the server (Ctrl+C)
+2. Run `npm run dev` again
+
+Vite caches environment variables at startup, so changes to `.env` require a restart.
 
 For complete command reference, see [CLAUDE.md](./CLAUDE.md).
 
