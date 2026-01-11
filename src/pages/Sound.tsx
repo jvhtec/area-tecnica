@@ -253,6 +253,9 @@ const Sound = () => {
             title="Departamento de sonido"
             icon={Music}
             tools={allTools}
+            jobs={getDepartmentJobs()}
+            date={date || new Date()}
+            onDateSelect={setDate}
             canCreateJob={userRole ? ["admin", "management"].includes(userRole) : false}
             onCreateJob={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
             userRole={userRole}
