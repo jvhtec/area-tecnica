@@ -115,6 +115,7 @@ export default function TechnicianSuperApp() {
   const { user, hasSoundVisionAccess } = useOptimizedAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   // Determine if dark mode (guard for SSR/test environments)
   const isDark = nextTheme === 'dark' || (
@@ -318,6 +319,7 @@ export default function TechnicianSuperApp() {
             onOpenTour={(tourId) => setSelectedTourId(tourId)}
             onOpenRates={() => setShowRatesModal(true)}
             onOpenMessages={() => setShowMessagesModal(true)}
+            onOpenSysCalc={() => navigate('/syscalc')}
             hasSoundVisionAccess={hasSoundVisionAccess}
           />
         )}
