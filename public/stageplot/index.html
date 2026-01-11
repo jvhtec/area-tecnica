@@ -1071,14 +1071,14 @@
       return state.items.filter(i => selectedIds.has(i.id));
     }
 
-    function setStageFromInputs(){
-      const w = clamp(parseFloat($("#stageW").value || 24), 8, 80);
-      const d = clamp(parseFloat($("#stageD").value || 16), 6, 60);
-      state.stage.w = w;
-      state.stage.d = d;
-      $("#stageLabel").textContent = `${w} x ${d}`;
-      save();
-      render();
+	    function setStageFromInputs(){
+	      const w = clamp(parseFloat($("#stageW").value || 7), 2.5, 25);
+	      const d = clamp(parseFloat($("#stageD").value || 5), 2, 20);
+	      state.stage.w = w;
+	      state.stage.d = d;
+	      $("#stageLabel").textContent = `${w} x ${d}`;
+	      save();
+	      render();
     }
 
     /* Print-safe sizing (fixes stage disappearing in print) */
@@ -1756,7 +1756,7 @@
         startedAt: { x: e.clientX, y: e.clientY }
       };
 
-      updateMarqueeDiv({ x1:start.xFt, y1:start.yFt, x2:start.xFt, y2:start.xFt });
+	      updateMarqueeDiv({ x1:start.xFt, y1:start.yFt, x2:start.xFt, y2:start.yFt });
 
       window.addEventListener("pointermove", onMarqueeMove);
       window.addEventListener("pointerup", onMarqueeEnd, { once: true });

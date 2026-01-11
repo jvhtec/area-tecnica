@@ -184,9 +184,12 @@ const Layout = () => {
     logout,
   } = useOptimizedAuth()
 
-  // Synchronous redirect for technician users - prevent any Layout rendering
-  // Preserve showAbout query param for deeplinks
-  if (!isLoading && userRole === 'technician') {
+  // Synchronous redirect for technician users - prevent any Layout rendering.
+  // Preserve showAbout query param for deeplinks.
+  // Allow-list technician-accessible routes that still live under Layout (e.g. SysCalc).
+  const isAllowedTechnicianLayoutRoute = location.pathname === '/syscalc'
+
+  if (!isLoading && userRole === 'technician' && !isAllowedTechnicianLayoutRoute) {
     const showAboutParam = searchParams.get('showAbout')
     const redirectPath = showAboutParam ? `/tech-app?showAbout=${showAboutParam}` : '/tech-app'
     return <Navigate to={redirectPath} replace />;

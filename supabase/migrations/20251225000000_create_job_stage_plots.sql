@@ -27,7 +27,7 @@ CREATE POLICY "Users can read stage plots for accessible jobs"
       WHERE j.id = job_stage_plots.job_id
       AND (
         -- Admin and management can see all
-        auth.jwt() ->> 'user_role' IN ('admin', 'management')
+        current_user_role() IN ('admin', 'management')
         -- Or assigned to the job
         OR EXISTS (
           SELECT 1 FROM job_assignments ja
@@ -36,14 +36,11 @@ CREATE POLICY "Users can read stage plots for accessible jobs"
         )
         -- Or house tech in the job's department
         OR (
-          auth.jwt() ->> 'user_role' = 'house_tech'
+          current_user_role() = 'house_tech'
           AND EXISTS (
             SELECT 1 FROM job_departments jd
             WHERE jd.job_id = j.id
-            AND jd.department = (
-              SELECT department FROM profiles
-              WHERE id = auth.uid()
-            )
+            AND jd.department = current_user_department()
           )
         )
       )
@@ -56,7 +53,15 @@ CREATE POLICY "Authorized users can insert job stage plots"
   FOR INSERT
   TO authenticated
   WITH CHECK (
-    auth.jwt() ->> 'user_role' IN ('admin', 'management', 'house_tech')
+    current_user_role() IN ('admin', 'management')
+    OR (
+      current_user_role() = 'house_tech'
+      AND EXISTS (
+        SELECT 1 FROM job_departments jd
+        WHERE jd.job_id = job_stage_plots.job_id
+        AND jd.department = current_user_department()
+      )
+    )
   );
 
 -- Users can update stage plots for jobs they have access to
@@ -65,23 +70,24 @@ CREATE POLICY "Users can update stage plots for accessible jobs"
   FOR UPDATE
   TO authenticated
   USING (
-    auth.jwt() ->> 'user_role' IN ('admin', 'management', 'house_tech')
-    AND EXISTS (
-      SELECT 1 FROM jobs j
-      WHERE j.id = job_stage_plots.job_id
-      AND (
-        auth.jwt() ->> 'user_role' IN ('admin', 'management')
-        OR (
-          auth.jwt() ->> 'user_role' = 'house_tech'
-          AND EXISTS (
-            SELECT 1 FROM job_departments jd
-            WHERE jd.job_id = j.id
-            AND jd.department = (
-              SELECT department FROM profiles
-              WHERE id = auth.uid()
-            )
-          )
-        )
+    current_user_role() IN ('admin', 'management')
+    OR (
+      current_user_role() = 'house_tech'
+      AND EXISTS (
+        SELECT 1 FROM job_departments jd
+        WHERE jd.job_id = job_stage_plots.job_id
+        AND jd.department = current_user_department()
+      )
+    )
+  )
+  WITH CHECK (
+    current_user_role() IN ('admin', 'management')
+    OR (
+      current_user_role() = 'house_tech'
+      AND EXISTS (
+        SELECT 1 FROM job_departments jd
+        WHERE jd.job_id = job_stage_plots.job_id
+        AND jd.department = current_user_department()
       )
     )
   );

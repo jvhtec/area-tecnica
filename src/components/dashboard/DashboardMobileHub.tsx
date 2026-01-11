@@ -17,9 +17,10 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { getOptimizedProfilePictureUrl } from "@/utils/imageOptimization";
 
 interface DashboardMobileHubProps {
   jobs: any[];
@@ -203,8 +204,11 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
     ? `${userProfile.first_name} ${userProfile.last_name}`
     : 'Usuario';
   const userInitials = userProfile?.first_name && userProfile?.last_name
-    ? `${userProfile.first_name[0]}${userProfile.last_name[0]}`
+    ? `${userProfile.first_name[0]}${userProfile.last_name[0]}`.toUpperCase()
     : 'U';
+  const profilePictureUrl = userProfile?.profile_picture_url
+    ? getOptimizedProfilePictureUrl(userProfile.profile_picture_url, { width: 96, height: 96 })
+    : undefined;
 
   if (!isMobile) return null;
 
@@ -220,8 +224,8 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
             <h2 className={cn("text-2xl font-bold", themeTokens.textMain)}>Agenda</h2>
           </div>
           <Avatar className="h-12 w-12 shadow-lg ring-2 ring-blue-500/20">
-            {userProfile?.profile_picture_url && (
-              <AvatarImage src={userProfile.profile_picture_url} alt={userName} />
+            {profilePictureUrl && (
+              <AvatarImage src={profilePictureUrl} alt={userName} />
             )}
             <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold">
               {userInitials}

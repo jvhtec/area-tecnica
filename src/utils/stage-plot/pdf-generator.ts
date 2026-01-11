@@ -45,7 +45,41 @@ const ELEMENT_ICONS: Record<string, string> = {
   'Pie de micrófono': '⚡',
   'Toma de corriente': '🔌',
   'Tarima': '⬜',
-  'Consola FOH': '🎛️'
+	  'Consola FOH': '🎛️'
+	};
+
+const DEFAULT_ITEM_COLOR = '#4aa3ff';
+
+const clampByte = (value: number) => {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(255, Math.max(0, Math.round(value)));
+};
+
+const normalizeHexColor = (color: string | undefined | null) => {
+  if (!color) return DEFAULT_ITEM_COLOR;
+
+  const trimmed = color.trim();
+  const match = trimmed.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+  if (!match) return DEFAULT_ITEM_COLOR;
+
+  let hex = match[1];
+  if (hex.length === 3) {
+    hex = hex.split('').map((ch) => ch + ch).join('');
+  }
+
+  return `#${hex}`;
+};
+
+const hexToRgb = (hex: string) => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+
+  return {
+    r: clampByte(r),
+    g: clampByte(g),
+    b: clampByte(b),
+  };
 };
 
 export const generateStagePlotPDF = async (
@@ -79,16 +113,23 @@ export const generateStagePlotPDF = async (
       const logoImg = new Image();
       logoImg.src = logoData;
       await new Promise((resolve, reject) => {
-        logoImg.onload = resolve;
-        logoImg.onerror = reject;
-      });
-      const logoHeight = 30;
-      const logoWidth = logoHeight * (logoImg.width / logoImg.height) || 60;
-      pdfDoc.addImage(logoData, 'PNG', 15, 10, logoWidth, logoHeight);
-    } catch (error) {
-      console.error("Error adding logo to stage plot:", error);
-    }
-  }
+	      logoImg.onload = resolve;
+	      logoImg.onerror = reject;
+	    });
+	      const logoHeight = 30;
+	      let logoWidth = 60;
+	      if (logoImg.width > 0 && logoImg.height > 0) {
+	        const ratio = logoImg.width / logoImg.height;
+	        const computedWidth = logoHeight * ratio;
+	        if (Number.isFinite(computedWidth) && computedWidth > 0) {
+	          logoWidth = computedWidth;
+	        }
+	      }
+	      pdfDoc.addImage(logoData, 'PNG', 15, 10, logoWidth, logoHeight);
+	    } catch (error) {
+	      console.error("Error adding logo to stage plot:", error);
+	    }
+	  }
 
   // Header title - White text
   pdfDoc.setText(18, [255, 255, 255]);
@@ -157,19 +198,17 @@ export const generateStagePlotPDF = async (
     const scale = item.scale || 1;
     const itemX = stageMargin + (item.x * scaleX);
     const itemY = stageStartY + (item.y * scaleY);
-    const itemW = item.w * scaleX * scale;
-    const itemH = item.h * scaleY * scale;
+	    const itemW = item.w * scaleX * scale;
+	    const itemH = item.h * scaleY * scale;
 
-    // Parse color (hex to RGB)
-    const hexColor = item.color || '#4aa3ff';
-    const r = parseInt(hexColor.slice(1, 3), 16);
-    const g = parseInt(hexColor.slice(3, 5), 16);
-    const b = parseInt(hexColor.slice(5, 7), 16);
+	    // Parse color (hex to RGB)
+	    const hexColor = normalizeHexColor(item.color);
+	    const { r, g, b } = hexToRgb(hexColor);
 
-    // Draw item box with color
-    pdfDoc.document.setFillColor(r, g, b);
-    pdfDoc.document.setDrawColor(Math.max(0, r - 30), Math.max(0, g - 30), Math.max(0, b - 30));
-    pdfDoc.document.setLineWidth(1);
+	    // Draw item box with color
+	    pdfDoc.document.setFillColor(r, g, b);
+	    pdfDoc.document.setDrawColor(Math.max(0, r - 30), Math.max(0, g - 30), Math.max(0, b - 30));
+	    pdfDoc.document.setLineWidth(1);
 
     // Apply rotation if needed
     if (item.rot && item.rot !== 0) {

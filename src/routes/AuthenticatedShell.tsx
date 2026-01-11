@@ -11,7 +11,8 @@ function ActivityPushFallbackInit() {
   return null;
 }
 
-// Redirect 'technician' role to /tech-app (house_tech can access Layout routes)
+// Redirect 'technician' role to /tech-app (house_tech can access Layout routes).
+// Allow-list a small set of technician-accessible routes outside /tech-app (e.g. tools like SysCalc).
 function TechnicianRouteGuard() {
   const { userRole, isLoading } = useOptimizedAuth();
   const location = useLocation();
@@ -20,7 +21,13 @@ function TechnicianRouteGuard() {
   React.useEffect(() => {
     if (isLoading) return;
     if (userRole !== "technician") return;
-    if (location.pathname === "/tech-app" || location.pathname === "/auth" || location.pathname.startsWith("/auth")) {
+    const isAllowedTechnicianRoute =
+      location.pathname === "/tech-app" ||
+      location.pathname === "/syscalc" ||
+      location.pathname === "/auth" ||
+      location.pathname.startsWith("/auth");
+
+    if (isAllowedTechnicianRoute) {
       return;
     }
 
@@ -42,4 +49,3 @@ export default function AuthenticatedShell() {
     </RequireAuth>
   );
 }
-

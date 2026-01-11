@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 import { useJobs } from "@/hooks/useJobs";
-import { isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +31,7 @@ import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDetailsModal";
 import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
 import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
+import { isJobOnDate } from "@/utils/timezoneUtils";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -161,7 +161,7 @@ const Sound = () => {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const getDepartmentJobs = () => {
+  const departmentJobs = useMemo(() => {
     if (!jobs) return [];
     return jobs.filter(job => {
       if (job.job_type === 'tour') return false;
@@ -174,24 +174,15 @@ const Sound = () => {
       }
       return isInDepartment;
     });
-  };
+  }, [jobs, currentDepartment]);
 
-  const getSelectedDateJobs = () => {
-    if (!date || !jobs) return [];
-    const selectedDate = startOfDay(date);
-    return getDepartmentJobs().filter(job => {
-      // Skip jobs with invalid dates
+  const selectedDateJobs = useMemo(() => {
+    if (!date) return [];
+    return departmentJobs.filter(job => {
       if (!job.start_time || !job.end_time) return false;
-
-      const jobStartDate = startOfDay(new Date(job.start_time));
-      const jobEndDate = endOfDay(new Date(job.end_time));
-
-      return isWithinInterval(selectedDate, {
-        start: jobStartDate,
-        end: jobEndDate
-      });
+      return isJobOnDate(job.start_time, job.end_time, date);
     });
-  };
+  }, [date, departmentJobs]);
 
   const handleJobClick = (jobId: string) => {
     if (isMobile) {
@@ -254,7 +245,7 @@ const Sound = () => {
             title="Departamento de sonido"
             icon={Music}
             tools={allTools}
-            jobs={getDepartmentJobs()}
+            jobs={departmentJobs}
             date={date || new Date()}
             onDateSelect={setDate}
             canCreateJob={userRole ? ["admin", "management"].includes(userRole) : false}
@@ -406,9 +397,8 @@ const Sound = () => {
                     <CalendarSection
                       date={date}
                       onDateSelect={setDate}
-                      jobs={getDepartmentJobs()}
+                      jobs={departmentJobs}
                       department={currentDepartment}
-                      onDateTypeChange={() => { }}
                     />
                   </CardContent>
                 </Card>
@@ -416,7 +406,7 @@ const Sound = () => {
               <div className="xl:col-span-4 2xl:col-span-3">
                 <div className="bg-card rounded-xl border border-border shadow-sm">
                   <TodaySchedule
-                    jobs={getSelectedDateJobs()}
+                    jobs={selectedDateJobs}
                     onEditClick={handleEditClick}
                     onDeleteClick={handleDeleteClick}
                     onJobClick={handleJobClick}

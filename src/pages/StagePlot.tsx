@@ -15,6 +15,7 @@ export default function StagePlot() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pendingSaveJobIdRef = useRef<string | null>(null);
   const pendingPDFRef = useRef<boolean>(false);
+  const stagePlotOrigin = new URL("/stageplot/index.html", window.location.href).origin;
 
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
@@ -49,7 +50,7 @@ export default function StagePlot() {
             iframeRef.current.contentWindow.postMessage({
               type: 'LOAD_PLOT',
               data: data.plot_data
-            }, window.location.origin);
+            }, stagePlotOrigin);
           }
 
           toast({
@@ -87,56 +88,70 @@ export default function StagePlot() {
     pendingSaveJobIdRef.current = selectedJobId;
 
     // Request plot data from iframe
-    if (iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({
-        type: 'GET_PLOT_DATA'
-      }, window.location.origin);
+    const contentWindow = iframeRef.current?.contentWindow;
+    if (!contentWindow) {
+      pendingSaveJobIdRef.current = null;
+      setIsSaving(false);
+      toast({
+        title: "Error",
+        description: "No se pudo comunicar con el plano de escenario.",
+        variant: "destructive",
+      });
+      return;
     }
+
+    contentWindow.postMessage({
+        type: 'GET_PLOT_DATA'
+      }, stagePlotOrigin);
   };
 
   // Listen for messages from iframe
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
-      if (event.data.type === 'PLOT_DATA') {
-        const jobIdToSave = pendingSaveJobIdRef.current;
-        if (!jobIdToSave) {
-          setIsSaving(false);
-          return;
-        }
+      if (event.origin !== stagePlotOrigin) return;
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      if (!event.data || typeof event.data !== 'object') return;
+      if (event.data.type !== 'PLOT_DATA') return;
 
-        try {
-          const { data, error } = await supabase
-            .from('job_stage_plots')
-            .upsert({
-              job_id: jobIdToSave,
-              plot_data: event.data.data,
-              updated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'job_id'
-            });
+      const jobIdToSave = pendingSaveJobIdRef.current;
+      if (!jobIdToSave) {
+        setIsSaving(false);
+        return;
+      }
 
-          if (error) throw error;
-
-          toast({
-            title: "✅ Plano guardado",
-            description: "El plano de escenario se ha guardado correctamente.",
+      try {
+        const { error } = await supabase
+          .from('job_stage_plots')
+          .upsert({
+            job_id: jobIdToSave,
+            plot_data: event.data.data,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'job_id'
           });
-        } catch (error) {
-          console.error('Error saving plot:', error);
-          toast({
-            title: "❌ Error al guardar",
-            description: "No se pudo guardar el plano de escenario.",
-            variant: "destructive",
-          });
-        } finally {
-          setIsSaving(false);
-        }
+
+        if (error) throw error;
+
+        toast({
+          title: "✅ Plano guardado",
+          description: "El plano de escenario se ha guardado correctamente.",
+        });
+      } catch (error) {
+        console.error('Error saving plot:', error);
+        toast({
+          title: "❌ Error al guardar",
+          description: "No se pudo guardar el plano de escenario.",
+          variant: "destructive",
+        });
+      } finally {
+        pendingSaveJobIdRef.current = null;
+        setIsSaving(false);
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [selectedJobId, toast]);
+  }, [stagePlotOrigin, toast]);
 
   // Generate PDF from stage plot
   const handleGeneratePDF = async () => {
@@ -149,61 +164,82 @@ export default function StagePlot() {
       return;
     }
 
+    const contentWindow = iframeRef.current?.contentWindow;
+    if (!contentWindow) {
+      toast({
+        title: "Error",
+        description: "No se pudo comunicar con el plano de escenario.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsGeneratingPDF(true);
     pendingPDFRef.current = true;
 
-    // Request plot data from iframe
-    if (iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({
-        type: 'GET_PLOT_DATA_FOR_PDF'
-      }, window.location.origin);
-    }
+    let timeoutId: ReturnType<typeof window.setTimeout> | null = null;
+
+    const cleanup = () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      window.removeEventListener('message', handlePDFDataMessage);
+    };
 
     // Listen for PDF data response
-    const handlePDFDataMessage = async (event: MessageEvent) => {
-      if (event.data.type === 'PLOT_DATA_FOR_PDF') {
-        pendingPDFRef.current = false;
-        try {
-          const selectedJob = soundJobs.find(job => job.id === selectedJobId);
+    async function handlePDFDataMessage(event: MessageEvent) {
+      if (event.origin !== stagePlotOrigin) return;
+      if (event.source !== contentWindow) return;
+      if (!event.data || typeof event.data !== 'object') return;
+      if (event.data.type !== 'PLOT_DATA_FOR_PDF') return;
 
-          await generateStagePlotPDF(
-            {
-              ...event.data.data,
-              jobId: selectedJobId,
-              jobTitle: selectedJob?.title
-            },
-            {
-              saveToDatabase: true,
-              downloadLocal: true,
-              jobId: selectedJobId
-            }
-          );
+      pendingPDFRef.current = false;
+      cleanup();
 
-          toast({
-            title: "✅ PDF generado",
-            description: "El plano de escenario se ha generado y guardado correctamente.",
-          });
-        } catch (error) {
-          console.error('Error generating PDF:', error);
-          toast({
-            title: "❌ Error al generar PDF",
-            description: "No se pudo generar el PDF del plano de escenario.",
-            variant: "destructive",
-          });
-        } finally {
-          setIsGeneratingPDF(false);
-          window.removeEventListener('message', handlePDFDataMessage);
-        }
+      try {
+        const selectedJob = soundJobs.find(job => job.id === selectedJobId);
+
+        await generateStagePlotPDF(
+          {
+            ...event.data.data,
+            jobId: selectedJobId,
+            jobTitle: selectedJob?.title
+          },
+          {
+            saveToDatabase: true,
+            downloadLocal: true,
+            jobId: selectedJobId
+          }
+        );
+
+        toast({
+          title: "✅ PDF generado",
+          description: "El plano de escenario se ha generado y guardado correctamente.",
+        });
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        toast({
+          title: "❌ Error al generar PDF",
+          description: "No se pudo generar el PDF del plano de escenario.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsGeneratingPDF(false);
       }
-    };
+    }
 
     window.addEventListener('message', handlePDFDataMessage);
 
+    // Request plot data from iframe (after listener is attached)
+    contentWindow.postMessage({
+      type: 'GET_PLOT_DATA_FOR_PDF'
+    }, stagePlotOrigin);
+
     // Timeout in case iframe doesn't respond
-    setTimeout(() => {
+    timeoutId = window.setTimeout(() => {
       if (pendingPDFRef.current) {
         pendingPDFRef.current = false;
-        window.removeEventListener('message', handlePDFDataMessage);
+        cleanup();
         setIsGeneratingPDF(false);
         toast({
           title: "Error de tiempo",
@@ -236,11 +272,18 @@ export default function StagePlot() {
               <SelectValue placeholder="Seleccionar trabajo..." />
             </SelectTrigger>
             <SelectContent>
-              {soundJobs.map((job) => (
-                <SelectItem key={job.id} value={job.id}>
-                  {job.title} - {new Date(job.start_time).toLocaleDateString('es-ES')}
-                </SelectItem>
-              ))}
+              {soundJobs.map((job) => {
+                const hasValidStartTime = Boolean(job.start_time) && !isNaN(new Date(job.start_time).getTime());
+                const startDateLabel = hasValidStartTime
+                  ? new Date(job.start_time).toLocaleDateString('es-ES')
+                  : '';
+
+                return (
+                  <SelectItem key={job.id} value={job.id}>
+                    {job.title}{startDateLabel ? ` - ${startDateLabel}` : ''}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
 
