@@ -103,6 +103,7 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                 <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
                     {hasSoundVisionAccess && (
                         <button
+                            type="button"
                             onClick={onOpenSV}
                             className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-blue-500 transition-colors text-left group`}
                         >
@@ -111,6 +112,7 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                         </button>
                     )}
                     <button
+                        type="button"
                         onClick={onOpenMessages}
                         className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-purple-500 transition-colors text-left group`}
                     >
@@ -118,6 +120,7 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                         <span className={`text-xs font-bold ${theme.textMain}`}>Mensajes</span>
                     </button>
                     <button
+                        type="button"
                         onClick={onOpenRates}
                         className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-emerald-500 transition-colors text-left group`}
                     >
@@ -126,6 +129,7 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                     </button>
                     {onOpenSysCalc && userProfile?.department === 'sound' && (
                         <button
+                            type="button"
                             onClick={onOpenSysCalc}
                             className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-teal-500 transition-colors text-left group`}
                         >
