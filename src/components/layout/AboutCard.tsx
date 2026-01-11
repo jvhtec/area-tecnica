@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Info, Edit3, Save, X, Clock, Plus, Trash2, Bell } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
+import { getChangelogVersionAutofill } from "@/lib/changelog-version"
 
 // Get the version from Vite's env variables
 const defaultVersion = import.meta.env.VITE_APP_VERSION || "dev"
@@ -239,7 +240,16 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
     try {
       const today = new Date()
       const yyyy_mm_dd = today.toISOString().slice(0,10)
-      const ver = String(defaultVersion)
+      const { data: latest, error: latestError } = await supabase
+        .from('app_changelog')
+        .select('version')
+        .order('entry_date', { ascending: false })
+        .order('last_updated', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (latestError) throw latestError
+
+      const ver = getChangelogVersionAutofill(latest?.version, '1.0.0')
       const { data, error } = await supabase
         .from('app_changelog')
         .insert({ version: ver, entry_date: yyyy_mm_dd, content: '' })

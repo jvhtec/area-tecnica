@@ -42,6 +42,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [selectedColor, setSelectedColor] = useState(userProfile?.bg_color || '#3b82f6');
+    const [appVersion, setAppVersion] = useState<string>('...');
 
     // Push notifications hook
     const {
@@ -88,6 +89,27 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
             setCalendarToken(userProfile.calendar_ics_token || '');
         }
     }, [userProfile]);
+
+    // Load app version from the changelog (admin-controlled)
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('app_changelog')
+                    .select('version')
+                    .order('entry_date', { ascending: false })
+                    .order('last_updated', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                if (error) throw error;
+                setAppVersion(data?.version || 'N/A');
+            } catch (e: any) {
+                console.warn('Failed to load app version', e?.message || e);
+                setAppVersion('N/A');
+            }
+        };
+        void load();
+    }, []);
 
     const userInitials = firstName && lastName
         ? `${firstName[0]}`.toUpperCase()
@@ -512,7 +534,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
 
             {/* Version */}
             <div className={`text-center text-xs mt-6 ${theme.textMuted}`}>
-                Versión 2.4.1 (Build 2930)
+                Versión {appVersion}
             </div>
 
             {/* Password Change Modal */}
