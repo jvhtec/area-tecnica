@@ -4,6 +4,7 @@ import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
 import { Map as MapIcon, Calendar as CalendarIcon, MessageSquare, Euro, Loader2, Briefcase } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useMyTours } from '@/hooks/useMyTours';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { TechJobCard } from './TechJobCard';
@@ -68,9 +69,14 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                     <h1 className={`text-2xl font-bold ${theme.textMain}`}>Panel</h1>
                     <p className={`text-xs ${theme.textMuted}`}>Bienvenido, {userName}</p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg">
-                    {userInitials}
-                </div>
+                <Avatar className="h-12 w-12 shadow-lg ring-2 ring-blue-500/20">
+                    {userProfile?.profile_picture_url && (
+                        <AvatarImage src={userProfile.profile_picture_url} alt={userName} />
+                    )}
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold">
+                        {userInitials}
+                    </AvatarFallback>
+                </Avatar>
             </div>
 
             {/* Stats Grid */}
