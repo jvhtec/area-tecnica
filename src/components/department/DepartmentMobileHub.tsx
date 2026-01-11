@@ -278,6 +278,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
             {tools.map((tool, idx) => (
               <button
                 key={idx}
+                type="button"
                 onClick={tool.onClick || (tool.to ? () => navigate(tool.to!) : undefined)}
                 className={cn(
                   "flex flex-col items-center justify-center p-3 rounded-xl border min-w-[80px] h-[80px] flex-shrink-0 transition-all",
