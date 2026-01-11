@@ -30,7 +30,7 @@ const SysCalc = () => {
       {/* Calculator iframe */}
       <div className="w-full h-[calc(100vh-73px)]">
         <iframe
-          src="https://mistrnick.com/calculators.html"
+          src="https://mistrnick.com/calc.html"
           className="w-full h-full border-0"
           title="System Calculator - Audio Engineering Tools"
           allow="clipboard-write"
