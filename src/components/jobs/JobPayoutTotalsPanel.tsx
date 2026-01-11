@@ -278,13 +278,11 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
 
       let deduction = 0;
       const isNonAutonomo = autonomoMap.get(payout.technician_id) === false;
-      if (isNonAutonomo && !override) { // Only apply deduction if no override (override implies final amount) -> Or should it apply to override too? Usually override is final.
-        if (isTourDate) {
-          deduction = NON_AUTONOMO_DEDUCTION_EUR;
-        } else {
-          const days = techDaysMap.get(payout.technician_id) || (payout.timesheets_total_eur > 0 ? 1 : 0);
-          deduction = days * NON_AUTONOMO_DEDUCTION_EUR;
-        }
+      // For tourdate jobs, discount is already applied server-side to base before multipliers
+      // For regular jobs, apply deduction per day
+      if (isNonAutonomo && !override && !isTourDate) {
+        const days = techDaysMap.get(payout.technician_id) || (payout.timesheets_total_eur > 0 ? 1 : 0);
+        deduction = days * NON_AUTONOMO_DEDUCTION_EUR;
       }
 
       const effectiveTotal = (override?.override_amount_eur ?? payout.total_eur) - (override ? 0 : deduction);
@@ -794,13 +792,11 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                     const isNonAutonomo = autonomoMap.get(payout.technician_id) === false;
                     let deduction = 0;
                     let daysUsed = 0;
-                    if (isNonAutonomo) {
-                      if (isTourDate) {
-                        deduction = NON_AUTONOMO_DEDUCTION_EUR;
-                      } else {
-                        daysUsed = techDaysMap.get(payout.technician_id) || (payout.timesheets_total_eur > 0 ? 1 : 0);
-                        deduction = daysUsed * NON_AUTONOMO_DEDUCTION_EUR;
-                      }
+                    // For tourdate jobs, discount is already applied server-side to base before multipliers
+                    // For regular jobs, apply deduction per day
+                    if (isNonAutonomo && !isTourDate) {
+                      daysUsed = techDaysMap.get(payout.technician_id) || (payout.timesheets_total_eur > 0 ? 1 : 0);
+                      deduction = daysUsed * NON_AUTONOMO_DEDUCTION_EUR;
                     }
                     const effectiveTotal = payout.total_eur - deduction;
 

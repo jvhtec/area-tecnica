@@ -1,8 +1,31 @@
 import { createClient } from "./deps.ts";
 import { EVENT_TYPES } from "./config.ts";
 import { jsonResponse } from "./http.ts";
+import { sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
-import type { CheckScheduledBody, PushPayload } from "./types.ts";
+import type { CheckScheduledBody, NativePushTokenRow, PushPayload } from "./types.ts";
+
+const loadNativeTokens = async (
+  client: ReturnType<typeof createClient>,
+  userIds: string[],
+): Promise<NativePushTokenRow[]> => {
+  if (userIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await client
+    .from("push_device_tokens")
+    .select("user_id, device_token, platform")
+    .in("user_id", userIds)
+    .returns<NativePushTokenRow[]>();
+
+  if (error) {
+    console.error("scheduled push fetch native tokens error", error);
+    return [];
+  }
+
+  return data ?? [];
+};
 
 // ============================================================================
 // DAILY MORNING SUMMARY HELPERS
@@ -596,7 +619,8 @@ export async function handleCheckScheduled(
         continue;
       }
 
-      if (!pushSubs || pushSubs.length === 0) {
+      const nativeTokens = await loadNativeTokens(client, [userId]);
+      if ((!pushSubs || pushSubs.length === 0) && nativeTokens.length === 0) {
         console.log(`  ⚠️ User ${userId} has no push subscriptions`);
         continue;
       }
@@ -618,25 +642,44 @@ export async function handleCheckScheduled(
 
       // Send to all devices for this user
       let userSent = false;
-      for (const pushSub of pushSubs) {
-        const result = await sendPushNotification(
-          client,
-          { endpoint: pushSub.endpoint, p256dh: pushSub.p256dh, auth: pushSub.auth },
-          payload
-        );
-        allResults.push({
-          endpoint: pushSub.endpoint,
-          ok: result.ok,
-          status: 'status' in result ? (result as any).status : undefined,
-          skipped: 'skipped' in result ? (result as any).skipped : undefined,
-          user_id: userId,
-        });
-        if (result.ok) userSent = true;
+      const sendPromises: Promise<void>[] = [];
+      for (const pushSub of pushSubs || []) {
+        sendPromises.push((async () => {
+          const result = await sendPushNotification(
+            client,
+            { endpoint: pushSub.endpoint, p256dh: pushSub.p256dh, auth: pushSub.auth },
+            payload
+          );
+          allResults.push({
+            endpoint: pushSub.endpoint,
+            ok: result.ok,
+            status: 'status' in result ? (result as any).status : undefined,
+            skipped: 'skipped' in result ? (result as any).skipped : undefined,
+            user_id: userId,
+          });
+          if (result.ok) userSent = true;
+        })());
       }
+
+      for (const tokenRow of nativeTokens) {
+        sendPromises.push((async () => {
+          const result = await sendNativePushNotification(client, tokenRow.device_token, payload);
+          allResults.push({
+            endpoint: `apns:${tokenRow.device_token}`,
+            ok: result.ok,
+            status: 'status' in result ? (result as any).status : undefined,
+            skipped: 'skipped' in result ? (result as any).skipped : undefined,
+            user_id: userId,
+          });
+          if (result.ok) userSent = true;
+        })());
+      }
+
+      await Promise.all(sendPromises);
 
       if (userSent) {
         successfulUsers++;
-        console.log(`  ✅ Sent to ${pushSubs.length} device(s) for user ${userId}`);
+        console.log(`  ✅ Sent to ${(pushSubs?.length || 0) + nativeTokens.length} device(s) for user ${userId}`);
       }
     }
 
@@ -659,4 +702,3 @@ export async function handleCheckScheduled(
   // For other scheduled notification types (future expansion)
   return jsonResponse({ status: 'error', reason: 'Unsupported scheduled notification type' }, 400);
 }
-

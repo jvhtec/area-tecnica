@@ -201,3 +201,42 @@ export function getProfilePictureUrl(
 ): string {
   return `${supabaseUrl}/storage/v1/object/public/profile-pictures/${filePath}`;
 }
+
+export interface ProfilePictureTransformOptions {
+  width?: number;
+  height?: number;
+  quality?: number;
+  resize?: 'cover' | 'contain';
+}
+
+/**
+ * Returns an optimized, resized URL for profile pictures stored in Supabase Storage.
+ * Falls back to the original URL if it's not a Supabase public storage URL.
+ */
+export function getOptimizedProfilePictureUrl(
+  url: string,
+  options: ProfilePictureTransformOptions = {}
+): string {
+  const { width = 96, height = 96, quality = 80, resize = 'cover' } = options;
+
+  try {
+    const parsed = new URL(url);
+
+    const objectPrefix = '/storage/v1/object/public/';
+    const renderPrefix = '/storage/v1/render/image/public/';
+
+    if (!parsed.pathname.startsWith(objectPrefix)) {
+      return url;
+    }
+
+    parsed.pathname = parsed.pathname.replace(objectPrefix, renderPrefix);
+    parsed.searchParams.set('width', String(width));
+    parsed.searchParams.set('height', String(height));
+    parsed.searchParams.set('quality', String(quality));
+    parsed.searchParams.set('resize', resize);
+
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}

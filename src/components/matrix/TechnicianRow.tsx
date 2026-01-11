@@ -3,7 +3,8 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin, Refrigerator, Edit, Save, X } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin, Refrigerator, Edit, Save, X, Medal, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +13,7 @@ import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { formatUserName } from '@/utils/userName';
 import { CityAutocomplete } from '@/components/maps/CityAutocomplete';
@@ -35,9 +36,11 @@ interface TechnicianRowProps {
   height: number;
   isFridge?: boolean;
   compact?: boolean;
+  medalRank?: 'gold' | 'silver' | 'bronze';
+  lastYearMedalRank?: 'gold' | 'silver' | 'bronze';
 }
 
-const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false }: TechnicianRowProps) => {
+const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false, medalRank, lastYearMedalRank }: TechnicianRowProps) => {
   const { userRole } = useOptimizedAuth();
   const isAdmin = userRole === 'admin';
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
@@ -47,7 +50,15 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
   const [togglingFridge, setTogglingFridge] = React.useState(false);
 
   const [metricsLoading, setMetricsLoading] = React.useState(false);
-  const [metrics, setMetrics] = React.useState<{ monthConfirmed: number; yearConfirmed: number }>({ monthConfirmed: 0, yearConfirmed: 0 });
+  const [metricsExpanded, setMetricsExpanded] = React.useState(false);
+  const [metrics, setMetrics] = React.useState<{
+    monthTotal: number;
+    yearTotal: number;
+    lastYearTotal: number;
+    monthUpcoming: number;
+    yearUpcoming: number;
+    lastYearUpcoming: number;
+  }>({ monthTotal: 0, yearTotal: 0, lastYearTotal: 0, monthUpcoming: 0, yearUpcoming: 0, lastYearUpcoming: 0 });
   const [residencia, setResidencia] = React.useState<string | null>(null);
   const [residenciaLoading, setResidenciaLoading] = React.useState(false);
   const [sendingOnboarding, setSendingOnboarding] = React.useState(false);
@@ -73,33 +84,65 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     try {
       setMetricsLoading(true);
       const now = new Date();
-      const mStart = startOfMonth(now).toISOString();
-      const mEnd = endOfMonth(now).toISOString();
-      const yStart = startOfYear(now).toISOString();
-      const yEnd = endOfYear(now).toISOString();
+      const lastYear = subYears(now, 1);
 
-      // Count confirmed assignments within a date range via inner join to jobs; avoid HEAD to prevent 400s
-      const countInRange = async (fromISO: string, toISO: string) => {
+      const mStart = startOfMonth(now).toISOString().split('T')[0];
+      const mEnd = endOfMonth(now).toISOString().split('T')[0];
+      const yStart = startOfYear(now).toISOString().split('T')[0];
+      const yEnd = endOfYear(now).toISOString().split('T')[0];
+      const lyStart = startOfYear(lastYear).toISOString().split('T')[0];
+      const lyEnd = endOfYear(lastYear).toISOString().split('T')[0];
+
+      // Count all active timesheets (individual work dates)
+      const countTotalInRange = async (fromDate: string, toDate: string) => {
         const { count, error } = await supabase
-          .from('job_assignments')
-          .select('job_id,jobs!inner(id)', { count: 'exact' })
+          .from('timesheets')
+          .select('*', { count: 'exact', head: true })
           .eq('technician_id', technician.id)
-          .eq('status', 'confirmed')
-          .gte('jobs.start_time', fromISO)
-          .lte('jobs.end_time', toISO)
-          .limit(1);
+          .eq('is_active', true)
+          .gte('date', fromDate)
+          .lte('date', toDate);
         if (error) {
-          console.warn('Metrics count error', error);
+          console.warn('Total metrics count error', error);
           return 0;
         }
         return count || 0;
       };
 
-      const [m, y] = await Promise.all([
-        countInRange(mStart, mEnd),
-        countInRange(yStart, yEnd)
+      // Count upcoming/draft timesheets
+      const countUpcomingInRange = async (fromDate: string, toDate: string) => {
+        const { count, error } = await supabase
+          .from('timesheets')
+          .select('*', { count: 'exact', head: true })
+          .eq('technician_id', technician.id)
+          .eq('is_active', true)
+          .eq('status', 'draft')
+          .gte('date', fromDate)
+          .lte('date', toDate);
+        if (error) {
+          console.warn('Upcoming metrics count error', error);
+          return 0;
+        }
+        return count || 0;
+      };
+
+      const [mTotal, yTotal, lyTotal, mUpcoming, yUpcoming, lyUpcoming] = await Promise.all([
+        countTotalInRange(mStart, mEnd),
+        countTotalInRange(yStart, yEnd),
+        countTotalInRange(lyStart, lyEnd),
+        countUpcomingInRange(mStart, mEnd),
+        countUpcomingInRange(yStart, yEnd),
+        countUpcomingInRange(lyStart, lyEnd)
       ]);
-      setMetrics({ monthConfirmed: m, yearConfirmed: y });
+
+      setMetrics({
+        monthTotal: mTotal,
+        yearTotal: yTotal,
+        lastYearTotal: lyTotal,
+        monthUpcoming: mUpcoming,
+        yearUpcoming: yUpcoming,
+        lastYearUpcoming: lyUpcoming
+      });
     } finally {
       setMetricsLoading(false);
     }
@@ -261,6 +304,121 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     }
   };
 
+  const getRandomSnarkyComment = (rank: 'gold' | 'silver' | 'bronze'): string => {
+    const comments = {
+      gold: [
+        '¡El campeón indiscutible! ¿Será que no tiene vida fuera del trabajo?',
+        'Oro puro. Probablemente duerme con el móvil debajo de la almohada.',
+        'El número uno. Los demás técnicos lloran en la esquina.',
+        '¡Medalla de oro! ¿Seguro que no eres un robot?',
+        'Primer puesto. Tu cuenta bancaria debe estar feliz.',
+        '¡Oro! Los demás están tomando notas furiosamente.',
+        'Rey o reina de los bolos. ¿Cuándo descansas?',
+        'Medalla dorada. Hasta tu sombra trabaja más que los demás.',
+        '¡Campeón! Probablemente rechazas vacaciones por diversión.',
+        'Número uno con bala. Los otros técnicos necesitan un plan.',
+      ],
+      silver: [
+        'Plata. Cerca pero no lo suficiente. ¿Quizás el próximo mes?',
+        'Segundo lugar. El primer perdedor, como dicen por ahí.',
+        'Medalla de plata. Al menos no eres bronce.',
+        '¡Subcampeón! Tan cerca y tan lejos a la vez.',
+        'Plata reluciente. El oro te mira desde arriba.',
+        'Número dos. Como Pepsi, siempre detrás de Coca-Cola.',
+        'Medalla plateada. Tu esfuerzo es... respetable.',
+        '¡Plata! Casi oro, pero casi no cuenta.',
+        'Segundo puesto. El primero de los perdedores.',
+        'Plata brillante. El oro te envía saludos desde el podio.',
+      ],
+      bronze: [
+        'Bronce. Al menos estás en el podio... apenas.',
+        'Tercer lugar. Mejor que nada, ¿no?',
+        'Medalla de bronce. Los demás te miran con lástima.',
+        '¡Bronce! Felicidades por ser el último en el podio.',
+        'Tercero. Es como decir "casi competente".',
+        'Medalla de bronce. Al menos no eres cuarto.',
+        '¡Bronce! Tu mamá está orgullosa, probablemente.',
+        'Tercer puesto. Los otros dos te saludan desde arriba.',
+        'Bronce resplandeciente. Bueno, más o menos resplandeciente.',
+        'Número tres. Podría ser peor... o mejor.',
+      ]
+    };
+
+    const list = comments[rank];
+    return list[Math.floor(Math.random() * list.length)];
+  };
+
+  const getLastYearSnarkyComment = (rank: 'gold' | 'silver' | 'bronze'): string => {
+    const lastYear = new Date().getFullYear() - 1;
+    const comments = {
+      gold: [
+        'Fuiste oro el año pasado. ¿Qué pasó? ¿Te jubilaste?',
+        'Campeón del año pasado. Ahora... no tanto. ¿Nostalgia?',
+        `Oro en ${lastYear}. ¿Dónde quedó esa energía?`,
+        'Eras el número uno. Pasado perfecto, presente... dudoso.',
+        '¡Medalla de oro histórica! Énfasis en "histórica".',
+        'Top del año pasado. Las glorias pasadas no pagan facturas.',
+        'Fuiste el rey. Ahora más bien... plebeyo.',
+        'Eras imparable. ¿Te pararon?',
+        `Oro ${lastYear}. ¿Ya te cansaste o simplemente te dio pereza?`,
+        'Campeón que fue. La clave está en "fue".',
+      ],
+      silver: [
+        'Plata el año pasado. Ni oro entonces, ni ahora.',
+        `Segundo en ${lastYear}. Al menos eres consistente... en no ganar.`,
+        'Medalla plateada histórica. ¿Sigues casi ganando?',
+        'Subcampeón del pasado. ¿Cuándo será tu año de verdad?',
+        `Plata en ${lastYear}. Eternamente segundo, ¿no?`,
+        'Casi ganaste el año pasado. Casi. Como siempre.',
+        'Segundo puesto histórico. ¿Te suena familiar?',
+        'Plata vintage. Tu zona de confort es el segundo lugar.',
+        'Fuiste plata. Sorpresa: sigues sin ser oro.',
+        'Subcampeón perenne. El oro te envía saludos del pasado.',
+      ],
+      bronze: [
+        'Bronce el año pasado. ¿Bajaste o ya estabas abajo?',
+        `Tercero en ${lastYear}. ¿Vas pa bajo o qué?`,
+        'Medalla de bronce histórica. Última del podio... qué logro.',
+        'Tercer puesto del pasado. ¿Al menos mantienes el ritmo?',
+        `Bronce ${lastYear}. Podio por los pelos, como siempre.`,
+        'Último en el podio el año pasado. ¿Sigues ahí?',
+        'Bronce vintage. Sigues siendo el tercero más motivado.',
+        'Tercer lugar histórico. Los otros dos no te extrañan.',
+        'Fuiste bronce. ¿Fuiste, eres o vas para allá?',
+        'Podio del año pasado. Énfasis en "último del podio".',
+      ]
+    };
+
+    const list = comments[rank];
+    return list[Math.floor(Math.random() * list.length)];
+  };
+
+  const getMedalIcon = (rank?: 'gold' | 'silver' | 'bronze', size: 'sm' | 'md' = 'sm') => {
+    if (!rank) return null;
+    const sizeClass = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
+    const colorMap = {
+      gold: '#FFD700',
+      silver: '#C0C0C0',
+      bronze: '#CD7F32'
+    };
+
+    // Generate a random comment on each render
+    const comment = getRandomSnarkyComment(rank);
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Medal className={sizeClass} style={{ color: colorMap[rank], cursor: 'help' }} />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="max-w-xs">{comment}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   const deptAbbrev = (technician.department || '').slice(0, 3).toUpperCase();
 
   return (
@@ -288,6 +446,11 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                   {isFridge && (
                     <Refrigerator className="absolute -top-1 -right-1 h-3.5 w-3.5 text-sky-600" />
                   )}
+                  {medalRank && !isFridge && (
+                    <div className="absolute -top-1 -right-1">
+                      {getMedalIcon(medalRank, 'sm')}
+                    </div>
+                  )}
                 </div>
                 <div className="mt-1 text-[10px] leading-none text-muted-foreground">{deptAbbrev}</div>
               </div>
@@ -301,10 +464,11 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                 </Avatar>
 
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm truncate">
-                    {displayName}
+                  <div className="font-medium text-sm truncate flex items-center gap-1">
+                    <span>{displayName}</span>
+                    {medalRank && !isFridge && getMedalIcon(medalRank, 'sm')}
                     {isFridge && (
-                      <Refrigerator className="inline-block h-3.5 w-3.5 ml-1 text-sky-600" />
+                      <Refrigerator className="inline-block h-3.5 w-3.5 text-sky-600" />
                     )}
                   </div>
                   <div className="flex gap-1 mt-1 flex-wrap">
@@ -337,8 +501,9 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <div className="font-semibold">
-                  {displayName}
+                <div className="font-semibold flex items-center gap-2">
+                  <span>{displayName}</span>
+                  {medalRank && getMedalIcon(medalRank, 'md')}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {technician.role === 'house_tech' ? 'Técnico de Casa' : 'Técnico'}
@@ -613,13 +778,93 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
 
                 {/* Metrics */}
                 <div className="pt-2 border-t">
-                  <div className="text-sm font-medium mb-1">Actividad</div>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-sm font-medium">Actividad</div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setMetricsExpanded(!metricsExpanded)}
+                    >
+                      {metricsExpanded ? (
+                        <>
+                          <ChevronUp className="h-3 w-3 mr-1" />
+                          Menos
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3 w-3 mr-1" />
+                          Más
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   {metricsLoading ? (
                     <div className="text-xs text-muted-foreground">Cargando...</div>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">Bolos/Mes: {metrics.monthConfirmed}</Badge>
-                      <Badge variant="outline" className="text-xs">Bolos/Año: {metrics.yearConfirmed}</Badge>
+                    <div className="space-y-2">
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Este mes</div>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Badge variant="default" className="text-xs">
+                            {metrics.monthTotal} total
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {metrics.monthUpcoming} programados
+                          </Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Este año</div>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Badge variant="default" className="text-xs">
+                            {metrics.yearTotal} total
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {metrics.yearUpcoming} programados
+                          </Badge>
+                        </div>
+                      </div>
+                      {metricsExpanded && (
+                        <div className="pt-2 border-t">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="text-xs text-muted-foreground">
+                              Año pasado ({subYears(new Date(), 1).getFullYear()})
+                            </div>
+                            {lastYearMedalRank && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Medal
+                                      className="h-4 w-4"
+                                      style={{
+                                        color: lastYearMedalRank === 'gold' ? '#FFD700' :
+                                               lastYearMedalRank === 'silver' ? '#C0C0C0' : '#CD7F32',
+                                        cursor: 'help',
+                                        opacity: 0.7
+                                      }}
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs">{getLastYearSnarkyComment(lastYearMedalRank)}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Badge variant="default" className="text-xs">
+                              {metrics.lastYearTotal} total
+                            </Badge>
+                            <Badge variant="outline" className="text-xs opacity-50">
+                              {metrics.lastYearUpcoming} programados*
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1 italic">
+                            *Datos históricos de programación
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

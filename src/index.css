@@ -201,6 +201,15 @@
   display: none;
 }
 
+/* Auth: hide OAuth provider buttons/dividers when using Supabase Auth UI */
+.auth-no-oauth .supabase-auth-ui_ui-button[data-provider="google"],
+.auth-no-oauth .supabase-auth-ui_ui-button[data-provider="apple"],
+.auth-no-oauth button[data-provider="google"],
+.auth-no-oauth button[data-provider="apple"],
+.auth-no-oauth .supabase-auth-ui_ui-divider {
+  display: none !important;
+}
+
 /* Assignment Matrix Layout */
 .matrix-layout {
   position: relative;

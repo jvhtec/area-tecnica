@@ -293,6 +293,7 @@ const TechnicianDashboard = () => {
             onOpenTour={(tourId) => setSelectedTourId(tourId)}
             onOpenRates={() => setShowRatesModal(true)}
             onOpenMessages={() => setShowMessagesModal(true)}
+            onOpenSysCalc={() => navigate('/syscalc')}
             hasSoundVisionAccess={hasSoundVisionAccess}
           />
         )}

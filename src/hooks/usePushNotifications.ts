@@ -7,37 +7,50 @@ import {
   getPushPermissionStatus,
   isPushSupported
 } from '@/lib/push'
+import {
+  disableNativePush,
+  enableNativePush,
+  getNativePushPermissionStatus,
+  getStoredNativePushToken,
+  isNativePushSupported
+} from '@/lib/push-native'
 
 type PushState = {
   isSupported: boolean
   permission: NotificationPermission
-  subscription: PushSubscription | null
+  subscription: PushSubscription | NativePushSubscription | null
   isInitializing: boolean
   isEnabling: boolean
   isDisabling: boolean
   error: string | null
-  enable: () => Promise<PushSubscription | null>
+  enable: () => Promise<PushSubscription | NativePushSubscription | null>
   disable: () => Promise<void>
   canEnable: boolean
+}
+
+type NativePushSubscription = {
+  platform: 'ios'
+  token: string
 }
 
 const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined
 
 const getUnsupportedError = (): string =>
-  'Push notifications are not supported in this browser.'
+  'Push notifications are not supported on this device.'
 
 const getMissingVapidKeyError = (): string =>
   'VITE_VAPID_PUBLIC_KEY is not configured. Ask an administrator to set it before enabling push notifications.'
 
 export const usePushNotifications = (): PushState => {
-  const [subscription, setSubscription] = useState<PushSubscription | null>(null)
+  const isNative = useMemo(() => isNativePushSupported(), [])
+  const [subscription, setSubscription] = useState<PushSubscription | NativePushSubscription | null>(null)
   const [permission, setPermission] = useState<NotificationPermission>(getPushPermissionStatus())
-  const [isInitializing, setIsInitializing] = useState<boolean>(isPushSupported())
+  const [isInitializing, setIsInitializing] = useState<boolean>(isPushSupported() || isNative)
   const [isEnabling, setIsEnabling] = useState<boolean>(false)
   const [isDisabling, setIsDisabling] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
-  const supported = useMemo(() => isPushSupported(), [])
+  const supported = useMemo(() => (isNative ? true : isPushSupported()), [isNative])
   const hasVapidKey = Boolean(vapidPublicKey)
 
   useEffect(() => {
@@ -51,17 +64,28 @@ export const usePushNotifications = (): PushState => {
       }
     }
 
-    if (!hasVapidKey) {
+    if (!isNative && !hasVapidKey) {
       setError(getMissingVapidKeyError())
     }
 
     const loadExistingSubscription = async () => {
       setIsInitializing(true)
       try {
-        const existing = await getExistingPushSubscription()
-        if (!cancelled) {
-          setSubscription(existing)
-          setPermission(getPushPermissionStatus())
+        if (isNative) {
+          const existingToken = getStoredNativePushToken()
+          const nativePermission = await getNativePushPermissionStatus()
+          if (!cancelled) {
+            setSubscription(
+              existingToken ? { platform: 'ios', token: existingToken } : null
+            )
+            setPermission(nativePermission)
+          }
+        } else {
+          const existing = await getExistingPushSubscription()
+          if (!cancelled) {
+            setSubscription(existing)
+            setPermission(getPushPermissionStatus())
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -84,7 +108,7 @@ export const usePushNotifications = (): PushState => {
     return () => {
       cancelled = true
     }
-  }, [supported, hasVapidKey])
+  }, [supported, hasVapidKey, isNative])
 
   const enable = useCallback(async () => {
     if (!supported) {
@@ -93,7 +117,7 @@ export const usePushNotifications = (): PushState => {
       throw new Error(message)
     }
 
-    if (!vapidPublicKey) {
+    if (!isNative && !vapidPublicKey) {
       const message = getMissingVapidKeyError()
       setError(message)
       throw new Error(message)
@@ -103,7 +127,23 @@ export const usePushNotifications = (): PushState => {
     setError(null)
 
     try {
-      const nextSubscription = await enablePush(vapidPublicKey)
+      if (isNative) {
+        const token = await enableNativePush()
+        const nativePermission = await getNativePushPermissionStatus()
+        setPermission(nativePermission)
+
+        if (token) {
+          const nativeSubscription: NativePushSubscription = { platform: 'ios', token }
+          setSubscription(nativeSubscription)
+          console.log('✅ Native push registration successful.')
+          return nativeSubscription
+        }
+
+        console.warn('⚠️ Native push permission denied or registration failed')
+        return null
+      }
+
+      const nextSubscription = await enablePush(vapidPublicKey as string)
       setPermission(getPushPermissionStatus())
 
       if (nextSubscription) {
@@ -138,6 +178,13 @@ export const usePushNotifications = (): PushState => {
     setError(null)
 
     try {
+      if (isNative) {
+        await disableNativePush()
+        setSubscription(null)
+        setPermission(await getNativePushPermissionStatus())
+        return
+      }
+
       await disablePush()
       setSubscription(null)
       setPermission(getPushPermissionStatus())
@@ -151,9 +198,13 @@ export const usePushNotifications = (): PushState => {
     } finally {
       setIsDisabling(false)
     }
-  }, [supported])
+  }, [supported, isNative])
 
-  const canEnable = supported && hasVapidKey && !subscription && permission !== 'denied'
+  const canEnable =
+    supported &&
+    (isNative || hasVapidKey) &&
+    !subscription &&
+    permission !== 'denied'
 
   return {
     isSupported: supported,
@@ -168,4 +219,3 @@ export const usePushNotifications = (): PushState => {
     canEnable
   }
 }
-

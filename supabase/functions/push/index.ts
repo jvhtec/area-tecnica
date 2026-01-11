@@ -4,7 +4,12 @@ import { resolveCaller } from "./auth.ts";
 import { handleBroadcast } from "./broadcast.ts";
 import { handleCheckScheduled } from "./scheduled.ts";
 import { corsHeaders, ensureAuthHeader, jsonResponse } from "./http.ts";
-import { handleSubscribe, handleUnsubscribe } from "./subscriptions.ts";
+import {
+  handleSubscribe,
+  handleSubscribeNative,
+  handleUnsubscribe,
+  handleUnsubscribeNative,
+} from "./subscriptions.ts";
 import { handleTest } from "./test.ts";
 import type {
   Action,
@@ -12,8 +17,10 @@ import type {
   CheckScheduledBody,
   RequestBody,
   SubscribeBody,
+  SubscribeNativeBody,
   TestBody,
   UnsubscribeBody,
+  UnsubscribeNativeBody,
 } from "./types.ts";
 
 serve(async (req) => {
@@ -49,6 +56,10 @@ serve(async (req) => {
       return await handleSubscribe(client, userId, body as SubscribeBody, req);
     case "unsubscribe":
       return await handleUnsubscribe(client, userId, body as UnsubscribeBody);
+    case "subscribe_native":
+      return await handleSubscribeNative(client, userId, body as SubscribeNativeBody);
+    case "unsubscribe_native":
+      return await handleUnsubscribeNative(client, userId, body as UnsubscribeNativeBody);
     case "test":
       return await handleTest(client, userId, body as TestBody);
     case "broadcast":
@@ -59,4 +70,3 @@ serve(async (req) => {
       return jsonResponse({ error: "Unsupported action" }, 400);
   }
 });
-

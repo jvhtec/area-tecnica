@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { getExistingPushSubscription, isPushSupported } from '@/lib/push';
+import { isNativePushSupported } from '@/lib/push-native';
 
 /**
  * Hook to detect when a user previously had push notifications enabled
@@ -23,7 +24,7 @@ export function usePushSubscriptionRecovery() {
     }
 
     // Only run if push is supported
-    if (!isPushSupported()) {
+    if (isNativePushSupported() || !isPushSupported()) {
       return;
     }
 

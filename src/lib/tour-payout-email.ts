@@ -13,8 +13,7 @@ export interface TourJobEmailJobDetails {
   rates_approved?: boolean | null;
 }
 
-// ...
-const NON_AUTONOMO_DEDUCTION_EUR = 30;
+// Note: NON_AUTONOMO_DEDUCTION removed - server applies discount to base before multipliers
 
 export interface TourJobEmailAttachment {
   technician_id: string;
@@ -129,13 +128,10 @@ export async function prepareTourJobEmailContext(
 
     const profile = profileMap.get(techId);
     const fullName = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || techId;
-    
-    // Calculate deduction based on timesheet count, as per user requirement (source of truth)
-    let deduction = 0;
-    if (profile?.autonomo === false) {
-        const daysCount = timesheetDateMap.get(techId)?.size || 0;
-        deduction = daysCount * NON_AUTONOMO_DEDUCTION_EUR;
-    }
+
+    // For tour jobs, deduction is already applied server-side to base before multipliers
+    // No client-side deduction calculation needed
+    const deduction = 0;
 
     const blob = (await generateRateQuotePDF(
       techQuotes,

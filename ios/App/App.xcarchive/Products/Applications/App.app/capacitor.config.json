@@ -1,0 +1,11 @@
+{
+	"appId": "com.sectorpro.areatecnica",
+	"appName": "Area Tecnica - Sector Pro",
+	"webDir": "dist",
+	"server": {
+		"allowNavigation": [
+			"*.supabase.co"
+		]
+	},
+	"packageClassList": []
+}

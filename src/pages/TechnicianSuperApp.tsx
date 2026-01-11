@@ -115,6 +115,7 @@ export default function TechnicianSuperApp() {
   const { user, hasSoundVisionAccess } = useOptimizedAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   // Determine if dark mode (guard for SSR/test environments)
   const isDark = nextTheme === 'dark' || (
@@ -303,7 +304,7 @@ export default function TechnicianSuperApp() {
     <div className={`min-h-screen flex flex-col ${t.bg} transition-colors duration-300 font-sans`}>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 pb-[calc(6rem+var(--safe-area-bottom))]">
+      <div className={`flex-1 overflow-y-auto ${t.bg} px-6 pt-[max(1.5rem,calc(env(safe-area-inset-top)+1.5rem))] pb-[calc(6rem+env(safe-area-inset-bottom))]`}>
         {tab === 'dashboard' && (
           <DashboardScreen
             theme={t}
@@ -318,6 +319,7 @@ export default function TechnicianSuperApp() {
             onOpenTour={(tourId) => setSelectedTourId(tourId)}
             onOpenRates={() => setShowRatesModal(true)}
             onOpenMessages={() => setShowMessagesModal(true)}
+            onOpenSysCalc={() => navigate('/syscalc')}
             hasSoundVisionAccess={hasSoundVisionAccess}
           />
         )}

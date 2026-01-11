@@ -151,10 +151,6 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
     { table: 'jobs', priority: 'high' }, 
     { table: 'job_departments', priority: 'medium' }
   ],
-  '/labor-po-form': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
 };
 
 const ROUTE_QUERY_KEY_OVERRIDES: Record<string, string | string[]> = {

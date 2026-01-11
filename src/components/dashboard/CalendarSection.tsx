@@ -33,7 +33,7 @@ interface CalendarSectionProps {
   onDateSelect: (date: Date | undefined) => void;
   jobs?: any[];
   department?: string;
-  onDateTypeChange: () => void;
+  onDateTypeChange?: () => void;
 }
 
 export const CalendarSection: React.FC<CalendarSectionProps> = ({
@@ -41,7 +41,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   onDateSelect,
   jobs = [],
   department,
-  onDateTypeChange,
+  onDateTypeChange = () => {},
 }) => {
   const isMobile = useIsMobile();
   const [isCollapsed, setIsCollapsed] = useState(false);

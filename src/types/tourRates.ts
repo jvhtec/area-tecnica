@@ -27,6 +27,12 @@ export interface TourJobRateQuote {
   vehicle_disclaimer_text?: string;
   breakdown: {
     error?: string;
+    autonomo_discount_eur?: number;
     [key: string]: any;
   };
+  // Payout override fields (when manual override is set)
+  autonomo_discount_eur?: number;
+  has_override?: boolean; // True if override_amount_eur is set
+  override_amount_eur?: number; // Manual override amount (if set)
+  calculated_total_eur?: number; // Original calculated amount (before override)
 }

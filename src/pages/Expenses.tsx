@@ -318,7 +318,7 @@ const ExpensesPage: React.FC = () => {
   const pendingSelectionDisabled = selectableExpenses.length === 0;
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Gastos de técnicos</h1>

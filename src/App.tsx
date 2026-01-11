@@ -48,9 +48,7 @@ const VideoPesosTool = lazy(() => import('@/pages/VideoPesosTool'));
 const ConsumosTool = lazy(() => import('@/pages/ConsumosTool'));
 const LightsConsumosTool = lazy(() => import('@/pages/LightsConsumosTool'));
 const VideoConsumosTool = lazy(() => import('@/pages/VideoConsumosTool'));
-const ExcelTool = lazy(() => import('@/pages/ExcelTool'));
 const ModernHojaDeRuta = lazy(() => import('@/components/hoja-de-ruta/ModernHojaDeRuta').then(m => ({ default: m.ModernHojaDeRuta })));
-const LaborPOForm = lazy(() => import('@/pages/LaborPOForm'));
 const Logistics = lazy(() => import('@/pages/Logistics'));
 const FestivalManagement = lazy(() => import('@/pages/FestivalManagement'));
 const FestivalArtistManagement = lazy(() => import('@/pages/FestivalArtistManagement'));
@@ -79,6 +77,8 @@ const SoundVisionFiles = lazy(() => import('@/pages/SoundVisionFiles'));
 const Layout = lazy(() => import('@/components/layout/Layout'));
 const AuthenticatedShell = lazy(() => import('@/routes/AuthenticatedShell'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
+const StagePlot = lazy(() => import('@/pages/StagePlot'));
+const SysCalc = lazy(() => import('@/pages/SysCalc'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -107,6 +107,8 @@ function ShortcutSystemInit() {
 
 const SOUND_DEPARTMENT = "sound";
 const LIGHTS_DEPARTMENT = "lights";
+const SOUND_TOOL_ROLES = ["admin", "management", "house_tech"] as const;
+const SOUND_TOOL_ROLES_WITH_TECH = [...SOUND_TOOL_ROLES, "technician"] as const;
 
 const FestivalsAccessGuard = () => {
   const { userRole, userDepartment, isLoading } = useOptimizedAuth();
@@ -239,12 +241,12 @@ export default function App() {
                               <Route path="/video-pesos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoPesosTool /></ProtectedRoute>} />
                               <Route path="/consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ConsumosTool /></ProtectedRoute>} />
                               <Route path="/lights-consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsConsumosTool /></ProtectedRoute>} />
+                              <Route path="/stage-plot" element={<ProtectedRoute allowedRoles={[...SOUND_TOOL_ROLES]}><StagePlot /></ProtectedRoute>} />
+                              <Route path="/syscalc" element={<ProtectedRoute allowedRoles={[...SOUND_TOOL_ROLES_WITH_TECH]}><SysCalc /></ProtectedRoute>} />
                               <Route path="/video-consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoConsumosTool /></ProtectedRoute>} />
                               <Route path="/lights-memoria-tecnica" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsMemoriaTecnica /></ProtectedRoute>} />
                               <Route path="/video-memoria-tecnica" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoMemoriaTecnica /></ProtectedRoute>} />
-                              <Route path="/excel-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ExcelTool /></ProtectedRoute>} />
                               <Route path="/hoja-de-ruta" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ModernHojaDeRuta /></ProtectedRoute>} />
-                              <Route path="/labor-po-form" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LaborPOForm /></ProtectedRoute>} />
 
                               {/* Tour-specific tool routes */}
                               <Route path="/tours/:tourId/sound/pesos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><PesosTool /></ProtectedRoute>} />

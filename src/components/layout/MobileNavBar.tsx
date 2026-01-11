@@ -45,7 +45,7 @@ export const MobileNavBar = ({
     <nav
       role="navigation"
       aria-label="Navegación principal"
-      className="fixed inset-x-0 bottom-0 z-40 bg-[#05070a]/95 backdrop-blur-xl border-t border-[#1f232e] px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_rgba(0,0,0,0.5)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-lg md:hidden"
     >
       <div className="mx-auto flex w-full max-w-3xl items-stretch justify-evenly gap-1">
         {primaryItems.map((item) => {
@@ -59,10 +59,10 @@ export const MobileNavBar = ({
               aria-label={item.label}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#05070a]",
+                "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 isActive
                   ? "bg-blue-600/20 text-blue-400"
-                  : "text-[#94a3b8] hover:text-white hover:bg-[#151820]",
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent",
               )}
             >
               <Icon className={cn("h-5 w-5", isActive && "text-blue-400")} aria-hidden="true" />
@@ -83,7 +83,7 @@ export const MobileNavBar = ({
                 type="button"
                 aria-label="Más opciones"
                 className={cn(
-                  "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold text-[#94a3b8] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#05070a] hover:text-white hover:bg-[#151820]",
+                  "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:text-foreground hover:bg-accent",
                   (open || activeInTray) && "bg-blue-600/20 text-blue-400",
                 )}
               >

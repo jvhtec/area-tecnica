@@ -17,8 +17,10 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { getOptimizedProfilePictureUrl } from "@/utils/imageOptimization";
 
 interface DashboardMobileHubProps {
   jobs: any[];
@@ -61,6 +63,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([]);
   const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<{ first_name?: string; last_name?: string; profile_picture_url?: string } | null>(null);
 
   const canEdit = userRole ? ["admin", "management"].includes(userRole) : false;
 
@@ -73,7 +76,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
 
         const { data: profile, error } = await supabase
           .from("profiles")
-          .select("selected_job_types, selected_job_statuses")
+          .select("selected_job_types, selected_job_statuses, first_name, last_name, profile_picture_url")
           .eq("id", session.user.id)
           .single();
 
@@ -88,6 +91,13 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
         if (profile?.selected_job_statuses) {
           setSelectedJobStatuses(profile.selected_job_statuses);
         }
+
+        // Set user profile data
+        setUserProfile({
+          first_name: profile?.first_name,
+          last_name: profile?.last_name,
+          profile_picture_url: profile?.profile_picture_url,
+        });
       } catch (error) {
         console.error("Error in loadUserPreferences:", error);
       }
@@ -189,17 +199,38 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   const handleNextDay = () => onDateSelect(addDays(selectedDate, 1));
   const handleToday = () => onDateSelect(new Date());
 
+  // User display name and initials
+  const userName = userProfile?.first_name && userProfile?.last_name
+    ? `${userProfile.first_name} ${userProfile.last_name}`
+    : 'Usuario';
+  const userInitials = userProfile?.first_name && userProfile?.last_name
+    ? `${userProfile.first_name[0]}${userProfile.last_name[0]}`.toUpperCase()
+    : 'U';
+  const profilePictureUrl = userProfile?.profile_picture_url
+    ? getOptimizedProfilePictureUrl(userProfile.profile_picture_url, { width: 96, height: 96 })
+    : undefined;
+
   if (!isMobile) return null;
 
   return (
     <div className={cn("min-h-screen", themeTokens.bg, "font-sans pb-24")}>
       <div className="max-w-md mx-auto space-y-6 p-4">
         {/* Header */}
-        <div>
-          <div className="flex items-center gap-2 text-blue-500 text-xs font-semibold uppercase tracking-[0.08em]">
-            <span>Dashboard</span>
+        <div className="flex justify-between items-center">
+          <div>
+            <div className="flex items-center gap-2 text-blue-500 text-xs font-semibold uppercase tracking-[0.08em]">
+              <span>Dashboard</span>
+            </div>
+            <h2 className={cn("text-2xl font-bold", themeTokens.textMain)}>Agenda</h2>
           </div>
-          <h2 className={cn("text-2xl font-bold", themeTokens.textMain)}>Agenda</h2>
+          <Avatar className="h-12 w-12 shadow-lg ring-2 ring-blue-500/20">
+            {profilePictureUrl && (
+              <AvatarImage src={profilePictureUrl} alt={userName} />
+            )}
+            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold">
+              {userInitials}
+            </AvatarFallback>
+          </Avatar>
         </div>
 
         {/* Quick Actions */}

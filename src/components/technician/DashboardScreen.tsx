@@ -2,8 +2,9 @@ import React from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
-import { Map as MapIcon, Calendar as CalendarIcon, MessageSquare, Euro, Loader2, Briefcase } from 'lucide-react';
+import { Map as MapIcon, Calendar as CalendarIcon, MessageSquare, Euro, Loader2, Briefcase, Binary } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useMyTours } from '@/hooks/useMyTours';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { TechJobCard } from './TechJobCard';
@@ -24,10 +25,11 @@ interface DashboardScreenProps {
     onOpenTour: (tourId: string) => void;
     onOpenRates: () => void;
     onOpenMessages: () => void;
+    onOpenSysCalc?: () => void;
     hasSoundVisionAccess: boolean;
 }
 
-export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy, onOpenTour, onOpenRates, onOpenMessages, hasSoundVisionAccess }: DashboardScreenProps) => {
+export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments, isLoading, onOpenAction, onOpenSV, onOpenObliqueStrategy, onOpenTour, onOpenRates, onOpenMessages, onOpenSysCalc, hasSoundVisionAccess }: DashboardScreenProps) => {
     const { activeTours } = useMyTours();
 
     const userInitials = userProfile?.first_name && userProfile?.last_name
@@ -68,9 +70,14 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                     <h1 className={`text-2xl font-bold ${theme.textMain}`}>Panel</h1>
                     <p className={`text-xs ${theme.textMuted}`}>Bienvenido, {userName}</p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg">
-                    {userInitials}
-                </div>
+                <Avatar className="h-12 w-12 shadow-lg ring-2 ring-blue-500/20">
+                    {userProfile?.profile_picture_url && (
+                        <AvatarImage src={userProfile.profile_picture_url} alt={userName} />
+                    )}
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold">
+                        {userInitials}
+                    </AvatarFallback>
+                </Avatar>
             </div>
 
             {/* Stats Grid */}
@@ -96,6 +103,7 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                 <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
                     {hasSoundVisionAccess && (
                         <button
+                            type="button"
                             onClick={onOpenSV}
                             className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-blue-500 transition-colors text-left group`}
                         >
@@ -104,6 +112,7 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                         </button>
                     )}
                     <button
+                        type="button"
                         onClick={onOpenMessages}
                         className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-purple-500 transition-colors text-left group`}
                     >
@@ -111,12 +120,23 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                         <span className={`text-xs font-bold ${theme.textMain}`}>Mensajes</span>
                     </button>
                     <button
+                        type="button"
                         onClick={onOpenRates}
                         className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-emerald-500 transition-colors text-left group`}
                     >
                         <Euro size={20} className="text-emerald-500 group-hover:scale-110 transition-transform" />
                         <span className={`text-xs font-bold ${theme.textMain}`}>Mis<br />tarifas</span>
                     </button>
+                    {onOpenSysCalc && userProfile?.department === 'sound' && (
+                        <button
+                            type="button"
+                            onClick={onOpenSysCalc}
+                            className={`flex-shrink-0 w-28 h-24 p-3 rounded-xl border ${theme.card} flex flex-col justify-between hover:border-teal-500 transition-colors text-left group`}
+                        >
+                            <Binary size={20} className="text-teal-500 group-hover:scale-110 transition-transform" />
+                            <span className={`text-xs font-bold ${theme.textMain}`}>SysCalc</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
