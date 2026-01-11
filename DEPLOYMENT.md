@@ -34,16 +34,20 @@ Navigate to: **Settings → Environment variables** and add:
 
 | Variable | Value | Environment |
 |----------|-------|-------------|
-| `VITE_SUPABASE_PROJECT_ID` | Your Supabase project ID | Production + Preview |
 | `VITE_SUPABASE_URL` | `https://YOUR_PROJECT_ID.supabase.co` | Production + Preview |
 | `VITE_SUPABASE_ANON_KEY` | Your Supabase anon key (JWT token) | Production + Preview |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Same as anon key | Production + Preview |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Same as anon key (fallback for compatibility) | Production + Preview |
+| `VITE_SUPABASE_FUNCTIONS_URL` | `https://YOUR_PROJECT_ID.supabase.co/functions/v1` | Production + Preview |
 | `VITE_VAPID_PUBLIC_KEY` | Your VAPID public key for web push | Production + Preview |
+| `VITE_ENABLE_ACTIVITY_PUSH_FALLBACK` | `false` (or `true` to enable) | Production + Preview |
 
 **Get Supabase credentials from**:
 - Dashboard: https://supabase.com/dashboard/project/YOUR_PROJECT_ID/settings/api
 - Copy the **anon/public** key (NOT the service_role key)
 - Copy the **Project URL**
+- Functions URL is Project URL + `/functions/v1`
+
+**Note**: `VITE_SUPABASE_PUBLISHABLE_KEY` is a fallback to `VITE_SUPABASE_ANON_KEY` for compatibility. Set it to the same value.
 
 #### Setting Variables for Both Environments
 
@@ -54,7 +58,7 @@ For each variable:
 4. Select environments: ✅ Production ✅ Preview
 5. Click **Save**
 
-Repeat for all 5 required variables.
+Repeat for all 6 required variables.
 
 ### Deployment Process
 
