@@ -169,10 +169,21 @@ Long-term goals to move toward standard practices:
 
 ## Environment Variables
 
-Production secrets are managed via Cloudflare Pages environment variables. **Never commit:**
+### Local Development
+
+Local development uses `.env` file (not committed to git):
+- Copy `.env.example` to `.env`
+- Add your Supabase credentials from the dashboard
+- Restart dev server after changing environment variables
+
+### Production/Preview Deployments
+
+Production and preview deployments use Cloudflare Pages environment variables. **Never commit:**
 - `.env` files
 - API keys, tokens, or credentials
 - Private keys or certificates
+
+**To configure deployment environment variables**, see [DEPLOYMENT.md](./DEPLOYMENT.md) for complete setup instructions.
 
 See [SECURITY.md](./SECURITY.md) for security best practices.
 
