@@ -11,6 +11,23 @@ node_modules
 dist
 dist-ssr
 *.local
+package-lock.json
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Sensitive files
+*.pem
+*.key
+*.p12
+*.keystore
+*.jks
+credentials.json
+secrets.json
 
 # Editor directories and files
 .vscode/*
