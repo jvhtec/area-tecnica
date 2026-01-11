@@ -1,5 +1,4 @@
 import { APNS_AUTH_KEY, APNS_BUNDLE_ID, APNS_ENV, APNS_KEY_ID, APNS_TEAM_ID } from "./config.ts";
-import { jsonResponse } from "./http.ts";
 import type { PushPayload, PushSendResult } from "./types.ts";
 
 const APNS_HOST = APNS_ENV === "sandbox" ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
@@ -143,11 +142,4 @@ export async function sendNativePushNotification(
   }
 
   return { ok: false, status };
-}
-
-export function apnsConfigCheck() {
-  if (!APNS_AUTH_KEY || !APNS_KEY_ID || !APNS_TEAM_ID || !APNS_BUNDLE_ID) {
-    return jsonResponse({ error: "APNs keys are not configured" }, 500);
-  }
-  return null;
 }

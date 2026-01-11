@@ -160,7 +160,7 @@ const Auth = () => {
   // Show legacy forms for signup/recovery
   if (showSignUp || showForgotPassword || isRecovery) {
     return (
-      <div className="min-h-screen flex flex-col px-4 py-8 md:py-12 bg-slate-50">
+      <div className="auth-no-oauth min-h-screen flex flex-col px-4 py-8 md:py-12 bg-slate-50">
         <div className="container max-w-lg mx-auto flex-1 flex flex-col">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold mb-2 text-slate-900">Bienvenido</h1>
@@ -182,7 +182,7 @@ const Auth = () => {
 
   return (
     <div
-      className={`min-h-screen w-full overflow-hidden relative transition-opacity duration-700 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
+      className={`auth-no-oauth min-h-screen w-full overflow-hidden relative transition-opacity duration-700 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
       onMouseMove={isDragging ? onMouseMove : undefined}
       onMouseUp={isDragging ? onMouseUp : undefined}
       onMouseLeave={onMouseLeave}

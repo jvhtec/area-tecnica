@@ -1,6 +1,6 @@
 import { createClient } from "./deps.ts";
 import { jsonResponse } from "./http.ts";
-import { apnsConfigCheck, sendNativePushNotification } from "./apns.ts";
+import { sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
 import type { NativePushTokenRow, PushSubscriptionRow, TestBody } from "./types.ts";
 
@@ -58,11 +58,6 @@ export async function handleTest(
   }
 
   if (nativeTokens?.length) {
-    const apnsCheck = apnsConfigCheck();
-    if (apnsCheck) {
-      return apnsCheck;
-    }
-
     await Promise.all(
       nativeTokens.map(async (tokenRow) => {
         const result = await sendNativePushNotification(client, tokenRow.device_token, payload);

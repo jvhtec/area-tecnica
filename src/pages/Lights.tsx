@@ -177,6 +177,12 @@ const Lights = () => {
             jobs={departmentJobs}
             date={date ?? new Date()}
             onDateSelect={(nextDate) => setDate(nextDate)}
+            canCreateJob={userRole ? ["admin", "management"].includes(userRole) : false}
+            onCreateJob={() => handleCreateJob(undefined)}
+            userRole={userRole}
+            onEditJob={handleEditClick}
+            onDeleteJob={handleDeleteClick}
+            onJobClick={handleJobClick}
           />
         )}
         {!isMobile && (
