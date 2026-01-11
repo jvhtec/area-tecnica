@@ -240,7 +240,7 @@ export default function App() {
                               <Route path="/consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ConsumosTool /></ProtectedRoute>} />
                               <Route path="/lights-consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsConsumosTool /></ProtectedRoute>} />
                               <Route path="/stage-plot" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><StagePlot /></ProtectedRoute>} />
-                              <Route path="/syscalc" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><SysCalc /></ProtectedRoute>} />
+                              <Route path="/syscalc" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech', 'tech']}><SysCalc /></ProtectedRoute>} />
                               <Route path="/video-consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoConsumosTool /></ProtectedRoute>} />
                               <Route path="/lights-memoria-tecnica" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsMemoriaTecnica /></ProtectedRoute>} />
                               <Route path="/video-memoria-tecnica" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoMemoriaTecnica /></ProtectedRoute>} />
