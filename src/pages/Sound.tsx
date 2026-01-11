@@ -179,6 +179,9 @@ const Sound = () => {
     if (!date || !jobs) return [];
     const selectedDate = startOfDay(date);
     return getDepartmentJobs().filter(job => {
+      // Skip jobs with invalid dates
+      if (!job.start_time || !job.end_time) return false;
+
       const jobStartDate = startOfDay(new Date(job.start_time));
       const jobEndDate = endOfDay(new Date(job.end_time));
 
