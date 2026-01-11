@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# Lock files - See DEVELOPMENT.md for rationale
 package-lock.json
 
 # Environment variables
