@@ -47,16 +47,22 @@ export const getDayBoundsInTimezone = (date: Date, timezone: string = 'Europe/Ma
  * Check if a UTC job time falls within a local date
  */
 export const isJobOnDate = (
-  jobStartUTC: string | Date, 
-  jobEndUTC: string | Date, 
-  localDate: Date, 
+  jobStartUTC: string | Date,
+  jobEndUTC: string | Date,
+  localDate: Date,
   jobTimezone: string = 'Europe/Madrid'
 ): boolean => {
+  // Guard against null/undefined dates
+  if (!jobStartUTC || !jobEndUTC) return false;
+
   const { start: dayStartUTC, end: dayEndUTC } = getDayBoundsInTimezone(localDate, jobTimezone);
-  
+
   const jobStart = typeof jobStartUTC === 'string' ? parseISO(jobStartUTC) : jobStartUTC;
   const jobEnd = typeof jobEndUTC === 'string' ? parseISO(jobEndUTC) : jobEndUTC;
-  
+
+  // Check if dates are valid
+  if (isNaN(jobStart.getTime()) || isNaN(jobEnd.getTime())) return false;
+
   // Check if job overlaps with the day
   return jobStart <= dayEndUTC && jobEnd >= dayStartUTC;
 };

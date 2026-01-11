@@ -77,6 +77,7 @@ const SoundVisionFiles = lazy(() => import('@/pages/SoundVisionFiles'));
 const Layout = lazy(() => import('@/components/layout/Layout'));
 const AuthenticatedShell = lazy(() => import('@/routes/AuthenticatedShell'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
+const StagePlot = lazy(() => import('@/pages/StagePlot'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -237,6 +238,7 @@ export default function App() {
                               <Route path="/video-pesos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoPesosTool /></ProtectedRoute>} />
                               <Route path="/consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><ConsumosTool /></ProtectedRoute>} />
                               <Route path="/lights-consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsConsumosTool /></ProtectedRoute>} />
+                              <Route path="/stage-plot" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><StagePlot /></ProtectedRoute>} />
                               <Route path="/video-consumos-tool" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoConsumosTool /></ProtectedRoute>} />
                               <Route path="/lights-memoria-tecnica" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><LightsMemoriaTecnica /></ProtectedRoute>} />
                               <Route path="/video-memoria-tecnica" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoMemoriaTecnica /></ProtectedRoute>} />

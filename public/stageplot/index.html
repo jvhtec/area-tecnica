@@ -1,0 +1,2495 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <meta name="theme-color" content="#0b0d12">
+
+  
+  
+  
+  <title>Plano de Escenario v2</title>
+
+  <style>
+    :root{
+      --bg:#0b0d12;
+      --panel:#121826;
+      --panel2:#0f1420;
+      --line:#26324a;
+      --text:#e9eefb;
+      --muted:#a9b4cc;
+      --accent:#4aa3ff;
+      --danger:#ff5a6a;
+      --ok:#40d98a;
+      --grid:rgba(255,255,255,.06);
+      --select: rgba(74,163,255,.22);
+      --selectLine: rgba(74,163,255,.65);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(1200px 700px at 50% -10%, #1a2540, var(--bg));
+      color:var(--text);
+    }
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:14px 16px;
+      border-bottom:1px solid var(--line);
+      background: rgba(10,12,18,.7);
+      backdrop-filter: blur(10px);
+      position:sticky;
+      top:0;
+      z-index:10;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    header h1{
+      font-size:16px;
+      margin:0;
+      letter-spacing:.2px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    header .right{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .appTitle{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .logo{
+      width:28px;
+      height:28px;
+      object-fit:contain;
+      display:block;
+    }
+
+    button, select, input, textarea{
+      font: inherit;
+      color:var(--text);
+      background: var(--panel);
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:8px 10px;
+      outline:none;
+    }
+    button{
+      cursor:pointer;
+      transition: transform .05s ease, border-color .15s ease, background .15s ease;
+    }
+    button:hover{ border-color: rgba(74,163,255,.8); }
+    button:active{ transform: translateY(1px); }
+    button.primary{ background: rgba(74,163,255,.14); border-color: rgba(74,163,255,.6); }
+    button.danger{ background: rgba(255,90,106,.12); border-color: rgba(255,90,106,.5); }
+    button.ok{ background: rgba(64,217,138,.12); border-color: rgba(64,217,138,.5); }
+    button.ghost{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.10); }
+    button:disabled{ opacity:.55; cursor:not-allowed; }
+
+    /* Blue bounding-box link button (User Guide) */
+    a.guideBtn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:12px;
+      border:2px solid rgba(74,163,255,.95);
+      color: rgba(233,238,251,.98);
+      background: rgba(74,163,255,.08);
+      text-decoration:none;
+      font-weight:700;
+      letter-spacing:.2px;
+      box-shadow: 0 0 0 2px rgba(74,163,255,.14);
+    }
+    a.guideBtn:hover{
+      background: rgba(74,163,255,.14);
+      border-color: rgba(74,163,255,1);
+    }
+    a.guideBtn:active{
+      transform: translateY(1px);
+    }
+
+    .pill{
+      display:inline-flex;
+      gap:6px;
+      align-items:center;
+      padding:6px 10px;
+      border-radius:999px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.08);
+      color: var(--muted);
+      font-size:12px;
+      cursor:default;
+      user-select:none;
+    }
+    .pill.clickable{ cursor:pointer; }
+    .dot{ width:8px; height:8px; border-radius:50%; background: var(--accent); display:inline-block; }
+
+    .layout{
+      display:grid;
+      grid-template-columns: 340px 1fr 380px;
+      gap:12px;
+      padding:12px;
+      min-height: calc(100vh - 70px);
+    }
+    .panel{
+      background: linear-gradient(180deg, rgba(18,24,38,.9), rgba(12,16,26,.9));
+      border:1px solid var(--line);
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
+    }
+
+    /* Panel headers + bodies - now supports <summary class="title"> and .body */
+    .panel .title,
+    .panel summary.title{
+      padding:12px 12px 10px 12px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .panel .title h2,
+    .panel summary.title h2{
+      margin:0;
+      font-size:13px;
+      color: var(--muted);
+      font-weight:600;
+      letter-spacing:.2px;
+      text-transform: uppercase;
+    }
+    .panel .body{ padding:12px; }
+
+    .stack{ display:flex; flex-direction:column; gap:10px; }
+    .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .small{ font-size:12px; color: var(--muted); }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+    .catalog{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      max-height: 420px;
+      overflow:auto;
+      padding-right:4px;
+    }
+    .catItem{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.04);
+    }
+    .catLeft{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      min-width:0;
+    }
+    .catIcon{
+      width:34px;
+      height:34px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 auto;
+    }
+    /* SAFARI FIX: force size for library SVG icons */
+    .catIcon svg.icon{
+      width:22px;
+      height:22px;
+      display:block;
+    }
+    .catIcon svg{ overflow: visible; }
+    .catText{ min-width:0; }
+    .catName{
+      font-size:13px;
+      font-weight:650;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width: 210px;
+    }
+    .catMeta{ font-size:12px; color: var(--muted); }
+
+    .stageWrap{
+      padding:12px;
+      height: 100%;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .stageMeta{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+
+    /* IMPORTANT: keep stage always fully visible (no cutoff) */
+    .stage{
+      flex:1;
+      min-height: 540px;
+      aspect-ratio: 4 / 3;
+      width: 100%;
+      max-width: 960px;
+      margin: 0 auto;
+      background:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      background-size: 32px 32px, 32px 32px, auto;
+      border:1px solid var(--line);
+      border-radius:16px;
+      position:relative;
+      overflow:hidden;
+      contain: layout paint;
+      user-select:none;
+      -webkit-user-select:none;
+    }
+
+    /* Inner layer that gets view-zoomed */
+    .stageInner{
+      position:absolute;
+      inset:0;
+      transform-origin:center center;
+      will-change: transform;
+    }
+
+    /* Orientation labels (default plot convention) */
+    .stage::before{
+      content:"UPSTAGE";
+      position:absolute;
+      top:10px;
+      left:50%;
+      transform: translateX(-50%);
+      font-size:12px;
+      color: rgba(255,255,255,.22);
+      letter-spacing: 2px;
+      pointer-events:none;
+      user-select:none;
+      z-index:2;
+    }
+    .stage::after{
+      content:"AUDIENCE";
+      position:absolute;
+      bottom:10px;
+      left:50%;
+      transform: translateX(-50%);
+      font-size:12px;
+      color: rgba(255,255,255,.22);
+      letter-spacing: 2px;
+      pointer-events:none;
+      user-select:none;
+      z-index:2;
+    }
+
+    .stageEdge{
+      position:absolute;
+      inset:0;
+      border-radius:16px;
+      pointer-events:none;
+      box-shadow: inset 0 0 0 2px rgba(74,163,255,.06);
+    }
+
+    .marquee{
+      position:absolute;
+      border:1px solid var(--selectLine);
+      background: var(--select);
+      border-radius:10px;
+      pointer-events:none;
+      z-index:5;
+    }
+
+    .item{
+      position:absolute;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.08);
+      box-shadow: 0 10px 18px rgba(0,0,0,.25);
+      padding:10px 10px 8px 10px;
+      touch-action:none;
+      user-select:none;
+      min-width: 90px;
+      color: var(--accent);
+      display:flex;
+      gap:8px;
+      align-items:center;
+      transform-origin: center center;
+      z-index:3;
+    }
+    .item .iconWrap{
+      width:34px;
+      height:34px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 auto;
+    }
+    .item svg.icon{
+      width:22px; height:22px;
+      display:block;
+      color: currentColor;
+    }
+    .item .textWrap{ min-width:0; }
+    .item .type{ font-size:10px; color: rgba(233,238,251,.70); text-transform: uppercase; letter-spacing:.35px; }
+    .item .label{ font-size:13px; font-weight:700; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 180px; color: rgba(233,238,251,.96); }
+    .item .sub{ font-size:11px; color: rgba(233,238,251,.60); margin-top:3px; display:flex; gap:8px; }
+    .item.selected{
+      border-color: rgba(74,163,255,.55);
+      box-shadow: 0 0 0 2px rgba(74,163,255,.18), 0 10px 18px rgba(0,0,0,.25);
+    }
+    .item.primary{
+      border-color: rgba(74,163,255,.95);
+      box-shadow: 0 0 0 2px rgba(74,163,255,.26), 0 10px 18px rgba(0,0,0,.25);
+    }
+
+    /* Resize + rotate handles (only rendered for primary item) */
+    .handles{ position:absolute; inset:0; pointer-events:none; }
+    .handle{
+      position:absolute;
+      width:12px;
+      height:12px;
+      border-radius:999px;
+      background: rgba(233,238,251,.92);
+      border:1px solid rgba(0,0,0,.45);
+      box-shadow: 0 4px 10px rgba(0,0,0,.25);
+      pointer-events:auto;
+      touch-action:none;
+    }
+    .handle.n { left:50%; top:-6px; transform:translateX(-50%); cursor:ns-resize; }
+    .handle.s { left:50%; bottom:-6px; transform:translateX(-50%); cursor:ns-resize; }
+    .handle.e { right:-6px; top:50%; transform:translateY(-50%); cursor:ew-resize; }
+    .handle.w { left:-6px; top:50%; transform:translateY(-50%); cursor:ew-resize; }
+    .handle.ne{ right:-6px; top:-6px; cursor:nesw-resize; }
+    .handle.nw{ left:-6px; top:-6px; cursor:nwse-resize; }
+    .handle.se{ right:-6px; bottom:-6px; cursor:nwse-resize; }
+    .handle.sw{ left:-6px; bottom:-6px; cursor:nesw-resize; }
+
+    .rotHandle{
+      position:absolute;
+      left:50%;
+      top:-28px;
+      width:14px;
+      height:14px;
+      border-radius:999px;
+      background: rgba(74,163,255,.95);
+      border:1px solid rgba(0,0,0,.45);
+      box-shadow: 0 6px 14px rgba(0,0,0,.25);
+      transform: translateX(-50%);
+      pointer-events:auto;
+      touch-action:none;
+      cursor:grab;
+    }
+    .rotStem{
+      position:absolute;
+      left:50%;
+      top:-18px;
+      width:2px;
+      height:14px;
+      background: rgba(74,163,255,.65);
+      transform: translateX(-50%);
+      pointer-events:none;
+      border-radius:999px;
+    }
+
+    table{ width:100%; border-collapse: collapse; font-size:12px; }
+    th, td{
+      text-align:left;
+      padding:8px 8px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      vertical-align:top;
+    }
+    th{ color: var(--muted); font-weight:650; }
+
+    .scrollBox{
+      max-height: 220px;
+      overflow:auto;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;
+      background: rgba(255,255,255,.03);
+    }
+
+    .printOnly{ display:none; }
+
+    @page { margin: 0.35in; }
+
+    /* Accordion styling */
+    details.accordion{ display:block; }
+    details.accordion > summary::-webkit-details-marker{ display:none; }
+    details.accordion > summary.title{
+      list-style:none;
+      cursor:pointer;
+      user-select:none;
+    }
+    .accRight{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .chev{
+      width:28px;
+      height:28px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color: rgba(233,238,251,.85);
+      flex:0 0 auto;
+    }
+    details.accordion[open] .chev{
+      transform: rotate(180deg);
+    }
+    .chev svg{ width:16px; height:16px; display:block; }
+
+    /* Print */
+    @media print{
+      header{ display:none !important; }
+      body{ background:#fff; color:#000; }
+      *{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+      .printOnly{
+        display:block !important;
+        font-size: 16px !important;
+        font-weight: 800 !important;
+        margin: 2px 0 10px 0 !important;
+      }
+
+      .layout{
+        display:block !important;
+        padding:0 !important;
+        gap:0 !important;
+        min-height: 0 !important;
+        width: 100% !important;
+        max-width: 960px !important;
+        margin: 0 auto !important;
+      }
+
+      .panel{
+        box-shadow:none !important;
+        background:#fff !important;
+        color:#000 !important;
+        border:1px solid #ddd !important;
+        border-radius: 12px !important;
+        margin: 0 0 10px 0 !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      .panel.catalogPanel{ display:none !important; }
+
+      button, select, input, textarea, .pill.clickable{ display:none !important; }
+
+      /* IMPORTANT: ensure accordion content is visible in print */
+      details.accordion > summary{ display:none !important; }
+      details.accordion .body{ display:block !important; padding:10px !important; }
+
+      .stageWrap{ padding:10px !important; }
+      .stageMeta{ margin-bottom:6px !important; }
+
+      .stage{
+        min-height: 0 !important;
+        width: 960px !important;
+        height: 720px !important;
+        max-width: 960px !important;
+        max-height: 720px !important;
+        aspect-ratio: auto !important;
+        background: #fff !important;
+        border:1px solid #bbb !important;
+        overflow:hidden !important;
+        contain: none !important;
+      }
+
+      .stage::before, .stage::after{ color:#888 !important; }
+      .stageEdge{ box-shadow:none !important; }
+      .marquee{ display:none !important; }
+
+      .item{
+        box-shadow:none !important;
+        background: rgba(0,0,0,.04) !important;
+        border: 1px solid rgba(0,0,0,.22) !important;
+        color:#000 !important;
+      }
+      .item .label{ color:#000 !important; }
+      .item .type, .item .sub{ color: rgba(0,0,0,.70) !important; }
+
+      .handles{ display:none !important; }
+      th, td{ border-bottom: 1px solid #e3e3e3 !important; }
+      th{ color:#444 !important; }
+
+      .scrollBox{
+        max-height: none !important;
+        overflow: visible !important;
+        border:1px solid #ddd !important;
+      }
+      .small{ color:#444 !important; }
+    }
+
+    /* Print fix: force real pixel size and stable layout before print dialog opens */
+    body.printing .layout{
+      display:block !important;
+      padding:0 !important;
+      gap:0 !important;
+      min-height: 0 !important;
+      width: 100% !important;
+      max-width: 960px !important;
+      margin: 0 auto !important;
+    }
+    body.printing header{ display:none !important; }
+    body.printing .panel{ box-shadow:none !important; }
+    body.printing .panel.catalogPanel{ display:none !important; }
+
+    /* IMPORTANT: ensure accordion content is visible during printing mode too */
+    body.printing details.accordion > summary{ display:none !important; }
+    body.printing details.accordion .body{ display:block !important; }
+
+    body.printing .stage{
+      width: 960px !important;
+      height: 720px !important;
+      min-height: 720px !important;
+      max-height: 720px !important;
+      aspect-ratio: auto !important;
+      background:#fff !important;
+      border:1px solid #bbb !important;
+      overflow:hidden !important;
+    }
+
+    body.printing .item{ box-shadow:none !important; }
+
+    /* Responsive layout (mobile) */
+    @media (max-width: 1100px){
+      .layout{
+        display:flex;
+        flex-direction:column;
+      }
+      /* MOBILE ORDER: Stage first */
+      .stagePanel{ order: 1; }
+      .catalogPanel{ order: 2; }
+      .infoPanel{ order: 3; }
+
+      .panel{ width: 100%; }
+      .stage{ min-height: 520px; }
+    }
+
+    @media (max-width: 520px){
+      button, select, input, textarea{ border-radius: 12px; padding: 10px 12px; }
+      .panel .body{ padding:10px; }
+      .stageWrap{ padding:10px; }
+      .item{ padding:10px; min-width: 86px; }
+      .item .label{ max-width: 140px; }
+    }
+
+    /* Keep desktop from accidentally collapsing */
+    @media (min-width: 1101px){
+      details.accordion > summary.title{ cursor:default; }
+    }
+
+    .item, .item *{
+      user-select:none;
+      -webkit-user-select:none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <svg width="1" height="1"
+     style="position:absolute; left:-9999px; top:-9999px;"
+     aria-hidden="true" focusable="false"
+     xmlns:xlink="http://www.w3.org/1999/xlink">
+    <symbol id="spr-mic" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M32 6c-6 0-11 5-11 11v14c0 6 5 11 11 11s11-5 11-11V17c0-6-5-11-11-11zm-7 25V17a7 7 0 0 1 14 0v14a7 7 0 0 1-14 0z"/>
+      <path fill="currentColor" d="M18 30a2 2 0 0 1 2 2c0 7 5 13 12 13s12-6 12-13a2 2 0 1 1 4 0c0 8-6 15-14 16v6h6a2 2 0 1 1 0 4H24a2 2 0 1 1 0-4h6v-6c-8-1-14-8-14-16a2 2 0 0 1 2-2z"/>
+    </symbol>
+
+    <symbol id="spr-guitar" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M44 6l14 14-4 4-3-3-9 9c2 5 0 12-5 17-6 6-15 7-20 2l-5 5a4 4 0 0 1-6-6l5-5c-5-5-4-14 2-20 5-5 12-7 17-5l9-9-3-3 4-4zm-24 19c-4 4-5 10-1 14s10 3 14-1 5-10 1-14-10-3-14 1z"/>
+    </symbol>
+
+    <symbol id="spr-bass" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M46 6l12 12-4 4-2-2-10 10c3 6 1 13-5 19-7 7-17 8-23 2l-4 4a4 4 0 1 1-6-6l4-4c-6-6-5-16 2-23 6-6 13-8 19-5L39 17l-2-2 4-4zM20 24c-5 5-6 12-2 16s11 3 16-2 6-12 2-16-11-3-16 2z"/>
+    </symbol>
+
+    <symbol id="spr-keys" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M10 18h44a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4zm0 4v20h44V22H10z"/>
+      <path fill="currentColor" d="M14 22h4v20h-4V22zm6 0h4v20h-4V22zm6 0h4v20h-4V22zm6 0h4v20h-4V22zm6 0h4v20h-4V22zm6 0h4v20h-4V22z"/>
+      <path fill="currentColor" d="M19 22h3v12h-3V22zm8 0h3v12h-3V22zm8 0h3v12h-3V22zm8 0h3v12h-3V22z"/>
+    </symbol>
+
+    <symbol id="spr-drums" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M14 26c0-8 8-14 18-14s18 6 18 14-8 14-18 14-18-6-18-14zm4 0c0 6 6 10 14 10s14-4 14-10-6-10-14-10-14 4-14 10z"/>
+      <path fill="currentColor" d="M20 40h24v12a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4V40zm4 4v8h16v-8H24z"/>
+      <path fill="currentColor" d="M10 18a2 2 0 0 1 3 0l8 8a2 2 0 0 1-3 3l-8-8a2 2 0 0 1 0-3zm44 0a2 2 0 0 1 0 3l-8 8a2 2 0 1 1-3-3l8-8a2 2 0 0 1 3 0z"/>
+    </symbol>
+
+    <symbol id="spr-amp" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M14 16h36a4 4 0 0 1 4 4v28a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4V20a4 4 0 0 1 4-4zm0 4v28h36V20H14z"/>
+      <path fill="currentColor" d="M18 24h28v4H18v-4zm0 8h28v4H18v-4zm0 8h18v4H18v-4z"/>
+      <circle fill="currentColor" cx="44" cy="42" r="3"/>
+    </symbol>
+
+    <symbol id="spr-wedge" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M10 42l44-16v18a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4v-2z"/>
+      <path fill="currentColor" d="M12 40l40-14v3L12 43v-3z" opacity=".5"/>
+    </symbol>
+
+    <symbol id="spr-iem" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M20 28c0-7 5-12 12-12s12 5 12 12v10a2 2 0 1 1-4 0V28c0-4-3-8-8-8s-8 4-8 8v10a2 2 0 1 1-4 0V28z"/>
+      <path fill="currentColor" d="M16 40a6 6 0 0 0 12 0v-2h-4v2a2 2 0 0 1-4 0v-2h-4v2zm20 0a6 6 0 0 0 12 0v-2h-4v2a2 2 0 0 1-4 0v-2h-4v2z"/>
+    </symbol>
+
+    <symbol id="spr-di" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M18 18h28a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4zm0 4v20h28V22H18z"/>
+      <path fill="currentColor" d="M22 26h8v4h-8v-4zm0 8h12v4H22v-4z"/>
+      <circle fill="currentColor" cx="42" cy="28" r="2"/>
+      <circle fill="currentColor" cx="42" cy="36" r="2"/>
+    </symbol>
+
+    <symbol id="spr-stand" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M40 10a2 2 0 0 1 2 2v10a2 2 0 1 1-4 0V12a2 2 0 0 1 2-2z"/>
+      <path fill="currentColor" d="M26 22a2 2 0 0 1 3 0l11 11a2 2 0 0 1-3 3L26 25a2 2 0 0 1 0-3z"/>
+      <path fill="currentColor" d="M40 32a2 2 0 0 1 2 2v14l6 6a2 2 0 0 1-3 3l-5-5-5 5a2 2 0 1 1-3-3l6-6V34a2 2 0 0 1 2-2z"/>
+      <path fill="currentColor" d="M20 52h40a2 2 0 1 1 0 4H20a2 2 0 1 1 0-4z"/>
+    </symbol>
+
+    <symbol id="spr-outlet" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M20 12h24a8 8 0 0 1 8 8v24a8 8 0 0 1-8 8H20a8 8 0 0 1-8-8V20a8 8 0 0 1 8-8zm0 4a4 4 0 0 0-4 4v24a4 4 0 0 0 4 4h24a4 4 0 0 0 4-4V20a4 4 0 0 0-4-4H20z"/>
+      <circle fill="currentColor" cx="26" cy="28" r="4"/>
+      <circle fill="currentColor" cx="38" cy="28" r="4"/>
+      <rect fill="currentColor" x="29" y="36" width="6" height="10" rx="3"/>
+    </symbol>
+
+    <symbol id="spr-riser" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M10 22h44a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4zm0 4v16h44V26H10z"/>
+      <path fill="currentColor" d="M14 30h10v8H14v-8zm13 0h10v8H27v-8zm13 0h10v8H40v-8z" opacity=".55"/>
+    </symbol>
+
+    <symbol id="spr-console" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M10 18h44a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4zm0 4v20h44V22H10z"/>
+      <path fill="currentColor" d="M14 26h36v4H14v-4zm0 8h20v4H14v-4z"/>
+      <circle fill="currentColor" cx="44" cy="36" r="2.5"/>
+      <circle fill="currentColor" cx="50" cy="36" r="2.5"/>
+    </symbol>
+
+    <symbol id="spr-misc" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M14 18h36a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4zm0 4v20h36V22H14z"/>
+      <path fill="currentColor" d="M20 30h24v4H20v-4zm0 8h16v4H20v-4z" opacity=".6"/>
+      <circle fill="currentColor" cx="46" cy="40" r="3"/>
+    </symbol>
+
+    <symbol id="spr-chev" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M12 15.5 5.5 9a1 1 0 0 1 1.4-1.4l5.1 5.1 5.1-5.1A1 1 0 1 1 18.5 9L12 15.5z"/>
+    </symbol>
+  </svg>
+
+  <header>
+    <h1 class="appTitle">
+      
+      <span>Plano de Escenario v2</span>
+      <span class="pill"><span class="dot"></span><span id="autosavePill">Autoguardado activado</span></span>
+    </h1>
+    <div class="right">
+      <!-- Print button hidden - use PDF generation from React -->
+
+      <button id="btnExportProject">Exportar proyecto</button>
+      <label class="pill clickable">
+        <span class="dot"></span>Import project
+        <input id="fileImportProject" type="file" accept="application/json" style="display:none;">
+      </label>
+
+      <button id="btnExportLibrary">Exportar biblioteca</button>
+      <label class="pill clickable">
+        <span class="dot"></span>Import library
+        <input id="fileImportLibrary" type="file" accept="application/json" style="display:none;">
+      </label>
+
+      <button class="danger" id="btnReset">Restablecer</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- LIBRARY (accordion on mobile) -->
+    <section class="panel catalogPanel">
+      <details class="accordion" id="accLibrary" open>
+        <summary class="title">
+          <h2>Biblioteca de elementos</h2>
+          <div class="accRight">
+            <span class="small" id="libCount">0 elementos</span>
+            <span class="chev" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><use href="#spr-chev" xlink:href="#spr-chev"></use></svg>
+            </span>
+          </div>
+        </summary>
+
+        <div class="body">
+          <div class="stack">
+            <div class="row">
+              <select id="stagePreset">
+                <option value="small">Escenario: Pequeño (5x4)</option>
+                <option value="medium" selected>Escenario: Mediano (7x5)</option>
+                <option value="large">Escenario: Grande (10x6)</option>
+                <option value="custom">Escenario: Personalizado</option>
+              </select>
+            </div>
+            <div class="row">
+              <input id="stageW" type="number" min="2.5" max="25" step="0.5" value="7" style="width:110px" />
+              <input id="stageD" type="number" min="2" max="20" step="0.5" value="5" style="width:110px" />
+              <span class="small">An x Pr</span>
+            </div>
+
+            <div class="row">
+              <input id="search" placeholder="Buscar (guitar, outlet, riser...)" style="width:100%" />
+            </div>
+            <div class="row">
+              <select id="category" style="width:100%"></select>
+            </div>
+
+            <div class="catalog" id="catalog"></div>
+
+            <div class="small">
+              Consejo: Shift clic o Cmd en Mac o Ctrl en Windows para selección múltiple. Arrastra en el escenario vacío para selección en caja.
+              <br>
+              <br>
+              <br>
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- STAGE (not accordion) -->
+    <section class="panel stagePanel">
+      <div class="title">
+        <h2>Escenario</h2>
+        <div class="row">
+          <button class="ghost" id="btnFlipView" title="Voltear todo el plano 180 grados">Vista: Público</button>
+
+          <button id="btnCenter">Centrar selección</button>
+          <button class="ghost" id="btnDuplicate" title="Duplicar seleccionados (Cmd/Ctrl+D)">Duplicar</button>
+
+          <button id="btnAddMiscS">+ Misc 1</button>
+          <button id="btnAddMiscM">+ Misc 2</button>
+          <button id="btnAddMiscL">+ Misc 3</button>
+
+          <button class="danger" id="btnDelete">Eliminar</button>
+        </div>
+      </div>
+      <div class="stageWrap">
+        <div class="stageMeta">
+          <span class="pill"><span class="dot"></span><span id="stageLabel">7 x 5</span></span>
+          <span class="small">
+            Haz clic en un elemento para editar. Arrastra para mover. Shift + Arrow nudges 0.1 m. Arrastra los puntos para redimensionar. Arrastra el punto azul para rotar (Shift ajusta 15 grados).
+          </span>
+        </div>
+        <div id="stage" class="stage">
+          <div id="stageInner" class="stageInner">
+            <div class="stageEdge"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INFO (accordion on mobile) -->
+    <section class="panel infoPanel">
+      <details class="accordion" id="accInfo" open>
+        <summary class="title">
+          <h2>Información para imprimir</h2>
+          <div class="accRight">
+            <span class="small" id="selHint">Ningún elemento seleccionado</span>
+            <span class="chev" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><use href="#spr-chev" xlink:href="#spr-chev"></use></svg>
+            </span>
+          </div>
+        </summary>
+
+        <div class="body">
+          <div class="stack">
+            <div id="printBandName" class="printOnly"></div>
+
+            <div class="row">
+              <input id="bandName" placeholder="Nombre de la banda (opcional)" style="width:100%" />
+            </div>
+
+            <div class="row">
+              <input id="fLabel" placeholder="Etiqueta (ex: Pete Vox)" style="width:100%" />
+            </div>
+
+            <div class="row">
+              <input id="fType" placeholder="Tipo" style="width:48%" disabled />
+              <input id="fColor" type="color" value="#4aa3ff" style="width:54px; padding:6px;" />
+              <input id="fInput" placeholder="Entrada (ex: Ch 1)" style="width:40%" />
+              <input id="fMix" placeholder="Mezcla (ex: M1)" style="width:30%" />
+            </div>
+
+            <div class="row">
+              <label class="small" style="min-width:70px;">Escala</label>
+              <input id="fScale" type="range" min="0.5" max="2.0" step="0.05" value="1" style="flex:1;" />
+              <span class="pill"><span id="scaleReadout">100%</span></span>
+            </div>
+
+            <!-- NEW: View zoom controls -->
+            <div class="row">
+              <label class="small" style="min-width:70px;">Zoom de vista</label>
+              <input id="viewZoom" type="range" min="0.6" max="2.0" step="0.05" value="1" style="flex:1;" />
+              <span class="pill"><span id="viewZoomReadout">100%</span></span>
+              <button class="ghost" id="btnResetViewZoom" type="button" title="Restablecer zoom de vista al 100%">Restablecer vista</button>
+            </div>
+
+            <div class="row">
+              <label class="small" style="min-width:70px;">Rotación</label>
+              <button class="ghost" id="btnResetRot" type="button">Restablecer rotación</button>
+              <span class="pill"><span id="rotReadout">0°</span></span>
+            </div>
+
+            <div class="row">
+              <textarea id="fNotes" rows="3" placeholder="Notas del elemento (ex: DI after pedals, needs boom, etc)" style="width:100%"></textarea>
+            </div>
+
+            <div class="small">Entradas</div>
+            <div class="scrollBox">
+              <table id="inputsTable">
+                <thead>
+                  <tr>
+                    <th style="width:62px">Can</th>
+                    <th>Fuente</th>
+                    <th style="width:70px">Mix</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            <div class="small">Mezclas de monitor</div>
+            <div class="scrollBox">
+              <table id="mixTable">
+                <thead>
+                  <tr>
+                    <th style="width:70px">Mix</th>
+                    <th>Quién</th>
+                    <th>Notas</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            <div class="small">Notas del evento</div>
+            <textarea id="showNotes" rows="6" placeholder="Notas del evento (estacionamiento, backline, contacto, duración del show, etc)"></textarea>
+
+            <div class="small mono" id="notesPreview" style="white-space:pre-wrap; padding:10px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:12px;"></div>
+          </div>
+        </div>
+      </details>
+    </section>
+  </div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const stageEl = $("#stage");
+    const stageInnerEl = $("#stageInner");
+
+    const STORAGE_KEY = "stageplot_v2_state";
+    const STORAGE_KEY_LIB = "stageplot_v2_user_library";
+
+    // Accordion state keys
+    const ACC_KEY = "stageplot_v2_accordion_state";
+
+    const BUILTIN_LIBRARY = {
+      version: 1,
+      items: [
+        { type:"Voz", labelDefault:"Voz", category:"Personas", w:1.0, h:0.7, sprite:"mic", inputHint:"Ch 1", mixHint:"M1" },
+        { type:"Guitarra", labelDefault:"Guitarra", category:"Instrumentos", w:1.0, h:0.7, sprite:"guitar", inputHint:"Ch ?", mixHint:"M?" },
+        { type:"Bajo", labelDefault:"Bajo", category:"Instrumentos", w:1.0, h:0.7, sprite:"bass", inputHint:"Ch ?", mixHint:"M?" },
+        { type:"Teclados", labelDefault:"Teclados", category:"Instrumentos", w:1.1, h:0.7, sprite:"keys", inputHint:"Ch ?", mixHint:"M?" },
+        { type:"Batería", labelDefault:"Batería", category:"Instrumentos", w:0.5, h:1.0, sprite:"drums", inputHint:"Multi", mixHint:"M?" },
+
+        { type:"Amplificador", labelDefault:"Amplificador", category:"Equipo de escenario", w:0.7, h:0.6, sprite:"amp" },
+        { type:"Cuña", labelDefault:"Cuña", category:"Equipo de escenario", w:0.6, h:0.5, sprite:"wedge", inputHint:"Aux ?", mixHint:"Aux?" },
+        { type:"Auricular", labelDefault:"Auricular", category:"Equipo de escenario", w:0.6, h:0.5, sprite:"iem", mixHint:"M?" },
+        { type:"DI", labelDefault:"DI", category:"Equipo de escenario", w:0.55, h:0.4, sprite:"di" },
+        { type:"Pie de micrófono", labelDefault:"Pie", category:"Equipo de escenario", w:0.55, h:0.4, sprite:"stand" },
+
+        { type:"Toma de corriente", labelDefault:"Corriente", category:"Eléctrico", w:0.5, h:0.35, sprite:"outlet" },
+        { type:"Tarima", labelDefault:"Tarima", category:"Escenario", w:1.3, h:0.7, sprite:"riser" },
+        { type:"Consola FOH", labelDefault:"FOH", category:"Sala", w:1.1, h:0.6, sprite:"console" }
+      ]
+    };
+
+    function deepClone(x){ return JSON.parse(JSON.stringify(x)); }
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+    function normalizeHex(h){
+      if(!h) return "#4aa3ff";
+      if(/^#([0-9a-f]{3})$/i.test(h)){
+        const m = h.slice(1).split("");
+        return "#" + m.map(x=>x+x).join("");
+      }
+      if(/^#([0-9a-f]{6})$/i.test(h)) return h;
+      return "#4aa3ff";
+    }
+
+    function hexToRgba(hex, a){
+      const h = normalizeHex(hex).slice(1);
+      const r = parseInt(h.slice(0,2),16);
+      const g = parseInt(h.slice(2,4),16);
+      const b = parseInt(h.slice(4,6),16);
+      return `rgba(${r},${g},${b},${a})`;
+    }
+
+    function escapeHtml(s){
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[c]));
+    }
+
+    function uid(){
+      return Math.random().toString(16).slice(2) + Date.now().toString(16);
+    }
+
+    function loadJSON(key){
+      try{
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+      }catch(e){ return null; }
+    }
+    function saveJSON(key, value){
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+
+    function mergedLibrary(){
+      const userLib = loadJSON(STORAGE_KEY_LIB) || { version: 1, items: [] };
+      const map = new Map();
+      for(const it of BUILTIN_LIBRARY.items) map.set(it.type.toLowerCase(), it);
+      for(const it of userLib.items || []) map.set((it.type||"").toLowerCase(), it);
+      const items = [...map.values()];
+      return { version: 1, items };
+    }
+
+    function buildCategoryOptions(lib){
+      const sel = $("#category");
+      const cats = new Set(["Todos"]);
+      for(const it of lib.items){
+        cats.add(it.category || "Other");
+      }
+      const list = [...cats].sort((a,b)=>{
+        if(a==="Todos") return -1;
+        if(b==="Todos") return 1;
+        return a.localeCompare(b);
+      });
+      sel.innerHTML = "";
+      for(const c of list){
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        sel.appendChild(opt);
+      }
+    }
+
+    const defaults = {
+      stage: { w: 7, d: 5 },
+      bandName: "",
+      notes: "",
+      items: [],
+      view: "audience", // "audience" or "stage"
+      viewZoom: 1
+    };
+
+    let state = loadJSON(STORAGE_KEY) || deepClone(defaults);
+
+    // Ensure view exists for older saves
+    if(!state.view) state.view = "audience";
+    if(state.viewZoom == null) state.viewZoom = 1;
+
+    function save(){ saveJSON(STORAGE_KEY, state); }
+
+    // Apply global view zoom (visual only)
+    function applyViewZoom(){
+      const z = clamp(parseFloat(state.viewZoom || 1), 0.6, 2.0);
+      state.viewZoom = z;
+      if(stageInnerEl) stageInnerEl.style.transform = `scale(${z})`;
+      const r = $("#viewZoomReadout");
+      if(r) r.textContent = `${Math.round(z * 100)}%`;
+    }
+
+    // Multi select state
+    let selectedIds = new Set();
+    let primaryId = null;
+
+    function hasModifier(e){
+      return !!(e && (e.shiftKey || e.metaKey || e.ctrlKey));
+    }
+
+    function setPrimary(id){
+      primaryId = id || null;
+      if(primaryId && !selectedIds.has(primaryId)){
+        selectedIds.add(primaryId);
+      }
+    }
+
+    function clearSelection(){
+      selectedIds.clear();
+      primaryId = null;
+    }
+
+    function toggleSelect(id){
+      if(selectedIds.has(id)){
+        selectedIds.delete(id);
+        if(primaryId === id){
+          const next = selectedIds.values().next();
+          primaryId = next && !next.done ? next.value : null;
+        }
+      }else{
+        selectedIds.add(id);
+        primaryId = id;
+      }
+    }
+
+    function selectOnly(id){
+      selectedIds = new Set([id]);
+      primaryId = id;
+    }
+
+    function selectedItems(){
+      return state.items.filter(i => selectedIds.has(i.id));
+    }
+
+    function setStageFromInputs(){
+      const w = clamp(parseFloat($("#stageW").value || 24), 8, 80);
+      const d = clamp(parseFloat($("#stageD").value || 16), 6, 60);
+      state.stage.w = w;
+      state.stage.d = d;
+      $("#stageLabel").textContent = `${w} x ${d}`;
+      save();
+      render();
+    }
+
+    /* Print-safe sizing (fixes stage disappearing in print) */
+    const PRINT_FALLBACK = { w: 960, h: 720 };
+
+    function getStageSizePx(){
+      const rect = stageEl.getBoundingClientRect();
+      let w = stageEl.clientWidth || rect.width || stageEl.offsetWidth || 0;
+      let h = stageEl.clientHeight || rect.height || stageEl.offsetHeight || 0;
+
+      if (w < 50 || h < 50) {
+        w = PRINT_FALLBACK.w;
+        h = PRINT_FALLBACK.h;
+      }
+      return { w, h, rect };
+    }
+
+    function stageToPx(xFt, yFt){
+      const { w, h, rect } = getStageSizePx();
+
+      const pad = 16;
+      const usableW = Math.max(1, w - pad*2);
+      const usableH = Math.max(1, h - pad*2);
+      const sx = usableW / state.stage.w;
+      const sy = usableH / state.stage.d;
+
+      return { x: pad + xFt * sx, y: pad + yFt * sy, sx, sy, pad, usableW, usableH, rect };
+    }
+
+    function pxToStage(clientX, clientY){
+      const { w, h, rect } = getStageSizePx();
+
+      const pad = 16;
+      const usableW = Math.max(1, w - pad*2);
+      const usableH = Math.max(1, h - pad*2);
+
+      const xIn = clamp(clientX - rect.left - pad, 0, usableW);
+      const yIn = clamp(clientY - rect.top - pad, 0, usableH);
+
+      const sx = usableW / state.stage.w;
+      const sy = usableH / state.stage.d;
+
+      return { xFt: xIn / sx, yFt: yIn / sy, rect, pad, usableW, usableH, sx, sy };
+    }
+
+    function getStageScale(){
+      const { w, h, rect } = getStageSizePx();
+
+      const pad = 16;
+      const usableW = Math.max(1, w - pad*2);
+      const usableH = Math.max(1, h - pad*2);
+
+      const sx = usableW / state.stage.w;
+      const sy = usableH / state.stage.d;
+
+      return { rect, pad, usableW, usableH, sx, sy };
+    }
+
+    const ICON_PATHS = {
+      mic: `
+        <path fill="currentColor" d="M32 6c-6 0-11 5-11 11v14c0 6 5 11 11 11s11-5 11-11V17c0-6-5-11-11-11zm-7 25V17a7 7 0 0 1 14 0v14a7 7 0 0 1-14 0z"/>
+        <path fill="currentColor" d="M18 30a2 2 0 0 1 2 2c0 7 5 13 12 13s12-6 12-13a2 2 0 1 1 4 0c0 8-6 15-14 16v6h6a2 2 0 1 1 0 4H24a2 2 0 1 1 0-4h6v-6c-8-1-14-8-14-16a2 2 0 0 1 2-2z"/>
+      `,
+      guitar: `<path fill="currentColor" d="M44 6l14 14-4 4-3-3-9 9c2 5 0 12-5 17-6 6-15 7-20 2l-5 5a4 4 0 0 1-6-6l5-5c-5-5-4-14 2-20 5-5 12-7 17-5l9-9-3-3 4-4zm-24 19c-4 4-5 10-1 14s10 3 14-1 5-10 1-14-10-3-14 1z"/>`,
+      bass: `<path fill="currentColor" d="M46 6l12 12-4 4-2-2-10 10c3 6 1 13-5 19-7 7-17 8-23 2l-4 4a4 4 0 1 1-6-6l4-4c-6-6-5-16 2-23 6-6 13-8 19-5L39 17l-2-2 4-4zM20 24c-5 5-6 12-2 16s11 3 16-2 6-12 2-16-11-3-16 2z"/>`,
+      keys: `
+        <path fill="currentColor" d="M10 18h44a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4zm0 4v20h44V22H10z"/>
+        <path fill="currentColor" d="M14 22h4v20h-4V22zm6 0h4v20h-4V22zm6 0h4v20h-4V22zm6 0h4v20h-4V22zm6 0h4v20h-4V22zm6 0h4v20h-4V22z"/>
+        <path fill="currentColor" d="M19 22h3v12h-3V22zm8 0h3v12h-3V22zm8 0h3v12h-3V22zm8 0h3v12h-3V22z"/>
+      `,
+      drums: `
+        <path fill="currentColor" d="M14 26c0-8 8-14 18-14s18 6 18 14-8 14-18 14-18-6-18-14zm4 0c0 6 6 10 14 10s14-4 14-10-6-10-14-10-14 4-14 10z"/>
+        <path fill="currentColor" d="M20 40h24v12a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4V40zm4 4v8h16v-8H24z"/>
+        <path fill="currentColor" d="M10 18a2 2 0 0 1 3 0l8 8a2 2 0 0 1-3 3l-8-8a2 2 0 0 1 0-3zm44 0a2 2 0 0 1 0 3l-8 8a2 2 0 1 1-3-3l8-8a2 2 0 0 1 3 0z"/>
+      `,
+      amp: `
+        <path fill="currentColor" d="M14 16h36a4 4 0 0 1 4 4v28a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4V20a4 4 0 0 1 4-4zm0 4v28h36V20H14z"/>
+        <path fill="currentColor" d="M18 24h28v4H18v-4zm0 8h28v4H18v-4zm0 8h18v4H18v-4z"/>
+        <circle fill="currentColor" cx="44" cy="42" r="3"/>
+      `,
+      wedge: `
+        <path fill="currentColor" d="M10 42l44-16v18a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4v-2z"/>
+        <path fill="currentColor" d="M12 40l40-14v3L12 43v-3z" opacity=".5"/>
+      `,
+      iem: `
+        <path fill="currentColor" d="M20 28c0-7 5-12 12-12s12 5 12 12v10a2 2 0 1 1-4 0V28c0-4-3-8-8-8s-8 4-8 8v10a2 2 0 1 1-4 0V28z"/>
+        <path fill="currentColor" d="M16 40a6 6 0 0 0 12 0v-2h-4v2a2 2 0 0 1-4 0v-2h-4v2zm20 0a6 6 0 0 0 12 0v-2h-4v2a2 2 0 0 1-4 0v-2h-4v2z"/>
+      `,
+      di: `
+        <path fill="currentColor" d="M18 18h28a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4zm0 4v20h28V22H18z"/>
+        <path fill="currentColor" d="M22 26h8v4h-8v-4zm0 8h12v4H22v-4z"/>
+        <circle fill="currentColor" cx="42" cy="28" r="2"/>
+        <circle fill="currentColor" cx="42" cy="36" r="2"/>
+      `,
+      stand: `
+        <path fill="currentColor" d="M40 10a2 2 0 0 1 2 2v10a2 2 0 1 1-4 0V12a2 2 0 0 1 2-2z"/>
+        <path fill="currentColor" d="M26 22a2 2 0 0 1 3 0l11 11a2 2 0 0 1-3 3L26 25a2 2 0 0 1 0-3z"/>
+        <path fill="currentColor" d="M40 32a2 2 0 0 1 2 2v14l6 6a2 2 0 0 1-3 3l-5-5-5 5a2 2 0 1 1-3-3l6-6V34a2 2 0 0 1 2-2z"/>
+        <path fill="currentColor" d="M20 52h40a2 2 0 1 1 0 4H20a2 2 0 1 1 0-4z"/>
+      `,
+      outlet: `
+        <path fill="currentColor" d="M20 12h24a8 8 0 0 1 8 8v24a8 8 0 0 1-8 8H20a8 8 0 0 1-8-8V20a8 8 0 0 1 8-8zm0 4a4 4 0 0 0-4 4v24a4 4 0 0 0 4 4h24a4 4 0 0 0 4-4V20a4 4 0 0 0-4-4H20z"/>
+        <circle fill="currentColor" cx="26" cy="28" r="4"/>
+        <circle fill="currentColor" cx="38" cy="28" r="4"/>
+        <rect fill="currentColor" x="29" y="36" width="6" height="10" rx="3"/>
+      `,
+      riser: `
+        <path fill="currentColor" d="M10 22h44a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4zm0 4v16h44V26H10z"/>
+        <path fill="currentColor" d="M14 30h10v8H14v-8zm13 0h10v8H27v-8zm13 0h10v8H40v-8z" opacity=".55"/>
+      `,
+      console: `
+        <path fill="currentColor" d="M10 18h44a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4zm0 4v20h44V22H10z"/>
+        <path fill="currentColor" d="M14 26h36v4H14v-4zm0 8h20v4H14v-4z"/>
+        <circle fill="currentColor" cx="44" cy="36" r="2.5"/>
+        <circle fill="currentColor" cx="50" cy="36" r="2.5"/>
+      `,
+      misc: `
+        <path fill="currentColor" d="M14 18h36a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4zm0 4v20h36V22H14z"/>
+        <path fill="currentColor" d="M20 30h24v4H20v-4zm0 8h16v4H20v-4z" opacity=".6"/>
+        <circle fill="currentColor" cx="46" cy="40" r="3"/>
+      `,
+      chev: `<path fill="currentColor" d="M12 15.5 5.5 9a1 1 0 0 1 1.4-1.4l5.1 5.1 5.1-5.1A1 1 0 1 1 18.5 9L12 15.5z"/>`
+    };
+
+    function renderSprite(sprite){
+      const key = (sprite || "").toLowerCase();
+      const paths = ICON_PATHS[key] || ICON_PATHS.misc;
+      const vb = (key === "chev") ? "0 0 24 24" : "0 0 64 64";
+      return `<svg class="icon" viewBox="${vb}" aria-hidden="true">${paths}</svg>`;
+    }
+
+    function rotatedAABB(w, h, deg){
+      const r = (deg || 0) * Math.PI / 180;
+      const c = Math.cos(r), s = Math.sin(r);
+      const bw = Math.abs(w*c) + Math.abs(h*s);
+      const bh = Math.abs(w*s) + Math.abs(h*c);
+      return { bw, bh };
+    }
+
+    function enforceBounds(item){
+      const wFt = item.w * (item.scale || 1);
+      const hFt = item.h * (item.scale || 1);
+      const rot = item.rot || 0;
+
+      const { bw, bh } = rotatedAABB(wFt, hFt, rot);
+
+      let cx = item.x + wFt/2;
+      let cy = item.y + hFt/2;
+
+      cx = clamp(cx, bw/2, state.stage.w - bw/2);
+      cy = clamp(cy, bh/2, state.stage.d - bh/2);
+
+      item.x = cx - wFt/2;
+      item.y = cy - hFt/2;
+
+      item.x = clamp(item.x, 0, state.stage.w - wFt);
+      item.y = clamp(item.y, 0, state.stage.d - hFt);
+    }
+
+    /* View flip - real 180-degree perspective transform (position + rotation) */
+    function updateViewUI(){
+      const b = $("#btnFlipView");
+      if(!b) return;
+      b.textContent = (state.view === "stage") ? "View: Stage" : "View: Audience";
+    }
+
+    function flipPerspective180(){
+      state.view = (state.view === "stage") ? "audience" : "stage";
+
+      for(const it of state.items){
+        const s = (it.scale || 1);
+        const wFt = (it.w || 0) * s;
+        const hFt = (it.h || 0) * s;
+
+        it.x = state.stage.w - (it.x + wFt);
+        it.y = state.stage.d - (it.y + hFt);
+
+        it.rot = ((it.rot || 0) + 180) % 360;
+
+        enforceBounds(it);
+      }
+
+      save();
+      render();
+      syncEditor();
+      updateViewUI();
+    }
+
+    function addFromCatalog(catItem){
+      const it = catItem;
+      const item = {
+        id: uid(),
+        type: it.type,
+        sprite: it.sprite || "mic",
+        x: (state.stage.w * 0.5) - (it.w/2),
+        y: (state.stage.d * 0.55) - (it.h/2),
+        w: it.w,
+        h: it.h,
+        scale: 1.0,
+        rot: 0,
+        label: it.labelDefault || it.type,
+        color: "#4aa3ff",
+        input: it.inputHint || "",
+        mix: it.mixHint || "",
+        notes: ""
+      };
+      state.items.push(item);
+      selectOnly(item.id);
+      save();
+      render();
+      syncEditor();
+
+      // On mobile, keep info panel easy to reach
+      autoAccordionBehaviorAfterSelection();
+    }
+
+    function addMisc(size){
+      const presets = {
+        S: { w: 2.2, h: 1.6, label: "Misc 1" },
+        M: { w: 3.2, h: 2.2, label: "Misc 2" },
+        L: { w: 4.4, h: 3.0, label: "Misc 3" },
+      };
+      const p = presets[size] || presets.M;
+
+      const item = {
+        id: uid(),
+        type: "Misc Gear",
+        sprite: "misc",
+        x: (state.stage.w * 0.5) - (p.w/2),
+        y: (state.stage.d * 0.70) - (p.h/2),
+        w: p.w,
+        h: p.h,
+        scale: 1.0,
+        rot: 0,
+        label: p.label,
+        color: "#4aa3ff",
+        input: "",
+        mix: "",
+        notes: ""
+      };
+
+      state.items.push(item);
+      selectOnly(item.id);
+      save();
+      render();
+      syncEditor();
+
+      autoAccordionBehaviorAfterSelection();
+    }
+
+    function render(){
+      $("#stageW").value = state.stage.w;
+      $("#stageD").value = state.stage.d;
+      $("#stageLabel").textContent = `${state.stage.w} x ${state.stage.d}`;
+
+      $("#bandName").value = state.bandName || "";
+      const bn = (state.bandName || "").trim();
+      const pb = document.querySelector("#printBandName");
+      if (pb) pb.textContent = bn ? bn : "StagePlot";
+
+      $("#showNotes").value = state.notes || "";
+      $("#notesPreview").textContent = state.notes || "";
+
+      // Sync view zoom UI + apply transform
+      const vz = clamp(parseFloat(state.viewZoom || 1), 0.6, 2.0);
+      state.viewZoom = vz;
+      $("#viewZoom").value = vz;
+      $("#viewZoomReadout").textContent = `${Math.round(vz * 100)}%`;
+      applyViewZoom();
+
+      const lib = mergedLibrary();
+      $("#libCount").textContent = `${lib.items.length} items`;
+      const search = ($("#search").value || "").trim().toLowerCase();
+      const cat = $("#category").value || "Todos";
+
+      const filtered = lib.items.filter(it => {
+        const inCat = (cat === "Todos") || ((it.category || "Other") === cat);
+        const inSearch = !search || (it.type || "").toLowerCase().includes(search) || (it.category || "").toLowerCase().includes(search);
+        return inCat && inSearch;
+      }).sort((a,b)=> (a.type||"").localeCompare(b.type||""));
+
+      const listEl = $("#catalog");
+      listEl.innerHTML = "";
+      for(const it of filtered){
+        const row = document.createElement("div");
+        row.className = "catItem";
+        row.innerHTML = `
+          <div class="catLeft">
+            <div class="catIcon">${renderSprite(it.sprite)}</div>
+            <div class="catText">
+              <div class="catName" title="${escapeHtml(it.type)}">${escapeHtml(it.type)}</div>
+              <div class="catMeta">${escapeHtml(it.category || "Other")} base ${it.w}x${it.h}</div>
+            </div>
+          </div>
+          <button class="primary">Add</button>
+        `;
+        row.querySelector("button").addEventListener("click", (e) => {
+          e.stopPropagation();
+          clearConfirms();
+          addFromCatalog(it);
+        });
+        listEl.appendChild(row);
+      }
+
+      (stageInnerEl || stageEl).querySelectorAll(".item").forEach(n => n.remove());
+
+      if(primaryId && !state.items.some(i => i.id === primaryId)){
+        primaryId = null;
+      }
+      const alive = new Set(state.items.map(i => i.id));
+      selectedIds = new Set([...selectedIds].filter(id => alive.has(id)));
+      if(!primaryId && selectedIds.size){
+        primaryId = selectedIds.values().next().value;
+      }
+
+      for(const item of state.items){
+        if(item.rot == null) item.rot = 0;
+
+        const div = document.createElement("div");
+        const isSel = selectedIds.has(item.id);
+        const isPrimary = item.id === primaryId;
+
+        div.className = "item" + (isSel ? " selected" : "") + (isPrimary ? " primary" : "");
+        div.dataset.id = item.id;
+
+        const p = stageToPx(item.x, item.y);
+        const wFt = item.w * (item.scale || 1);
+        const hFt = item.h * (item.scale || 1);
+
+        const wPx = wFt * p.sx;
+        const hPx = hFt * p.sy;
+
+        div.style.left = `${p.x}px`;
+        div.style.top = `${p.y}px`;
+        div.style.width = `${wPx}px`;
+        div.style.height = `${hPx}px`;
+
+        const c = normalizeHex(item.color || "#4aa3ff");
+        div.style.borderColor = hexToRgba(c, 0.55);
+        div.style.background = hexToRgba(c, 0.14);
+        div.style.color = c;
+        div.style.transform = `rotate(${item.rot || 0}deg)`;
+
+        div.innerHTML = `
+          <div class="iconWrap">${renderSprite(item.sprite)}</div>
+          <div class="textWrap">
+            <div class="type">${escapeHtml(item.type)}</div>
+            <div class="label" title="${escapeHtml(item.label)}">${escapeHtml(item.label)}</div>
+            <div class="sub">
+              <span>${escapeHtml(item.input || "")}</span>
+              <span>${escapeHtml(item.mix || "")}</span>
+            </div>
+          </div>
+        `;
+
+        if(isPrimary){
+          const overlay = document.createElement("div");
+          overlay.className = "handles";
+          overlay.innerHTML = `
+            <div class="rotStem"></div>
+            <div class="rotHandle" data-rot="1" title="Rotate (Shift ajusta 15 grados)"></div>
+
+            <div class="handle nw" data-h="nw"></div>
+            <div class="handle n"  data-h="n"></div>
+            <div class="handle ne" data-h="ne"></div>
+            <div class="handle e"  data-h="e"></div>
+            <div class="handle se" data-h="se"></div>
+            <div class="handle s"  data-h="s"></div>
+            <div class="handle sw" data-h="sw"></div>
+            <div class="handle w"  data-h="w"></div>
+          `;
+          div.appendChild(overlay);
+
+          overlay.querySelectorAll(".handle").forEach(h => {
+            h.addEventListener("pointerdown", onResizeStart);
+          });
+          overlay.querySelector(".rotHandle").addEventListener("pointerdown", onRotateStart);
+        }
+
+        div.addEventListener("pointerdown", onItemPointerDown);
+        (stageInnerEl || stageEl).appendChild(div);
+      }
+
+      rebuildLists();
+      updateActionButtons();
+    }
+
+    function updateActionButtons(){
+      const count = selectedIds.size;
+      $("#btnResetRot").disabled = !(primaryId && state.items.find(i => i.id === primaryId));
+      $("#btnDuplicate").disabled = (count === 0);
+      $("#btnCenter").disabled = (count === 0);
+      $("#btnDelete").disabled = (count === 0);
+    }
+
+    function rebuildLists(){
+      const tbody = $("#inputsTable tbody");
+      tbody.innerHTML = "";
+      const rows = state.items
+        .filter(i => (i.input || "").trim() || (i.type || "").trim())
+        .map(i => ({
+          ch: (i.input || "").trim(),
+          src: `${i.label || i.type}`.trim(),
+          mix: (i.mix || "").trim(),
+        }))
+        .sort((a,b) => (a.ch || "").localeCompare(b.ch || ""));
+
+      for(const r of rows){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="mono">${escapeHtml(r.ch)}</td>
+          <td>${escapeHtml(r.src)}</td>
+          <td class="mono">${escapeHtml(r.mix)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      const mixMap = new Map();
+      for(const i of state.items){
+        const mix = (i.mix || "").trim();
+        if(!mix) continue;
+        if(!mixMap.has(mix)) mixMap.set(mix, []);
+        mixMap.get(mix).push(i);
+      }
+
+      const mtbody = $("#mixTable tbody");
+      mtbody.innerHTML = "";
+      const mixes = [...mixMap.keys()].sort((a,b)=>a.localeCompare(b));
+      for(const mix of mixes){
+        const who = mixMap.get(mix).map(i => i.label || i.type).join(", ");
+        const notes = mixMap.get(mix).map(i => (i.notes || "").trim()).filter(Boolean).join(" | ");
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="mono">${escapeHtml(mix)}</td>
+          <td>${escapeHtml(who)}</td>
+          <td>${escapeHtml(notes)}</td>
+        `;
+        mtbody.appendChild(tr);
+      }
+    }
+
+    function setEditorEnabled(on){
+      ["#fLabel","#fColor","#fInput","#fMix","#fNotes","#fScale","#btnResetRot"].forEach(sel => {
+        const el = $(sel);
+        if(!el) return;
+        el.disabled = !on;
+      });
+    }
+
+    function syncEditor(){
+      const hint = $("#selHint");
+
+      // keep view zoom UI synced always
+      const vz = clamp(parseFloat(state.viewZoom || 1), 0.6, 2.0);
+      state.viewZoom = vz;
+      $("#viewZoom").value = vz;
+      $("#viewZoomReadout").textContent = `${Math.round(vz * 100)}%`;
+      applyViewZoom();
+
+      if(selectedIds.size > 1){
+        hint.textContent = `${selectedIds.size} items selected`;
+        setEditorEnabled(false);
+
+        $("#fLabel").value = "";
+        $("#fType").value = "Múltiple";
+        $("#fColor").value = "#4aa3ff";
+        $("#fInput").value = "";
+        $("#fMix").value = "";
+        $("#fNotes").value = "";
+        $("#fScale").value = 1.0;
+        $("#scaleReadout").textContent = "100%";
+        $("#rotReadout").textContent = "0°";
+        updateActionButtons();
+        return;
+      }
+
+      const item = primaryId ? state.items.find(i => i.id === primaryId) : null;
+      if(!item){
+        hint.textContent = "No item selected";
+        setEditorEnabled(false);
+
+        $("#fLabel").value = "";
+        $("#fType").value = "";
+        $("#fColor").value = "#4aa3ff";
+        $("#fInput").value = "";
+        $("#fMix").value = "";
+        $("#fNotes").value = "";
+        $("#fScale").value = 1.0;
+        $("#scaleReadout").textContent = "100%";
+        $("#rotReadout").textContent = "0°";
+        updateActionButtons();
+        return;
+      }
+
+      setEditorEnabled(true);
+      hint.textContent = `Editing: ${item.type}`;
+      $("#fLabel").value = item.label || "";
+      $("#fType").value = item.type || "";
+      $("#fColor").value = normalizeHex(item.color || "#4aa3ff");
+      $("#fInput").value = item.input || "";
+      $("#fMix").value = item.mix || "";
+      $("#fNotes").value = item.notes || "";
+      $("#fScale").value = clamp(parseFloat(item.scale || 1), 0.5, 2.0);
+      $("#scaleReadout").textContent = `${Math.round(parseFloat($("#fScale").value) * 100)}%`;
+      $("#rotReadout").textContent = `${Math.round((item.rot || 0))}°`;
+      updateActionButtons();
+    }
+
+    function updateSelected(patch){
+      if(selectedIds.size !== 1) return;
+      const item = primaryId ? state.items.find(i => i.id === primaryId) : null;
+      if(!item) return;
+
+      Object.assign(item, patch);
+      if(item.rot == null) item.rot = 0;
+      enforceBounds(item);
+
+      save();
+      render();
+      syncEditor();
+    }
+
+    // Dragging items (move). Supports moving multi selection as a group.
+    let drag = null;
+
+    function onItemPointerDown(e){
+      if(e.target && (e.target.closest(".handle") || e.target.closest(".rotHandle"))) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      clearConfirms();
+
+      const id = e.currentTarget.dataset.id;
+      const mod = hasModifier(e);
+
+      if(mod){
+        toggleSelect(id);
+      }else{
+        if(!selectedIds.has(id)) selectOnly(id);
+        else setPrimary(id);
+      }
+
+      if(selectedIds.size === 0){
+        save();
+        render();
+        syncEditor();
+        return;
+      }
+
+      const start = pxToStage(e.clientX, e.clientY);
+      const group = selectedItems().map(it => ({
+        id: it.id,
+        startX: it.x,
+        startY: it.y
+      }));
+
+      drag = {
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startXFt: start.xFt,
+        startYFt: start.yFt,
+        group
+      };
+
+      window.addEventListener("pointermove", onDragMove);
+      window.addEventListener("pointerup", onDragEnd, { once: true });
+
+      save();
+      render();
+      syncEditor();
+
+      autoAccordionBehaviorAfterSelection();
+    }
+
+    function onDragMove(e){
+      if(!drag) return;
+
+      const now = pxToStage(e.clientX, e.clientY);
+      const dxFt = now.xFt - drag.startXFt;
+      const dyFt = now.yFt - drag.startYFt;
+
+      for(const g of drag.group){
+        const item = state.items.find(i => i.id === g.id);
+        if(!item) continue;
+        item.x = g.startX + dxFt;
+        item.y = g.startY + dyFt;
+        enforceBounds(item);
+      }
+      render();
+    }
+
+    function onDragEnd(){
+      window.removeEventListener("pointermove", onDragMove);
+      drag = null;
+      save();
+      render();
+      syncEditor();
+    }
+
+    // Marquee selection (drag on empty stage)
+    let marquee = null;
+
+    function hitTestItemInRect(item, rectFt){
+      const wFt = item.w * (item.scale || 1);
+      const hFt = item.h * (item.scale || 1);
+      const ix1 = item.x;
+      const iy1 = item.y;
+      const ix2 = item.x + wFt;
+      const iy2 = item.y + hFt;
+
+      const rx1 = rectFt.x1;
+      const ry1 = rectFt.y1;
+      const rx2 = rectFt.x2;
+      const ry2 = rectFt.y2;
+
+      return !(ix2 < rx1 || ix1 > rx2 || iy2 < ry1 || iy1 > ry2);
+    }
+
+    function rectFromTwoPoints(a, b){
+      const x1 = Math.min(a.xFt, b.xFt);
+      const y1 = Math.min(a.yFt, b.yFt);
+      const x2 = Math.max(a.xFt, b.xFt);
+      const y2 = Math.max(a.yFt, b.yFt);
+      return { x1, y1, x2, y2 };
+    }
+
+    function ensureMarqueeDiv(){
+      const host = (stageInnerEl || stageEl);
+      let el = host.querySelector(".marquee");
+      if(!el){
+        el = document.createElement("div");
+        el.className = "marquee";
+        host.appendChild(el);
+      }
+      return el;
+    }
+
+    function removeMarqueeDiv(){
+      const host = (stageInnerEl || stageEl);
+      const el = host.querySelector(".marquee");
+      if(el) el.remove();
+    }
+
+    function updateMarqueeDiv(rectFt){
+      const p1 = stageToPx(rectFt.x1, rectFt.y1);
+      const p2 = stageToPx(rectFt.x2, rectFt.y2);
+
+      const left = Math.min(p1.x, p2.x);
+      const top = Math.min(p1.y, p2.y);
+      const width = Math.abs(p2.x - p1.x);
+      const height = Math.abs(p2.y - p1.y);
+
+      const el = ensureMarqueeDiv();
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+      el.style.width = `${width}px`;
+      el.style.height = `${height}px`;
+    }
+
+    stageEl.addEventListener("pointerdown", (e) => {
+      if(e.target && e.target.closest(".item")) return;
+      if(e.target && e.target.closest(".handle")) return;
+      if(e.target && e.target.closest(".rotHandle")) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      clearConfirms();
+
+      const start = pxToStage(e.clientX, e.clientY);
+      marquee = {
+        start,
+        mod: hasModifier(e),
+        startedAt: { x: e.clientX, y: e.clientY }
+      };
+
+      updateMarqueeDiv({ x1:start.xFt, y1:start.yFt, x2:start.xFt, y2:start.xFt });
+
+      window.addEventListener("pointermove", onMarqueeMove);
+      window.addEventListener("pointerup", onMarqueeEnd, { once: true });
+    });
+
+    function onMarqueeMove(e){
+      if(!marquee) return;
+
+      const now = pxToStage(e.clientX, e.clientY);
+      const rectFt = rectFromTwoPoints(marquee.start, now);
+      updateMarqueeDiv(rectFt);
+
+      const hit = state.items.filter(it => hitTestItemInRect(it, rectFt)).map(it => it.id);
+
+      if(marquee.mod){
+        const next = new Set(selectedIds);
+        hit.forEach(id => next.add(id));
+        selectedIds = next;
+        if(hit.length) primaryId = hit[hit.length - 1];
+      }else{
+        selectedIds = new Set(hit);
+        primaryId = hit.length ? hit[hit.length - 1] : null;
+      }
+
+      render();
+      syncEditor();
+    }
+
+    function onMarqueeEnd(e){
+      window.removeEventListener("pointermove", onMarqueeMove);
+
+      const startedAt = marquee && marquee.startedAt ? marquee.startedAt : { x: 0, y: 0 };
+      const mod = marquee && marquee.mod;
+
+      marquee = null;
+      removeMarqueeDiv();
+
+      const dx = Math.abs((e && e.clientX || 0) - startedAt.x);
+      const dy = Math.abs((e && e.clientY || 0) - startedAt.y);
+      if(!mod && !hasModifier(e) && (dx < 2 && dy < 2)){
+        clearSelection();
+      }
+
+      save();
+      render();
+      syncEditor();
+    }
+
+    // Resizing (primary only)
+    let resize = null;
+    const MIN_W_FT = 0.8;
+    const MIN_H_FT = 0.6;
+
+    function onResizeStart(e){
+      e.preventDefault();
+      e.stopPropagation();
+
+      const wrap = e.currentTarget.closest(".item");
+      const id = wrap && wrap.dataset && wrap.dataset.id;
+      if(!id) return;
+
+      clearConfirms();
+      selectOnly(id);
+
+      const item = state.items.find(i => i.id === id);
+      if(!item) return;
+
+      const handle = e.currentTarget.dataset.h;
+
+      const wFt = item.w;
+      const hFt = item.h;
+
+      resize = {
+        id,
+        handle,
+        startX: e.clientX,
+        startY: e.clientY,
+        startW: wFt,
+        startH: hFt,
+        startXFt: item.x,
+        startYFt: item.y,
+        startScale: item.scale || 1
+      };
+
+      e.currentTarget.setPointerCapture(e.pointerId);
+      window.addEventListener("pointermove", onResizeMove);
+      window.addEventListener("pointerup", onResizeEnd, { once: true });
+
+      render();
+      syncEditor();
+    }
+
+    function onResizeMove(e){
+      if(!resize) return;
+      const item = state.items.find(i => i.id === resize.id);
+      if(!item) return;
+
+      const { sx, sy } = getStageScale();
+      const dxFt = (e.clientX - resize.startX) / sx;
+      const dyFt = (e.clientY - resize.startY) / sy;
+
+      let w = resize.startW;
+      let h = resize.startH;
+      let x = resize.startXFt;
+      let y = resize.startYFt;
+
+      const s = item.scale || 1;
+
+      const dxBase = dxFt / s;
+      const dyBase = dyFt / s;
+
+      const hh = resize.handle;
+
+      if(hh.includes("e")) w = resize.startW + dxBase;
+      if(hh.includes("s")) h = resize.startH + dyBase;
+      if(hh.includes("w")) { w = resize.startW - dxBase; x = resize.startXFt + dxFt; }
+      if(hh.includes("n")) { h = resize.startH - dyBase; y = resize.startYFt + dyFt; }
+
+      w = Math.max(MIN_W_FT, w);
+      h = Math.max(MIN_H_FT, h);
+
+      item.w = w;
+      item.h = h;
+      item.x = x;
+      item.y = y;
+
+      enforceBounds(item);
+      render();
+      syncEditor();
+    }
+
+    function onResizeEnd(){
+      window.removeEventListener("pointermove", onResizeMove);
+      resize = null;
+      save();
+      render();
+      syncEditor();
+    }
+
+    // Rotation (primary only)
+    let rotate = null;
+    function onRotateStart(e){
+      e.preventDefault();
+      e.stopPropagation();
+
+      const wrap = e.currentTarget.closest(".item");
+      const id = wrap && wrap.dataset && wrap.dataset.id;
+      if(!id) return;
+
+      clearConfirms();
+      selectOnly(id);
+
+      const item = state.items.find(i => i.id === id);
+      if(!item) return;
+
+      const { rect, pad, sx, sy } = getStageScale();
+
+      const wFt = item.w * (item.scale || 1);
+      const hFt = item.h * (item.scale || 1);
+
+      const cxFt = item.x + wFt/2;
+      const cyFt = item.y + hFt/2;
+
+      const cxPx = rect.left + pad + cxFt * sx;
+      const cyPx = rect.top + pad + cyFt * sy;
+
+      rotate = { id, cxPx, cyPx };
+
+      e.currentTarget.setPointerCapture(e.pointerId);
+      window.addEventListener("pointermove", onRotateMove);
+      window.addEventListener("pointerup", onRotateEnd, { once: true });
+
+      render();
+      syncEditor();
+    }
+
+    function onRotateMove(e){
+      if(!rotate) return;
+      const item = state.items.find(i => i.id === rotate.id);
+      if(!item) return;
+
+      const dx = e.clientX - rotate.cxPx;
+      const dy = e.clientY - rotate.cyPx;
+
+      let deg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+      while(deg < 0) deg += 360;
+      while(deg >= 360) deg -= 360;
+
+      if(e.shiftKey){
+        deg = Math.round(deg / 15) * 15;
+      }
+
+      item.rot = deg;
+      enforceBounds(item);
+
+      render();
+      syncEditor();
+    }
+
+    function onRotateEnd(){
+      window.removeEventListener("pointermove", onRotateMove);
+      rotate = null;
+      save();
+      render();
+      syncEditor();
+    }
+
+    // Delete + Reset double confirm
+    let confirmDelete = false;
+    let confirmReset = false;
+
+    function clearConfirms(){
+      confirmDelete = false;
+      confirmReset = false;
+
+      const del = $("#btnDelete");
+      del.textContent = "Delete";
+      del.classList.add("danger");
+
+      const reset = $("#btnReset");
+      reset.textContent = "Reset";
+      reset.classList.add("danger");
+    }
+
+    document.addEventListener("click", () => { clearConfirms(); });
+
+    $("#stagePreset").addEventListener("change", (e) => {
+      e.stopPropagation();
+      clearConfirms();
+
+      const v = $("#stagePreset").value;
+      if(v === "small"){ $("#stageW").value = 5; $("#stageD").value = 4; }
+      if(v === "medium"){ $("#stageW").value = 7; $("#stageD").value = 5; }
+      if(v === "large"){ $("#stageW").value = 10; $("#stageD").value = 6; }
+      setStageFromInputs();
+    });
+
+    $("#stageW").addEventListener("change", () => { clearConfirms(); setStageFromInputs(); });
+    $("#stageD").addEventListener("change", () => { clearConfirms(); setStageFromInputs(); });
+
+    function refreshCatalog(){ render(); }
+    $("#search").addEventListener("input", refreshCatalog);
+    $("#category").addEventListener("change", refreshCatalog);
+
+    $("#bandName").addEventListener("input", () => {
+      state.bandName = $("#bandName").value || "";
+      save();
+
+      const bn = (state.bandName || "").trim();
+      const pb = document.querySelector("#printBandName");
+      if (pb) pb.textContent = bn ? bn : "StagePlot";
+    });
+
+    $("#showNotes").addEventListener("input", () => {
+      state.notes = $("#showNotes").value || "";
+      $("#notesPreview").textContent = state.notes || "";
+      save();
+    });
+
+    $("#fLabel").addEventListener("input", () => updateSelected({ label: $("#fLabel").value }));
+    $("#fColor").addEventListener("input", () => updateSelected({ color: $("#fColor").value }));
+    $("#fInput").addEventListener("input", () => updateSelected({ input: $("#fInput").value }));
+    $("#fMix").addEventListener("input", () => updateSelected({ mix: $("#fMix").value }));
+    $("#fNotes").addEventListener("input", () => updateSelected({ notes: $("#fNotes").value }));
+    $("#fScale").addEventListener("input", () => {
+      $("#scaleReadout").textContent = `${Math.round(parseFloat($("#fScale").value) * 100)}%`;
+      updateSelected({ scale: parseFloat($("#fScale").value) });
+    });
+
+    // View zoom controls
+    $("#viewZoom").addEventListener("input", (e) => {
+      state.viewZoom = parseFloat($("#viewZoom").value);
+      $("#viewZoomReadout").textContent = `${Math.round(state.viewZoom * 100)}%`;
+      applyViewZoom();
+      save();
+    });
+
+    $("#btnResetViewZoom").addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearConfirms();
+      state.viewZoom = 1;
+      $("#viewZoom").value = 1;
+      applyViewZoom();
+      save();
+    });
+
+    $("#btnResetRot").addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearConfirms();
+      if(selectedIds.size !== 1) return;
+      updateSelected({ rot: 0 });
+    });
+
+    $("#btnAddMiscS").addEventListener("click", (e) => { e.stopPropagation(); clearConfirms(); addMisc("S"); });
+    $("#btnAddMiscM").addEventListener("click", (e) => { e.stopPropagation(); clearConfirms(); addMisc("M"); });
+    $("#btnAddMiscL").addEventListener("click", (e) => { e.stopPropagation(); clearConfirms(); addMisc("L"); });
+
+    $("#btnDelete").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if(selectedIds.size === 0) return;
+
+      if(!confirmDelete){
+        clearConfirms();
+        confirmDelete = true;
+        $("#btnDelete").textContent = "Confirm Delete";
+        return;
+      }
+
+      const kill = new Set(selectedIds);
+      state.items = state.items.filter(i => !kill.has(i.id));
+      clearSelection();
+      clearConfirms();
+      save();
+      render();
+      syncEditor();
+    });
+
+    function groupBounds(items){
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for(const it of items){
+        const wFt = it.w * (it.scale || 1);
+        const hFt = it.h * (it.scale || 1);
+        minX = Math.min(minX, it.x);
+        minY = Math.min(minY, it.y);
+        maxX = Math.max(maxX, it.x + wFt);
+        maxY = Math.max(maxY, it.y + hFt);
+      }
+      if(!isFinite(minX)) return null;
+      return { minX, minY, maxX, maxY, w: (maxX - minX), h: (maxY - minY) };
+    }
+
+    $("#btnCenter").addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearConfirms();
+
+      const items = selectedItems();
+      if(items.length === 0) return;
+
+      const b = groupBounds(items);
+      if(!b) return;
+
+      const targetLeft = (state.stage.w - b.w) * 0.5;
+      const targetTop  = (state.stage.d - b.h) * 0.55;
+
+      const dx = targetLeft - b.minX;
+      const dy = targetTop - b.minY;
+
+      for(const it of items){
+        it.x += dx;
+        it.y += dy;
+        enforceBounds(it);
+      }
+
+      save();
+      render();
+      syncEditor();
+    });
+
+    function duplicateSelected(){
+      const items = selectedItems();
+      if(items.length === 0) return;
+
+      const clones = items.map(it => {
+        const copy = deepClone(it);
+        copy.id = uid();
+        copy.x = copy.x + 0.5;
+        copy.y = copy.y + 0.5;
+        enforceBounds(copy);
+        return copy;
+      });
+
+      for(const c of clones) state.items.push(c);
+
+      selectedIds = new Set(clones.map(c => c.id));
+      primaryId = clones.length ? clones[clones.length - 1].id : null;
+
+      save();
+      render();
+      syncEditor();
+    }
+
+    $("#btnDuplicate").addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearConfirms();
+      duplicateSelected();
+    });
+
+    $("#btnFlipView").addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearConfirms();
+      flipPerspective180();
+    });
+
+    // Accordion behavior (mobile) + persistence
+    const accLibrary = $("#accLibrary");
+    const accInfo = $("#accInfo");
+
+    function isMobileLayout(){
+      return window.innerWidth <= 1100;
+    }
+
+    function loadAccState(){
+      const s = loadJSON(ACC_KEY) || null;
+      return s && typeof s === "object" ? s : null;
+    }
+    function saveAccState(){
+      const s = {
+        libOpen: !!accLibrary.open,
+        infoOpen: !!accInfo.open
+      };
+      saveJSON(ACC_KEY, s);
+    }
+
+    function applyAccordionRules(){
+      // Desktop: keep both open
+      if(!isMobileLayout()){
+        accLibrary.open = true;
+        accInfo.open = true;
+        return;
+      }
+
+      // Mobile: restore last choice if available
+      const saved = loadAccState();
+      if(saved){
+        accLibrary.open = !!saved.libOpen;
+        accInfo.open = !!saved.infoOpen;
+      }else{
+        // Default mobile: keep library open, info closed until needed
+        accLibrary.open = true;
+        accInfo.open = false;
+      }
+    }
+
+    function autoAccordionBehaviorAfterSelection(){
+      if(!isMobileLayout()) return;
+      // When selecting/adding an item, open info panel (so edits are right there)
+      accInfo.open = true;
+      // Optionally collapse library to save scroll
+      accLibrary.open = false;
+      saveAccState();
+    }
+
+    // Keep state saved when user toggles
+    accLibrary.addEventListener("toggle", () => { if(isMobileLayout()) saveAccState(); });
+    accInfo.addEventListener("toggle", () => { if(isMobileLayout()) saveAccState(); });
+
+    /* Print: force stable layout before opening print dialog */
+    let prePrintAccState = null;
+
+    function preparePrintLayout(){
+      // remember accordion state
+      prePrintAccState = { libOpen: accLibrary.open, infoOpen: accInfo.open };
+
+      // force everything open so nothing disappears in print engine
+      accLibrary.open = true;
+      accInfo.open = true;
+
+      document.body.classList.add("printing");
+      stageEl.getBoundingClientRect();
+      render();
+      requestAnimationFrame(() => render());
+    }
+
+    function cleanupPrintLayout(){
+      document.body.classList.remove("printing");
+
+      // restore accordion state
+      if(prePrintAccState){
+        accLibrary.open = !!prePrintAccState.libOpen;
+        accInfo.open = !!prePrintAccState.infoOpen;
+        prePrintAccState = null;
+      }
+
+      requestAnimationFrame(() => render());
+    }
+
+    // Print button removed - using PDF generation instead
+
+    $("#btnExportProject").addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearConfirms();
+
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safeName = (state.bandName || "stageplot").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g,"");
+      a.download = `${safeName || "stageplot"}-project.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    $("#fileImportProject").addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if(!file) return;
+      const text = await file.text();
+      try{
+        const imported = JSON.parse(text);
+        if(!imported.stage || !imported.items) throw new Error("Archivo de proyecto inválido");
+        state = imported;
+
+        if(!state.view) state.view = "audience";
+        if(state.viewZoom == null) state.viewZoom = 1;
+
+        for(const it of (state.items || [])){
+          if(it.rot == null) it.rot = 0;
+        }
+
+        clearSelection();
+        clearConfirms();
+        save();
+        render();
+        syncEditor();
+        updateViewUI();
+      }catch(err){
+        alert("No se pudo importar ese JSON de proyecto.");
+      }finally{
+        $("#fileImportProject").value = "";
+      }
+    });
+
+    $("#btnExportLibrary").addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearConfirms();
+
+      const lib = loadJSON(STORAGE_KEY_LIB) || { version: 1, items: [] };
+      const blob = new Blob([JSON.stringify(lib, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "stageplot-user-library.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    function validateLibrary(obj){
+      if(!obj || typeof obj !== "object") return false;
+      if(!Array.isArray(obj.items)) return false;
+      for(const it of obj.items){
+        if(!it || typeof it !== "object") return false;
+        if(typeof it.type !== "string" || !it.type.trim()) return false;
+        if(typeof it.w !== "number" || typeof it.h !== "number") return false;
+      }
+      return true;
+    }
+
+    $("#fileImportLibrary").addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if(!file) return;
+      const text = await file.text();
+      try{
+        const imported = JSON.parse(text);
+        if(!validateLibrary(imported)) throw new Error("Archivo de biblioteca inválido");
+
+        const existing = loadJSON(STORAGE_KEY_LIB) || { version: 1, items: [] };
+        const map = new Map();
+
+        for(const it of (existing.items || [])){
+          map.set((it.type||"").toLowerCase(), it);
+        }
+        for(const it of (imported.items || [])){
+          map.set((it.type||"").toLowerCase(), it);
+        }
+
+        const merged = { version: 1, items: [...map.values()] };
+        saveJSON(STORAGE_KEY_LIB, merged);
+
+        buildCategoryOptions(mergedLibrary());
+        clearConfirms();
+        render();
+      }catch(err){
+        alert("No se pudo importar ese JSON de biblioteca.");
+      }finally{
+        $("#fileImportLibrary").value = "";
+      }
+    });
+
+    $("#btnReset").addEventListener("click", (e) => {
+      e.stopPropagation();
+
+      if(!confirmReset){
+        clearConfirms();
+        confirmReset = true;
+        $("#btnReset").textContent = "Confirmar Restablecer";
+        return;
+      }
+
+      state = deepClone(defaults);
+      clearSelection();
+      clearConfirms();
+      save();
+      render();
+      syncEditor();
+      updateViewUI();
+    });
+
+    function isTypingTarget(el){
+      if(!el) return false;
+      const t = (el.tagName || "").toLowerCase();
+      if(t === "input" || t === "textarea" || t === "select") return true;
+      if(el.isContentEditable) return true;
+      return false;
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if(isTypingTarget(document.activeElement)) return;
+
+      if((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "d")){
+        e.preventDefault();
+        duplicateSelected();
+        return;
+      }
+
+      if(e.shiftKey && ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key) && selectedIds.size){
+        e.preventDefault();
+        const step = 0.1;
+        for(const it of selectedItems()){
+          if(e.key === "ArrowLeft") it.x -= step;
+          if(e.key === "ArrowRight") it.x += step;
+          if(e.key === "ArrowUp") it.y -= step;
+          if(e.key === "ArrowDown") it.y += step;
+          enforceBounds(it);
+        }
+        save();
+        render();
+        syncEditor();
+      }
+    });
+
+    // init
+    const lib0 = mergedLibrary();
+    buildCategoryOptions(lib0);
+    $("#stagePreset").value = "medium";
+    $("#search").value = "";
+    $("#category").value = "Todos";
+
+    setStageFromInputs();
+    applyAccordionRules();
+    render();
+    syncEditor();
+    updateViewUI();
+    applyViewZoom();
+
+    let t = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        applyAccordionRules();
+        render();
+        syncEditor();
+      }, 80);
+    });
+  </script>
+
+  <!-- PostMessage communication for React integration -->
+  <script>
+    // Listen for messages from parent window (React app)
+    window.addEventListener('message', function(event) {
+      // Only accept messages from same origin
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data.type === 'LOAD_PLOT') {
+        // Load plot data from parent
+        try {
+          const plotData = event.data.data;
+          if (plotData && typeof plotData === 'object') {
+            // Merge with defaults to ensure all required fields exist
+            state = {
+              ...deepClone(defaults),
+              ...plotData
+            };
+            
+            // Ensure items have rotation field
+            for(const it of (state.items || [])){
+              if(it.rot == null) it.rot = 0;
+            }
+            
+            clearSelection();
+            save();
+            render();
+            syncEditor();
+            updateViewUI();
+            applyViewZoom();
+          }
+        } catch (error) {
+          console.error('Error loading plot data:', error);
+        }
+      } else if (event.data.type === 'GET_PLOT_DATA') {
+        // Send current plot data to parent
+        try {
+          window.parent.postMessage({
+            type: 'PLOT_DATA',
+            data: state
+          }, window.location.origin);
+        } catch (error) {
+          console.error('Error sending plot data:', error);
+        }
+      } else if (event.data.type === 'GET_PLOT_DATA_FOR_PDF') {
+        // Send complete plot data to parent for PDF generation
+        try {
+          window.parent.postMessage({
+            type: 'PLOT_DATA_FOR_PDF',
+            data: state
+          }, window.location.origin);
+        } catch (error) {
+          console.error('Error sending plot data for PDF:', error);
+        }
+      }
+    });
+
+    // Auto-save to parent when state changes (debounced)
+    let autoSaveTimeout = null;
+    const originalSave = save;
+    save = function() {
+      originalSave();
+      
+      // Clear existing timeout
+      if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+      
+      // Set new timeout to send data to parent after 2 seconds of no changes
+      autoSaveTimeout = setTimeout(() => {
+        try {
+          if (window.parent !== window) {
+            window.parent.postMessage({
+              type: 'STATE_CHANGED',
+              data: state
+            }, window.location.origin);
+          }
+        } catch (error) {
+          console.error('Error auto-saving to parent:', error);
+        }
+      }, 2000);
+    };
+  </script>
+</body>
+</html>
