@@ -181,6 +181,9 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
     if (!jobs) return [];
     return jobs
       .filter((job) => {
+        // Filter out jobs with invalid dates
+        if (!job.start_time || !job.end_time) return false;
+
         // Filter out tour jobs (but keep tourdate jobs)
         if (job.job_type === 'tour') return false;
 
@@ -201,7 +204,14 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
 
         return true;
       })
-      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+      .sort((a, b) => {
+        const aTime = new Date(a.start_time).getTime();
+        const bTime = new Date(b.start_time).getTime();
+        // Handle invalid dates by putting them at the end
+        if (isNaN(aTime)) return 1;
+        if (isNaN(bTime)) return -1;
+        return aTime - bTime;
+      });
   }, [jobs, department, selectedJobTypes, selectedJobStatuses]);
 
   // Get distinct job types and statuses for filter options
@@ -228,8 +238,14 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
     const dayEnd = endOfDay(selectedDate);
 
     return filteredJobs.filter((job) => {
+      // Double-check dates are valid (should already be filtered in filteredJobs)
+      if (!job.start_time || !job.end_time) return false;
+
       const jobStart = new Date(job.start_time);
       const jobEnd = new Date(job.end_time);
+
+      // Verify dates are valid after parsing
+      if (isNaN(jobStart.getTime()) || isNaN(jobEnd.getTime())) return false;
 
       return isWithinInterval(dayStart, { start: startOfDay(jobStart), end: endOfDay(jobEnd) }) ||
         isWithinInterval(dayEnd, { start: startOfDay(jobStart), end: endOfDay(jobEnd) });
@@ -529,7 +545,9 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                   <div className={cn("flex items-center gap-4 text-xs mt-3 pb-3 border-b border-dashed", t.textMuted, t.divider)}>
                     <div className="flex items-center gap-1.5">
                       <Clock size={14} />
-                      {format(new Date(job.start_time), "HH:mm")} - {format(new Date(job.end_time), "HH:mm")}
+                      {job.start_time && job.end_time
+                        ? `${format(new Date(job.start_time), "HH:mm")} - ${format(new Date(job.end_time), "HH:mm")}`
+                        : 'Time TBD'}
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Users size={14} />
