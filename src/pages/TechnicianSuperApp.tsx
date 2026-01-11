@@ -303,7 +303,7 @@ export default function TechnicianSuperApp() {
     <div className={`min-h-screen flex flex-col ${t.bg} transition-colors duration-300 font-sans`}>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 pb-[calc(6rem+var(--safe-area-bottom))]">
+      <div className="flex-1 overflow-y-auto px-6 pt-[max(1.5rem,calc(env(safe-area-inset-top)+1.5rem))] pb-[calc(6rem+env(safe-area-inset-bottom))]">
         {tab === 'dashboard' && (
           <DashboardScreen
             theme={t}
