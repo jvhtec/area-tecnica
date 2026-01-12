@@ -2919,36 +2919,45 @@ export type Database = {
       custom_tech_rates: {
         Row: {
           base_day_eur: number
+          base_day_especialista_eur: number | null
+          base_day_responsable_eur: number | null
           currency: string
           overtime_hour_eur: number | null
           plus_10_12_eur: number | null
           profile_id: string
           rehearsal_day_eur: number | null
           tour_base_other_eur: number | null
+          tour_base_especialista_eur: number | null
           tour_base_responsable_eur: number | null
           updated_at: string
           updated_by: string | null
         }
         Insert: {
           base_day_eur: number
+          base_day_especialista_eur?: number | null
+          base_day_responsable_eur?: number | null
           currency?: string
           overtime_hour_eur?: number | null
           plus_10_12_eur?: number | null
           profile_id: string
           rehearsal_day_eur?: number | null
           tour_base_other_eur?: number | null
+          tour_base_especialista_eur?: number | null
           tour_base_responsable_eur?: number | null
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
           base_day_eur?: number
+          base_day_especialista_eur?: number | null
+          base_day_responsable_eur?: number | null
           currency?: string
           overtime_hour_eur?: number | null
           plus_10_12_eur?: number | null
           profile_id?: string
           rehearsal_day_eur?: number | null
           tour_base_other_eur?: number | null
+          tour_base_especialista_eur?: number | null
           tour_base_responsable_eur?: number | null
           updated_at?: string
           updated_by?: string | null

@@ -27,47 +27,77 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
   const saveRateMutation = useSaveHouseTechRate();
   const logActivityMutation = useLogRateActivity();
   
-  const [baseDayEur, setBaseDayEur] = useState<string>('');
+  const [baseDayTecnicoEur, setBaseDayTecnicoEur] = useState<string>('');
+  const [baseDayEspecialistaEur, setBaseDayEspecialistaEur] = useState<string>('');
+  const [baseDayResponsableEur, setBaseDayResponsableEur] = useState<string>('');
+
   const [tourBaseResponsableEur, setTourBaseResponsableEur] = useState<string>('');
-  const [tourBaseOtherEur, setTourBaseOtherEur] = useState<string>('');
+  const [tourBaseEspecialistaEur, setTourBaseEspecialistaEur] = useState<string>('');
+  const [tourBaseTecnicoEur, setTourBaseTecnicoEur] = useState<string>('');
   const [plus1012Eur, setPlus1012Eur] = useState<string>('30');
   const [overtimeHourEur, setOvertimeHourEur] = useState<string>('');
 
+  const RATE_CATEGORIES = ['tecnico', 'especialista', 'responsable'] as const;
+  type RateCategory = (typeof RATE_CATEGORIES)[number];
+
   // Get category defaults for context
-  const { data: categoryDefaults } = useQuery({
-    queryKey: ['rate-card-defaults', category],
+  const { data: categoryDefaultsMap } = useQuery({
+    queryKey: ['rate-card-defaults', 'tecnico-especialista-responsable'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('rate_cards_2025')
-        .select('base_day_eur, plus_10_12_eur, overtime_hour_eur')
-        .eq('category', category)
-        .single();
+        .select('category, base_day_eur, plus_10_12_eur, overtime_hour_eur')
+        .in('category', RATE_CATEGORIES);
 
       if (error) throw error;
-      return data as CategoryDefaults;
+
+      const map: Partial<Record<RateCategory, CategoryDefaults>> = {};
+      const rows = (data || []) as Array<{
+        category: string;
+        base_day_eur: number;
+        plus_10_12_eur: number;
+        overtime_hour_eur: number;
+      }>;
+
+      rows.forEach((row) => {
+        if (RATE_CATEGORIES.includes(row.category as RateCategory)) {
+          map[row.category as RateCategory] = {
+            base_day_eur: row.base_day_eur,
+            plus_10_12_eur: row.plus_10_12_eur,
+            overtime_hour_eur: row.overtime_hour_eur,
+          };
+        }
+      });
+      return map;
     },
   });
 
   useEffect(() => {
     if (currentRate) {
-      setBaseDayEur(currentRate.base_day_eur.toString());
+      setBaseDayTecnicoEur(currentRate.base_day_eur.toString());
+      setBaseDayEspecialistaEur(currentRate.base_day_especialista_eur?.toString() || '');
+      setBaseDayResponsableEur(currentRate.base_day_responsable_eur?.toString() || '');
       setTourBaseResponsableEur(currentRate.tour_base_responsable_eur?.toString() || '');
-      setTourBaseOtherEur(currentRate.tour_base_other_eur?.toString() || '');
+      setTourBaseEspecialistaEur(currentRate.tour_base_especialista_eur?.toString() || '');
+      setTourBaseTecnicoEur(currentRate.tour_base_other_eur?.toString() || '');
       setPlus1012Eur(currentRate.plus_10_12_eur?.toString() || '30');
       setOvertimeHourEur(currentRate.overtime_hour_eur?.toString() || '');
     }
   }, [currentRate]);
 
   const handleSave = async () => {
-    if (!baseDayEur || parseFloat(baseDayEur) <= 0) {
+    if (!baseDayTecnicoEur || parseFloat(baseDayTecnicoEur) <= 0) {
       return;
     }
 
     await saveRateMutation.mutateAsync({
       profile_id: profileId,
-      base_day_eur: parseFloat(baseDayEur),
+      base_day_eur: parseFloat(baseDayTecnicoEur),
+      base_day_especialista_eur: baseDayEspecialistaEur ? parseFloat(baseDayEspecialistaEur) : null,
+      base_day_responsable_eur: baseDayResponsableEur ? parseFloat(baseDayResponsableEur) : null,
       tour_base_responsable_eur: tourBaseResponsableEur ? parseFloat(tourBaseResponsableEur) : null,
-      tour_base_other_eur: tourBaseOtherEur ? parseFloat(tourBaseOtherEur) : null,
+      tour_base_especialista_eur: tourBaseEspecialistaEur ? parseFloat(tourBaseEspecialistaEur) : null,
+      tour_base_other_eur: tourBaseTecnicoEur ? parseFloat(tourBaseTecnicoEur) : null,
       plus_10_12_eur: plus1012Eur ? parseFloat(plus1012Eur) : null,
       overtime_hour_eur: overtimeHourEur ? parseFloat(overtimeHourEur) : null,
     });
@@ -115,13 +145,28 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Category defaults for context */}
-        {categoryDefaults && (
+        {categoryDefaultsMap && (
           <div className="bg-muted/50 p-4 rounded-lg">
-            <h4 className="text-sm font-medium mb-2">Valores por defecto de la categoría ({category})</h4>
-            <div className="grid grid-cols-3 gap-4 text-sm text-muted-foreground">
-              <div>Día base: €{categoryDefaults.base_day_eur}</div>
-              <div>Plus 10-12h: €{categoryDefaults.plus_10_12_eur}</div>
-              <div>Horas extra: €{categoryDefaults.overtime_hour_eur}/h</div>
+            <h4 className="text-sm font-medium mb-2">Valores por defecto por categoría</h4>
+            <div className="grid gap-4 text-sm text-muted-foreground sm:grid-cols-3">
+              <div className={category === 'tecnico' ? 'text-foreground' : undefined}>
+                <div className="font-medium">Técnico</div>
+                <div>Día base: €{categoryDefaultsMap.tecnico?.base_day_eur ?? '—'}</div>
+                <div>Plus 10-12h: €{categoryDefaultsMap.tecnico?.plus_10_12_eur ?? '—'}</div>
+                <div>Horas extra: €{categoryDefaultsMap.tecnico?.overtime_hour_eur ?? '—'}/h</div>
+              </div>
+              <div className={category === 'especialista' ? 'text-foreground' : undefined}>
+                <div className="font-medium">Especialista</div>
+                <div>Día base: €{categoryDefaultsMap.especialista?.base_day_eur ?? '—'}</div>
+                <div>Plus 10-12h: €{categoryDefaultsMap.especialista?.plus_10_12_eur ?? '—'}</div>
+                <div>Horas extra: €{categoryDefaultsMap.especialista?.overtime_hour_eur ?? '—'}/h</div>
+              </div>
+              <div className={category === 'responsable' ? 'text-foreground' : undefined}>
+                <div className="font-medium">Responsable</div>
+                <div>Día base: €{categoryDefaultsMap.responsable?.base_day_eur ?? '—'}</div>
+                <div>Plus 10-12h: €{categoryDefaultsMap.responsable?.plus_10_12_eur ?? '—'}</div>
+                <div>Horas extra: €{categoryDefaultsMap.responsable?.overtime_hour_eur ?? '—'}/h</div>
+              </div>
             </div>
           </div>
         )}
@@ -131,18 +176,84 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
         {/* Rate override form */}
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="base-day">Tarifa día base (€) *</Label>
+            <Label htmlFor="base-day-tecnico">Tarifa día base - Técnico (€) *</Label>
             <Input
-              id="base-day"
+              id="base-day-tecnico"
               type="number"
               step="0.01"
               min="0"
-              value={baseDayEur}
-              onChange={(e) => setBaseDayEur(e.target.value)}
-              placeholder="Introduce la tarifa de día base"
+              value={baseDayTecnicoEur}
+              onChange={(e) => setBaseDayTecnicoEur(e.target.value)}
+              placeholder="Introduce la tarifa de día base (técnico)"
             />
             <p className="text-xs text-muted-foreground">
-              Se usa para eventos de house y turnos de hasta 10 horas
+              Se usa para turnos con categoría técnico. Especialista/Responsable pueden sobrescribir este valor.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="base-day-especialista">Tarifa día base - Especialista (€)</Label>
+            <Input
+              id="base-day-especialista"
+              type="number"
+              step="0.01"
+              min="0"
+              value={baseDayEspecialistaEur}
+              onChange={(e) => setBaseDayEspecialistaEur(e.target.value)}
+              placeholder="Dejar vacío para usar técnico"
+            />
+            <p className="text-xs text-muted-foreground">
+              Si está vacío, se usará la tarifa de técnico.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="base-day-responsable">Tarifa día base - Responsable (€)</Label>
+            <Input
+              id="base-day-responsable"
+              type="number"
+              step="0.01"
+              min="0"
+              value={baseDayResponsableEur}
+              onChange={(e) => setBaseDayResponsableEur(e.target.value)}
+              placeholder="Dejar vacío para usar especialista/técnico"
+            />
+            <p className="text-xs text-muted-foreground">
+              Si está vacío, se usará la tarifa de especialista (o técnico si especialista está vacío).
+            </p>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label htmlFor="tour-base-tecnico">Tarifa día base para tours - Técnico (€)</Label>
+            <Input
+              id="tour-base-tecnico"
+              type="number"
+              step="0.01"
+              min="0"
+              value={tourBaseTecnicoEur}
+              onChange={(e) => setTourBaseTecnicoEur(e.target.value)}
+              placeholder="Dejar vacío para usar día base"
+            />
+            <p className="text-xs text-muted-foreground">
+              Si está vacío, se usará la tarifa día base correspondiente a la categoría.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tour-base-especialista">Tarifa día base para tours - Especialista (€)</Label>
+            <Input
+              id="tour-base-especialista"
+              type="number"
+              step="0.01"
+              min="0"
+              value={tourBaseEspecialistaEur}
+              onChange={(e) => setTourBaseEspecialistaEur(e.target.value)}
+              placeholder="Dejar vacío para usar tour técnico o día base"
+            />
+            <p className="text-xs text-muted-foreground">
+              Si está vacío, se usará la tarifa de tour técnico; si también está vacío, la tarifa día base de especialista/técnico.
             </p>
           </div>
 
@@ -155,26 +266,10 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
               min="0"
               value={tourBaseResponsableEur}
               onChange={(e) => setTourBaseResponsableEur(e.target.value)}
-              placeholder="Dejar vacío para usar tarifa estándar"
+              placeholder="Dejar vacío para usar día base"
             />
             <p className="text-xs text-muted-foreground">
-              Tarifa cuando trabaja como responsable en tours. Si está vacío, se usará la tarifa día base estándar.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tour-base-other">Tarifa día base para tours - Técnico/Especialista (€)</Label>
-            <Input
-              id="tour-base-other"
-              type="number"
-              step="0.01"
-              min="0"
-              value={tourBaseOtherEur}
-              onChange={(e) => setTourBaseOtherEur(e.target.value)}
-              placeholder="Dejar vacío para usar tarifa estándar"
-            />
-            <p className="text-xs text-muted-foreground">
-              Tarifa cuando trabaja como técnico o especialista en tours. Si está vacío, se usará la tarifa día base estándar.
+              Si está vacío, se usará la tarifa día base de responsable (o especialista/técnico).
             </p>
           </div>
 
@@ -203,7 +298,7 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
               min="0"
               value={overtimeHourEur}
               onChange={(e) => setOvertimeHourEur(e.target.value)}
-              placeholder={`Por defecto: €${categoryDefaults?.overtime_hour_eur || '20'}/h`}
+              placeholder={`Por defecto: €${categoryDefaultsMap?.[category as RateCategory]?.overtime_hour_eur || '20'}/h`}
             />
             <p className="text-xs text-muted-foreground">
               Precio por hora por encima de 12 (dejar vacío para usar el valor por defecto de la categoría)
@@ -214,7 +309,7 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
         <div className="flex justify-end">
           <Button 
             onClick={handleSave}
-            disabled={saveRateMutation.isPending || !baseDayEur || parseFloat(baseDayEur) <= 0}
+            disabled={saveRateMutation.isPending || !baseDayTecnicoEur || parseFloat(baseDayTecnicoEur) <= 0}
             className="flex items-center gap-2"
           >
             <Save className="h-4 w-4" />

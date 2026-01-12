@@ -6,8 +6,11 @@ import { RATES_QUERY_KEYS } from '@/constants/ratesQueryKeys';
 export interface HouseTechRate {
   profile_id: string;
   base_day_eur: number;
+  base_day_especialista_eur?: number | null;
+  base_day_responsable_eur?: number | null;
   tour_base_responsable_eur?: number;
   tour_base_other_eur?: number;
+  tour_base_especialista_eur?: number | null;
   plus_10_12_eur?: number;
   overtime_hour_eur?: number;
   currency: string;
@@ -18,8 +21,11 @@ export interface HouseTechRate {
 export interface HouseTechRateInput {
   profile_id: string;
   base_day_eur: number;
+  base_day_especialista_eur?: number | null;
+  base_day_responsable_eur?: number | null;
   tour_base_responsable_eur?: number | null;
   tour_base_other_eur?: number | null;
+  tour_base_especialista_eur?: number | null;
   plus_10_12_eur?: number | null;
   overtime_hour_eur?: number | null;
 }

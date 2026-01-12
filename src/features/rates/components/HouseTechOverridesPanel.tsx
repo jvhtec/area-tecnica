@@ -53,6 +53,17 @@ export function HouseTechOverridesPanel() {
             >
               {technicians.map((tech) => {
                 const matches = !searchTerm || tech.profileName.toLowerCase().includes(searchTerm);
+                const hasCustom = tech.overrideBaseDayTecnico != null;
+                const effectiveTecnico = tech.overrideBaseDayTecnico ?? null;
+                const effectiveEspecialista =
+                  tech.overrideBaseDayTecnico != null
+                    ? tech.overrideBaseDayEspecialista ?? tech.overrideBaseDayTecnico
+                    : null;
+                const effectiveResponsable =
+                  tech.overrideBaseDayTecnico != null
+                    ? tech.overrideBaseDayResponsable ?? tech.overrideBaseDayEspecialista ?? tech.overrideBaseDayTecnico
+                    : null;
+
                 return (
                   <AccordionItem
                     key={tech.profileId}
@@ -68,8 +79,11 @@ export function HouseTechOverridesPanel() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {tech.overrideBaseDay ? (
-                        <Badge variant="secondary">Tarifa personalizada: {formatCurrency(tech.overrideBaseDay)}</Badge>
+                      {hasCustom ? (
+                        <Badge variant="secondary">
+                          Tarifas: T {formatCurrency(effectiveTecnico ?? 0)} · E {formatCurrency(effectiveEspecialista ?? 0)} · R{' '}
+                          {formatCurrency(effectiveResponsable ?? 0)}
+                        </Badge>
                       ) : (
                         <Badge variant="outline">Usando valor por defecto</Badge>
                       )}

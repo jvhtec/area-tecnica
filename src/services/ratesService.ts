@@ -22,8 +22,11 @@ export interface RatesOverview {
 export interface HouseTechOverrideListItem {
   profileId: string;
   profileName: string;
+  role: string | null;
   defaultCategory: string | null;
-  overrideBaseDay: number | null;
+  overrideBaseDayTecnico: number | null;
+  overrideBaseDayEspecialista: number | null;
+  overrideBaseDayResponsable: number | null;
   overrideUpdatedAt: string | null;
 }
 
@@ -130,12 +133,20 @@ export async function fetchHouseTechOverrides(): Promise<HouseTechOverrideListIt
   const technicianList = technicians || [];
   const profileIds = technicianList.map((tech) => tech.id);
 
-  let overrideMap: Record<string, { base_day_eur: Nullable<number>; updated_at: Nullable<string> }> = {};
+  let overrideMap: Record<
+    string,
+    {
+      base_day_eur: Nullable<number>;
+      base_day_especialista_eur: Nullable<number>;
+      base_day_responsable_eur: Nullable<number>;
+      updated_at: Nullable<string>;
+    }
+  > = {};
 
   if (profileIds.length > 0) {
     const { data: overrides, error: overridesError } = await supabase
       .from('custom_tech_rates')
-      .select('profile_id, base_day_eur, updated_at')
+      .select('profile_id, base_day_eur, base_day_especialista_eur, base_day_responsable_eur, updated_at')
       .in('profile_id', profileIds);
 
     if (overridesError) throw overridesError;
@@ -143,7 +154,12 @@ export async function fetchHouseTechOverrides(): Promise<HouseTechOverrideListIt
     overrideMap = Object.fromEntries(
       (overrides || []).map((override) => [
         override.profile_id,
-        { base_day_eur: override.base_day_eur, updated_at: override.updated_at },
+        {
+          base_day_eur: override.base_day_eur,
+          base_day_especialista_eur: override.base_day_especialista_eur,
+          base_day_responsable_eur: override.base_day_responsable_eur,
+          updated_at: override.updated_at,
+        },
       ]),
     );
   }
@@ -151,8 +167,11 @@ export async function fetchHouseTechOverrides(): Promise<HouseTechOverrideListIt
   return technicianList.map((tech) => ({
     profileId: tech.id,
     profileName: `${tech.first_name ?? ''} ${tech.last_name ?? ''}`.trim() || 'Sin nombre',
+    role: tech.role ?? null,
     defaultCategory: tech.default_timesheet_category ?? DEFAULT_CATEGORY,
-    overrideBaseDay: overrideMap[tech.id]?.base_day_eur ?? null,
+    overrideBaseDayTecnico: overrideMap[tech.id]?.base_day_eur ?? null,
+    overrideBaseDayEspecialista: overrideMap[tech.id]?.base_day_especialista_eur ?? null,
+    overrideBaseDayResponsable: overrideMap[tech.id]?.base_day_responsable_eur ?? null,
     overrideUpdatedAt: overrideMap[tech.id]?.updated_at ?? null,
   }));
 }
@@ -274,7 +293,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
     if (timesheetsError) throw timesheetsError;
     if (extrasError) throw extrasError;
 
-    (timesheets || []).forEach((t: any) => {
+    (timesheets || []).forEach((t) => {
       if (!t.job_id) return;
       const status = String(t.status ?? '').toLowerCase();
       const bucket = (timesheetInfoByJob[t.job_id] ||= { total: 0, approved: 0, rejected: 0 });
@@ -283,7 +302,7 @@ export async function fetchRatesApprovals(): Promise<RatesApprovalRow[]> {
       if (status === 'rejected') bucket.rejected += 1;
     });
 
-    (extras || []).forEach((row: any) => {
+    (extras || []).forEach((row) => {
       if (!row.job_id) return;
       const status = String(row.status ?? '').toLowerCase();
       const bucket = (extrasInfoByJob[row.job_id] ||= { pending: 0, rejected: 0 });
