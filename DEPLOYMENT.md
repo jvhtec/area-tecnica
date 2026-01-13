@@ -141,7 +141,11 @@ After rotating Supabase or VAPID credentials:
 - **Production**: Uses production environment variables
 - **Preview**: Uses preview environment variables (can be different)
 
-**Recommendation**: Use same credentials for both unless you have separate Supabase projects for staging/production.
+**Safe staging recommendation**:
+- Point **Preview** to a Supabase **branch/staging** project (separate URL + anon key) so feature branches don’t touch production data.
+- Keep **Production** pointing at the production Supabase project.
+
+If you intentionally want preview deployments to hit production (UI testing only), set Preview variables to the same values as Production.
 
 ### Branch Preview URLs
 

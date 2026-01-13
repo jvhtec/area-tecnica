@@ -39,11 +39,18 @@ export function usePushSubscriptionRecovery() {
         }
 
         // Check if user previously had push enabled
-        const { data: profile } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select('push_notifications_enabled')
           .eq('id', user.id)
-          .single();
+          .limit(1);
+
+        if (error) {
+          console.warn('[Push Recovery] Failed to fetch profile push preference:', error);
+          return;
+        }
+
+        const profile = data?.[0] ?? null;
 
         if (!profile?.push_notifications_enabled) {
           return; // User never enabled push or disabled it intentionally

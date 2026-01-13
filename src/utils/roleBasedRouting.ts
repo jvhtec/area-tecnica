@@ -2,6 +2,10 @@
 import { UserRole } from "@/types/user";
 
 export const getDashboardPath = (userRole: UserRole | null): string => {
+  if (!userRole) {
+    return '/profile';
+  }
+
   switch (userRole) {
     case 'wallboard':
       return '/wallboard';

@@ -1,5 +1,9 @@
 project_id = "syldobdcdsgfgjtbuwxm"
 
+[db]
+port = 54322
+major_version = 15
+
 [functions.get-secret]
 verify_jwt = true
 
@@ -19,6 +23,12 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.staffing-click]
+verify_jwt = false
+
+[functions.staffing-orchestrator]
+verify_jwt = false
+
+[functions.staffing-sweeper]
 verify_jwt = false
 
 [functions.push]

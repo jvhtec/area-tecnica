@@ -72,6 +72,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const PROFILE_CACHE_KEY = 'supabase_user_profile';
 const PROFILE_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
+const VALID_USER_ROLES = new Set<UserRole>([
+  'admin',
+  'management',
+  'logistics',
+  'technician',
+  'house_tech',
+  'wallboard',
+]);
+
 export const useOptimizedAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -165,12 +174,20 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       console.log('🔄 Fetching fresh profile data...');
       setIsProfileLoading(true);
 
+      const selectProfile = async (columns: string) => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select(columns)
+          .eq('id', userId)
+          .limit(1);
+
+        return { data: data?.[0] ?? null, error };
+      };
+
       // Prefer new flag name; alias to expected key. Fallback if columns missing.
-      let { data, error } = await supabase
-        .from('profiles')
-        .select('role, department, soundvision_access:soundvision_access_enabled, assignable_as_tech')
-        .eq('id', userId)
-        .maybeSingle();
+      let { data, error } = await selectProfile(
+        'role, department, soundvision_access:soundvision_access_enabled, assignable_as_tech',
+      );
 
       if (error && (error as any)?.code === '42703') {
         // Column missing - fallback to base columns only and default new fields to false
@@ -178,12 +195,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           'profiles columns missing (soundvision_access_enabled or assignable_as_tech). Falling back to role/department only.',
         );
 
-        const fallback = await supabase
-          .from('profiles')
-          .select('role, department')
-          .eq('id', userId)
-          .maybeSingle();
-
+        const fallback = await selectProfile('role, department');
         data = fallback.data;
         error = fallback.error;
 
@@ -193,6 +205,53 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           typedData.soundvision_access = false;
           typedData.assignable_as_tech = false;
           data = typedData;
+        }
+      }
+
+      if (!data && !error) {
+        const { data: authUserData, error: authUserError } = await supabase.auth.getUser();
+        const authUser = authUserData?.user ?? null;
+
+        if (!authUserError && authUser && authUser.id === userId) {
+          const email = authUser.email ?? (authUser.user_metadata as any)?.email ?? null;
+          if (email) {
+            const roleCandidate = (authUser.user_metadata as any)?.role;
+            const role = VALID_USER_ROLES.has(roleCandidate) ? (roleCandidate as UserRole) : null;
+
+            const { error: insertError } = await supabase.from('profiles').insert({
+              id: authUser.id,
+              email,
+              first_name: (authUser.user_metadata as any)?.first_name ?? null,
+              nickname: (authUser.user_metadata as any)?.nickname ?? null,
+              last_name: (authUser.user_metadata as any)?.last_name ?? null,
+              phone: (authUser.user_metadata as any)?.phone ?? null,
+              department: (authUser.user_metadata as any)?.department ?? null,
+              dni: (authUser.user_metadata as any)?.dni ?? null,
+              residencia: (authUser.user_metadata as any)?.residencia ?? null,
+              ...(role ? { role } : {}),
+            });
+
+            if (insertError && (insertError as any)?.code !== '23505') {
+              console.error('Error creating missing profile row:', insertError);
+            } else {
+              ({ data, error } = await selectProfile(
+                'role, department, soundvision_access:soundvision_access_enabled, assignable_as_tech',
+              ));
+
+              if (error && (error as any)?.code === '42703') {
+                const fallback = await selectProfile('role, department');
+                data = fallback.data;
+                error = fallback.error;
+
+                if (data) {
+                  const typedData = data as ProfileQueryResult;
+                  typedData.soundvision_access = false;
+                  typedData.assignable_as_tech = false;
+                  data = typedData;
+                }
+              }
+            }
+          }
         }
       }
 
@@ -212,6 +271,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         setCachedProfile(userId, typedData.role, typedData.department, soundVisionAccess, assignableAsTech);
         return { ...typedData, soundvision_access: soundVisionAccess, assignable_as_tech: assignableAsTech } as ProfileData;
       } else {
+        setUserRole(null);
+        setUserDepartment(null);
         setSoundVisionAccessFlag(false);
         setAssignableAsTechFlag(false);
       }

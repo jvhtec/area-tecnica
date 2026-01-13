@@ -8,11 +8,11 @@ This document provides essential information for developers working on Area Tecn
 
 ```bash
 # 1. Copy environment template
-cp .env.example .env
+cp .env.example .env.local
 
-# 2. Edit .env and add your Supabase credentials
+# 2. Edit .env.local and add your Supabase credentials
 # Get them from: https://supabase.com/dashboard/project/YOUR_PROJECT_ID/settings/api
-nano .env  # or use your preferred editor
+nano .env.local  # or use your preferred editor
 
 # 3. Install dependencies (ALWAYS use --legacy-peer-deps)
 npm install --legacy-peer-deps
@@ -171,15 +171,46 @@ Long-term goals to move toward standard practices:
 
 ### Local Development
 
-Local development uses `.env` file (not committed to git):
-- Copy `.env.example` to `.env`
+Local development uses `.env.local` (not committed to git):
+- Copy `.env.example` to `.env.local`
 - Add your Supabase credentials from the dashboard
 - Restart dev server after changing environment variables
+
+### Switching Between Supabase Environments (Safe)
+
+This repo is configured to **never** commit dotenv files (see `.gitignore`). Use Vite modes + local-only env files:
+
+- Put your default values in `.env.local`
+- Put environment-specific overrides in `.env.<mode>.local` (for example `.env.prod.local`, `.env.branch.local`)
+- Start Vite with `--mode <mode>`:
+
+```bash
+# Run local UI against production Supabase (while staying on a dev/feature git branch)
+npm run dev -- --mode prod
+
+# Run local UI against a Supabase "branch" / staging project
+npm run dev -- --mode branch
+```
+
+Minimal `.env.prod.local` example (never commit):
+```bash
+VITE_SUPABASE_URL="https://<prod-project-ref>.supabase.co"
+VITE_SUPABASE_ANON_KEY="<prod anon/public key>"
+VITE_SUPABASE_FUNCTIONS_URL="https://<prod-project-ref>.supabase.co/functions/v1"
+VITE_VAPID_PUBLIC_KEY="<prod VAPID public key>"
+```
+
+### Pre-Commit Secret Check (Optional)
+
+Before committing, run:
+```bash
+./scripts/check-staged-secrets.sh
+```
 
 ### Production/Preview Deployments
 
 Production and preview deployments use Cloudflare Pages environment variables. **Never commit:**
-- `.env` files
+- `.env*` / `.envrc*` files
 - API keys, tokens, or credentials
 - Private keys or certificates
 

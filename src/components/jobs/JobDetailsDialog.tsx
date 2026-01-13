@@ -19,6 +19,7 @@ import { JobDetailsLocationTab } from "./job-details-dialog/tabs/JobDetailsLocat
 import { JobDetailsPersonnelTab } from "./job-details-dialog/tabs/JobDetailsPersonnelTab";
 import { JobDetailsRestaurantsTab } from "./job-details-dialog/tabs/JobDetailsRestaurantsTab";
 import { JobDetailsWeatherTab } from "./job-details-dialog/tabs/JobDetailsWeatherTab";
+import { StaffingOrchestratorPanel } from "@/components/matrix/StaffingOrchestratorPanel";
 
 export { enrichTimesheetsWithProfiles } from "./job-details-dialog/enrichTimesheetsWithProfiles";
 
@@ -35,6 +36,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
   const isManager = ["admin", "management"].includes(userRole || "");
   const isTechnicianRole = ["technician", "house_tech"].includes(userRole || "");
   const isHouseTech = userRole === "house_tech";
+  const canSeeAutoStaffing = ["admin", "management", "logistics"].includes(userRole || "");
   const queryClient = useQueryClient();
 
   // Fetch comprehensive job data
@@ -120,7 +122,10 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
     if (!showExpensesTab && selectedTab === "expenses") {
       setSelectedTab("info");
     }
-  }, [showTourRatesTab, showExtrasTab, showExpensesTab, selectedTab]);
+    if (!canSeeAutoStaffing && selectedTab === "staffing") {
+      setSelectedTab("info");
+    }
+  }, [showTourRatesTab, showExtrasTab, showExpensesTab, canSeeAutoStaffing, selectedTab]);
 
   // Reset selectedTab to 'info' when dialog opens OR when job changes
   const [lastOpenState, setLastOpenState] = useState(false);
@@ -154,7 +159,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 
   // Reset selectedTab if user is on a dryhire-excluded tab when isDryhire is true
   useEffect(() => {
-    if (open && isDryhire && ["location", "personnel", "documents", "restaurants", "weather", "extras", "expenses"].includes(selectedTab)) {
+    if (open && isDryhire && ["location", "personnel", "staffing", "documents", "restaurants", "weather", "extras", "expenses"].includes(selectedTab)) {
       console.log("JobDetailsDialog: Dryhire job detected, resetting from", selectedTab, "to info");
       setSelectedTab("info");
     }
@@ -200,6 +205,11 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
               {!isDryhire && (
                 <TabsTrigger value="personnel" className="py-2">
                   Personal
+                </TabsTrigger>
+              )}
+              {!isDryhire && canSeeAutoStaffing && (
+                <TabsTrigger value="staffing" className="py-2">
+                  Auto staffing
                 </TabsTrigger>
               )}
               {!isDryhire && (
@@ -254,6 +264,16 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
                 <JobDetailsPersonnelTab jobDetails={jobDetails} isJobLoading={isJobLoading} department={department} />
               )}
 
+              {!isDryhire && canSeeAutoStaffing && (
+                <TabsContent value="staffing" className="space-y-4 min-w-0 overflow-x-hidden">
+                  <StaffingOrchestratorPanel
+                    jobId={resolvedJobId}
+                    department={department}
+                    jobTitle={jobDetails?.title || job?.title}
+                  />
+                </TabsContent>
+              )}
+
               {!isDryhire && (
                 <JobDetailsDocumentsTab
                   open={open}
@@ -303,4 +323,3 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 export const JobDetailsDialog = React.memo(JobDetailsDialogComponent);
 
 JobDetailsDialog.displayName = "JobDetailsDialog";
-

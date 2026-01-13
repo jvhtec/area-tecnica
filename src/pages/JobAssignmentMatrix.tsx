@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Filter, Users, RefreshCw, Refrigerator } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { OptimizedAssignmentMatrix } from '@/components/matrix/OptimizedAssignmentMatrix';
+import { StaffingOrchestratorPanel } from '@/components/matrix/StaffingOrchestratorPanel';
 
 import { DateRangeExpander } from '@/components/matrix/DateRangeExpander';
 import { useVirtualizedDateRange } from '@/hooks/useVirtualizedDateRange';
@@ -61,6 +62,11 @@ export default function JobAssignmentMatrix() {
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [hideFridge, setHideFridge] = useState<boolean>(true);
   const [showStaffingReminder, setShowStaffingReminder] = useState(false);
+  const [staffingOrchestratorTarget, setStaffingOrchestratorTarget] = useState<null | {
+    jobId: string;
+    department: string;
+    jobTitle: string;
+  }>(null);
   const [lastAcknowledgedHash, setLastAcknowledgedHash] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -955,7 +961,24 @@ export default function JobAssignmentMatrix() {
                 <div className="mt-2 space-y-2">
                   {job.departments.map((dept) => (
                     <div key={`${job.jobId}-${dept.department}`}>
-                      <div className="text-sm font-medium">{dept.displayName}</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm font-medium">{dept.displayName}</div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setStaffingOrchestratorTarget({
+                              jobId: job.jobId,
+                              department: dept.department,
+                              jobTitle: job.jobTitle,
+                            });
+                            setShowStaffingReminder(false);
+                          }}
+                        >
+                          Auto staffing
+                        </Button>
+                      </div>
                       <ul className="ml-4 mt-1 list-disc space-y-1 text-sm text-muted-foreground">
                         {dept.roles.map((role) => (
                           <li key={`${job.jobId}-${dept.department}-${role.roleCode}`}>
@@ -974,6 +997,35 @@ export default function JobAssignmentMatrix() {
               Entendido
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(staffingOrchestratorTarget)}
+        onOpenChange={(open) => {
+          if (!open) setStaffingOrchestratorTarget(null);
+        }}
+      >
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Auto staffing{staffingOrchestratorTarget?.jobTitle ? ` — ${staffingOrchestratorTarget.jobTitle}` : ''}
+            </DialogTitle>
+            <DialogDescription>
+              {staffingOrchestratorTarget?.department
+                ? `Departamento: ${DEPARTMENT_LABELS[staffingOrchestratorTarget.department] || formatLabel(staffingOrchestratorTarget.department)}`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+
+          {staffingOrchestratorTarget && (
+            <StaffingOrchestratorPanel
+              jobId={staffingOrchestratorTarget.jobId}
+              department={staffingOrchestratorTarget.department}
+              jobTitle={staffingOrchestratorTarget.jobTitle}
+              onClose={() => setStaffingOrchestratorTarget(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div >

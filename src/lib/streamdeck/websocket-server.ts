@@ -42,6 +42,7 @@ export class StreamDeckWebSocketClient {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private url: string;
   private isConnected = false;
+  private hasEverConnected = false;
 
   constructor(url: string = 'ws://localhost:3001') {
     this.url = url;
@@ -54,13 +55,18 @@ export class StreamDeckWebSocketClient {
       this.ws.onopen = () => {
         console.log('✅ Stream Deck WebSocket connected');
         this.isConnected = true;
+        this.hasEverConnected = true;
         this.clearReconnectTimer();
         this.sendStateUpdate();
       };
 
       this.ws.onclose = () => {
         this.isConnected = false;
-        this.scheduleReconnect();
+        // Only auto-reconnect after at least one successful connection.
+        // This avoids infinite retry noise when the local server isn't running.
+        if (this.hasEverConnected) {
+          this.scheduleReconnect();
+        }
       };
 
       this.ws.onerror = () => {
@@ -79,7 +85,9 @@ export class StreamDeckWebSocketClient {
       };
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
-      this.scheduleReconnect();
+      if (this.hasEverConnected) {
+        this.scheduleReconnect();
+      }
     }
   }
 
@@ -218,7 +226,19 @@ export function initializeStreamDeck() {
   }
 
   const client = getStreamDeckClient();
-  client.connect();
+  let autoConnectFromStorage = false;
+  try {
+    autoConnectFromStorage = localStorage.getItem('streamdeck_autoconnect') === 'true';
+  } catch {
+    autoConnectFromStorage = false;
+  }
+
+  const shouldAutoConnect =
+    import.meta.env.VITE_STREAMDECK_AUTOCONNECT === 'true' || autoConnectFromStorage;
+
+  if (shouldAutoConnect) {
+    client.connect();
+  }
 
   // Send state updates when things change
   window.addEventListener('job-selected', () => {

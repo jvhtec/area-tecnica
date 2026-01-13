@@ -17,10 +17,10 @@ package-lock.json
 
 # Environment variables
 .env
-.env.local
-.env.development
-.env.production
-.env.test
+.env.*
+!.env.example
+.envrc
+.direnv/
 
 # Sensitive files
 *.pem
@@ -52,3 +52,7 @@ android/.gradle
 android/.idea
 android/build
 android/app/build
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/
