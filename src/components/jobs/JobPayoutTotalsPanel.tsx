@@ -55,7 +55,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, title, start_time, tour_id, rates_approved, job_type')
+        .select('id, title, start_time, tour_id, rates_approved, job_type, invoicing_company')
         .eq('id', jobId)
         .maybeSingle();
       if (error) throw error;
@@ -66,6 +66,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         tour_id: string | null;
         rates_approved: boolean | null;
         job_type: string | null;
+        invoicing_company: string | null;
       };
     },
     staleTime: 60_000,
