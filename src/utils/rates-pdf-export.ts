@@ -31,6 +31,7 @@ export interface JobDetails {
   end_time?: string;
   tour_id?: string | null;
   job_type?: string | null;
+  invoicing_company?: string | null;
 }
 
 interface TourSummaryJob {
@@ -788,6 +789,33 @@ export async function generateJobPayoutPDF(
 
   let yPos = contentTop;
 
+  // Extract unique worked dates from timesheets for all technicians in this PDF
+  const allWorkedDates = new Set<string>();
+  payouts.forEach((payout) => {
+    const lines = timesheetMap?.get(payout.technician_id) || [];
+    lines.forEach((line) => {
+      if (line.date) allWorkedDates.add(line.date);
+    });
+  });
+  const sortedDates = Array.from(allWorkedDates).sort();
+
+  // Format dates nicely
+  let dateText: string;
+  if (sortedDates.length === 0) {
+    dateText = formatJobDate(jobDetails.start_time);
+  } else if (sortedDates.length === 1) {
+    dateText = format(new Date(sortedDates[0]), 'P', { locale: es });
+  } else if (sortedDates.length === 2) {
+    dateText = `${format(new Date(sortedDates[0]), 'P', { locale: es })} y ${format(new Date(sortedDates[1]), 'P', { locale: es })}`;
+  } else {
+    const firstDate = format(new Date(sortedDates[0]), 'P', { locale: es });
+    const lastDate = format(new Date(sortedDates[sortedDates.length - 1]), 'P', { locale: es });
+    dateText = `${firstDate} - ${lastDate} (${sortedDates.length} días)`;
+  }
+
+  // Get LPO number if this is a single-tech PDF
+  const lpoNumber = payouts.length === 1 ? (lpoMap?.get(payouts[0].technician_id) ?? null) : null;
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor(...CORPORATE_RED);
@@ -799,8 +827,20 @@ export async function generateJobPayoutPDF(
   doc.setTextColor(...TEXT_MUTED);
   doc.text(`Nombre: ${jobDetails.title}`, 14, yPos);
   yPos += 5;
-  doc.text(`Fecha: ${formatJobDate(jobDetails.start_time)}`, 14, yPos);
-  yPos += 10;
+  doc.text(`Fecha${sortedDates.length > 1 ? 's' : ''}: ${dateText}`, 14, yPos);
+  yPos += 5;
+
+  if (jobDetails.invoicing_company) {
+    doc.text(`Empresa facturadora: ${jobDetails.invoicing_company}`, 14, yPos);
+    yPos += 5;
+  }
+
+  if (lpoNumber) {
+    doc.text(`Nº Referencia (LPO): ${lpoNumber}`, 14, yPos);
+    yPos += 5;
+  }
+
+  yPos += 5;
 
   doc.setTextColor(...TEXT_PRIMARY);
 
