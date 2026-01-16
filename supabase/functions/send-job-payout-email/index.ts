@@ -163,6 +163,7 @@ serve(async (req) => {
                     <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeName || 'equipo'},</h2>
                       <p style="margin:0;color:#374151;line-height:1.55;">
                         Adjuntamos tu resumen de pagos correspondiente al trabajo <b>${body.job.title}</b>.
+                        ${invoicingCompany ? `<br><b>Empresa facturadora:</b> ${invoicingCompany}` : ''}
                         ${tech.lpo_number ? `<br><b>LPO:</b> ${tech.lpo_number}` : ''}
                       </p>
                       <p style="margin:4px 0 0 0;color:#374151;line-height:1.55;">
@@ -208,9 +209,6 @@ serve(async (req) => {
                 <tr>
                   <td style="padding:16px 24px 8px 24px;">
                     <p style="margin:0;color:#374151;line-height:1.55;">
-                      El documento PDF con el detalle va adjunto a este correo.
-                    </p>
-                    <p style="margin:8px 0 0 0;color:#374151;line-height:1.55;">
                       Si detectas alguna incidencia no respondas a este mensaje y contacta con administración.
                     </p>
                   </td>
@@ -246,9 +244,8 @@ serve(async (req) => {
         ],
       };
 
-      if (ADMIN_BCC) {
-        emailPayload['bcc'] = [{ email: ADMIN_BCC }];
-      }
+      // Always CC administration
+      emailPayload['cc'] = [{ email: 'administracion@mfo-producciones.com' }];
 
       try {
         const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', {
