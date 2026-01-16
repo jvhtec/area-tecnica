@@ -31,6 +31,9 @@ interface TechnicianPayload {
   pdf_base64: string;
   filename?: string;
   lpo_number?: string;
+  worked_dates?: string[];
+  autonomo?: boolean | null;
+  is_house_tech?: boolean | null;
 }
 
 interface JobPayoutRequestBody {
@@ -53,6 +56,42 @@ function formatJobDate(dateIso?: string) {
   const parsed = new Date(dateIso);
   if (Number.isNaN(parsed.getTime())) return 'sin fecha';
   return new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(parsed);
+}
+
+function formatWorkedDates(dates?: string[]): string {
+  if (!dates || dates.length === 0) return '';
+
+  const parsed = dates
+    .map(d => new Date(d))
+    .filter(d => !Number.isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  if (parsed.length === 0) return '';
+  if (parsed.length === 1) {
+    return 'el ' + new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(parsed[0]);
+  }
+
+  // Multiple dates - format as "los días X, Y y Z de mes de año"
+  const formatter = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  const dayFormatter = new Intl.DateTimeFormat('es-ES', { day: 'numeric' });
+
+  // Check if all dates are in the same month/year
+  const firstDate = parsed[0];
+  const sameMonth = parsed.every(d =>
+    d.getMonth() === firstDate.getMonth() && d.getFullYear() === firstDate.getFullYear()
+  );
+
+  if (sameMonth) {
+    const days = parsed.map(d => dayFormatter.format(d));
+    const lastDay = days.pop();
+    const monthYear = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(firstDate);
+    return `los días ${days.join(', ')} y ${lastDay} de ${monthYear}`;
+  } else {
+    // Different months - list all dates
+    const formatted = parsed.map(d => formatter.format(d));
+    const lastDate = formatted.pop();
+    return `los días ${formatted.join(', ')} y ${lastDate}`;
+  }
 }
 
 serve(async (req) => {
@@ -123,7 +162,9 @@ serve(async (req) => {
 
       // Corporate-styled HTML, aligned with other emails
       const safeName = tech.full_name || '';
-      const jobDate = formatJobDate(body.job.start_time);
+      const workedDatesText = formatWorkedDates(tech.worked_dates);
+      const fallbackJobDate = formatJobDate(body.job.start_time);
+      const dateText = workedDatesText || `el ${fallbackJobDate}`;
       const parts = formatCurrency(tech.totals?.timesheets_total_eur);
       const extras = formatCurrency(tech.totals?.extras_total_eur);
       const grand = formatCurrency(tech.totals?.total_eur);
@@ -131,6 +172,14 @@ serve(async (req) => {
       const deductionFormatted = formatCurrency(deductionAmount);
       const hasDeduction = deductionAmount > 0;
       const invoicingCompany = body.job.invoicing_company;
+
+      // Debug logging
+      console.log('[send-job-payout-email] Invoicing company raw value:', JSON.stringify(invoicingCompany));
+      console.log('[send-job-payout-email] Type:', typeof invoicingCompany);
+      console.log('[send-job-payout-email] Length:', invoicingCompany?.length);
+
+      const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
+      console.log('[send-job-payout-email] Company details result:', companyDetails ? 'FOUND' : 'NULL');
 
       const htmlContent = `<!DOCTYPE html>
       <html lang="es">
@@ -162,11 +211,7 @@ serve(async (req) => {
                   <td style="padding:24px 24px 8px 24px;">
                     <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeName || 'equipo'},</h2>
                       <p style="margin:0;color:#374151;line-height:1.55;">
-                        Adjuntamos tu resumen de pagos correspondiente al trabajo <b>${body.job.title}</b>.
-                        ${tech.lpo_number ? `<br><b>LPO:</b> ${tech.lpo_number}` : ''}
-                      </p>
-                      <p style="margin:4px 0 0 0;color:#374151;line-height:1.55;">
-                        Programado para el <b>${jobDate}</b>.
+                        Adjuntamos tu resumen de pagos correspondiente al trabajo <b>${body.job.title}</b>, realizado <b>${dateText}</b>.
                       </p>
                   </td>
                 </tr>
@@ -185,20 +230,16 @@ serve(async (req) => {
                   </td>
                 </tr>
                 ${(() => {
-                  const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
-                  if (!companyDetails) return '';
+                  // Only show invoicing details for autonomo technicians (excluding house techs)
+                  if (tech.autonomo !== true || tech.is_house_tech === true) return '';
+                  if (!companyDetails && !tech.lpo_number) return '';
                   return `
                 <tr>
                   <td style="padding:12px 24px 0 24px;">
                     <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;color:#1e40af;font-size:14px;">
                       <b>Nota de facturación:</b>
                       <p style="margin:8px 0 0 0;line-height:1.55;">
-                        Por favor emite tu factura para este trabajo a:
-                      </p>
-                      <p style="margin:8px 0 0 0;line-height:1.55;">
-                        <b>${companyDetails.legalName}</b><br/>
-                        CIF: ${companyDetails.cif}<br/>
-                        ${companyDetails.address}
+                        ${companyDetails ? `Te rogamos emitas tu factura a: <b>${companyDetails.legalName}</b> (CIF: ${companyDetails.cif}, ${companyDetails.address})` : ''}${companyDetails && tech.lpo_number ? ' e incluyas el siguiente número de referencia: ' : ''}${tech.lpo_number ? `<b>${tech.lpo_number}</b>` : ''}.
                       </p>
                     </div>
                   </td>
@@ -208,9 +249,6 @@ serve(async (req) => {
                 <tr>
                   <td style="padding:16px 24px 8px 24px;">
                     <p style="margin:0;color:#374151;line-height:1.55;">
-                      El documento PDF con el detalle va adjunto a este correo.
-                    </p>
-                    <p style="margin:8px 0 0 0;color:#374151;line-height:1.55;">
                       Si detectas alguna incidencia no respondas a este mensaje y contacta con administración.
                     </p>
                   </td>
@@ -246,9 +284,8 @@ serve(async (req) => {
         ],
       };
 
-      if (ADMIN_BCC) {
-        emailPayload['bcc'] = [{ email: ADMIN_BCC }];
-      }
+      // Always CC administration
+      emailPayload['cc'] = [{ email: 'administracion@mfo-producciones.com' }];
 
       try {
         const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', {
