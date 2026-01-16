@@ -31,6 +31,7 @@ import { useToggleTechnicianPayoutApproval } from '@/hooks/useToggleTechnicianPa
 import type { JobExpenseBreakdownItem, JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { JobPayoutOverrideSection, type JobPayoutOverride } from './JobPayoutOverrideSection';
+import { PayoutEmailPreview } from './PayoutEmailPreview';
 
 interface JobPayoutTotalsPanelProps {
   jobId: string;
@@ -255,6 +256,9 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const [sendingByTech, setSendingByTech] = React.useState<Record<string, boolean>>({});
   const [missingEmailTechIds, setMissingEmailTechIds] = React.useState<string[]>([]);
   const lastPreparedContext = React.useRef<JobPayoutEmailContextResult | null>(null);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [previewContext, setPreviewContext] = React.useState<JobPayoutEmailContextResult | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = React.useState(false);
 
   const { userRole } = useOptimizedAuth();
   const isManager = userRole === 'admin' || userRole === 'management';
@@ -509,6 +513,42 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     jobMeta,
   ]);
 
+  const handlePreviewEmails = React.useCallback(async () => {
+    if (!jobId) return;
+
+    setIsLoadingPreview(true);
+    try {
+      if (isTourDate) {
+        toast.info('Vista previa no disponible para tour dates aún');
+        return;
+      }
+
+      const approvedPayouts = standardPayoutTotals.filter(p => p.payout_approved);
+
+      if (approvedPayouts.length === 0) {
+        toast.warning('No hay técnicos aprobados para previsualizar.');
+        return;
+      }
+
+      const context = await prepareJobPayoutEmailContext({
+        jobId,
+        supabase,
+        payouts: approvedPayouts,
+        profiles: profilesWithEmail,
+        lpoMap,
+        jobDetails: jobMeta || undefined,
+      });
+
+      setPreviewContext(context);
+      setPreviewOpen(true);
+    } catch (err) {
+      console.error('[JobPayoutTotalsPanel] Error preparing preview:', err);
+      toast.error('No se pudo generar la vista previa');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  }, [jobId, isTourDate, standardPayoutTotals, supabase, profilesWithEmail, lpoMap, jobMeta]);
+
   const handleSendEmailForTech = React.useCallback(
     async (techId: string, isApproved?: boolean) => {
       if (!jobId) return;
@@ -685,6 +725,18 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
               <FileDown className="h-4 w-4 mr-1" />
               {isExporting ? 'Generando…' : 'Exportar PDF'}
             </Button>
+            {isManager && !isTourDate && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreviewEmails}
+                disabled={isLoadingPreview || payoutTotals.length === 0}
+                className={controlButton}
+              >
+                <ExternalLink className="h-4 w-4 mr-1" />
+                {isLoadingPreview ? 'Cargando…' : 'Previsualizar'}
+              </Button>
+            )}
             <Button
               size="sm"
               onClick={handleSendEmails}
@@ -966,6 +1018,13 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           </div>
         )}
       </CardContent>
+
+      <PayoutEmailPreview
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        context={previewContext}
+        jobTitle={jobMeta?.title || 'Trabajo'}
+      />
     </Card>
   );
 }
