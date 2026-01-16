@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/utils';
 import { fetchJobLogo, fetchTourLogo, getCompanyLogo } from '@/utils/pdf/logoUtils';
 import { appendAutonomoLabel } from '@/utils/autonomo';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
 const DEDUCTION_DISCLAIMER_TEXT = '* Se ha aplicado una deducción de 30€/día en concepto de IRPF por condición de no autónomo.';
@@ -831,8 +832,19 @@ export async function generateJobPayoutPDF(
   yPos += 5;
 
   if (jobDetails.invoicing_company) {
-    doc.text(`Empresa facturadora: ${jobDetails.invoicing_company}`, 14, yPos);
-    yPos += 5;
+    const companyDetails = getInvoicingCompanyDetails(jobDetails.invoicing_company);
+    if (companyDetails) {
+      doc.text(`Empresa facturadora: ${companyDetails.legalName}`, 14, yPos);
+      yPos += 5;
+      doc.text(`CIF: ${companyDetails.cif}`, 14, yPos);
+      yPos += 5;
+      doc.text(`Dirección: ${companyDetails.address}`, 14, yPos);
+      yPos += 5;
+    } else {
+      // Fallback to raw name if lookup fails
+      doc.text(`Empresa facturadora: ${jobDetails.invoicing_company}`, 14, yPos);
+      yPos += 5;
+    }
   }
 
   if (lpoNumber) {
