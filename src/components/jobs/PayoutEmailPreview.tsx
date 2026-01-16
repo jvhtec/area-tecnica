@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Download, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { JobPayoutEmailContextResult } from '@/lib/job-payout-email';
+import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 
 interface PayoutEmailPreviewProps {
   open: boolean;
@@ -91,6 +92,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
     const hasDeduction = deductionAmount > 0;
     const lpoNumber = selectedAttachment.lpo_number;
     const invoicingCompany = context.job.invoicing_company;
+    const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
 
     return `<!DOCTYPE html>
 <html lang="es">
@@ -131,13 +133,13 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
               </div>
             </td>
           </tr>
-          ${selectedAttachment.autonomo && (invoicingCompany || lpoNumber) ? `
+          ${selectedAttachment.autonomo && (companyDetails || lpoNumber) ? `
           <tr>
             <td style="padding:12px 24px 0 24px;">
               <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;color:#1e40af;font-size:14px;">
                 <b>Nota de facturación:</b>
                 <p style="margin:8px 0 0 0;line-height:1.55;">
-                  ${invoicingCompany ? `Te rogamos emitas tu factura a: <b>${invoicingCompany}</b>` : ''}${invoicingCompany && lpoNumber ? ' e incluyas el siguiente número de referencia: ' : ''}${lpoNumber ? `<b>${lpoNumber}</b>` : ''}.
+                  ${companyDetails ? `Te rogamos emitas tu factura a: <b>${companyDetails.legalName}</b> (CIF: ${companyDetails.cif}, ${companyDetails.address})` : ''}${companyDetails && lpoNumber ? ' e incluyas el siguiente número de referencia: ' : ''}${lpoNumber ? `<b>${lpoNumber}</b>` : ''}.
                 </p>
               </div>
             </td>

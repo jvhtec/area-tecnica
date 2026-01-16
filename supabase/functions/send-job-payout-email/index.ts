@@ -171,7 +171,14 @@ serve(async (req) => {
       const deductionFormatted = formatCurrency(deductionAmount);
       const hasDeduction = deductionAmount > 0;
       const invoicingCompany = body.job.invoicing_company;
+
+      // Debug logging
+      console.log('[send-job-payout-email] Invoicing company raw value:', JSON.stringify(invoicingCompany));
+      console.log('[send-job-payout-email] Type:', typeof invoicingCompany);
+      console.log('[send-job-payout-email] Length:', invoicingCompany?.length);
+
       const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
+      console.log('[send-job-payout-email] Company details result:', companyDetails ? 'FOUND' : 'NULL');
 
       const htmlContent = `<!DOCTYPE html>
       <html lang="es">
