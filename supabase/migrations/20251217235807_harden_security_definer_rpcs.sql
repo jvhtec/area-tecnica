@@ -125,6 +125,9 @@ GRANT EXECUTE ON FUNCTION public.get_timesheet_amounts_visible() TO authenticate
 -- 3) Profiles-with-skills RPC (fix broken auth check; limit PII)
 -- -----------------------------------------------------------------------------
 
+-- Drop existing function first since return type changed
+DROP FUNCTION IF EXISTS public.get_profiles_with_skills();
+
 CREATE OR REPLACE FUNCTION public.get_profiles_with_skills()
 RETURNS TABLE(
   id uuid,
@@ -1012,7 +1015,9 @@ BEGIN
     )) / 3600.0 - (COALESCE(v_timesheet.break_minutes, 0) / 60.0);
   END IF;
 
-  v_worked_hours := ROUND(v_worked_hours * 2) / 2.0;
+  -- FIXED: Round to nearest whole hour (12.0-12.49 -> 12h, 12.5-12.99 -> 13h)
+  -- Previously: Rounded to nearest 0.5 (12.7 -> 12.5)
+  v_worked_hours := ROUND(v_worked_hours);
 
   IF v_job_type = 'evento' THEN
     v_billable_hours := 12.0;
