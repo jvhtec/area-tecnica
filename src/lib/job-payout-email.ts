@@ -9,6 +9,7 @@ export interface TechnicianProfileWithEmail {
   last_name?: string | null;
   email?: string | null;
   autonomo?: boolean | null;
+  is_house_tech?: boolean | null;
 }
 
 export interface JobPayoutEmailJobDetails {
@@ -32,6 +33,7 @@ export interface JobPayoutEmailAttachment {
   pdfBase64: string;
   filename: string;
   autonomo?: boolean | null;
+  is_house_tech?: boolean | null;
   lpo_number?: string | null;
 }
 
@@ -139,14 +141,15 @@ async function fetchProfiles(
   if (provided) {
     const hasEmailField = provided.every((p) => Object.prototype.hasOwnProperty.call(p, 'email'));
     const hasAutonomoField = provided.every((p) => Object.prototype.hasOwnProperty.call(p, 'autonomo'));
-    if (hasEmailField && hasAutonomoField) {
+    const hasHouseTechField = provided.every((p) => Object.prototype.hasOwnProperty.call(p, 'is_house_tech'));
+    if (hasEmailField && hasAutonomoField && hasHouseTechField) {
       return provided;
     }
   }
   if (!techIds.length) return provided || [];
   const { data, error } = await client
     .from('profiles')
-    .select('id, first_name, last_name, email, autonomo')
+    .select('id, first_name, last_name, email, autonomo, is_house_tech')
     .in('id', techIds);
   if (error) throw error;
   return (data || []) as TechnicianProfileWithEmail[];
@@ -253,6 +256,7 @@ export async function prepareJobPayoutEmailContext(
       pdfBase64,
       filename,
       autonomo: profile?.autonomo ?? null,
+      is_house_tech: profile?.is_house_tech ?? null,
       lpo_number: lpoMap.get(payout.technician_id) ?? null,
     });
   }

@@ -33,6 +33,7 @@ interface TechnicianPayload {
   lpo_number?: string;
   worked_dates?: string[];
   autonomo?: boolean | null;
+  is_house_tech?: boolean | null;
 }
 
 interface JobPayoutRequestBody {
@@ -229,8 +230,8 @@ serve(async (req) => {
                   </td>
                 </tr>
                 ${(() => {
-                  // Only show invoicing details for autonomo technicians
-                  if (tech.autonomo !== true) return '';
+                  // Only show invoicing details for autonomo technicians (excluding house techs)
+                  if (tech.autonomo !== true || tech.is_house_tech === true) return '';
                   if (!companyDetails && !tech.lpo_number) return '';
                   return `
                 <tr>

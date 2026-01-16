@@ -25,6 +25,7 @@ export interface TourJobEmailAttachment {
   pdfBase64: string;
   filename: string;
   autonomo?: boolean | null;
+  is_house_tech?: boolean | null;
   lpo_number?: string | null;
 }
 
@@ -173,6 +174,7 @@ export async function prepareTourJobEmailContext(
       pdfBase64,
       filename,
       autonomo: profile?.autonomo ?? null,
+      is_house_tech: (profile as any)?.is_house_tech ?? null,
       lpo_number: lpoMap.get(techId) ?? null,
     });
   }

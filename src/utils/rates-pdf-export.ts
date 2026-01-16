@@ -23,6 +23,7 @@ export interface TechnicianProfile {
   default_timesheet_category?: string | null;
   role?: string | null;
   autonomo?: boolean | null;
+  is_house_tech?: boolean | null;
 }
 
 export interface JobDetails {
@@ -215,6 +216,7 @@ interface TechnicianNameInfo {
   name: string;
   profile?: TechnicianProfile;
   autonomo: boolean;
+  is_house_tech: boolean;
 }
 
 const getTechNameFactory = (profiles: TechnicianProfile[]) => {
@@ -222,11 +224,12 @@ const getTechNameFactory = (profiles: TechnicianProfile[]) => {
   return (id: string): TechnicianNameInfo => {
     const profile = profileMap.get(id);
     if (!profile) {
-      return { name: 'Unknown', profile: undefined, autonomo: true };
+      return { name: 'Unknown', profile: undefined, autonomo: true, is_house_tech: false };
     }
     const name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Unknown';
     const autonomo = profile.autonomo !== false;
-    return { name, profile, autonomo };
+    const is_house_tech = profile.is_house_tech === true;
+    return { name, profile, autonomo, is_house_tech };
   };
 };
 
@@ -814,8 +817,11 @@ export async function generateJobPayoutPDF(
     dateText = `${firstDate} - ${lastDate} (${sortedDates.length} días)`;
   }
 
-  // Get LPO number if this is a single-tech PDF
+  // Get LPO number and tech info if this is a single-tech PDF
   const lpoNumber = payouts.length === 1 ? (lpoMap?.get(payouts[0].technician_id) ?? null) : null;
+  const getTechName = getTechNameFactory(profiles);
+  const singleTechInfo = payouts.length === 1 ? getTechName(payouts[0].technician_id) : null;
+  const shouldShowInvoicing = singleTechInfo && singleTechInfo.autonomo && !singleTechInfo.is_house_tech;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -831,7 +837,8 @@ export async function generateJobPayoutPDF(
   doc.text(`Fecha${sortedDates.length > 1 ? 's' : ''}: ${dateText}`, 14, yPos);
   yPos += 5;
 
-  if (jobDetails.invoicing_company) {
+  // Only show invoicing details for autonomo techs (excluding house techs)
+  if (shouldShowInvoicing && jobDetails.invoicing_company) {
     const companyDetails = getInvoicingCompanyDetails(jobDetails.invoicing_company);
     if (companyDetails) {
       doc.text(`Empresa facturadora: ${companyDetails.legalName}`, 14, yPos);
@@ -847,7 +854,7 @@ export async function generateJobPayoutPDF(
     }
   }
 
-  if (lpoNumber) {
+  if (shouldShowInvoicing && lpoNumber) {
     doc.text(`Nº Referencia (LPO): ${lpoNumber}`, 14, yPos);
     yPos += 5;
   }
@@ -855,8 +862,6 @@ export async function generateJobPayoutPDF(
   yPos += 5;
 
   doc.setTextColor(...TEXT_PRIMARY);
-
-  const getTechName = getTechNameFactory(profiles);
 
   const tableData = payouts.map((payout) => {
     const { name: baseName, autonomo } = getTechName(payout.technician_id);

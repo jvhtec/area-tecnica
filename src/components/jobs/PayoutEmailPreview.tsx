@@ -133,7 +133,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
               </div>
             </td>
           </tr>
-          ${selectedAttachment.autonomo && (companyDetails || lpoNumber) ? `
+          ${selectedAttachment.autonomo && !selectedAttachment.is_house_tech && (companyDetails || lpoNumber) ? `
           <tr>
             <td style="padding:12px 24px 0 24px;">
               <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;color:#1e40af;font-size:14px;">
