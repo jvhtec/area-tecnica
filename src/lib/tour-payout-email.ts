@@ -34,6 +34,7 @@ export interface TourJobEmailContextResult {
   quotes: TourJobRateQuote[];
   profiles: (TechnicianProfile & { email?: string | null })[];
   lpoMap?: Map<string, string | null>;
+  timesheetDateMap: Map<string, Set<string>>;
   attachments: TourJobEmailAttachment[];
   missingEmails: string[];
 }
@@ -175,6 +176,7 @@ export async function prepareTourJobEmailContext(
     quotes,
     profiles,
     lpoMap,
+    timesheetDateMap,
     attachments,
     missingEmails,
   };
@@ -222,6 +224,11 @@ export async function sendTourJobEmails(
       const extrasTotal = Number(q.extras_total_eur || 0);
       const grandTotal = Number(q.total_with_extras_eur != null ? q.total_with_extras_eur : baseTotal + extrasTotal);
       const deduction = attachment.deduction_eur || 0;
+
+      // Extract unique worked dates from timesheets
+      const dateSet = context.timesheetDateMap.get(attachment.technician_id) || new Set<string>();
+      const workedDates = Array.from(dateSet).sort();
+
       return {
         technician_id: attachment.technician_id,
         email: attachment.email,
@@ -236,6 +243,7 @@ export async function sendTourJobEmails(
         filename: attachment.filename,
         autonomo: attachment.autonomo ?? null,
         lpo_number: attachment.lpo_number ?? null,
+        worked_dates: workedDates,
       };
     }),
     missing_emails: context.missingEmails,

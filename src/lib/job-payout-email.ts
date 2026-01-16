@@ -298,21 +298,34 @@ export async function sendJobPayoutEmails(
       tour_id: context.job.tour_id ?? null,
       invoicing_company: context.job.invoicing_company ?? null,
     },
-    technicians: recipients.map((attachment) => ({
-      technician_id: attachment.technician_id,
-      email: attachment.email,
-      full_name: attachment.full_name,
-      totals: {
-        timesheets_total_eur: attachment.payout.timesheets_total_eur,
-        extras_total_eur: attachment.payout.extras_total_eur,
-        total_eur: attachment.payout.total_eur - (attachment.deduction_eur || 0),
-        deduction_eur: attachment.deduction_eur,
-      },
-      pdf_base64: attachment.pdfBase64,
-      filename: attachment.filename,
-      autonomo: attachment.autonomo ?? null,
-      lpo_number: attachment.lpo_number ?? null,
-    })),
+    technicians: recipients.map((attachment) => {
+      // Extract unique worked dates from timesheets
+      const timesheetLines = context.timesheetMap.get(attachment.technician_id) || [];
+      const workedDates = Array.from(
+        new Set(
+          timesheetLines
+            .map(line => line.date)
+            .filter((date): date is string => date != null)
+        )
+      ).sort();
+
+      return {
+        technician_id: attachment.technician_id,
+        email: attachment.email,
+        full_name: attachment.full_name,
+        totals: {
+          timesheets_total_eur: attachment.payout.timesheets_total_eur,
+          extras_total_eur: attachment.payout.extras_total_eur,
+          total_eur: attachment.payout.total_eur - (attachment.deduction_eur || 0),
+          deduction_eur: attachment.deduction_eur,
+        },
+        pdf_base64: attachment.pdfBase64,
+        filename: attachment.filename,
+        autonomo: attachment.autonomo ?? null,
+        lpo_number: attachment.lpo_number ?? null,
+        worked_dates: workedDates,
+      };
+    }),
     missing_emails: context.missingEmails,
     requested_at: new Date().toISOString(),
   };
