@@ -220,15 +220,25 @@ export async function prepareJobPayoutEmailContext(
         deduction = daysCount * NON_AUTONOMO_DEDUCTION_EUR;
     }
 
-    const blob = (await generateJobPayoutPDF(
-      [payout],
-      job,
-      profiles,
-      lpoMap,
-      perTechMap,
-      { download: false }
-    )) as Blob | void;
-    if (!blob) continue;
+    let blob: Blob | void;
+    try {
+      blob = (await generateJobPayoutPDF(
+        [payout],
+        job,
+        profiles,
+        lpoMap,
+        perTechMap,
+        { download: false }
+      )) as Blob | void;
+    } catch (error) {
+      console.error(`[job-payout-email] Failed to generate PDF for technician ${payout.technician_id}:`, error);
+      continue;
+    }
+
+    if (!blob) {
+      console.warn(`[job-payout-email] PDF generation returned null/undefined for technician ${payout.technician_id}`);
+      continue;
+    }
     const pdfBase64 = await blobToBase64(blob);
     const jobSlug = sanitizeForFilename(job.title || job.id);
     const techSlug = sanitizeForFilename(fullName);

@@ -136,17 +136,27 @@ export async function prepareTourJobEmailContext(
     // No client-side deduction calculation needed
     const deduction = 0;
 
-    const blob = (await generateRateQuotePDF(
-      techQuotes,
-      { id: job.id, title: job.title, start_time: job.start_time, end_time: undefined, tour_id: job.tour_id, job_type: job.job_type },
-      profiles,
-      lpoMap,
-      { 
-          download: false,
-          timesheetMap: timesheetDateMap 
-      }
-    )) as Blob | void;
-    if (!blob) continue;
+    let blob: Blob | void;
+    try {
+      blob = (await generateRateQuotePDF(
+        techQuotes,
+        { id: job.id, title: job.title, start_time: job.start_time, end_time: undefined, tour_id: job.tour_id, job_type: job.job_type },
+        profiles,
+        lpoMap,
+        {
+            download: false,
+            timesheetMap: timesheetDateMap
+        }
+      )) as Blob | void;
+    } catch (error) {
+      console.error(`[tour-payout-email] Failed to generate PDF for technician ${techId}:`, error);
+      continue;
+    }
+
+    if (!blob) {
+      console.warn(`[tour-payout-email] PDF generation returned null/undefined for technician ${techId}`);
+      continue;
+    }
 
     const pdfBase64 = await blobToBase64(blob);
     const jobSlug = sanitizeForFilename(job.title || job.id);
