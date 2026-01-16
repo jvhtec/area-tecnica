@@ -17,6 +17,7 @@ export interface JobPayoutEmailJobDetails {
   start_time: string;
   tour_id?: string | null;
   rates_approved?: boolean | null;
+  invoicing_company?: string | null;
 }
 
 // ...
@@ -107,7 +108,7 @@ async function fetchJobDetails(
   if (provided) return provided;
   const { data, error } = await client
     .from('jobs')
-    .select('id, title, start_time, tour_id, rates_approved')
+    .select('id, title, start_time, tour_id, rates_approved, invoicing_company')
     .eq('id', jobId)
     .maybeSingle();
   if (error || !data) {
@@ -295,6 +296,7 @@ export async function sendJobPayoutEmails(
       title: context.job.title,
       start_time: context.job.start_time,
       tour_id: context.job.tour_id ?? null,
+      invoicing_company: context.job.invoicing_company ?? null,
     },
     technicians: recipients.map((attachment) => ({
       technician_id: attachment.technician_id,

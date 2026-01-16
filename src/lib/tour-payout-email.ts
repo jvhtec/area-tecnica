@@ -11,6 +11,7 @@ export interface TourJobEmailJobDetails {
   tour_id?: string | null;
   job_type?: string | null;
   rates_approved?: boolean | null;
+  invoicing_company?: string | null;
 }
 
 // Note: NON_AUTONOMO_DEDUCTION removed - server applies discount to base before multipliers
@@ -24,6 +25,7 @@ export interface TourJobEmailAttachment {
   pdfBase64: string;
   filename: string;
   autonomo?: boolean | null;
+  lpo_number?: string | null;
 }
 
 
@@ -70,7 +72,7 @@ async function fetchJobDetails(
 ): Promise<TourJobEmailJobDetails> {
   const { data, error } = await client
     .from('jobs')
-    .select('id, title, start_time, tour_id, job_type, rates_approved')
+    .select('id, title, start_time, tour_id, job_type, rates_approved, invoicing_company')
     .eq('id', jobId)
     .maybeSingle();
   if (error || !data) {
@@ -160,6 +162,7 @@ export async function prepareTourJobEmailContext(
       pdfBase64,
       filename,
       autonomo: profile?.autonomo ?? null,
+      lpo_number: lpoMap.get(techId) ?? null,
     });
   }
 
@@ -211,6 +214,7 @@ export async function sendTourJobEmails(
       title: context.job.title,
       start_time: context.job.start_time,
       tour_id: context.job.tour_id ?? null,
+      invoicing_company: context.job.invoicing_company ?? null,
     },
     technicians: recipients.map((attachment) => {
       const q = attachment.quote;
@@ -231,6 +235,7 @@ export async function sendTourJobEmails(
         pdf_base64: attachment.pdfBase64,
         filename: attachment.filename,
         autonomo: attachment.autonomo ?? null,
+        lpo_number: attachment.lpo_number ?? null,
       };
     }),
     missing_emails: context.missingEmails,
