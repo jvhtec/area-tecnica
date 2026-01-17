@@ -94,6 +94,42 @@ describe("selectPrimaryNavigationItems", () => {
       "job-assignment-matrix",
     ])
   })
+
+  it("uses the house tech profile order instead of the department default", () => {
+    const context = buildContext({
+      userDepartment: "sound",
+      userRole: "house_tech",
+    })
+    const items = sortNavigationItems(buildNavigationItems(context))
+
+    const primary = selectPrimaryNavigationItems({
+      items,
+      userDepartment: context.userDepartment,
+      userRole: context.userRole,
+    })
+
+    expect(primary.map((item) => item.id)).toEqual([
+      "tech-app",
+      "personal",
+      "logistics",
+      "house-department",
+    ])
+  })
+})
+
+describe("buildNavigationItems - house tech navigation", () => {
+  it("only shows the tech app, personal, logistics, department, and profile entries", () => {
+    const context = buildContext({ userRole: "house_tech", userDepartment: "lights" })
+    const items = buildNavigationItems(context)
+
+    expect(items.map((item) => item.id)).toEqual([
+      "tech-app",
+      "personal",
+      "logistics",
+      "house-department",
+      "profile",
+    ])
+  })
 })
 
 describe("buildNavigationItems - management department navigation", () => {
@@ -133,20 +169,20 @@ describe("buildNavigationItems - SoundVision visibility", () => {
     expect(soundVisionItem).toBeDefined()
   })
 
-  it("shows SoundVision item for house_tech without access", () => {
+  it("hides SoundVision item for house_tech without access", () => {
     const context = buildContext({ userRole: "house_tech", hasSoundVisionAccess: false })
     const items = buildNavigationItems(context)
 
     const soundVisionItem = items.find((item) => item.id === "soundvision-files")
-    expect(soundVisionItem).toBeDefined()
+    expect(soundVisionItem).toBeUndefined()
   })
 
-  it("shows SoundVision item for house_tech with access", () => {
+  it("hides SoundVision item for house_tech with access", () => {
     const context = buildContext({ userRole: "house_tech", hasSoundVisionAccess: true })
     const items = buildNavigationItems(context)
 
     const soundVisionItem = items.find((item) => item.id === "soundvision-files")
-    expect(soundVisionItem).toBeDefined()
+    expect(soundVisionItem).toBeUndefined()
   })
 
   it("hides SoundVision item for management role", () => {
