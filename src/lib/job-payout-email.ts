@@ -147,12 +147,26 @@ async function fetchProfiles(
     }
   }
   if (!techIds.length) return provided || [];
+
+  // Fetch basic profile data (is_house_tech is a function, not a column)
   const { data, error } = await client
     .from('profiles')
-    .select('id, first_name, last_name, email, autonomo, is_house_tech')
+    .select('id, first_name, last_name, email, autonomo')
     .in('id', techIds);
   if (error) throw error;
-  return (data || []) as TechnicianProfileWithEmail[];
+
+  // Fetch house tech status for each profile using the RPC function
+  const profiles = (data || []) as TechnicianProfileWithEmail[];
+  for (const profile of profiles) {
+    try {
+      const { data: isHouseTech } = await client.rpc('is_house_tech', { _profile_id: profile.id });
+      profile.is_house_tech = isHouseTech ?? false;
+    } catch {
+      profile.is_house_tech = false;
+    }
+  }
+
+  return profiles;
 }
 
 async function fetchLpoMap(
