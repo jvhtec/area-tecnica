@@ -96,12 +96,12 @@ BEGIN
     -- If no custom rate, use default €180
     IF v_rehearsal_flat_rate IS NULL THEN
       v_rehearsal_flat_rate := 180.00;
+    END IF;
 
-      -- Apply autonomo discount if applicable
-      IF NOT v_is_autonomo THEN
-        v_autonomo_discount := 30.00;
-        v_rehearsal_flat_rate := v_rehearsal_flat_rate - v_autonomo_discount;
-      END IF;
+    -- Apply autonomo discount if applicable (for both custom and default rates)
+    IF NOT v_is_autonomo THEN
+      v_autonomo_discount := 30.00;
+      v_rehearsal_flat_rate := v_rehearsal_flat_rate - v_autonomo_discount;
     END IF;
 
     -- Calculate worked hours for breakdown info only
@@ -161,14 +161,15 @@ BEGIN
   END IF;
 
   -- Standard rate card lookup (non-rehearsal)
+  -- Note: rate_cards_2025.category should have a UNIQUE constraint to ensure deterministic lookups
   SELECT
     CASE
       WHEN v_category = 'responsable' THEN COALESCE(base_day_responsable_eur, base_day_especialista_eur, base_day_eur)
       WHEN v_category = 'especialista' THEN COALESCE(base_day_especialista_eur, base_day_eur)
       ELSE base_day_eur
     END AS base_day_eur,
-    COALESCE(plus_10_12_eur, (SELECT plus_10_12_eur FROM public.rate_cards_2025 WHERE category = v_category LIMIT 1)) as plus_10_12_eur,
-    COALESCE(overtime_hour_eur, (SELECT overtime_hour_eur FROM public.rate_cards_2025 WHERE category = v_category LIMIT 1)) as overtime_hour_eur
+    COALESCE(plus_10_12_eur, (SELECT rc.plus_10_12_eur FROM public.rate_cards_2025 rc WHERE rc.category = v_category)) as plus_10_12_eur,
+    COALESCE(overtime_hour_eur, (SELECT rc.overtime_hour_eur FROM public.rate_cards_2025 rc WHERE rc.category = v_category)) as overtime_hour_eur
   INTO v_rate_card
   FROM public.custom_tech_rates
   WHERE profile_id = v_timesheet.technician_id;
@@ -224,11 +225,11 @@ BEGIN
       v_total_amount := v_base_day_amount;
     ELSIF v_worked_hours <= 12.5 THEN
       v_plus_10_12_hours := 0;
-      v_plus_10_12_amount := 30.0;
+      v_plus_10_12_amount := v_rate_card.plus_10_12_eur;
       v_total_amount := v_base_day_amount + v_plus_10_12_amount;
     ELSE
       v_plus_10_12_hours := 0;
-      v_plus_10_12_amount := 30.0;
+      v_plus_10_12_amount := v_rate_card.plus_10_12_eur;
 
       v_overtime_hours := v_worked_hours - 12.5;
       v_overtime_hours := CEILING(v_overtime_hours);
@@ -284,3 +285,10 @@ GRANT EXECUTE ON FUNCTION public.compute_timesheet_amount_2025(uuid,boolean) TO 
 
 COMMENT ON FUNCTION public.compute_timesheet_amount_2025(uuid,boolean) IS
   'Calculates timesheet amounts based on rate cards. Special rules: (1) Rehearsal jobs (tour_date_type=rehearsal) use flat €180 rate regardless of time/category, (2) Extended shifts over 20.5 hours use double base rate with no plus/overtime. Checks custom_tech_rates first for overrides, falls back to rate_cards_2025.';
+
+-- Ensure deterministic lookups by enforcing uniqueness on category columns
+CREATE UNIQUE INDEX IF NOT EXISTS rate_cards_2025_category_unique_idx
+  ON public.rate_cards_2025 (category);
+
+CREATE UNIQUE INDEX IF NOT EXISTS rate_cards_tour_2025_category_unique_idx
+  ON public.rate_cards_tour_2025 (category);
