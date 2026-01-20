@@ -357,7 +357,27 @@ export const generatePDF = async (
   logo.crossOrigin = "anonymous";
   logo.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
   
-  logo.onload = () => {
+  // Wait for logo to load (or timeout after 5 seconds)
+  const logoLoadTimeout = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Logo load timeout')), 5000);
+  });
+
+  const logoLoadPromise = new Promise<void>((resolve) => {
+    logo.onload = () => resolve();
+    logo.onerror = () => {
+      console.warn("Could not load logo, proceeding without it");
+      resolve(); // Continue without logo
+    };
+  });
+
+  try {
+    await Promise.race([logoLoadPromise, logoLoadTimeout]);
+  } catch (error) {
+    console.warn('Logo load timed out, proceeding without logo');
+  }
+
+  // Add logo to all pages if loaded successfully
+  if (logo.complete && logo.naturalWidth > 0) {
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
@@ -365,27 +385,70 @@ export const generatePDF = async (
       const logoHeight = logoWidth * (logo.height / logo.width);
       const xPositionLogo = (pageWidth - logoWidth) / 2;
       const yPositionLogo = pageHeight - logoHeight - 10;
-      doc.addImage(logo, "PNG", xPositionLogo, yPositionLogo, logoWidth, logoHeight);
+      try {
+        doc.addImage(logo, "PNG", xPositionLogo, yPositionLogo, logoWidth, logoHeight);
+      } catch (error) {
+        console.warn('Error adding logo to PDF:', error);
+      }
     }
+  }
+
+  // Generate and save PDF with enhanced error handling
+  try {
     const blob = doc.output("blob");
     const fileName = `hoja_de_ruta_${jobTitle.replace(/\s+/g, "_")}.pdf`;
-    uploadPdfToJob(selectedJobId, blob, fileName);
+    
+    // Upload to cloud storage
+    try {
+      await uploadPdfToJob(selectedJobId, blob, fileName);
+      console.log('✅ PDF uploaded to job storage successfully');
+    } catch (uploadError) {
+      console.error('❌ Error uploading PDF to job storage:', uploadError);
+      // Continue anyway - local download still works
+    }
+    
+    // Trigger download
+    await downloadPDFWithFallback(doc, fileName);
+    
+    toast?.({
+      title: "✅ Documento generado",
+      description: "La hoja de ruta ha sido generada y descargada correctamente.",
+    });
+  } catch (error) {
+    console.error('❌ Error generating PDF:', error);
+    toast?.({
+      title: "❌ Error",
+      description: "Hubo un problema al generar el documento.",
+      variant: "destructive",
+    });
+    throw error;
+  }
+};
+
+// Enhanced PDF download function with fallback
+const downloadPDFWithFallback = async (doc: any, filename: string) => {
+  try {
+    // Try the blob method first
+    const blob = doc.output('blob');
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+    
+    const link = document.createElement('a');
     link.href = url;
-    link.download = fileName;
+    link.download = filename;
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
-  };
-  
-  logo.onerror = () => {
-    console.error("No se pudo cargar el logo");
-    const blob = doc.output("blob");
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `hoja_de_ruta_${eventData.eventName.replace(/\s+/g, "_")}.pdf`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+    
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 100);
+    
+    console.log('✅ PDF downloaded successfully');
+  } catch (error) {
+    console.warn('Blob download failed, falling back to direct save:', error);
+    // Fallback to direct save
+    doc.save(filename);
+  }
 };
