@@ -17,6 +17,9 @@ DECLARE
   v_result json;
   v_deleted_count int;
 BEGIN
+  -- Set safe search_path as first executable line to prevent search path injection
+  PERFORM set_config('search_path', 'public,pg_temp', true);
+
   -- Check if user is authenticated
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
