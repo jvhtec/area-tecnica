@@ -196,19 +196,33 @@ export class PDFEngine {
       // Add Sector-Pro footer to all pages with page numbers and job name
       await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle);
 
-      // Save and upload PDF
+      // Save and upload PDF with enhanced error handling
+      console.log('🔄 Starting PDF save and upload process...');
       await this.saveAndUploadPDF();
       
+      // Show success message only if we get here without throwing
       toast?.({
         title: "✅ Documento generado",
         description: "La hoja de ruta ha sido generada y descargada correctamente.",
       });
 
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error('❌ Error generating PDF:', error);
+      
+      // Enhanced error messaging
+      let errorMessage = "Hubo un problema al generar el documento.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('download') || error.message.includes('save')) {
+          errorMessage = "El documento se generó pero hubo un problema con la descarga. Por favor, revisa tu configuración de navegador.";
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = "Error de red al generar el documento. Por favor, verifica tu conexión a internet.";
+        }
+      }
+      
       toast?.({
         title: "❌ Error",
-        description: "Hubo un problema al generar el documento.",
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;
@@ -224,11 +238,36 @@ export class PDFEngine {
     const timestamp = new Date().toISOString().split('T')[0];
     const filename = `hoja_de_ruta_${safeEventName}_${timestamp}.pdf`;
 
-    // Save locally
-    this.pdfDoc.save(filename);
+    console.log('📄 Generating PDF:', filename);
+
+    // Save locally with enhanced error handling
+    try {
+      console.log('💾 Saving PDF to download...');
+      this.pdfDoc.save(filename);
+      console.log('✅ PDF saved successfully');
+    } catch (saveError) {
+      console.error('❌ Error saving PDF locally:', saveError);
+      // Try to get the blob as fallback
+      try {
+        const blob = this.pdfDoc.outputBlob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        console.log('✅ PDF downloaded via fallback method');
+      } catch (fallbackError) {
+        console.error('❌ Fallback download also failed:', fallbackError);
+        throw new Error(`Failed to save PDF: ${saveError.message}`);
+      }
+    }
 
     // Upload to job storage
     try {
+      console.log('☁️ Uploading PDF to cloud storage...');
       const pdfBlob = this.pdfDoc.outputBlob();
       await uploadPdfToJob(selectedJobId, pdfBlob, filename);
       console.log('✅ PDF uploaded to job storage successfully');
