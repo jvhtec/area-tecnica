@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, type ChangeEvent } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
 import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
@@ -81,11 +82,45 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [uuidVideo, setUuidVideo] = useState("");
   const [uuidProduction, setUuidProduction] = useState("");
   const [isWhatsappDialogOpen, setIsWhatsappDialogOpen] = useState(false);
+  const [waDepartment, setWaDepartment] = useState<'sound' | 'lights' | 'video'>('sound');
   const [isAlmacenDialogOpen, setIsAlmacenDialogOpen] = useState(false);
   const [waMessage, setWaMessage] = useState<string>("");
   const [isSendingWa, setIsSendingWa] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Check if WhatsApp group already exists for this job/department
+  const { data: waGroup, refetch: refetchWaGroup } = useQuery({
+    queryKey: ['job-whatsapp-group', jobId, waDepartment],
+    enabled: !!jobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
+    queryFn: async () => {
+      if (!jobId) return null;
+      const { data, error } = await supabase
+        .from('job_whatsapp_groups')
+        .select('id, wa_group_id')
+        .eq('job_id', jobId)
+        .eq('department', waDepartment)
+        .maybeSingle();
+      if (error) return null;
+      return data;
+    }
+  });
+
+  const { data: waRequest, refetch: refetchWaRequest } = useQuery({
+    queryKey: ['job-whatsapp-group-request', jobId, waDepartment],
+    enabled: !!jobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
+    queryFn: async () => {
+      if (!jobId) return null;
+      const { data, error } = await supabase
+        .from('job_whatsapp_group_requests')
+        .select('id, created_at')
+        .eq('job_id', jobId)
+        .eq('department', waDepartment)
+        .maybeSingle();
+      if (error) return null;
+      return data;
+    }
+  });
 
   const resolveJobDocumentLocation = useCallback((path: string) => resolveJobDocLocation(path), []);
 
@@ -936,7 +971,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
       try {
         setIsSendingWa(true);
         const { error } = await supabase.functions.invoke("create-whatsapp-group", {
-          body: { job_id: jobId },
+          body: { job_id: jobId, department: waDepartment },
         });
         if (error) throw error;
         toast({
@@ -944,6 +979,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
           description: "Grupo de WhatsApp creado exitosamente",
         });
         setIsWhatsappDialogOpen(false);
+        await Promise.all([refetchWaGroup(), refetchWaRequest()]);
       } catch (error: any) {
         console.error("Error creating WhatsApp group:", error);
         toast({
@@ -951,11 +987,75 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
           description: error.message || "Error al crear grupo de WhatsApp",
           variant: "destructive",
         });
+        await Promise.all([refetchWaGroup(), refetchWaRequest()]);
       } finally {
         setIsSendingWa(false);
       }
     },
-    [jobId, toast],
+    [jobId, waDepartment, refetchWaGroup, refetchWaRequest, toast],
+  );
+
+  const handleRetryWhatsappGroup = useCallback(
+    async () => {
+      if (!jobId) {
+        toast({ title: 'Error', description: 'No se encontró el trabajo.', variant: 'destructive' });
+        return;
+      }
+
+      setIsSendingWa(true);
+      try {
+        // Clear the failed request using RPC function
+        const { data: clearResult, error: clearError } = await supabase.rpc(
+          'clear_whatsapp_group_request',
+          { p_job_id: jobId, p_department: waDepartment }
+        );
+
+        if (clearError) {
+          toast({
+            title: 'Error',
+            description: `No se pudo limpiar la solicitud: ${clearError.message}`,
+            variant: 'destructive'
+          });
+          setIsSendingWa(false);
+          return;
+        }
+
+        const result = clearResult as any;
+
+        if (!result.success) {
+          toast({
+            title: 'Aviso',
+            description: result.error || result.message,
+            variant: result.can_retry ? 'default' : 'destructive'
+          });
+          await Promise.all([refetchWaGroup(), refetchWaRequest()]);
+          setIsSendingWa(false);
+          return;
+        }
+
+        toast({
+          title: 'Solicitud limpiada',
+          description: 'Intentando crear el grupo de nuevo...'
+        });
+
+        await Promise.all([refetchWaGroup(), refetchWaRequest()]);
+
+        // Wait a moment for state to update, then retry creation
+        setTimeout(() => {
+          handleCreateWhatsappGroup();
+        }, 500);
+
+      } catch (err: any) {
+        toast({
+          title: 'Error',
+          description: `Error al reintentar: ${err.message}`,
+          variant: 'destructive'
+        });
+        await Promise.all([refetchWaGroup(), refetchWaRequest()]);
+        setIsSendingWa(false);
+      }
+    },
+    [jobId, waDepartment, refetchWaGroup, refetchWaRequest, handleCreateWhatsappGroup, toast],
   );
 
   const handleSendToAlmacen = useCallback(
@@ -1148,8 +1248,13 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
 
     isWhatsappDialogOpen,
     setIsWhatsappDialogOpen,
+    waDepartment,
+    setWaDepartment,
+    waGroup,
+    waRequest,
     isSendingWa,
     handleCreateWhatsappGroup,
+    handleRetryWhatsappGroup,
 
     isAlmacenDialogOpen,
     setIsAlmacenDialogOpen,

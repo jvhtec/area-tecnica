@@ -86,8 +86,13 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
 
     isWhatsappDialogOpen,
     setIsWhatsappDialogOpen,
+    waDepartment,
+    setWaDepartment,
+    waGroup,
+    waRequest,
     isSendingWa,
     handleCreateWhatsappGroup,
+    handleRetryWhatsappGroup,
 
     isAlmacenDialogOpen,
     setIsAlmacenDialogOpen,
@@ -338,18 +343,65 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
             <DialogTitle>Crear Grupo de WhatsApp</DialogTitle>
             <DialogDescription>Crea un grupo de WhatsApp para coordinar este trabajo con tu equipo.</DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground">
-              Se creará un grupo de WhatsApp con el título del trabajo: <span className="font-semibold">{job?.title}</span>
-            </p>
+          <div className="space-y-4 py-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Se creará un grupo de WhatsApp con el título del trabajo: <span className="font-semibold">{job?.title}</span>
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Departamento</label>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input type="radio" name="wa-dept-festival" checked={waDepartment==='sound'} onChange={() => setWaDepartment('sound')} />
+                  <span>Sonido</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input type="radio" name="wa-dept-festival" checked={waDepartment==='lights'} onChange={() => setWaDepartment('lights')} />
+                  <span>Luces</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input type="radio" name="wa-dept-festival" checked={waDepartment==='video'} onChange={() => setWaDepartment('video')} />
+                  <span>Vídeo</span>
+                </label>
+              </div>
+            </div>
+            {/* Show status if group exists or request pending */}
+            {waGroup && (
+              <div className="rounded-md bg-green-50 border border-green-200 p-3">
+                <p className="text-sm text-green-800 font-medium">
+                  ✓ Grupo ya creado para este departamento
+                </p>
+              </div>
+            )}
+            {!waGroup && waRequest && (
+              <div className="rounded-md bg-orange-50 border border-orange-200 p-3">
+                <p className="text-sm text-orange-800 font-medium">
+                  ⚠ Creación fallida. Puedes reintentar.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsWhatsappDialogOpen(false)} disabled={isSendingWa}>
               Cancelar
             </Button>
-            <Button onClick={handleCreateWhatsappGroup} disabled={isSendingWa}>
-              {isSendingWa ? "Creando..." : "Crear Grupo"}
-            </Button>
+            {waRequest && !waGroup ? (
+              <Button
+                onClick={handleRetryWhatsappGroup}
+                disabled={isSendingWa}
+                className="bg-orange-500 hover:bg-orange-600"
+              >
+                {isSendingWa ? "Reintentando..." : "Reintentar Crear Grupo"}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleCreateWhatsappGroup}
+                disabled={isSendingWa || !!waGroup}
+              >
+                {isSendingWa ? "Creando..." : waGroup ? "Grupo Creado" : "Crear Grupo"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -92,6 +92,7 @@ export interface JobCardNewViewProps {
   transportButtonTone?: any;
   handleTransportClick: (e: React.MouseEvent) => void;
   handleCreateWhatsappGroup: (e: React.MouseEvent) => void;
+  handleRetryWhatsappGroup: (e: React.MouseEvent) => void;
   waGroup?: any;
   waRequest?: any;
 
@@ -193,6 +194,7 @@ export function JobCardNewView({
   transportButtonTone,
   handleTransportClick,
   handleCreateWhatsappGroup,
+  handleRetryWhatsappGroup,
   waGroup,
   waRequest,
   setTaskManagerOpen,
@@ -331,7 +333,10 @@ export function JobCardNewView({
             transportButtonTone={transportButtonTone}
             onTransportClick={handleTransportClick}
             onCreateWhatsappGroup={handleCreateWhatsappGroup}
+            onRetryWhatsappGroup={handleRetryWhatsappGroup}
             whatsappDisabled={!!waGroup || !!waRequest}
+            whatsappGroup={waGroup}
+            whatsappRequest={waRequest}
           />
         </div>
 

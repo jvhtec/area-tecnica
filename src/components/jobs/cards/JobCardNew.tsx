@@ -469,7 +469,7 @@ function JobCardNewFull({
         body: { job_id: job.id as string, department: department as any }
       });
       if (error) {
-        // Even on error, lock may have been recorded. We’ll refetch lock and inform user.
+        // Even on error, lock may have been recorded. We'll refetch lock and inform user.
         toast({ title: 'Grupo solicitado', description: 'Se ha solicitado la creación del grupo. El botón quedará bloqueado.', });
       } else {
         const warnings = (data as any)?.warnings;
@@ -485,6 +485,60 @@ function JobCardNewFull({
       // Still lock; refetch
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
       toast({ title: 'Grupo solicitado', description: 'Se ha solicitado la creación del grupo. El botón quedará bloqueado.' });
+    }
+  };
+
+  const handleRetryWhatsappGroup = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!(userRole === 'management' || userRole === 'admin')) return;
+
+    try {
+      // Clear the failed request using RPC function
+      const { data: clearResult, error: clearError } = await supabase.rpc(
+        'clear_whatsapp_group_request',
+        { p_job_id: job.id, p_department: department }
+      );
+
+      if (clearError) {
+        toast({
+          title: 'Error',
+          description: `No se pudo limpiar la solicitud: ${clearError.message}`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const result = clearResult as any;
+
+      if (!result.success) {
+        toast({
+          title: 'Aviso',
+          description: result.error || result.message,
+          variant: result.can_retry ? 'default' : 'destructive'
+        });
+        await Promise.all([refetchWaGroup(), refetchWaRequest()]);
+        return;
+      }
+
+      toast({
+        title: 'Solicitud limpiada',
+        description: 'Intentando crear el grupo de nuevo...'
+      });
+
+      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
+
+      // Wait a moment for state to update, then retry creation
+      setTimeout(() => {
+        handleCreateWhatsappGroup(e);
+      }, 500);
+
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: `Error al reintentar: ${err.message}`,
+        variant: 'destructive'
+      });
+      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
     }
   };
 
@@ -1011,6 +1065,7 @@ function JobCardNewFull({
       transportButtonTone={transportButtonTone}
       handleTransportClick={handleTransportClick}
       handleCreateWhatsappGroup={handleCreateWhatsappGroup}
+      handleRetryWhatsappGroup={handleRetryWhatsappGroup}
       waGroup={waGroup}
       waRequest={waRequest}
       setTaskManagerOpen={setTaskManagerOpen}
