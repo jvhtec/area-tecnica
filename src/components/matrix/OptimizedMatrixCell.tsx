@@ -1,10 +1,12 @@
 
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator, MessageCircle } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator, MessageCircle, Loader2 } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
@@ -14,6 +16,19 @@ import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
 import { pickTextColor, rgbaFromHex } from '@/utils/color';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
+
+interface TimesheetDateRow {
+  date: string;
+}
+
+interface MultiDateRemovalState {
+  isOpen: boolean;
+  isLoading: boolean;
+  otherDates: string[];  // Other timesheet dates for this job/tech (excluding current)
+  otherDatesCount: number;
+  currentDate: string | null;  // The date of the cell being removed
+  removeOption: 'single' | 'all';
+}
 
 interface OptimizedMatrixCellProps {
   technician: {
@@ -87,8 +102,143 @@ export const OptimizedMatrixCell = memo(({
   const [availabilityRetrying, setAvailabilityRetrying] = React.useState(false);
   const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
   const [pendingCancel, setPendingCancel] = React.useState<null | { phase: 'availability' | 'offer', jobId: string | null }>(null);
-  const [pendingRemoveAssignment, setPendingRemoveAssignment] = React.useState(false);
+  const [multiDateRemoval, setMultiDateRemoval] = React.useState<MultiDateRemovalState>({
+    isOpen: false,
+    isLoading: false,
+    otherDates: [],
+    otherDatesCount: 0,
+    currentDate: null,
+    removeOption: 'single'
+  });
+  const [isRemovingAssignment, setIsRemovingAssignment] = React.useState(false);
   const [retryChannel, setRetryChannel] = React.useState<'email' | 'whatsapp'>('email');
+
+  // Check if tech has timesheets on other dates for this same job
+  const checkMultiDateAssignment = useCallback(async () => {
+    if (!assignment?.job_id) return;
+
+    const currentDateStr = format(date, 'yyyy-MM-dd');
+    setMultiDateRemoval(prev => ({ ...prev, isOpen: true, isLoading: true, currentDate: currentDateStr }));
+
+    try {
+      // Get all timesheets for this job/technician combination
+      const { data: timesheets, error: timesheetError } = await supabase
+        .from('timesheets')
+        .select('date')
+        .eq('job_id', assignment.job_id)
+        .eq('technician_id', technician.id)
+        .eq('is_active', true)
+        .neq('date', currentDateStr);
+
+      if (timesheetError) throw timesheetError;
+
+      const otherDates = ((timesheets || []) as TimesheetDateRow[]).map((t) => t.date);
+
+      setMultiDateRemoval({
+        isOpen: true,
+        isLoading: false,
+        otherDates,
+        otherDatesCount: otherDates.length,
+        currentDate: currentDateStr,
+        removeOption: 'single'
+      });
+    } catch (error) {
+      console.error('Error checking multi-date assignment:', error);
+      // On error, show simple removal dialog
+      setMultiDateRemoval({
+        isOpen: true,
+        isLoading: false,
+        otherDates: [],
+        otherDatesCount: 0,
+        currentDate: currentDateStr,
+        removeOption: 'single'
+      });
+    }
+  }, [assignment?.job_id, technician.id, date]);
+
+  // Remove assignment based on user selection
+  const handleRemoveAssignment = useCallback(async (removeAll: boolean) => {
+    if (!assignment?.job_id) return;
+
+    setIsRemovingAssignment(true);
+
+    try {
+      if (removeAll || multiDateRemoval.otherDatesCount === 0) {
+        // Remove entire assignment + all timesheets
+        const { data, error } = await supabase.rpc('manage_assignment_lifecycle', {
+          p_job_id: assignment.job_id,
+          p_technician_id: technician.id,
+          p_action: 'cancel',
+          p_delete_mode: 'hard'
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        // Remove Flex crew assignment if applicable
+        const flexDepartments = determineFlexDepartmentsForAssignment(assignment, technician.department);
+        if (flexDepartments.length > 0) {
+          await Promise.allSettled(flexDepartments.map(async (department) => {
+            try {
+              await supabase.functions.invoke('manage-flex-crew-assignments', {
+                body: {
+                  job_id: assignment.job_id,
+                  technician_id: technician.id,
+                  department,
+                  action: 'remove'
+                }
+              });
+            } catch (flexError) {
+              console.error('Failed to remove Flex crew assignment:', flexError);
+            }
+          }));
+        }
+
+        // Send push notification
+        try {
+          void supabase.functions.invoke('push', {
+            body: {
+              action: 'broadcast',
+              type: 'assignment.removed',
+              job_id: assignment.job_id,
+              recipient_id: technician.id,
+              technician_id: technician.id
+            }
+          });
+        } catch (pushErr) {
+          console.warn('Failed to send assignment removal notification:', pushErr);
+        }
+
+        const message = multiDateRemoval.otherDatesCount > 0
+          ? `${multiDateRemoval.otherDatesCount + 1} días eliminados de la asignación`
+          : 'Asignación eliminada';
+        toast.success(message);
+      } else {
+        // Remove only the current date's timesheet, keep assignment active
+        const { error } = await supabase
+          .from('timesheets')
+          .delete()
+          .eq('job_id', assignment.job_id)
+          .eq('technician_id', technician.id)
+          .eq('date', multiDateRemoval.currentDate);
+
+        if (error) throw error;
+
+        toast.success('Día eliminado de la asignación');
+      }
+
+      setMultiDateRemoval(prev => ({ ...prev, isOpen: false }));
+      window.dispatchEvent(new CustomEvent('assignment-updated'));
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error(String(error) || 'No se pudo eliminar la asignación');
+      }
+    } finally {
+      setIsRemovingAssignment(false);
+    }
+  }, [assignment, technician.id, technician.department, multiDateRemoval.otherDatesCount, multiDateRemoval.currentDate]);
 
   // Use job-specific status for assigned cells, date-based status for empty cells
   const staffingStatus = hasAssignment ? staffingStatusByJob : staffingStatusByDate;
@@ -475,7 +625,7 @@ export const OptimizedMatrixCell = memo(({
                   size="sm"
                   className="h-5 w-5 p-0 hover:bg-red-100"
                   title="Eliminar asignación"
-                  onClick={(e) => { e.stopPropagation(); setPendingRemoveAssignment(true); }}
+                  onClick={(e) => { e.stopPropagation(); checkMultiDateAssignment(); }}
                 >
                   <X className="h-3 w-3 text-red-600" />
                 </Button>
@@ -600,83 +750,76 @@ export const OptimizedMatrixCell = memo(({
             </Dialog>
           )}
 
-          {pendingRemoveAssignment && (
-            <Dialog open={true} onOpenChange={(v) => !v && setPendingRemoveAssignment(false)}>
+          {multiDateRemoval.isOpen && (
+            <Dialog open={true} onOpenChange={(v) => !v && setMultiDateRemoval(prev => ({ ...prev, isOpen: false }))}>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>¿Eliminar asignación?</DialogTitle>
                   <DialogDescription>
-                    Se eliminará la asignación de {displayName} en este trabajo.
+                    {multiDateRemoval.isLoading ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Comprobando otras fechas asignadas...
+                      </span>
+                    ) : multiDateRemoval.otherDatesCount > 0 ? (
+                      <>
+                        {displayName} está asignado a este trabajo durante <strong>{multiDateRemoval.otherDatesCount + 1} días</strong>.
+                        ¿Qué deseas eliminar?
+                      </>
+                    ) : (
+                      <>Se eliminará la asignación de {displayName} de este trabajo.</>
+                    )}
                   </DialogDescription>
                 </DialogHeader>
+
+                {!multiDateRemoval.isLoading && multiDateRemoval.otherDatesCount > 0 && (
+                  <div className="py-4">
+                    <RadioGroup
+                      value={multiDateRemoval.removeOption}
+                      onValueChange={(value: 'single' | 'all') =>
+                        setMultiDateRemoval(prev => ({ ...prev, removeOption: value }))
+                      }
+                      className="space-y-3"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <RadioGroupItem value="single" id="remove-single" />
+                        <Label htmlFor="remove-single" className="cursor-pointer">
+                          Solo este día ({multiDateRemoval.currentDate})
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <RadioGroupItem value="all" id="remove-all" />
+                        <Label htmlFor="remove-all" className="cursor-pointer">
+                          Todos los días ({multiDateRemoval.otherDatesCount + 1} días - elimina la asignación completa)
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                )}
+
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setPendingRemoveAssignment(false)}>Mantener</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setMultiDateRemoval(prev => ({ ...prev, isOpen: false }))}
+                    disabled={isRemovingAssignment}
+                  >
+                    Cancelar
+                  </Button>
                   <Button
                     variant="destructive"
-                    onClick={async () => {
-                      try {
-                        if (!assignment?.job_id) { setPendingRemoveAssignment(false); return; }
-
-                        // Use atomic RPC to delete assignment + timesheets in one transaction
-                        const { data, error } = await supabase.rpc('manage_assignment_lifecycle', {
-                          p_job_id: assignment.job_id,
-                          p_technician_id: technician.id,
-                          p_action: 'cancel',
-                          p_delete_mode: 'hard' // Hard delete for matrix removals
-                        });
-
-                        if (error) throw error;
-
-                        if (data?.error) {
-                          throw new Error(data.error);
-                        }
-
-                        const flexDepartments = determineFlexDepartmentsForAssignment(assignment, technician.department);
-                        if (flexDepartments.length > 0) {
-                          await Promise.allSettled(flexDepartments.map(async (department) => {
-                            try {
-                              const { error } = await supabase.functions.invoke('manage-flex-crew-assignments', {
-                                body: {
-                                  job_id: assignment.job_id,
-                                  technician_id: technician.id,
-                                  department,
-                                  action: 'remove'
-                                }
-                              });
-                              if (error) {
-                                console.error('Error removing Flex crew assignment:', error);
-                              }
-                            } catch (flexError) {
-                              console.error('Failed to remove Flex crew assignment:', flexError);
-                            }
-                          }));
-                        }
-
-                        // Send push notification for assignment removal (fire-and-forget, non-blocking)
-                        try {
-                          void supabase.functions.invoke('push', {
-                            body: {
-                              action: 'broadcast',
-                              type: 'assignment.removed',
-                              job_id: assignment.job_id,
-                              recipient_id: technician.id,
-                              technician_id: technician.id
-                            }
-                          });
-                        } catch (pushErr) {
-                          // Non-blocking: log but don't fail the removal
-                          console.warn('Failed to send assignment removal notification:', pushErr);
-                        }
-
-                        setPendingRemoveAssignment(false)
-                        toast.success('Asignación eliminada')
-                        window.dispatchEvent(new CustomEvent('assignment-updated'))
-                      } catch (e: any) {
-                        toast.error(e?.message || 'No se pudo eliminar la asignación')
-                      }
-                    }}
+                    onClick={() => handleRemoveAssignment(multiDateRemoval.removeOption === 'all')}
+                    disabled={multiDateRemoval.isLoading || isRemovingAssignment}
                   >
-                    Eliminar
+                    {isRemovingAssignment ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Eliminando...
+                      </span>
+                    ) : multiDateRemoval.removeOption === 'all' && multiDateRemoval.otherDatesCount > 0 ? (
+                      `Eliminar ${multiDateRemoval.otherDatesCount + 1} días`
+                    ) : (
+                      'Eliminar'
+                    )}
                   </Button>
                 </DialogFooter>
               </DialogContent>
