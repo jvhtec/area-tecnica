@@ -33,11 +33,12 @@ DECLARE
   v_is_autonomo BOOLEAN := TRUE;
   v_autonomo_discount NUMERIC := 0;
 BEGIN
-  -- Fetch timesheet with job info and category
+  -- Fetch timesheet with job info, category, and autonomo status
   SELECT
     t.*,
     j.job_type,
     j.tour_date_id,
+    COALESCE(p.autonomo, true) as is_autonomo,
     COALESCE(
       t.category,
       CASE
@@ -81,10 +82,8 @@ BEGIN
     END IF;
   END IF;
 
-  -- Check autonomo status for potential discount
-  SELECT COALESCE(autonomo, true) INTO v_is_autonomo
-  FROM public.profiles
-  WHERE id = v_timesheet.technician_id;
+  -- Get autonomo status from the main query
+  v_is_autonomo := v_timesheet.is_autonomo;
 
   -- Handle rehearsal flat rate
   IF v_is_rehearsal THEN
@@ -292,3 +291,79 @@ CREATE UNIQUE INDEX IF NOT EXISTS rate_cards_2025_category_unique_idx
 
 CREATE UNIQUE INDEX IF NOT EXISTS rate_cards_tour_2025_category_unique_idx
   ON public.rate_cards_tour_2025 (category);
+
+-- -----------------------------------------------------------------------------
+-- Row Level Security for rate_cards_2025
+-- -----------------------------------------------------------------------------
+ALTER TABLE public.rate_cards_2025 ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if any (idempotent)
+DROP POLICY IF EXISTS "rate_cards_2025_select_policy" ON public.rate_cards_2025;
+DROP POLICY IF EXISTS "rate_cards_2025_insert_policy" ON public.rate_cards_2025;
+DROP POLICY IF EXISTS "rate_cards_2025_update_policy" ON public.rate_cards_2025;
+DROP POLICY IF EXISTS "rate_cards_2025_delete_policy" ON public.rate_cards_2025;
+
+-- Allow authenticated users to read rate cards
+CREATE POLICY "rate_cards_2025_select_policy"
+  ON public.rate_cards_2025
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- Only admin/management can modify rate cards
+CREATE POLICY "rate_cards_2025_insert_policy"
+  ON public.rate_cards_2025
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (public.is_admin_or_management());
+
+CREATE POLICY "rate_cards_2025_update_policy"
+  ON public.rate_cards_2025
+  FOR UPDATE
+  TO authenticated
+  USING (public.is_admin_or_management())
+  WITH CHECK (public.is_admin_or_management());
+
+CREATE POLICY "rate_cards_2025_delete_policy"
+  ON public.rate_cards_2025
+  FOR DELETE
+  TO authenticated
+  USING (public.is_admin_or_management());
+
+-- -----------------------------------------------------------------------------
+-- Row Level Security for rate_cards_tour_2025
+-- -----------------------------------------------------------------------------
+ALTER TABLE public.rate_cards_tour_2025 ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if any (idempotent)
+DROP POLICY IF EXISTS "rate_cards_tour_2025_select_policy" ON public.rate_cards_tour_2025;
+DROP POLICY IF EXISTS "rate_cards_tour_2025_insert_policy" ON public.rate_cards_tour_2025;
+DROP POLICY IF EXISTS "rate_cards_tour_2025_update_policy" ON public.rate_cards_tour_2025;
+DROP POLICY IF EXISTS "rate_cards_tour_2025_delete_policy" ON public.rate_cards_tour_2025;
+
+-- Allow authenticated users to read tour rate cards
+CREATE POLICY "rate_cards_tour_2025_select_policy"
+  ON public.rate_cards_tour_2025
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- Only admin/management can modify tour rate cards
+CREATE POLICY "rate_cards_tour_2025_insert_policy"
+  ON public.rate_cards_tour_2025
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (public.is_admin_or_management());
+
+CREATE POLICY "rate_cards_tour_2025_update_policy"
+  ON public.rate_cards_tour_2025
+  FOR UPDATE
+  TO authenticated
+  USING (public.is_admin_or_management())
+  WITH CHECK (public.is_admin_or_management());
+
+CREATE POLICY "rate_cards_tour_2025_delete_policy"
+  ON public.rate_cards_tour_2025
+  FOR DELETE
+  TO authenticated
+  USING (public.is_admin_or_management());
