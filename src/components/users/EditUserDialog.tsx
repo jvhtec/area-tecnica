@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Profile } from "./types";
-import { Department } from "@/types/department";
+import { Department, ALL_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
@@ -268,18 +268,17 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
+              <Label htmlFor="department">Departamento</Label>
               <Select name="department" defaultValue={user?.department || 'sound'}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
+                  <SelectValue placeholder="Selecciona un departamento" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sound">Sound</SelectItem>
-                  <SelectItem value="lights">Lights</SelectItem>
-                  <SelectItem value="video">Video</SelectItem>
-                  <SelectItem value="production">Production</SelectItem>
-                  <SelectItem value="logistics">Logistics</SelectItem>
-                  <SelectItem value="administrative">Administrative</SelectItem>
+                  {ALL_DEPARTMENTS.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {DEPARTMENT_LABELS[dept]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

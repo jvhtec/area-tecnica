@@ -33,6 +33,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { deleteJobDateTypes } from "@/services/deleteJobDateTypes";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
+import { TECHNICAL_DEPARTMENTS } from "@/types/department";
 
 interface TourDateManagementDialogProps {
   open: boolean;
@@ -304,7 +305,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       const departments =
         tourData.tour_dates?.[0]?.jobs?.[0]?.job_departments?.map(
           (dept: any) => dept.department
-        ) || ["sound", "lights", "video"];
+        ) || TECHNICAL_DEPARTMENTS;
       const jobDepartments = departments.map((department) => ({
         job_id: newJob.id,
         department,
