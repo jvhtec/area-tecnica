@@ -162,11 +162,14 @@ BEGIN
   -- Standard rate card lookup (non-rehearsal)
   -- Note: rate_cards_2025.category should have a UNIQUE constraint to ensure deterministic lookups
   SELECT
-    CASE
-      WHEN v_category = 'responsable' THEN COALESCE(base_day_responsable_eur, base_day_especialista_eur, base_day_eur)
-      WHEN v_category = 'especialista' THEN COALESCE(base_day_especialista_eur, base_day_eur)
-      ELSE base_day_eur
-    END AS base_day_eur,
+    COALESCE(
+      CASE
+        WHEN v_category = 'responsable' THEN COALESCE(base_day_responsable_eur, base_day_especialista_eur, base_day_eur)
+        WHEN v_category = 'especialista' THEN COALESCE(base_day_especialista_eur, base_day_eur)
+        ELSE base_day_eur
+      END,
+      (SELECT rc.base_day_eur FROM public.rate_cards_2025 rc WHERE rc.category = v_category)
+    ) AS base_day_eur,
     COALESCE(plus_10_12_eur, (SELECT rc.plus_10_12_eur FROM public.rate_cards_2025 rc WHERE rc.category = v_category)) as plus_10_12_eur,
     COALESCE(overtime_hour_eur, (SELECT rc.overtime_hour_eur FROM public.rate_cards_2025 rc WHERE rc.category = v_category)) as overtime_hour_eur
   INTO v_rate_card
