@@ -38,7 +38,7 @@ import {
 import { Loader2, Calendar as CalendarIcon, Clock, CalendarDays, CalendarRange } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
@@ -121,7 +121,7 @@ export const AssignJobDialog = ({
   const assignmentDate = React.useMemo(() => format((singleDate ?? date), 'yyyy-MM-dd'), [date, singleDate]);
 
   // Fetch existing timesheets when modifying the same job
-  const { data: existingTimesheets } = useQuery({
+  const { data: existingTimesheets, isLoading: isLoadingExistingTimesheets } = useQuery({
     queryKey: ['existing-timesheets', selectedJobId, technicianId],
     enabled: isModifyingSameJob && !!selectedJobId && !!technicianId,
     queryFn: async () => {
@@ -222,6 +222,13 @@ export const AssignJobDialog = ({
 
     if (isAssigning) {
       console.log('Assignment already in progress, ignoring duplicate click');
+      return;
+    }
+
+    // Wait for existing timesheets query to complete when modifying same job
+    if (isModifyingSameJob && isLoadingExistingTimesheets) {
+      console.log('Waiting for existing timesheets to load...');
+      toast.error('Cargando hojas de hora existentes, por favor espera...');
       return;
     }
 
@@ -413,8 +420,8 @@ export const AssignJobDialog = ({
           const datesToCreate = coverageDates.filter(d => !existingDates.includes(d));
           console.log('Add mode - creating timesheets for new dates:', datesToCreate);
 
-          // Use Promise.all for parallel execution to improve performance
-          await Promise.all(datesToCreate.map(dateIso =>
+          // Use Promise.allSettled for parallel execution with failure handling
+          const results = await Promise.allSettled(datesToCreate.map(dateIso =>
             toggleTimesheetDay({
               jobId: selectedJobId,
               technicianId,
@@ -423,13 +430,23 @@ export const AssignJobDialog = ({
               source: 'assignment-dialog'
             })
           ));
+
+          const failures = results
+            .map((result, idx) => ({ result, date: datesToCreate[idx] }))
+            .filter(({ result }) => result.status === 'rejected');
+
+          if (failures.length > 0) {
+            console.error('Some timesheets failed to create in add mode:', failures);
+            const failedDates = failures.map(({ date }) => date).join(', ');
+            throw new Error(`Error al añadir hojas de hora para las fechas: ${failedDates}`);
+          }
         } else {
           // Replace mode: Remove dates not in new coverage, add missing ones
           console.log('Replace mode - replacing timesheets. Old:', existingDates, 'New:', coverageDates);
 
-          // Delete dates that are no longer needed (parallel execution)
+          // Delete dates that are no longer needed (parallel execution with failure handling)
           const datesToRemove = existingDates.filter(d => !coverageDates.includes(d));
-          await Promise.all(datesToRemove.map(dateIso =>
+          const removeResults = await Promise.allSettled(datesToRemove.map(dateIso =>
             toggleTimesheetDay({
               jobId: selectedJobId,
               technicianId,
@@ -439,9 +456,19 @@ export const AssignJobDialog = ({
             })
           ));
 
-          // Create dates that don't exist yet (parallel execution)
+          const removeFailures = removeResults
+            .map((result, idx) => ({ result, date: datesToRemove[idx] }))
+            .filter(({ result }) => result.status === 'rejected');
+
+          if (removeFailures.length > 0) {
+            console.error('Some timesheets failed to remove in replace mode:', removeFailures);
+            const failedDates = removeFailures.map(({ date }) => date).join(', ');
+            throw new Error(`Error al eliminar hojas de hora para las fechas: ${failedDates}`);
+          }
+
+          // Create dates that don't exist yet (parallel execution with failure handling)
           const datesToCreate = coverageDates.filter(d => !existingDates.includes(d));
-          await Promise.all(datesToCreate.map(dateIso =>
+          const createResults = await Promise.allSettled(datesToCreate.map(dateIso =>
             toggleTimesheetDay({
               jobId: selectedJobId,
               technicianId,
@@ -450,18 +477,33 @@ export const AssignJobDialog = ({
               source: 'assignment-dialog'
             })
           ));
+
+          const createFailures = createResults
+            .map((result, idx) => ({ result, date: datesToCreate[idx] }))
+            .filter(({ result }) => result.status === 'rejected');
+
+          if (createFailures.length > 0) {
+            console.error('Some timesheets failed to create in replace mode:', createFailures);
+            const failedDates = createFailures.map(({ date }) => date).join(', ');
+            throw new Error(`Error al crear hojas de hora para las fechas: ${failedDates}`);
+          }
         }
       } else {
         // Not modifying same job - delete all existing and create new (current behavior)
         console.log('Different job or new assignment - replacing all timesheets');
-        await supabase
+        const { error: deleteError } = await supabase
           .from('timesheets')
           .delete()
           .eq('job_id', selectedJobId)
           .eq('technician_id', technicianId);
 
-        // Use Promise.all for parallel execution to improve performance
-        await Promise.all(coverageDates.map(dateIso =>
+        if (deleteError) {
+          console.error('Error deleting existing timesheets:', deleteError);
+          throw new Error(`No se pudieron eliminar las hojas de hora existentes: ${deleteError.message}`);
+        }
+
+        // Use Promise.allSettled for parallel execution with failure handling
+        const results = await Promise.allSettled(coverageDates.map(dateIso =>
           toggleTimesheetDay({
             jobId: selectedJobId,
             technicianId,
@@ -470,6 +512,16 @@ export const AssignJobDialog = ({
             source: 'assignment-dialog'
           })
         ));
+
+        const failures = results
+          .map((result, idx) => ({ result, date: coverageDates[idx] }))
+          .filter(({ result }) => result.status === 'rejected');
+
+        if (failures.length > 0) {
+          console.error('Some timesheets failed to create:', failures);
+          const failedDates = failures.map(({ date }) => date).join(', ');
+          throw new Error(`Error al crear hojas de hora para las fechas: ${failedDates}`);
+        }
       }
 
       // Verification: ensure at least one assignment row now exists for this job/tech

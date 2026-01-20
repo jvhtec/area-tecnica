@@ -14,7 +14,7 @@ import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useDeletionState } from '@/hooks/useDeletionState';
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { format } from "date-fns";

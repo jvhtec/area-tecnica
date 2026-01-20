@@ -28,7 +28,8 @@ BEGIN
   WHERE id = auth.uid();
 
   -- Only admin and management can clear requests
-  IF v_user_role NOT IN ('admin', 'management') THEN
+  -- Explicitly handle NULL to prevent bypass
+  IF v_user_role IS NULL OR v_user_role NOT IN ('admin', 'management') THEN
     RAISE EXCEPTION 'Only admin and management users can clear WhatsApp group requests';
   END IF;
 

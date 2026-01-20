@@ -6,7 +6,7 @@ import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog"
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import type { Department } from "@/types/department";
 import { createAllFoldersForJob, openFlexElement } from "@/utils/flex-folders";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
