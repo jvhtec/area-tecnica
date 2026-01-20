@@ -14,7 +14,7 @@ import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useDeletionState } from '@/hooks/useDeletionState';
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { format } from "date-fns";
@@ -437,8 +437,8 @@ function JobCardNewFull({
     return () => { supabase.removeChannel(channel); };
   }, [hasAssignedTechnicians, job.id, job.job_type, queryClient]);
 
-  const handleCreateWhatsappGroup = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Core group creation logic (shared by initial creation and retry)
+  const createWhatsappGroupCore = async () => {
     if (!(userRole === 'management' || userRole === 'admin')) return;
     try {
       // Pre-check: warn for missing phones
@@ -469,7 +469,7 @@ function JobCardNewFull({
         body: { job_id: job.id as string, department: department as any }
       });
       if (error) {
-        // Even on error, lock may have been recorded. We’ll refetch lock and inform user.
+        // Even on error, lock may have been recorded. We'll refetch lock and inform user.
         toast({ title: 'Grupo solicitado', description: 'Se ha solicitado la creación del grupo. El botón quedará bloqueado.', });
       } else {
         const warnings = (data as any)?.warnings;
@@ -485,6 +485,64 @@ function JobCardNewFull({
       // Still lock; refetch
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
       toast({ title: 'Grupo solicitado', description: 'Se ha solicitado la creación del grupo. El botón quedará bloqueado.' });
+    }
+  };
+
+  const handleCreateWhatsappGroup = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await createWhatsappGroupCore();
+  };
+
+  const handleRetryWhatsappGroup = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!(userRole === 'management' || userRole === 'admin')) return;
+
+    try {
+      // Clear the failed request using RPC function
+      const { data: clearResult, error: clearError } = await supabase.rpc(
+        'clear_whatsapp_group_request',
+        { p_job_id: job.id, p_department: department }
+      );
+
+      if (clearError) {
+        toast({
+          title: 'Error',
+          description: `No se pudo limpiar la solicitud: ${clearError.message}`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const result = clearResult as any;
+
+      if (!result.success) {
+        toast({
+          title: 'Aviso',
+          description: result.error || result.message,
+          variant: result.can_retry ? 'default' : 'destructive'
+        });
+        await Promise.all([refetchWaGroup(), refetchWaRequest()]);
+        return;
+      }
+
+      toast({
+        title: 'Solicitud limpiada',
+        description: 'Intentando crear el grupo de nuevo...'
+      });
+
+      // Await refetch to ensure state is updated before retrying
+      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
+
+      // Call the core creation logic directly (no setTimeout or event needed)
+      await createWhatsappGroupCore();
+
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: `Error al reintentar: ${err.message}`,
+        variant: 'destructive'
+      });
+      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
     }
   };
 
@@ -1011,6 +1069,7 @@ function JobCardNewFull({
       transportButtonTone={transportButtonTone}
       handleTransportClick={handleTransportClick}
       handleCreateWhatsappGroup={handleCreateWhatsappGroup}
+      handleRetryWhatsappGroup={handleRetryWhatsappGroup}
       waGroup={waGroup}
       waRequest={waRequest}
       setTaskManagerOpen={setTaskManagerOpen}
