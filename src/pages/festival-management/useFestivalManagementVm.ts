@@ -1038,12 +1038,11 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
           description: 'Intentando crear el grupo de nuevo...'
         });
 
+        // Await refetch to ensure state is updated before retrying
         await Promise.all([refetchWaGroup(), refetchWaRequest()]);
 
-        // Wait a moment for state to update, then retry creation
-        setTimeout(() => {
-          handleCreateWhatsappGroup();
-        }, 500);
+        // Call the create handler directly (no setTimeout needed)
+        await handleCreateWhatsappGroup();
 
       } catch (err: any) {
         toast({

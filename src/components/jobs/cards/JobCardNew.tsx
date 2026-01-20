@@ -437,8 +437,8 @@ function JobCardNewFull({
     return () => { supabase.removeChannel(channel); };
   }, [hasAssignedTechnicians, job.id, job.job_type, queryClient]);
 
-  const handleCreateWhatsappGroup = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Core group creation logic (shared by initial creation and retry)
+  const createWhatsappGroupCore = async () => {
     if (!(userRole === 'management' || userRole === 'admin')) return;
     try {
       // Pre-check: warn for missing phones
@@ -488,6 +488,11 @@ function JobCardNewFull({
     }
   };
 
+  const handleCreateWhatsappGroup = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await createWhatsappGroupCore();
+  };
+
   const handleRetryWhatsappGroup = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!(userRole === 'management' || userRole === 'admin')) return;
@@ -525,12 +530,11 @@ function JobCardNewFull({
         description: 'Intentando crear el grupo de nuevo...'
       });
 
+      // Await refetch to ensure state is updated before retrying
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
 
-      // Wait a moment for state to update, then retry creation
-      setTimeout(() => {
-        handleCreateWhatsappGroup(e);
-      }, 500);
+      // Call the core creation logic directly (no setTimeout or event needed)
+      await createWhatsappGroupCore();
 
     } catch (err: any) {
       toast({

@@ -413,42 +413,43 @@ export const AssignJobDialog = ({
           const datesToCreate = coverageDates.filter(d => !existingDates.includes(d));
           console.log('Add mode - creating timesheets for new dates:', datesToCreate);
 
-          for (const dateIso of datesToCreate) {
-            await toggleTimesheetDay({
+          // Use Promise.all for parallel execution to improve performance
+          await Promise.all(datesToCreate.map(dateIso =>
+            toggleTimesheetDay({
               jobId: selectedJobId,
               technicianId,
               dateIso,
               present: true,
               source: 'assignment-dialog'
-            });
-          }
+            })
+          ));
         } else {
           // Replace mode: Remove dates not in new coverage, add missing ones
           console.log('Replace mode - replacing timesheets. Old:', existingDates, 'New:', coverageDates);
 
-          // Delete dates that are no longer needed
+          // Delete dates that are no longer needed (parallel execution)
           const datesToRemove = existingDates.filter(d => !coverageDates.includes(d));
-          for (const dateIso of datesToRemove) {
-            await toggleTimesheetDay({
+          await Promise.all(datesToRemove.map(dateIso =>
+            toggleTimesheetDay({
               jobId: selectedJobId,
               technicianId,
               dateIso,
               present: false,
               source: 'assignment-dialog'
-            });
-          }
+            })
+          ));
 
-          // Create dates that don't exist yet
+          // Create dates that don't exist yet (parallel execution)
           const datesToCreate = coverageDates.filter(d => !existingDates.includes(d));
-          for (const dateIso of datesToCreate) {
-            await toggleTimesheetDay({
+          await Promise.all(datesToCreate.map(dateIso =>
+            toggleTimesheetDay({
               jobId: selectedJobId,
               technicianId,
               dateIso,
               present: true,
               source: 'assignment-dialog'
-            });
-          }
+            })
+          ));
         }
       } else {
         // Not modifying same job - delete all existing and create new (current behavior)
@@ -459,15 +460,16 @@ export const AssignJobDialog = ({
           .eq('job_id', selectedJobId)
           .eq('technician_id', technicianId);
 
-        for (const dateIso of coverageDates) {
-          await toggleTimesheetDay({
+        // Use Promise.all for parallel execution to improve performance
+        await Promise.all(coverageDates.map(dateIso =>
+          toggleTimesheetDay({
             jobId: selectedJobId,
             technicianId,
             dateIso,
             present: true,
             source: 'assignment-dialog'
-          });
-        }
+          })
+        ));
       }
 
       // Verification: ensure at least one assignment row now exists for this job/tech

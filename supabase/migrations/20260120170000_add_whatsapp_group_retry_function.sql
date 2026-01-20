@@ -10,6 +10,7 @@ CREATE OR REPLACE FUNCTION clear_whatsapp_group_request(
 RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_user_role user_role;

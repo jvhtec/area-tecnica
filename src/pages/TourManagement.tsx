@@ -96,15 +96,31 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   const [isCreatingWaGroup, setIsCreatingWaGroup] = useState(false);
 
   // Check if WhatsApp group already exists for selected date/department
-  const { data: waGroup, refetch: refetchWaGroup } = useQuery({
-    queryKey: ['job-whatsapp-group', waSelectedDateId, waDepartment],
-    enabled: !!waSelectedDateId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
+  // First resolve the job_id from tour_date_id
+  const { data: resolvedJobId } = useQuery({
+    queryKey: ['tour-date-job-id', waSelectedDateId],
+    enabled: !!waSelectedDateId,
     queryFn: async () => {
       if (!waSelectedDateId) return null;
       const { data, error } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('tour_date_id', waSelectedDateId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return data.id;
+    }
+  });
+
+  const { data: waGroup, refetch: refetchWaGroup } = useQuery({
+    queryKey: ['job-whatsapp-group', resolvedJobId, waDepartment],
+    enabled: !!resolvedJobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
+    queryFn: async () => {
+      if (!resolvedJobId) return null;
+      const { data, error } = await supabase
         .from('job_whatsapp_groups')
         .select('id, wa_group_id')
-        .eq('job_id', waSelectedDateId)
+        .eq('job_id', resolvedJobId)
         .eq('department', waDepartment)
         .maybeSingle();
       if (error) return null;
@@ -113,14 +129,14 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   });
 
   const { data: waRequest, refetch: refetchWaRequest } = useQuery({
-    queryKey: ['job-whatsapp-group-request', waSelectedDateId, waDepartment],
-    enabled: !!waSelectedDateId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
+    queryKey: ['job-whatsapp-group-request', resolvedJobId, waDepartment],
+    enabled: !!resolvedJobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
     queryFn: async () => {
-      if (!waSelectedDateId) return null;
+      if (!resolvedJobId) return null;
       const { data, error } = await supabase
         .from('job_whatsapp_group_requests')
         .select('id, created_at')
-        .eq('job_id', waSelectedDateId)
+        .eq('job_id', resolvedJobId)
         .eq('department', waDepartment)
         .maybeSingle();
       if (error) return null;
@@ -249,10 +265,29 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
 
     setIsCreatingWaGroup(true);
     try {
-      // Clear the failed request using RPC function
+      // First resolve the job_id from the tour_date_id
+      const { data: jobData, error: jobError } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('tour_date_id', waSelectedDateId)
+        .maybeSingle();
+
+      if (jobError || !jobData) {
+        toast({
+          title: 'Error',
+          description: 'No se encontró el trabajo asociado a esta fecha de gira.',
+          variant: 'destructive'
+        });
+        setIsCreatingWaGroup(false);
+        return;
+      }
+
+      const jobId = jobData.id;
+
+      // Clear the failed request using RPC function with correct job_id
       const { data: clearResult, error: clearError } = await supabase.rpc(
         'clear_whatsapp_group_request',
-        { p_job_id: waSelectedDateId, p_department: waDepartment }
+        { p_job_id: jobId, p_department: waDepartment }
       );
 
       if (clearError) {
@@ -283,12 +318,11 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         description: 'Intentando crear el grupo de nuevo...'
       });
 
+      // Await the refetch to ensure state is updated before retrying
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
 
-      // Wait a moment for state to update, then retry creation
-      setTimeout(() => {
-        createWhatsappGroup();
-      }, 500);
+      // Call the create handler directly (no setTimeout needed)
+      await handleCreateWaGroup();
 
     } catch (err: any) {
       toast({
