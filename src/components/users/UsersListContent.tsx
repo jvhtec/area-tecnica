@@ -44,7 +44,7 @@ export const UsersListContent = ({ users, groupBy, isManagementUser = false }: U
   if (!groupBy) {
     return (
       <ScrollArea className="h-[400px] sm:h-[500px] md:h-[600px]">
-        <div className="space-y-2">
+        <div className="space-y-2 pr-2">
           {users.map((user) => (
             user?.id ? (
               <UserCard
@@ -101,7 +101,7 @@ export const UsersListContent = ({ users, groupBy, isManagementUser = false }: U
             </AccordionTrigger>
             <AccordionContent>
               <ScrollArea className="h-[300px]">
-                <div className="space-y-2">
+                <div className="space-y-2 pr-2">
               {groupUsers.map((user) => (
                 user?.id ? (
                   <UserCard
