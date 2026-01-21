@@ -426,10 +426,10 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
       <Popover open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
         <PopoverTrigger asChild>
           <div
-            className="border-b hover:bg-accent/50 cursor-pointer transition-colors"
+            className="border-b hover:bg-accent/50 cursor-pointer transition-colors overflow-hidden"
             style={{
               height,
-              padding: compact ? '0.25rem' : '0.75rem',
+              padding: compact ? '0.25rem' : '0.5rem',
               backgroundColor: technician.bg_color || undefined
             }}
             title={compact ? displayName : undefined}
@@ -471,16 +471,16 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                       <Refrigerator className="inline-block h-3.5 w-3.5 text-sky-600" />
                     )}
                   </div>
-                  <div className="flex gap-1 mt-1 flex-wrap">
+                  <div className="flex gap-1 mt-1 flex-nowrap overflow-hidden">
                     <Badge
                       variant="secondary"
-                      className={`text-xs ${getDepartmentColor(technician.department)}`}
+                      className={`text-xs whitespace-nowrap ${getDepartmentColor(technician.department)}`}
                     >
                       {technician.department}
                     </Badge>
                     <Badge
                       variant="outline"
-                      className={`text-xs ${getRoleColor(technician.role)}`}
+                      className={`text-xs whitespace-nowrap ${getRoleColor(technician.role)}`}
                     >
                       {technician.role === 'house_tech' ? 'Técnico de Casa' : 'Técnico'}
                     </Badge>
@@ -839,7 +839,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                                       className="h-4 w-4"
                                       style={{
                                         color: lastYearMedalRank === 'gold' ? '#FFD700' :
-                                               lastYearMedalRank === 'silver' ? '#C0C0C0' : '#CD7F32',
+                                          lastYearMedalRank === 'silver' ? '#C0C0C0' : '#CD7F32',
                                         cursor: 'help',
                                         opacity: 0.7
                                       }}
