@@ -19,7 +19,7 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
 
   return (
     <div className="group border rounded-lg hover:bg-accent/5 transition-colors overflow-visible">
-      <div className="flex items-start sm:items-center justify-between p-1.5 sm:p-3 gap-1 sm:gap-2">
+      <div className="flex items-start sm:items-center justify-between p-1 sm:p-3 gap-1 sm:gap-2">
         <HoverCard>
           <HoverCardTrigger asChild>
             <div className="flex flex-col gap-1.5 cursor-pointer flex-1 min-w-0">
@@ -50,7 +50,7 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
           </HoverCardContent>
         </HoverCard>
 
-        <div className="flex gap-0.5 sm:gap-2 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -mr-1 sm:mr-0">
+        <div className="flex gap-0.5 sm:gap-2 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -mr-2 sm:mr-0">
           {onManageSkills && (
             <Button
               variant="outline"
