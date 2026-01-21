@@ -2,7 +2,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { Department } from "@/types/department";
+import { Department, TECHNICAL_DEPARTMENTS } from "@/types/department";
 import { useTourCreation } from "@/hooks/useTourCreation";
 import { TourFormFields } from "./TourFormFields";
 
@@ -36,10 +36,8 @@ const CreateTourDialog = ({
     isCreating,
   } = useTourCreation(currentDepartment, () => onOpenChange(false));
 
-  // Mock available departments for now - you might want to fetch these from a hook
-  const availableDepartments: Department[] = [
-    "sound", "lights", "video", "production", "logistics", "administrative", "personnel", "comercial"
-  ];
+  // Only technical departments are available for tours
+  const availableDepartments: Department[] = TECHNICAL_DEPARTMENTS;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

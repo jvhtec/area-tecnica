@@ -10,11 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Department } from "@/types/department";
+import { Department, TECHNICAL_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
 import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
 import {
   Select,
@@ -285,8 +285,6 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
     }
   };
 
-  const departments: Department[] = ["sound", "lights", "video", "production"];
-
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -427,17 +425,17 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               </p>
             </div>
             <div className="space-y-2">
-              <Label>Departments</Label>
+              <Label>Departamentos</Label>
               <div className="flex flex-col gap-2">
-                {departments.map((department) => (
+                {TECHNICAL_DEPARTMENTS.map((department) => (
                   <div key={department} className="flex items-center space-x-2">
                     <Checkbox
                       id={`department-${department}`}
                       checked={selectedDepartments.includes(department)}
                       onCheckedChange={() => handleDepartmentToggle(department)}
                     />
-                    <Label htmlFor={`department-${department}`} className="capitalize">
-                      {department}
+                    <Label htmlFor={`department-${department}`}>
+                      {DEPARTMENT_LABELS[department]}
                     </Label>
                   </div>
                 ))}

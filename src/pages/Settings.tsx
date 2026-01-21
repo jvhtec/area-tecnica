@@ -15,6 +15,7 @@ import { CompanyLogoUploader } from "@/components/CompanyLogoUploader";
 import { EquipmentModelsList } from "@/components/equipment/EquipmentModelsList";
 import { DepartmentProvider } from "@/contexts/DepartmentContext";
 import type { Department } from "@/types/equipment";
+import { DEPARTMENT_LABELS } from "@/types/department";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -60,25 +61,41 @@ const CollapsibleCard = ({
       className="border rounded-lg"
     >
       <Card className="border-none shadow-none">
-        <CardHeader className="flex flex-row items-start justify-between gap-3">
-          <div className="space-y-1">
-            <CardTitle>{title}</CardTitle>
-            {description && <CardDescription>{description}</CardDescription>}
+        <CardHeader className="pb-3 md:pb-6">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-base md:text-lg">{title}</CardTitle>
+                {description && (
+                  <CardDescription className="mt-1.5 text-xs md:text-sm">
+                    {description}
+                  </CardDescription>
+                )}
+              </div>
+              <CollapsibleTrigger asChild>
+                <button
+                  className="shrink-0 rounded-md border px-2 py-1 text-xs md:text-sm text-muted-foreground hover:bg-muted flex items-center gap-1 [&[data-state=open]>svg]:rotate-180"
+                  aria-label={open ? "Collapse section" : "Expand section"}
+                >
+                  <ChevronDown className="h-3.5 w-3.5 md:h-4 md:w-4 transition-transform duration-200" />
+                  <span className="hidden sm:inline">Toggle</span>
+                </button>
+              </CollapsibleTrigger>
+            </div>
           </div>
-          <CollapsibleTrigger asChild>
-            <button className="rounded-md border px-2 py-1 text-sm text-muted-foreground hover:bg-muted flex items-center gap-1">
-              <ChevronDown className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
-              Toggle
-            </button>
-          </CollapsibleTrigger>
         </CardHeader>
         <CollapsibleContent>
-          <CardContent className="pt-0">{children}</CardContent>
+          <CardContent className="pt-0 pb-4 md:pb-6 space-y-3 md:space-y-4 overflow-visible">
+            {children}
+          </CardContent>
         </CollapsibleContent>
       </Card>
     </Collapsible>
   );
 };
+
+// Equipment departments (sound, lights, video only)
+const EQUIPMENT_DEPARTMENTS: Department[] = ['sound', 'lights', 'video'];
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -218,23 +235,34 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto w-full max-w-full px-4 sm:px-6 lg:px-8 py-4 space-y-4 md:space-y-6">
-        <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
-          <h1 className="text-2xl font-semibold">Settings</h1>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={() => setImportUsersOpen(true)} variant="outline" className="w-full sm:w-auto">
-              <Upload className="mr-2 h-4 w-4" />
-              Import Users
+      <div className="mx-auto w-full max-w-full px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 space-y-3 md:space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+          <h1 className="text-xl md:text-2xl font-semibold">Settings</h1>
+          <div className="flex flex-row gap-2">
+            <Button
+              onClick={() => setImportUsersOpen(true)}
+              variant="outline"
+              className="flex-1 sm:flex-initial text-xs sm:text-sm"
+              size="sm"
+            >
+              <Upload className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Import Users</span>
+              <span className="xs:hidden">Import</span>
             </Button>
-            <Button onClick={() => setCreateUserOpen(true)} className="w-full sm:w-auto">
-              <UserPlus className="mr-2 h-4 w-4" />
-              Add User
+            <Button
+              onClick={() => setCreateUserOpen(true)}
+              className="flex-1 sm:flex-initial text-xs sm:text-sm"
+              size="sm"
+            >
+              <UserPlus className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Add User</span>
+              <span className="xs:hidden">Add</span>
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 auto-rows-fr">
-          <div className="space-y-4 md:space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 items-start">
+          <div className="space-y-4 md:space-y-6 w-full min-w-0">
             <CollapsibleCard
               id="push-notifications"
               title="Push notifications"
@@ -283,15 +311,16 @@ const Settings = () => {
                     </Alert>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
                       onClick={() => {
                         void enable().catch(() => undefined);
                       }}
                       disabled={!showEnableButton || isEnabling}
-                      className="w-full"
+                      className="w-full text-xs sm:text-sm"
+                      size="sm"
                     >
-                      {isEnabling ? 'Enabling…' : 'Enable push'}
+                      {isEnabling ? 'Enabling…' : 'Enable'}
                     </Button>
                     <Button
                       variant="outline"
@@ -299,27 +328,30 @@ const Settings = () => {
                         void disable().catch(() => undefined);
                       }}
                       disabled={!hasSubscription || isDisabling || isInitializing}
-                      className="w-full"
+                      className="w-full text-xs sm:text-sm"
+                      size="sm"
                     >
-                      {isDisabling ? 'Disabling…' : 'Disable push'}
+                      {isDisabling ? 'Disabling…' : 'Disable'}
                     </Button>
                     <Button
                       variant="secondary"
                       onClick={handleTestNotification}
                       disabled={!hasSubscription || isInitializing}
-                      className="w-full"
+                      className="w-full text-xs sm:text-sm"
+                      size="sm"
                     >
-                      <Bell className="mr-2 h-4 w-4" />
-                      Send Test
+                      <Bell className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden xs:inline">Send </span>Test
                     </Button>
                     <Button
                       variant="secondary"
                       onClick={handleBackgroundTest}
                       disabled={!hasSubscription || isInitializing}
                       title="Schedules a test push in 5s so you can background the app"
-                      className="w-full"
+                      className="w-full text-xs sm:text-sm"
+                      size="sm"
                     >
-                      Background test (5s)
+                      BG test (5s)
                     </Button>
                   </div>
                 </>
@@ -341,12 +373,23 @@ const Settings = () => {
                     <p className="break-words"><span className="font-medium">Endpoint:</span> {String(subInfo.endpoint).slice(0, 64)}…</p>
                   )}
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2 mt-3">
-                  <Button variant="secondary" onClick={() => void showLocalTest()} disabled={permission !== 'granted'} className="w-full sm:w-auto">
-                    Show local SW test
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => void showLocalTest()}
+                    disabled={permission !== 'granted'}
+                    className="w-full text-xs sm:text-sm"
+                    size="sm"
+                  >
+                    <span className="hidden xs:inline">Show </span>Local test
                   </Button>
-                  <Button variant="outline" onClick={async () => setSubInfo(await getSubscriptionInfo())} className="w-full sm:w-auto">
-                    Refresh subscription info
+                  <Button
+                    variant="outline"
+                    onClick={async () => setSubInfo(await getSubscriptionInfo())}
+                    className="w-full text-xs sm:text-sm"
+                    size="sm"
+                  >
+                    Refresh<span className="hidden xs:inline"> info</span>
                   </Button>
                 </div>
                 <div className="text-xs text-muted-foreground mt-3">
@@ -399,7 +442,7 @@ const Settings = () => {
             </CollapsibleCard>
           </div>
 
-          <div className="space-y-4 md:space-y-6">
+          <div className="space-y-4 md:space-y-6 w-full min-w-0">
             <CollapsibleCard
               id="morning-summary"
               title="Morning summary"
@@ -454,21 +497,23 @@ const Settings = () => {
                 isOpen={collapsibleStates['equipment-models']}
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'equipment-models': open }))}
               >
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-muted-foreground">
+                <div className="space-y-3 md:space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs md:text-sm text-muted-foreground">
                       Manage equipment models used in festival forms and gear setup.
                     </p>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Department</span>
+                      <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">Department:</span>
                       <select
-                        className="border rounded px-3 py-2 text-sm min-w-[120px]"
+                        className="border rounded px-2 py-1.5 text-xs md:text-sm flex-1 sm:flex-initial sm:min-w-[120px]"
                         value={modelsDepartment}
                         onChange={(e) => setModelsDepartment(e.target.value as Department)}
                       >
-                        <option value="sound">Sound</option>
-                        <option value="lights">Lights</option>
-                        <option value="video">Video</option>
+                        {EQUIPMENT_DEPARTMENTS.map((dept) => (
+                          <option key={dept} value={dept}>
+                            {DEPARTMENT_LABELS[dept]}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
