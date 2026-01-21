@@ -15,6 +15,7 @@ import { CompanyLogoUploader } from "@/components/CompanyLogoUploader";
 import { EquipmentModelsList } from "@/components/equipment/EquipmentModelsList";
 import { DepartmentProvider } from "@/contexts/DepartmentContext";
 import type { Department } from "@/types/equipment";
+import { DEPARTMENT_LABELS } from "@/types/department";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -73,10 +74,10 @@ const CollapsibleCard = ({
               </div>
               <CollapsibleTrigger asChild>
                 <button
-                  className="shrink-0 rounded-md border px-2 py-1 text-xs md:text-sm text-muted-foreground hover:bg-muted flex items-center gap-1"
+                  className="shrink-0 rounded-md border px-2 py-1 text-xs md:text-sm text-muted-foreground hover:bg-muted flex items-center gap-1 [&[data-state=open]>svg]:rotate-180"
                   aria-label={open ? "Collapse section" : "Expand section"}
                 >
-                  <ChevronDown className="h-3.5 w-3.5 md:h-4 md:w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
+                  <ChevronDown className="h-3.5 w-3.5 md:h-4 md:w-4 transition-transform duration-200" />
                   <span className="hidden sm:inline">Toggle</span>
                 </button>
               </CollapsibleTrigger>
@@ -92,6 +93,9 @@ const CollapsibleCard = ({
     </Collapsible>
   );
 };
+
+// Equipment departments (sound, lights, video only)
+const EQUIPMENT_DEPARTMENTS: Department[] = ['sound', 'lights', 'video'];
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -505,9 +509,11 @@ const Settings = () => {
                         value={modelsDepartment}
                         onChange={(e) => setModelsDepartment(e.target.value as Department)}
                       >
-                        <option value="sound">Sound</option>
-                        <option value="lights">Lights</option>
-                        <option value="video">Video</option>
+                        {EQUIPMENT_DEPARTMENTS.map((dept) => (
+                          <option key={dept} value={dept}>
+                            {DEPARTMENT_LABELS[dept]}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
