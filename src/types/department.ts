@@ -1,14 +1,14 @@
 
 // Legacy department values kept for backward compatibility with existing database records
-export type LegacyDepartment = "logistics" | "personnel" | "comercial" | "management";
+export type LegacyDepartment = "personnel" | "comercial" | "management";
 
 // Current active departments
-export type ActiveDepartment = "sound" | "lights" | "video" | "production" | "administrative";
+export type ActiveDepartment = "sound" | "lights" | "video" | "production" | "administrative" | "logistics";
 
 // Full Department type includes both active and legacy values for database compatibility
 export type Department = ActiveDepartment | LegacyDepartment;
 
-// Technical departments - used for jobs and tours (excludes administrative and legacy)
+// Technical departments - used for jobs and tours (excludes administrative, logistics, and legacy)
 export type TechnicalDepartment = "sound" | "lights" | "video" | "production";
 
 // Department labels in Spanish (includes legacy values for display purposes)
@@ -19,8 +19,8 @@ export const DEPARTMENT_LABELS: Record<Department, string> = {
   video: "Video",
   production: "Producción",
   administrative: "Administración",
+  logistics: "Logística",
   // Legacy departments (for backward compatibility with existing records)
-  logistics: "Logística (Legacy)",
   personnel: "Personal (Legacy)",
   comercial: "Comercial (Legacy)",
   management: "Gestión (Legacy)",
@@ -33,6 +33,7 @@ export const ACTIVE_DEPARTMENTS: ActiveDepartment[] = [
   "video",
   "production",
   "administrative",
+  "logistics",
 ];
 
 // All departments including legacy (for editing existing records)
@@ -60,6 +61,7 @@ export const TECHNICAL_DEPARTMENTS: TechnicalDepartment[] = [
 export const MANAGEMENT_DEPARTMENTS: Department[] = [
   "production",
   "administrative",
+  "logistics",
 ];
 
 // Helper function to get department label with fallback
