@@ -2,7 +2,7 @@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserRole } from "@/types/user";
-import { Department } from "@/types/department";
+import { Department, ACTIVE_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 
@@ -26,7 +26,6 @@ export const FilterBar = ({
   onClearFilters,
 }: FilterBarProps) => {
   const roles: UserRole[] = ['admin', 'management', 'logistics', 'technician', 'house_tech'];
-  const departments: Department[] = ['sound', 'lights', 'video', 'production'];
 
   return (
     <div className="space-y-2 mb-3 md:mb-4">
@@ -59,9 +58,9 @@ export const FilterBar = ({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All departments</SelectItem>
-            {departments.map((dept) => (
+            {ACTIVE_DEPARTMENTS.map((dept) => (
               <SelectItem key={dept} value={dept}>
-                {dept.charAt(0).toUpperCase() + dept.slice(1)}
+                {DEPARTMENT_LABELS[dept]}
               </SelectItem>
             ))}
           </SelectContent>

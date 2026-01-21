@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Profile } from "./types";
 import { AlertTriangle, Pencil, Trash2, Award } from "lucide-react";
 import { formatUserName } from "@/utils/userName";
+import { getDepartmentLabel } from "@/types/department";
 
 interface UserCardProps {
   user: Profile;
@@ -22,7 +23,7 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
       <div className="flex items-start sm:items-center justify-between p-1 sm:p-3 gap-1 sm:gap-2">
         <HoverCard>
           <HoverCardTrigger asChild>
-            <div className="flex flex-col gap-1.5 cursor-pointer flex-1 min-w-0">
+            <button type="button" className="flex flex-col gap-1.5 cursor-pointer flex-1 min-w-0 text-left">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="font-medium text-sm sm:text-base truncate">{fullName || user.email}</span>
                 {showPasswordAlert && (
@@ -33,10 +34,10 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
               <div className="flex gap-1 flex-wrap">
                 <Badge variant="secondary" className="text-xs">{user.role}</Badge>
                 {user.department && (
-                  <Badge variant="outline" className="text-xs">{user.department}</Badge>
+                  <Badge variant="outline" className="text-xs">{getDepartmentLabel(user.department)}</Badge>
                 )}
               </div>
-            </div>
+            </button>
           </HoverCardTrigger>
           <HoverCardContent className="w-80">
             <div className="space-y-2">
@@ -50,13 +51,14 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
           </HoverCardContent>
         </HoverCard>
 
-        <div className="flex gap-0.5 sm:gap-2 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -mr-2 sm:mr-0">
+        <div className="flex gap-0.5 sm:gap-2 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity -mr-2 sm:mr-0">
           {onManageSkills && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => onManageSkills(user)}
               className="h-6 px-1 sm:h-8 sm:px-3 text-[10px] sm:text-xs"
+              aria-label={`Manage skills for ${fullName || user.email}`}
             >
               <Award className="h-2.5 w-2.5 sm:h-4 sm:w-4 sm:mr-1" />
               <span className="hidden sm:inline">Skills</span>
@@ -67,6 +69,7 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
             size="icon"
             onClick={() => onEdit(user)}
             className="h-6 w-6 p-0 sm:h-9 sm:w-9"
+            aria-label={`Edit ${fullName || user.email}`}
           >
             <Pencil className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
@@ -75,6 +78,7 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
             size="icon"
             onClick={() => onDelete(user)}
             className="h-6 w-6 p-0 sm:h-9 sm:w-9"
+            aria-label={`Delete ${fullName || user.email}`}
           >
             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
