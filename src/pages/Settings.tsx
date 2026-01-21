@@ -257,8 +257,8 @@ const Settings = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 auto-rows-fr">
-          <div className="space-y-4 md:space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 items-start">
+          <div className="space-y-4 md:space-y-6 w-full min-w-0">
             <CollapsibleCard
               id="push-notifications"
               title="Push notifications"
@@ -438,7 +438,7 @@ const Settings = () => {
             </CollapsibleCard>
           </div>
 
-          <div className="space-y-4 md:space-y-6">
+          <div className="space-y-4 md:space-y-6 w-full min-w-0">
             <CollapsibleCard
               id="morning-summary"
               title="Morning summary"

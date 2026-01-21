@@ -43,7 +43,7 @@ export const UsersListContent = ({ users, groupBy, isManagementUser = false }: U
 
   if (!groupBy) {
     return (
-      <ScrollArea className="h-[600px]">
+      <ScrollArea className="h-[400px] sm:h-[500px] md:h-[600px]">
         <div className="space-y-2">
           {users.map((user) => (
             user?.id ? (
