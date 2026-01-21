@@ -85,7 +85,7 @@ const CollapsibleCard = ({
           </div>
         </CardHeader>
         <CollapsibleContent>
-          <CardContent className="pt-0 pb-4 md:pb-6 space-y-3 md:space-y-4">
+          <CardContent className="pt-0 pb-4 md:pb-6 space-y-3 md:space-y-4 overflow-visible">
             {children}
           </CardContent>
         </CollapsibleContent>

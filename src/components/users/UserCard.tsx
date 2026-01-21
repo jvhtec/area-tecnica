@@ -18,8 +18,8 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
   const fullName = formatUserName(user.first_name, user.nickname, user.last_name);
 
   return (
-    <div className="group border rounded-lg hover:bg-accent/5 transition-colors">
-      <div className="flex items-start sm:items-center justify-between p-2 sm:p-3 gap-1.5 sm:gap-2">
+    <div className="group border rounded-lg hover:bg-accent/5 transition-colors overflow-visible">
+      <div className="flex items-start sm:items-center justify-between p-1.5 sm:p-3 gap-1 sm:gap-2">
         <HoverCard>
           <HoverCardTrigger asChild>
             <div className="flex flex-col gap-1.5 cursor-pointer flex-1 min-w-0">
@@ -50,15 +50,15 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
           </HoverCardContent>
         </HoverCard>
 
-        <div className="flex gap-0.5 sm:gap-2 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <div className="flex gap-0.5 sm:gap-2 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -mr-1 sm:mr-0">
           {onManageSkills && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => onManageSkills(user)}
-              className="h-6 px-1.5 sm:h-8 sm:px-3 text-xs"
+              className="h-6 px-1 sm:h-8 sm:px-3 text-[10px] sm:text-xs"
             >
-              <Award className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+              <Award className="h-2.5 w-2.5 sm:h-4 sm:w-4 sm:mr-1" />
               <span className="hidden sm:inline">Skills</span>
             </Button>
           )}
@@ -66,7 +66,7 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
             variant="outline"
             size="icon"
             onClick={() => onEdit(user)}
-            className="h-6 w-6 sm:h-9 sm:w-9"
+            className="h-6 w-6 p-0 sm:h-9 sm:w-9"
           >
             <Pencil className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
@@ -74,7 +74,7 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
             variant="outline"
             size="icon"
             onClick={() => onDelete(user)}
-            className="h-6 w-6 sm:h-9 sm:w-9"
+            className="h-6 w-6 p-0 sm:h-9 sm:w-9"
           >
             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
