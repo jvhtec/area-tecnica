@@ -2,6 +2,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { FlexFolderPayload, FlexFolderResponse } from "./types";
 import { getFlexApiBaseUrl } from "./config";
 
+/**
+ * Error response from Flex API
+ */
+interface FlexApiError {
+  exceptionMessage?: string;
+}
+
 let cachedFlexToken: string | null = null;
 
 /**
@@ -72,13 +79,60 @@ export async function deleteFlexFolder(elementId: string): Promise<void> {
   });
 
   if (!response.ok) {
-    let errorData: any = null;
+    let errorData: FlexApiError | null = null;
     try {
-      errorData = await response.json();
+      errorData = await response.json() as FlexApiError;
     } catch {
       // ignore non-JSON response
     }
     console.error("Flex folder deletion error:", errorData);
     throw new Error(errorData?.exceptionMessage || `Failed to delete folder in Flex (${response.status})`);
+  }
+}
+
+/**
+ * Updates a header field on a Flex element
+ * @param elementId The element UUID to update
+ * @param fieldType The field to update (e.g., "documentNumber", "plannedStartDate", "plannedEndDate")
+ * @param value The new value for the field
+ */
+export async function updateFlexElementHeader(
+  elementId: string,
+  fieldType: string,
+  value: string
+): Promise<void> {
+  const token = await getFlexAuthToken();
+  const apiBaseUrl = getFlexApiBaseUrl();
+
+  const response = await fetch(
+    `${apiBaseUrl}/element/${encodeURIComponent(elementId)}/header-update`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Auth-Token": token,
+        "X-Api-Client": "flex5-desktop",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify({
+        fieldType,
+        payloadValue: value,
+        displayValue: value,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    let errorData: FlexApiError | null = null;
+    try {
+      errorData = await response.json() as FlexApiError;
+    } catch {
+      // ignore non-JSON response
+    }
+    console.error(`Flex element header update error (${fieldType}):`, errorData);
+    throw new Error(
+      errorData?.exceptionMessage ||
+        `Failed to update ${fieldType} in Flex (${response.status})`
+    );
   }
 }

@@ -28,6 +28,7 @@ import { utcToLocalInput, localInputToUTC } from "@/utils/timezoneUtils";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
+import { syncFlexElementsForJobDateChange } from "@/utils/flex-folders/syncDateChange";
 
 interface EditJobDialogProps {
   open: boolean;
@@ -262,6 +263,50 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           });
         }
       } catch { }
+
+      // Sync Flex elements if dates or title changed and job has flex folders
+      const datesChanged =
+        job.start_time !== startTimeUTC.toISOString() ||
+        job.end_time !== endTimeUTC.toISOString();
+      const titleChanged = job.title !== title;
+
+      if ((datesChanged || titleChanged) && job.flex_folders_created) {
+        try {
+          console.log("[EditJobDialog] Dates/title changed, syncing Flex elements...");
+          const syncResult = await syncFlexElementsForJobDateChange(
+            job.id,
+            startTimeUTC.toISOString(),
+            endTimeUTC.toISOString(),
+            titleChanged ? title : undefined
+          );
+          if (syncResult.failed > 0) {
+            console.warn(
+              `[EditJobDialog] Flex sync completed with ${syncResult.failed} errors:`,
+              syncResult.errors
+            );
+            toast({
+              title: "Job updated with warnings",
+              description: `Job saved but ${syncResult.failed} Flex element(s) failed to sync.`,
+              variant: "destructive",
+            });
+          } else if (syncResult.success > 0) {
+            console.log(
+              `[EditJobDialog] Flex sync completed: ${syncResult.success} elements updated`
+            );
+          }
+        } catch (syncError: unknown) {
+          console.error("[EditJobDialog] Flex sync error:", syncError);
+          // Don't fail the whole operation, just warn
+          const errorMessage = syncError instanceof Error
+            ? syncError.message
+            : String(syncError);
+          toast({
+            title: "Job updated with warnings",
+            description: "Job saved but Flex sync failed: " + errorMessage,
+            variant: "destructive",
+          });
+        }
+      }
 
       toast({
         title: "Job updated successfully",
