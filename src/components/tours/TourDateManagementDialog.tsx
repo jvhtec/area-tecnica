@@ -504,6 +504,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       const originalDate = editingTourDate?.date || editingTourDate?.start_date;
       const dateChanged = originalDate && originalDate.split('T')[0] !== startDate;
       const hasFlexFolders = foldersExistenceMap?.[dateId];
+      let flexSyncHadWarningsOrError = false;
 
       if (dateChanged && hasFlexFolders) {
         try {
@@ -513,6 +514,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
             startDate
           );
           if (syncResult.failed > 0) {
+            flexSyncHadWarningsOrError = true;
             console.warn(
               `[TourDateManagement] Flex sync completed with ${syncResult.failed} errors:`,
               syncResult.errors
@@ -528,6 +530,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
             );
           }
         } catch (syncError: unknown) {
+          flexSyncHadWarningsOrError = true;
           console.error("[TourDateManagement] Flex sync error:", syncError);
           const errorMessage = syncError instanceof Error
             ? syncError.message
@@ -548,10 +551,13 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
       ]);
 
-      toast({
-        title: "Success",
-        description: "Tour date updated successfully",
-      });
+      // Only show success toast if flex sync didn't have warnings or errors
+      if (!flexSyncHadWarningsOrError) {
+        toast({
+          title: "Success",
+          description: "Tour date updated successfully",
+        });
+      }
     } catch (error: any) {
       console.error("Error editing date:", error);
       toast({

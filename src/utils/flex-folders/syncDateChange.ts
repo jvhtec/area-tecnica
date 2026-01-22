@@ -230,35 +230,22 @@ export async function syncFlexElementsForJobDateChange(
             : "";
           const newDocNumber = `${newBaseDocNumber}${suffix}`;
 
-          // Update document number
-          await updateFlexElementHeader(
-            element.elementId,
-            "documentNumber",
-            newDocNumber
-          );
-
-          // Update planned start date
-          await updateFlexElementHeader(
-            element.elementId,
-            "plannedStartDate",
-            formattedStartDate
-          );
-
-          // Update planned end date
-          await updateFlexElementHeader(
-            element.elementId,
-            "plannedEndDate",
-            formattedEndDate
-          );
+          // Build array of updates to batch
+          const updates: Promise<void>[] = [
+            updateFlexElementHeader(element.elementId, "documentNumber", newDocNumber),
+            updateFlexElementHeader(element.elementId, "plannedStartDate", formattedStartDate),
+            updateFlexElementHeader(element.elementId, "plannedEndDate", formattedEndDate),
+          ];
 
           // Update name for folders that include title/date in their names
           // Only update if this is the root folder (element_id matches folder.element_id)
+          let newName: string | null = null;
           if (
             element.elementId === folder.element_id &&
             folder.department &&
             folder.folder_type
           ) {
-            const newName = generateFolderName(
+            newName = generateFolderName(
               folder.folder_type,
               folder.department,
               jobTitle,
@@ -267,11 +254,17 @@ export async function syncFlexElementsForJobDateChange(
             );
 
             if (newName) {
-              await updateFlexElementHeader(element.elementId, "name", newName);
-              console.log(
-                `[syncFlexElements] Updated folder name: ${element.displayName || "(unknown)"} -> ${newName}`
-              );
+              updates.push(updateFlexElementHeader(element.elementId, "name", newName));
             }
+          }
+
+          // Execute all updates for this element in parallel
+          await Promise.all(updates);
+
+          if (newName) {
+            console.log(
+              `[syncFlexElements] Updated folder name: ${element.displayName || "(unknown)"} -> ${newName}`
+            );
           }
 
           results.success++;
@@ -387,37 +380,30 @@ export async function syncFlexElementsForTourDateChange(
             : "";
           const newDocNumber = `${newBaseDocNumber}${suffix}`;
 
-          // Update document number
-          await updateFlexElementHeader(
-            element.elementId,
-            "documentNumber",
-            newDocNumber
-          );
-
-          // Update planned start date
-          await updateFlexElementHeader(
-            element.elementId,
-            "plannedStartDate",
-            formattedDate
-          );
-
-          // Update planned end date
-          await updateFlexElementHeader(
-            element.elementId,
-            "plannedEndDate",
-            formattedDate
-          );
+          // Build array of updates to batch
+          const updates: Promise<void>[] = [
+            updateFlexElementHeader(element.elementId, "documentNumber", newDocNumber),
+            updateFlexElementHeader(element.elementId, "plannedStartDate", formattedDate),
+            updateFlexElementHeader(element.elementId, "plannedEndDate", formattedDate),
+          ];
 
           // Update name for main tourdate folders (they include date in name)
           // Only update if this is the root folder and it's a tourdate type
+          let newName: string | null = null;
           if (
             folder.folder_type === "tourdate" &&
             element.elementId === folder.element_id &&
             folder.department
           ) {
             const deptLabel = capitalize(folder.department);
-            const newName = `${locationName} - ${displayDate} - ${deptLabel}`;
-            await updateFlexElementHeader(element.elementId, "name", newName);
+            newName = `${locationName} - ${displayDate} - ${deptLabel}`;
+            updates.push(updateFlexElementHeader(element.elementId, "name", newName));
+          }
+
+          // Execute all updates for this element in parallel
+          await Promise.all(updates);
+
+          if (newName) {
             console.log(
               `[syncFlexElements] Updated folder name: ${element.displayName || "(unknown)"} -> ${newName}`
             );
