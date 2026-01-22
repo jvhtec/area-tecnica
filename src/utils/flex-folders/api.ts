@@ -82,3 +82,50 @@ export async function deleteFlexFolder(elementId: string): Promise<void> {
     throw new Error(errorData?.exceptionMessage || `Failed to delete folder in Flex (${response.status})`);
   }
 }
+
+/**
+ * Updates a header field on a Flex element
+ * @param elementId The element UUID to update
+ * @param fieldType The field to update (e.g., "documentNumber", "plannedStartDate", "plannedEndDate")
+ * @param value The new value for the field
+ */
+export async function updateFlexElementHeader(
+  elementId: string,
+  fieldType: string,
+  value: string
+): Promise<void> {
+  const token = await getFlexAuthToken();
+  const apiBaseUrl = getFlexApiBaseUrl();
+
+  const response = await fetch(
+    `${apiBaseUrl}/element/${encodeURIComponent(elementId)}/header-update`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Auth-Token": token,
+        "X-Api-Client": "flex5-desktop",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify({
+        fieldType,
+        payloadValue: value,
+        displayValue: value,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    let errorData: any = null;
+    try {
+      errorData = await response.json();
+    } catch {
+      // ignore non-JSON response
+    }
+    console.error(`Flex element header update error (${fieldType}):`, errorData);
+    throw new Error(
+      errorData?.exceptionMessage ||
+        `Failed to update ${fieldType} in Flex (${response.status})`
+    );
+  }
+}
