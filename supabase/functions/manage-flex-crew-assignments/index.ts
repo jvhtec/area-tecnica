@@ -311,11 +311,213 @@ serve(async (req) => {
         );
       }
 
-      // Remove from Flex
-      const removeUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${assignment.flex_line_item_id}`;
-      
+      const flexHeaders: Record<string, string> = {
+        'X-Auth-Token': flexAuthToken,
+        'apikey': flexAuthToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-API-Client': 'flex5-desktop',
+        'Accept': '*/*',
+      };
+
+      let lineItemIdToDelete = assignment.flex_line_item_id;
+
+      // If line item ID is missing, try to discover it by scanning Flex
+      if (!lineItemIdToDelete) {
+        console.log(`Line item ID missing for assignment ${assignment.id}, attempting discovery...`);
+        try {
+          const qs = new URLSearchParams();
+          qs.set('_dc', String(Date.now()));
+          for (const c of ['contact', 'business-role', 'pickup-date', 'return-date', 'notes', 'quantity', 'status']) {
+            qs.append('codeList', c);
+          }
+          qs.set('node', 'root');
+          const rdUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crewCall.flex_element_id)}/row-data/?${qs.toString()}`;
+          const rdRes = await fetch(rdUrl, { headers: flexHeaders });
+          if (rdRes.ok) {
+            const arr = await rdRes.json().catch(() => null) as any;
+            if (Array.isArray(arr)) {
+              const resId = technician.flex_resource_id as string;
+              const hit = arr.find((r: any) => {
+                const cand = r?.resourceId || r?.resource?.id || r?.resource?.resourceId;
+                return cand === resId;
+              });
+              if (hit?.id) {
+                lineItemIdToDelete = hit.id as string;
+                console.log(`Discovered line item ID: ${lineItemIdToDelete}`);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Discovery attempt failed:', e);
+        }
+      }
+
+      // If we still don't have a line item ID, fall back to clear-and-repopulate
+      if (!lineItemIdToDelete) {
+        console.log('Line item ID discovery failed, falling back to clear-and-repopulate strategy');
+
+        // 1. Get all current flex_crew_assignments for this crew call
+        const { data: allAssignments } = await supabase
+          .from('flex_crew_assignments')
+          .select('id, technician_id, flex_line_item_id')
+          .eq('crew_call_id', crewCall.id);
+
+        // 2. Get technicians that should remain (all except the one being removed)
+        const remainingTechIds = (allAssignments ?? [])
+          .filter((a: any) => a.technician_id !== technician_id)
+          .map((a: any) => a.technician_id);
+
+        // 3. Get flex_resource_ids for remaining technicians
+        const { data: remainingTechs } = remainingTechIds.length > 0
+          ? await supabase
+              .from('profiles')
+              .select('id, flex_resource_id')
+              .in('id', remainingTechIds)
+          : { data: [] };
+
+        // 4. Delete all line items from Flex for this crew call
+        try {
+          const qs = new URLSearchParams();
+          qs.set('_dc', String(Date.now()));
+          for (const c of ['contact', 'business-role', 'pickup-date', 'return-date', 'notes', 'quantity', 'status']) {
+            qs.append('codeList', c);
+          }
+          qs.set('node', 'root');
+          const rdUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crewCall.flex_element_id)}/row-data/?${qs.toString()}`;
+          const rdRes = await fetch(rdUrl, { headers: flexHeaders });
+          if (rdRes.ok) {
+            const arr = await rdRes.json().catch(() => null) as any;
+            if (Array.isArray(arr)) {
+              // Delete each contact line item
+              for (const item of arr) {
+                if (item?.id) {
+                  const delUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${item.id}`;
+                  await fetch(delUrl, { method: 'DELETE', headers: flexHeaders });
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Error clearing Flex crew call:', e);
+        }
+
+        // 5. Delete all flex_crew_assignments from DB for this crew call
+        await supabase
+          .from('flex_crew_assignments')
+          .delete()
+          .eq('crew_call_id', crewCall.id);
+
+        // 6. Re-add remaining technicians
+        let readdedCount = 0;
+        for (const tech of (remainingTechs ?? [])) {
+          if (!tech.flex_resource_id) continue;
+
+          const addUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${crewCall.flex_element_id}/add-resource/${tech.flex_resource_id}`;
+          let newLineItemId: string | null = null;
+
+          try {
+            const addRes = await fetch(addUrl, { method: 'POST', headers: flexHeaders });
+            if (addRes.ok) {
+              const j = await addRes.json().catch(() => ({} as any));
+              newLineItemId = j?.id || j?.lineItemId || j?.data?.id || j?.data?.lineItemId || (Array.isArray(j?.addedResourceLineIds) && j.addedResourceLineIds[0]) || null;
+            }
+          } catch (_) {}
+
+          // Fallback: form-encoded POST
+          if (!newLineItemId) {
+            try {
+              const params = new URLSearchParams();
+              params.set('resourceParentId', '');
+              params.set('managedResourceLineItemType', 'contact');
+              params.set('quantity', '1');
+              params.set('parentLineItemId', '');
+              params.set('nextSiblingId', '');
+              const addRes2 = await fetch(addUrl, {
+                method: 'POST',
+                headers: { ...flexHeaders, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                body: params.toString()
+              });
+              if (addRes2.ok) {
+                const j2 = await addRes2.json().catch(() => ({} as any));
+                newLineItemId = j2?.id || j2?.lineItemId || j2?.data?.id || j2?.data?.lineItemId || (Array.isArray(j2?.addedResourceLineIds) && j2.addedResourceLineIds[0]) || null;
+              }
+            } catch (_) {}
+          }
+
+          // Discover line item ID if still missing
+          if (!newLineItemId) {
+            try {
+              const qs = new URLSearchParams();
+              qs.set('_dc', String(Date.now()));
+              for (const c of ['contact', 'business-role', 'pickup-date', 'return-date', 'notes', 'quantity', 'status']) {
+                qs.append('codeList', c);
+              }
+              qs.set('node', 'root');
+              const rdUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crewCall.flex_element_id)}/row-data/?${qs.toString()}`;
+              const rdRes = await fetch(rdUrl, { headers: flexHeaders });
+              if (rdRes.ok) {
+                const arr = await rdRes.json().catch(() => null) as any;
+                if (Array.isArray(arr)) {
+                  const hit = arr.find((r: any) => {
+                    const cand = r?.resourceId || r?.resource?.id || r?.resource?.resourceId;
+                    return cand === tech.flex_resource_id;
+                  });
+                  if (hit?.id) newLineItemId = hit.id as string;
+                }
+              }
+            } catch (_) {}
+          }
+
+          // Insert into DB
+          await supabase.from('flex_crew_assignments').insert({
+            crew_call_id: crewCall.id,
+            technician_id: tech.id,
+            flex_line_item_id: newLineItemId
+          });
+          readdedCount++;
+        }
+
+        console.log(`Clear-and-repopulate completed: removed 1, re-added ${readdedCount} technicians`);
+
+        try {
+          const logActivity = async () => {
+            await supabase.rpc('log_activity_as', {
+              _actor_id: actorId,
+              _code: 'flex.crew.updated',
+              _job_id: job_id,
+              _entity_type: 'flex',
+              _entity_id: crewCall.id,
+              _payload: {
+                action: 'remove',
+                department,
+                technician_id,
+                strategy: 'clear-and-repopulate',
+                readded_count: readdedCount,
+              },
+              _visibility: null,
+            });
+          };
+
+          if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
+            EdgeRuntime.waitUntil(logActivity());
+          } else {
+            await logActivity();
+          }
+        } catch (activityError) {
+          console.warn('[manage-flex-crew-assignments] Failed to log remove activity', activityError);
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Resource removed via clear-and-repopulate', strategy: 'clear-and-repopulate', readded_count: readdedCount }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Normal path: we have a line item ID to delete
+      const removeUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${lineItemIdToDelete}`;
+
       console.log(`Removing line item from Flex: ${removeUrl}`);
-      
+
       const removeResponse = await fetch(removeUrl, {
         method: 'DELETE',
         headers: {
