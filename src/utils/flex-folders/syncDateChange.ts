@@ -46,6 +46,22 @@ function generateBaseDocumentNumber(date: Date): string {
 }
 
 /**
+ * Format date for display in folder names (e.g., "Jan 15, 2026")
+ * Uses Europe/Madrid timezone for consistency with the app
+ */
+function formatDateForDisplay(date: Date): string {
+  const zonedDate = toZonedTime(date, DEFAULT_TIMEZONE);
+  return format(zonedDate, "MMM d, yyyy");
+}
+
+/**
+ * Capitalize first letter of a string
+ */
+function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
  * Extract the suffix from an existing document number
  * Document numbers follow pattern: YYMMDD + suffix(es)
  * Examples: 260212S, 260212SDT, 260212HR, 260212HRDT
@@ -62,14 +78,15 @@ function extractDocumentNumberSuffix(docNumber: string): string {
  */
 function collectAllElements(
   nodes: FlexElementNode[]
-): Array<{ elementId: string; documentNumber?: string }> {
-  const result: Array<{ elementId: string; documentNumber?: string }> = [];
+): Array<{ elementId: string; documentNumber?: string; displayName?: string }> {
+  const result: Array<{ elementId: string; documentNumber?: string; displayName?: string }> = [];
 
   for (const node of nodes) {
     if (node.elementId) {
       result.push({
         elementId: node.elementId,
         documentNumber: node.documentNumber,
+        displayName: node.displayName,
       });
     }
 
@@ -83,7 +100,7 @@ function collectAllElements(
 
 /**
  * Sync all Flex elements for a job when its dates change
- * Updates document numbers and planned dates for all nested elements
+ * Updates document numbers, planned dates, and folder names for all nested elements
  *
  * @param jobId The job ID whose dates changed
  * @param newStartTime The new start time (ISO string)
@@ -103,11 +120,30 @@ export async function syncFlexElementsForJobDateChange(
   const newBaseDocNumber = generateBaseDocumentNumber(startDate);
   const formattedStartDate = formatDateForFlex(startDate);
   const formattedEndDate = formatDateForFlex(endDate);
+  const displayDate = formatDateForDisplay(startDate);
 
   console.log(
     `[syncFlexElements] Syncing job ${jobId} to new dates: ${newStartTime} - ${newEndTime}`
   );
   console.log(`[syncFlexElements] New base document number: ${newBaseDocNumber}`);
+
+  // Fetch job with location to get the location name for folder renaming
+  const { data: jobData, error: jobError } = await supabase
+    .from("jobs")
+    .select(`
+      job_type,
+      location:locations(name)
+    `)
+    .eq("id", jobId)
+    .single();
+
+  if (jobError) {
+    console.error("[syncFlexElements] Error fetching job:", jobError);
+    throw new Error(`Failed to fetch job: ${jobError.message}`);
+  }
+
+  const locationName = jobData?.location?.name || "No Location";
+  const isTourDateJob = jobData?.job_type === "tourdate";
 
   // Fetch all flex_folders for this job
   const { data: folders, error: foldersError } = await supabase
@@ -176,6 +212,22 @@ export async function syncFlexElementsForJobDateChange(
             formattedEndDate
           );
 
+          // Update name for main tourdate folders (they include date in name)
+          // Only update if this is the root folder and it's a tourdate type
+          if (
+            isTourDateJob &&
+            folder.folder_type === "tourdate" &&
+            element.elementId === folder.element_id &&
+            folder.department
+          ) {
+            const deptLabel = capitalize(folder.department);
+            const newName = `${locationName} - ${displayDate} - ${deptLabel}`;
+            await updateFlexElementHeader(element.elementId, "name", newName);
+            console.log(
+              `[syncFlexElements] Updated folder name: ${element.displayName || "(unknown)"} -> ${newName}`
+            );
+          }
+
           results.success++;
           console.log(
             `[syncFlexElements] Updated element ${element.elementId}: ${element.documentNumber || "(no doc#)"} -> ${newDocNumber}`
@@ -204,7 +256,7 @@ export async function syncFlexElementsForJobDateChange(
 
 /**
  * Sync all Flex elements for a tour date when its date changes
- * Updates document numbers and planned dates for all nested elements
+ * Updates document numbers, planned dates, and folder names for all nested elements
  *
  * @param tourDateId The tour_date ID whose date changed
  * @param newDate The new date (ISO string)
@@ -220,11 +272,28 @@ export async function syncFlexElementsForTourDateChange(
   const date = new Date(newDate);
   const newBaseDocNumber = generateBaseDocumentNumber(date);
   const formattedDate = formatDateForFlex(date);
+  const displayDate = formatDateForDisplay(date);
 
   console.log(
     `[syncFlexElements] Syncing tour date ${tourDateId} to new date: ${newDate}`
   );
   console.log(`[syncFlexElements] New base document number: ${newBaseDocNumber}`);
+
+  // Fetch tour date with location to get the location name for folder renaming
+  const { data: tourDateData, error: tourDateError } = await supabase
+    .from("tour_dates")
+    .select(`
+      location:locations(name)
+    `)
+    .eq("id", tourDateId)
+    .single();
+
+  if (tourDateError) {
+    console.error("[syncFlexElements] Error fetching tour date:", tourDateError);
+    throw new Error(`Failed to fetch tour date: ${tourDateError.message}`);
+  }
+
+  const locationName = tourDateData?.location?.name || "No Location";
 
   // Fetch all flex_folders for this tour date
   const { data: folders, error: foldersError } = await supabase
@@ -292,6 +361,21 @@ export async function syncFlexElementsForTourDateChange(
             "plannedEndDate",
             formattedDate
           );
+
+          // Update name for main tourdate folders (they include date in name)
+          // Only update if this is the root folder and it's a tourdate type
+          if (
+            folder.folder_type === "tourdate" &&
+            element.elementId === folder.element_id &&
+            folder.department
+          ) {
+            const deptLabel = capitalize(folder.department);
+            const newName = `${locationName} - ${displayDate} - ${deptLabel}`;
+            await updateFlexElementHeader(element.elementId, "name", newName);
+            console.log(
+              `[syncFlexElements] Updated folder name: ${element.displayName || "(unknown)"} -> ${newName}`
+            );
+          }
 
           results.success++;
           console.log(
