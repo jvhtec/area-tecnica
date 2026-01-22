@@ -295,90 +295,85 @@ serve(async (req) => {
       );
 
     } else if (action === 'remove') {
-      // Get existing assignment
-      const { data: assignment, error: assignmentError } = await supabase
-        .from('flex_crew_assignments')
-        .select('id, flex_line_item_id')
-        .eq('crew_call_id', crewCall.id)
-        .eq('technician_id', technician_id)
-        .single();
+      // For removals, we use a full sync approach to avoid issues with missing/stale line item IDs.
+      // We trigger a full sync for this job and department, which will:
+      // 1. Clear all crew from Flex that shouldn't be there
+      // 2. Re-add all crew that should be there (based on job_assignments)
+      // This ensures consistency without relying on persisted line item IDs.
 
-      if (assignmentError || !assignment) {
-        console.log(`No assignment found for technician ${technician_id} in crew call ${crewCall.id}`);
-        return new Response(
-          JSON.stringify({ success: true, message: 'No assignment to remove' }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Remove from Flex
-      const removeUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${assignment.flex_line_item_id}`;
-      
-      console.log(`Removing line item from Flex: ${removeUrl}`);
-      
-      const removeResponse = await fetch(removeUrl, {
-        method: 'DELETE',
-        headers: {
-          'X-Auth-Token': flexAuthToken,
-          'apikey': flexAuthToken,
-        },
-      });
-
-      if (!removeResponse.ok) {
-        const errorText = await removeResponse.text();
-        console.error(`Failed to remove line item from Flex: ${removeResponse.status} - ${errorText}`);
-        return new Response(
-          JSON.stringify({ error: `Failed to remove from Flex: ${removeResponse.status}` }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      console.log('Successfully removed line item from Flex');
-
-      // Remove from database
-      const { error: deleteError } = await supabase
-        .from('flex_crew_assignments')
-        .delete()
-        .eq('id', assignment.id);
-
-      if (deleteError) {
-        console.error('Error removing crew assignment from database:', deleteError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to remove assignment from database' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      console.log(`Triggering full crew sync for job ${job_id}, department ${department} to handle removal of technician ${technician_id}`);
 
       try {
-        const logActivity = async () => {
-          await supabase.rpc('log_activity_as', {
-            _actor_id: actorId,
-            _code: 'flex.crew.updated',
-            _job_id: job_id,
-            _entity_type: 'flex',
-            _entity_id: crewCall.id,
-            _payload: {
-              action: 'remove',
-              department,
-              technician_id,
-            },
-            _visibility: null,
-          });
-        };
+        // Call the sync-flex-crew-for-job function to perform a full sync
+        const syncUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/sync-flex-crew-for-job`;
+        const syncResponse = await fetch(syncUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': req.headers.get('Authorization') ?? '',
+            'Content-Type': 'application/json',
+            'apikey': Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          },
+          body: JSON.stringify({
+            job_id: job_id,
+            departments: [department]
+          })
+        });
 
-        if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
-          EdgeRuntime.waitUntil(logActivity());
-        } else {
-          await logActivity();
+        if (!syncResponse.ok) {
+          const errorText = await syncResponse.text();
+          console.error(`Failed to sync crew for removal: ${syncResponse.status} - ${errorText}`);
+          return new Response(
+            JSON.stringify({ error: `Failed to sync crew: ${syncResponse.status}` }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
-      } catch (activityError) {
-        console.warn('[manage-flex-crew-assignments] Failed to log remove activity', activityError);
-      }
 
-      return new Response(
-        JSON.stringify({ success: true, message: 'Resource removed from crew call' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+        const syncResult = await syncResponse.json();
+        console.log('Crew sync completed successfully:', syncResult);
+
+        // Log activity for the removal
+        try {
+          const logActivity = async () => {
+            await supabase.rpc('log_activity_as', {
+              _actor_id: actorId,
+              _code: 'flex.crew.updated',
+              _job_id: job_id,
+              _entity_type: 'flex',
+              _entity_id: crewCall.id,
+              _payload: {
+                action: 'remove',
+                department,
+                technician_id,
+                sync_triggered: true,
+              },
+              _visibility: null,
+            });
+          };
+
+          if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
+            EdgeRuntime.waitUntil(logActivity());
+          } else {
+            await logActivity();
+          }
+        } catch (activityError) {
+          console.warn('[manage-flex-crew-assignments] Failed to log remove activity', activityError);
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'Crew synced successfully after removal',
+            sync_result: syncResult
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (syncError) {
+        console.error('Error during crew sync for removal:', syncError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to sync crew after removal' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     return new Response(
