@@ -591,7 +591,22 @@ export async function createAllFoldersForJob(
       "personnel",
       "comercial",
     ];
-    const locationName = job.location?.name || "No Location";
+
+    // Check both possible location sources (from different hooks)
+    // useJobs uses job.location, useOptimizedJobs uses job.location_data
+    let locationName = job.location?.name || job.location_data?.name;
+
+    // If no location in the job object, fetch it from the database using location_id
+    if (!locationName && job.location_id) {
+      const { data: locationData } = await supabase
+        .from("locations")
+        .select("name")
+        .eq("id", job.location_id)
+        .single();
+      locationName = locationData?.name;
+    }
+    locationName = locationName || "No Location";
+
     const formattedDate = format(new Date(job.start_time), "MMM d, yyyy");
 
     for (const dept of allDepartments) {
