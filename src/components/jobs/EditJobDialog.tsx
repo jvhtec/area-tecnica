@@ -292,12 +292,15 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               `[EditJobDialog] Flex sync completed: ${syncResult.success} elements updated`
             );
           }
-        } catch (syncError: any) {
+        } catch (syncError: unknown) {
           console.error("[EditJobDialog] Flex sync error:", syncError);
           // Don't fail the whole operation, just warn
+          const errorMessage = syncError instanceof Error
+            ? syncError.message
+            : String(syncError);
           toast({
             title: "Job updated with warnings",
-            description: "Job saved but Flex sync failed: " + syncError.message,
+            description: "Job saved but Flex sync failed: " + errorMessage,
             variant: "destructive",
           });
         }

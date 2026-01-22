@@ -527,11 +527,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
               `[TourDateManagement] Flex sync completed: ${syncResult.success} elements updated`
             );
           }
-        } catch (syncError: any) {
+        } catch (syncError: unknown) {
           console.error("[TourDateManagement] Flex sync error:", syncError);
+          const errorMessage = syncError instanceof Error
+            ? syncError.message
+            : String(syncError);
           toast({
             title: "Tour date updated with warnings",
-            description: "Tour date saved but Flex sync failed: " + syncError.message,
+            description: "Tour date saved but Flex sync failed: " + errorMessage,
             variant: "destructive",
           });
         }

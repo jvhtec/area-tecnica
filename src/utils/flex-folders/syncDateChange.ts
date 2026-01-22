@@ -1,6 +1,10 @@
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { supabase } from "@/integrations/supabase/client";
-import { updateFlexElementHeader } from "./api";
-import { getElementTree, flattenTree, FlexElementNode } from "./getElementTree";
+import { updateFlexElementHeader } from "@/utils/flex-folders/api";
+import { getElementTree, FlexElementNode } from "@/utils/flex-folders/getElementTree";
+
+const DEFAULT_TIMEZONE = "Europe/Madrid";
 
 export interface SyncResult {
   success: number;
@@ -9,17 +13,36 @@ export interface SyncResult {
 }
 
 /**
- * Format a date string for Flex API (ISO format with milliseconds)
+ * Extract error message from unknown error type
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  return String(error);
+}
+
+/**
+ * Format a date string for Flex API (ISO-like format with milliseconds)
+ * Uses Europe/Madrid timezone for consistency with the app
  */
 function formatDateForFlex(date: Date): string {
-  return date.toISOString().split(".")[0] + ".000Z";
+  const zonedDate = toZonedTime(date, DEFAULT_TIMEZONE);
+  // Format as ISO-like string in Madrid timezone
+  const formatted = format(zonedDate, "yyyy-MM-dd'T'HH:mm:ss");
+  return formatted + ".000Z";
 }
 
 /**
  * Generate a YYMMDD document number from a date
+ * Uses Europe/Madrid timezone for consistency with the app
  */
 function generateBaseDocumentNumber(date: Date): string {
-  return date.toISOString().slice(2, 10).replace(/-/g, "");
+  const zonedDate = toZonedTime(date, DEFAULT_TIMEZONE);
+  return format(zonedDate, "yyMMdd");
 }
 
 /**
@@ -157,16 +180,16 @@ export async function syncFlexElementsForJobDateChange(
           console.log(
             `[syncFlexElements] Updated element ${element.elementId}: ${element.documentNumber || "(no doc#)"} -> ${newDocNumber}`
           );
-        } catch (elementError: any) {
+        } catch (elementError: unknown) {
           results.failed++;
-          const errorMsg = `Element ${element.elementId}: ${elementError.message}`;
+          const errorMsg = `Element ${element.elementId}: ${getErrorMessage(elementError)}`;
           results.errors.push(errorMsg);
           console.error(`[syncFlexElements] ${errorMsg}`);
         }
       }
-    } catch (treeError: any) {
+    } catch (treeError: unknown) {
       results.failed++;
-      const errorMsg = `Folder ${folder.element_id}: ${treeError.message}`;
+      const errorMsg = `Folder ${folder.element_id}: ${getErrorMessage(treeError)}`;
       results.errors.push(errorMsg);
       console.error(`[syncFlexElements] ${errorMsg}`);
     }
@@ -274,16 +297,16 @@ export async function syncFlexElementsForTourDateChange(
           console.log(
             `[syncFlexElements] Updated element ${element.elementId}: ${element.documentNumber || "(no doc#)"} -> ${newDocNumber}`
           );
-        } catch (elementError: any) {
+        } catch (elementError: unknown) {
           results.failed++;
-          const errorMsg = `Element ${element.elementId}: ${elementError.message}`;
+          const errorMsg = `Element ${element.elementId}: ${getErrorMessage(elementError)}`;
           results.errors.push(errorMsg);
           console.error(`[syncFlexElements] ${errorMsg}`);
         }
       }
-    } catch (treeError: any) {
+    } catch (treeError: unknown) {
       results.failed++;
-      const errorMsg = `Folder ${folder.element_id}: ${treeError.message}`;
+      const errorMsg = `Folder ${folder.element_id}: ${getErrorMessage(treeError)}`;
       results.errors.push(errorMsg);
       console.error(`[syncFlexElements] ${errorMsg}`);
     }

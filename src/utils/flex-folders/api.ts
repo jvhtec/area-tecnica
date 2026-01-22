@@ -2,6 +2,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { FlexFolderPayload, FlexFolderResponse } from "./types";
 import { getFlexApiBaseUrl } from "./config";
 
+/**
+ * Error response from Flex API
+ */
+interface FlexApiError {
+  exceptionMessage?: string;
+}
+
 let cachedFlexToken: string | null = null;
 
 /**
@@ -72,9 +79,9 @@ export async function deleteFlexFolder(elementId: string): Promise<void> {
   });
 
   if (!response.ok) {
-    let errorData: any = null;
+    let errorData: FlexApiError | null = null;
     try {
-      errorData = await response.json();
+      errorData = await response.json() as FlexApiError;
     } catch {
       // ignore non-JSON response
     }
@@ -116,9 +123,9 @@ export async function updateFlexElementHeader(
   );
 
   if (!response.ok) {
-    let errorData: any = null;
+    let errorData: FlexApiError | null = null;
     try {
-      errorData = await response.json();
+      errorData = await response.json() as FlexApiError;
     } catch {
       // ignore non-JSON response
     }
