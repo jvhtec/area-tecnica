@@ -65,12 +65,58 @@ vi.mock("@/lib/supabase", () => {
     private async execute(): SupabaseResult<any> {
       if (this.action === "select") {
         if (this.table === "flex_folders") {
+          if (this.filters["job_id"]) {
+            return { data: [], error: null };
+          }
+
+          const elementId = this.filters["element_id"];
+          if (elementId) {
+            return {
+              data: [
+                {
+                  id: `db-${elementId}`,
+                  element_id: elementId,
+                  parent_id: null,
+                  folder_type: "department",
+                  department: null,
+                },
+              ],
+              error: null,
+            };
+          }
+
           return { data: [], error: null };
         }
 
-        if (this.table === "job_departments") {
-          const department = this.filters["job_id"] ? "sound" : "sound";
-          return { data: [{ department }], error: null };
+        if (this.table === "jobs") {
+          return {
+            data: [{ job_departments: [] }],
+            error: null,
+          };
+        }
+
+        if (this.table === "tours") {
+          const row = {
+            id: this.filters["id"] ?? "tour-1",
+            name: "Test Tour",
+            flex_main_folder_id: "flex-main",
+            flex_sound_folder_id: "flex-sound",
+            flex_lights_folder_id: "flex-lights",
+            flex_video_folder_id: "flex-video",
+            flex_production_folder_id: "flex-production",
+            flex_personnel_folder_id: "flex-personnel",
+          };
+
+          return this.wantsSingle
+            ? { data: row, error: null }
+            : { data: [row], error: null };
+        }
+
+        if (this.table === "tour_dates") {
+          const row = { is_tour_pack_only: false };
+          return this.wantsSingle
+            ? { data: row, error: null }
+            : { data: [row], error: null };
         }
 
         return { data: [], error: null };
@@ -116,7 +162,7 @@ vi.mock("@/lib/supabase", () => {
 
 import { createAllFoldersForJob } from "../folders";
 
-describe("createAllFoldersForJob folder picker options", () => {
+describe("createAllFoldersForJob tourdate location naming", () => {
   beforeEach(() => {
     createFlexFolderMock.mockReset();
     let counter = 0;
@@ -125,32 +171,31 @@ describe("createAllFoldersForJob folder picker options", () => {
     }));
   });
 
-  it("only creates explicitly selected items when options omit other departments", async () => {
+  it("uses job.location_data when job.location is missing", async () => {
     const job = {
       id: "job-1",
-      job_type: "single",
+      job_type: "tourdate",
+      tour_id: "tour-1",
       title: "Test Job",
       start_time: "2025-01-01T10:00:00.000Z",
-      end_time: "2025-01-02T10:00:00.000Z",
+      end_time: "2025-01-01T12:00:00.000Z",
+      location_data: { name: "Madrid", formatted_address: "Madrid, ES" },
     };
 
     await createAllFoldersForJob(
       job,
       "2025-01-01T10:00:00.000Z",
-      "2025-01-02T10:00:00.000Z",
+      "2025-01-01T12:00:00.000Z",
       "250101",
-      { sound: { subfolders: ["documentacionTecnica"] } }
+      {
+        production: { subfolders: [] },
+        personnel: { subfolders: [] },
+      }
     );
 
-    const names = createFlexFolderMock.mock.calls.map(([payload]) => payload?.name);
+    const createdNames = createFlexFolderMock.mock.calls.map(([payload]) => payload?.name);
 
-    expect(names).toContain("Test Job - Documentación Técnica - Sound");
-    expect(names.some((name: string) => name.includes(" - Documentación Técnica - Production"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Presupuestos Recibidos"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Hoja de Gastos"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Crew Call"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Orden de Trabajo"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Gastos de Personal"))).toBe(false);
-    expect(names.some((name: string) => name.includes("Extras"))).toBe(false);
+    expect(createdNames.some((name: unknown) => typeof name === "string" && name.includes("Madrid"))).toBe(true);
+    expect(createdNames.some((name: unknown) => typeof name === "string" && name.includes("No Location"))).toBe(false);
   });
 });

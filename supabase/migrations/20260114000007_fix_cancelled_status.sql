@@ -1,12 +1,4 @@
--- Rank staffing candidates for a specific role_code within a department.
--- This RPC is designed to be called from the Job Assignment Matrix UI.
---
--- Policy object shape (all optional):
--- {
---   "weights": {"skills": 0.5, "proximity": 0.1, "reliability": 0.2, "fairness": 0.1, "experience": 0.1},
---   "exclude_fridge": true,
---   "soft_conflict_policy": "warn" | "block" | "allow"
--- }
+-- Fix the rank_staffing_candidates function to not use 'cancelled' status
 CREATE OR REPLACE FUNCTION public.rank_staffing_candidates(
   p_job_id uuid,
   p_department text,
@@ -42,10 +34,10 @@ DECLARE
   w_sum numeric;
   v_soft_conflict_policy text := COALESCE(p_policy->>'soft_conflict_policy', 'warn');
   v_exclude_fridge boolean := COALESCE((p_policy->>'exclude_fridge')::boolean, true);
+  v_job_start timestamptz;
+  v_job_end timestamptz;
 BEGIN
-  -- Access control:
-  -- - service_role can always call
-  -- - otherwise require admin/management/logistics and department match (production may include logistics pool)
+  -- Access control
   IF auth.role() <> 'service_role' THEN
     IF NOT EXISTS (
       SELECT 1
@@ -61,6 +53,15 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'Not authorized to rank candidates';
     END IF;
+  END IF;
+
+  -- Get job time range
+  SELECT start_time, end_time INTO v_job_start, v_job_end
+  FROM jobs
+  WHERE id = p_job_id;
+
+  IF v_job_start IS NULL THEN
+    RAISE EXCEPTION 'Job not found';
   END IF;
 
   w_sum := w_skills + w_proximity + w_reliability + w_fairness + w_experience;
@@ -108,7 +109,36 @@ BEGIN
           AND ts.is_active = true
           AND ts.date >= date_trunc('month', now())::date
           AND ts.date < (date_trunc('month', now()) + interval '1 month')::date
-      ) AS current_month_days
+      ) AS current_month_days,
+      -- Check for unavailability (vacation, travel, sick, day_off)
+      EXISTS (
+        SELECT 1
+        FROM technician_availability ta
+        WHERE ta.technician_id = p.id::text
+          AND ta.date >= v_job_start::date
+          AND ta.date <= v_job_end::date
+      ) AS has_unavailability,
+      -- Check for overlapping job assignments (only confirmed/invited, not declined)
+      EXISTS (
+        SELECT 1
+        FROM job_assignments ja2
+        JOIN jobs j2 ON j2.id = ja2.job_id
+        WHERE ja2.technician_id = p.id
+          AND ja2.job_id != p_job_id
+          AND COALESCE(ja2.status, 'invited') NOT IN ('declined')
+          AND j2.time_range && tstzrange(v_job_start, v_job_end, '[]')
+      ) AS has_job_overlap,
+      -- Check for soft conflicts (jobs on same day but not overlapping)
+      EXISTS (
+        SELECT 1
+        FROM job_assignments ja2
+        JOIN jobs j2 ON j2.id = ja2.job_id
+        WHERE ja2.technician_id = p.id
+          AND ja2.job_id != p_job_id
+          AND COALESCE(ja2.status, 'invited') NOT IN ('declined')
+          AND j2.start_time::date = v_job_start::date
+          AND NOT (j2.time_range && tstzrange(v_job_start, v_job_end, '[]'))
+      ) AS has_same_day_job
     FROM profiles p
     LEFT JOIN technician_fridge tf ON tf.technician_id = p.id
     LEFT JOIN LATERAL (
@@ -122,8 +152,10 @@ BEGIN
       LIMIT 1
     ) AS skill ON true
     WHERE
-      p.assignable_as_tech = true
-      AND p.role IN ('technician', 'house_tech')
+      (
+        p.role IN ('technician', 'house_tech')
+        OR (p.role NOT IN ('technician', 'house_tech') AND p.assignable_as_tech = true)
+      )
       AND (
         (p_department <> 'production' AND p.department = p_department)
         OR (p_department = 'production' AND p.department IN ('production', 'logistics'))
@@ -137,128 +169,73 @@ BEGIN
           AND COALESCE(ja.status, 'invited') <> 'declined'
       )
   ),
+  reliability_stats AS (
+    SELECT
+      sr.profile_id,
+      COUNT(*) FILTER (WHERE sr.phase = 'availability' AND sr.status = 'confirmed') AS avail_yes,
+      COUNT(*) FILTER (WHERE sr.phase = 'availability' AND sr.status IN ('confirmed', 'declined')) AS avail_total,
+      COUNT(*) FILTER (WHERE sr.phase = 'offer' AND sr.status = 'confirmed') AS offer_yes,
+      COUNT(*) FILTER (WHERE sr.phase = 'offer' AND sr.status IN ('confirmed', 'declined')) AS offer_total
+    FROM staffing_requests sr
+    GROUP BY sr.profile_id
+  ),
   with_reliability AS (
     SELECT
       b.*,
-      (
-        SELECT COUNT(*) FROM staffing_requests sr
-        WHERE sr.profile_id = b.profile_id
-          AND sr.phase = 'availability'
-          AND sr.status = 'confirmed'
-      ) AS avail_yes,
-      (
-        SELECT COUNT(*) FROM staffing_requests sr
-        WHERE sr.profile_id = b.profile_id
-          AND sr.phase = 'availability'
-          AND sr.status IN ('confirmed', 'declined')
-      ) AS avail_total,
-      (
-        SELECT COUNT(*) FROM staffing_requests sr
-        WHERE sr.profile_id = b.profile_id
-          AND sr.phase = 'offer'
-          AND sr.status = 'confirmed'
-      ) AS offer_yes,
-      (
-        SELECT COUNT(*) FROM staffing_requests sr
-        WHERE sr.profile_id = b.profile_id
-          AND sr.phase = 'offer'
-          AND sr.status IN ('confirmed', 'declined')
-      ) AS offer_total
+      COALESCE(rs.avail_yes, 0) AS avail_yes,
+      COALESCE(rs.avail_total, 0) AS avail_total,
+      COALESCE(rs.offer_yes, 0) AS offer_yes,
+      COALESCE(rs.offer_total, 0) AS offer_total
     FROM base b
-  ),
-  with_conflicts AS (
-    SELECT
-      wr.*,
-      check_technician_conflicts(wr.profile_id, p_job_id) AS conflict_json
-    FROM with_reliability wr
+    LEFT JOIN reliability_stats rs ON rs.profile_id = b.profile_id
   ),
   scored AS (
     SELECT
-      wc.profile_id,
-      wc.full_name,
-      wc.department,
-      wc.user_role,
-      wc.is_primary,
-      wc.proficiency,
-      wc.jobs_worked,
-      wc.current_month_days,
-      -- Component scores (skills is 0-100, others 0-10)
+      wr.profile_id,
+      wr.full_name,
+      wr.department,
+      wr.user_role,
+      wr.is_primary,
+      wr.proficiency,
+      wr.jobs_worked,
+      wr.current_month_days,
       (
         CASE
-          WHEN wc.proficiency > 0 THEN LEAST(
+          WHEN wr.proficiency > 0 THEN LEAST(
             100,
-            (CASE WHEN wc.is_primary THEN 60 ELSE 40 END) + (wc.proficiency * 8)
+            (CASE WHEN wr.is_primary THEN 60 ELSE 40 END) + (wr.proficiency * 8)
           )
           ELSE 10
         END
       )::int AS skills_score,
       NULL::double precision AS distance_to_madrid_km,
       0::int AS proximity_score,
-      LEAST(wc.jobs_worked, 10)::int AS experience_score,
+      LEAST(wr.jobs_worked, 10)::int AS experience_score,
       (
         CASE
-          WHEN wc.avail_total > 0 OR wc.offer_total > 0 THEN
+          WHEN wr.avail_total > 0 OR wr.offer_total > 0 THEN
             ROUND(
-              COALESCE(wc.avail_yes::numeric / NULLIF(wc.avail_total, 0), 0) * 5 +
-              COALESCE(wc.offer_yes::numeric / NULLIF(wc.offer_total, 0), 0) * 5
+              COALESCE(wr.avail_yes::numeric / NULLIF(wr.avail_total, 0), 0) * 5 +
+              COALESCE(wr.offer_yes::numeric / NULLIF(wr.offer_total, 0), 0) * 5
             )
           ELSE 5
         END
       )::int AS reliability_score,
       (
         CASE
-          WHEN wc.user_role = 'house_tech' AND wc.current_month_days < 4 THEN 10
-          WHEN wc.last_work_date IS NULL THEN 10
-          WHEN (now()::date - wc.last_work_date) > 30 THEN 10
-          WHEN (now()::date - wc.last_work_date) > 14 THEN 7
+          WHEN wr.user_role = 'house_tech' AND wr.current_month_days < 4 THEN 10
+          WHEN wr.last_work_date IS NULL THEN 10
+          WHEN (now()::date - wr.last_work_date) > 30 THEN 10
+          WHEN (now()::date - wr.last_work_date) > 14 THEN 7
           ELSE 3
         END
       )::int AS fairness_score,
-      COALESCE((wc.conflict_json->>'hasSoftConflict')::boolean, false) AS soft_conflict,
-      (
-        COALESCE((wc.conflict_json->>'hasHardConflict')::boolean, false)
-        OR jsonb_array_length(COALESCE(wc.conflict_json->'unavailabilityConflicts', '[]'::jsonb)) > 0
-      ) AS hard_conflict
-    FROM with_conflicts wc
+      wr.has_same_day_job AS soft_conflict,
+      (wr.has_unavailability OR wr.has_job_overlap) AS hard_conflict
+    FROM with_reliability wr
   ),
   filtered AS (
-    SELECT
-      s.*,
-      LEAST(
-        100,
-        ROUND(
-          (
-            (s.skills_score::numeric) * w_skills +
-            (s.proximity_score::numeric * 10) * w_proximity +
-            (s.reliability_score::numeric * 10) * w_reliability +
-            (s.fairness_score::numeric * 10) * w_fairness +
-            (s.experience_score::numeric * 10) * w_experience
-          ) * (
-            CASE
-              WHEN s.user_role = 'house_tech' AND s.current_month_days < 4 THEN 1.3
-              ELSE 1.0
-            END
-          )
-        )::int
-      ) AS final_score,
-      (
-        jsonb_build_array(
-          CASE
-            WHEN s.proficiency > 0 THEN
-              (CASE WHEN s.is_primary THEN 'Primary skill match' ELSE 'Skill match' END) || ' (lvl ' || s.proficiency || ')'
-            ELSE 'No direct skill match'
-          END,
-          'Reliability: ' || s.reliability_score || '/10',
-          'Fairness: ' || s.fairness_score || '/10',
-          'Experience: ' || s.experience_score || '/10'
-        )
-        || (CASE
-              WHEN s.user_role = 'house_tech' AND s.current_month_days < 4
-              THEN jsonb_build_array('House tech boost (+30%)')
-              ELSE '[]'::jsonb
-            END)
-        || (CASE WHEN s.soft_conflict THEN jsonb_build_array('⚠ Potential scheduling conflict') ELSE '[]'::jsonb END)
-      ) AS reasons
+    SELECT s.*
     FROM scored s
     WHERE s.hard_conflict = false
       AND (v_soft_conflict_policy <> 'block' OR s.soft_conflict = false)
@@ -275,13 +252,41 @@ BEGIN
     f.fairness_score,
     f.soft_conflict,
     f.hard_conflict,
-    f.final_score,
-    f.reasons
+    LEAST(
+      100,
+      ROUND(
+        (
+          (f.skills_score::numeric) * w_skills +
+          (f.proximity_score::numeric * 10) * w_proximity +
+          (f.reliability_score::numeric * 10) * w_reliability +
+          (f.fairness_score::numeric * 10) * w_fairness +
+          (f.experience_score::numeric * 10) * w_experience
+        ) * (
+          CASE
+            WHEN f.user_role = 'house_tech' AND f.current_month_days < 4 THEN 1.3
+            ELSE 1.0
+          END
+        )
+      )::int
+    ) AS final_score,
+    jsonb_build_array(
+      CASE
+        WHEN f.proficiency > 0 THEN
+          (CASE WHEN f.is_primary THEN 'Primary skill match' ELSE 'Skill match' END) || ' (lvl ' || f.proficiency || ')'
+        ELSE 'No direct skill match'
+      END,
+      'Reliability: ' || f.reliability_score || '/10',
+      'Fairness: ' || f.fairness_score || '/10',
+      'Experience: ' || f.experience_score || '/10'
+    ) ||
+    (CASE
+      WHEN f.user_role = 'house_tech' AND f.current_month_days < 4
+      THEN jsonb_build_array('House tech boost (+30%)')
+      ELSE '[]'::jsonb
+    END) ||
+    (CASE WHEN f.soft_conflict THEN jsonb_build_array('⚠ Same-day job (different time)') ELSE '[]'::jsonb END) AS reasons
   FROM filtered f
-  ORDER BY f.final_score DESC, f.profile_id
+  ORDER BY final_score DESC, f.profile_id
   LIMIT 50;
 END;
 $$;
-
-GRANT EXECUTE ON FUNCTION public.rank_staffing_candidates(uuid, text, text, text, jsonb)
-  TO authenticated, service_role;

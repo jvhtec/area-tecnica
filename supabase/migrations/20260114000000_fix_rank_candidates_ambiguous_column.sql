@@ -1,12 +1,4 @@
--- Rank staffing candidates for a specific role_code within a department.
--- This RPC is designed to be called from the Job Assignment Matrix UI.
---
--- Policy object shape (all optional):
--- {
---   "weights": {"skills": 0.5, "proximity": 0.1, "reliability": 0.2, "fairness": 0.1, "experience": 0.1},
---   "exclude_fridge": true,
---   "soft_conflict_policy": "warn" | "block" | "allow"
--- }
+-- Fix ambiguous column reference in rank_staffing_candidates
 CREATE OR REPLACE FUNCTION public.rank_staffing_candidates(
   p_job_id uuid,
   p_department text,
@@ -282,6 +274,3 @@ BEGIN
   LIMIT 50;
 END;
 $$;
-
-GRANT EXECUTE ON FUNCTION public.rank_staffing_candidates(uuid, text, text, text, jsonb)
-  TO authenticated, service_role;

@@ -591,7 +591,29 @@ export async function createAllFoldersForJob(
       "personnel",
       "comercial",
     ];
-    const locationName = job.location?.name || "No Location";
+    const locationName = (() => {
+      if (typeof job.location === "string") {
+        const value = job.location.trim();
+        if (value) return value;
+      }
+
+      if (job.location && typeof job.location === "object") {
+        const value = (job.location.name || job.location.formatted_address || "").trim();
+        if (value) return value;
+      }
+
+      if (job.location_data && typeof job.location_data === "object") {
+        const value = (job.location_data.name || job.location_data.formatted_address || "").trim();
+        if (value) return value;
+      }
+
+      if (typeof job.venue_name === "string") {
+        const value = job.venue_name.trim();
+        if (value) return value;
+      }
+
+      return "No Location";
+    })();
     const formattedDate = format(new Date(job.start_time), "MMM d, yyyy");
 
     for (const dept of allDepartments) {

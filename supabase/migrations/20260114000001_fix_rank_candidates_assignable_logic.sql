@@ -1,12 +1,6 @@
--- Rank staffing candidates for a specific role_code within a department.
--- This RPC is designed to be called from the Job Assignment Matrix UI.
---
--- Policy object shape (all optional):
--- {
---   "weights": {"skills": 0.5, "proximity": 0.1, "reliability": 0.2, "fairness": 0.1, "experience": 0.1},
---   "exclude_fridge": true,
---   "soft_conflict_policy": "warn" | "block" | "allow"
--- }
+-- Fix assignable_as_tech logic in rank_staffing_candidates
+-- The assignable_as_tech flag is for management users who can also be assigned as techs
+-- Regular technicians (role='technician' or 'house_tech') are always assignable
 CREATE OR REPLACE FUNCTION public.rank_staffing_candidates(
   p_job_id uuid,
   p_department text,
@@ -122,13 +116,19 @@ BEGIN
       LIMIT 1
     ) AS skill ON true
     WHERE
-      p.assignable_as_tech = true
-      AND p.role IN ('technician', 'house_tech')
+      -- Assignable: either role is technician/house_tech, OR other role with assignable_as_tech flag
+      (
+        p.role IN ('technician', 'house_tech')
+        OR (p.role NOT IN ('technician', 'house_tech') AND p.assignable_as_tech = true)
+      )
+      -- Department match
       AND (
         (p_department <> 'production' AND p.department = p_department)
         OR (p_department = 'production' AND p.department IN ('production', 'logistics'))
       )
+      -- Fridge filter
       AND (NOT v_exclude_fridge OR COALESCE(tf.in_fridge, false) = false)
+      -- Not already assigned to this job
       AND NOT EXISTS (
         SELECT 1
         FROM job_assignments ja
@@ -282,6 +282,3 @@ BEGIN
   LIMIT 50;
 END;
 $$;
-
-GRANT EXECUTE ON FUNCTION public.rank_staffing_candidates(uuid, text, text, text, jsonb)
-  TO authenticated, service_role;

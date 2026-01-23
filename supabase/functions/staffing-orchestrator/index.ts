@@ -174,14 +174,18 @@ async function startCampaign(
 
   try {
     // Get job details
-    const { data: job } = await supabase
+    console.log('[staffing-orchestrator] Fetching job:', job_id);
+    const { data: job, error: jobError } = await supabase
       .from('jobs')
-      .select('id, job_date, title')
+      .select('id, start_time, title')
       .eq('id', job_id)
       .single();
 
+    console.log('[staffing-orchestrator] Job query result:', { job, jobError });
+
     if (!job) {
-      return { status: 404, body: { error: 'Job not found' } };
+      console.log('[staffing-orchestrator] Job not found:', job_id);
+      return { status: 404, body: { error: 'Job not found', job_id, jobError: jobError?.message || null, debug: { received_body: body } } };
     }
 
     // Create campaign
