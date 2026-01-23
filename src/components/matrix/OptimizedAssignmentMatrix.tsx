@@ -488,8 +488,8 @@ export const OptimizedAssignmentMatrix = ({
   useEffect(() => {
     return () => {
       if ((handleMainScroll as any)?.cancel) (handleMainScroll as any).cancel();
-      if ((handleDateHeadersScroll as any)?.cancel) handleDateHeadersScroll.cancel();
-      if ((handleTechnicianScroll as any)?.cancel) handleTechnicianScroll.cancel();
+      if ((handleDateHeadersScroll as any)?.cancel) (handleDateHeadersScroll as any).cancel();
+      if ((handleTechnicianScroll as any)?.cancel) (handleTechnicianScroll as any).cancel();
     };
   }, [handleDateHeadersScroll, handleMainScroll, handleTechnicianScroll]);
 

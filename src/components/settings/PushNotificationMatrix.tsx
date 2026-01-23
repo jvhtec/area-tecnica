@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -150,7 +150,7 @@ export function PushNotificationMatrix() {
   const pendingCount = pending.size;
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  useDragScroll(scrollRef, { enabled: !isMobile && !loading });
+  useDragScroll(scrollRef, { enabled: !isMobile && !loading, direction: 'both' });
 
   const sortedUsers = useMemo(() => {
     return users.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -514,11 +514,11 @@ export function PushNotificationMatrix() {
           <div className="p-4 text-sm text-muted-foreground">Loading…</div>
         ) : (
           <div>
-            <div ref={scrollRef} className="relative overflow-x-auto border rounded-md">
-              <Table>
-                <TableHeader>
+            <div ref={scrollRef} className="relative overflow-auto border rounded-md max-h-[600px]">
+              <table className="w-full caption-bottom text-sm border-separate border-spacing-0">
+                <TableHeader className="sticky top-0 z-30 bg-background shadow-[0_2px_5px_-2px_rgba(0,0,0,0.1)]">
                   <TableRow>
-                    <TableHead className="min-w-[220px] sticky left-0 z-20 bg-background border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Event</TableHead>
+                    <TableHead className="min-w-[220px] sticky left-0 top-0 z-40 bg-background border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Event</TableHead>
                     <TableHead className="min-w-[120px]">Natural</TableHead>
                     <TableHead className="min-w-[120px]">Broadcast</TableHead>
                     <TableHead className="min-w-[180px]">Assigned technicians</TableHead>
@@ -588,7 +588,7 @@ export function PushNotificationMatrix() {
                     );
                   })}
                 </TableBody>
-              </Table>
+              </table>
             </div>
           </div>
         )}
