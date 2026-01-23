@@ -155,9 +155,11 @@ serve(async (req) => {
         continue;
       }
       if (!pdfBase64) {
+        console.error('[send-job-payout-email] Missing PDF for technician:', tech.technician_id);
         results.push({ technician_id: tech.technician_id, sent: false, error: 'missing_pdf' });
         continue;
       }
+      console.log(`[send-job-payout-email] PDF for ${tech.technician_id}: ${pdfBase64.length} chars, starts with: ${pdfBase64.substring(0, 50)}...`);
 
       const subject = `Resumen de pagos · ${body.job.title}`;
 
@@ -278,7 +280,7 @@ serve(async (req) => {
         to: [{ email: trimmedEmail, name: tech.full_name || undefined }],
         subject,
         htmlContent,
-        attachments: [
+        attachment: [
           {
             content: pdfBase64,
             name: tech.filename || `pago_${body.job.id}_${tech.technician_id}.pdf`,
@@ -288,6 +290,14 @@ serve(async (req) => {
 
       // Always CC administration
       emailPayload['cc'] = [{ email: 'administracion@mfo-producciones.com' }];
+
+      // Debug: log attachment info
+      console.log('[send-job-payout-email] Sending email with attachment:', {
+        to: trimmedEmail,
+        pdfLength: pdfBase64.length,
+        pdfStartsWith: pdfBase64.substring(0, 30),
+        filename: tech.filename || `pago_${body.job.id}_${tech.technician_id}.pdf`
+      });
 
       try {
         const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', {

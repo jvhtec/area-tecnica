@@ -455,7 +455,7 @@ serve(async (req) => {
           to: toList,
           subject,
           htmlContent,
-          attachments: [
+          attachment: [
             {
               content: pdfB64,
               name: filename,
