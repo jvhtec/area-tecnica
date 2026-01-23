@@ -354,6 +354,7 @@ export async function sendJobPayoutEmails(
         pdf_base64: attachment.pdfBase64,
         filename: attachment.filename,
         autonomo: attachment.autonomo ?? null,
+        is_house_tech: attachment.is_house_tech ?? null,
         lpo_number: attachment.lpo_number ?? null,
         worked_dates: workedDates,
         is_evento: hasEventoTimesheet,
