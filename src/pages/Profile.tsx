@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Department } from "@/types/department";
+import { Department, ALL_DEPARTMENTS, DEPARTMENT_LABELS, getDepartmentLabel } from "@/types/department";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, RefreshCcw, Shield, ExternalLink } from "lucide-react";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
@@ -321,19 +321,30 @@ export const Profile = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="department">Departamento</Label>
-                    <Select
-                      value={profile.department || ''}
-                      onValueChange={(value) => setProfile({ ...profile, department: value as Department })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un departamento" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sound">Sonido</SelectItem>
-                        <SelectItem value="lights">Luces</SelectItem>
-                        <SelectItem value="video">Vídeo</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {profile.role === 'admin' || profile.role === 'super_admin' ? (
+                      <Select
+                        value={profile.department || ''}
+                        onValueChange={(value) => setProfile({ ...profile, department: value as Department })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona un departamento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ALL_DEPARTMENTS.map((dept) => (
+                            <SelectItem key={dept} value={dept}>
+                              {DEPARTMENT_LABELS[dept]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="department"
+                        value={getDepartmentLabel(profile.department)}
+                        disabled
+                        className="bg-muted"
+                      />
+                    )}
                   </div>
 
                   <div className="space-y-2">

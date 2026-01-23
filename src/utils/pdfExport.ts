@@ -20,6 +20,7 @@ interface ExportTable {
   dualMotors?: boolean;
   totalWatts?: number;
   currentPerPhase?: number;   // line current (per-phase if 3φ, single-line if 1φ)
+  phaseMode?: 'single' | 'three';
   toolType?: 'pesos' | 'consumos' | 'rigging';
   pduType?: string;
   customPduType?: string;
@@ -256,7 +257,8 @@ export const exportToPDF = async (
             }
 
             if (table.currentPerPhase !== undefined) {
-              doc.text(`Corriente${/* label agnostic to phase */''}: ${table.currentPerPhase.toFixed(2)} A`, 14, yPosition);
+              const currentLabel = table.phaseMode === 'three' ? 'Corriente por Fase' : 'Corriente';
+              doc.text(`${currentLabel}: ${table.currentPerPhase.toFixed(2)} A`, 14, yPosition);
               yPosition += 10;
             }
           }

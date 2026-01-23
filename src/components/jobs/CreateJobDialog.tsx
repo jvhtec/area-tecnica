@@ -14,7 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { Department } from "@/types/department";
+import { Department, TECHNICAL_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
 import { JobType } from "@/types/job";
 import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
@@ -289,7 +289,6 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
     }
   }, [isSubmitting, getOrCreateLocationWithDetails, queryClient, toast, reset, onOpenChange, onCreated, navigate]);
 
-  const departments: Department[] = ["sound", "lights", "video", "production"];
   const selectedDepartments = watch("departments") || [];
 
   const toggleDepartment = useCallback((department: Department) => {
@@ -436,9 +435,9 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           </div>
 
           <div className="space-y-2">
-            <Label>Departments</Label>
+            <Label>Departamentos</Label>
             <div className="flex gap-2">
-              {departments.map((department) => (
+              {TECHNICAL_DEPARTMENTS.map((department) => (
                 <Button
                   key={department}
                   type="button"
@@ -454,7 +453,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                       : "border-border"
                   }
                 >
-                  {department}
+                  {DEPARTMENT_LABELS[department]}
                 </Button>
               ))}
             </div>

@@ -9,6 +9,7 @@ export interface TechnicianProfileWithEmail {
   last_name?: string | null;
   email?: string | null;
   autonomo?: boolean | null;
+  is_house_tech?: boolean | null;
 }
 
 export interface JobPayoutEmailJobDetails {
@@ -17,6 +18,7 @@ export interface JobPayoutEmailJobDetails {
   start_time: string;
   tour_id?: string | null;
   rates_approved?: boolean | null;
+  invoicing_company?: string | null;
 }
 
 // ...
@@ -31,6 +33,7 @@ export interface JobPayoutEmailAttachment {
   pdfBase64: string;
   filename: string;
   autonomo?: boolean | null;
+  is_house_tech?: boolean | null;
   lpo_number?: string | null;
 }
 
@@ -107,7 +110,7 @@ async function fetchJobDetails(
   if (provided) return provided;
   const { data, error } = await client
     .from('jobs')
-    .select('id, title, start_time, tour_id, rates_approved')
+    .select('id, title, start_time, tour_id, rates_approved, invoicing_company')
     .eq('id', jobId)
     .maybeSingle();
   if (error || !data) {
@@ -138,17 +141,32 @@ async function fetchProfiles(
   if (provided) {
     const hasEmailField = provided.every((p) => Object.prototype.hasOwnProperty.call(p, 'email'));
     const hasAutonomoField = provided.every((p) => Object.prototype.hasOwnProperty.call(p, 'autonomo'));
-    if (hasEmailField && hasAutonomoField) {
+    const hasHouseTechField = provided.every((p) => Object.prototype.hasOwnProperty.call(p, 'is_house_tech'));
+    if (hasEmailField && hasAutonomoField && hasHouseTechField) {
       return provided;
     }
   }
   if (!techIds.length) return provided || [];
+
+  // Fetch basic profile data (is_house_tech is a function, not a column)
   const { data, error } = await client
     .from('profiles')
     .select('id, first_name, last_name, email, autonomo')
     .in('id', techIds);
   if (error) throw error;
-  return (data || []) as TechnicianProfileWithEmail[];
+
+  // Fetch house tech status for each profile using the RPC function
+  const profiles = (data || []) as TechnicianProfileWithEmail[];
+  for (const profile of profiles) {
+    try {
+      const { data: isHouseTech } = await client.rpc('is_house_tech', { _profile_id: profile.id });
+      profile.is_house_tech = isHouseTech ?? false;
+    } catch {
+      profile.is_house_tech = false;
+    }
+  }
+
+  return profiles;
 }
 
 async function fetchLpoMap(
@@ -219,15 +237,25 @@ export async function prepareJobPayoutEmailContext(
         deduction = daysCount * NON_AUTONOMO_DEDUCTION_EUR;
     }
 
-    const blob = (await generateJobPayoutPDF(
-      [payout],
-      job,
-      profiles,
-      lpoMap,
-      perTechMap,
-      { download: false }
-    )) as Blob | void;
-    if (!blob) continue;
+    let blob: Blob | void;
+    try {
+      blob = (await generateJobPayoutPDF(
+        [payout],
+        job,
+        profiles,
+        lpoMap,
+        perTechMap,
+        { download: false }
+      )) as Blob | void;
+    } catch (error) {
+      console.error(`[job-payout-email] Failed to generate PDF for technician ${payout.technician_id}:`, error);
+      continue;
+    }
+
+    if (!blob) {
+      console.warn(`[job-payout-email] PDF generation returned null/undefined for technician ${payout.technician_id}`);
+      continue;
+    }
     const pdfBase64 = await blobToBase64(blob);
     const jobSlug = sanitizeForFilename(job.title || job.id);
     const techSlug = sanitizeForFilename(fullName);
@@ -242,6 +270,7 @@ export async function prepareJobPayoutEmailContext(
       pdfBase64,
       filename,
       autonomo: profile?.autonomo ?? null,
+      is_house_tech: profile?.is_house_tech ?? null,
       lpo_number: lpoMap.get(payout.technician_id) ?? null,
     });
   }
@@ -295,22 +324,36 @@ export async function sendJobPayoutEmails(
       title: context.job.title,
       start_time: context.job.start_time,
       tour_id: context.job.tour_id ?? null,
+      invoicing_company: context.job.invoicing_company ?? null,
     },
-    technicians: recipients.map((attachment) => ({
-      technician_id: attachment.technician_id,
-      email: attachment.email,
-      full_name: attachment.full_name,
-      totals: {
-        timesheets_total_eur: attachment.payout.timesheets_total_eur,
-        extras_total_eur: attachment.payout.extras_total_eur,
-        total_eur: attachment.payout.total_eur - (attachment.deduction_eur || 0),
-        deduction_eur: attachment.deduction_eur,
-      },
-      pdf_base64: attachment.pdfBase64,
-      filename: attachment.filename,
-      autonomo: attachment.autonomo ?? null,
-      lpo_number: attachment.lpo_number ?? null,
-    })),
+    technicians: recipients.map((attachment) => {
+      // Extract unique worked dates from timesheets
+      const timesheetLines = context.timesheetMap.get(attachment.technician_id) || [];
+      const workedDates = Array.from(
+        new Set(
+          timesheetLines
+            .map(line => line.date)
+            .filter((date): date is string => date != null)
+        )
+      ).sort();
+
+      return {
+        technician_id: attachment.technician_id,
+        email: attachment.email,
+        full_name: attachment.full_name,
+        totals: {
+          timesheets_total_eur: attachment.payout.timesheets_total_eur,
+          extras_total_eur: attachment.payout.extras_total_eur,
+          total_eur: attachment.payout.total_eur - (attachment.deduction_eur || 0),
+          deduction_eur: attachment.deduction_eur,
+        },
+        pdf_base64: attachment.pdfBase64,
+        filename: attachment.filename,
+        autonomo: attachment.autonomo ?? null,
+        lpo_number: attachment.lpo_number ?? null,
+        worked_dates: workedDates,
+      };
+    }),
     missing_emails: context.missingEmails,
     requested_at: new Date().toISOString(),
   };

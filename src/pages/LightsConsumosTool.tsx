@@ -16,72 +16,97 @@ import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { Badge } from '@/components/ui/badge';
 
-const lightComponentDatabase = [
-  { id: 1, name: 'CAMEO OPUS S5', watts: 650 },
-  { id: 2, name: 'CLAY PAKY A-LEDA K20', watts: 650 },
-  { id: 3, name: 'CLAY PAKY A-LEDA K25', watts: 1100 },
-  { id: 4, name: 'CLAY PAKY STORMY CC', watts: 800 },
-  { id: 5, name: 'ELATION CHORUS LINE 16', watts: 750 },
-  { id: 6, name: 'MARTIN MAC AURA', watts: 260 },
-  { id: 7, name: 'MARTIN MAC VIPER', watts: 1200 },
-  { id: 8, name: 'ROBE BMFL BLADE', watts: 2000 },
-  { id: 9, name: 'ROBE BMFL SPOT', watts: 2000 },
-  { id: 10, name: 'ROBE BMFL WASHBEAM', watts: 2000 },
-  { id: 11, name: 'ROBE MEGAPOINTE', watts: 670 },
-  { id: 12, name: 'ROBE POINTE', watts: 470 },
-  { id: 13, name: 'TRITON BLUE 15R BEAM', watts: 500 },
-  { id: 14, name: 'TRITON BLUE 15R SPOT', watts: 500 },
-  { id: 15, name: 'TRITON BLUE WALLY 3715', watts: 650 },
-  { id: 16, name: 'CAMEO AURO BAR 100', watts: 140 },
-  { id: 17, name: 'ACL 250W (2 BARRAS)', watts: 2000 },
-  { id: 18, name: 'ACL 650W (2 BARRAS)', watts: 5200 },
-  { id: 19, name: 'BARRA PAR 64x6', watts: 6000 },
-  { id: 20, name: 'FRESNELL 2KW', watts: 2000 },
-  { id: 21, name: 'MOLEFAY BLINDER 4', watts: 2600 },
-  { id: 22, name: 'MOLEFAY BLINDER 8', watts: 5200 },
-  { id: 23, name: 'PAR 64', watts: 1000 },
-  { id: 24, name: 'ADMIRAL VINTAGE 53cm', watts: 60 },
-  { id: 25, name: 'ADMIRAL VINTAGE 38cm', watts: 60 },
-  { id: 26, name: 'FRESNELL 5KW', watts: 5000 },
-  { id: 27, name: 'MOLEFAY BLINDER 2', watts: 1300 },
-  { id: 28, name: 'RECORTE ETC 25º/50º', watts: 750 },
-  { id: 29, name: 'RECORTE ETC 15º/30º', watts: 750 },
-  { id: 30, name: 'RECORTE ETC 19º', watts: 750 },
-  { id: 31, name: 'RECORTE ETC 10º', watts: 750 },
-  { id: 32, name: 'RECORTE TB LED 25º/50º', watts: 300 },
-  { id: 33, name: 'SUNSTRIP', watts: 500 },
-  { id: 34, name: 'CAMEO ZENIT 120', watts: 120 },
-  { id: 35, name: 'ELATION SIXBAR 1000', watts: 150 },
-  { id: 36, name: 'MARTIN ATOMIC 3000', watts: 3000 },
-  { id: 37, name: 'SGM Q7', watts: 500 },
-  { id: 38, name: 'ELATION SIXBAR 500', watts: 80 },
-  { id: 39, name: 'SMOKE FACTORY TOUR HAZERII', watts: 1500 },
-  { id: 40, name: 'ROBE 500 FT-PRO', watts: 1200 },
-  { id: 41, name: 'SAHARA TURBO DRYER', watts: 1500 },
-  { id: 42, name: 'ROBE SPIIDER', watts: 660 },
-  { id: 43, name: 'GLP JDC1', watts: 1200 },
-  { id: 44, name: 'CAMEO W3', watts: 325 },
-  { id: 45, name: 'CHAUVET COLOR STRIKE M', watts: 750 },
-  { id: 46, name: 'GLP X4 BAR 20', watts: 500 },
-  { id: 47, name: 'ROBERT JULIAT ARAMIS', watts: 2500 },
-  { id: 48, name: 'ROBERT JULIAT MERLIN', watts: 2500 },
-  { id: 49, name: 'ROBERT JULIAT CYRANO', watts: 2500 },
-  { id: 50, name: 'ROBERT JULIAT LANCELOT', watts: 4000 },
-  { id: 51, name: 'ROBERT JULIAT KORRIGAN', watts: 1200 },
-  { id: 52, name: 'PIXEL LINE IP', watts: 420 },
-  { id: 53, name: 'COLORADO PXL BAR ', watts: 768 }
+type FixtureType = 'incandescent' | 'discharge' | 'led' | 'led-pro';
+
+const FIXTURE_PF: Record<FixtureType, { label: string; pf: number }> = {
+  incandescent: { label: 'Incandescent / filament', pf: 1.0 },
+  discharge: { label: 'Discharge (generic)', pf: 0.9 },
+  led: { label: 'LED (generic)', pf: 0.9 },
+  'led-pro': { label: 'LED (pro / specified)', pf: 0.95 },
+};
+
+const DEFAULT_FIXTURE_TYPE: FixtureType = 'led';
+
+type LightComponent = {
+  id: number;
+  name: string;
+  watts: number;
+  fixtureType: FixtureType;
+};
+
+const lightComponentDatabase: LightComponent[] = [
+  { id: 1, name: 'CAMEO OPUS S5', watts: 650, fixtureType: 'led' },
+  { id: 2, name: 'CLAY PAKY A-LEDA K20', watts: 650, fixtureType: 'led' },
+  { id: 3, name: 'CLAY PAKY A-LEDA K25', watts: 1100, fixtureType: 'led' },
+  { id: 4, name: 'CLAY PAKY STORMY CC', watts: 800, fixtureType: 'discharge' },
+  { id: 5, name: 'ELATION CHORUS LINE 16', watts: 750, fixtureType: 'led' },
+  { id: 6, name: 'MARTIN MAC AURA', watts: 260, fixtureType: 'led' },
+  { id: 7, name: 'MARTIN MAC VIPER', watts: 1200, fixtureType: 'discharge' },
+  { id: 8, name: 'ROBE BMFL BLADE', watts: 2000, fixtureType: 'discharge' },
+  { id: 9, name: 'ROBE BMFL SPOT', watts: 2000, fixtureType: 'discharge' },
+  { id: 10, name: 'ROBE BMFL WASHBEAM', watts: 2000, fixtureType: 'discharge' },
+  { id: 11, name: 'ROBE MEGAPOINTE', watts: 670, fixtureType: 'discharge' },
+  { id: 12, name: 'ROBE POINTE', watts: 470, fixtureType: 'discharge' },
+  { id: 13, name: 'TRITON BLUE 15R BEAM', watts: 500, fixtureType: 'discharge' },
+  { id: 14, name: 'TRITON BLUE 15R SPOT', watts: 500, fixtureType: 'discharge' },
+  { id: 15, name: 'TRITON BLUE WALLY 3715', watts: 650, fixtureType: 'discharge' },
+  { id: 16, name: 'CAMEO AURO BAR 100', watts: 140, fixtureType: 'led' },
+  { id: 17, name: 'ACL 250W (2 BARRAS)', watts: 2000, fixtureType: 'incandescent' },
+  { id: 18, name: 'ACL 650W (2 BARRAS)', watts: 5200, fixtureType: 'incandescent' },
+  { id: 19, name: 'BARRA PAR 64x6', watts: 6000, fixtureType: 'incandescent' },
+  { id: 20, name: 'FRESNELL 2KW', watts: 2000, fixtureType: 'incandescent' },
+  { id: 21, name: 'MOLEFAY BLINDER 4', watts: 2600, fixtureType: 'incandescent' },
+  { id: 22, name: 'MOLEFAY BLINDER 8', watts: 5200, fixtureType: 'incandescent' },
+  { id: 23, name: 'PAR 64', watts: 1000, fixtureType: 'incandescent' },
+  { id: 24, name: 'ADMIRAL VINTAGE 53cm', watts: 60, fixtureType: 'incandescent' },
+  { id: 25, name: 'ADMIRAL VINTAGE 38cm', watts: 60, fixtureType: 'incandescent' },
+  { id: 26, name: 'FRESNELL 5KW', watts: 5000, fixtureType: 'incandescent' },
+  { id: 27, name: 'MOLEFAY BLINDER 2', watts: 1300, fixtureType: 'incandescent' },
+  { id: 28, name: 'RECORTE ETC 25º/50º', watts: 750, fixtureType: 'incandescent' },
+  { id: 29, name: 'RECORTE ETC 15º/30º', watts: 750, fixtureType: 'incandescent' },
+  { id: 30, name: 'RECORTE ETC 19º', watts: 750, fixtureType: 'incandescent' },
+  { id: 31, name: 'RECORTE ETC 10º', watts: 750, fixtureType: 'incandescent' },
+  { id: 32, name: 'RECORTE TB LED 25º/50º', watts: 300, fixtureType: 'led' },
+  { id: 33, name: 'SUNSTRIP', watts: 500, fixtureType: 'incandescent' },
+  { id: 34, name: 'CAMEO ZENIT 120', watts: 120, fixtureType: 'led' },
+  { id: 35, name: 'ELATION SIXBAR 1000', watts: 150, fixtureType: 'led' },
+  { id: 36, name: 'MARTIN ATOMIC 3000', watts: 3000, fixtureType: 'discharge' },
+  { id: 37, name: 'SGM Q7', watts: 500, fixtureType: 'led' },
+  { id: 38, name: 'ELATION SIXBAR 500', watts: 80, fixtureType: 'led' },
+  { id: 39, name: 'SMOKE FACTORY TOUR HAZERII', watts: 1500, fixtureType: 'discharge' },
+  { id: 40, name: 'ROBE 500 FT-PRO', watts: 1200, fixtureType: 'discharge' },
+  { id: 41, name: 'SAHARA TURBO DRYER', watts: 1500, fixtureType: 'discharge' },
+  { id: 42, name: 'ROBE SPIIDER', watts: 660, fixtureType: 'led' },
+  { id: 43, name: 'GLP JDC1', watts: 1200, fixtureType: 'led' },
+  { id: 44, name: 'CAMEO W3', watts: 325, fixtureType: 'led' },
+  { id: 45, name: 'CHAUVET COLOR STRIKE M', watts: 750, fixtureType: 'led' },
+  { id: 46, name: 'GLP X4 BAR 20', watts: 500, fixtureType: 'led' },
+  { id: 47, name: 'ROBERT JULIAT ARAMIS', watts: 2500, fixtureType: 'discharge' },
+  { id: 48, name: 'ROBERT JULIAT MERLIN', watts: 2500, fixtureType: 'discharge' },
+  { id: 49, name: 'ROBERT JULIAT CYRANO', watts: 2500, fixtureType: 'discharge' },
+  { id: 50, name: 'ROBERT JULIAT LANCELOT', watts: 4000, fixtureType: 'discharge' },
+  { id: 51, name: 'ROBERT JULIAT KORRIGAN', watts: 1200, fixtureType: 'discharge' },
+  { id: 52, name: 'PIXEL LINE IP', watts: 420, fixtureType: 'led' },
+  { id: 53, name: 'COLORADO PXL BAR ', watts: 768, fixtureType: 'led' }
 ];
 
-const VOLTAGE_3PHASE = 400;
-const POWER_FACTOR = 0.85;
-const PHASES = 3;
+const SQRT3 = Math.sqrt(3);
 
-const PDU_TYPES = ['CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE125A 3P+N+G', 'Powerlock 400A 3P+N+G', 'Custom'];
+const PDU_TYPES_THREE = [
+  'CEE32A 3P+N+G',
+  'CEE63A 3P+N+G',
+  'CEE125A 3P+N+G',
+  'Powerlock 400A 3P+N+G',
+];
+
+const PDU_TYPES_SINGLE = ['Schuko 16A', 'CEE32A 1P+N+G', 'CEE63A 1P+N+G'];
 
 interface TableRow {
   quantity: string;
   componentId: string;
   watts: string;
+  fixtureType?: FixtureType;
+  pf?: string;
   componentName?: string;
   totalWatts?: number;
 }
@@ -123,15 +148,24 @@ const LightsConsumosTool: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
   const [includesHoist, setIncludesHoist] = useState(false);
-  const [selectedPduType, setSelectedPduType] = useState<string>('');
+  const [selectedPduType, setSelectedPduType] = useState<string>('default');
   const [customPduType, setCustomPduType] = useState<string>('');
+  const [phaseMode, setPhaseMode] = useState<'single' | 'three'>('three');
+  const [voltage, setVoltage] = useState<number>(400);
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
-    rows: [{ quantity: '', componentId: '', watts: '' }],
+    rows: [{
+      quantity: '',
+      componentId: '',
+      watts: '',
+      fixtureType: DEFAULT_FIXTURE_TYPE,
+      pf: FIXTURE_PF[DEFAULT_FIXTURE_TYPE].pf.toFixed(2),
+    }],
   });
 
   const [defaultTables, setDefaultTables] = useState<Table[]>([]);
+  const pduOptions = phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE;
 
   // Load defaults when in override mode
   useEffect(() => {
@@ -152,10 +186,34 @@ const LightsConsumosTool: React.FC = () => {
     }
   }, [isOverrideMode, overrideData]);
 
+  useEffect(() => {
+    setVoltage(phaseMode === 'single' ? 230 : 400);
+  }, [phaseMode]);
+
+  useEffect(() => {
+    if (
+      selectedPduType &&
+      selectedPduType !== 'default' &&
+      selectedPduType !== 'Custom' &&
+      !pduOptions.includes(selectedPduType)
+    ) {
+      setSelectedPduType('default');
+    }
+  }, [pduOptions, selectedPduType]);
+
   const addRow = () => {
     setCurrentTable((prev) => ({
       ...prev,
-      rows: [...prev.rows, { quantity: '', componentId: '', watts: '' }],
+      rows: [
+        ...prev.rows,
+        {
+          quantity: '',
+          componentId: '',
+          watts: '',
+          fixtureType: DEFAULT_FIXTURE_TYPE,
+          pf: FIXTURE_PF[DEFAULT_FIXTURE_TYPE].pf.toFixed(2),
+        },
+      ],
     }));
   };
 
@@ -164,7 +222,15 @@ const LightsConsumosTool: React.FC = () => {
       const filteredRows = prev.rows.filter((_, i) => i !== index);
       return {
         ...prev,
-        rows: filteredRows.length > 0 ? filteredRows : [{ quantity: '', componentId: '', watts: '' }],
+        rows: filteredRows.length > 0
+          ? filteredRows
+          : [{
+            quantity: '',
+            componentId: '',
+            watts: '',
+            fixtureType: DEFAULT_FIXTURE_TYPE,
+            pf: FIXTURE_PF[DEFAULT_FIXTURE_TYPE].pf.toFixed(2),
+          }],
       };
     });
   };
@@ -173,10 +239,22 @@ const LightsConsumosTool: React.FC = () => {
     const newRows = [...currentTable.rows];
     if (field === 'componentId') {
       const component = lightComponentDatabase.find((c) => c.id.toString() === value);
+      const fixtureType = component?.fixtureType || DEFAULT_FIXTURE_TYPE;
+      const recommendedPf = FIXTURE_PF[fixtureType]?.pf ?? FIXTURE_PF[DEFAULT_FIXTURE_TYPE].pf;
       newRows[index] = {
         ...newRows[index],
         [field]: value,
         watts: component ? component.watts.toString() : '',
+        fixtureType,
+        pf: recommendedPf.toFixed(2),
+      };
+    } else if (field === 'fixtureType') {
+      const fixtureType = value as FixtureType;
+      const recommendedPf = FIXTURE_PF[fixtureType]?.pf ?? FIXTURE_PF[DEFAULT_FIXTURE_TYPE].pf;
+      newRows[index] = {
+        ...newRows[index],
+        fixtureType,
+        pf: recommendedPf.toFixed(2),
       };
     } else {
       newRows[index] = {
@@ -196,18 +274,37 @@ const LightsConsumosTool: React.FC = () => {
     setSelectedJob(job);
   };
 
-  const calculatePhaseCurrents = (totalWatts: number) => {
-    const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
-    const wattsPerPhase = adjustedWatts / PHASES;
-    const currentPerPhase = wattsPerPhase / (VOLTAGE_3PHASE * POWER_FACTOR);
-    return { wattsPerPhase, currentPerPhase, adjustedWatts };
+  const getRecommendedPf = (fixtureType?: FixtureType) =>
+    FIXTURE_PF[fixtureType || DEFAULT_FIXTURE_TYPE]?.pf ?? FIXTURE_PF[DEFAULT_FIXTURE_TYPE].pf;
+
+  const parseRowPf = (row: TableRow, component?: LightComponent) => {
+    const rawPf = Number(row.pf);
+    if (Number.isFinite(rawPf) && rawPf > 0) return Math.min(Math.max(rawPf, 0.1), 1);
+    return getRecommendedPf(row.fixtureType || component?.fixtureType);
   };
 
-  const recommendPDU = (current: number) => {
-    if (current <= 32) return 'CEE32A 3P+N+G';
-    if (current <= 63) return 'CEE63A 3P+N+G';
-    if (current <= 125) return 'CEE125A 3P+N+G';
-    return 'Powerlock 400A 3P+N+G';
+  const calculateLineCurrent = (totalWatts: number, totalVa: number) => {
+    const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
+    const adjustedVa = totalVa * (1 + safetyMargin / 100);
+    const currentLine =
+      phaseMode === 'single'
+        ? adjustedVa / voltage
+        : adjustedVa / (SQRT3 * voltage);
+    return { adjustedWatts, currentLine, adjustedVa };
+  };
+
+  const planningLimit = (amps: number) => amps * 0.8;
+
+  const recommendPDU = (currentLine: number) => {
+    if (phaseMode === 'single') {
+      if (currentLine <= planningLimit(16)) return PDU_TYPES_SINGLE[0];
+      if (currentLine <= planningLimit(32)) return PDU_TYPES_SINGLE[1];
+      return PDU_TYPES_SINGLE[2];
+    }
+    if (currentLine <= planningLimit(32)) return PDU_TYPES_THREE[0];
+    if (currentLine <= planningLimit(63)) return PDU_TYPES_THREE[1];
+    if (currentLine <= planningLimit(125)) return PDU_TYPES_THREE[2];
+    return PDU_TYPES_THREE[3];
   };
 
   const savePowerRequirementTable = async (table: Table) => {
@@ -279,6 +376,8 @@ const LightsConsumosTool: React.FC = () => {
 
     const calculatedRows = currentTable.rows.map((row) => {
       const component = lightComponentDatabase.find((c) => c.id.toString() === row.componentId);
+      const fixtureType = row.fixtureType || component?.fixtureType || DEFAULT_FIXTURE_TYPE;
+      const pfValue = parseRowPf(row, component);
       const totalWatts =
         parseFloat(row.quantity) && parseFloat(row.watts)
           ? parseFloat(row.quantity) * parseFloat(row.watts)
@@ -286,22 +385,35 @@ const LightsConsumosTool: React.FC = () => {
       return {
         ...row,
         componentName: component?.name || '',
+        fixtureType,
+        pf: pfValue.toFixed(2),
         totalWatts,
       };
     });
 
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    const { currentPerPhase, adjustedWatts } = calculatePhaseCurrents(totalWatts);
-    const pduSuggestion = recommendPDU(currentPerPhase);
+    const totalVa = calculatedRows.reduce((sum, row) => {
+      const pfValue = Number(row.pf) || getRecommendedPf(row.fixtureType);
+      if (!pfValue) return sum;
+      return sum + (row.totalWatts || 0) / pfValue;
+    }, 0);
+    const { currentLine, adjustedWatts } = calculateLineCurrent(totalWatts, totalVa);
+    const pduSuggestion = recommendPDU(currentLine);
+    const pduOverride =
+      selectedPduType && selectedPduType !== 'default'
+        ? selectedPduType === 'Custom'
+          ? customPduType
+          : selectedPduType
+        : undefined;
 
     const newTable: Table = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
       adjustedWatts,
-      currentPerPhase,
-      pduType: selectedPduType === 'Custom' ? customPduType : pduSuggestion,
-      customPduType: selectedPduType === 'Custom' ? customPduType : undefined,
+      currentPerPhase: currentLine,
+      pduType: pduSuggestion,
+      customPduType: pduOverride,
       includesHoist,
       id: Date.now(),
     };
@@ -318,7 +430,13 @@ const LightsConsumosTool: React.FC = () => {
   const resetCurrentTable = () => {
     setCurrentTable({
       name: '',
-      rows: [{ quantity: '', componentId: '', watts: '' }],
+      rows: [{
+        quantity: '',
+        componentId: '',
+        watts: '',
+        fixtureType: DEFAULT_FIXTURE_TYPE,
+        pf: FIXTURE_PF[DEFAULT_FIXTURE_TYPE].pf.toFixed(2),
+      }],
     });
     setTableName('');
   };
@@ -383,7 +501,7 @@ const LightsConsumosTool: React.FC = () => {
 
       const pdfBlob = await exportToPDF(
         jobToUse.title,
-        allTables.map((table) => ({ ...table, toolType: 'consumos' })),
+        allTables.map((table) => ({ ...table, toolType: 'consumos', phaseMode })),
         'power',
         jobToUse.title,
         ('start_time' in jobToUse ? jobToUse.start_time : null) || new Date().toISOString(),
@@ -503,10 +621,10 @@ const LightsConsumosTool: React.FC = () => {
                         <span className="font-medium">Total Watts:</span> {table.totalWatts?.toFixed(2)} W
                       </div>
                       <div>
-                        <span className="font-medium">Current per Phase:</span> {table.currentPerPhase?.toFixed(2)} A
+                        <span className="font-medium">{phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}</span> {table.currentPerPhase?.toFixed(2)} A
                       </div>
                       <div>
-                        <span className="font-medium">PDU Type:</span> {table.pduType}
+                        <span className="font-medium">PDU Type:</span> {table.customPduType || table.pduType}
                       </div>
                       {table.includesHoist && (
                         <div className="col-span-2 text-gray-600 italic">
@@ -537,6 +655,41 @@ const LightsConsumosTool: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Supply</Label>
+              <Select value={phaseMode} onValueChange={(value) => setPhaseMode(value as 'single' | 'three')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar suministro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single">Monofásico (230 V)</SelectItem>
+                  <SelectItem value="three">Trifásico (400 V LL)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Voltaje</Label>
+              <Input
+                type="number"
+                value={voltage}
+                onChange={(e) => setVoltage(Number(e.target.value) || 0)}
+              />
+              <p className="text-xs text-muted-foreground">230 V (1φ) o 400 V LL (3φ) por defecto en ES</p>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-muted-foreground/20 bg-muted/30 p-3 text-sm">
+            <p className="font-medium text-foreground">Power factor recomendado por tipo de fixture</p>
+            <ul className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 text-muted-foreground">
+              <li>{FIXTURE_PF.incandescent.label}: {FIXTURE_PF.incandescent.pf.toFixed(2)}</li>
+              <li>{FIXTURE_PF.discharge.label}: {FIXTURE_PF.discharge.pf.toFixed(2)}</li>
+              <li>{FIXTURE_PF.led.label}: {FIXTURE_PF.led.pf.toFixed(2)}</li>
+              <li>{FIXTURE_PF['led-pro'].label}: {FIXTURE_PF['led-pro'].pf.toFixed(2)}</li>
+            </ul>
+            <p className="mt-2 text-muted-foreground">Puedes ajustar el PF por ítem si el fabricante especifica un valor distinto.</p>
           </div>
 
           {!isOverrideMode && (
@@ -575,11 +728,12 @@ const LightsConsumosTool: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="default">Usar el tipo de PDU recomendado</SelectItem>
-                {PDU_TYPES.map((type) => (
+                {pduOptions.map((type) => (
                   <SelectItem key={type} value={type}>
                     {type}
                   </SelectItem>
                 ))}
+                <SelectItem value="Custom">Tipo de PDU personalizado</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -611,6 +765,7 @@ const LightsConsumosTool: React.FC = () => {
                   <th className="px-4 py-3 text-left font-medium">Cantidad</th>
                   <th className="px-4 py-3 text-left font-medium">Componente</th>
                   <th className="px-4 py-3 text-left font-medium">Vatios (por unidad)</th>
+                  <th className="px-4 py-3 text-left font-medium">PF (tipo recomendado)</th>
                   <th className="w-12 px-4 py-3 text-left font-medium">&nbsp;</th>
                 </tr>
               </thead>
@@ -650,6 +805,34 @@ const LightsConsumosTool: React.FC = () => {
                         readOnly
                         className="w-full bg-muted"
                       />
+                    </td>
+                    <td className="p-4">
+                      <div className="space-y-2">
+                        <Select
+                          value={row.fixtureType || DEFAULT_FIXTURE_TYPE}
+                          onValueChange={(value) => updateInput(index, 'fixtureType', value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Tipo de fixture" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(FIXTURE_PF).map(([key, data]) => (
+                              <SelectItem key={key} value={key}>
+                                {data.label} ({data.pf.toFixed(2)})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0.1"
+                          max="1"
+                          value={row.pf || ''}
+                          onChange={(e) => updateInput(index, 'pf', e.target.value)}
+                          placeholder="PF"
+                        />
+                      </div>
                     </td>
                     <td className="p-4">
                       <Button
@@ -722,26 +905,47 @@ const LightsConsumosTool: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <Label>Anulación de Tipo de PDU:</Label>
                       <Select
-                        value={table.customPduType || 'default'}
-                        onValueChange={(value) => 
-                          updateTableSettings(table.id as number, { 
-                            customPduType: value === 'default' ? undefined : value 
-                          })
+                        value={
+                          table.customPduType
+                            ? pduOptions.includes(table.customPduType)
+                              ? table.customPduType
+                              : 'Custom'
+                            : 'default'
                         }
+                        onValueChange={(value) => {
+                          if (value === 'default') {
+                            updateTableSettings(table.id as number, { customPduType: undefined });
+                          } else if (value === 'Custom') {
+                            updateTableSettings(table.id as number, { customPduType: '' });
+                          } else {
+                            updateTableSettings(table.id as number, { customPduType: value });
+                          }
+                        }}
                       >
                         <SelectTrigger className="w-[200px]">
                           <SelectValue placeholder="Usar PDU sugerido" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="default">Usar PDU sugerido</SelectItem>
-                          {PDU_TYPES.map((type) => (
+                          {pduOptions.map((type) => (
                             <SelectItem key={type} value={type}>
                               {type}
                             </SelectItem>
                           ))}
+                          <SelectItem value="Custom">Tipo de PDU personalizado</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+                    {table.customPduType !== undefined && !pduOptions.includes(table.customPduType || '') && (
+                      <Input
+                        placeholder="Ingrese un tipo de PDU personalizado"
+                        value={table.customPduType || ''}
+                        onChange={(e) =>
+                          updateTableSettings(table.id as number, { customPduType: e.target.value })
+                        }
+                        className="w-[220px]"
+                      />
+                    )}
                   </div>
                 </div>
               )}
@@ -752,6 +956,7 @@ const LightsConsumosTool: React.FC = () => {
                     <th className="px-4 py-3 text-left font-medium">Cantidad</th>
                     <th className="px-4 py-3 text-left font-medium">Componente</th>
                     <th className="px-4 py-3 text-left font-medium">Vatios (por unidad)</th>
+                    <th className="px-4 py-3 text-left font-medium">PF</th>
                     <th className="px-4 py-3 text-left font-medium">Vatios Totales</th>
                   </tr>
                 </thead>
@@ -761,38 +966,43 @@ const LightsConsumosTool: React.FC = () => {
                       <td className="px-4 py-3">{row.quantity}</td>
                       <td className="px-4 py-3">{row.componentName}</td>
                       <td className="px-4 py-3">{row.watts}</td>
+                      <td className="px-4 py-3">
+                        {Number.isFinite(Number(row.pf))
+                          ? Number(row.pf).toFixed(2)
+                          : getRecommendedPf(row.fixtureType).toFixed(2)}
+                      </td>
                       <td className="px-4 py-3">{row.totalWatts?.toFixed(2)}</td>
                     </tr>
                   ))}
                   <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
+                    <td colSpan={4} className="px-4 py-3 text-right">
                       Vatios Totales:
                     </td>
                     <td className="px-4 py-3">{table.totalWatts?.toFixed(2)} W</td>
                   </tr>
                   {safetyMargin > 0 && (
                     <tr className="border-t bg-muted/50 font-medium">
-                      <td colSpan={3} className="px-4 py-3 text-right">
+                      <td colSpan={4} className="px-4 py-3 text-right">
                         Vatios Ajustados ({safetyMargin}% margen de seguridad):
                       </td>
                       <td className="px-4 py-3">{table.adjustedWatts?.toFixed(2)} W</td>
                     </tr>
                   )}
                   <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
-                      Corriente por Fase:
+                    <td colSpan={4} className="px-4 py-3 text-right">
+                      {phaseMode === 'three' ? 'Corriente por Fase:' : 'Corriente:'}
                     </td>
                     <td className="px-4 py-3">{table.currentPerPhase?.toFixed(2)} A</td>
                   </tr>
                   <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
+                    <td colSpan={4} className="px-4 py-3 text-right">
                       PDU Sugerido:
                     </td>
                     <td className="px-4 py-3">{table.pduType}</td>
                   </tr>
                   {table.customPduType && (
                     <tr className="border-t bg-muted/50 font-medium text-primary">
-                      <td colSpan={3} className="px-4 py-3 text-right">
+                      <td colSpan={4} className="px-4 py-3 text-right">
                         Anulación de PDU Seleccionada:
                       </td>
                       <td className="px-4 py-3">{table.customPduType}</td>

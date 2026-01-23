@@ -38,7 +38,7 @@ import {
 import { Loader2, Calendar as CalendarIcon, Clock, CalendarDays, CalendarRange } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
@@ -86,6 +86,8 @@ export const AssignJobDialog = ({
     targetDate?: string;
     mode: 'full' | 'single' | 'multi';
   } | null>(null);
+  // Modification mode: 'add' adds dates to existing, 'replace' replaces all dates
+  const [modificationMode, setModificationMode] = useState<'add' | 'replace'>('add');
 
   // Get technician details
   const { data: technician } = useQuery({
@@ -114,8 +116,25 @@ export const AssignJobDialog = ({
   const selectedJob = filteredJobs.find(job => job.id === selectedJobId);
   const roleOptions = technician ? roleOptionsForDiscipline(technician.department) : [];
   const isReassignment = !!existingAssignment;
+  const isModifyingSameJob = isReassignment && existingAssignment?.job_id === selectedJobId;
   // IMPORTANT: use local yyyy-MM-dd, not toISOString (which is UTC)
   const assignmentDate = React.useMemo(() => format((singleDate ?? date), 'yyyy-MM-dd'), [date, singleDate]);
+
+  // Fetch existing timesheets when modifying the same job
+  const { data: existingTimesheets, isLoading: isLoadingExistingTimesheets } = useQuery({
+    queryKey: ['existing-timesheets', selectedJobId, technicianId],
+    enabled: isModifyingSameJob && !!selectedJobId && !!technicianId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('date')
+        .eq('job_id', selectedJobId)
+        .eq('technician_id', technicianId)
+        .eq('is_active', true);
+      if (error) throw error;
+      return data?.map(t => t.date) || [];
+    }
+  });
 
   // Set initial role if reassigning
   React.useEffect(() => {
@@ -203,6 +222,13 @@ export const AssignJobDialog = ({
 
     if (isAssigning) {
       console.log('Assignment already in progress, ignoring duplicate click');
+      return;
+    }
+
+    // Wait for existing timesheets query to complete when modifying same job
+    if (isModifyingSameJob && isLoadingExistingTimesheets) {
+      console.log('Waiting for existing timesheets to load...');
+      toast.error('Cargando hojas de hora existentes, por favor espera...');
       return;
     }
 
@@ -351,13 +377,8 @@ export const AssignJobDialog = ({
         }
       }
 
-      // Clear existing timesheets for this job/technician to avoid having stale coverage
-      // This ensures we only have timesheets for the current assignment mode
-      await supabase
-        .from('timesheets')
-        .delete()
-        .eq('job_id', selectedJobId)
-        .eq('technician_id', technicianId);
+      // Handle timesheet updates based on whether we're modifying the same job
+      const existingDates = existingTimesheets || [];
 
       const coverageDates: string[] = await (async () => {
         if (coverageMode === 'multi') {
@@ -392,14 +413,115 @@ export const AssignJobDialog = ({
         return [];
       })();
 
-      for (const dateIso of coverageDates) {
-        await toggleTimesheetDay({
-          jobId: selectedJobId,
-          technicianId,
-          dateIso,
-          present: true,
-          source: 'assignment-dialog'
-        });
+      // Smart timesheet management based on modification mode
+      if (isModifyingSameJob) {
+        if (modificationMode === 'add') {
+          // Add mode: Keep existing dates + add new ones
+          const datesToCreate = coverageDates.filter(d => !existingDates.includes(d));
+          console.log('Add mode - creating timesheets for new dates:', datesToCreate);
+
+          // Use Promise.allSettled for parallel execution with failure handling
+          const results = await Promise.allSettled(datesToCreate.map(dateIso =>
+            toggleTimesheetDay({
+              jobId: selectedJobId,
+              technicianId,
+              dateIso,
+              present: true,
+              source: 'assignment-dialog'
+            })
+          ));
+
+          const failures = results
+            .map((result, idx) => ({ result, date: datesToCreate[idx] }))
+            .filter(({ result }) => result.status === 'rejected');
+
+          if (failures.length > 0) {
+            console.error('Some timesheets failed to create in add mode:', failures);
+            const failedDates = failures.map(({ date }) => date).join(', ');
+            throw new Error(`Error al añadir hojas de hora para las fechas: ${failedDates}`);
+          }
+        } else {
+          // Replace mode: Remove dates not in new coverage, add missing ones
+          console.log('Replace mode - replacing timesheets. Old:', existingDates, 'New:', coverageDates);
+
+          // Delete dates that are no longer needed (parallel execution with failure handling)
+          const datesToRemove = existingDates.filter(d => !coverageDates.includes(d));
+          const removeResults = await Promise.allSettled(datesToRemove.map(dateIso =>
+            toggleTimesheetDay({
+              jobId: selectedJobId,
+              technicianId,
+              dateIso,
+              present: false,
+              source: 'assignment-dialog'
+            })
+          ));
+
+          const removeFailures = removeResults
+            .map((result, idx) => ({ result, date: datesToRemove[idx] }))
+            .filter(({ result }) => result.status === 'rejected');
+
+          if (removeFailures.length > 0) {
+            console.error('Some timesheets failed to remove in replace mode:', removeFailures);
+            const failedDates = removeFailures.map(({ date }) => date).join(', ');
+            throw new Error(`Error al eliminar hojas de hora para las fechas: ${failedDates}`);
+          }
+
+          // Create dates that don't exist yet (parallel execution with failure handling)
+          const datesToCreate = coverageDates.filter(d => !existingDates.includes(d));
+          const createResults = await Promise.allSettled(datesToCreate.map(dateIso =>
+            toggleTimesheetDay({
+              jobId: selectedJobId,
+              technicianId,
+              dateIso,
+              present: true,
+              source: 'assignment-dialog'
+            })
+          ));
+
+          const createFailures = createResults
+            .map((result, idx) => ({ result, date: datesToCreate[idx] }))
+            .filter(({ result }) => result.status === 'rejected');
+
+          if (createFailures.length > 0) {
+            console.error('Some timesheets failed to create in replace mode:', createFailures);
+            const failedDates = createFailures.map(({ date }) => date).join(', ');
+            throw new Error(`Error al crear hojas de hora para las fechas: ${failedDates}`);
+          }
+        }
+      } else {
+        // Not modifying same job - delete all existing and create new (current behavior)
+        console.log('Different job or new assignment - replacing all timesheets');
+        const { error: deleteError } = await supabase
+          .from('timesheets')
+          .delete()
+          .eq('job_id', selectedJobId)
+          .eq('technician_id', technicianId);
+
+        if (deleteError) {
+          console.error('Error deleting existing timesheets:', deleteError);
+          throw new Error(`No se pudieron eliminar las hojas de hora existentes: ${deleteError.message}`);
+        }
+
+        // Use Promise.allSettled for parallel execution with failure handling
+        const results = await Promise.allSettled(coverageDates.map(dateIso =>
+          toggleTimesheetDay({
+            jobId: selectedJobId,
+            technicianId,
+            dateIso,
+            present: true,
+            source: 'assignment-dialog'
+          })
+        ));
+
+        const failures = results
+          .map((result, idx) => ({ result, date: coverageDates[idx] }))
+          .filter(({ result }) => result.status === 'rejected');
+
+        if (failures.length > 0) {
+          console.error('Some timesheets failed to create:', failures);
+          const failedDates = failures.map(({ date }) => date).join(', ');
+          throw new Error(`Error al crear hojas de hora para las fechas: ${failedDates}`);
+        }
       }
 
       // Verification: ensure at least one assignment row now exists for this job/tech
@@ -679,6 +801,41 @@ export const AssignJobDialog = ({
 
             {selectedJobId && selectedRole && (
               <div className="space-y-4">
+                {/* Modification mode toggle - only show when modifying the same job */}
+                {isModifyingSameJob && coverageMode !== 'full' && existingTimesheets && existingTimesheets.length > 0 && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <label className="text-sm font-medium text-blue-900 block mb-2">
+                      Modo de Modificación
+                    </label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={modificationMode === 'add' ? 'default' : 'outline'}
+                        onClick={() => setModificationMode('add')}
+                        className="flex-1"
+                      >
+                        Añadir Fechas
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={modificationMode === 'replace' ? 'default' : 'outline'}
+                        onClick={() => setModificationMode('replace')}
+                        className="flex-1"
+                      >
+                        Reemplazar Fechas
+                      </Button>
+                    </div>
+                    <p className="text-xs text-blue-700 mt-2">
+                      {modificationMode === 'add'
+                        ? `Añadir: Las fechas seleccionadas se añadirán a las ${existingTimesheets.length} fecha(s) existente(s).`
+                        : `Reemplazar: Las fechas existentes serán reemplazadas por las fechas seleccionadas.`
+                      }
+                    </p>
+                  </div>
+                )}
+
                 <Tabs value={coverageMode} onValueChange={(v) => setCoverageMode(v as any)} className="w-full">
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="full">

@@ -10,11 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Department } from "@/types/department";
+import { Department, TECHNICAL_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
 import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
 import {
   Select,
@@ -28,6 +28,7 @@ import { utcToLocalInput, localInputToUTC } from "@/utils/timezoneUtils";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
+import { syncFlexElementsForJobDateChange } from "@/utils/flex-folders/syncDateChange";
 
 interface EditJobDialogProps {
   open: boolean;
@@ -263,6 +264,50 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         }
       } catch { }
 
+      // Sync Flex elements if dates or title changed and job has flex folders
+      const datesChanged =
+        job.start_time !== startTimeUTC.toISOString() ||
+        job.end_time !== endTimeUTC.toISOString();
+      const titleChanged = job.title !== title;
+
+      if ((datesChanged || titleChanged) && job.flex_folders_created) {
+        try {
+          console.log("[EditJobDialog] Dates/title changed, syncing Flex elements...");
+          const syncResult = await syncFlexElementsForJobDateChange(
+            job.id,
+            startTimeUTC.toISOString(),
+            endTimeUTC.toISOString(),
+            titleChanged ? title : undefined
+          );
+          if (syncResult.failed > 0) {
+            console.warn(
+              `[EditJobDialog] Flex sync completed with ${syncResult.failed} errors:`,
+              syncResult.errors
+            );
+            toast({
+              title: "Job updated with warnings",
+              description: `Job saved but ${syncResult.failed} Flex element(s) failed to sync.`,
+              variant: "destructive",
+            });
+          } else if (syncResult.success > 0) {
+            console.log(
+              `[EditJobDialog] Flex sync completed: ${syncResult.success} elements updated`
+            );
+          }
+        } catch (syncError: unknown) {
+          console.error("[EditJobDialog] Flex sync error:", syncError);
+          // Don't fail the whole operation, just warn
+          const errorMessage = syncError instanceof Error
+            ? syncError.message
+            : String(syncError);
+          toast({
+            title: "Job updated with warnings",
+            description: "Job saved but Flex sync failed: " + errorMessage,
+            variant: "destructive",
+          });
+        }
+      }
+
       toast({
         title: "Job updated successfully",
         description: "The job has been updated.",
@@ -284,8 +329,6 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       setIsLoading(false);
     }
   };
-
-  const departments: Department[] = ["sound", "lights", "video", "production"];
 
   return (
     <>
@@ -427,17 +470,17 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               </p>
             </div>
             <div className="space-y-2">
-              <Label>Departments</Label>
+              <Label>Departamentos</Label>
               <div className="flex flex-col gap-2">
-                {departments.map((department) => (
+                {TECHNICAL_DEPARTMENTS.map((department) => (
                   <div key={department} className="flex items-center space-x-2">
                     <Checkbox
                       id={`department-${department}`}
                       checked={selectedDepartments.includes(department)}
                       onCheckedChange={() => handleDepartmentToggle(department)}
                     />
-                    <Label htmlFor={`department-${department}`} className="capitalize">
-                      {department}
+                    <Label htmlFor={`department-${department}`}>
+                      {DEPARTMENT_LABELS[department]}
                     </Label>
                   </div>
                 ))}

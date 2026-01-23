@@ -186,16 +186,16 @@ export const UsersList = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 md:space-y-4">
       {isFetching && !isLoading && (
         <div className="text-xs text-muted-foreground">Refreshing...</div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-2 flex-1 sm:flex-initial">
           <Select value={groupBy || 'none'} onValueChange={(value: string) => setGroupBy(value === 'none' ? null : value as 'department' | 'role')}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Group by..." />
+            <SelectTrigger className="flex-1 sm:w-[140px] text-xs sm:text-sm">
+              <SelectValue placeholder="Group" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">No grouping</SelectItem>
@@ -205,8 +205,8 @@ export const UsersList = ({
           </Select>
 
           <Select value={sortBy} onValueChange={(value: 'name' | 'email' | 'role' | 'department') => setSortBy(value)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Sort by..." />
+            <SelectTrigger className="flex-1 sm:w-[140px] text-xs sm:text-sm">
+              <SelectValue placeholder="Sort" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="name">Sort by Name</SelectItem>
@@ -218,14 +218,15 @@ export const UsersList = ({
 
           <Button
             variant="ghost"
-            size="icon"
+            size="sm"
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="shrink-0 px-2"
           >
             {sortOrder === 'asc' ? '↑' : '↓'}
           </Button>
         </div>
 
-        <div className="text-sm text-muted-foreground">
+        <div className="text-xs sm:text-sm text-muted-foreground">
           Total: {users.count} users
         </div>
       </div>

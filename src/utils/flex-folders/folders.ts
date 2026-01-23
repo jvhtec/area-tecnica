@@ -592,6 +592,11 @@ export async function createAllFoldersForJob(
       "comercial",
     ];
     const locationName = (() => {
+      // Priority 1: Main branch logic (optimized jobs)
+      const optimizationCandidate = job.location?.name || job.location_data?.name;
+      if (optimizationCandidate) return optimizationCandidate;
+
+      // Priority 2: Dev branch logic (robust object scanning)
       if (typeof job.location === "string") {
         const value = job.location.trim();
         if (value) return value;

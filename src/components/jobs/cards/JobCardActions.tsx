@@ -65,7 +65,10 @@ interface JobCardActionsProps {
   onTransportClick?: (e: React.MouseEvent) => void;
   // WhatsApp group
   onCreateWhatsappGroup?: (e: React.MouseEvent) => void;
+  onRetryWhatsappGroup?: (e: React.MouseEvent) => void;
   whatsappDisabled?: boolean;
+  whatsappGroup?: any;
+  whatsappRequest?: any;
 }
 
 export const JobCardActions: React.FC<JobCardActionsProps> = ({
@@ -102,7 +105,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   transportButtonTone,
   onTransportClick,
   onCreateWhatsappGroup,
+  onRetryWhatsappGroup,
   whatsappDisabled,
+  whatsappGroup,
+  whatsappRequest,
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -619,17 +625,33 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         </Button>
       )}
       {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && job.job_type !== 'dryhire' && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onCreateWhatsappGroup}
-          disabled={!!whatsappDisabled}
-          className="gap-2"
-          title={whatsappDisabled ? 'Grupo ya creado' : 'Crear grupo WhatsApp'}
-        >
-          <MessageCircle className="h-4 w-4" />
-          <span className="hidden sm:inline">WhatsApp</span>
-        </Button>
+        <>
+          {/* Show retry button if there's a request but no group (failed creation) */}
+          {whatsappRequest && !whatsappGroup && onRetryWhatsappGroup ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRetryWhatsappGroup}
+              className="gap-2 border-orange-500 text-orange-600 hover:bg-orange-50"
+              title="Reintentar crear grupo WhatsApp"
+            >
+              <MessageCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Reintentar</span>
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onCreateWhatsappGroup}
+              disabled={!!whatsappDisabled}
+              className="gap-2"
+              title={whatsappDisabled ? 'Grupo ya creado' : 'Crear grupo WhatsApp'}
+            >
+              <MessageCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">WhatsApp</span>
+            </Button>
+          )}
+        </>
       )}
       {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && (
         <Button

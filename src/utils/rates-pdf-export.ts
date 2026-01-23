@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/utils';
 import { fetchJobLogo, fetchTourLogo, getCompanyLogo } from '@/utils/pdf/logoUtils';
 import { appendAutonomoLabel } from '@/utils/autonomo';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
 const DEDUCTION_DISCLAIMER_TEXT = '* Se ha aplicado una deducción de 30€/día en concepto de IRPF por condición de no autónomo.';
@@ -22,6 +23,7 @@ export interface TechnicianProfile {
   default_timesheet_category?: string | null;
   role?: string | null;
   autonomo?: boolean | null;
+  is_house_tech?: boolean | null;
 }
 
 export interface JobDetails {
@@ -31,6 +33,7 @@ export interface JobDetails {
   end_time?: string;
   tour_id?: string | null;
   job_type?: string | null;
+  invoicing_company?: string | null;
 }
 
 interface TourSummaryJob {
@@ -213,6 +216,7 @@ interface TechnicianNameInfo {
   name: string;
   profile?: TechnicianProfile;
   autonomo: boolean;
+  is_house_tech: boolean;
 }
 
 const getTechNameFactory = (profiles: TechnicianProfile[]) => {
@@ -220,11 +224,12 @@ const getTechNameFactory = (profiles: TechnicianProfile[]) => {
   return (id: string): TechnicianNameInfo => {
     const profile = profileMap.get(id);
     if (!profile) {
-      return { name: 'Unknown', profile: undefined, autonomo: true };
+      return { name: 'Unknown', profile: undefined, autonomo: true, is_house_tech: false };
     }
     const name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Unknown';
     const autonomo = profile.autonomo !== false;
-    return { name, profile, autonomo };
+    const is_house_tech = profile.is_house_tech === true;
+    return { name, profile, autonomo, is_house_tech };
   };
 };
 
@@ -788,6 +793,36 @@ export async function generateJobPayoutPDF(
 
   let yPos = contentTop;
 
+  // Extract unique worked dates from timesheets for all technicians in this PDF
+  const allWorkedDates = new Set<string>();
+  payouts.forEach((payout) => {
+    const lines = timesheetMap?.get(payout.technician_id) || [];
+    lines.forEach((line) => {
+      if (line.date) allWorkedDates.add(line.date);
+    });
+  });
+  const sortedDates = Array.from(allWorkedDates).sort();
+
+  // Format dates nicely
+  let dateText: string;
+  if (sortedDates.length === 0) {
+    dateText = formatJobDate(jobDetails.start_time);
+  } else if (sortedDates.length === 1) {
+    dateText = format(new Date(sortedDates[0]), 'P', { locale: es });
+  } else if (sortedDates.length === 2) {
+    dateText = `${format(new Date(sortedDates[0]), 'P', { locale: es })} y ${format(new Date(sortedDates[1]), 'P', { locale: es })}`;
+  } else {
+    const firstDate = format(new Date(sortedDates[0]), 'P', { locale: es });
+    const lastDate = format(new Date(sortedDates[sortedDates.length - 1]), 'P', { locale: es });
+    dateText = `${firstDate} - ${lastDate} (${sortedDates.length} días)`;
+  }
+
+  // Get LPO number and tech info if this is a single-tech PDF
+  const lpoNumber = payouts.length === 1 ? (lpoMap?.get(payouts[0].technician_id) ?? null) : null;
+  const getTechName = getTechNameFactory(profiles);
+  const singleTechInfo = payouts.length === 1 ? getTechName(payouts[0].technician_id) : null;
+  const shouldShowInvoicing = singleTechInfo && singleTechInfo.autonomo && !singleTechInfo.is_house_tech;
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor(...CORPORATE_RED);
@@ -799,12 +834,34 @@ export async function generateJobPayoutPDF(
   doc.setTextColor(...TEXT_MUTED);
   doc.text(`Nombre: ${jobDetails.title}`, 14, yPos);
   yPos += 5;
-  doc.text(`Fecha: ${formatJobDate(jobDetails.start_time)}`, 14, yPos);
-  yPos += 10;
+  doc.text(`Fecha${sortedDates.length > 1 ? 's' : ''}: ${dateText}`, 14, yPos);
+  yPos += 5;
+
+  // Only show invoicing details for autonomo techs (excluding house techs)
+  if (shouldShowInvoicing && jobDetails.invoicing_company) {
+    const companyDetails = getInvoicingCompanyDetails(jobDetails.invoicing_company);
+    if (companyDetails) {
+      doc.text(`Empresa facturadora: ${companyDetails.legalName}`, 14, yPos);
+      yPos += 5;
+      doc.text(`CIF: ${companyDetails.cif}`, 14, yPos);
+      yPos += 5;
+      doc.text(`Dirección: ${companyDetails.address}`, 14, yPos);
+      yPos += 5;
+    } else {
+      // Fallback to raw name if lookup fails
+      doc.text(`Empresa facturadora: ${jobDetails.invoicing_company}`, 14, yPos);
+      yPos += 5;
+    }
+  }
+
+  if (shouldShowInvoicing && lpoNumber) {
+    doc.text(`Nº Referencia (LPO): ${lpoNumber}`, 14, yPos);
+    yPos += 5;
+  }
+
+  yPos += 5;
 
   doc.setTextColor(...TEXT_PRIMARY);
-
-  const getTechName = getTechNameFactory(profiles);
 
   const tableData = payouts.map((payout) => {
     const { name: baseName, autonomo } = getTechName(payout.technician_id);

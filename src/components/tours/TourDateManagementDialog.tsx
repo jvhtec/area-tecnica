@@ -33,6 +33,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { deleteJobDateTypes } from "@/services/deleteJobDateTypes";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
+import { TECHNICAL_DEPARTMENTS } from "@/types/department";
+import { syncFlexElementsForTourDateChange } from "@/utils/flex-folders/syncDateChange";
 
 interface TourDateManagementDialogProps {
   open: boolean;
@@ -304,7 +306,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       const departments =
         tourData.tour_dates?.[0]?.jobs?.[0]?.job_departments?.map(
           (dept: any) => dept.department
-        ) || ["sound", "lights", "video"];
+        ) || TECHNICAL_DEPARTMENTS;
       const jobDepartments = departments.map((department) => ({
         job_id: newJob.id,
         department,
@@ -498,6 +500,49 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         }
       }
 
+      // Sync Flex elements if date changed and flex folders exist
+      const originalDate = editingTourDate?.date || editingTourDate?.start_date;
+      const dateChanged = originalDate && originalDate.split('T')[0] !== startDate;
+      const hasFlexFolders = foldersExistenceMap?.[dateId];
+      let flexSyncHadWarningsOrError = false;
+
+      if (dateChanged && hasFlexFolders) {
+        try {
+          console.log("[TourDateManagement] Date changed, syncing Flex elements...");
+          const syncResult = await syncFlexElementsForTourDateChange(
+            dateId,
+            startDate
+          );
+          if (syncResult.failed > 0) {
+            flexSyncHadWarningsOrError = true;
+            console.warn(
+              `[TourDateManagement] Flex sync completed with ${syncResult.failed} errors:`,
+              syncResult.errors
+            );
+            toast({
+              title: "Tour date updated with warnings",
+              description: `Tour date saved but ${syncResult.failed} Flex element(s) failed to sync.`,
+              variant: "destructive",
+            });
+          } else if (syncResult.success > 0) {
+            console.log(
+              `[TourDateManagement] Flex sync completed: ${syncResult.success} elements updated`
+            );
+          }
+        } catch (syncError: unknown) {
+          flexSyncHadWarningsOrError = true;
+          console.error("[TourDateManagement] Flex sync error:", syncError);
+          const errorMessage = syncError instanceof Error
+            ? syncError.message
+            : String(syncError);
+          toast({
+            title: "Tour date updated with warnings",
+            description: "Tour date saved but Flex sync failed: " + errorMessage,
+            variant: "destructive",
+          });
+        }
+      }
+
       // Force refresh all related queries after successful edit
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
@@ -506,10 +551,13 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
       ]);
 
-      toast({
-        title: "Success",
-        description: "Tour date updated successfully",
-      });
+      // Only show success toast if flex sync didn't have warnings or errors
+      if (!flexSyncHadWarningsOrError) {
+        toast({
+          title: "Success",
+          description: "Tour date updated successfully",
+        });
+      }
     } catch (error: any) {
       console.error("Error editing date:", error);
       toast({

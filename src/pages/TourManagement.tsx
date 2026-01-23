@@ -50,6 +50,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { openFlexElement } from "@/utils/flex-folders";
 import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { TourSchedulingDialog } from "@/components/tours/TourSchedulingDialog";
+import { useQuery } from "@tanstack/react-query";
 
 interface TourManagementProps {
   tour: any;
@@ -93,6 +94,55 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   const [waSelectedDateId, setWaSelectedDateId] = useState<string | null>(null);
   const [waDepartment, setWaDepartment] = useState<'sound'|'lights'|'video'>('sound');
   const [isCreatingWaGroup, setIsCreatingWaGroup] = useState(false);
+
+  // Check if WhatsApp group already exists for selected date/department
+  // First resolve the job_id from tour_date_id
+  const { data: resolvedJobId } = useQuery({
+    queryKey: ['tour-date-job-id', waSelectedDateId],
+    enabled: !!waSelectedDateId,
+    queryFn: async () => {
+      if (!waSelectedDateId) return null;
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('tour_date_id', waSelectedDateId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return data.id;
+    }
+  });
+
+  const { data: waGroup, refetch: refetchWaGroup } = useQuery({
+    queryKey: ['job-whatsapp-group', resolvedJobId, waDepartment],
+    enabled: !!resolvedJobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
+    queryFn: async () => {
+      if (!resolvedJobId) return null;
+      const { data, error } = await supabase
+        .from('job_whatsapp_groups')
+        .select('id, wa_group_id')
+        .eq('job_id', resolvedJobId)
+        .eq('department', waDepartment)
+        .maybeSingle();
+      if (error) return null;
+      return data;
+    }
+  });
+
+  const { data: waRequest, refetch: refetchWaRequest } = useQuery({
+    queryKey: ['job-whatsapp-group-request', resolvedJobId, waDepartment],
+    enabled: !!resolvedJobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
+    queryFn: async () => {
+      if (!resolvedJobId) return null;
+      const { data, error } = await supabase
+        .from('job_whatsapp_group_requests')
+        .select('id, created_at')
+        .eq('job_id', resolvedJobId)
+        .eq('department', waDepartment)
+        .maybeSingle();
+      if (error) return null;
+      return data;
+    }
+  });
 
   const { assignments } = useTourAssignments(tour?.id);
   const { data: approvalRow, refetch: refetchApproval } = useTourRatesApproval(tour?.id);
@@ -198,9 +248,89 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         toast({ title: 'Solicitado', description: 'Se solicitó la creación del grupo de WhatsApp. Se finalizará en breve.' });
         setIsWaDialogOpen(false);
       }
+      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
     } catch (e: any) {
       toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
+      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
     } finally {
+      setIsCreatingWaGroup(false);
+    }
+  };
+
+  const retryWhatsappGroup = async () => {
+    if (!waSelectedDateId) {
+      toast({ title: 'Error', description: 'Selecciona una fecha primero.', variant: 'destructive' });
+      return;
+    }
+
+    setIsCreatingWaGroup(true);
+    try {
+      // First resolve the job_id from the tour_date_id
+      const { data: jobData, error: jobError } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('tour_date_id', waSelectedDateId)
+        .maybeSingle();
+
+      if (jobError || !jobData) {
+        toast({
+          title: 'Error',
+          description: 'No se encontró el trabajo asociado a esta fecha de gira.',
+          variant: 'destructive'
+        });
+        setIsCreatingWaGroup(false);
+        return;
+      }
+
+      const jobId = jobData.id;
+
+      // Clear the failed request using RPC function with correct job_id
+      const { data: clearResult, error: clearError } = await supabase.rpc(
+        'clear_whatsapp_group_request',
+        { p_job_id: jobId, p_department: waDepartment }
+      );
+
+      if (clearError) {
+        toast({
+          title: 'Error',
+          description: `No se pudo limpiar la solicitud: ${clearError.message}`,
+          variant: 'destructive'
+        });
+        setIsCreatingWaGroup(false);
+        return;
+      }
+
+      const result = clearResult as any;
+
+      if (!result.success) {
+        toast({
+          title: 'Aviso',
+          description: result.error || result.message,
+          variant: result.can_retry ? 'default' : 'destructive'
+        });
+        await Promise.all([refetchWaGroup(), refetchWaRequest()]);
+        setIsCreatingWaGroup(false);
+        return;
+      }
+
+      toast({
+        title: 'Solicitud limpiada',
+        description: 'Intentando crear el grupo de nuevo...'
+      });
+
+      // Await the refetch to ensure state is updated before retrying
+      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
+
+      // Call the create handler directly (no setTimeout needed)
+      await handleCreateWaGroup();
+
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: `Error al reintentar: ${err.message}`,
+        variant: 'destructive'
+      });
+      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
       setIsCreatingWaGroup(false);
     }
   };
@@ -932,12 +1062,41 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                 </label>
               </div>
             </div>
+            {/* Show status if group exists or request pending */}
+            {waGroup && (
+              <div className="rounded-md bg-green-50 border border-green-200 p-3">
+                <p className="text-xs md:text-sm text-green-800 font-medium">
+                  ✓ Grupo ya creado para esta fecha y departamento
+                </p>
+              </div>
+            )}
+            {!waGroup && waRequest && (
+              <div className="rounded-md bg-orange-50 border border-orange-200 p-3">
+                <p className="text-xs md:text-sm text-orange-800 font-medium">
+                  ⚠ Creación fallida. Puedes reintentar.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setIsWaDialogOpen(false)} disabled={isCreatingWaGroup} className="w-full sm:w-auto">Cancelar</Button>
-            <Button onClick={handleCreateWaGroup} disabled={isCreatingWaGroup} className="w-full sm:w-auto">
-              {isCreatingWaGroup ? 'Creando…' : 'Crear Grupo'}
-            </Button>
+            {waRequest && !waGroup ? (
+              <Button
+                onClick={retryWhatsappGroup}
+                disabled={isCreatingWaGroup}
+                className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600"
+              >
+                {isCreatingWaGroup ? 'Reintentando…' : 'Reintentar Crear Grupo'}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleCreateWaGroup}
+                disabled={isCreatingWaGroup || !!waGroup}
+                className="w-full sm:w-auto"
+              >
+                {isCreatingWaGroup ? 'Creando…' : waGroup ? 'Grupo Creado' : 'Crear Grupo'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

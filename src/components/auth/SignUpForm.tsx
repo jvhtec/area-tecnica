@@ -7,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ACTIVE_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
 
 interface SignUpFormProps {
   onBack?: () => void;
@@ -214,12 +215,11 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
             <SelectValue placeholder="Seleccionar departamento" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="sound">Sonido</SelectItem>
-            <SelectItem value="lights">Iluminación</SelectItem>
-            <SelectItem value="video">Video</SelectItem>
-            <SelectItem value="production">Producción</SelectItem>
-            <SelectItem value="logistics">Logística</SelectItem>
-            <SelectItem value="management">Gestión</SelectItem>
+            {ACTIVE_DEPARTMENTS.map((dept) => (
+              <SelectItem key={dept} value={dept}>
+                {DEPARTMENT_LABELS[dept]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
