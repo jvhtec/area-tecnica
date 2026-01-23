@@ -949,6 +949,12 @@ export const TimesheetView = ({
                                 <p className="text-muted-foreground">Cantidad Base</p>
                                 <p className="font-medium">€{(breakdown.base_amount_eur ?? 0).toFixed(2)}</p>
                               </div>
+                              {(breakdown.plus_10_12_amount_eur ?? 0) > 0 && (
+                                <div>
+                                  <p className="text-muted-foreground">Plus 10-12h</p>
+                                  <p className="font-medium">€{(breakdown.plus_10_12_amount_eur).toFixed(2)}</p>
+                                </div>
+                              )}
                               <div>
                                 <p className="text-muted-foreground">Horas Extra</p>
                                 <p className="font-medium">{breakdown.overtime_hours || 0}h × €{breakdown.overtime_hour_eur || 0}</p>
@@ -961,6 +967,11 @@ export const TimesheetView = ({
                                 <p className="text-muted-foreground">Total</p>
                                 <p className="font-semibold">€{(breakdown.total_eur ?? 0).toFixed(2)}</p>
                               </div>
+                              {breakdown.is_evento && (
+                                <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
+                                  Evento: tarifa fija de 12h (base + plus) independientemente de las horas trabajadas.
+                                </div>
+                              )}
                               {(userRole === 'technician' || userRole === 'house_tech') && (
                                 <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
                                   Notas: redondeo después de 30 minutos; pueden aplicarse algunas condiciones como descuentos de 30€ para autónomos según el contrato.
