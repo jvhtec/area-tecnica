@@ -67,7 +67,7 @@ export interface OptimizedAssignmentMatrixViewProps {
   currentTechnician: any | null;
   closeDialogs: () => void;
   handleJobSelected: (jobId: string) => void;
-  handleStaffingActionSelected: (args: any) => void;
+  handleStaffingActionSelected: (jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => void;
   forcedStaffingAction: any;
   forcedStaffingChannel: any;
   jobs: any[];

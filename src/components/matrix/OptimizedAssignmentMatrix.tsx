@@ -13,9 +13,12 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { throttle } from '@/utils/throttle';
 import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
+import { useDragScroll } from '@/hooks/useDragScroll';
 
 import { OptimizedAssignmentMatrixView } from './optimized-assignment-matrix/OptimizedAssignmentMatrixView';
 import type { CellAction, OptimizedAssignmentMatrixExtendedProps, TechSortMethod } from './optimized-assignment-matrix/types';
+
+// Drag scroll hook is used on mainScrollRef below for desktop users
 
 export const OptimizedAssignmentMatrix = ({
   technicians,
@@ -47,6 +50,21 @@ export const OptimizedAssignmentMatrix = ({
   const technicianScrollRef = useRef<HTMLDivElement>(null);
   const dateHeadersRef = useRef<HTMLDivElement>(null);
   const mainScrollRef = useRef<HTMLDivElement>(null);
+
+  // Enable drag scrolling (desktop only)
+  useDragScroll(mainScrollRef, {
+    enabled: !mobile,
+    onScroll: (left, top) => {
+      // Sync headers and technician column
+      syncScrollPositions(left, top, 'main');
+      // Update virtualization window
+      scheduleVisibleWindowUpdate();
+      // Update refs
+      lastKnownScrollRef.current.left = left;
+      lastKnownScrollRef.current.top = top;
+    }
+  });
+
   const [scrollAttempts, setScrollAttempts] = useState(0);
   const syncInProgressRef = useRef(false);
   const lastKnownScrollRef = useRef({ left: 0, top: 0 });

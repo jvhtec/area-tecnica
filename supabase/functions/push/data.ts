@@ -110,6 +110,32 @@ export async function getManagementByDepartmentUserIds(client: ReturnType<typeof
   return data.map((r: any) => r.id).filter(Boolean);
 }
 
+/**
+ * Get the department of a technician by their user ID.
+ * Used for scoping staffing notifications to the correct department managers.
+ */
+export async function getTechnicianDepartment(
+  client: ReturnType<typeof createClient>,
+  technicianId?: string | null
+): Promise<string | null> {
+  if (!technicianId) return null;
+  try {
+    const { data, error } = await client
+      .from('profiles')
+      .select('department')
+      .eq('id', technicianId)
+      .maybeSingle();
+    if (error) {
+      console.error('⚠️ Failed to fetch technician department:', { technicianId, error });
+      return null;
+    }
+    return data?.department ?? null;
+  } catch (err) {
+    console.error('⚠️ Exception fetching technician department:', { technicianId, err });
+    return null;
+  }
+}
+
 export async function getTimesheetSubmittingTechDepartment(
   client: ReturnType<typeof createClient>,
   jobId?: string | null,
