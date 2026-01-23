@@ -22,6 +22,28 @@ interface InsertError {
   error_message: string;
 }
 
+interface FlexCrewAssignment {
+  id: string;
+  technician_id: string;
+  flex_line_item_id: string | null;
+}
+
+/** Standard codeList params for Flex row-data queries */
+const FLEX_CODE_LIST = ['contact', 'business-role', 'pickup-date', 'return-date', 'notes', 'quantity', 'status'] as const;
+
+/** Build query params for Flex row-data endpoint */
+function buildFlexRowDataParams(includeTimestamp = true): URLSearchParams {
+  const qs = new URLSearchParams();
+  if (includeTimestamp) {
+    qs.set('_dc', String(Date.now()));
+  }
+  for (const c of FLEX_CODE_LIST) {
+    qs.append('codeList', c);
+  }
+  qs.set('node', 'root');
+  return qs;
+}
+
 async function resolveActorId(supabase: ReturnType<typeof createClient>, req: Request): Promise<string | null> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -55,12 +77,7 @@ async function discoverLineItemId(
 ): Promise<string | null> {
   // Attempt 1: row-data endpoint
   try {
-    const qs = new URLSearchParams();
-    qs.set('_dc', String(Date.now()));
-    for (const c of ['contact', 'business-role', 'pickup-date', 'return-date', 'notes', 'quantity', 'status']) {
-      qs.append('codeList', c);
-    }
-    qs.set('node', 'root');
+    const qs = buildFlexRowDataParams();
     const rdUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crewCallElementId)}/row-data/?${qs.toString()}`;
     const rdRes = await fetch(rdUrl, { headers: flexHeaders });
     if (rdRes.ok) {
@@ -79,10 +96,7 @@ async function discoverLineItemId(
 
   // Attempt 2: findRowData fallback
   try {
-    const qs2 = new URLSearchParams();
-    for (const c of ['contact', 'business-role', 'pickup-date', 'return-date', 'notes', 'quantity', 'status']) {
-      qs2.append('codeList', c);
-    }
+    const qs2 = buildFlexRowDataParams(false);
     const rdUrl2 = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crewCallElementId)}/row-data/findRowData?${qs2.toString()}`;
     const rdRes2 = await fetch(rdUrl2, { headers: flexHeaders });
     if (rdRes2.ok) {
@@ -310,8 +324,10 @@ serve(async (req) => {
           .eq('id', existingAssignment!.id);
       }
 
-      // Set business-role for SOUND department
-      await setBusinessRole(supabase, department, job_id, technician_id, crewCall.flex_element_id, effectiveLineItemId!, flexHeaders);
+      // Set business-role for SOUND department (setBusinessRole guards against null lineItemId)
+      if (effectiveLineItemId) {
+        await setBusinessRole(supabase, department, job_id, technician_id, crewCall.flex_element_id, effectiveLineItemId, flexHeaders);
+      }
 
       try {
         const logActivity = async () => {
@@ -380,12 +396,12 @@ serve(async (req) => {
         const { data: allAssignments } = await supabase
           .from('flex_crew_assignments')
           .select('id, technician_id, flex_line_item_id')
-          .eq('crew_call_id', crewCall.id);
+          .eq('crew_call_id', crewCall.id) as { data: FlexCrewAssignment[] | null };
 
         // 2. Get technicians that should remain (all except the one being removed)
         const remainingTechIds = (allAssignments ?? [])
-          .filter((a: any) => a.technician_id !== technician_id)
-          .map((a: any) => a.technician_id);
+          .filter((a) => a.technician_id !== technician_id)
+          .map((a) => a.technician_id);
 
         // 3. Get flex_resource_ids for remaining technicians
         const { data: remainingTechs } = remainingTechIds.length > 0
@@ -398,12 +414,7 @@ serve(async (req) => {
         // 4. Delete all line items from Flex for this crew call
         const deletionErrors: { itemId: string; status: number; message: string }[] = [];
         try {
-          const qs = new URLSearchParams();
-          qs.set('_dc', String(Date.now()));
-          for (const c of ['contact', 'business-role', 'pickup-date', 'return-date', 'notes', 'quantity', 'status']) {
-            qs.append('codeList', c);
-          }
-          qs.set('node', 'root');
+          const qs = buildFlexRowDataParams();
           const rdUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crewCall.flex_element_id)}/row-data/?${qs.toString()}`;
           const rdRes = await fetch(rdUrl, { headers: flexHeaders });
           if (rdRes.ok) {
@@ -451,10 +462,22 @@ serve(async (req) => {
         }
 
         // 5. Delete all flex_crew_assignments from DB for this crew call
-        await supabase
+        const { error: dbDeleteError } = await supabase
           .from('flex_crew_assignments')
           .delete()
           .eq('crew_call_id', crewCall.id);
+
+        if (dbDeleteError) {
+          console.error('[clear-and-repopulate] Failed to delete DB assignments:', dbDeleteError);
+          return new Response(
+            JSON.stringify({
+              error: 'Failed to delete crew assignments from database',
+              details: dbDeleteError.message,
+              message: 'Flex items were cleared but DB deletion failed. Manual cleanup may be required.'
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
         // 6. Re-add remaining technicians with business role assignment
         let readdedCount = 0;
