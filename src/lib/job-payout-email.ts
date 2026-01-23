@@ -93,6 +93,7 @@ function buildTimesheetMap(rows: any[]): Map<string, TimesheetLine[]> {
       overtime_amount_eur:
         breakdown.overtime_amount_eur != null ? Number(breakdown.overtime_amount_eur) : undefined,
       total_eur: breakdown.total_eur != null ? Number(breakdown.total_eur) : undefined,
+      is_evento: breakdown.is_evento === true,
     };
 
     const existing = map.get(row.technician_id) || [];
@@ -223,9 +224,10 @@ export async function prepareJobPayoutEmailContext(
       [payout.technician_id, timesheetMap.get(payout.technician_id) || []],
     ]);
     
-    // Calculate deduction
+    // Calculate deduction - only for non-autonomo contracted workers (not house techs)
     let deduction = 0;
-    if (profile?.autonomo === false) {
+    const isNonAutonomoContracted = profile?.autonomo === false && profile?.is_house_tech !== true;
+    if (isNonAutonomoContracted) {
         let daysCount = 0;
         const lines = timesheetMap.get(payout.technician_id) || [];
         if (lines.length > 0) {
@@ -336,6 +338,8 @@ export async function sendJobPayoutEmails(
             .filter((date): date is string => date != null)
         )
       ).sort();
+      // Check if any timesheet is an evento type
+      const hasEventoTimesheet = timesheetLines.some(line => line.is_evento === true);
 
       return {
         technician_id: attachment.technician_id,
@@ -352,6 +356,7 @@ export async function sendJobPayoutEmails(
         autonomo: attachment.autonomo ?? null,
         lpo_number: attachment.lpo_number ?? null,
         worked_dates: workedDates,
+        is_evento: hasEventoTimesheet,
       };
     }),
     missing_emails: context.missingEmails,

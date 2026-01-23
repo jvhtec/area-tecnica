@@ -5,6 +5,7 @@ import { Download, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { JobPayoutEmailContextResult } from '@/lib/job-payout-email';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
+import { HOUSE_TECH_LABEL } from '@/utils/autonomo';
 
 interface PayoutEmailPreviewProps {
   open: boolean;
@@ -239,7 +240,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
                   </div>
                   <div>
                     <div className="font-semibold">Técnico:</div>
-                    <div>{selectedAttachment.full_name} ({selectedAttachment.autonomo ? 'Autónomo' : 'No autónomo'})</div>
+                    <div>{selectedAttachment.full_name} ({selectedAttachment.is_house_tech ? HOUSE_TECH_LABEL : selectedAttachment.autonomo ? 'Autónomo' : 'No autónomo'})</div>
                   </div>
                   <div>
                     <div className="font-semibold">Fechas trabajadas:</div>

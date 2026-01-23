@@ -15,6 +15,7 @@ import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
 const DEDUCTION_DISCLAIMER_TEXT = '* Se ha aplicado una deducción de 30€/día en concepto de IRPF por condición de no autónomo.';
 const TOUR_DEDUCTION_DISCLAIMER_TEXT = '* Deducción de 30€ en concepto de IRPF por condición de no autónomo ya aplicada a la tarifa base antes de multiplicadores.';
+const EVENTO_DISCLAIMER_TEXT = '* Evento: tarifa fija de 12h (base + plus) independientemente de las horas trabajadas.';
 
 export interface TechnicianProfile {
   id: string;
@@ -82,6 +83,7 @@ export interface TimesheetLine {
   overtime_hour_eur?: number;
   overtime_amount_eur?: number;
   total_eur?: number;
+  is_evento?: boolean;
 }
 
 const CORPORATE_RED: [number, number, number] = [125, 1, 1];
@@ -227,8 +229,9 @@ const getTechNameFactory = (profiles: TechnicianProfile[]) => {
       return { name: 'Unknown', profile: undefined, autonomo: true, is_house_tech: false };
     }
     const name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Unknown';
-    const autonomo = profile.autonomo !== false;
     const is_house_tech = profile.is_house_tech === true;
+    // autonomo field reflects profile setting - deduction logic handles house techs separately
+    const autonomo = profile.autonomo !== false;
     return { name, profile, autonomo, is_house_tech };
   };
 };
@@ -326,9 +329,9 @@ export async function generateRateQuotePDF(
   }));
 
   const tableData = quotesWithComputed.map(({ quote, computed }) => {
-    const { name: baseName, autonomo } = getTechName(quote.technician_id);
+    const { name: baseName, autonomo, is_house_tech } = getTechName(quote.technician_id);
     const lpo = lpoMap?.get(quote.technician_id) ?? null;
-    const nameWithStatus = appendAutonomoLabel(baseName, autonomo);
+    const nameWithStatus = appendAutonomoLabel(baseName, autonomo, { isHouseTech: is_house_tech });
     const { effectiveBase, extrasTotal, preMultiplierBase, rawMultiplier, usedFallbackBase } =
       computed;
     const hasError = quote.breakdown?.error;
@@ -566,7 +569,7 @@ export async function generateTourRatesSummaryPDF(
   const summaryRows = Array.from(techTotals.values())
     .sort((a, b) => a.info.name.localeCompare(b.info.name))
     .map((item) => [
-      appendAutonomoLabel(item.info.name, item.info.autonomo, { multiline: false }),
+      appendAutonomoLabel(item.info.name, item.info.autonomo, { multiline: false, isHouseTech: item.info.is_house_tech }),
       item.dates.toString(),
       item.lpos.size ? Array.from(item.lpos).join(', ') : '—',
       formatCurrency(item.total),
@@ -647,9 +650,9 @@ export async function generateTourRatesSummaryPDF(
     breakdownY += 4;
 
     const jobTableRows = item.quotes.map((quote) => {
-      const { name: baseName, autonomo } = getTechName(quote.technician_id);
+      const { name: baseName, autonomo, is_house_tech } = getTechName(quote.technician_id);
       const lpo = item.lpoMap?.get(quote.technician_id) ?? null;
-      const nameWithStatus = appendAutonomoLabel(baseName, autonomo);
+      const nameWithStatus = appendAutonomoLabel(baseName, autonomo, { isHouseTech: is_house_tech });
       const hasError = quote.breakdown?.error;
       const {
         effectiveBase,
@@ -864,15 +867,16 @@ export async function generateJobPayoutPDF(
   doc.setTextColor(...TEXT_PRIMARY);
 
   const tableData = payouts.map((payout) => {
-    const { name: baseName, autonomo } = getTechName(payout.technician_id);
+    const { name: baseName, autonomo, is_house_tech } = getTechName(payout.technician_id);
     const lpo = lpoMap?.get(payout.technician_id) ?? null;
-    const nameWithStatus = appendAutonomoLabel(baseName, autonomo);
-    
-    // Calculate deduction
+    const nameWithStatus = appendAutonomoLabel(baseName, autonomo, { isHouseTech: is_house_tech });
+
+    // Calculate deduction - only for non-autonomo contracted workers (not house techs)
     let deduction = 0;
     let daysCount = 0;
-    
-    if (!autonomo) {
+    const isNonAutonomoContracted = !autonomo && !is_house_tech;
+
+    if (isNonAutonomoContracted) {
         // Count unique days from timesheets
         const lines = timesheetMap?.get(payout.technician_id) || [];
         // If timesheets available, count unique dates
@@ -914,6 +918,12 @@ export async function generateJobPayoutPDF(
 
   const anyOverride = payouts.some(p => p.has_override);
 
+  // Check if any timesheet has is_evento flag
+  const anyEvento = payouts.some(p => {
+      const lines = timesheetMap?.get(p.technician_id) || [];
+      return lines.some(l => l.is_evento === true);
+  });
+
   autoTable(doc, {
     startY: yPos,
     head: [['Técnico', 'Partes', 'Extras', 'Gastos', 'Total']],
@@ -953,6 +963,14 @@ export async function generateJobPayoutPDF(
       disclaimerY += 6;
   }
 
+  if (anyEvento) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(...CORPORATE_RED);
+      doc.text(EVENTO_DISCLAIMER_TEXT, 14, disclaimerY);
+      disclaimerY += 6;
+  }
+
   let currentY = disclaimerY + 4;
   const pageHeight = doc.internal.pageSize.getHeight();
 
@@ -988,8 +1006,8 @@ export async function generateJobPayoutPDF(
         currentY = drawCorporateHeader(doc, headerOptions) + 2;
       }
 
-      const { name: baseName, autonomo } = getTechName(payout.technician_id);
-      const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false });
+      const { name: baseName, autonomo, is_house_tech } = getTechName(payout.technician_id);
+      const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false, isHouseTech: is_house_tech });
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(...CORPORATE_RED);
@@ -1054,8 +1072,8 @@ export async function generateJobPayoutPDF(
         currentY = drawCorporateHeader(doc, headerOptions) + 2;
       }
 
-      const { name: baseName, autonomo } = getTechName(payout.technician_id);
-      const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false });
+      const { name: baseName, autonomo, is_house_tech } = getTechName(payout.technician_id);
+      const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false, isHouseTech: is_house_tech });
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(...CORPORATE_RED);
@@ -1103,8 +1121,8 @@ export async function generateJobPayoutPDF(
         currentY = drawCorporateHeader(doc, headerOptions) + 2;
       }
 
-      const { name: baseName, autonomo } = getTechName(payout.technician_id);
-      const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false });
+      const { name: baseName, autonomo, is_house_tech } = getTechName(payout.technician_id);
+      const headingName = appendAutonomoLabel(baseName, autonomo, { multiline: false, isHouseTech: is_house_tech });
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(...CORPORATE_RED);

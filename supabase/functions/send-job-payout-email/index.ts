@@ -34,6 +34,7 @@ interface TechnicianPayload {
   worked_dates?: string[];
   autonomo?: boolean | null;
   is_house_tech?: boolean | null;
+  is_evento?: boolean;
 }
 
 interface JobPayoutRequestBody {
@@ -226,6 +227,7 @@ serve(async (req) => {
                         <li><b>Total general:</b> ${grand}</li>
                       </ul>
                        ${hasDeduction ? `<p style="margin:10px 0 0 0;font-size:12px;color:#b91c1c;">* Se ha aplicado una deducción de 30€/día por condición de no autónomo.</p>` : ''}
+                       ${tech.is_evento ? `<p style="margin:10px 0 0 0;font-size:12px;color:#6b7280;">* Evento: tarifa fija de 12h (base + plus) independientemente de las horas trabajadas.</p>` : ''}
                     </div>
                   </td>
                 </tr>
