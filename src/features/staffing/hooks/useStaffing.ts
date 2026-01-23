@@ -141,25 +141,55 @@ export function useCancelStaffingRequest() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer' }) => {
-      const { error } = await supabase
+      console.log('🔴 CANCEL STAFFING: Starting cancellation', payload)
+
+      // First, check what records exist for this combination
+      const { data: existingRecords } = await supabase
+        .from('staffing_requests')
+        .select('id, status, single_day, target_date')
+        .eq('job_id', payload.job_id)
+        .eq('profile_id', payload.profile_id)
+        .eq('phase', payload.phase)
+
+      console.log('🔴 CANCEL STAFFING: Existing records', existingRecords)
+
+      // Cancel ALL non-expired records (not just pending) to ensure cell clears
+      const { data, error, count } = await supabase
         .from('staffing_requests')
         .update({ status: 'expired' })
         .eq('job_id', payload.job_id)
         .eq('profile_id', payload.profile_id)
         .eq('phase', payload.phase)
-        .eq('status', 'pending') // only cancel pending
+        .neq('status', 'expired') // Cancel any non-expired status
+        .select('id')
+
+      console.log('🔴 CANCEL STAFFING: Update result', { data, error, count, rowsAffected: data?.length })
+
       if (error) throw error
+
+      if (!data?.length) {
+        console.warn('🔴 CANCEL STAFFING: No records were updated!')
+      }
+
       // Fire-and-forget notification via same channel used originally
       try {
         supabase.functions.invoke('notify-staffing-cancellation', { body: payload }).catch(() => {})
       } catch {}
-      return true
+      return { success: true, rowsAffected: data?.length || 0 }
     },
     onSuccess: (_data, vars) => {
+      console.log('🔴 CANCEL STAFFING: onSuccess, invalidating queries')
+
+      // Invalidate all related queries
       qc.invalidateQueries({ queryKey: ['staffing', vars.job_id, vars.profile_id] })
       qc.invalidateQueries({ queryKey: ['staffing-by-date', vars.profile_id] })
       qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
       qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
+      qc.invalidateQueries({ queryKey: ['assignment-matrix'] })
+
+      // Also refetch to ensure fresh data
+      qc.refetchQueries({ queryKey: ['staffing-matrix'], type: 'active' })
+
       try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
       // Push broadcast: cancellation
       try {

@@ -101,7 +101,7 @@ export const OptimizedMatrixCell = memo(({
   const { mutate: cancelStaffing, isPending: isCancelling } = useCancelStaffingRequest();
   const [availabilityRetrying, setAvailabilityRetrying] = React.useState(false);
   const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
-  const [pendingCancel, setPendingCancel] = React.useState<null | { phase: 'availability' | 'offer', jobId: string | null }>(null);
+  const [pendingCancel, setPendingCancel] = React.useState<null | { phase: 'availability' | 'offer', jobId: string | null, allJobIds?: string[] }>(null);
   const [multiDateRemoval, setMultiDateRemoval] = React.useState<MultiDateRemovalState>({
     isOpen: false,
     isLoading: false,
@@ -242,6 +242,21 @@ export const OptimizedMatrixCell = memo(({
 
   // Use job-specific status for assigned cells, date-based status for empty cells
   const staffingStatus = hasAssignment ? staffingStatusByJob : staffingStatusByDate;
+
+  // Debug logging for staffing status changes
+  React.useEffect(() => {
+    if (staffingStatus?.availability_status || staffingStatus?.offer_status) {
+      console.log('🔵 CELL STATUS:', {
+        tech: technician.id,
+        date: format(date, 'yyyy-MM-dd'),
+        hasAssignment,
+        availabilityStatus: staffingStatus?.availability_status,
+        offerStatus: staffingStatus?.offer_status,
+        byDateJobId: staffingStatusByDate?.availability_job_id,
+        pendingJobIds: staffingStatusByDate?.pending_availability_job_ids
+      });
+    }
+  }, [staffingStatus?.availability_status, staffingStatus?.offer_status, technician.id, date, hasAssignment, staffingStatusByDate]);
 
   // Handle staffing email actions
   const handleStaffingEmail = useCallback((e: React.MouseEvent, phase: 'availability' | 'offer') => {
@@ -441,7 +456,9 @@ export const OptimizedMatrixCell = memo(({
                     onClick={(e) => {
                       e.stopPropagation();
                       const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id || null;
-                      setPendingCancel({ phase: 'availability', jobId: targetJobId });
+                      // Include all pending job IDs to cancel all requests for this date
+                      const allJobIds = (staffingStatusByDate as any)?.pending_availability_job_ids || (targetJobId ? [targetJobId] : []);
+                      setPendingCancel({ phase: 'availability', jobId: targetJobId, allJobIds });
                     }}
                     title="Cancelar solicitud de disponibilidad"
                     className="focus:outline-none"
@@ -484,7 +501,9 @@ export const OptimizedMatrixCell = memo(({
                     onClick={(e) => {
                       e.stopPropagation();
                       const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id || null;
-                      setPendingCancel({ phase: 'offer', jobId: targetJobId });
+                      // Include all pending job IDs to cancel all requests for this date
+                      const allJobIds = (staffingStatusByDate as any)?.pending_offer_job_ids || (targetJobId ? [targetJobId] : []);
+                      setPendingCancel({ phase: 'offer', jobId: targetJobId, allJobIds });
                     }}
                     title="Cancelar oferta"
                     className="focus:outline-none"
@@ -724,24 +743,46 @@ export const OptimizedMatrixCell = memo(({
                   <DialogTitle>{pendingCancel.phase === 'availability' ? '¿Cancelar solicitud de disponibilidad?' : '¿Cancelar oferta?'}</DialogTitle>
                   <DialogDescription>
                     Esto marcará la fase de {pendingCancel.phase === 'availability' ? 'disponibilidad' : 'oferta'} como cancelada para {displayName}.
+                    {pendingCancel.allJobIds && pendingCancel.allJobIds.length > 1 && (
+                      <span className="block mt-1 text-xs text-muted-foreground">
+                        Se cancelarán {pendingCancel.allJobIds.length} solicitudes pendientes en esta fecha.
+                      </span>
+                    )}
                   </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setPendingCancel(null)}>Mantener</Button>
-                  <Button onClick={() => {
-                    if (!pendingCancel.jobId) { setPendingCancel(null); return; }
-                    cancelStaffing(
-                      { job_id: pendingCancel.jobId, profile_id: technician.id, phase: pendingCancel.phase },
-                      {
-                        onSuccess: () => {
-                          setPendingCancel(null);
-                          toast.success(`${pendingCancel.phase === 'availability' ? 'Disponibilidad' : 'Oferta'} cancelada`)
-                        },
-                        onError: (e: any) => {
-                          toast.error(e?.message || 'No se pudo cancelar')
-                        }
-                      }
-                    )
+                  <Button onClick={async () => {
+                    // Cancel ALL pending job IDs for this date to fully clear the cell
+                    const jobIdsToCancel = pendingCancel.allJobIds?.length
+                      ? pendingCancel.allJobIds
+                      : (pendingCancel.jobId ? [pendingCancel.jobId] : []);
+
+                    if (!jobIdsToCancel.length) {
+                      setPendingCancel(null);
+                      return;
+                    }
+
+                    try {
+                      // Cancel all job IDs in parallel
+                      await Promise.all(
+                        jobIdsToCancel.map(jid =>
+                          new Promise<void>((resolve, reject) => {
+                            cancelStaffing(
+                              { job_id: jid, profile_id: technician.id, phase: pendingCancel.phase },
+                              {
+                                onSuccess: () => resolve(),
+                                onError: (e: any) => reject(e)
+                              }
+                            );
+                          })
+                        )
+                      );
+                      setPendingCancel(null);
+                      toast.success(`${pendingCancel.phase === 'availability' ? 'Disponibilidad' : 'Oferta'} cancelada`);
+                    } catch (e: any) {
+                      toast.error(e?.message || 'No se pudo cancelar');
+                    }
                   }} disabled={isCancelling}>
                     {isCancelling ? 'Cancelando…' : 'Cancelar'}
                   </Button>

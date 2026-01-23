@@ -18,6 +18,9 @@ interface ByJobStatus {
 interface ByDateStatus extends ByJobStatus {
   availability_job_id?: string | null
   offer_job_id?: string | null
+  // Arrays of ALL job IDs with pending requests for this date (for bulk cancel)
+  pending_availability_job_ids?: string[]
+  pending_offer_job_ids?: string[]
 }
 
 export function useStaffingMatrixStatuses(
@@ -76,10 +79,15 @@ export function useStaffingMatrixStatuses(
               if (s === 'expired') return null // treat cancelled/expired as cleared
               return s as any
             }
-            mapByJob.set(key, {
-              availability_status: mapAvailability(r.availability_status),
-              offer_status: mapOffer(r.offer_status)
-            })
+            const availStatus = mapAvailability(r.availability_status)
+            const offerStatus = mapOffer(r.offer_status)
+            // Only add entry if at least one status is non-null (same logic as byDate)
+            if (availStatus || offerStatus) {
+              mapByJob.set(key, {
+                availability_status: availStatus,
+                offer_status: offerStatus
+              })
+            }
           })
         })
       } catch (e) {
@@ -164,10 +172,14 @@ export function useStaffingMatrixStatuses(
           })
           if (!matchingRequests.length) return
 
-          // Reduce to latest per phase
+          // Reduce to latest per phase, and collect ALL non-expired job IDs for bulk cancel
           const latest = matchingRequests.reduce((acc: any, r: any) => {
             const t = r.updated_at ? new Date(r.updated_at).getTime() : 0
             if (r.phase === 'availability') {
+              // Collect ALL non-expired job IDs for this phase (to ensure complete cell clearing)
+              if (r.status !== 'expired' && !acc.pending_availability_job_ids.includes(r.job_id)) {
+                acc.pending_availability_job_ids.push(r.job_id)
+              }
               const accT = acc.availability_updated_at || 0
               if (t > accT) {
                 const mapped = r.status === 'pending' ? 'requested' : (r.status === 'expired' ? null : r.status)
@@ -176,6 +188,10 @@ export function useStaffingMatrixStatuses(
                 acc.availability_job_id = r.job_id
               }
             } else if (r.phase === 'offer') {
+              // Collect ALL non-expired job IDs for this phase (to ensure complete cell clearing)
+              if (r.status !== 'expired' && !acc.pending_offer_job_ids.includes(r.job_id)) {
+                acc.pending_offer_job_ids.push(r.job_id)
+              }
               const accT = acc.offer_updated_at || 0
               if (t > accT) {
                 const mapped = r.status === 'pending' ? 'sent' : (r.status === 'expired' ? null : r.status)
@@ -185,7 +201,7 @@ export function useStaffingMatrixStatuses(
               }
             }
             return acc
-          }, { availability_status: null, offer_status: null, availability_updated_at: 0, offer_updated_at: 0, availability_job_id: null, offer_job_id: null })
+          }, { availability_status: null, offer_status: null, availability_updated_at: 0, offer_updated_at: 0, availability_job_id: null, offer_job_id: null, pending_availability_job_ids: [] as string[], pending_offer_job_ids: [] as string[] })
 
           // Only set an entry if there's a non-null status for either phase
           if (latest.availability_status || latest.offer_status) {
@@ -193,7 +209,9 @@ export function useStaffingMatrixStatuses(
               availability_status: latest.availability_status as Status,
               offer_status: latest.offer_status as Status,
               availability_job_id: latest.availability_job_id,
-              offer_job_id: latest.offer_job_id
+              offer_job_id: latest.offer_job_id,
+              pending_availability_job_ids: latest.pending_availability_job_ids,
+              pending_offer_job_ids: latest.pending_offer_job_ids
             })
           }
         })
