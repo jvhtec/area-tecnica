@@ -2,73 +2,23 @@
 -- Previously the function did exact match on role_code (e.g., "SND-FOH-R")
 -- but skills are named things like "FOH", "Monitores", etc.
 
--- Create a mapping table from role positions to skill names
+-- Create a mapping table from role prefixes to skill names
+-- Using role_prefix (e.g., "SND-FOH", "LGT-MON") to distinguish between departments
 CREATE TABLE IF NOT EXISTS public.role_skill_mapping (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  role_position text NOT NULL,          -- e.g., 'FOH', 'MON', 'SYS'
-  skill_name text NOT NULL,             -- e.g., 'FOH', 'Monitores'
-  weight numeric DEFAULT 1.0 NOT NULL,  -- 1.0 = exact match, 0.5 = related skill
+  role_prefix text NOT NULL,            -- e.g., 'SND-FOH', 'LGT-MON', 'VID-CAM'
+  skill_name text NOT NULL,             -- e.g., 'foh', 'monitores' (lowercase to match DB)
+  weight numeric DEFAULT 1.0 NOT NULL,  -- 1.0 = exact match, <1.0 = related skill
   created_at timestamptz DEFAULT now() NOT NULL,
-  UNIQUE(role_position, skill_name)
+  UNIQUE(role_prefix, skill_name)
 );
-
--- Seed the mapping with known role positions and their corresponding skills
--- Primary mappings (weight 1.0) - exact skill match
-INSERT INTO public.role_skill_mapping (role_position, skill_name, weight) VALUES
-  -- Sound positions
-  ('FOH', 'FOH', 1.0),
-  ('MON', 'Monitores', 1.0),
-  ('SYS', 'Sistemas', 1.0),
-  ('RF', 'RF', 1.0),
-  ('PA', 'Escenario', 1.0),
-  ('MNT', 'Montaje', 1.0),
-  -- Lights positions
-  ('BRD', 'Mesa', 1.0),
-  ('ASST', 'Asistente', 1.0),
-  ('DIM', 'Dimmer', 1.0),
-  ('FOLO', 'Follow Spot', 1.0),
-  ('CAN', 'Cañón', 1.0),
-  -- Video positions
-  ('SW', 'Switcher', 1.0),
-  ('DIR', 'Director', 1.0),
-  ('CAM', 'Cámara', 1.0),
-  ('LED', 'LED', 1.0),
-  ('PROJ', 'Proyección', 1.0),
-  -- Production positions
-  ('RESP', 'Producción', 1.0),
-  ('AYUD', 'Ayudante', 1.0),
-  ('COND', 'Conductor', 1.0)
-ON CONFLICT (role_position, skill_name) DO NOTHING;
-
--- Related skill mappings (weight 0.5) - partial credit for related skills
-INSERT INTO public.role_skill_mapping (role_position, skill_name, weight) VALUES
-  -- FOH engineers can do monitors and vice versa
-  ('FOH', 'Monitores', 0.5),
-  ('MON', 'FOH', 0.5),
-  -- System techs have some FOH/MON skills
-  ('SYS', 'FOH', 0.3),
-  ('SYS', 'Monitores', 0.3),
-  -- RF is related to systems
-  ('RF', 'Sistemas', 0.4),
-  -- PA/Escenario techs have general skills
-  ('PA', 'Montaje', 0.7),
-  ('MNT', 'Escenario', 0.7),
-  -- Lights related skills
-  ('BRD', 'Dimmer', 0.5),
-  ('DIM', 'Mesa', 0.4),
-  ('ASST', 'Mesa', 0.4),
-  ('ASST', 'Dimmer', 0.4),
-  -- Video related skills
-  ('SW', 'Director', 0.5),
-  ('DIR', 'Switcher', 0.4),
-  ('CAM', 'Director', 0.3),
-  ('LED', 'Proyección', 0.4),
-  ('PROJ', 'LED', 0.4)
-ON CONFLICT (role_position, skill_name) DO NOTHING;
 
 -- Grant access
 GRANT SELECT ON public.role_skill_mapping TO authenticated;
 GRANT SELECT ON public.role_skill_mapping TO service_role;
+
+-- Create index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_role_skill_mapping_prefix ON public.role_skill_mapping(role_prefix);
 
 -- Now update the ranking function to use the mapping
 CREATE OR REPLACE FUNCTION public.rank_staffing_candidates(
@@ -108,7 +58,7 @@ DECLARE
   v_exclude_fridge boolean := COALESCE((p_policy->>'exclude_fridge')::boolean, true);
   v_job_start timestamptz;
   v_job_end timestamptz;
-  v_role_position text;
+  v_role_prefix text;
 BEGIN
   -- Access control
   IF auth.role() <> 'service_role' THEN
@@ -137,11 +87,11 @@ BEGIN
     RAISE EXCEPTION 'Job not found';
   END IF;
 
-  -- Extract position from role code (e.g., 'FOH' from 'SND-FOH-R')
-  -- Format is DEPT-POSITION-LEVEL
-  v_role_position := CASE
-    WHEN p_role_code ~ '^[A-Z]+-([A-Z]+)-[RET]$'
-    THEN (regexp_match(p_role_code, '^[A-Z]+-([A-Z]+)-[RET]$'))[1]
+  -- Extract role prefix from role code (e.g., 'SND-FOH' from 'SND-FOH-R')
+  -- Format is DEPT-POSITION-LEVEL, we want DEPT-POSITION
+  v_role_prefix := CASE
+    WHEN p_role_code ~ '^([A-Z]+-[A-Z]+)-[RET]$'
+    THEN (regexp_match(p_role_code, '^([A-Z]+-[A-Z]+)-[RET]$'))[1]
     ELSE p_role_code  -- Fallback to full code if format doesn't match
   END;
 
@@ -255,7 +205,7 @@ BEGIN
           JOIN skills s ON s.id = ps.skill_id AND s.active = true
           JOIN role_skill_mapping rsm ON LOWER(rsm.skill_name) = LOWER(s.name)
           WHERE ps.profile_id = b.profile_id
-            AND rsm.role_position = v_role_position
+            AND rsm.role_prefix = v_role_prefix
             AND COALESCE(ps.proficiency, 0) > 0
         ),
         0
@@ -272,7 +222,7 @@ BEGIN
         JOIN skills s ON s.id = ps.skill_id AND s.active = true
         JOIN role_skill_mapping rsm ON LOWER(rsm.skill_name) = LOWER(s.name)
         WHERE ps.profile_id = b.profile_id
-          AND rsm.role_position = v_role_position
+          AND rsm.role_prefix = v_role_prefix
           AND COALESCE(ps.proficiency, 0) > 0
         ORDER BY
           (CASE WHEN ps.is_primary THEN 60 ELSE 40 END) + (COALESCE(ps.proficiency, 0) * 8) * rsm.weight DESC
@@ -380,7 +330,7 @@ BEGIN
           (CASE WHEN (f.best_skill->>'is_primary')::boolean THEN 'Primary skill: ' ELSE 'Skill: ' END) ||
           (f.best_skill->>'name') || ' (lvl ' || (f.best_skill->>'proficiency') || ')' ||
           (CASE WHEN (f.best_skill->>'weight')::numeric < 1 THEN ' [related]' ELSE '' END)
-        ELSE 'No matching skill for ' || v_role_position
+        ELSE 'No matching skill for ' || v_role_prefix
       END,
       'Reliability: ' || f.reliability_score || '/10',
       'Fairness: ' || f.fairness_score || '/10',
