@@ -152,7 +152,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-gray-500">Loading candidates...</p>
+          <p className="text-muted-foreground">Loading candidates...</p>
         </CardContent>
       </Card>
     )
@@ -162,7 +162,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-gray-500">No candidates available for {roleCode}</p>
+          <p className="text-muted-foreground">No candidates available for {roleCode}</p>
         </CardContent>
       </Card>
     )
@@ -179,7 +179,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
 
       <CardContent className="space-y-4">
         {/* Select all checkbox */}
-        <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+        <div className="flex items-center gap-2 p-2 bg-muted rounded">
           <Checkbox
             checked={selectedCandidates.size === candidates.length && candidates.length > 0}
             onCheckedChange={toggleSelectAll}
@@ -194,7 +194,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
           {candidates.map((candidate) => (
             <div
               key={candidate.profile_id}
-              className="flex items-start gap-3 p-3 border rounded hover:bg-gray-50"
+              className="flex items-start gap-3 p-3 border rounded hover:bg-muted"
             >
               <Checkbox
                 checked={selectedCandidates.has(candidate.profile_id)}
@@ -213,7 +213,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-2">
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-2">
                   <div>Skills: <span className="font-semibold">{candidate.skills_score}</span>pts</div>
                   <div>Reliability: <span className="font-semibold">{candidate.reliability_score}</span>pts</div>
                   <div>
@@ -229,13 +229,13 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <div className="h-2 flex-1 bg-gray-200 rounded overflow-hidden">
+                  <div className="h-2 flex-1 bg-muted rounded overflow-hidden">
                     <div
                       className="h-full bg-blue-500"
                       style={{ width: `${(candidate.final_score / 100) * 100}%` }}
                     />
                   </div>
-                  <span className="text-xs font-semibold text-gray-700">{candidate.final_score}</span>
+                  <span className="text-xs font-semibold text-foreground">{candidate.final_score}</span>
                 </div>
 
                 {(Array.isArray(candidate.reasons) ? candidate.reasons : []).length > 0 && (
@@ -251,9 +251,9 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                 )}
 
                 {expandedReasons === candidate.profile_id && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded text-xs space-y-1">
+                  <div className="mt-2 p-2 bg-blue-500/10 rounded text-xs space-y-1">
                     {(Array.isArray(candidate.reasons) ? candidate.reasons : []).map((reason, idx) => (
-                      <div key={idx} className="text-gray-700">• {reason}</div>
+                      <div key={idx} className="text-muted-foreground">• {reason}</div>
                     ))}
                   </div>
                 )}
