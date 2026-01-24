@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { useWeatherData } from '@/hooks/useWeatherData';
 import { PlacesRestaurantService } from '@/utils/hoja-de-ruta/services/places-restaurant-service';
 import { createSignedUrl } from '@/utils/jobDocuments';
 import { labelForCode } from '@/utils/roles';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import type { Restaurant, WeatherData } from '@/types/hoja-de-ruta';
 import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from '@/types/job';
 
@@ -27,6 +29,7 @@ interface DetailsModalProps {
 type TabId = 'Info' | 'Ubicación' | 'Personal' | 'Docs' | 'Restau.' | 'Clima';
 
 export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
+    const { user } = useOptimizedAuth();
     const [activeTab, setActiveTab] = useState<TabId>('Info');
     const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
     const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);
@@ -67,6 +70,39 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         `)
                 .eq('job_id', job.id)
                 .eq('status', 'confirmed');
+            if (error) throw error;
+            return data || [];
+        },
+        enabled: !!job?.id,
+    });
+
+    // Fetch technician's assigned dates from timesheets
+    const { data: assignedDates = [], isLoading: assignedDatesLoading } = useQuery({
+        queryKey: ['tech-assigned-dates', job?.id, user?.id],
+        queryFn: async () => {
+            if (!job?.id || !user?.id) return [];
+            const { data, error } = await supabase
+                .from('timesheets')
+                .select('date')
+                .eq('job_id', job.id)
+                .eq('technician_id', user.id)
+                .eq('is_active', true)
+                .order('date', { ascending: true });
+            if (error) throw error;
+            return data?.map(t => t.date) || [];
+        },
+        enabled: !!job?.id && !!user?.id,
+    });
+
+    // Fetch job date types for this job
+    const { data: jobDateTypes = [], isLoading: jobDateTypesLoading } = useQuery({
+        queryKey: ['job-date-types', job?.id],
+        queryFn: async () => {
+            if (!job?.id) return [];
+            const { data, error } = await supabase
+                .from('job_date_types')
+                .select('date, type')
+                .eq('job_id', job.id);
             if (error) throw error;
             return data || [];
         },
@@ -244,6 +280,37 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         return role ? (labelForCode(role) || role) : 'Técnico';
     };
 
+    // Get date type label in Spanish
+    const getDateTypeLabel = (type: string): string => {
+        const labels: Record<string, string> = {
+            'travel': 'Viaje',
+            'setup': 'Montaje',
+            'show': 'Show',
+            'off': 'Descanso',
+            'rehearsal': 'Ensayo'
+        };
+        return labels[type] || type;
+    };
+
+    // Get date type badge color
+    const getDateTypeBadgeClass = (type: string): string => {
+        const colors: Record<string, string> = {
+            'travel': isDark ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-blue-100 text-blue-700 border-blue-200',
+            'setup': isDark ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-purple-100 text-purple-700 border-purple-200',
+            'show': isDark ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            'off': isDark ? 'bg-slate-500/20 text-slate-400 border-slate-500/30' : 'bg-slate-100 text-slate-700 border-slate-200',
+            'rehearsal': isDark ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-amber-100 text-amber-700 border-amber-200'
+        };
+        return colors[type] || (isDark ? 'bg-slate-500/20 text-slate-400 border-slate-500/30' : 'bg-slate-100 text-slate-700 border-slate-200');
+    };
+
+    // Memoized map for O(1) date type lookup
+    const dateTypeMap = useMemo(() => {
+        const map = new Map<string, string>();
+        jobDateTypes.forEach(dt => map.set(dt.date, dt.type));
+        return map;
+    }, [jobDateTypes]);
+
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
             <div className={`w-full max-w-md md:max-w-lg lg:max-w-xl h-[85vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200`}>
@@ -306,6 +373,50 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Assigned Dates */}
+                            {user?.id && (
+                                <div>
+                                    <label className={`text-xs ${theme.textMuted} font-bold uppercase mb-2 block`}>Mis fechas asignadas</label>
+                                    {assignedDatesLoading || jobDateTypesLoading ? (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                                            <span className={theme.textMuted}>Cargando fechas...</span>
+                                        </div>
+                                    ) : assignedDates.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {assignedDates.map((date) => {
+                                                const dateTypeValue = dateTypeMap.get(date);
+                                                return (
+                                                    <div
+                                                        key={date}
+                                                        className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border`}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <CalendarIcon size={14} className={theme.textMuted} />
+                                                            <span className={`text-sm font-medium ${theme.textMain}`}>
+                                                                {formatInTimeZone(parseISO(date), 'Europe/Madrid', "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+                                                            </span>
+                                                        </div>
+                                                        {dateTypeValue && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={`text-xs font-bold border ${getDateTypeBadgeClass(dateTypeValue)}`}
+                                                            >
+                                                                {getDateTypeLabel(dateTypeValue)}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className={`text-sm ${theme.textMuted} italic`}>
+                                            No hay fechas asignadas para este trabajo
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Description */}
                             {job?.description && (
