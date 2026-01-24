@@ -1,6 +1,76 @@
--- Fix skills scoring: give 0 points when there's no skill match instead of 10
--- This ensures candidates without the required skill are properly ranked lower
+-- Fix skills scoring: proper role-to-skill mapping
+-- Previously the function did exact match on role_code (e.g., "SND-FOH-R")
+-- but skills are named things like "FOH", "Monitores", etc.
 
+-- Create a mapping table from role positions to skill names
+CREATE TABLE IF NOT EXISTS public.role_skill_mapping (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  role_position text NOT NULL,          -- e.g., 'FOH', 'MON', 'SYS'
+  skill_name text NOT NULL,             -- e.g., 'FOH', 'Monitores'
+  weight numeric DEFAULT 1.0 NOT NULL,  -- 1.0 = exact match, 0.5 = related skill
+  created_at timestamptz DEFAULT now() NOT NULL,
+  UNIQUE(role_position, skill_name)
+);
+
+-- Seed the mapping with known role positions and their corresponding skills
+-- Primary mappings (weight 1.0) - exact skill match
+INSERT INTO public.role_skill_mapping (role_position, skill_name, weight) VALUES
+  -- Sound positions
+  ('FOH', 'FOH', 1.0),
+  ('MON', 'Monitores', 1.0),
+  ('SYS', 'Sistemas', 1.0),
+  ('RF', 'RF', 1.0),
+  ('PA', 'Escenario', 1.0),
+  ('MNT', 'Montaje', 1.0),
+  -- Lights positions
+  ('BRD', 'Mesa', 1.0),
+  ('ASST', 'Asistente', 1.0),
+  ('DIM', 'Dimmer', 1.0),
+  ('FOLO', 'Follow Spot', 1.0),
+  ('CAN', 'Cañón', 1.0),
+  -- Video positions
+  ('SW', 'Switcher', 1.0),
+  ('DIR', 'Director', 1.0),
+  ('CAM', 'Cámara', 1.0),
+  ('LED', 'LED', 1.0),
+  ('PROJ', 'Proyección', 1.0),
+  -- Production positions
+  ('RESP', 'Producción', 1.0),
+  ('AYUD', 'Ayudante', 1.0),
+  ('COND', 'Conductor', 1.0)
+ON CONFLICT (role_position, skill_name) DO NOTHING;
+
+-- Related skill mappings (weight 0.5) - partial credit for related skills
+INSERT INTO public.role_skill_mapping (role_position, skill_name, weight) VALUES
+  -- FOH engineers can do monitors and vice versa
+  ('FOH', 'Monitores', 0.5),
+  ('MON', 'FOH', 0.5),
+  -- System techs have some FOH/MON skills
+  ('SYS', 'FOH', 0.3),
+  ('SYS', 'Monitores', 0.3),
+  -- RF is related to systems
+  ('RF', 'Sistemas', 0.4),
+  -- PA/Escenario techs have general skills
+  ('PA', 'Montaje', 0.7),
+  ('MNT', 'Escenario', 0.7),
+  -- Lights related skills
+  ('BRD', 'Dimmer', 0.5),
+  ('DIM', 'Mesa', 0.4),
+  ('ASST', 'Mesa', 0.4),
+  ('ASST', 'Dimmer', 0.4),
+  -- Video related skills
+  ('SW', 'Director', 0.5),
+  ('DIR', 'Switcher', 0.4),
+  ('CAM', 'Director', 0.3),
+  ('LED', 'Proyección', 0.4),
+  ('PROJ', 'LED', 0.4)
+ON CONFLICT (role_position, skill_name) DO NOTHING;
+
+-- Grant access
+GRANT SELECT ON public.role_skill_mapping TO authenticated;
+GRANT SELECT ON public.role_skill_mapping TO service_role;
+
+-- Now update the ranking function to use the mapping
 CREATE OR REPLACE FUNCTION public.rank_staffing_candidates(
   p_job_id uuid,
   p_department text,
@@ -38,6 +108,7 @@ DECLARE
   v_exclude_fridge boolean := COALESCE((p_policy->>'exclude_fridge')::boolean, true);
   v_job_start timestamptz;
   v_job_end timestamptz;
+  v_role_position text;
 BEGIN
   -- Access control
   IF auth.role() <> 'service_role' THEN
@@ -66,6 +137,14 @@ BEGIN
     RAISE EXCEPTION 'Job not found';
   END IF;
 
+  -- Extract position from role code (e.g., 'FOH' from 'SND-FOH-R')
+  -- Format is DEPT-POSITION-LEVEL
+  v_role_position := CASE
+    WHEN p_role_code ~ '^[A-Z]+-([A-Z]+)-[RET]$'
+    THEN (regexp_match(p_role_code, '^[A-Z]+-([A-Z]+)-[RET]$'))[1]
+    ELSE p_role_code  -- Fallback to full code if format doesn't match
+  END;
+
   w_sum := w_skills + w_proximity + w_reliability + w_fairness + w_experience;
   IF w_sum <= 0 THEN
     w_skills := 0.5;
@@ -90,8 +169,6 @@ BEGIN
       COALESCE(p.department, '') AS department,
       p.role AS user_role,
       COALESCE(tf.in_fridge, false) AS in_fridge,
-      skill.is_primary,
-      skill.proficiency,
       (
         SELECT MAX(ts.date)::date
         FROM timesheets ts
@@ -135,16 +212,6 @@ BEGIN
       ) AS has_same_day_job
     FROM profiles p
     LEFT JOIN technician_fridge tf ON tf.technician_id = p.id
-    LEFT JOIN LATERAL (
-      SELECT ps.is_primary, ps.proficiency
-      FROM profile_skills ps
-      JOIN skills s ON s.id = ps.skill_id
-      WHERE ps.profile_id = p.id
-        AND s.active = true
-        AND s.name = p_role_code
-      ORDER BY ps.is_primary DESC, ps.proficiency DESC NULLS LAST
-      LIMIT 1
-    ) AS skill ON true
     WHERE
       (
         p.role IN ('technician', 'house_tech')
@@ -172,6 +239,47 @@ BEGIN
           AND ta.date <= v_job_end::date
       )
   ),
+  -- Calculate skills score using the mapping table
+  skill_scores AS (
+    SELECT
+      b.profile_id,
+      COALESCE(
+        (
+          SELECT MAX(
+            LEAST(100,
+              (CASE WHEN ps.is_primary THEN 60 ELSE 40 END) +
+              (COALESCE(ps.proficiency, 0) * 8)
+            ) * rsm.weight
+          )::int
+          FROM profile_skills ps
+          JOIN skills s ON s.id = ps.skill_id AND s.active = true
+          JOIN role_skill_mapping rsm ON LOWER(rsm.skill_name) = LOWER(s.name)
+          WHERE ps.profile_id = b.profile_id
+            AND rsm.role_position = v_role_position
+            AND COALESCE(ps.proficiency, 0) > 0
+        ),
+        0
+      ) AS skills_score,
+      -- Get best matching skill info for reasons
+      (
+        SELECT jsonb_build_object(
+          'name', s.name,
+          'proficiency', ps.proficiency,
+          'is_primary', ps.is_primary,
+          'weight', rsm.weight
+        )
+        FROM profile_skills ps
+        JOIN skills s ON s.id = ps.skill_id AND s.active = true
+        JOIN role_skill_mapping rsm ON LOWER(rsm.skill_name) = LOWER(s.name)
+        WHERE ps.profile_id = b.profile_id
+          AND rsm.role_position = v_role_position
+          AND COALESCE(ps.proficiency, 0) > 0
+        ORDER BY
+          (CASE WHEN ps.is_primary THEN 60 ELSE 40 END) + (COALESCE(ps.proficiency, 0) * 8) * rsm.weight DESC
+        LIMIT 1
+      ) AS best_skill
+    FROM base b
+  ),
   reliability_stats AS (
     SELECT
       sr.profile_id,
@@ -185,11 +293,14 @@ BEGIN
   with_reliability AS (
     SELECT
       b.*,
+      ss.skills_score,
+      ss.best_skill,
       COALESCE(rs.avail_yes, 0) AS avail_yes,
       COALESCE(rs.avail_total, 0) AS avail_total,
       COALESCE(rs.offer_yes, 0) AS offer_yes,
       COALESCE(rs.offer_total, 0) AS offer_total
     FROM base b
+    LEFT JOIN skill_scores ss ON ss.profile_id = b.profile_id
     LEFT JOIN reliability_stats rs ON rs.profile_id = b.profile_id
   ),
   scored AS (
@@ -198,21 +309,10 @@ BEGIN
       wr.full_name,
       wr.department,
       wr.user_role,
-      wr.is_primary,
-      wr.proficiency,
+      wr.skills_score,
+      wr.best_skill,
       wr.jobs_worked,
       wr.current_month_days,
-      -- FIXED: Give 0 points when there's no skill match instead of 10
-      -- This properly differentiates candidates with/without required skills
-      (
-        CASE
-          WHEN wr.proficiency IS NOT NULL AND wr.proficiency > 0 THEN LEAST(
-            100,
-            (CASE WHEN wr.is_primary THEN 60 ELSE 40 END) + (wr.proficiency * 8)
-          )
-          ELSE 0
-        END
-      )::int AS skills_score,
       NULL::double precision AS distance_to_madrid_km,
       0::int AS proximity_score,
       LEAST(wr.jobs_worked, 10)::int AS experience_score,
@@ -276,9 +376,11 @@ BEGIN
     ) AS final_score,
     jsonb_build_array(
       CASE
-        WHEN f.proficiency IS NOT NULL AND f.proficiency > 0 THEN
-          (CASE WHEN f.is_primary THEN 'Primary skill match' ELSE 'Skill match' END) || ' (lvl ' || f.proficiency || ')'
-        ELSE 'No skill match for role'
+        WHEN f.skills_score > 0 AND f.best_skill IS NOT NULL THEN
+          (CASE WHEN (f.best_skill->>'is_primary')::boolean THEN 'Primary skill: ' ELSE 'Skill: ' END) ||
+          (f.best_skill->>'name') || ' (lvl ' || (f.best_skill->>'proficiency') || ')' ||
+          (CASE WHEN (f.best_skill->>'weight')::numeric < 1 THEN ' [related]' ELSE '' END)
+        ELSE 'No matching skill for ' || v_role_position
       END,
       'Reliability: ' || f.reliability_score || '/10',
       'Fairness: ' || f.fairness_score || '/10',
