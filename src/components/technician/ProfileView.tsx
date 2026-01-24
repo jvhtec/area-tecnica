@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -187,13 +187,48 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
         ? `webcal://${SUPABASE_URL.replace(/^https?:\/\//, '')}/functions/v1/tech-calendar-ics?tid=${user.id}&token=${calendarToken}&apikey=${SUPABASE_ANON_KEY}&back=90&fwd=365`
         : '';
 
+    // Handle calendar token generation/rotation
+    const generateCalendarToken = async (): Promise<string> => {
+        const { data, error } = await supabase.rpc('rotate_my_calendar_ics_token');
+        if (error) throw error;
+        const newToken = data as string;
+
+        // Update local state
+        setCalendarToken(newToken);
+
+        // Update cache
+        queryClient.setQueryData(['user-profile', user?.id], (old: any) => ({
+            ...old,
+            calendar_ics_token: newToken
+        }));
+
+        return newToken;
+    };
+
     // Handle calendar sync - open webcal:// link directly
-    const handleCalendarSync = () => {
-        if (!icsUrl) {
-            toast.error('No tienes un enlace de calendario configurado');
-            return;
+    const handleCalendarSync = async () => {
+        try {
+            let token = calendarToken;
+
+            // If no token exists, generate one
+            if (!token) {
+                toast.loading('Generando enlace de calendario...', { id: 'calendar-sync' });
+                token = await generateCalendarToken();
+                toast.success('Enlace de calendario generado', { id: 'calendar-sync' });
+            }
+
+            // Build the URL with the token
+            if (!token || !user?.id) {
+                toast.error('No se pudo generar el enlace de calendario');
+                return;
+            }
+
+            const url = `webcal://${SUPABASE_URL.replace(/^https?:\/\//, '')}/functions/v1/tech-calendar-ics?tid=${user.id}&token=${token}&apikey=${SUPABASE_ANON_KEY}&back=90&fwd=365`;
+            window.location.href = url;
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error al sincronizar calendario';
+            toast.error(message, { id: 'calendar-sync' });
         }
-        window.location.href = icsUrl;
     };
 
     // Handle push notifications enable/disable
@@ -464,7 +499,9 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                         <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400"><CalendarIcon size={18} /></div>
                         <div>
                             <div className={`font-bold text-sm ${theme.textMain}`}>Sincronizar Calendario</div>
-                            <div className={`text-xs ${theme.textMuted}`}>Google / Apple Calendar (ICS)</div>
+                            <div className={`text-xs ${theme.textMuted}`}>
+                                {calendarToken ? 'Google / Apple Calendar (ICS)' : 'Configurar sincronización de calendario'}
+                            </div>
                         </div>
                     </div>
                     <ChevronRight size={18} className={theme.textMuted} />
