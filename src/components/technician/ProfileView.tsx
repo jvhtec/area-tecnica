@@ -197,8 +197,8 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
         setCalendarToken(newToken);
 
         // Update cache
-        queryClient.setQueryData(['user-profile', user?.id], (old: any) => ({
-            ...old,
+        queryClient.setQueryData(['user-profile', user?.id], (old: UserProfile | undefined) => ({
+            ...(old ?? {}),
             calendar_ics_token: newToken
         }));
 
@@ -276,8 +276,8 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
         onSuccess: (data) => {
             toast.success('Perfil actualizado');
             // Update cache directly with returned data
-            queryClient.setQueryData(['user-profile', user?.id], (old: any) => ({
-                ...old,
+            queryClient.setQueryData(['user-profile', user?.id], (old: UserProfile | undefined) => ({
+                ...(old ?? {}),
                 ...data,
             }));
             // Also invalidate to ensure consistency
@@ -314,13 +314,13 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                             currentPictureUrl={userProfile?.profile_picture_url}
                             userInitials={userInitials}
                             onUploadComplete={(url) => {
-                                queryClient.setQueryData(['user-profile', user.id], (old: any) => ({
+                                queryClient.setQueryData(['user-profile', user.id], (old: UserProfile | undefined) => ({
                                     ...(old ?? {}),
                                     profile_picture_url: url
                                 }));
                             }}
                             onRemove={() => {
-                                queryClient.setQueryData(['user-profile', user.id], (old: any) => ({
+                                queryClient.setQueryData(['user-profile', user.id], (old: UserProfile | undefined) => ({
                                     ...(old ?? {}),
                                     profile_picture_url: null
                                 }));

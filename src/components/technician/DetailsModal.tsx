@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -303,6 +304,13 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         return colors[type] || (isDark ? 'bg-slate-500/20 text-slate-400 border-slate-500/30' : 'bg-slate-100 text-slate-700 border-slate-200');
     };
 
+    // Memoized map for O(1) date type lookup
+    const dateTypeMap = useMemo(() => {
+        const map = new Map<string, string>();
+        jobDateTypes.forEach(dt => map.set(dt.date, dt.type));
+        return map;
+    }, [jobDateTypes]);
+
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
             <div className={`w-full max-w-md md:max-w-lg lg:max-w-xl h-[85vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200`}>
@@ -378,7 +386,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                     ) : assignedDates.length > 0 ? (
                                         <div className="space-y-2">
                                             {assignedDates.map((date) => {
-                                                const dateType = jobDateTypes.find(dt => dt.date === date);
+                                                const dateTypeValue = dateTypeMap.get(date);
                                                 return (
                                                     <div
                                                         key={date}
@@ -387,15 +395,15 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                                         <div className="flex items-center gap-2">
                                                             <CalendarIcon size={14} className={theme.textMuted} />
                                                             <span className={`text-sm font-medium ${theme.textMain}`}>
-                                                                {format(parseISO(date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+                                                                {formatInTimeZone(parseISO(date), 'Europe/Madrid', "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
                                                             </span>
                                                         </div>
-                                                        {dateType && (
+                                                        {dateTypeValue && (
                                                             <Badge
                                                                 variant="outline"
-                                                                className={`text-xs font-bold border ${getDateTypeBadgeClass(dateType.type)}`}
+                                                                className={`text-xs font-bold border ${getDateTypeBadgeClass(dateTypeValue)}`}
                                                             >
-                                                                {getDateTypeLabel(dateType.type)}
+                                                                {getDateTypeLabel(dateTypeValue)}
                                                             </Badge>
                                                         )}
                                                     </div>
