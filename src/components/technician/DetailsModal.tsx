@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -377,11 +377,11 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                         </div>
                                     ) : assignedDates.length > 0 ? (
                                         <div className="space-y-2">
-                                            {assignedDates.map((date, idx) => {
+                                            {assignedDates.map((date) => {
                                                 const dateType = jobDateTypes.find(dt => dt.date === date);
                                                 return (
                                                     <div
-                                                        key={idx}
+                                                        key={date}
                                                         className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border`}
                                                     >
                                                         <div className="flex items-center gap-2">
