@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { supabase } from '@/integrations/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { Info } from 'lucide-react'
@@ -64,6 +65,33 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
         return []
       }
     }
+  })
+
+  // Fetch profile pictures for candidates
+  const candidateIds = useMemo(
+    () => candidates?.map(c => c.profile_id) || [],
+    [candidates]
+  )
+
+  const { data: profilePictures } = useQuery({
+    queryKey: ['candidate_profile_pictures', candidateIds],
+    queryFn: async () => {
+      if (candidateIds.length === 0) return {}
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, profile_picture_url')
+        .in('id', candidateIds)
+      if (error) {
+        console.error('Error fetching profile pictures:', error)
+        return {}
+      }
+      // Convert to a map for easy lookup
+      return (data || []).reduce((acc, p) => {
+        acc[p.id] = p.profile_picture_url
+        return acc
+      }, {} as Record<string, string | null>)
+    },
+    enabled: candidateIds.length > 0
   })
 
   // Send availability mutation
@@ -140,6 +168,14 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
     setSelectedCandidates(newSelected)
   }
 
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(' ')
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    }
+    return (name[0] || 'T').toUpperCase()
+  }
+
   const toggleSelectAll = () => {
     if (selectedCandidates.size === candidates?.length) {
       setSelectedCandidates(new Set())
@@ -201,6 +237,16 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                 onCheckedChange={() => toggleCandidate(candidate.profile_id)}
                 className="mt-1"
               />
+
+              <Avatar className="h-10 w-10 shrink-0">
+                <AvatarImage
+                  src={profilePictures?.[candidate.profile_id] || undefined}
+                  alt={candidate.full_name}
+                />
+                <AvatarFallback className="text-xs">
+                  {getInitials(candidate.full_name)}
+                </AvatarFallback>
+              </Avatar>
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
