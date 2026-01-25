@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { formatUserName } from '@/utils/userName';
@@ -608,11 +608,13 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                     id="residencia"
                     value={editedData.residencia}
                     onChange={(city, coordinates) => {
+                      // Clear coordinates if city changes without autocomplete selection
+                      // to prevent stale location data from skewing proximity ranking
                       setEditedData(prev => ({
                         ...prev,
                         residencia: city,
-                        home_latitude: coordinates?.lat ?? prev.home_latitude,
-                        home_longitude: coordinates?.lng ?? prev.home_longitude
+                        home_latitude: coordinates?.lat ?? null,
+                        home_longitude: coordinates?.lng ?? null
                       }));
                     }}
                     placeholder="Ingresa ciudad"

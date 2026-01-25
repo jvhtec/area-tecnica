@@ -364,8 +364,10 @@ export const Profile = () => {
                     onChange={(city, coordinates) => setProfile({
                       ...profile,
                       residencia: city,
-                      home_latitude: coordinates?.lat ?? profile.home_latitude,
-                      home_longitude: coordinates?.lng ?? profile.home_longitude,
+                      // Clear coordinates if city changes without autocomplete selection
+                      // to prevent stale location data from skewing proximity ranking
+                      home_latitude: coordinates?.lat ?? null,
+                      home_longitude: coordinates?.lng ?? null,
                     })}
                     placeholder="Enter city"
                     label="Residencia"

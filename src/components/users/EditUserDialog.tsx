@@ -333,10 +333,10 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
               value={residencia}
               onChange={(city, coordinates) => {
                 setResidencia(city);
-                if (coordinates) {
-                  setHomeLatitude(coordinates.lat);
-                  setHomeLongitude(coordinates.lng);
-                }
+                // Clear coordinates if city changes without autocomplete selection
+                // to prevent stale location data from skewing proximity ranking
+                setHomeLatitude(coordinates?.lat ?? null);
+                setHomeLongitude(coordinates?.lng ?? null);
               }}
               placeholder="Enter city"
               label="Residencia"
