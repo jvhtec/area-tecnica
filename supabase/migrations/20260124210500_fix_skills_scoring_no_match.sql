@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.role_skill_mapping (
 ALTER TABLE public.role_skill_mapping ENABLE ROW LEVEL SECURITY;
 
 -- Create SELECT policy for authenticated users
+DROP POLICY IF EXISTS "role_skill_mapping_select_for_authenticated" ON public.role_skill_mapping;
 CREATE POLICY "role_skill_mapping_select_for_authenticated"
   ON public.role_skill_mapping
   FOR SELECT
