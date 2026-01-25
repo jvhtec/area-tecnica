@@ -13,7 +13,17 @@ CREATE TABLE IF NOT EXISTS public.role_skill_mapping (
   UNIQUE(role_prefix, skill_name)
 );
 
--- Grant access
+-- Enable Row Level Security
+ALTER TABLE public.role_skill_mapping ENABLE ROW LEVEL SECURITY;
+
+-- Create SELECT policy for authenticated users
+CREATE POLICY "role_skill_mapping_select_for_authenticated"
+  ON public.role_skill_mapping
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- Grant access (service_role bypasses RLS)
 GRANT SELECT ON public.role_skill_mapping TO authenticated;
 GRANT SELECT ON public.role_skill_mapping TO service_role;
 
@@ -225,7 +235,7 @@ BEGIN
           AND rsm.role_prefix = v_role_prefix
           AND COALESCE(ps.proficiency, 0) > 0
         ORDER BY
-          (CASE WHEN ps.is_primary THEN 60 ELSE 40 END) + (COALESCE(ps.proficiency, 0) * 8) * rsm.weight DESC
+          LEAST(100, (CASE WHEN ps.is_primary THEN 60 ELSE 40 END) + (COALESCE(ps.proficiency, 0) * 8)) * rsm.weight DESC
         LIMIT 1
       ) AS best_skill
     FROM base b

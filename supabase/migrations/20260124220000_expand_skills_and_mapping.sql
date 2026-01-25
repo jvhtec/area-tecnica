@@ -1,14 +1,21 @@
 -- Expand skills table with missing entries and populate role_skill_mapping
 -- to properly match actual skill names in the database
 
--- First, add missing skills to the skills table
+-- First, add all skills referenced by role_skill_mapping to ensure they exist
 -- Using lowercase names to match existing convention
--- Note: skills.name has UNIQUE constraint, so each skill name can only exist once
+-- Note: skills.name has UNIQUE constraint, so ON CONFLICT DO NOTHING handles existing entries
 INSERT INTO public.skills (name, category, active) VALUES
-  -- Sound skills (missing ones)
+  -- Sound skills (existing in DB but included for completeness)
+  ('foh', 'sound-specialty', true),
+  ('monitores', 'sound-specialty', true),
+  ('sistemas', 'sound-specialty', true),
+  ('rf', 'sound-specialty', true),
+  ('escenario', 'sound', true),
+  ('pa', 'sound', true),
   ('montaje', 'sound', true),
 
-  -- Lights skills (from SkillsFilter presets + extras)
+  -- Lights skills (existing + new)
+  ('lighting op', 'lights', true),
   ('operador (ma2)', 'lights', true),
   ('operador (ma3)', 'lights', true),
   ('operador (hog)', 'lights', true),
@@ -19,7 +26,8 @@ INSERT INTO public.skills (name, category, active) VALUES
   ('cañón', 'lights', true),
   ('asistente iluminación', 'lights', true),
 
-  -- Video skills
+  -- Video skills (existing + new)
+  ('video op', 'video', true),
   ('switcher', 'video', true),
   ('director', 'video', true),
   ('cámara', 'video', true),
@@ -27,13 +35,15 @@ INSERT INTO public.skills (name, category, active) VALUES
   ('proyección', 'video', true),
   ('pa video', 'video', true),
 
-  -- Production skills
+  -- Production/Logistics skills (existing + new)
+  ('rigging', 'production', true),
+  ('truck driving', 'logistics', true),
   ('producción', 'production', true),
   ('ayudante producción', 'production', true),
   ('conductor', 'production', true),
   ('runner', 'production', true),
 
-  -- General/cross-department skills (applicable to multiple departments)
+  -- General/cross-department skills
   ('trabajo en altura', 'general', true),
   ('carnet de conducir', 'general', true),
   ('idioma inglés', 'general', true)
