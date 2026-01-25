@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface CityAutocompleteProps {
   value: string;
-  onChange: (city: string) => void;
+  onChange: (city: string, coordinates?: { lat: number; lng: number }) => void;
   placeholder?: string;
   label?: string;
   className?: string;
@@ -157,7 +157,7 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
       const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
         headers: {
           'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'id,displayName,formattedAddress,addressComponents',
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,addressComponents,location',
         },
       });
 
@@ -185,7 +185,13 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
         }
       }
 
-      onChange(cityName);
+      // Extract coordinates if available
+      const coordinates = place.location ? {
+        lat: place.location.latitude,
+        lng: place.location.longitude,
+      } : undefined;
+
+      onChange(cityName, coordinates);
       setInputValue(cityName);
       setShowSuggestions(false);
     } catch (err) {

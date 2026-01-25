@@ -105,6 +105,8 @@ export const Profile = () => {
           department: profile.department,
           dni: profile.dni,
           residencia: profile.residencia,
+          home_latitude: profile.home_latitude,
+          home_longitude: profile.home_longitude,
           bg_color: profile.bg_color || null,
           custom_folder_structure: folderStructure,
           custom_tour_folder_structure: tourFolderStructure,
@@ -359,7 +361,12 @@ export const Profile = () => {
                   <CityAutocomplete
                     id="residencia"
                     value={profile.residencia || ''}
-                    onChange={(city) => setProfile({ ...profile, residencia: city })}
+                    onChange={(city, coordinates) => setProfile({
+                      ...profile,
+                      residencia: city,
+                      home_latitude: coordinates?.lat ?? profile.home_latitude,
+                      home_longitude: coordinates?.lng ?? profile.home_longitude,
+                    })}
                     placeholder="Enter city"
                     label="Residencia"
                     className="space-y-2"

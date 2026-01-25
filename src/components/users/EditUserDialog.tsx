@@ -35,6 +35,8 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   const [flexResourceId, setFlexResourceId] = useState<string>(user?.flex_resource_id || "");
   const [isSendingOnboarding, setIsSendingOnboarding] = useState(false);
   const [residencia, setResidencia] = useState<string>(user?.residencia || "");
+  const [homeLatitude, setHomeLatitude] = useState<number | null>(user?.home_latitude ?? null);
+  const [homeLongitude, setHomeLongitude] = useState<number | null>(user?.home_longitude ?? null);
   const [bgColor, setBgColor] = useState<string>(user?.bg_color || "");
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(user?.profile_picture_url || null);
 
@@ -46,6 +48,8 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     setFlexUrl("");
     setIsAutonomo(user?.autonomo !== false);
     setResidencia(user?.residencia || "");
+    setHomeLatitude(user?.home_latitude ?? null);
+    setHomeLongitude(user?.home_longitude ?? null);
     setBgColor(user?.bg_color || "");
     setProfilePictureUrl(user?.profile_picture_url || null);
   }, [user?.id]);
@@ -89,6 +93,8 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       department: formData.get('department') as Department,
       dni: formData.get('dni') as string,
       residencia: residencia,
+      home_latitude: homeLatitude,
+      home_longitude: homeLongitude,
       bg_color: bgColor || null,
       role: formData.get('role') as string,
       assignable_as_tech: assignableAsTech,
@@ -325,7 +331,13 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
             <CityAutocomplete
               id="residencia"
               value={residencia}
-              onChange={setResidencia}
+              onChange={(city, coordinates) => {
+                setResidencia(city);
+                if (coordinates) {
+                  setHomeLatitude(coordinates.lat);
+                  setHomeLongitude(coordinates.lng);
+                }
+              }}
               placeholder="Enter city"
               label="Residencia"
               className="space-y-2"
