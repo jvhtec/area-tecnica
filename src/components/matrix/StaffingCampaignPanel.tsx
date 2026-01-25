@@ -54,11 +54,11 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
   const queryClient = useQueryClient()
   const [showStartDialog, setShowStartDialog] = useState(false)
   const [formData, setFormData] = useState({
-    mode: 'assisted' as const,
-    scope: 'outstanding' as const,
+    mode: 'assisted' as 'assisted' | 'auto',
+    scope: 'outstanding' as 'outstanding' | 'all',
     proximityWeight: 0.1,
-    historyWeight: 0.2,
-    softConflictPolicy: 'block' as const,
+    historyWeight: 0.2, // Will be mapped to reliability
+    softConflictPolicy: 'block' as 'warn' | 'block' | 'allow',
     excludeFridge: true,
     availabilityTtl: 24,
     offerTtl: 4,
@@ -79,6 +79,24 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
       return data as Campaign | null
     }
   })
+
+  // Initialize formData from active campaign
+  useEffect(() => {
+    if (campaign) {
+      setFormData({
+        mode: campaign.mode,
+        scope: 'outstanding',
+        proximityWeight: campaign.policy?.weights?.proximity ?? 0.1,
+        historyWeight: campaign.policy?.weights?.reliability ?? 0.2,
+        softConflictPolicy: campaign.policy?.soft_conflict_policy ?? 'block',
+        excludeFridge: campaign.policy?.exclude_fridge ?? true,
+        availabilityTtl: campaign.policy?.availability_ttl_hours ?? 24,
+        offerTtl: campaign.policy?.offer_ttl_hours ?? 4,
+        offerMessage: campaign.offer_message ?? '',
+        tickInterval: campaign.policy?.tick_interval_seconds ?? 300
+      })
+    }
+  }, [campaign])
 
   // Fetch campaign roles if campaign exists
   const { data: campaignRoles } = useQuery({
@@ -102,7 +120,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         weights: {
           skills: 0.5,
           proximity: formData.proximityWeight,
-          reliability: 0.2,
+          reliability: formData.historyWeight,
           fairness: 0.1,
           experience: 0.1
         },
@@ -153,6 +171,60 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
     onError: (error: any) => {
       toast({
         title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      })
+    }
+  })
+
+  // Update campaign settings mutation
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      const policy = {
+        weights: {
+          skills: 0.5,
+          proximity: formData.proximityWeight,
+          reliability: formData.historyWeight,
+          fairness: 0.1,
+          experience: 0.1
+        },
+        availability_ttl_hours: formData.availabilityTtl,
+        offer_ttl_hours: formData.offerTtl,
+        availability_multiplier: 4,
+        offer_buffer: 1,
+        exclude_fridge: formData.excludeFridge,
+        soft_conflict_policy: formData.softConflictPolicy,
+        tick_interval_seconds: formData.tickInterval,
+        escalation_steps: ['increase_wave', 'include_fridge', 'allow_soft_conflicts']
+      }
+
+      const nextRunUpdate = formData.mode === 'auto' && campaign?.mode === 'assisted'
+        ? { next_run_at: new Date().toISOString() }
+        : {}
+
+      const { data, error } = await supabase
+        .from('staffing_campaigns')
+        .update({
+          mode: formData.mode,
+          policy,
+          offer_message: formData.offerMessage || null,
+          updated_at: new Date().toISOString(),
+          ...nextRunUpdate
+        })
+        .eq('id', campaign?.id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      toast({ title: 'Settings updated' })
+      queryClient.invalidateQueries({ queryKey: ['staffing_campaign', jobId, department] })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error updating settings',
         description: error.message,
         variant: 'destructive'
       })
@@ -291,7 +363,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                         name="mode"
                         value="assisted"
                         checked={formData.mode === 'assisted'}
-                        onChange={(e) => setFormData({ ...formData, mode: 'assisted' })}
+                        onChange={() => setFormData({ ...formData, mode: 'assisted' })}
                       />
                       <span className="text-sm">Assisted (Manager-controlled)</span>
                     </label>
@@ -301,7 +373,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                         name="mode"
                         value="auto"
                         checked={formData.mode === 'auto'}
-                        onChange={(e) => setFormData({ ...formData, mode: 'auto' })}
+                        onChange={() => setFormData({ ...formData, mode: 'auto' })}
                       />
                       <span className="text-sm">Auto (System-driven)</span>
                     </label>
@@ -318,7 +390,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                         name="scope"
                         value="outstanding"
                         checked={formData.scope === 'outstanding'}
-                        onChange={(e) => setFormData({ ...formData, scope: 'outstanding' })}
+                        onChange={() => setFormData({ ...formData, scope: 'outstanding' })}
                       />
                       <span className="text-sm">Outstanding roles only</span>
                     </label>
@@ -328,7 +400,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                         name="scope"
                         value="all"
                         checked={formData.scope === 'all'}
-                        onChange={(e) => setFormData({ ...formData, scope: 'all' })}
+                        onChange={() => setFormData({ ...formData, scope: 'all' })}
                       />
                       <span className="text-sm">All required roles</span>
                     </label>
@@ -346,7 +418,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                       max="0.3"
                       value={formData.proximityWeight}
                       onChange={(e) => setFormData({ ...formData, proximityWeight: parseFloat(e.target.value) })}
-                      className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                      className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
                     />
                   </div>
                   <div>
@@ -358,7 +430,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                       max="0.4"
                       value={formData.historyWeight}
                       onChange={(e) => setFormData({ ...formData, historyWeight: parseFloat(e.target.value) })}
-                      className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                      className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
                     />
                   </div>
                 </div>
@@ -373,7 +445,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                       max="72"
                       value={formData.availabilityTtl}
                       onChange={(e) => setFormData({ ...formData, availabilityTtl: parseInt(e.target.value) })}
-                      className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                      className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
                     />
                   </div>
                   <div>
@@ -384,7 +456,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                       max="24"
                       value={formData.offerTtl}
                       onChange={(e) => setFormData({ ...formData, offerTtl: parseInt(e.target.value) })}
-                      className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                      className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
                     />
                   </div>
                 </div>
@@ -395,7 +467,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                   <select
                     value={formData.softConflictPolicy}
                     onChange={(e) => setFormData({ ...formData, softConflictPolicy: e.target.value as any })}
-                    className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                    className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
                   >
                     <option value="block">Block (Auto mode default)</option>
                     <option value="warn">Warn (Assisted mode)</option>
@@ -420,7 +492,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                     value={formData.offerMessage}
                     onChange={(e) => setFormData({ ...formData, offerMessage: e.target.value })}
                     placeholder="Personal note to include in offer emails..."
-                    className="w-full mt-1 px-2 py-1 border rounded text-sm h-20"
+                    className="w-full mt-1 px-2 py-1 border rounded text-sm h-20 bg-background"
                   />
                 </div>
 
@@ -434,7 +506,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                       step="60"
                       value={formData.tickInterval}
                       onChange={(e) => setFormData({ ...formData, tickInterval: parseInt(e.target.value) })}
-                      className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                      className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
                     />
                   </div>
                 )}
@@ -518,8 +590,155 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           </div>
         )}
 
+        {/* Editable Settings form */}
+        <div className="border-t pt-4 space-y-6">
+          <h4 className="text-sm font-semibold">Campaign Settings</h4>
+
+          <div className="space-y-6">
+            {/* Mode Selection */}
+            <div>
+              <label className="text-sm font-medium">Mode</label>
+              <div className="flex gap-4 mt-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="active_mode"
+                    value="assisted"
+                    checked={formData.mode === 'assisted'}
+                    onChange={() => setFormData({ ...formData, mode: 'assisted' })}
+                  />
+                  <span className="text-sm">Assisted (Manager-controlled)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="active_mode"
+                    value="auto"
+                    checked={formData.mode === 'auto'}
+                    onChange={() => setFormData({ ...formData, mode: 'auto' })}
+                  />
+                  <span className="text-sm">Auto (System-driven)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Weights */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Proximity Weight</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  min="0"
+                  max="0.3"
+                  value={formData.proximityWeight}
+                  onChange={(e) => setFormData({ ...formData, proximityWeight: parseFloat(e.target.value) })}
+                  className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">History Weight (Reliability)</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  min="0"
+                  max="0.5"
+                  value={formData.historyWeight}
+                  onChange={(e) => setFormData({ ...formData, historyWeight: parseFloat(e.target.value) })}
+                  className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+                />
+              </div>
+            </div>
+
+            {/* TTLs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Availability TTL (hours)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="72"
+                  value={formData.availabilityTtl}
+                  onChange={(e) => setFormData({ ...formData, availabilityTtl: parseInt(e.target.value) })}
+                  className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Offer TTL (hours)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="24"
+                  value={formData.offerTtl}
+                  onChange={(e) => setFormData({ ...formData, offerTtl: parseInt(e.target.value) })}
+                  className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+                />
+              </div>
+            </div>
+
+            {/* Conflict policy */}
+            <div>
+              <label className="text-sm font-medium">Soft Conflict Policy</label>
+              <select
+                value={formData.softConflictPolicy}
+                onChange={(e) => setFormData({ ...formData, softConflictPolicy: e.target.value as any })}
+                className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+              >
+                <option value="block">Block (Auto mode default)</option>
+                <option value="warn">Warn (Assisted mode)</option>
+                <option value="allow">Allow (Escalation only)</option>
+              </select>
+            </div>
+
+            {/* Fridge toggle */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.excludeFridge}
+                onChange={(e) => setFormData({ ...formData, excludeFridge: e.target.checked })}
+              />
+              <span className="text-sm">Exclude fridge techs</span>
+            </label>
+
+            {/* Offer message */}
+            <div>
+              <label className="text-sm font-medium">Offer Message</label>
+              <textarea
+                value={formData.offerMessage}
+                onChange={(e) => setFormData({ ...formData, offerMessage: e.target.value })}
+                placeholder="Personal note to include in offer emails..."
+                className="w-full mt-1 px-2 py-1 border rounded text-sm h-20 bg-background"
+              />
+            </div>
+
+            {formData.mode === 'auto' && (
+              <div>
+                <label className="text-sm font-medium">Tick Interval (seconds)</label>
+                <input
+                  type="number"
+                  min="60"
+                  max="3600"
+                  step="60"
+                  value={formData.tickInterval}
+                  onChange={(e) => setFormData({ ...formData, tickInterval: parseInt(e.target.value) })}
+                  className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <Button
+              onClick={() => updateMutation.mutate()}
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? 'Saving...' : 'Save Settings'}
+            </Button>
+          </div>
+        </div>
+
         {/* Controls */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 border-t pt-4">
           {campaign.status === 'active' ? (
             <>
               <Button
