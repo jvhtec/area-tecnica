@@ -12,9 +12,6 @@ import { UsersList } from "@/components/users/UsersList";
 import { FilterBar } from "@/components/users/filters/FilterBar";
 import { ImportUsersDialog } from "@/components/users/import/ImportUsersDialog";
 import { CompanyLogoUploader } from "@/components/CompanyLogoUploader";
-import { EquipmentModelsList } from "@/components/equipment/EquipmentModelsList";
-import { DepartmentProvider } from "@/contexts/DepartmentContext";
-import type { Department } from "@/types/equipment";
 import { DEPARTMENT_LABELS } from "@/types/department";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -95,7 +92,6 @@ const CollapsibleCard = ({
 };
 
 // Equipment departments (sound, lights, video only)
-const EQUIPMENT_DEPARTMENTS: Department[] = ['sound', 'lights', 'video'];
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -104,8 +100,7 @@ const Settings = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
-  // Department selector for Equipment Models card
-  const [modelsDepartment, setModelsDepartment] = useState<Department>('sound');
+
 
   const { userRole, isLoading: authLoading } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
@@ -228,7 +223,6 @@ const Settings = () => {
     'shortcuts': false,
     'users': false,
     'company-settings': false,
-    'equipment-models': false,
     'dryhire-folders': false,
     'version-info': false,
   });
@@ -490,39 +484,7 @@ const Settings = () => {
               </div>
             </CollapsibleCard>
 
-            {isManagementUser && (
-              <CollapsibleCard
-                id="equipment-models"
-                title="Equipment models"
-                isOpen={collapsibleStates['equipment-models']}
-                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'equipment-models': open }))}
-              >
-                <div className="space-y-3 md:space-y-4">
-                  <div className="flex flex-col gap-2">
-                    <p className="text-xs md:text-sm text-muted-foreground">
-                      Manage equipment models used in festival forms and gear setup.
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">Department:</span>
-                      <select
-                        className="border rounded px-2 py-1.5 text-xs md:text-sm flex-1 sm:flex-initial sm:min-w-[120px]"
-                        value={modelsDepartment}
-                        onChange={(e) => setModelsDepartment(e.target.value as Department)}
-                      >
-                        {EQUIPMENT_DEPARTMENTS.map((dept) => (
-                          <option key={dept} value={dept}>
-                            {DEPARTMENT_LABELS[dept]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <DepartmentProvider department={modelsDepartment}>
-                    <EquipmentModelsList />
-                  </DepartmentProvider>
-                </div>
-              </CollapsibleCard>
-            )}
+
 
             {isManagementUser && (
               <CollapsibleCard

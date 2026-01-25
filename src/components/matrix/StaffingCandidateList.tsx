@@ -69,7 +69,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
 
   // Fetch profile pictures for candidates
   const candidateIds = useMemo(
-    () => candidates?.map(c => c.profile_id) || [],
+    () => Array.from(new Set(candidates?.map(c => c.profile_id) || [])).sort(),
     [candidates]
   )
 
@@ -169,11 +169,14 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
   }
 
   const getInitials = (name: string) => {
-    const parts = name.trim().split(' ')
+    const trimmed = name.trim()
+    if (!trimmed) return 'T'
+
+    const parts = trimmed.split(/\s+/)
     if (parts.length >= 2) {
       return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     }
-    return (name[0] || 'T').toUpperCase()
+    return trimmed[0].toUpperCase()
   }
 
   const toggleSelectAll = () => {

@@ -90,6 +90,12 @@ export async function createDryhireYearFolders(year: number): Promise<void> {
     lights: "Luces",
   };
 
+  // Document number prefixes: 666 for sound, 555 for lights
+  const departmentPrefixes: Record<DryhireDepartment, string> = {
+    sound: "666",
+    lights: "555",
+  };
+
   // Check if folders already exist for this year
   const { data: existing } = await supabase
     .from("dryhire_parent_folders")
@@ -105,7 +111,13 @@ export async function createDryhireYearFolders(year: number): Promise<void> {
   const yearStart = `${year}-01-01T00:00:00.000Z`;
   const yearEnd = `${year}-12-31T23:59:59.000Z`;
 
+  // Get last 2 digits of year
+  const yearSuffix = String(year).slice(-2);
+
   for (const dept of departments) {
+    // Document number for root folder: XXX.YY (e.g., 555.25 for lights 2025)
+    const rootDocumentNumber = `${departmentPrefixes[dept]}.${yearSuffix}`;
+
     // Create main folder for the year/department
     const mainFolderPayload = {
       definitionId: FLEX_FOLDER_IDS.mainFolder,
@@ -117,6 +129,7 @@ export async function createDryhireYearFolders(year: number): Promise<void> {
       locationId: FLEX_FOLDER_IDS.location,
       departmentId: DEPARTMENT_IDS[dept],
       personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
+      documentNumber: rootDocumentNumber,
     };
 
     console.log(`Creating main dryhire folder for ${year} ${dept}:`, mainFolderPayload);
@@ -140,6 +153,9 @@ export async function createDryhireYearFolders(year: number): Promise<void> {
       const monthKey = String(monthIndex + 1).padStart(2, "0");
       const monthName = MONTH_NAMES[monthIndex];
 
+      // Document number for month subfolder: XXX.YY.MM (e.g., 555.25.01 for lights Jan 2025)
+      const monthDocumentNumber = `${rootDocumentNumber}.${monthKey}`;
+
       // Calculate month start/end dates
       const monthStart = new Date(year, monthIndex, 1);
       const monthEnd = new Date(year, monthIndex + 1, 0, 23, 59, 59);
@@ -155,6 +171,7 @@ export async function createDryhireYearFolders(year: number): Promise<void> {
         locationId: FLEX_FOLDER_IDS.location,
         departmentId: DEPARTMENT_IDS[dept],
         personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
+        documentNumber: monthDocumentNumber,
       };
 
       console.log(`Creating ${monthName} subfolder for ${year} ${dept}:`, subFolderPayload);

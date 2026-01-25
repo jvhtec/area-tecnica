@@ -20,6 +20,7 @@ interface PredictionItem {
   place_id: string;
   name: string;
   formatted_address: string;
+  coordinates?: { lat: number; lng: number };
 }
 
 export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
@@ -78,15 +79,16 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
   }, []);
 
   const searchCities = async (query: string) => {
+    const trimmedQuery = query.trim();
     const key = apiKey || (await fetchApiKey());
-    if (!key || !query || query.length < 2) {
+    if (!key || !trimmedQuery || trimmedQuery.length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
-    if (cacheRef.current[query]) {
-      setSuggestions(cacheRef.current[query]);
+    if (cacheRef.current[trimmedQuery]) {
+      setSuggestions(cacheRef.current[trimmedQuery]);
       setShowSuggestions(true);
       return;
     }
@@ -94,11 +96,68 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
     setIsLoading(true);
 
     try {
+      // Prefer Text Search (more reliable + includes coordinates), then fallback to Autocomplete
+      let textSearchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': key,
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
+        },
+        body: JSON.stringify({
+          textQuery: trimmedQuery,
+          includedType: 'locality',
+          maxResultCount: 6,
+          languageCode: 'es',
+          regionCode: 'ES',
+        }),
+      });
+
+      if (!textSearchRes.ok) {
+        // Retry without includedType to avoid 400s from strict filters
+        const errTxt = await textSearchRes.text().catch(() => '');
+        console.warn('CityAutocomplete: Text Search error, retrying without includedType:', textSearchRes.status, errTxt);
+        textSearchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': key,
+            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
+          },
+          body: JSON.stringify({
+            textQuery: trimmedQuery,
+            maxResultCount: 6,
+            languageCode: 'es',
+            regionCode: 'ES',
+          }),
+        });
+      }
+
+      if (textSearchRes.ok) {
+        const data = await textSearchRes.json();
+        const results: PredictionItem[] = (data.places || []).map((p: any) => ({
+          place_id: p.id,
+          name: p.displayName?.text || p.formattedAddress || trimmedQuery,
+          formatted_address: p.formattedAddress || '',
+          coordinates: p.location
+            ? { lat: p.location.latitude, lng: p.location.longitude }
+            : undefined,
+        }));
+
+        if (results.length > 0) {
+          cacheRef.current[trimmedQuery] = results;
+          setSuggestions(results);
+          setShowSuggestions(true);
+          return;
+        }
+      }
+
       const requestBody = {
-        input: query,
+        input: trimmedQuery,
+        maxResultCount: 6,
+        languageCode: 'es',
+        regionCode: 'ES',
       };
-      console.log('CityAutocomplete: Request body:', requestBody);
-      console.log('CityAutocomplete: API key exists:', !!key);
 
       // Use Places Autocomplete API - filter cities on client side
       const acRes = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
@@ -111,12 +170,6 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
         body: JSON.stringify(requestBody),
       });
 
-      console.log('CityAutocomplete: Response status:', acRes.status);
-      if (!acRes.ok) {
-        const errorText = await acRes.text();
-        console.log('CityAutocomplete: Error response:', errorText);
-      }
-
       if (acRes.ok) {
         const data = await acRes.json();
         const results: PredictionItem[] = (data.suggestions || [])
@@ -126,11 +179,12 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
             name: s.placePrediction.structuredFormat?.mainText?.text || s.placePrediction.text?.text,
             formatted_address: s.placePrediction.structuredFormat?.secondaryText?.text || '',
           }));
-        cacheRef.current[query] = results;
+        cacheRef.current[trimmedQuery] = results;
         setSuggestions(results);
         setShowSuggestions(results.length > 0);
       } else {
-        console.error('City Autocomplete API error:', acRes.status);
+        const errorText = await acRes.text().catch(() => '');
+        console.error('CityAutocomplete: Autocomplete API error:', acRes.status, errorText);
         setSuggestions([]);
         setShowSuggestions(false);
       }
@@ -143,11 +197,15 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
     }
   };
 
-  const getCityDetails = async (placeId: string, fallbackName: string) => {
+  const getCityDetails = async (
+    placeId: string,
+    fallbackName: string,
+    fallbackCoordinates?: { lat: number; lng: number }
+  ) => {
     const key = apiKey || (await fetchApiKey());
     if (!key) {
       // Use fallback name if API key not available
-      onChange(fallbackName);
+      onChange(fallbackName, fallbackCoordinates);
       setInputValue(fallbackName);
       setShowSuggestions(false);
       return;
@@ -191,13 +249,13 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
         lng: place.location.longitude,
       } : undefined;
 
-      onChange(cityName, coordinates);
+      onChange(cityName, coordinates ?? fallbackCoordinates);
       setInputValue(cityName);
       setShowSuggestions(false);
     } catch (err) {
       console.error('Error fetching city details:', err);
       // Use fallback on error
-      onChange(fallbackName);
+      onChange(fallbackName, fallbackCoordinates);
       setInputValue(fallbackName);
       setShowSuggestions(false);
     }
@@ -214,7 +272,7 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
   };
 
   const handleSelect = (item: PredictionItem) => {
-    getCityDetails(item.place_id, item.name);
+    getCityDetails(item.place_id, item.name, item.coordinates);
   };
 
   return (
