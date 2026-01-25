@@ -60,6 +60,8 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     lastYearUpcoming: number;
   }>({ monthTotal: 0, yearTotal: 0, lastYearTotal: 0, monthUpcoming: 0, yearUpcoming: 0, lastYearUpcoming: 0 });
   const [residencia, setResidencia] = React.useState<string | null>(null);
+  const [homeLatitude, setHomeLatitude] = React.useState<number | null>(null);
+  const [homeLongitude, setHomeLongitude] = React.useState<number | null>(null);
   const [residenciaLoading, setResidenciaLoading] = React.useState(false);
   const [sendingOnboarding, setSendingOnboarding] = React.useState(false);
   const { toast } = useToast();
@@ -77,6 +79,8 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     department: technician.department,
     role: technician.role,
     residencia: residencia || '',
+    home_latitude: homeLatitude,
+    home_longitude: homeLongitude,
     bg_color: technician.bg_color || ''
   });
 
@@ -153,13 +157,22 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
       setResidenciaLoading(true);
       const { data, error } = await supabase
         .from('profiles')
-        .select('residencia')
+        .select('residencia, home_latitude, home_longitude')
         .eq('id', technician.id)
         .single();
       if (!error) {
         const resValue = (data as any)?.residencia ?? null;
+        const lat = (data as any)?.home_latitude ?? null;
+        const lng = (data as any)?.home_longitude ?? null;
         setResidencia(resValue);
-        setEditedData(prev => ({ ...prev, residencia: resValue || '' }));
+        setHomeLatitude(lat);
+        setHomeLongitude(lng);
+        setEditedData(prev => ({
+          ...prev,
+          residencia: resValue || '',
+          home_latitude: lat,
+          home_longitude: lng
+        }));
       }
     } finally {
       setResidenciaLoading(false);
@@ -181,6 +194,8 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
           department: editedData.department,
           role: editedData.role,
           residencia: editedData.residencia || null,
+          home_latitude: editedData.home_latitude,
+          home_longitude: editedData.home_longitude,
           bg_color: editedData.bg_color || null
         })
         .eq('id', technician.id);
@@ -189,6 +204,8 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
 
       // Update local state
       setResidencia(editedData.residencia || null);
+      setHomeLatitude(editedData.home_latitude);
+      setHomeLongitude(editedData.home_longitude);
 
       // Invalidate queries to refresh data
       await qc.invalidateQueries({ queryKey: ['optimized-matrix-technicians'] });
@@ -214,6 +231,8 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
       department: technician.department,
       role: technician.role,
       residencia: residencia || '',
+      home_latitude: homeLatitude,
+      home_longitude: homeLongitude,
       bg_color: technician.bg_color || ''
     });
     setIsEditing(true);
@@ -230,6 +249,8 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
       department: technician.department,
       role: technician.role,
       residencia: residencia || '',
+      home_latitude: homeLatitude,
+      home_longitude: homeLongitude,
       bg_color: technician.bg_color || ''
     });
     setIsEditing(false);
@@ -586,7 +607,14 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                   <CityAutocomplete
                     id="residencia"
                     value={editedData.residencia}
-                    onChange={(city) => setEditedData(prev => ({ ...prev, residencia: city }))}
+                    onChange={(city, coordinates) => {
+                      setEditedData(prev => ({
+                        ...prev,
+                        residencia: city,
+                        home_latitude: coordinates?.lat ?? prev.home_latitude,
+                        home_longitude: coordinates?.lng ?? prev.home_longitude
+                      }));
+                    }}
                     placeholder="Ingresa ciudad"
                     label="Residencia"
                     className="space-y-2"

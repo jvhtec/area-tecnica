@@ -377,3 +377,7 @@ BEGIN
   LIMIT 50;
 END;
 $$;
+
+-- Grant execute permissions for the function
+GRANT EXECUTE ON FUNCTION public.rank_staffing_candidates(uuid, text, text, text, jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rank_staffing_candidates(uuid, text, text, text, jsonb) TO service_role;
