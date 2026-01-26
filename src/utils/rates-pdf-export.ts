@@ -13,9 +13,11 @@ import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
+const HOUSE_TECH_TRAVEL_RATE_EUR = 20;
 const DEDUCTION_DISCLAIMER_TEXT = '* Se ha aplicado una deducción de 30€/día en concepto de IRPF por condición de no autónomo.';
 const TOUR_DEDUCTION_DISCLAIMER_TEXT = '* Deducción de 30€ en concepto de IRPF por condición de no autónomo ya aplicada a la tarifa base antes de multiplicadores.';
 const EVENTO_DISCLAIMER_TEXT = '* Evento: tarifa fija de 12h (base + plus) independientemente de las horas trabajadas.';
+const HOUSE_TECH_TRAVEL_DISCLAIMER_TEXT = `* (plantilla): Tarifa fija de ${HOUSE_TECH_TRAVEL_RATE_EUR}€ para días de viaje de técnicos en plantilla.`;
 
 export interface TechnicianProfile {
   id: string;
@@ -924,6 +926,12 @@ export async function generateJobPayoutPDF(
       return lines.some(l => l.is_evento === true);
   });
 
+  // Check if any extras use house tech travel rate
+  const anyHouseTechTravelRate = payouts.some(p => {
+      const items = (p.extras_breakdown?.items as any[]) || [];
+      return items.some((item: any) => item.is_house_tech_rate === true);
+  });
+
   autoTable(doc, {
     startY: yPos,
     head: [['Técnico', 'Partes', 'Extras', 'Gastos', 'Total']],
@@ -968,6 +976,14 @@ export async function generateJobPayoutPDF(
       doc.setFontSize(8);
       doc.setTextColor(...CORPORATE_RED);
       doc.text(EVENTO_DISCLAIMER_TEXT, 14, disclaimerY);
+      disclaimerY += 6;
+  }
+
+  if (anyHouseTechTravelRate) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(...CORPORATE_RED);
+      doc.text(HOUSE_TECH_TRAVEL_DISCLAIMER_TEXT, 14, disclaimerY);
       disclaimerY += 6;
   }
 
@@ -1084,8 +1100,9 @@ export async function generateJobPayoutPDF(
       doc.setFontSize(9);
       doc.setTextColor(...TEXT_MUTED);
 
-      payout.extras_breakdown!.items!.forEach((item) => {
-        const itemText = `• ${item.extra_type.replace('_', ' ')} × ${item.quantity} = ${formatCurrency(item.amount_eur)}`;
+      payout.extras_breakdown!.items!.forEach((item: any) => {
+        const houseTechLabel = item.is_house_tech_rate ? ' (plantilla)' : '';
+        const itemText = `• ${item.extra_type.replace('_', ' ')}${houseTechLabel} × ${item.quantity} = ${formatCurrency(item.amount_eur)}`;
         doc.text(itemText, 18, currentY);
         currentY += 5;
 

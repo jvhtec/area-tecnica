@@ -16,11 +16,15 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { useRateExtrasCatalog } from '@/hooks/useRateExtrasCatalog';
 
+// House tech travel rate - fixed €20 for both half and full travel days
+const HOUSE_TECH_TRAVEL_RATE = 20;
+
 interface JobExtrasEditorProps {
   jobId: string;
   technicianId: string;
   technicianName: string;
   isManager?: boolean;
+  isHouseTech?: boolean;
   showVehicleDisclaimer?: boolean;
   vehicleDisclaimerText?: string;
 }
@@ -30,6 +34,7 @@ export function JobExtrasEditor({
   technicianId,
   technicianName,
   isManager = false,
+  isHouseTech = false,
   showVehicleDisclaimer = false,
   vehicleDisclaimerText,
 }: JobExtrasEditorProps) {
@@ -82,9 +87,18 @@ export function JobExtrasEditor({
   };
 
   // Get unit amount for extra type from catalog
+  // House techs get fixed €20 for travel days (both half and full)
   function getUnitAmount(extraType: JobExtraType): number {
+    if (isHouseTech && (extraType === 'travel_half' || extraType === 'travel_full')) {
+      return HOUSE_TECH_TRAVEL_RATE;
+    }
     const catalogItem = catalog?.find(r => r.extra_type === extraType);
     return catalogItem?.amount_eur ?? 0;
+  }
+
+  // Check if a given extra type uses the house tech travel rate
+  function usesHouseTechTravelRate(extraType: JobExtraType): boolean {
+    return isHouseTech && (extraType === 'travel_half' || extraType === 'travel_full');
   }
 
   // Calculate total extras amount
@@ -133,8 +147,12 @@ export function JobExtrasEditor({
                   {EXTRA_TYPE_LABELS[extraType]}
                 </Label>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">
+                  <Badge
+                    variant={usesHouseTechTravelRate(extraType) ? "default" : "outline"}
+                    className={`text-xs ${usesHouseTechTravelRate(extraType) ? 'bg-blue-600 text-white' : ''}`}
+                  >
                     {formatCurrency(unitAmount)} each
+                    {usesHouseTechTravelRate(extraType) && ' (plantilla)'}
                   </Badge>
                   {currentQuantity > 0 && (
                     <Badge variant="secondary" className="text-xs">

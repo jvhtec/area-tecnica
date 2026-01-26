@@ -419,7 +419,12 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                         <div className="space-y-1">
                           {quote.extras.items.map((item, idx) => (
                             <div key={idx} className="flex justify-between text-sm text-green-700">
-                              <span>{item.extra_type.replace('_', ' ')} × {item.quantity}</span>
+                              <span>
+                                {item.extra_type.replace('_', ' ')} × {item.quantity}
+                                {item.is_house_tech_rate && (
+                                  <span className="ml-1 text-xs text-blue-600">(plantilla)</span>
+                                )}
+                              </span>
                               <span>{formatCurrency(item.amount_eur)}</span>
                             </div>
                           ))}

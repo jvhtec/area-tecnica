@@ -658,6 +658,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                           technicianId={q.technician_id}
                           technicianName={name}
                           isManager={true}
+                          isHouseTech={Boolean(q.is_house_tech)}
                           showVehicleDisclaimer={Boolean(q.vehicle_disclaimer)}
                           vehicleDisclaimerText={q.vehicle_disclaimer_text}
                         />
