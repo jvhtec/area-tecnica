@@ -299,7 +299,16 @@ X-Idempotency-Key: unique-key (for POST/PUT/PATCH)
 | **Analytics** | `/analytics` | Aggregated statistics |
 | **Activity** | `/activity` | Audit log and activity feed |
 
-### 4.4 System
+### 4.4 Integrations
+
+| Category | Resource | Description |
+|----------|----------|-------------|
+| **Flex** | `/flex` | Flex Rental Solutions folder management |
+| **Tour Defaults** | `/tour-defaults` | Power/weight default configurations |
+| **Consumos** | `/consumos` | Power consumption calculations |
+| **Pesos** | `/pesos` | Weight/rigging calculations |
+
+### 4.5 System
 
 | Category | Resource | Description |
 |----------|----------|-------------|
@@ -1761,7 +1770,11 @@ GET /api/v1
     "assignments": "/api/v1/assignments",
     "timesheets": "/api/v1/timesheets",
     "crew": "/api/v1/crew",
-    "equipment": "/api/v1/equipment"
+    "equipment": "/api/v1/equipment",
+    "flex": "/api/v1/flex",
+    "tour_defaults": "/api/v1/tour-defaults",
+    "consumos": "/api/v1/consumos",
+    "pesos": "/api/v1/pesos"
   }
 }
 ```
@@ -1790,6 +1803,655 @@ GET /api/v1/rate-limit
       "day": "2024-06-02T00:00:00+02:00"
     }
   }
+}
+```
+
+---
+
+### 5.13 Flex Integration API
+
+Manage folder structures in Flex Rental Solutions ERP system.
+
+#### List Flex Folders
+```http
+GET /api/v1/flex/folders
+```
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `job_id` | uuid | Filter by job |
+| `tour_id` | uuid | Filter by tour |
+| `tour_date_id` | uuid | Filter by tour date |
+| `folder_type` | string | Filter by type: main_event, department, tourdate, etc. |
+| `department` | string | Filter by department |
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "folder-uuid",
+      "type": "flex_folder",
+      "attributes": {
+        "element_id": "flex-element-uuid",
+        "folder_type": "department",
+        "department": "sound",
+        "job_id": "job-uuid",
+        "tour_date_id": "tour-date-uuid",
+        "parent_id": "parent-folder-uuid",
+        "current_status": "active",
+        "created_at": "2024-06-01T10:00:00+02:00"
+      }
+    }
+  ]
+}
+```
+
+#### Create Root Tour Folders
+```http
+POST /api/v1/flex/folders/tour
+```
+
+**Request Body:**
+```json
+{
+  "tour_id": "tour-uuid",
+  "departments": ["sound", "lights", "video"],
+  "include_comercial": true,
+  "settings": {
+    "create_pullsheets": true,
+    "create_technical_docs": true,
+    "create_crew_calls": true
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "root_folder_id": "flex-root-uuid",
+    "department_folders": {
+      "sound": "flex-sound-uuid",
+      "lights": "flex-lights-uuid",
+      "video": "flex-video-uuid"
+    },
+    "created_count": 15
+  }
+}
+```
+
+#### Create Tour Date Folders
+```http
+POST /api/v1/flex/folders/tour-date
+```
+
+**Request Body:**
+```json
+{
+  "tour_date_id": "tour-date-uuid",
+  "departments": ["sound", "lights"],
+  "folder_options": {
+    "sound": {
+      "subfolders": ["hojaInfo", "documentacionTecnica", "pullSheetTP", "crewCall"],
+      "customPullsheet": {
+        "enabled": true,
+        "name": "Custom PA System"
+      }
+    },
+    "lights": {
+      "subfolders": ["hojaInfo", "documentacionTecnica", "pullSheetTP"]
+    }
+  }
+}
+```
+
+#### Create Job Folders
+```http
+POST /api/v1/flex/folders/job
+```
+
+**Request Body:**
+```json
+{
+  "job_id": "job-uuid",
+  "job_type": "default",
+  "departments": ["sound", "lights", "video"],
+  "options": {
+    "create_dryhire_folders": false,
+    "create_comercial_extras": true,
+    "create_presupuestos": true
+  }
+}
+```
+
+#### Update Flex Folder Header
+```http
+PATCH /api/v1/flex/folders/:elementId/header
+```
+
+**Request Body:**
+```json
+{
+  "name": "Updated Folder Name",
+  "document_number": "DOC-2024-001",
+  "planned_start_date": "2024-06-01",
+  "planned_end_date": "2024-06-03",
+  "person_responsible_id": "flex-person-uuid"
+}
+```
+
+#### Delete Flex Folder
+```http
+DELETE /api/v1/flex/folders/:elementId
+```
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cascade` | boolean | Delete child folders (default: false) |
+
+#### Sync Flex Crew Assignments
+```http
+POST /api/v1/flex/crew-assignments/sync
+```
+
+**Request Body:**
+```json
+{
+  "job_id": "job-uuid",
+  "department": "sound",
+  "assignments": [
+    {
+      "technician_id": "tech-uuid",
+      "flex_labor_resource_id": "flex-resource-uuid",
+      "role": "FOH Engineer"
+    }
+  ]
+}
+```
+
+#### Get Flex Folder Hierarchy
+```http
+GET /api/v1/flex/folders/:elementId/tree
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "root-uuid",
+    "name": "Tour 2024",
+    "folder_type": "main_event",
+    "children": [
+      {
+        "id": "dept-uuid",
+        "name": "Sound",
+        "folder_type": "department",
+        "children": [
+          {
+            "id": "date-uuid",
+            "name": "2024-06-01 - Barcelona",
+            "folder_type": "tourdate",
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 5.14 Tour Defaults API
+
+Manage power consumption and weight default configurations per tour.
+
+#### List Tour Default Sets
+```http
+GET /api/v1/tour-defaults/sets
+```
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `tour_id` | uuid | Filter by tour (required) |
+| `department` | string | Filter by department: sound, lights, video |
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "set-uuid",
+      "type": "tour_default_set",
+      "attributes": {
+        "tour_id": "tour-uuid",
+        "name": "Main PA Defaults",
+        "description": "Standard power and weight for main PA",
+        "department": "sound",
+        "table_count": 5,
+        "created_at": "2024-05-01T00:00:00+02:00",
+        "updated_at": "2024-05-15T00:00:00+02:00"
+      }
+    }
+  ]
+}
+```
+
+#### Get Tour Default Set
+```http
+GET /api/v1/tour-defaults/sets/:id
+```
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `expand` | string | Include: tables |
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "set-uuid",
+    "type": "tour_default_set",
+    "attributes": {
+      "tour_id": "tour-uuid",
+      "name": "Main PA Defaults",
+      "description": "Standard configuration",
+      "department": "sound"
+    },
+    "relationships": {
+      "tables": {
+        "data": [
+          {
+            "id": "table-uuid",
+            "type": "tour_default_table",
+            "attributes": {
+              "table_name": "FOH System",
+              "table_type": "power",
+              "total_value": 15000,
+              "table_data": {
+                "rows": [
+                  { "component": "d&b SL-SUB", "quantity": 12, "watts": 2800 },
+                  { "component": "d&b SL-GSub", "quantity": 8, "watts": 2800 }
+                ]
+              },
+              "metadata": {
+                "current_per_phase": 21.7,
+                "pdu_type": "32A",
+                "includes_hoist": false
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+#### Create Tour Default Set
+```http
+POST /api/v1/tour-defaults/sets
+```
+
+**Request Body:**
+```json
+{
+  "tour_id": "tour-uuid",
+  "name": "Monitor World Defaults",
+  "description": "Standard monitor system configuration",
+  "department": "sound"
+}
+```
+
+#### Update Tour Default Set
+```http
+PUT /api/v1/tour-defaults/sets/:id
+```
+
+**Request Body:**
+```json
+{
+  "name": "Updated Name",
+  "description": "Updated description"
+}
+```
+
+#### Delete Tour Default Set
+```http
+DELETE /api/v1/tour-defaults/sets/:id
+```
+
+#### List Default Tables
+```http
+GET /api/v1/tour-defaults/tables
+```
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `set_id` | uuid | Filter by default set (required) |
+| `table_type` | string | Filter by type: power, weight |
+
+#### Create Default Table
+```http
+POST /api/v1/tour-defaults/tables
+```
+
+**Request Body:**
+```json
+{
+  "set_id": "set-uuid",
+  "table_name": "Main PA Power",
+  "table_type": "power",
+  "table_data": {
+    "rows": [
+      { "component": "d&b SL-SUB", "quantity": 12, "watts": 2800 },
+      { "component": "d&b SL-GSub", "quantity": 8, "watts": 2800 },
+      { "component": "d&b V8", "quantity": 24, "watts": 750 }
+    ]
+  },
+  "metadata": {
+    "pdu_type": "63A",
+    "safety_margin": 1.2,
+    "includes_hoist": true,
+    "order_index": 1
+  }
+}
+```
+
+#### Update Default Table
+```http
+PUT /api/v1/tour-defaults/tables/:id
+```
+
+**Request Body:**
+```json
+{
+  "table_name": "Updated Table Name",
+  "table_data": {
+    "rows": [
+      { "component": "Updated Component", "quantity": 10, "watts": 3000 }
+    ]
+  },
+  "metadata": {
+    "pdu_type": "125A"
+  }
+}
+```
+
+#### Delete Default Table
+```http
+DELETE /api/v1/tour-defaults/tables/:id
+```
+
+#### Clone Default Set
+```http
+POST /api/v1/tour-defaults/sets/:id/clone
+```
+
+**Request Body:**
+```json
+{
+  "target_tour_id": "new-tour-uuid",
+  "new_name": "Cloned Defaults for Tour B"
+}
+```
+
+---
+
+### 5.15 Consumos & Pesos API
+
+Power consumption (consumos) and weight/rigging (pesos) calculations.
+
+#### Calculate Power Consumption
+```http
+POST /api/v1/consumos/calculate
+```
+
+**Request Body:**
+```json
+{
+  "items": [
+    { "component": "d&b SL-SUB", "quantity": 12, "watts": 2800 },
+    { "component": "d&b V8", "quantity": 24, "watts": 750 },
+    { "component": "DiGiCo SD12", "quantity": 1, "watts": 400 }
+  ],
+  "options": {
+    "voltage": 400,
+    "phases": 3,
+    "power_factor": 0.85,
+    "safety_margin": 1.2,
+    "include_hoist": true,
+    "hoist_count": 8,
+    "hoist_watts": 1500
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "total_watts": 63600,
+    "current_per_phase": 108.4,
+    "recommended_pdu": "125A",
+    "breakdown": {
+      "equipment_watts": 51600,
+      "hoist_watts": 12000,
+      "with_safety_margin": 76320
+    },
+    "pdu_options": [
+      { "type": "125A", "capacity": 86600, "utilization": 0.73 },
+      { "type": "63A", "capacity": 43648, "utilization": 1.46, "warning": "Exceeds capacity" }
+    ]
+  }
+}
+```
+
+#### Calculate Weight/Rigging
+```http
+POST /api/v1/pesos/calculate
+```
+
+**Request Body:**
+```json
+{
+  "items": [
+    { "name": "d&b V8", "quantity": 12, "weight_kg": 39 },
+    { "name": "d&b V-SUB", "quantity": 4, "weight_kg": 69 },
+    { "name": "Bumper", "quantity": 1, "weight_kg": 85 }
+  ],
+  "rigging_options": {
+    "dual_motors": true,
+    "rigging_point_prefix": "SX",
+    "start_index": 1,
+    "cable_pick": true,
+    "cable_pick_weight": 50
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "total_weight_kg": 897,
+    "items_breakdown": [
+      { "name": "d&b V8", "quantity": 12, "unit_weight": 39, "total": 468 },
+      { "name": "d&b V-SUB", "quantity": 4, "unit_weight": 69, "total": 276 },
+      { "name": "Bumper", "quantity": 1, "unit_weight": 85, "total": 85 },
+      { "name": "Cable Pick", "quantity": 1, "unit_weight": 50, "total": 50 }
+    ],
+    "rigging_points": [
+      { "id": "SX01", "load_kg": 448.5 },
+      { "id": "SX02", "load_kg": 448.5 }
+    ],
+    "motor_requirements": {
+      "count": 2,
+      "min_capacity_kg": 500,
+      "recommended": "1T CM Lodestar"
+    }
+  }
+}
+```
+
+#### Get Tour Date Power Overrides
+```http
+GET /api/v1/tour-dates/:tourDateId/power-overrides
+```
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `department` | string | Filter by department |
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "override-uuid",
+      "type": "power_override",
+      "attributes": {
+        "tour_date_id": "tour-date-uuid",
+        "table_name": "FOH System",
+        "department": "sound",
+        "total_watts": 18000,
+        "current_per_phase": 26.0,
+        "pdu_type": "63A",
+        "includes_hoist": true,
+        "default_table_id": "default-table-uuid",
+        "override_data": {
+          "rows": [
+            { "component": "Extra Subs", "quantity": 4, "watts": 2800 }
+          ],
+          "notes": "Added extra subs for outdoor show"
+        }
+      }
+    }
+  ]
+}
+```
+
+#### Create Power Override
+```http
+POST /api/v1/tour-dates/:tourDateId/power-overrides
+```
+
+**Request Body:**
+```json
+{
+  "table_name": "FOH System Override",
+  "department": "sound",
+  "default_table_id": "default-table-uuid",
+  "total_watts": 18000,
+  "current_per_phase": 26.0,
+  "pdu_type": "63A",
+  "includes_hoist": true,
+  "override_data": {
+    "rows": [
+      { "component": "Additional Subs", "quantity": 4, "watts": 2800 }
+    ],
+    "notes": "Outdoor venue requires more low end"
+  }
+}
+```
+
+#### Get Tour Date Weight Overrides
+```http
+GET /api/v1/tour-dates/:tourDateId/weight-overrides
+```
+
+#### Create Weight Override
+```http
+POST /api/v1/tour-dates/:tourDateId/weight-overrides
+```
+
+**Request Body:**
+```json
+{
+  "item_name": "Additional Flown Subs",
+  "weight_kg": 69,
+  "quantity": 4,
+  "category": "speakers",
+  "department": "sound",
+  "default_table_id": "default-table-uuid",
+  "override_data": {
+    "notes": "Added for festival main stage"
+  }
+}
+```
+
+#### Update Override
+```http
+PUT /api/v1/tour-dates/:tourDateId/power-overrides/:id
+PUT /api/v1/tour-dates/:tourDateId/weight-overrides/:id
+```
+
+#### Delete Override
+```http
+DELETE /api/v1/tour-dates/:tourDateId/power-overrides/:id
+DELETE /api/v1/tour-dates/:tourDateId/weight-overrides/:id
+```
+
+#### Export Power/Weight Report
+```http
+POST /api/v1/tour-dates/:tourDateId/export/technical
+```
+
+**Request Body:**
+```json
+{
+  "format": "pdf",
+  "department": "sound",
+  "include_power": true,
+  "include_weights": true,
+  "include_rigging_plot": true,
+  "language": "es",
+  "branding": {
+    "include_logo": true,
+    "company_name": "Production Company SL"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "report_id": "report-uuid",
+    "status": "processing",
+    "download_url": null
+  }
+}
+```
+
+#### Bulk Export Tour Defaults
+```http
+POST /api/v1/tours/:tourId/export/defaults
+```
+
+**Request Body:**
+```json
+{
+  "format": "pdf",
+  "departments": ["sound", "lights", "video"],
+  "include_all_dates": true,
+  "combine_into_single_pdf": true
 }
 ```
 
@@ -2083,7 +2745,45 @@ function verifyWebhookSignature(payload, signature, secret) {
 
 ---
 
-### Phase 7: Reports & Polish (Weeks 16-18)
+### Phase 7: Flex Integration (Weeks 16-17)
+
+**Goals**: Flex Rental Solutions integration
+
+**Deliverables**:
+1. Flex folder creation API
+2. Folder hierarchy management
+3. Crew assignment sync
+4. Header/metadata updates
+5. Folder tree retrieval
+
+**Endpoints**:
+- Full Flex API (`/api/v1/flex/*`)
+- Folder creation endpoints (tour, date, job)
+- Crew assignment sync endpoints
+
+---
+
+### Phase 8: Technical Tools (Weeks 18-19)
+
+**Goals**: Power/weight calculations and tour defaults
+
+**Deliverables**:
+1. Tour Defaults API (sets, tables)
+2. Consumos (power calculation) API
+3. Pesos (weight/rigging) API
+4. Tour date overrides
+5. PDF export for technical documents
+6. Clone/template functionality
+
+**Endpoints**:
+- Full Tour Defaults API (`/api/v1/tour-defaults/*`)
+- Consumos API (`/api/v1/consumos/*`)
+- Pesos API (`/api/v1/pesos/*`)
+- Tour date override endpoints
+
+---
+
+### Phase 9: Reports & Polish (Weeks 20-22)
 
 **Goals**: Reporting and production readiness
 
