@@ -87,7 +87,11 @@ const lightComponentDatabase: LightComponent[] = [
   { id: 50, name: 'ROBERT JULIAT LANCELOT', watts: 4000, fixtureType: 'discharge' },
   { id: 51, name: 'ROBERT JULIAT KORRIGAN', watts: 1200, fixtureType: 'discharge' },
   { id: 52, name: 'PIXEL LINE IP', watts: 420, fixtureType: 'led' },
-  { id: 53, name: 'COLORADO PXL BAR ', watts: 768, fixtureType: 'led' }
+  { id: 53, name: 'COLORADO PXL BAR ', watts: 768, fixtureType: 'led' },
+  { id: 54, name: 'AROLA AQUA S-LT', watts: 600, fixtureType: 'led' },
+  { id: 55, name: 'AROLA AQUA HP', watts: 1900, fixtureType: 'led' },
+  { id: 56, name: 'HY B-EYE K15 AQUA', watts: 680, fixtureType: 'led' },
+  { id: 57, name: 'CLUSTER B2 FC', watts: 600, fixtureType: 'led' }
 ];
 
 const SQRT3 = Math.sqrt(3);
@@ -129,17 +133,17 @@ const LightsConsumosTool: React.FC = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
-  
+
   // Tour override mode detection
   const tourId = searchParams.get('tourId');
   const tourDateId = searchParams.get('tourDateId');
   const mode = searchParams.get('mode');
-  
-  const { 
-    isOverrideMode, 
-    overrideData, 
+
+  const {
+    isOverrideMode,
+    overrideData,
     isLoading: overrideLoading,
-    saveOverride 
+    saveOverride
   } = useTourOverrideMode(tourId || undefined, tourDateId || undefined, 'lights');
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
@@ -181,7 +185,7 @@ const LightsConsumosTool: React.FC = () => {
           id: `default-${table.id}`,
           isDefault: true
         }));
-      
+
       setDefaultTables(powerDefaults);
     }
   }, [isOverrideMode, overrideData]);
@@ -333,7 +337,7 @@ const LightsConsumosTool: React.FC = () => {
 
     // Original job-based save logic
     if (!selectedJobId) return;
-    
+
     try {
       const { error } = await supabase
         .from('power_requirement_tables')
@@ -467,7 +471,7 @@ const LightsConsumosTool: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    const jobToUse = isOverrideMode && overrideData 
+    const jobToUse = isOverrideMode && overrideData
       ? { id: 'override', title: `${overrideData.tourName} - ${overrideData.locationName}` }
       : selectedJob;
 
@@ -482,7 +486,7 @@ const LightsConsumosTool: React.FC = () => {
 
     try {
       // Combine defaults and current tables for export
-      const allTables = isOverrideMode 
+      const allTables = isOverrideMode
         ? [...defaultTables, ...tables]
         : tables;
 
@@ -530,7 +534,7 @@ const LightsConsumosTool: React.FC = () => {
           const { autoCompleteConsumosTasks } = await import('@/utils/taskAutoCompletion');
           const result = await autoCompleteConsumosTasks(selectedJobId, 'lights');
           completedTasksCount = result.completedCount;
-          
+
           if (result.completedCount > 0) {
             console.log(`Auto-completed ${result.completedCount} lights Consumos task(s)`);
           }
@@ -887,7 +891,7 @@ const LightsConsumosTool: React.FC = () => {
                   </Button>
                 )}
               </div>
-              
+
               {typeof table.id === 'number' && (
                 <div className="p-4 bg-muted/50 space-y-4">
                   <div className="flex items-center gap-4">
@@ -895,13 +899,13 @@ const LightsConsumosTool: React.FC = () => {
                       <Checkbox
                         id={`hoist-${table.id}`}
                         checked={table.includesHoist}
-                        onCheckedChange={(checked) => 
+                        onCheckedChange={(checked) =>
                           updateTableSettings(table.id as number, { includesHoist: !!checked })
                         }
                       />
                       <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Polipasto (CEE32A 3P+N+G)</Label>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       <Label>Anulación de Tipo de PDU:</Label>
                       <Select
