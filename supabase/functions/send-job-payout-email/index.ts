@@ -4,6 +4,7 @@ import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 const BREVO_KEY = Deno.env.get("BREVO_API_KEY") ?? "";

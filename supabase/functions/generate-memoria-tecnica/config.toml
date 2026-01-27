@@ -5,7 +5,7 @@ deno task bundle
 """
 
 [deploy]
-allowed_imports = ["https://deno.land/std/*", "https://esm.sh/*", "https://cdn.skypack.dev/*"]
+allowed_imports = ["https://deno.land/std/*", "https://esm.sh/*", "https://cdn.skypack.dev/*", "npm:*"]
 
 [env]
 # Must be the full Supabase URL, not just the project ref

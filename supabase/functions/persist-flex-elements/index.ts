@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 type Dept = "sound" | "lights" | "video" | "production" | "personnel" | "comercial";
 type Kind =
@@ -33,6 +33,7 @@ serve(async (req) => {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
       },
     });
   }
@@ -161,4 +162,3 @@ serve(async (req) => {
     });
   }
 });
-

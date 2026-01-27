@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { wrapInCorporateTemplate } from "../_shared/corporateEmailTemplate.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -10,6 +10,7 @@ const BREVO_FROM = Deno.env.get("BREVO_FROM")!;
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 const DEFAULT_INLINE_IMAGE_RETENTION_HOURS = 24 * 7; // 7 days
