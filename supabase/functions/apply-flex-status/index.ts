@@ -1,3 +1,4 @@
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -126,10 +127,10 @@ async function callFlexWorkflowAction(args: {
   return { ok, httpStatus, response, errorMessage };
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', {
+    return new Response(null, {
       status: 204,
       headers: corsHeaders
     });
