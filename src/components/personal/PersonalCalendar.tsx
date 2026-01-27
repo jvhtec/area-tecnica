@@ -105,23 +105,25 @@ export const PersonalCalendar = memo<PersonalCalendarProps>(({
   };
 
   const getAssignmentsForDate = (day: Date) => {
-    return assignments.filter(assignment => {
-      // Check if this is a single-day assignment (legacy/fallback)
+    const dayString = format(day, 'yyyy-MM-dd');
+
+    const filtered = assignments.filter(assignment => {
+      // Check specific dates from timesheets FIRST (source of truth)
+      if (assignment.dates && assignment.dates.length > 0) {
+        return assignment.dates.includes(dayString);
+      }
+
+      // Fallback to single-day assignment check (legacy) only if no timesheet dates exist
       if (assignment.single_day && assignment.assignment_date) {
         const assignmentDate = parse(assignment.assignment_date, "yyyy-MM-dd", new Date());
         return isSameDay(day, assignmentDate);
       }
 
-      // Check specific dates from timesheets if available
-      if (assignment.dates && assignment.dates.length > 0) {
-        const dayString = format(day, 'yyyy-MM-dd');
-        return assignment.dates.includes(dayString);
-      }
-
-      // No fallback - if there are no specific timesheet dates, don't show the assignment
-      // This prevents showing techs assigned to the whole job span when they only worked specific days
+      // No dates available - don't show the assignment
       return false;
     });
+
+    return filtered;
   };
 
   const handleAvailabilityChange = useCallback((techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => {
