@@ -77,7 +77,8 @@ serve(async (req) => {
   const url = new URL(req.url);
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS' } });
+    return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform', 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS' } });
+  'Access-Control-Max-Age': '86400',
   }
 
   if (req.method === 'HEAD') {
