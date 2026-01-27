@@ -13,11 +13,12 @@ import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
-const HOUSE_TECH_TRAVEL_RATE_EUR = 20;
+// Fixed travel rate for house techs and assignable management users
+const FIXED_TRAVEL_RATE_EUR = 20;
 const DEDUCTION_DISCLAIMER_TEXT = '* Se ha aplicado una deducción de 30€/día en concepto de IRPF por condición de no autónomo.';
 const TOUR_DEDUCTION_DISCLAIMER_TEXT = '* Deducción de 30€ en concepto de IRPF por condición de no autónomo ya aplicada a la tarifa base antes de multiplicadores.';
 const EVENTO_DISCLAIMER_TEXT = '* Evento: tarifa fija de 12h (base + plus) independientemente de las horas trabajadas.';
-const HOUSE_TECH_TRAVEL_DISCLAIMER_TEXT = `* (plantilla): Tarifa fija de ${HOUSE_TECH_TRAVEL_RATE_EUR}€ para días de viaje de técnicos en plantilla.`;
+const FIXED_TRAVEL_RATE_DISCLAIMER_TEXT = `* (plantilla): Tarifa fija de ${FIXED_TRAVEL_RATE_EUR}€ para días de viaje de técnicos en plantilla y gestión asignables.`;
 
 export interface TechnicianProfile {
   id: string;
@@ -983,7 +984,7 @@ export async function generateJobPayoutPDF(
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
       doc.setTextColor(...CORPORATE_RED);
-      doc.text(HOUSE_TECH_TRAVEL_DISCLAIMER_TEXT, 14, disclaimerY);
+      doc.text(FIXED_TRAVEL_RATE_DISCLAIMER_TEXT, 14, disclaimerY);
       disclaimerY += 6;
   }
 

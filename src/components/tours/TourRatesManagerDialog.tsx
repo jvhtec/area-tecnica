@@ -79,7 +79,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, default_timesheet_category, role')
+        .select('id, first_name, last_name, email, default_timesheet_category, role, assignable_as_tech')
         .in('id', techIds);
       if (error) throw error;
       return data || [];
@@ -90,6 +90,11 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   const getTechName = (id: string) => {
     const p = profiles.find((x: any) => x.id === id);
     return p ? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unknown' : 'Unknown';
+  };
+
+  const isAssignableManagement = (id: string) => {
+    const p = profiles.find((x: any) => x.id === id);
+    return p && ['admin', 'management'].includes(p.role || '') && Boolean(p.assignable_as_tech);
   };
 
   // Debug logging for manager view
@@ -659,6 +664,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                           technicianName={name}
                           isManager={true}
                           isHouseTech={Boolean(q.is_house_tech)}
+                          isAssignableManagement={isAssignableManagement(q.technician_id)}
                           showVehicleDisclaimer={Boolean(q.vehicle_disclaimer)}
                           vehicleDisclaimerText={q.vehicle_disclaimer_text}
                         />

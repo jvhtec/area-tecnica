@@ -20,6 +20,7 @@ interface JobAssignment {
     first_name?: string | null;
     last_name?: string | null;
     role?: string | null;
+    assignable_as_tech?: boolean | null;
   } | null;
 }
 
@@ -39,7 +40,8 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
           profiles:technician_id (
             first_name,
             last_name,
-            role
+            role,
+            assignable_as_tech
           )
         `)
         .eq('job_id', jobId);
@@ -152,6 +154,10 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
                 technicianName={technicianName}
                 isManager={isManager}
                 isHouseTech={assignment.profiles?.role === 'house_tech'}
+                isAssignableManagement={
+                  ['admin', 'management'].includes(assignment.profiles?.role || '') &&
+                  Boolean(assignment.profiles?.assignable_as_tech)
+                }
                 showVehicleDisclaimer={technicianPayout?.vehicle_disclaimer || false}
               />
 
