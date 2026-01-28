@@ -64,7 +64,9 @@ export function adjustRehearsalQuotesForMultiDay(
 
     const adjustedBaseDayEur = Number(quote.base_day_eur ?? 0) * days;
     const adjustedTotalEur = Number(quote.total_eur ?? 0) * days;
-    const extrasTotal = Number(quote.extras_total_eur ?? 0);
+    const extrasTotal = Number(
+      quote.extras_total_eur ?? (quote.extras?.total_eur != null ? quote.extras.total_eur : 0)
+    );
 
     return {
       ...quote,
@@ -137,8 +139,7 @@ async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<a
   const { data, error } = await client
     .from('timesheets')
     .select('technician_id, date, approved_by_manager')
-    .eq('job_id', jobId)
-    .eq('approved_by_manager', true);
+    .eq('job_id', jobId);
   if (error) throw error;
   return data || [];
 }
@@ -275,9 +276,14 @@ export async function sendTourJobEmails(
     },
     technicians: recipients.map((attachment) => {
       const q = attachment.quote;
-      const baseTotal = Number(q.total_eur || 0);
-      const extrasTotal = Number(q.extras_total_eur || 0);
-      const grandTotal = Number(q.total_with_extras_eur != null ? q.total_with_extras_eur : baseTotal + extrasTotal);
+      const baseTotal = Number(q.total_eur ?? 0);
+      const extrasTotal = Number(
+        q.extras_total_eur ?? (q.extras?.total_eur != null ? q.extras.total_eur : 0)
+      );
+      const grandTotal =
+        q.total_with_extras_eur != null
+          ? Number(q.total_with_extras_eur)
+          : baseTotal + extrasTotal;
       const deduction = attachment.deduction_eur || 0;
 
       // Extract unique worked dates from timesheets
@@ -297,6 +303,7 @@ export async function sendTourJobEmails(
         pdf_base64: attachment.pdfBase64,
         filename: attachment.filename,
         autonomo: attachment.autonomo ?? null,
+        is_house_tech: attachment.is_house_tech ?? null,
         lpo_number: attachment.lpo_number ?? null,
         worked_dates: workedDates,
       };
@@ -317,4 +324,3 @@ export async function sendTourJobEmails(
     context,
   };
 }
-

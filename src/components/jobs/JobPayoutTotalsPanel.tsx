@@ -585,27 +585,36 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
               })),
             ])
           ),
-          attachments: tourContext.attachments.map(a => ({
-            technician_id: a.technician_id,
-            email: a.email,
-            full_name: a.full_name,
-            payout: {
-              job_id: jobId,
+          attachments: tourContext.attachments.map((a) => {
+            const baseTotal = Number(a.quote.total_eur ?? 0);
+            const extrasTotal = Number(
+              a.quote.extras_total_eur ?? (a.quote.extras?.total_eur != null ? a.quote.extras.total_eur : 0)
+            );
+            const totalWithExtras =
+              a.quote.total_with_extras_eur != null ? Number(a.quote.total_with_extras_eur) : baseTotal + extrasTotal;
+
+            return {
               technician_id: a.technician_id,
-              timesheets_total_eur: Number(a.quote.total_eur ?? 0),
-              extras_total_eur: Number(a.quote.extras_total_eur ?? 0),
-              total_eur: Number(a.quote.total_with_extras_eur ?? a.quote.total_eur ?? 0),
-              extras_breakdown: { items: [], total_eur: Number(a.quote.extras_total_eur ?? 0) },
-              expenses_total_eur: 0,
-              expenses_breakdown: [],
-            },
-            deduction_eur: a.deduction_eur,
-            pdfBase64: a.pdfBase64,
-            filename: a.filename,
-            autonomo: a.autonomo,
-            is_house_tech: a.is_house_tech,
-            lpo_number: a.lpo_number,
-          })),
+              email: a.email,
+              full_name: a.full_name,
+              payout: {
+                job_id: jobId,
+                technician_id: a.technician_id,
+                timesheets_total_eur: baseTotal,
+                extras_total_eur: extrasTotal,
+                total_eur: totalWithExtras,
+                extras_breakdown: { items: a.quote.extras?.items ?? [], total_eur: extrasTotal },
+                expenses_total_eur: 0,
+                expenses_breakdown: [],
+              },
+              deduction_eur: a.deduction_eur,
+              pdfBase64: a.pdfBase64,
+              filename: a.filename,
+              autonomo: a.autonomo,
+              is_house_tech: a.is_house_tech,
+              lpo_number: a.lpo_number,
+            };
+          }),
           missingEmails: tourContext.missingEmails,
         };
 
