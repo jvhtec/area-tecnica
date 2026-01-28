@@ -23,7 +23,7 @@ import {
   type JobPayoutEmailContextResult,
   type TechnicianProfileWithEmail,
 } from '@/lib/job-payout-email';
-import { sendTourJobEmails } from '@/lib/tour-payout-email';
+import { sendTourJobEmails, prepareTourJobEmailContext } from '@/lib/tour-payout-email';
 import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-export';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -93,24 +93,31 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     jobMeta?.tour_id ?? undefined
   );
 
-  // Fetch approvals for tour dates (since useJobPayoutTotals is disabled)
-  const { data: tourApprovals = new Map<string, boolean>() } = useQuery({
-    queryKey: ['job-tech-payout', jobId, 'approvals'],
+  // Fetch approvals and timesheet day counts for tour dates
+  const { data: tourTimesheetData = { approvals: new Map<string, boolean>(), daysCounts: new Map<string, number>() } } = useQuery({
+    queryKey: ['job-tech-payout', jobId, 'tour-timesheet-data'],
     enabled: !!jobId && isTourDate,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('timesheets')
-        .select('technician_id, approved_by_manager')
+        .select('technician_id, date, approved_by_manager')
         .eq('job_id', jobId);
 
       if (error) throw error;
 
       const techApprovals = new Map<string, boolean[]>();
+      const techDates = new Map<string, Set<string>>();
       (data || []).forEach(t => {
         if (!t.technician_id) return;
+        // Approvals
         const current = techApprovals.get(t.technician_id) || [];
         current.push(t.approved_by_manager || false);
         techApprovals.set(t.technician_id, current);
+        // Day counts
+        if (t.date) {
+          if (!techDates.has(t.technician_id)) techDates.set(t.technician_id, new Set());
+          techDates.get(t.technician_id)!.add(t.date);
+        }
       });
 
       const approvalMap = new Map<string, boolean>();
@@ -118,36 +125,52 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         const allApproved = statuses.length > 0 && statuses.every(s => s === true);
         approvalMap.set(techId, allApproved);
       });
-      return approvalMap;
+
+      const daysCountMap = new Map<string, number>();
+      techDates.forEach((dates, techId) => daysCountMap.set(techId, dates.size));
+
+      return { approvals: approvalMap, daysCounts: daysCountMap };
     },
     staleTime: 30 * 1000,
   });
+  const tourApprovals = tourTimesheetData.approvals;
+  const tourTimesheetDays = tourTimesheetData.daysCounts;
 
-  // Fetch timesheet unique days count for standard jobs
-  const { data: techDaysMap = new Map<string, number>() } = useQuery({
+  // Fetch timesheet unique days count for standard jobs (approved + total)
+  const { data: techDaysMaps = { approved: new Map<string, number>(), total: new Map<string, number>() } } = useQuery({
     queryKey: ['job-tech-days', jobId],
     enabled: !!jobId && !isTourDate && !jobMetaLoading,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('timesheets')
-        .select('technician_id, date')
-        .eq('job_id', jobId)
-        .eq('approved_by_manager', true);
+        .select('technician_id, date, approved_by_manager, status')
+        .eq('job_id', jobId);
       if (error) throw error;
 
-      const map = new Map<string, Set<string>>();
+      const approvedMap = new Map<string, Set<string>>();
+      const totalMap = new Map<string, Set<string>>();
       data?.forEach(row => {
         if (!row.technician_id || !row.date) return;
-        if (!map.has(row.technician_id)) map.set(row.technician_id, new Set());
-        map.get(row.technician_id)!.add(row.date);
+        // Total dates (all timesheets)
+        if (!totalMap.has(row.technician_id)) totalMap.set(row.technician_id, new Set());
+        totalMap.get(row.technician_id)!.add(row.date);
+        // Approved dates (approved_by_manager for IRPF deduction)
+        if (row.approved_by_manager) {
+          if (!approvedMap.has(row.technician_id)) approvedMap.set(row.technician_id, new Set());
+          approvedMap.get(row.technician_id)!.add(row.date);
+        }
       });
 
-      const countMap = new Map<string, number>();
-      map.forEach((dates, tech) => countMap.set(tech, dates.size));
-      return countMap;
+      const approvedCount = new Map<string, number>();
+      approvedMap.forEach((dates, tech) => approvedCount.set(tech, dates.size));
+      const totalCount = new Map<string, number>();
+      totalMap.forEach((dates, tech) => totalCount.set(tech, dates.size));
+      return { approved: approvedCount, total: totalCount };
     },
     staleTime: 60_000,
   });
+  const techDaysMap = techDaysMaps.approved;
+  const techTotalDaysMap = techDaysMaps.total;
 
   const visibleTourQuotes = React.useMemo(() => {
     const quotes = (rawTourQuotes as TourJobRateQuote[]) || [];
@@ -159,13 +182,19 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
 
   const tourPayoutTotals = React.useMemo<JobPayoutTotals[]>(() => {
     return visibleTourQuotes.map((quote) => {
-      const baseTotal = Number(quote.total_eur ?? 0);
+      // For rehearsal flat-rate quotes, the RPC returns a per-day rate.
+      // Multiply by the number of scheduled timesheet days for correct total.
+      const isRehearsalFlat = quote.category === 'rehearsal';
+      const scheduledDays = isRehearsalFlat
+        ? (tourTimesheetDays.get(quote.technician_id) || 1)
+        : 1;
+
+      const perDayRate = Number(quote.total_eur ?? 0);
+      const baseTotal = perDayRate * scheduledDays;
       const extrasTotal = Number(
         quote.extras_total_eur ?? (quote.extras?.total_eur != null ? quote.extras.total_eur : 0)
       );
-      const totalWithExtras = Number(
-        quote.total_with_extras_eur != null ? quote.total_with_extras_eur : baseTotal + extrasTotal
-      );
+      const totalWithExtras = baseTotal + extrasTotal;
       const extrasBreakdown =
         quote.extras != null
           ? (quote.extras as JobPayoutTotals['extras_breakdown'])
@@ -188,7 +217,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         expenses_breakdown: [],
       } satisfies JobPayoutTotals;
     });
-  }, [visibleTourQuotes, tourApprovals]);
+  }, [visibleTourQuotes, tourApprovals, tourTimesheetDays]);
 
   const payoutTotals = isTourDate ? tourPayoutTotals : standardPayoutTotals;
   const isLoading = jobMetaLoading || (isTourDate ? tourQuotesLoading : standardLoading);
@@ -520,7 +549,66 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     setIsLoadingPreview(true);
     try {
       if (isTourDate) {
-        toast.info('Vista previa no disponible para tour dates aún');
+        if (visibleTourQuotes.length === 0) {
+          toast.warning('No hay tarifas disponibles para previsualizar.');
+          return;
+        }
+
+        const tourContext = await prepareTourJobEmailContext({
+          jobId,
+          supabase,
+          quotes: visibleTourQuotes,
+          profiles: profilesWithEmail as any,
+        });
+
+        // Convert tour context to standard format for PayoutEmailPreview
+        const standardContext: JobPayoutEmailContextResult = {
+          job: {
+            id: tourContext.job.id,
+            title: tourContext.job.title,
+            start_time: tourContext.job.start_time,
+            tour_id: tourContext.job.tour_id ?? null,
+            rates_approved: tourContext.job.rates_approved ?? null,
+            invoicing_company: tourContext.job.invoicing_company ?? null,
+          },
+          payouts: [],
+          profiles: profilesWithEmail,
+          lpoMap: tourContext.lpoMap,
+          timesheetMap: new Map(
+            Array.from(tourContext.timesheetDateMap.entries()).map(([techId, dates]) => [
+              techId,
+              Array.from(dates).sort().map(d => ({
+                date: d,
+                hours_rounded: 0,
+              })),
+            ])
+          ),
+          attachments: tourContext.attachments.map(a => ({
+            technician_id: a.technician_id,
+            email: a.email,
+            full_name: a.full_name,
+            payout: {
+              job_id: jobId,
+              technician_id: a.technician_id,
+              timesheets_total_eur: Number(a.quote.total_eur ?? 0),
+              extras_total_eur: Number(a.quote.extras_total_eur ?? 0),
+              total_eur: Number(a.quote.total_with_extras_eur ?? a.quote.total_eur ?? 0),
+              extras_breakdown: { items: [], total_eur: Number(a.quote.extras_total_eur ?? 0) },
+              expenses_total_eur: 0,
+              expenses_breakdown: [],
+            },
+            deduction_eur: a.deduction_eur,
+            pdfBase64: a.pdfBase64,
+            filename: a.filename,
+            autonomo: a.autonomo,
+            is_house_tech: a.is_house_tech,
+            lpo_number: a.lpo_number,
+          })),
+          missingEmails: tourContext.missingEmails,
+        };
+
+        setPreviewContext(standardContext);
+        setPreviewOpen(true);
         return;
       }
 
@@ -548,7 +636,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     } finally {
       setIsLoadingPreview(false);
     }
-  }, [jobId, isTourDate, standardPayoutTotals, supabase, profilesWithEmail, lpoMap, jobMeta]);
+  }, [jobId, isTourDate, visibleTourQuotes, standardPayoutTotals, supabase, profilesWithEmail, lpoMap, jobMeta]);
 
   const handleSendEmailForTech = React.useCallback(
     async (techId: string, isApproved?: boolean) => {
@@ -726,7 +814,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
               <FileDown className="h-4 w-4 mr-1" />
               {isExporting ? 'Generando…' : 'Exportar PDF'}
             </Button>
-            {isManager && !isTourDate && (
+            {isManager && (
               <Button
                 variant="outline"
                 size="sm"
@@ -898,6 +986,21 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                   {formatCurrency(payout.timesheets_total_eur)}
                 </Badge>
               </div>
+              {!isTourDate && (() => {
+                const totalDays = techTotalDaysMap.get(payout.technician_id) || 0;
+                const approvedDays = techDaysMap.get(payout.technician_id) || 0;
+                if (totalDays > 1 && approvedDays < totalDays) {
+                  return (
+                    <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>
+                        Solo {approvedDays} de {totalDays} partes aprobados — el total puede no reflejar todos los días asignados
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               {/* Extras breakdown */}
               {payout.extras_total_eur > 0 && (
