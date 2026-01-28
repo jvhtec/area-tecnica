@@ -6,8 +6,8 @@
  * Flow:
  * 1. Look up <token> in Supabase staffing_click_tokens table
  * 2. Validate token (not expired, not used)
- * 3. Mark token as used
- * 4. Call existing staffing-click Edge Function to process the RSVP
+ * 3. Call existing staffing-click Edge Function to process the RSVP
+ * 4. Mark token as used only after successful processing
  * 5. Redirect to answer page (/answer/yes, /answer/no, /answer/error, etc.)
  */
 
@@ -82,10 +82,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     }
 
     // 2) Check expiration
-    const now = new Date();
     const expiresAt = new Date(row.expires_at);
 
-    if (expiresAt.getTime() < now.getTime()) {
+    if (expiresAt.getTime() < Date.now()) {
       console.log('[staffing-token] Token expired', {
         token: token.substring(0, 8) + '...',
         expiredAt: row.expires_at,
@@ -102,29 +101,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       return redirectTo(request, '/answer/already');
     }
 
-    // 4) Mark token as used (optimistic - do this before calling the function)
-    const patchRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/staffing_click_tokens?token=eq.${encodeURIComponent(token)}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'apikey': SERVICE_ROLE,
-          'Authorization': `Bearer ${SERVICE_ROLE}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({ used_at: now.toISOString() }),
-      }
-    );
-
-    if (!patchRes.ok) {
-      console.warn('[staffing-token] Failed to mark token as used', {
-        status: patchRes.status,
-      });
-      // Continue anyway - the token lookup succeeded
-    }
-
-    // 5) Call the staffing-click Edge Function
+    // 4) Call the staffing-click Edge Function
     // The staffing-click function expects: rid, a, exp, t, c
     const actionParam = row.action; // 'confirm' or 'decline'
     const channelParam = row.channel || 'whatsapp';
@@ -180,7 +157,30 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       return redirectTo(request, '/answer/error');
     }
 
-    // 7) Redirect to success page based on action
+    // 5) Mark token as used AFTER successful processing
+    // This ensures users can retry if there was a transient failure
+    const patchRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/staffing_click_tokens?token=eq.${encodeURIComponent(token)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey': SERVICE_ROLE,
+          'Authorization': `Bearer ${SERVICE_ROLE}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ used_at: new Date().toISOString() }),
+      }
+    );
+
+    if (!patchRes.ok) {
+      console.warn('[staffing-token] Failed to mark token as used (non-blocking)', {
+        status: patchRes.status,
+      });
+      // Continue anyway - the RSVP was already processed successfully
+    }
+
+    // 6) Redirect to success page based on action
     const finalPath = actionParam === 'confirm' ? '/answer/yes' : '/answer/no';
     console.log('[staffing-token] Success, redirecting', { action: actionParam, path: finalPath });
 
