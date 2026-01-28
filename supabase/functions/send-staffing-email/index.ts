@@ -612,8 +612,72 @@ serve(async (req) => {
 
       // Step 5: Build content (email or whatsapp)
       console.log('📧 BUILDING EMAIL CONTENT...');
+
+      // For WhatsApp, generate short tokens for clean URLs
+      let waConfirmUrl: string | null = null;
+      let waDeclineUrl: string | null = null;
+      const SHORT_URL_BASE = 'https://www.sector-pro.work/a';
+
+      if (desiredChannel === 'whatsapp') {
+        try {
+          // Generate short tokens (22 chars each, URL-safe)
+          const genShortToken = () => {
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+          };
+
+          const confirmShortToken = genShortToken();
+          const declineShortToken = genShortToken();
+
+          // Store both tokens in the database
+          const tokenInserts = [
+            {
+              token: confirmShortToken,
+              rid: insertedId,
+              action: 'confirm',
+              channel: 'whatsapp',
+              expires_at: exp,
+              hmac_token: token,
+              phase: phase
+            },
+            {
+              token: declineShortToken,
+              rid: insertedId,
+              action: 'decline',
+              channel: 'whatsapp',
+              expires_at: exp,
+              hmac_token: token,
+              phase: phase
+            }
+          ];
+
+          const { error: tokenInsertErr } = await supabase
+            .from('staffing_click_tokens')
+            .insert(tokenInserts);
+
+          if (tokenInsertErr) {
+            console.warn('[send-staffing-email] Failed to insert short tokens, using long URLs:', tokenInsertErr);
+          } else {
+            waConfirmUrl = `${SHORT_URL_BASE}/${confirmShortToken}`;
+            waDeclineUrl = `${SHORT_URL_BASE}/${declineShortToken}`;
+            console.log('📱 Short tokens generated for WhatsApp:', {
+              confirm: confirmShortToken.substring(0, 8) + '...',
+              decline: declineShortToken.substring(0, 8) + '...'
+            });
+          }
+        } catch (tokenErr) {
+          console.warn('[send-staffing-email] Error generating short tokens:', tokenErr);
+        }
+      }
+
+      // Long URLs (used for email, or as fallback for WhatsApp)
       const confirmUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=confirm&exp=${encodeURIComponent(exp)}&t=${token}&c=${encodeURIComponent(desiredChannel)}`;
       const declineUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=decline&exp=${encodeURIComponent(exp)}&t=${token}&c=${encodeURIComponent(desiredChannel)}`;
+
+      // For WhatsApp, use short URLs if available
+      const waConfirmLink = waConfirmUrl || confirmUrl;
+      const waDeclineLink = waDeclineUrl || declineUrl;
 
       const roleLabel = labelForRoleCode(role) || null;
       const subject = phase === "availability"
@@ -786,8 +850,8 @@ serve(async (req) => {
           lines.push(`Calendario del tour (PDF): ${tourPdfSignedUrl}`);
           lines.push('');
         }
-        lines.push(`Confirmar: ${confirmUrl}`);
-        lines.push(`No estoy disponible: ${declineUrl}`);
+        lines.push(`Confirmar: ${waConfirmLink}`);
+        lines.push(`No estoy disponible: ${waDeclineLink}`);
         const text = lines.join('\n');
 
         // WAHA config - use actor's endpoint
