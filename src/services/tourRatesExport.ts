@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { syncFlexWorkOrdersForJob } from '@/services/flexWorkOrders';
 import type { TourJobRateQuote } from '@/types/tourRates';
+import { adjustRehearsalQuotesForMultiDay } from '@/lib/tour-payout-email';
 
 export interface TourRatesExportJob {
   id: string;
@@ -192,6 +193,46 @@ export async function buildTourRatesExportPayload(
         })
       );
       filteredQuotes = (quotes.filter(Boolean) as TourJobRateQuote[]).filter(q => q.technician_id);
+
+      // Adjust rehearsal-category quotes for multi-day rehearsal jobs.
+      // Tourdate timesheets are fixed-rate and don't require approvals, so count all active timesheets.
+      const techDates = new Map<string, Set<string>>();
+      const { data: tsDays, error: tsDaysError } = await supabase
+        .from('timesheets')
+        .select('technician_id, date')
+        .eq('job_id', job.id)
+        .eq('is_active', true)
+        .in('technician_id', techIds);
+
+      if (!tsDaysError && Array.isArray(tsDays) && tsDays.length) {
+        (tsDays as any[]).forEach((row: any) => {
+          if (!row?.technician_id || !row?.date) return;
+          if (!techDates.has(row.technician_id)) techDates.set(row.technician_id, new Set());
+          techDates.get(row.technician_id)!.add(row.date);
+        });
+      }
+
+      if ((tsDaysError || !tsDays || tsDays.length === 0) && techDates.size === 0) {
+        const { data: tsVisible } = await supabase.rpc('get_timesheet_amounts_visible');
+        if (Array.isArray(tsVisible) && tsVisible.length) {
+          (tsVisible as any[])
+            .filter(
+              (row) =>
+                row.job_id === job.id &&
+                techIds.includes(row.technician_id) &&
+                (row.is_active == null || row.is_active === true)
+            )
+            .forEach((row: any) => {
+              if (!row?.technician_id || !row?.date) return;
+              if (!techDates.has(row.technician_id)) techDates.set(row.technician_id, new Set());
+              techDates.get(row.technician_id)!.add(row.date);
+            });
+        }
+      }
+
+      const daysCounts = new Map<string, number>();
+      techDates.forEach((dates, techId) => daysCounts.set(techId, dates.size));
+      filteredQuotes = adjustRehearsalQuotesForMultiDay(filteredQuotes, daysCounts);
 
       // Attach timesheet-derived hours/OT breakdown when available (informational only)
       const { data: ts } = await supabase

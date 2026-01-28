@@ -139,7 +139,8 @@ async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<a
   const { data, error } = await client
     .from('timesheets')
     .select('technician_id, date, approved_by_manager')
-    .eq('job_id', jobId);
+    .eq('job_id', jobId)
+    .eq('is_active', true);
   if (error) throw error;
   return data || [];
 }
