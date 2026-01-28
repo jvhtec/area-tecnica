@@ -4,12 +4,13 @@
  * Handles short URLs like https://www.sector-pro.work/a/<token>
  *
  * Flow:
- * 1. Look up <token> in Supabase staffing_click_tokens table
- * 2. Validate token (not expired)
- * 3. Atomically claim the token (set processing_at where used_at and processing_at are null)
- * 4. Call existing staffing-click Edge Function to process the RSVP
- * 5. Mark token as used (set used_at, clear processing_at) after successful processing
- * 6. Redirect to answer page (/answer/yes, /answer/no, /answer/error, etc.)
+ * 1. Look up <token> in staffing_requests.wa_confirm_token / wa_decline_token
+ * 2. Validate (not expired, still pending)
+ * 3. Call existing staffing-click Edge Function with the stored HMAC token
+ * 4. Redirect to answer page (/answer/yes, /answer/no, /answer/error, etc.)
+ *
+ * No separate token table needed — columns live on staffing_requests.
+ * Idempotency is handled by staffing-click (rejects if status != 'pending').
  */
 
 interface Env {
@@ -18,22 +19,16 @@ interface Env {
   SUPABASE_FUNCTIONS_BASE_URL?: string;
 }
 
-interface TokenRow {
-  token: string;
-  rid: string;
-  action: 'confirm' | 'decline';
-  channel: string;
-  expires_at: string;
-  used_at: string | null;
-  processing_at: string | null;
-  created_at: string;
-  hmac_token: string | null;
-  phase: string | null;
+interface StaffingRow {
+  id: string;
+  status: string;
+  phase: string;
+  token_expires_at: string;
+  hmac_token_raw: string | null;
+  wa_confirm_token: string | null;
+  wa_decline_token: string | null;
 }
 
-/**
- * Safely parse a URL, returning null if parsing fails
- */
 function safeParseUrl(urlString: string): URL | null {
   try {
     return new URL(urlString);
@@ -49,7 +44,6 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const SUPABASE_URL = env.SUPABASE_URL;
   const SERVICE_ROLE = env.SUPABASE_SERVICE_ROLE_KEY;
 
-  // Safely derive functions base URL from Supabase URL if not explicitly set
   let projectRef = '';
   if (SUPABASE_URL) {
     const parsed = safeParseUrl(SUPABASE_URL);
@@ -61,7 +55,6 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const FUNCTIONS_BASE = env.SUPABASE_FUNCTIONS_BASE_URL ||
     (projectRef ? `https://${projectRef}.functions.supabase.co` : '');
 
-  // Validate environment
   if (!token || !SUPABASE_URL || !SERVICE_ROLE || !FUNCTIONS_BASE) {
     console.error('[staffing-token] Missing configuration', {
       hasToken: !!token,
@@ -73,9 +66,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   }
 
   try {
-    // 1) Look up token in database
+    // 1) Look up token — could be a confirm or decline token
+    const encodedToken = encodeURIComponent(token);
     const lookupRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/staffing_click_tokens?token=eq.${encodeURIComponent(token)}&select=token,rid,action,channel,expires_at,used_at,processing_at,hmac_token,phase`,
+      `${SUPABASE_URL}/rest/v1/staffing_requests?or=(wa_confirm_token.eq.${encodedToken},wa_decline_token.eq.${encodedToken})&select=id,status,phase,token_expires_at,hmac_token_raw,wa_confirm_token,wa_decline_token&limit=1`,
       {
         headers: {
           'apikey': SERVICE_ROLE,
@@ -86,14 +80,14 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     );
 
     if (!lookupRes.ok) {
-      console.error('[staffing-token] Token lookup failed', {
+      console.error('[staffing-token] Lookup failed', {
         status: lookupRes.status,
         statusText: lookupRes.statusText,
       });
       return redirectTo(request, '/answer/error');
     }
 
-    const rows = await lookupRes.json() as TokenRow[];
+    const rows = await lookupRes.json() as StaffingRow[];
     const row = rows?.[0];
 
     if (!row) {
@@ -101,152 +95,67 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       return redirectTo(request, '/answer/invalid');
     }
 
-    // 2) Check expiration
-    const expiresAt = new Date(row.expires_at);
+    // 2) Determine action from which column matched
+    const action: 'confirm' | 'decline' =
+      row.wa_confirm_token === token ? 'confirm' : 'decline';
 
+    // 3) Check expiration
+    const expiresAt = new Date(row.token_expires_at);
     if (expiresAt.getTime() < Date.now()) {
       console.log('[staffing-token] Token expired', {
-        token: token.substring(0, 8) + '...',
-        expiredAt: row.expires_at,
+        rid: row.id,
+        expiredAt: row.token_expires_at,
       });
       return redirectTo(request, '/answer/expired');
     }
 
-    // 3) Check if already used (quick check before atomic claim)
-    if (row.used_at) {
-      console.log('[staffing-token] Token already used', {
-        token: token.substring(0, 8) + '...',
-        usedAt: row.used_at,
+    // 4) Check if already processed (staffing-click also checks, but early-out is faster)
+    if (row.status !== 'pending') {
+      console.log('[staffing-token] Already responded', {
+        rid: row.id,
+        status: row.status,
       });
       return redirectTo(request, '/answer/already');
     }
 
-    // Check if we have the HMAC token stored
-    if (!row.hmac_token) {
-      console.error('[staffing-token] No HMAC token stored for this click token', {
-        token: token.substring(0, 8) + '...',
-        rid: row.rid,
-      });
+    // 5) Verify we have the HMAC token to forward
+    if (!row.hmac_token_raw) {
+      console.error('[staffing-token] No HMAC token stored', { rid: row.id });
       return redirectTo(request, '/answer/error');
     }
 
-    // 4) Atomically claim the token to prevent race conditions
-    // Only claim if used_at IS NULL AND processing_at IS NULL
-    const claimTime = new Date().toISOString();
-    const claimRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/staffing_click_tokens?token=eq.${encodeURIComponent(token)}&used_at=is.null&processing_at=is.null`,
-      {
-        method: 'PATCH',
-        headers: {
-          'apikey': SERVICE_ROLE,
-          'Authorization': `Bearer ${SERVICE_ROLE}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
-        body: JSON.stringify({ processing_at: claimTime }),
-      }
-    );
-
-    if (!claimRes.ok) {
-      console.error('[staffing-token] Failed to claim token', {
-        status: claimRes.status,
-      });
-      return redirectTo(request, '/answer/error');
-    }
-
-    const claimedRows = await claimRes.json() as TokenRow[];
-    if (!claimedRows || claimedRows.length === 0) {
-      // Another request already claimed this token
-      console.log('[staffing-token] Token already claimed by another request', {
-        token: token.substring(0, 8) + '...',
-      });
-      return redirectTo(request, '/answer/already');
-    }
-
-    // 5) Call the staffing-click Edge Function
-    const actionParam = row.action;
-    const channelParam = row.channel || 'whatsapp';
-
+    // 6) Call staffing-click Edge Function
     const fnUrl = new URL(`${FUNCTIONS_BASE}/staffing-click`);
-    fnUrl.searchParams.set('rid', row.rid);
-    fnUrl.searchParams.set('a', actionParam);
-    fnUrl.searchParams.set('exp', row.expires_at);
-    fnUrl.searchParams.set('t', row.hmac_token);
-    fnUrl.searchParams.set('c', channelParam);
+    fnUrl.searchParams.set('rid', row.id);
+    fnUrl.searchParams.set('a', action);
+    fnUrl.searchParams.set('exp', row.token_expires_at);
+    fnUrl.searchParams.set('t', row.hmac_token_raw);
+    fnUrl.searchParams.set('c', 'whatsapp');
 
-    console.log('[staffing-token] Calling staffing-click function', {
-      rid: row.rid,
-      action: actionParam,
-      channel: channelParam,
+    console.log('[staffing-token] Calling staffing-click', {
+      rid: row.id,
+      action,
     });
 
-    const fnRes = await fetch(fnUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'X-Internal-Token': SERVICE_ROLE.substring(0, 32),
-      },
-    });
-
+    const fnRes = await fetch(fnUrl.toString(), { method: 'GET' });
     const fnStatus = fnRes.status;
-    const fnOk = fnRes.ok || fnStatus === 302;
 
-    if (!fnOk && fnStatus !== 200 && fnStatus !== 302) {
+    if (!fnRes.ok && fnStatus !== 302) {
       const errorBody = await fnRes.text().catch(() => '');
-      console.error('[staffing-token] Staffing-click function failed', {
+      console.error('[staffing-token] staffing-click failed', {
         status: fnStatus,
         body: errorBody.substring(0, 500),
       });
 
-      // Release the claim so user can retry
-      await fetch(
-        `${SUPABASE_URL}/rest/v1/staffing_click_tokens?token=eq.${encodeURIComponent(token)}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'apikey': SERVICE_ROLE,
-            'Authorization': `Bearer ${SERVICE_ROLE}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal',
-          },
-          body: JSON.stringify({ processing_at: null }),
-        }
-      ).catch(() => {});
-
       if (errorBody.includes('Ya has') || errorBody.includes('already')) {
         return redirectTo(request, '/answer/already');
       }
-
       return redirectTo(request, '/answer/error');
     }
 
-    // 6) Mark token as used and clear processing_at
-    const finalizeRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/staffing_click_tokens?token=eq.${encodeURIComponent(token)}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'apikey': SERVICE_ROLE,
-          'Authorization': `Bearer ${SERVICE_ROLE}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({
-          used_at: new Date().toISOString(),
-          processing_at: null,
-        }),
-      }
-    );
-
-    if (!finalizeRes.ok) {
-      console.warn('[staffing-token] Failed to finalize token (non-blocking)', {
-        status: finalizeRes.status,
-      });
-    }
-
-    // 7) Redirect to success page based on action
-    const finalPath = actionParam === 'confirm' ? '/answer/yes' : '/answer/no';
-    console.log('[staffing-token] Success, redirecting', { action: actionParam, path: finalPath });
-
+    // 7) Redirect to answer page
+    const finalPath = action === 'confirm' ? '/answer/yes' : '/answer/no';
+    console.log('[staffing-token] Success', { action, path: finalPath });
     return redirectTo(request, finalPath);
 
   } catch (error) {
@@ -257,18 +166,13 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   }
 };
 
-/**
- * Helper to redirect to an answer page
- */
 function redirectTo(request: Request, path: string): Response {
   const url = new URL(request.url);
   const targetUrl = new URL(path, url.origin);
   return Response.redirect(targetUrl.toString(), 302);
 }
 
-/**
- * Handle HEAD requests (for link previews) - return 204 to minimize preview noise
- */
+/** Return 204 for link-preview HEAD requests to minimize preview noise */
 export const onRequestHead: PagesFunction<Env> = async () => {
   return new Response(null, { status: 204 });
 };

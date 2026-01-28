@@ -630,38 +630,23 @@ serve(async (req) => {
           const confirmShortToken = genShortToken();
           const declineShortToken = genShortToken();
 
-          // Store both tokens in the database
-          const tokenInserts = [
-            {
-              token: confirmShortToken,
-              rid: insertedId,
-              action: 'confirm',
-              channel: 'whatsapp',
-              expires_at: exp,
-              hmac_token: token,
-              phase: phase
-            },
-            {
-              token: declineShortToken,
-              rid: insertedId,
-              action: 'decline',
-              channel: 'whatsapp',
-              expires_at: exp,
-              hmac_token: token,
-              phase: phase
-            }
-          ];
+          // Store tokens directly on the staffing_requests row
+          const { error: tokenUpdateErr } = await supabase
+            .from('staffing_requests')
+            .update({
+              wa_confirm_token: confirmShortToken,
+              wa_decline_token: declineShortToken,
+              hmac_token_raw: token,
+            })
+            .eq('id', insertedId);
 
-          const { error: tokenInsertErr } = await supabase
-            .from('staffing_click_tokens')
-            .insert(tokenInserts);
-
-          if (tokenInsertErr) {
-            console.warn('[send-staffing-email] Failed to insert short tokens, using long URLs:', tokenInsertErr);
+          if (tokenUpdateErr) {
+            console.warn('[send-staffing-email] Failed to store short tokens, using long URLs:', tokenUpdateErr);
           } else {
             waConfirmUrl = `${SHORT_URL_BASE}/${confirmShortToken}`;
             waDeclineUrl = `${SHORT_URL_BASE}/${declineShortToken}`;
-            console.log('📱 Short tokens generated for WhatsApp:', {
+            console.log('📱 Short tokens stored on staffing_request:', {
+              rid: insertedId,
               confirm: confirmShortToken.substring(0, 8) + '...',
               decline: declineShortToken.substring(0, 8) + '...'
             });
