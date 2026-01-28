@@ -8,6 +8,7 @@ create table if not exists public.staffing_click_tokens (
   channel text not null default 'whatsapp',
   expires_at timestamptz not null,
   used_at timestamptz,
+  processing_at timestamptz, -- Used for atomic claim to prevent race conditions
   created_at timestamptz not null default now(),
   -- Store original HMAC token for forwarding to staffing-click Edge Function
   hmac_token text,
@@ -26,12 +27,26 @@ create index if not exists staffing_click_tokens_rid_idx
 -- RLS policies
 alter table public.staffing_click_tokens enable row level security;
 
--- Service role can do everything (for Edge Functions)
+-- Service role can do everything (for Edge Functions / Cloudflare Workers)
 create policy "Service role full access"
   on public.staffing_click_tokens
   for all
+  to service_role
   using (true)
   with check (true);
+
+-- Authenticated users can only read their own tokens (via staffing_requests join)
+create policy "Authenticated users read own tokens"
+  on public.staffing_click_tokens
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.staffing_requests sr
+      where sr.id = rid
+      and sr.profile_id = auth.uid()
+    )
+  );
 
 -- Grant permissions
 grant select, insert, update, delete on public.staffing_click_tokens to service_role;
@@ -44,5 +59,6 @@ comment on column public.staffing_click_tokens.action is 'The action this token 
 comment on column public.staffing_click_tokens.channel is 'Channel where this token was sent (whatsapp, email, etc)';
 comment on column public.staffing_click_tokens.expires_at is 'When this token expires';
 comment on column public.staffing_click_tokens.used_at is 'When this token was used (null if not yet used)';
+comment on column public.staffing_click_tokens.processing_at is 'Timestamp when processing started (for atomic claim to prevent race conditions)';
 comment on column public.staffing_click_tokens.hmac_token is 'Original HMAC token for forwarding to staffing-click Edge Function';
 comment on column public.staffing_click_tokens.phase is 'Phase of the staffing request (availability or offer)';

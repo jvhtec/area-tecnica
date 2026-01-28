@@ -616,7 +616,7 @@ serve(async (req) => {
       // For WhatsApp, generate short tokens for clean URLs
       let waConfirmUrl: string | null = null;
       let waDeclineUrl: string | null = null;
-      const SHORT_URL_BASE = 'https://www.sector-pro.work/a';
+      const SHORT_URL_BASE = Deno.env.get('SHORT_URL_BASE') || 'https://www.sector-pro.work/a';
 
       if (desiredChannel === 'whatsapp') {
         try {
