@@ -23,7 +23,7 @@ import {
   type JobPayoutEmailContextResult,
   type TechnicianProfileWithEmail,
 } from '@/lib/job-payout-email';
-import { sendTourJobEmails, prepareTourJobEmailContext } from '@/lib/tour-payout-email';
+import { sendTourJobEmails, prepareTourJobEmailContext, adjustRehearsalQuotesForMultiDay } from '@/lib/tour-payout-email';
 import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-export';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -389,8 +389,9 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
       if (visibleTourQuotes.length === 0 || !jobMeta) return;
       setIsExporting(true);
       try {
+        const adjustedQuotes = adjustRehearsalQuotesForMultiDay(visibleTourQuotes, tourTimesheetDays);
         await generateRateQuotePDF(
-          visibleTourQuotes,
+          adjustedQuotes,
           {
             id: jobMeta.id,
             title: jobMeta.title,
@@ -438,6 +439,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     lpoMap,
     standardPayoutTotals,
     prepareStandardContext,
+    tourTimesheetDays,
   ]);
 
   const handleSendEmails = React.useCallback(async () => {

@@ -47,6 +47,44 @@ export interface TourJobEmailInput {
   profiles: (TechnicianProfile & { email?: string | null })[];
 }
 
+/**
+ * For rehearsal-category quotes the RPC returns a per-day flat rate.
+ * This helper multiplies the relevant totals by the number of scheduled
+ * timesheet days so that PDFs and emails show the correct multi-day amount.
+ */
+export function adjustRehearsalQuotesForMultiDay(
+  quotes: TourJobRateQuote[],
+  daysCounts: Map<string, number>
+): TourJobRateQuote[] {
+  return quotes.map(quote => {
+    if (quote.category !== 'rehearsal') return quote;
+
+    const days = daysCounts.get(quote.technician_id) || 1;
+    if (days <= 1) return quote;
+
+    const adjustedBaseDayEur = Number(quote.base_day_eur ?? 0) * days;
+    const adjustedTotalEur = Number(quote.total_eur ?? 0) * days;
+    const extrasTotal = Number(quote.extras_total_eur ?? 0);
+
+    return {
+      ...quote,
+      base_day_eur: adjustedBaseDayEur,
+      total_eur: adjustedTotalEur,
+      total_with_extras_eur: adjustedTotalEur + extrasTotal,
+      breakdown: {
+        ...quote.breakdown,
+        ...(quote.breakdown?.after_discount != null
+          ? { after_discount: Number(quote.breakdown.after_discount) * days }
+          : {}),
+        ...(quote.breakdown?.base_calculation != null
+          ? { base_calculation: Number(quote.breakdown.base_calculation) * days }
+          : {}),
+        rehearsal_days: days,
+      },
+    };
+  });
+}
+
 function sanitizeForFilename(value: string) {
   return value
     .replace(/[^\w\s-]/g, '')
@@ -121,13 +159,18 @@ export async function prepareTourJobEmailContext(
       timesheetDateMap.get(row.technician_id)!.add(row.date);
   });
 
+  // Adjust rehearsal quotes for multi-day (RPC returns per-day flat rate)
+  const daysCounts = new Map<string, number>();
+  timesheetDateMap.forEach((dates, techId) => daysCounts.set(techId, dates.size));
+  const adjustedQuotes = adjustRehearsalQuotesForMultiDay(quotes, daysCounts);
+
   const profileMap = new Map(profiles.map((p) => [p.id, p]));
   const attachments: TourJobEmailAttachment[] = [];
 
   // Generate one PDF per technician (filtered quote array per tech)
-  const techIds = Array.from(new Set(quotes.map(q => q.technician_id)));
+  const techIds = Array.from(new Set(adjustedQuotes.map(q => q.technician_id)));
   for (const techId of techIds) {
-    const techQuotes = quotes.filter(q => q.technician_id === techId);
+    const techQuotes = adjustedQuotes.filter(q => q.technician_id === techId);
     if (!techQuotes.length) continue;
 
     const profile = profileMap.get(techId);
@@ -185,7 +228,7 @@ export async function prepareTourJobEmailContext(
 
   return {
     job,
-    quotes,
+    quotes: adjustedQuotes,
     profiles,
     lpoMap,
     timesheetDateMap,
