@@ -256,7 +256,7 @@ export const AssignJobDialog = ({
 
       console.log('Role assignments:', { soundRole, lightsRole, videoRole, department: technician.department });
 
-      if (isReassignment) {
+      if (isReassignment && !isModifyingSameJob) {
         const { deleted_assignment } = await removeTimesheetAssignment({ jobId: existingAssignment.job_id, technicianId });
 
         if (!deleted_assignment) {
@@ -378,7 +378,20 @@ export const AssignJobDialog = ({
       }
 
       // Handle timesheet updates based on whether we're modifying the same job
-      const existingDates = existingTimesheets || [];
+      let existingDates: string[] = [];
+      if (isModifyingSameJob) {
+        const { data: freshTimesheets, error: freshTimesheetsError } = await supabase
+          .from('timesheets')
+          .select('date')
+          .eq('job_id', selectedJobId)
+          .eq('technician_id', technicianId)
+          .eq('is_active', true);
+
+        if (freshTimesheetsError) throw freshTimesheetsError;
+        existingDates = freshTimesheets?.map((t) => t.date) || [];
+      } else {
+        existingDates = existingTimesheets || [];
+      }
 
       const coverageDates: string[] = await (async () => {
         if (coverageMode === 'multi') {
