@@ -570,3 +570,145 @@ npx supabase start
 - **Operational Focus**: Crew management, logistics, technical documentation, equipment tracking
 
 This platform replaces fragmented workflows with integrated planning, communication, and execution tools validated by active production professionals.
+
+---
+
+## Claude Code Workflow Guide
+
+This section defines how we work with Claude Code across the project. These patterns apply to all sessions.
+
+### Parallel Worktrees
+
+We run 3-5 Claude Code sessions in parallel using git worktrees. Each worktree is a fully isolated working copy with its own branch, node_modules, and Claude session.
+
+**Setup:**
+```bash
+# Create a worktree for a feature
+./scripts/worktree.sh create feature-auth main
+
+# Create a worktree for a bugfix
+./scripts/worktree.sh create bugfix-timesheets main
+
+# List active worktrees
+./scripts/worktree.sh list
+
+# Clean up when done
+./scripts/worktree.sh remove feature-auth
+```
+
+**Shell aliases** (add to `~/.bashrc` or `~/.zshrc`):
+```bash
+alias za='cd /path/to/area-tecnica-a && claude'
+alias zb='cd /path/to/area-tecnica-b && claude'
+alias zc='cd /path/to/area-tecnica-c && claude'
+alias zmain='cd /path/to/area-tecnica && claude'
+```
+
+**Rules for parallel work:**
+- Each worktree works on ONE task. Don't mix concerns.
+- Name worktrees after the task: `feature-auth`, `bugfix-timesheets`, `refactor-pdf`
+- Keep a dedicated "analysis" worktree for read-only investigation (logs, queries, exploration)
+- Always `npm install --legacy-peer-deps` in new worktrees
+- Merge back to dev/main via PR, never cross-merge between worktrees
+
+### Plan Mode First
+
+Start every complex task in plan mode. Don't start coding until the plan is solid.
+
+**When to use plan mode:**
+- Multi-file changes (3+ files)
+- New features or components
+- Database schema changes
+- Refactoring existing patterns
+- Anything touching auth, assignments, timesheets, or Flex integration
+
+**How to plan:**
+1. Use `/plan <task description>` to create a detailed implementation plan
+2. Use `/review-plan` to review the plan as a staff engineer
+3. Only proceed to implementation after the plan passes review
+4. If implementation goes sideways, STOP and re-plan. Don't keep pushing.
+5. Use plan mode for verification steps too, not just the build
+
+**Plan mode shortcuts:**
+- `Shift+Tab` in Claude Code cycles through permission modes (Normal -> Auto-Accept -> Plan)
+- `claude --permission-mode plan` starts a session directly in plan mode
+
+### Skills & Slash Commands
+
+Custom slash commands live in `.claude/commands/`. Use them frequently:
+
+| Command | Purpose |
+|---------|---------|
+| `/plan <task>` | Create an implementation plan (plan mode) |
+| `/review-plan` | Review a plan as staff engineer |
+| `/fix <error>` | Diagnose and fix a bug |
+| `/techdebt` | Scan for tech debt and duplicated code |
+| `/ci-fix` | Fix failing build/CI |
+| `/verify` | Verify changes are correct (diff, build, logic check) |
+| `/update-notes` | Capture session learnings in `.claude/notes/` |
+
+**Creating new commands:** If you do something more than once a day, turn it into a command. Create a markdown file in `.claude/commands/<name>.md` with instructions.
+
+**Skills** (in `.claude/skills/`) are more advanced commands that support frontmatter for model selection, tool restrictions, and subagent execution:
+- `plan-review` -- Two-phase plan + self-review in a subagent
+- `techdebt-scan` -- Deep tech debt scan using Explore agent
+
+### Subagents
+
+Use subagents to throw more compute at problems while keeping the main context window clean.
+
+**When to use subagents:**
+- Append "use subagents" to any request where you want parallel investigation
+- Offload individual tasks (search, analysis, tests) to subagents
+- Use the `Explore` agent type for read-only codebase investigation
+- Use the `Plan` agent type for planning without modifying files
+
+**Built-in agent types:** `Bash`, `Explore`, `Plan`, `general-purpose`
+
+### Session Notes
+
+After every meaningful session, run `/update-notes` to capture:
+- What was done
+- Key decisions and their rationale
+- Patterns or gotchas discovered
+- Follow-up items
+
+Notes are stored in `.claude/notes/` and feed back into CLAUDE.md when patterns are confirmed.
+
+### CLAUDE.md Maintenance
+
+This file is a living document. After every correction or mistake:
+1. Fix the immediate issue
+2. Update CLAUDE.md so the mistake doesn't recur
+3. Be specific -- add the exact rule or pattern, not vague guidance
+
+### Prompting Patterns
+
+**Challenge Claude:**
+- "Grill me on these changes and don't make a PR until I pass your test"
+- "Prove to me this works" -- have Claude diff behavior between main and feature branch
+- After a mediocre fix: "Knowing everything you know now, scrap this and implement the elegant solution"
+
+**Be specific:**
+- Write detailed specs before handing off work
+- Reduce ambiguity -- the more specific, the better the output
+- Include file paths, function names, and expected behavior in requests
+
+**Bug fixing:**
+- Paste the error/log directly and say "fix"
+- "Go fix the failing CI tests" -- don't micromanage how
+- Point Claude at logs for distributed system debugging
+
+### Learned Rules (Updated Per Session)
+
+_Add rules here as they are discovered. Each rule should reference a specific mistake or pattern._
+
+- **Always use `--legacy-peer-deps`** with npm install (peer dependency conflicts with vite 6, date-fns 3)
+- **Never add package-lock.json** to the repo (breaks Cloudflare CI)
+- **Timezone is always Europe/Madrid** for all date operations
+- **UI text is in Spanish** -- don't introduce English strings in user-facing components
+- **date-fns must stay at ^3.6.0** -- react-day-picker breaks on v4
+- **Supabase types are auto-generated** -- don't manually edit `src/integrations/supabase/types.ts`
+- **Tour assignments cascade** -- removing a tour assignment must remove related job assignments and timesheets
+- **Flex folder hierarchy must exist** before creating work elements or crew calls
+- **Don't import lovable-tagger** in vite.config.ts (causes build failures)
