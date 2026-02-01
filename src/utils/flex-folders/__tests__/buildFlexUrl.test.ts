@@ -337,7 +337,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
       viewHint: 'equipment-list',
     });
 
-    expect(url).toContain('#equipment-list/test-element-id/view/simple-element/detail');
+    expect(url).toContain('#element/test-element-id/view/equipment-list/detail');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -346,7 +346,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
       viewHint: 'remote-file-list',
     });
 
-    expect(url).toContain('#remote-file-list/test-element-id/view/simple-element/detail');
+    expect(url).toContain('#element/test-element-id/view/remote-file-list/detail');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 });

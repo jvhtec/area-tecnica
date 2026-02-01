@@ -2,6 +2,7 @@
 
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import ProjectManagement from "../ProjectManagement";
 
 const mockNavigate = vi.fn();
@@ -130,10 +131,14 @@ describe("ProjectManagement department tabs", () => {
       isLoading: false,
     });
 
-    render(<ProjectManagement />);
+    render(
+      <MemoryRouter>
+        <ProjectManagement />
+      </MemoryRouter>
+    );
 
-    const lightsTab = await screen.findByRole("tab", { name: /lights/i });
-    const soundTab = screen.getByRole("tab", { name: /sound/i });
+    const lightsTab = await screen.findByRole("tab", { name: /luces/i });
+    const soundTab = screen.getByRole("tab", { name: /sonido/i });
 
     await waitFor(() => expect(lightsTab).toHaveAttribute("data-state", "active"));
     expect(soundTab).toHaveAttribute("data-state", "inactive");
@@ -143,10 +148,18 @@ describe("ProjectManagement department tabs", () => {
     let authState = { userDepartment: null as string | null, isLoading: true };
     mockUseOptimizedAuth.mockImplementation(() => authState);
 
-    const { rerender } = render(<ProjectManagement />);
+    const { rerender } = render(
+      <MemoryRouter>
+        <ProjectManagement />
+      </MemoryRouter>
+    );
 
     authState = { userDepartment: "video", isLoading: false };
-    rerender(<ProjectManagement />);
+    rerender(
+      <MemoryRouter>
+        <ProjectManagement />
+      </MemoryRouter>
+    );
 
     const videoTab = await screen.findByRole("tab", { name: /video/i });
     await waitFor(() => expect(videoTab).toHaveAttribute("data-state", "active"));
