@@ -56,3 +56,6 @@ android/app/build
 # Supabase CLI local state
 supabase/.branches/
 supabase/.temp/
+
+# Claude Code local settings (shared settings go in .claude/settings.json)
+.claude/settings.local.json
