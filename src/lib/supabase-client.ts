@@ -8,13 +8,20 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './api-config';
  * - Configured for auth persistence and token refresh
  * - Optimized realtime settings
  */
+const getAuthStorage = (): Storage | undefined => {
+  // In Node/Vitest (non-jsdom), localStorage doesn’t exist.
+  // Avoid crashing at import-time; tests can mock auth explicitly when needed.
+  if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+  return undefined;
+};
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
+    persistSession: !!getAuthStorage(),
+    detectSessionInUrl: typeof window !== 'undefined',
     flowType: 'pkce',
-    storage: localStorage,
+    storage: getAuthStorage(),
     storageKey: 'supabase.auth.token',
   },
   realtime: {
