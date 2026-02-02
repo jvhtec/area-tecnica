@@ -561,7 +561,9 @@ function JobCardNewFull({
         queryClient.invalidateQueries({ queryKey: ['transport-request', job.id, departmentForReq] });
         queryClient.invalidateQueries({ queryKey: ['transport-requests-all', job.id] });
       }
-    } catch { }
+    } catch (err) {
+      console.error('checkAndFulfillRequest failed', err);
+    }
   };
 
   // Manual Flex sync handler

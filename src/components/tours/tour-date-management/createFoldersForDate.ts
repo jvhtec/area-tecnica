@@ -101,13 +101,19 @@ export async function createFoldersForDate(
       const mainFolderResponse = await createFlexFolder(mainFolderPayload);
       const mainFolderElementId = mainFolderResponse.elementId;
 
-      await supabase.from("flex_folders").insert({
-        tour_date_id: dateObj.id,
-        parent_id: parentRow.id,
-        element_id: mainFolderElementId,
-        department: dept,
-        folder_type: "tourdate",
-      });
+      {
+        const { error: insertMainErr } = await supabase.from("flex_folders").insert({
+          tour_date_id: dateObj.id,
+          parent_id: parentRow.id,
+          element_id: mainFolderElementId,
+          department: dept,
+          folder_type: "tourdate",
+        });
+        if (insertMainErr) {
+          console.error('Error inserting main flex_folders row:', insertMainErr);
+          throw insertMainErr;
+        }
+      }
 
       if (dept !== "personnel") {
         const subfolders = [
@@ -144,13 +150,19 @@ export async function createFoldersForDate(
           console.log(`Creating subfolder ${sf.name} for ${dept}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
           const subFolderElementId = subResponse.elementId;
-          await supabase.from("flex_folders").insert({
-            tour_date_id: dateObj.id,
-            parent_id: parentRow.id,
-            element_id: subFolderElementId,
-            department: dept,
-            folder_type: "tourdate_subfolder",
-          });
+          {
+            const { error: insertSubErr } = await supabase.from("flex_folders").insert({
+              tour_date_id: dateObj.id,
+              parent_id: parentRow.id,
+              element_id: subFolderElementId,
+              department: dept,
+              folder_type: "tourdate_subfolder",
+            });
+            if (insertSubErr) {
+              console.error('Error inserting flex_folders subfolder row:', insertSubErr);
+              throw insertSubErr;
+            }
+          }
         }
       }
 
@@ -210,13 +222,19 @@ export async function createFoldersForDate(
           console.log(`Creating sound extra subfolder ${sf.name}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
           const subFolderElementId = subResponse.elementId;
-          await supabase.from("flex_folders").insert({
-            tour_date_id: dateObj.id,
-            parent_id: parentRow.id,
-            element_id: subFolderElementId,
-            department: dept,
-            folder_type: "tourdate_subfolder",
-          });
+          {
+            const { error: insertSoundSubErr } = await supabase.from("flex_folders").insert({
+              tour_date_id: dateObj.id,
+              parent_id: parentRow.id,
+              element_id: subFolderElementId,
+              department: dept,
+              folder_type: "tourdate_subfolder",
+            });
+            if (insertSoundSubErr) {
+              console.error('Error inserting flex_folders sound subfolder row:', insertSoundSubErr);
+              throw insertSoundSubErr;
+            }
+          }
         }
       }
 
@@ -240,13 +258,19 @@ export async function createFoldersForDate(
           console.log(`Creating personnel subfolder ${sf.name}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
           const subFolderElementId = subResponse.elementId;
-          await supabase.from("flex_folders").insert({
-            tour_date_id: dateObj.id,
-            parent_id: parentRow.id,
-            element_id: subFolderElementId,
-            department: dept,
-            folder_type: "tourdate_subfolder",
-          });
+          {
+            const { error: insertPersonnelErr } = await supabase.from("flex_folders").insert({
+              tour_date_id: dateObj.id,
+              parent_id: parentRow.id,
+              element_id: subFolderElementId,
+              department: dept,
+              folder_type: "tourdate_subfolder",
+            });
+            if (insertPersonnelErr) {
+              console.error('Error inserting flex_folders personnel subfolder row:', insertPersonnelErr);
+              throw insertPersonnelErr;
+            }
+          }
         }
         const personnelCrewCall = [
           { name: `Crew Call Sonido - ${tourData.name}`, suffix: "CCS" },
@@ -269,13 +293,19 @@ export async function createFoldersForDate(
           console.log(`Creating personnel crew call subfolder ${sf.name}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
           const subFolderElementId = subResponse.elementId;
-          await supabase.from("flex_folders").insert({
-            tour_date_id: dateObj.id,
-            parent_id: parentRow.id,
-            element_id: subFolderElementId,
-            department: dept,
-            folder_type: "tourdate_subfolder",
-          });
+          {
+            const { error: insertCrewCallErr } = await supabase.from("flex_folders").insert({
+              tour_date_id: dateObj.id,
+              parent_id: parentRow.id,
+              element_id: subFolderElementId,
+              department: dept,
+              folder_type: "tourdate_subfolder",
+            });
+            if (insertCrewCallErr) {
+              console.error('Error inserting flex_folders crew call subfolder row:', insertCrewCallErr);
+              throw insertCrewCallErr;
+            }
+          }
         }
       }
     }
