@@ -84,8 +84,14 @@ export function TransportRequestDialog({
           .update(payload)
           .eq('id', requestId);
         if (error) throw error;
-        // Replace items
-        await supabase.from('transport_request_items').delete().eq('request_id', requestId);
+
+        // Replace items (do not ignore delete failures)
+        const { error: deleteItemsError } = await supabase
+          .from('transport_request_items')
+          .delete()
+          .eq('request_id', requestId);
+        if (deleteItemsError) throw deleteItemsError;
+
         const toInsert = items
           .filter((it) => !!it.transport_type)
           .map((it) => ({
