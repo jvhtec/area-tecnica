@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { EventData, TravelArrangement, Accommodation, Restaurant } from '@/types/hoja-de-ruta';
 
 /**
@@ -126,13 +126,13 @@ export const useHojaDeRutaData = () => {
       }
 
       // Save related data
-      await Promise.all([
-        saveContacts(savedHoja.id, eventData.contacts || []),
-        saveStaff(savedHoja.id, eventData.staff || []),
-        saveTravelArrangements(savedHoja.id, travelArrangements),
-        saveAccommodations(savedHoja.id, accommodations),
-        saveRestaurants(savedHoja.id, eventData.restaurants || [])
-      ]);
+      // NOTE: This is not a true transaction (Supabase JS cannot wrap multiple tables in a single client-side txn).
+      // We run sequentially so we can abort as soon as an operation fails.
+      await saveContacts(savedHoja.id, eventData.contacts || []);
+      await saveStaff(savedHoja.id, eventData.staff || []);
+      await saveTravelArrangements(savedHoja.id, travelArrangements);
+      await saveAccommodations(savedHoja.id, accommodations);
+      await saveRestaurants(savedHoja.id, eventData.restaurants || []);
 
       return savedHoja;
     } catch (err: any) {
@@ -276,15 +276,15 @@ const saveAccommodations = async (hojaId: string, accommodations: Accommodation[
   }
 
   if (existingAccommodations && existingAccommodations.length > 0) {
-    for (const acc of existingAccommodations) {
-      const { error: deleteRoomsError } = await supabase
-        .from('hoja_de_ruta_room_assignments')
-        .delete()
-        .eq('accommodation_id', acc.id);
-      if (deleteRoomsError) {
-        console.error('Error deleting hoja_de_ruta_room_assignments:', deleteRoomsError);
-        throw deleteRoomsError;
-      }
+    // Batch delete rooms for all accommodations to reduce round-trips
+    const accommodationIds = existingAccommodations.map((acc) => acc.id);
+    const { error: deleteRoomsError } = await supabase
+      .from('hoja_de_ruta_room_assignments')
+      .delete()
+      .in('accommodation_id', accommodationIds);
+    if (deleteRoomsError) {
+      console.error('Error deleting hoja_de_ruta_room_assignments:', deleteRoomsError);
+      throw deleteRoomsError;
     }
 
     const { error: deleteAccError } = await supabase
