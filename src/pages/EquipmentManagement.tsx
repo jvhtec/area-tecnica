@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StockEntry, getCategoriesForDepartment } from '@/types/equipment';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { StockCreationManager } from '@/components/disponibilidad/StockCreationManager';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 export function EquipmentManagement() {
-  const auth = useOptimizedAuth();
+  const auth = useAuth();
   const { session } = auth;
   const userDepartment = auth.userDepartment;
   const queryClient = useQueryClient();

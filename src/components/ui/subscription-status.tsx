@@ -7,11 +7,11 @@ import { useState } from "react";
 import { Button } from "./button";
 import { useResetSubscriptions } from "@/hooks/useResetSubscriptions";
 import { toast } from "sonner";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 export function SubscriptionStatus() {
   const { connectionStatus, subscriptionCount, subscriptionsByTable } = useSubscriptionContext();
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const isAdmin = userRole === 'admin';
   const [expanded, setExpanded] = useState(false);
   const { resetAllSubscriptions } = useResetSubscriptions();

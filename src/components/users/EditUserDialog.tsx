@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { HouseTechRateEditor } from "@/components/settings/HouseTechRateEditor";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { formatUserName } from "@/utils/userName";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
@@ -29,7 +29,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   const [assignableAsTech, setAssignableAsTech] = useState<boolean>(!!user?.assignable_as_tech);
   const [soundvisionAccessEnabled, setSoundvisionAccessEnabled] = useState<boolean>(!!user?.soundvision_access_enabled);
   const [isAutonomo, setIsAutonomo] = useState<boolean>(user?.autonomo !== false);
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const [flexUrl, setFlexUrl] = useState<string>("");
   const [flexResourceId, setFlexResourceId] = useState<string>(user?.flex_resource_id || "");

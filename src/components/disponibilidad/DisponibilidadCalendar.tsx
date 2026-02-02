@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
@@ -30,7 +30,7 @@ interface DisponibilidadCalendarProps {
 }
 
 export function DisponibilidadCalendar({ selectedDate, onDateSelect, className }: DisponibilidadCalendarProps & { className?: string }) {
-  const { session, userDepartment } = useOptimizedAuth();
+  const { session, userDepartment } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { TokenManager } from "@/lib/token-manager";
 import { UnifiedSubscriptionManager, type SubscriptionSnapshot } from "@/lib/unified-subscription-manager";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 interface SubscriptionContextType {
   connectionStatus: "connected" | "disconnected" | "connecting";
@@ -93,7 +93,7 @@ interface SubscriptionProviderProps {
 
 export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   const queryClient = useQueryClient();
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const isAdmin = userRole === "admin";
 
   const manager = useMemo(() => UnifiedSubscriptionManager.getInstance(queryClient), [queryClient]);

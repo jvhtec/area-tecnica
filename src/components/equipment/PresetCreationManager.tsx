@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PresetEditor } from './PresetEditor';
@@ -21,7 +21,7 @@ interface PresetCreationManagerProps {
 }
 
 export function PresetCreationManager({ onClose, selectedDate }: PresetCreationManagerProps) {
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const { department } = useDepartment();
   const { toast } = useToast();
   const queryClient = useQueryClient();

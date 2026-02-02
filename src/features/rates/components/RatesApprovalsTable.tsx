@@ -17,7 +17,7 @@ import { buildTourRatesExportPayload } from '@/services/tourRatesExport';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import type { RatesApprovalRow } from '@/services/ratesService';
 
 interface RatesApprovalsTableProps {
@@ -32,7 +32,7 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
   const [page, setPage] = React.useState(1);
   const [selectedJob, setSelectedJob] = React.useState<RatesApprovalRow | null>(null);
   const PAGE_SIZE = 10;
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const isManagementUser = React.useMemo(() => ['management', 'admin'].includes(userRole || ''), [userRole]);
 
   const handleOpenJob = React.useCallback((row: RatesApprovalRow) => {

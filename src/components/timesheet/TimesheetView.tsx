@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarDays, Clock, FileText, Download, Plus, User, Trash2, AlertTriangle, Mail, Receipt } from "lucide-react";
 import { useTimesheets } from "@/hooks/useTimesheets";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { Timesheet, TimesheetFormData } from "@/types/timesheet";
 import { TimesheetSignature } from "./TimesheetSignature";
 import { JobTotalAmounts } from "./JobTotalAmounts";
@@ -56,7 +56,7 @@ export const TimesheetView = ({
   filterDate
 }: TimesheetViewProps) => {
   // Ensure userRole is initialized before passing into hooks that depend on it
-  const { user, userRole } = useOptimizedAuth();
+  const { user, userRole } = useAuth();
   const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, revertTimesheet, refetch } = useTimesheets(jobId, { userRole });
   const { assignments } = useJobAssignmentsRealtime(jobId);
   const { toast } = useToast();

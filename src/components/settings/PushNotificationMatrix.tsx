@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -136,7 +136,7 @@ function routeKey(event: string, type: RecipientType, target: string | null) {
 }
 
 export function PushNotificationMatrix() {
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const isManagement = ['admin', 'management'].includes(userRole || '');
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);

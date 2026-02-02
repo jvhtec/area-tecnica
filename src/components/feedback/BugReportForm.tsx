@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/lib/supabase-client";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 import { ScreenshotCapture } from "./ScreenshotCapture";
 import { getRecentConsoleLogs } from "@/utils/consoleCapture";
 import {
@@ -49,7 +49,7 @@ type BugReportFormData = z.infer<typeof bugReportSchema>;
 
 export function BugReportForm() {
   const { toast } = useToast();
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [screenshotFilename, setScreenshotFilename] = useState<string | null>(null);

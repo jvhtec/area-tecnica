@@ -8,7 +8,7 @@ import { Toaster as SonnerToaster } from 'sonner';
 import { queryClient } from '@/lib/react-query';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { OptimizedAuthProvider, useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useServiceWorkerUpdate } from '@/hooks/useServiceWorkerUpdate';
 import { usePushSubscriptionRecovery } from '@/hooks/usePushSubscriptionRecovery';
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
@@ -111,7 +111,7 @@ const SOUND_TOOL_ROLES = ["admin", "management", "house_tech"] as const;
 const SOUND_TOOL_ROLES_WITH_TECH = [...SOUND_TOOL_ROLES, "technician"] as const;
 
 const FestivalsAccessGuard = () => {
-  const { userRole, userDepartment, isLoading } = useOptimizedAuth();
+  const { userRole, userDepartment, isLoading } = useAuth();
 
   if (isLoading) {
     return null;
@@ -128,7 +128,7 @@ const FestivalsAccessGuard = () => {
 };
 
 const DisponibilidadAccessGuard = () => {
-  const { userRole, userDepartment, isLoading } = useOptimizedAuth();
+  const { userRole, userDepartment, isLoading } = useAuth();
 
   if (isLoading) {
     return null;
@@ -166,7 +166,7 @@ export default function App() {
             <TooltipProvider>
               <AppBadgeProvider>
                 <Router>
-                  <OptimizedAuthProvider>
+                  <AuthProvider>
                     <ServiceWorkerUpdateInit />
                     <PushSubscriptionRecoveryInit />
                     <ShortcutSystemInit />
@@ -282,7 +282,7 @@ export default function App() {
                       <Toaster />
                       <SonnerToaster richColors position="top-right" />
                     </div>
-                  </OptimizedAuthProvider>
+                  </AuthProvider>
                 </Router>
               </AppBadgeProvider>
             </TooltipProvider>

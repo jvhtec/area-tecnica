@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,7 +18,7 @@ interface SignUpFormProps {
 }
 
 export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps) => {
-  const { signUp, createUserAsAdmin, isLoading, error: authError } = useOptimizedAuth();
+  const { signUp, createUserAsAdmin, isLoading, error: authError } = useAuth();
   const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({

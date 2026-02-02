@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useDepartment } from '@/contexts/DepartmentContext';
 
 interface PresetEditorProps {
@@ -31,7 +31,7 @@ interface PresetEditorProps {
 }
 
 export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTourId, jobId, jobCandidates, allowedCategories }: PresetEditorProps) => {
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const { department } = useDepartment();
   const [name, setName] = useState(preset?.name || '');
   const [selectedTourId, setSelectedTourId] = useState<string | undefined | null>(fixedTourId ?? preset?.tour_id ?? undefined);

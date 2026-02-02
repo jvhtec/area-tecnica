@@ -3,7 +3,7 @@ import { checkNetworkConnection, getRealtimeConnectionStatus, ensureRealtimeConn
 import { useQueryClient } from "@tanstack/react-query";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 import { useLocation } from "react-router-dom";
-import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscriptions";
+import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
 import { toast } from "sonner";
 import { TokenManager } from "@/lib/token-manager";
 import { MultiTabCoordinator } from "@/lib/multitab-coordinator";
@@ -150,7 +150,7 @@ function AppInitWithRouter() {
   }, [isLeader, manager]);
   
   // Use the enhanced route subscriptions hook to manage subscriptions
-  const subscriptionStatus = useEnhancedRouteSubscriptions();
+  const subscriptionStatus = useRouteSubscriptions();
   
   // Handle subscription staleness (only for leader)
   useEffect(() => {

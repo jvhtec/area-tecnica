@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StockEntry, getCategoriesForDepartment } from '@/types/equipment';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { StockCreationManager } from '@/components/disponibilidad/StockCreationManager';
 import { AlertCircle, Box } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -18,7 +18,7 @@ import {
 
 export function InventoryManagementDialog() {
     const [open, setOpen] = useState(false);
-    const auth = useOptimizedAuth();
+    const auth = useAuth();
     const { session } = auth;
     const userDepartment = auth.userDepartment;
 

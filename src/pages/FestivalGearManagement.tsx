@@ -7,7 +7,7 @@ import { ArrowLeft, Plus, Wrench, Printer, Loader2, Edit2, Check, X } from "luci
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/enhanced-supabase-client";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
-import { ConnectionIndicator } from "@/components/ui/connection-indicator";
+import { ConnectionIndicator } from "@/components/ui/connection-status";
 import { FestivalGearSetupForm } from "@/components/festival/FestivalGearSetupForm";
 import { FestivalGearSetup } from "@/types/festival";
 import { Input } from "@/components/ui/input";

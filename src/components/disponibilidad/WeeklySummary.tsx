@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase';
 import { SUPABASE_URL } from '@/lib/api-config';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
@@ -125,7 +125,7 @@ function FlexImage({
 
 export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps) {
   const { department } = useDepartment();
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(selectedDate));

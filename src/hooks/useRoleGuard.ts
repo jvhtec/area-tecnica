@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { getDashboardPath } from '@/utils/roleBasedRouting';
 import { UserRole } from '@/types/user';
 
 export function useRoleGuard(allowedRoles: UserRole[], requiredDepartment?: string) {
-  const { userRole, userDepartment, isLoading } = useOptimizedAuth();
+  const { userRole, userDepartment, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

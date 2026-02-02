@@ -4,7 +4,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { AppInit } from "@/components/AppInit";
 import { useActivityPushFallback } from "@/hooks/useActivityPushFallback";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 function ActivityPushFallbackInit() {
   useActivityPushFallback();
@@ -14,7 +14,7 @@ function ActivityPushFallbackInit() {
 // Redirect 'technician' role to /tech-app (house_tech can access Layout routes).
 // Allow-list a small set of technician-accessible routes outside /tech-app (e.g. tools like SysCalc).
 function TechnicianRouteGuard() {
-  const { userRole, isLoading } = useOptimizedAuth();
+  const { userRole, isLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 

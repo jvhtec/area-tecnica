@@ -15,8 +15,8 @@ vi.mock("react-router-dom", async () => {
 });
 
 const mockUseOptimizedAuth = vi.fn();
-vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: () => mockUseOptimizedAuth(),
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => mockUseOptimizedAuth(),
 }));
 
 const mockUseOptimizedJobs = vi.fn();

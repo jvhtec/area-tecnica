@@ -7,7 +7,7 @@ import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { Scale, Zap, Calendar, FileText, Plus, Calculator, Lightbulb } from "lucide-react";
@@ -31,7 +31,7 @@ const Lights = () => {
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const currentDepartment = "lights";
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
 
   const mobileTools = useMemo(
     () => [

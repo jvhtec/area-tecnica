@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
@@ -46,7 +46,7 @@ interface SubRental {
 }
 
 export function SubRentalManager() {
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { department } = useDepartment();

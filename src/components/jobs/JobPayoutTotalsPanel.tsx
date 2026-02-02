@@ -26,7 +26,7 @@ import {
 import { sendTourJobEmails, prepareTourJobEmailContext, adjustRehearsalQuotesForMultiDay } from '@/lib/tour-payout-email';
 import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-export';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useToggleTechnicianPayoutApproval } from '@/hooks/useToggleTechnicianPayoutApproval';
 import type { JobExpenseBreakdownItem, JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
@@ -291,7 +291,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const [previewContext, setPreviewContext] = React.useState<JobPayoutEmailContextResult | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = React.useState(false);
 
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const isManager = userRole === 'admin' || userRole === 'management';
 
   const { data: payoutOverrides = [] } = useJobTechnicianPayoutOverrides(jobId);

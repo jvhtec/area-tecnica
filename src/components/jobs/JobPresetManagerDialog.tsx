@@ -11,7 +11,7 @@ import { PresetEditor } from '@/components/equipment/PresetEditor';
 import { PA_PRESET_ALLOWED_CATEGORIES, PresetItem, PresetWithItems, Department, mapPresetWithItemsRow } from '@/types/equipment';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
 import { format } from 'date-fns';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { AmplifierTool } from '@/components/sound/AmplifierTool';
 
 interface Props {
@@ -23,7 +23,7 @@ interface Props {
 export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const [isCreating, setIsCreating] = useState(false);
   const [editingPreset, setEditingPreset] = useState<PresetWithItems | null>(null);
   const [copyingPreset, setCopyingPreset] = useState<PresetWithItems | null>(null);

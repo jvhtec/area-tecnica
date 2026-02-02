@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
 import {
   AVAILABLE_DEPARTMENTS,
@@ -44,7 +44,7 @@ import {
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
   const prefetchStatusRef = React.useRef<Map<string, 'pending' | 'done'>>(new Map<string, 'pending' | 'done'>());
-  const { userDepartment } = useOptimizedAuth();
+  const { userDepartment } = useAuth();
   const [defaultDepartment, setDefaultDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const hasManualDepartmentSelection = React.useRef(false);

@@ -7,14 +7,14 @@ import { useMyJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useTechnicianTourRateQuotes } from '@/hooks/useTourJobRateQuotes';
 import { formatCurrency } from '@/lib/utils';
 import { calculateQuoteTotal } from '@/lib/tourRateMath';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTourRatesApprovalMap } from '@/hooks/useTourRatesApproval';
 import { useJobRatesApprovalMap } from '@/hooks/useJobRatesApproval';
 import type { TourJobRateQuote } from '@/types/tourRates';
 
 export function MyJobTotalsSection() {
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const { data: payoutTotals = [], isLoading: isLoadingPayouts } = useMyJobPayoutTotals();
   const { data: tourQuotes = [], isLoading: isLoadingTours } = useTechnicianTourRateQuotes();
 

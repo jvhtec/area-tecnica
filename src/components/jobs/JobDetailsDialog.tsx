@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 import { useJobExtras } from "@/hooks/useJobExtras";
 import { useJobRatesApproval } from "@/hooks/useJobRatesApproval";
@@ -32,7 +32,7 @@ interface JobDetailsDialogProps {
 
 const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOpenChange, job, department = "sound" }) => {
   const [selectedTab, setSelectedTab] = useState("info");
-  const { userRole, user } = useOptimizedAuth();
+  const { userRole, user } = useAuth();
   const isManager = ["admin", "management"].includes(userRole || "");
   const isTechnicianRole = ["technician", "house_tech"].includes(userRole || "");
   const isHouseTech = userRole === "house_tech";

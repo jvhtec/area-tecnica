@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
-import { getRealtimeConnectionStatus } from '@/lib/supabase-client';
+import { getRealtimeConnectionStatus } from '@/lib/supabase';
 import { forceRefreshSubscriptions } from '@/lib/enhanced-supabase-client';
 
 /**

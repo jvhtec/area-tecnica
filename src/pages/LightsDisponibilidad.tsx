@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { PresetManagementDialog } from '@/components/equipment/PresetManagementDialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { endOfDay, format, startOfDay } from 'date-fns';
 import { WeeklySummary } from '@/components/disponibilidad/WeeklySummary';
@@ -22,7 +22,7 @@ export default function LightsDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);
   const navigate = useNavigate();
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 

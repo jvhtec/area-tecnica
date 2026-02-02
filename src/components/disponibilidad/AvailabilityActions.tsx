@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from '@/integrations/supabase/client';
 import type { AvailabilityStatus } from '@/types/availability';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -19,7 +19,7 @@ interface AvailabilityActionsProps {
 }
 
 export function AvailabilityActions({ selectedDate }: AvailabilityActionsProps) {
-  const { session, userDepartment } = useOptimizedAuth();
+  const { session, userDepartment } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

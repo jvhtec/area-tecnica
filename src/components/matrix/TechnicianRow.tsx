@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date-fns';
@@ -41,7 +41,7 @@ interface TechnicianRowProps {
 }
 
 const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false, medalRank, lastYearMedalRank }: TechnicianRowProps) => {
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const isAdmin = userRole === 'admin';
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const [skillsOpen, setSkillsOpen] = React.useState(false);

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Equipment } from "@/types/equipment";
@@ -27,7 +27,7 @@ export function StockMovementDialog({
 }: StockMovementDialogProps) {
   const [quantity, setQuantity] = useState<number>(1);
   const [notes, setNotes] = useState("");
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

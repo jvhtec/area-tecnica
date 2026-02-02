@@ -3,7 +3,7 @@ import { Navigate, useSearchParams, useNavigate } from "react-router-dom";
 import { SignUpForm } from "@/components/auth/SignUpForm";
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { UserRole } from "@/types/user";
 import { Mail, Lock, ChevronRight, Loader2 } from "lucide-react";
@@ -23,7 +23,7 @@ const BRAND_CONFIG = {
 };
 
 const Auth = () => {
-  const { session, userRole, isLoading, error: authError, login } = useOptimizedAuth();
+  const { session, userRole, isLoading, error: authError, login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [showSignUp, setShowSignUp] = useState(false);

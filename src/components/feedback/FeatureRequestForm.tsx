@@ -16,8 +16,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/lib/supabase-client";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +37,7 @@ type FeatureRequestFormData = z.infer<typeof featureRequestSchema>;
 
 export function FeatureRequestForm() {
   const { toast } = useToast();
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 

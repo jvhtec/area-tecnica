@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth'
+import { useAuth } from '@/hooks/useAuth'
 
 const COVERED_CODES = new Set<string>([
   'job.created',
@@ -24,7 +24,7 @@ const COVERED_CODES = new Set<string>([
 ])
 
 export function useActivityPushFallback() {
-  const { userRole } = useOptimizedAuth()
+  const { userRole } = useAuth()
   const enabled = (import.meta.env.VITE_ENABLE_ACTIVITY_PUSH_FALLBACK as any) === 'true'
   const processed = useRef<Set<string>>(new Set())
 

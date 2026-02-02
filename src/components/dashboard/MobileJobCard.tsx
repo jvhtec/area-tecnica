@@ -6,10 +6,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Department } from "@/types/department";
 import { useNavigate } from "react-router-dom";
-import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
+import { useJobCard } from '@/hooks/useJobCard';
 import { useJobActions } from '@/hooks/useJobActions';
 import { useFolderExistence } from "@/hooks/useFolderExistence";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
 import { 
@@ -73,7 +73,7 @@ export function MobileJobCard({
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const [dateTypeDialogOpen, setDateTypeDialogOpen] = useState(false);
   const [selectedDateType, setSelectedDateType] = useState<string>('show');
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
@@ -100,7 +100,7 @@ export function MobileJobCard({
     setVideoTaskDialogOpen,
     setEditJobDialogOpen,
     setAssignmentDialogOpen
-  } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick, {
+  } = useJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick, {
     enableRoleSummary: false,
     enableSoundTasks: false,
   });

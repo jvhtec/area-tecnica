@@ -21,7 +21,7 @@ import { useNavigate } from "react-router-dom";
 import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
 import { IncidentReport } from "@/components/sound/tools";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { SoundVisionAccessRequestDialog } from "@/components/soundvision/SoundVisionAccessRequestDialog";
 import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
@@ -59,7 +59,7 @@ const Sound = () => {
   const { data: jobs } = useJobs();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { userRole, hasSoundVisionAccess, userDepartment } = useOptimizedAuth();
+  const { userRole, hasSoundVisionAccess, userDepartment } = useAuth();
 
   // Generate navigation items for mobile nav bar
   const navigationItems = useMemo(() => {

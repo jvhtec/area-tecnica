@@ -81,7 +81,7 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
     const key = assignment.technician_id ? `tech:${assignment.technician_id}` : `ext:${name}`;
     const roleLabel = roleCode ? labelForCode(roleCode) : null;
     const isFromTour = assignment.assignment_source === 'tour';
-    // Use timesheet dates if available (from useOptimizedJobCard), otherwise fall back to assignment date
+    // Use timesheet dates if available (from useJobCard), otherwise fall back to assignment date
     const timesheetDates = assignment._timesheet_dates;
     const assignmentDate = assignment.single_day && assignment.assignment_date ? assignment.assignment_date : null;
 

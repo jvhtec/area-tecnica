@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Euro, Plus, User, ShieldAlert } from 'lucide-react';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { formatCurrency } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -16,7 +16,7 @@ interface MyJobTotalProps {
 }
 
 export function MyJobTotal({ jobId, filterTechnicianId }: MyJobTotalProps) {
-  const { user, userRole } = useOptimizedAuth();
+  const { user, userRole } = useAuth();
   const isTech = userRole === 'technician' || userRole === 'house_tech';
   // Techs: filter by current user. Management: fetch all rows for job.
   const { data: rows = [], isLoading, error } = useJobPayoutTotals(jobId, isTech ? user?.id : undefined);

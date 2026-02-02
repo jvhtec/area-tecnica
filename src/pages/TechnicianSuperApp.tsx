@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useMyTours } from '@/hooks/useMyTours';
 import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
 import { useTechnicianDashboardSubscriptions } from '@/hooks/useMobileRealtimeSubscriptions';
@@ -112,7 +112,7 @@ const getThemeStyles = (isDark: boolean) => ({
 export default function TechnicianSuperApp() {
   const [tab, setTab] = useState('dashboard');
   const { theme: nextTheme, setTheme } = useTheme();
-  const { user, hasSoundVisionAccess } = useOptimizedAuth();
+  const { user, hasSoundVisionAccess } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();

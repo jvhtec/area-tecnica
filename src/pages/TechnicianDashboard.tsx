@@ -13,7 +13,7 @@ import {
 import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
 import { useTechnicianDashboardSubscriptions } from '@/hooks/useMobileRealtimeSubscriptions';
 import { useTourRateSubscriptions } from '@/hooks/useTourRateSubscriptions';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 
 import { DashboardScreen } from '@/components/technician/DashboardScreen';
@@ -92,7 +92,7 @@ const TechnicianDashboard = () => {
   };
 
   const { theme: nextTheme, setTheme } = useTheme();
-  const { user, hasSoundVisionAccess } = useOptimizedAuth();
+  const { user, hasSoundVisionAccess } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 

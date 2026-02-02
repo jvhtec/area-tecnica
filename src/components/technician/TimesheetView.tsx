@@ -35,7 +35,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTimesheets } from '@/hooks/useTimesheets';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { formatCurrency } from '@/lib/utils';
@@ -94,7 +94,7 @@ const getStatusBadge = (status: string, isDark: boolean) => {
 };
 
 export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }: TimesheetViewProps) => {
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
   const {
     timesheets,
     isLoading,

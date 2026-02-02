@@ -11,7 +11,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 import { TourRequirementsDialog } from '@/components/tours/TourRequirementsDialog';
 import { RequestTourAvailabilityDialog } from '@/components/tours/RequestTourAvailabilityDialog';
@@ -61,7 +61,7 @@ export const TourAssignmentDialog = ({
   tourId, 
   readOnly = false 
 }: TourAssignmentDialogProps) => {
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');

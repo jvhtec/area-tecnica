@@ -5,11 +5,11 @@ import { Bug, Lightbulb, Settings } from "lucide-react";
 import { BugReportForm } from "@/components/feedback/BugReportForm";
 import { FeatureRequestForm } from "@/components/feedback/FeatureRequestForm";
 import { AdminPanel } from "@/components/feedback/AdminPanel";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { initConsoleCapture } from "@/utils/consoleCapture";
 
 export default function Feedback() {
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const [activeTab, setActiveTab] = useState("bug");
 
   const isAdmin = userRole === "admin" || userRole === "management";

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useOptimizedAuth } from './useOptimizedAuth';
+import { useAuth } from './useAuth';
 
 export interface ExpensePermission {
   id: string;
@@ -34,7 +34,7 @@ export interface ExpenseCategory {
  * Hook to fetch expense permissions for the current user for a specific job.
  */
 export const useExpensePermissions = (jobId: string | null | undefined) => {
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
 
   return useQuery({
     queryKey: ['expense-permissions', jobId, user?.id],

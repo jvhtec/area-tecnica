@@ -17,7 +17,7 @@ import {
 import { HeaderStatus } from "@/components/ui/header-status"
 import { ReloadButton } from "@/components/ui/reload-button"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth"
+import { useAuth } from "@/hooks/useAuth"
 import { useActivityRealtime } from "@/features/activity/hooks/useActivityRealtime"
 import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions"
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider"
@@ -182,7 +182,7 @@ const Layout = () => {
     assignableAsTech,
     isLoading,
     logout,
-  } = useOptimizedAuth()
+  } = useAuth()
 
   // Synchronous redirect for technician users - prevent any Layout rendering.
   // Preserve showAbout query param for deeplinks.

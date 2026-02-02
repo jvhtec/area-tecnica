@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listActivity } from '@/features/activity/api';
 import { getActivityMeta } from '@/features/activity/catalog';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { getDashboardPath } from '@/utils/roleBasedRouting';
 
 export default function ActivityCenter() {
   const navigate = useNavigate();
-  const { userRole, isLoading: authLoading } = useOptimizedAuth();
+  const { userRole, isLoading: authLoading } = useAuth();
 
   // Early security check: Only allow admin, management
   useEffect(() => {

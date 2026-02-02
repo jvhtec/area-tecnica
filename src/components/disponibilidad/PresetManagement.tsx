@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -27,7 +27,7 @@ type AvailabilityPreference = {
 type AvailabilityStatus = 'available' | 'tentative' | 'unavailable';
 
 export function PresetManagement() {
-  const { session, userDepartment } = useOptimizedAuth();
+  const { session, userDepartment } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

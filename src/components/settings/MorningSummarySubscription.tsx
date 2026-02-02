@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useMorningSummarySubscription } from '@/hooks/useMorningSummarySubscription';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { Bell, Info } from 'lucide-react';
 
 type Department = {
@@ -23,7 +23,7 @@ const DEPARTMENTS: Department[] = [
 ];
 
 export function MorningSummarySubscription() {
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const { subscription, isLoading, upsertSubscription, isUpdating } = useMorningSummarySubscription();
 
   const [enabled, setEnabled] = useState(false);

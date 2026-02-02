@@ -12,11 +12,11 @@
 
 import { CreateJobDialog } from './CreateJobDialog';
 import { useCreateJobDialogStore } from '@/stores/useCreateJobDialogStore';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 
 export function GlobalCreateJobDialog() {
   const { isOpen, closeDialog, initialDepartment, initialDate, initialJobType } = useCreateJobDialogStore();
-  const { userDepartment } = useOptimizedAuth();
+  const { userDepartment } = useAuth();
 
   // Use current user's department as default if not specified
   const currentDepartment = initialDepartment || userDepartment || 'sound';

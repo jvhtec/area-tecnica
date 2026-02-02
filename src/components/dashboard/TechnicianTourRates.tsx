@@ -4,7 +4,7 @@ import { Euro, Info, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, AlertTri
 import { format, getISOWeek, getISOWeekYear, startOfWeek, endOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { useTechnicianTourRateQuotes } from "@/hooks/useTourJobRateQuotes";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useTourRatesApprovalMap } from "@/hooks/useTourRatesApproval";
 import { useJobRatesApprovalMap } from "@/hooks/useJobRatesApproval";
 import { calculateQuoteTotal, formatMultiplier, getPerJobMultiplier, shouldDisplayMultiplier } from "@/lib/tourRateMath";
@@ -31,7 +31,7 @@ interface TechnicianTourRatesProps {
 
 export const TechnicianTourRates: React.FC<TechnicianTourRatesProps> = ({ theme, isDark = false }) => {
   const { data: quotes, isLoading, error } = useTechnicianTourRateQuotes();
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
 
   // Default theme fallback
   const t = theme || {

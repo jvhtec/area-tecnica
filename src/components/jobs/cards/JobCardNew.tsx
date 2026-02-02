@@ -10,9 +10,9 @@ declare global {
 }
 import { useNavigate } from "react-router-dom";
 import { useFolderExistence } from "@/hooks/useFolderExistence";
-import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
+import { useJobCard } from '@/hooks/useJobCard';
 import { useDeletionState } from '@/hooks/useDeletionState';
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
 import { supabase } from "@/integrations/supabase/client";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
@@ -194,7 +194,7 @@ function JobCardNewFull({
   const [requirementsDialogOpen, setRequirementsDialogOpen] = useState(false);
   const [selectedTransportRequest, setSelectedTransportRequest] = useState<any | null>(null);
   const [logisticsInitialEventType, setLogisticsInitialEventType] = useState<'load' | 'unload' | undefined>(undefined);
-  const { user, userDepartment: currentUserDepartment } = useOptimizedAuth();
+  const { user, userDepartment: currentUserDepartment } = useAuth();
 
   const {
     appliedBorderColor,
@@ -225,7 +225,7 @@ function JobCardNewFull({
     setVideoTaskDialogOpen,
     setEditJobDialogOpen,
     setAssignmentDialogOpen
-  } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick, {
+  } = useJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick, {
     enableRoleSummary: true,
     enableSoundTasks: !hideTasks,
   });
