@@ -15,6 +15,8 @@ export default defineConfig({
     environmentMatchGlobs: [
       // Use jsdom for component tests
       ["**/components/**/*.test.{ts,tsx}", "jsdom"],
+      // Some utilities interact with the DOM (e.g. openFlexElementSync, toast libs)
+      ["**/src/utils/flex-folders/**/__tests__/**/*.test.{ts,tsx}", "jsdom"],
     ],
   },
   resolve: {

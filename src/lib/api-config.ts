@@ -5,6 +5,7 @@
 type EnvSource = Record<string, string | undefined>;
 
 const getEnv = (name: string): string | undefined => {
+  // In non-Vite contexts (Vitest/Node), `import.meta.env` may be missing.
   const metaEnv = (import.meta as any)?.env as EnvSource | undefined;
   // In Vite client bundles, `process` may be undefined.
   const processEnv = typeof process !== 'undefined' ? process.env?.[name] : undefined;

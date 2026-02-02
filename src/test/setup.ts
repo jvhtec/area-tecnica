@@ -1,5 +1,16 @@
 import { expect, afterEach, vi } from 'vitest';
 
+// Global mock: prevent sonner from trying to inject CSS into jsdom (or crashing in node).
+// Some files import `toast as showToast` and then call `showToast.error(...)`.
+vi.mock('sonner', () => {
+  const toast = Object.assign(vi.fn(), {
+    error: vi.fn(),
+    success: vi.fn(),
+    message: vi.fn(),
+  });
+  return { toast };
+});
+
 // Only import testing-library/react and jest-dom if we're in a DOM environment
 if (typeof window !== 'undefined') {
   // @ts-ignore
