@@ -15,7 +15,9 @@ const requireEnv = (name: string, value: string | undefined) => {
   if (!value || value.trim() === '') {
     // Vitest runs in Node and does not automatically inject Vite env vars.
     // Provide safe placeholders so modules can import without crashing.
-    if (process.env.VITEST || process.env.NODE_ENV === 'test') {
+    const isTestEnv =
+      typeof process !== 'undefined' && (process.env?.VITEST || process.env?.NODE_ENV === 'test');
+    if (isTestEnv) {
       if (name.includes('VITE_SUPABASE_URL')) return 'http://localhost:54321';
       return 'test-key';
     }
