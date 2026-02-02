@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -17,6 +16,17 @@ interface QuickPresetAssignmentProps {
   className?: string;
 }
 
+/**
+ * Render a popover UI that lets users assign presets to, or remove assignments from, the given date.
+ *
+ * Fetches presets and current assignments for the component's department and uses mutations to create
+ * or delete day preset assignments; shows success and error toasts and refreshes assignment data on change.
+ *
+ * @param selectedDate - The date to view and modify preset assignments for; if invalid, the component renders `null`
+ * @param onAssign - Optional callback invoked after a successful assign or removal operation
+ * @param className - Optional class name applied to the trigger button for styling
+ * @returns A React element containing the "Assign Preset" popover, or `null` when `selectedDate` is invalid
+ */
 export function QuickPresetAssignment({ selectedDate, onAssign, className }: QuickPresetAssignmentProps) {
   const { department } = useDepartment();
   const { session } = useAuth();

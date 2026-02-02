@@ -27,6 +27,16 @@ const DEPARTMENT_LABELS: Record<DisponibilidadDepartment, string> = {
   lights: 'Luces'
 };
 
+/**
+ * Renders the availability (Disponibilidad) interface for the resolved department.
+ *
+ * Displays a two-pane desktop layout (or a mobile-optimized view) showing weekly summary, a date calendar,
+ * selected-day job/preset details, quick preset assignment, and management dialogs. Resolves the active
+ * department based on the current user's role (admin or management) and allows admins to switch departments.
+ * On the selected date it loads jobs and preset assignments, prefetches job logos, and surfaces errors via toast.
+ *
+ * @returns The rendered availability UI for the resolved department, or `null` when no department is available.
+ */
 export default function Disponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);

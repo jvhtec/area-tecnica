@@ -20,6 +20,18 @@ interface PresetCreationManagerProps {
   selectedDate?: Date;
 }
 
+/**
+ * Manage creation, editing, copying, and deletion of department presets, including an amplifier-calculator flow.
+ *
+ * Renders a list of shared presets for the current department and provides UI flows to create new presets,
+ * edit or copy existing ones, delete presets (with confirmation), and create presets from the Amplifier Calculator.
+ * Fetches job candidates for a selected date to associate presets with jobs and synchronizes changes with Supabase,
+ * invalidating the local presets query on success.
+ *
+ * @param props.onClose - Optional callback invoked when the manager should be closed (not used internally by the component).
+ * @param props.selectedDate - Optional date used to limit job candidate fetching to that day's jobs.
+ * @returns The JSX element rendering the preset management UI.
+ */
 export function PresetCreationManager({ onClose, selectedDate }: PresetCreationManagerProps) {
   const { session } = useAuth();
   const { department } = useDepartment();

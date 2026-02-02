@@ -13,6 +13,14 @@ import { useTourRatesApprovalMap } from '@/hooks/useTourRatesApproval';
 import { useJobRatesApprovalMap } from '@/hooks/useJobRatesApproval';
 import type { TourJobRateQuote } from '@/types/tourRates';
 
+/**
+ * Render a card summarizing the authenticated user's approved and pending job payout totals and tour quote totals.
+ *
+ * Displays loading and empty states, separates regular job payouts and tour date quotes, shows per-item breakdowns,
+ * pending-approval alerts, and a grand total (including a note when expenses are included).
+ *
+ * @returns A React element containing the "My Job Totals" UI card.
+ */
 export function MyJobTotalsSection() {
   const { userRole } = useAuth();
   const { data: payoutTotals = [], isLoading: isLoadingPayouts } = useMyJobPayoutTotals();

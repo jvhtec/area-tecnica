@@ -24,6 +24,16 @@ interface RatesApprovalsTableProps {
   onManageTour: (tourId: string) => void;
 }
 
+/**
+ * Render the rates approvals table with filtering, pagination, export and management actions for tours and jobs.
+ *
+ * Displays searchable and filterable rows of rate approvals, paginates results, and exposes actions:
+ * - Tour rows: export PDF summary and invoke tour management.
+ * - Job rows: view payout totals (management users) and navigate to timesheets.
+ *
+ * @param onManageTour - Callback invoked with a tour's id when the user chooses to manage a tour.
+ * @returns The RatesApprovalsTable component UI as a JSX element.
+ */
 export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) {
   const { data: rows = [], isLoading } = useRatesApprovals();
   const [search, setSearch] = React.useState('');

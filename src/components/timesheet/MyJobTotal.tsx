@@ -15,6 +15,16 @@ interface MyJobTotalProps {
   filterTechnicianId?: string;
 }
 
+/**
+ * Render a card showing technician payout totals for a job, with selection behavior for non-technician users.
+ *
+ * Shows the current technician's totals when the authenticated user is a technician, and for management users
+ * it displays a selector to choose a technician and view their totals. Handles loading, no-data, and rates-not-approved states.
+ *
+ * @param jobId - The job identifier used to fetch payout totals and approvals.
+ * @param filterTechnicianId - Optional technician id to preselect the displayed technician for management users.
+ * @returns The JSX element that displays the payout totals card for the specified job and technician.
+ */
 export function MyJobTotal({ jobId, filterTechnicianId }: MyJobTotalProps) {
   const { user, userRole } = useAuth();
   const isTech = userRole === 'technician' || userRole === 'house_tech';

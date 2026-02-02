@@ -60,6 +60,21 @@ const DATE_TYPE_OPTIONS = [
   { value: 'rehearsal', label: 'Rehearsal', emoji: '🎵' }
 ];
 
+/**
+ * Renders a mobile-optimized interactive job card with actions, date-type management, folder/Flex integration, and role-aware dialogs.
+ *
+ * Displays job metadata (title, venue, times, departments) and exposes actions via a dropdown (change date type, Flex navigation/creation, timesheets, assignments, upload, edit, delete, etc.). Handles local UI state and invokes provided callbacks for edits, deletions, job clicks, and date-type changes. Behavior adapts to user role and job properties.
+ *
+ * @param job - The job object to display and act upon
+ * @param department - The department context for the card (defaults to "sound")
+ * @param currentDate - The date used to resolve and update the job's date type
+ * @param dateTypes - Optional map of preloaded date-type entries keyed by `${job.id}-YYYY-MM-DD`
+ * @param onDateTypeChange - Optional callback invoked after a successful date-type update
+ * @param onEditClick - Optional callback invoked when the edit action is requested
+ * @param onDeleteClick - Optional callback invoked when the delete action is confirmed
+ * @param onJobClick - Optional callback invoked when the card is clicked (subject to role and state)
+ * @returns The rendered mobile job card element
+ */
 export function MobileJobCard({
   job,
   department = "sound",

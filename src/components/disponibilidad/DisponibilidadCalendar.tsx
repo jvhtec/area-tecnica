@@ -1,4 +1,3 @@
-
 import { useMemo, useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
@@ -29,6 +28,16 @@ interface DisponibilidadCalendarProps {
   onDateSelect?: (date: Date | undefined) => void;
 }
 
+/**
+ * Render an interactive calendar showing preset assignments and per-day equipment availability for the current user department.
+ *
+ * Renders day-level visual indicators for presets, stock sufficiency, rental coverage, and conflicts, and provides hover tooltips with preset names and status.
+ *
+ * @param selectedDate - Currently selected date (may be `undefined`).
+ * @param onDateSelect - Callback invoked with a Date or `undefined` when the user selects a date.
+ * @param className - Optional container CSS class names to apply.
+ * @returns The calendar JSX element populated with availability and preset information.
+ */
 export function DisponibilidadCalendar({ selectedDate, onDateSelect, className }: DisponibilidadCalendarProps & { className?: string }) {
   const { session, userDepartment } = useAuth();
   const { toast } = useToast();

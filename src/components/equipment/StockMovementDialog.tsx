@@ -18,6 +18,19 @@ interface StockMovementDialogProps {
   isAddition?: boolean;
 }
 
+/**
+ * Renders a dialog for adding or removing stock for a specific equipment item.
+ *
+ * Displays inputs for quantity and optional notes, performs validation against current stock when removing,
+ * records the movement in the database, updates the global stock entry, and shows success or error toasts.
+ *
+ * @param open - Whether the dialog is open
+ * @param onOpenChange - Callback invoked with the new open state
+ * @param equipment - The equipment item that the stock movement applies to
+ * @param currentStock - Current stock level for the equipment (used to bound removals); defaults to 0
+ * @param isAddition - If true, the dialog performs an addition; if false, it performs a subtraction; defaults to true
+ * @returns The rendered stock movement dialog element
+ */
 export function StockMovementDialog({
   open,
   onOpenChange,

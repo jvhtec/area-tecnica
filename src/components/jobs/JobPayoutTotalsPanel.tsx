@@ -44,6 +44,17 @@ const subtleText = "text-muted-foreground";
 const controlButton = "variant-outline border-border";
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
 
+/**
+ * Render and manage payout information and actions for a job, handling both standard jobs and tour dates.
+ *
+ * This component displays per-technician payout totals, approvals, overrides, extras and timesheet details;
+ * it also provides PDF export, email preview and sending, and per-technician send controls. Behavior adapts
+ * for tour dates (quotes-based) versus standard jobs (timesheet-based) and respects manager permissions.
+ *
+ * @param jobId - The ID of the job to show payouts for.
+ * @param technicianId - Optional technician ID to filter the view to a single technician.
+ * @returns A React element rendering the job payout totals panel and its interactive controls.
+ */
 export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPanelProps) {
   const {
     data: jobMeta,

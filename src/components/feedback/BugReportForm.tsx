@@ -47,6 +47,16 @@ const bugReportSchema = z.object({
 
 type BugReportFormData = z.infer<typeof bugReportSchema>;
 
+/**
+ * Render a bug report form UI that collects user-provided bug details and submits them to the backend.
+ *
+ * The form collects a title, description, optional reproduction steps, severity, an optional screenshot,
+ * an option to include recent console logs, and a reporter email. It validates input (including a 5MB
+ * approximate limit for screenshots), sends the data to a Supabase function, shows a success dialog
+ * with an optional GitHub issue link on success, and displays an error toast on failure.
+ *
+ * @returns The React element for the bug report form and its success dialog.
+ */
 export function BugReportForm() {
   const { toast } = useToast();
   const { user } = useAuth();

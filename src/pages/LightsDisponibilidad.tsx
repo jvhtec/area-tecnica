@@ -18,6 +18,13 @@ import { useOptimizedJobs } from '@/hooks/useOptimizedJobs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
+/**
+ * Render the LightsDisponibilidad page that presents and manages lighting equipment presets and availability for a selected date.
+ *
+ * Displays a calendar, job list for the selected day, preset assignments, weekly summary, sub-rental manager, and preset management dialog; provides navigation to equipment management and controls for opening the preset dialog.
+ *
+ * @returns The component's rendered JSX element.
+ */
 export default function LightsDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);
