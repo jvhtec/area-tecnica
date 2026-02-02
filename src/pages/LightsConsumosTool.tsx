@@ -91,7 +91,9 @@ const lightComponentDatabase: LightComponent[] = [
   { id: 54, name: 'AROLA AQUA S-LT', watts: 600, fixtureType: 'led' },
   { id: 55, name: 'AROLA AQUA HP', watts: 1900, fixtureType: 'led' },
   { id: 56, name: 'HY B-EYE K15 AQUA', watts: 680, fixtureType: 'led' },
-  { id: 57, name: 'CLUSTER B2 FC', watts: 600, fixtureType: 'led' }
+  { id: 57, name: 'CLUSTER B2 FC', watts: 600, fixtureType: 'led' },
+  { id: 58, name: 'ACME TORNADO', watts: 935, fixtureType: 'led' },
+  { id: 59, name: 'CLAY PAKY A-LEDA K15', watts: 760, fixtureType: 'led' }
 ];
 
 const SQRT3 = Math.sqrt(3);
