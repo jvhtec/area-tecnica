@@ -6,7 +6,9 @@ type EnvSource = Record<string, string | undefined>;
 
 const getEnv = (name: string): string | undefined => {
   const metaEnv = (import.meta as any)?.env as EnvSource | undefined;
-  return metaEnv?.[name] ?? process.env[name];
+  // In Vite client bundles, `process` may be undefined.
+  const processEnv = typeof process !== 'undefined' ? process.env?.[name] : undefined;
+  return metaEnv?.[name] ?? processEnv;
 };
 
 const requireEnv = (name: string, value: string | undefined) => {
