@@ -155,8 +155,15 @@ export const useHojaDeRutaData = () => {
 // Helper functions
 const saveContacts = async (hojaId: string, contacts: any[]) => {
   // Delete existing contacts
-  await supabase.from('hoja_de_ruta_contacts').delete().eq('hoja_de_ruta_id', hojaId);
-  
+  const { error: deleteError } = await supabase
+    .from('hoja_de_ruta_contacts')
+    .delete()
+    .eq('hoja_de_ruta_id', hojaId);
+  if (deleteError) {
+    console.error('Error deleting hoja_de_ruta_contacts:', deleteError);
+    throw deleteError;
+  }
+
   // Insert new contacts
   if (contacts.length > 0) {
     const contactsData = contacts
@@ -167,17 +174,28 @@ const saveContacts = async (hojaId: string, contacts: any[]) => {
         role: contact.role,
         phone: contact.phone
       }));
-    
+
     if (contactsData.length > 0) {
-      await supabase.from('hoja_de_ruta_contacts').insert(contactsData);
+      const { error: insertError } = await supabase.from('hoja_de_ruta_contacts').insert(contactsData);
+      if (insertError) {
+        console.error('Error inserting hoja_de_ruta_contacts:', insertError);
+        throw insertError;
+      }
     }
   }
 };
 
 const saveStaff = async (hojaId: string, staff: any[]) => {
   // Delete existing staff
-  await supabase.from('hoja_de_ruta_staff').delete().eq('hoja_de_ruta_id', hojaId);
-  
+  const { error: deleteError } = await supabase
+    .from('hoja_de_ruta_staff')
+    .delete()
+    .eq('hoja_de_ruta_id', hojaId);
+  if (deleteError) {
+    console.error('Error deleting hoja_de_ruta_staff:', deleteError);
+    throw deleteError;
+  }
+
   // Insert new staff
   if (staff.length > 0) {
     const staffData = staff
@@ -190,9 +208,13 @@ const saveStaff = async (hojaId: string, staff: any[]) => {
         position: member.position,
         dni: member.dni
       }));
-    
+
     if (staffData.length > 0) {
-      await supabase.from('hoja_de_ruta_staff').insert(staffData);
+      const { error: insertError } = await supabase.from('hoja_de_ruta_staff').insert(staffData);
+      if (insertError) {
+        console.error('Error inserting hoja_de_ruta_staff:', insertError);
+        throw insertError;
+      }
     }
   }
 };
@@ -243,22 +265,42 @@ const saveTravelArrangements = async (hojaId: string, arrangements: TravelArrang
 
 const saveAccommodations = async (hojaId: string, accommodations: Accommodation[]) => {
   // Delete existing accommodations and rooms
-  const { data: existingAccommodations } = await supabase
+  const { data: existingAccommodations, error: fetchError } = await supabase
     .from('hoja_de_ruta_accommodations')
     .select('id')
     .eq('hoja_de_ruta_id', hojaId);
-  
-  if (existingAccommodations) {
+
+  if (fetchError) {
+    console.error('Error fetching existing hoja_de_ruta_accommodations:', fetchError);
+    throw fetchError;
+  }
+
+  if (existingAccommodations && existingAccommodations.length > 0) {
     for (const acc of existingAccommodations) {
-      await supabase.from('hoja_de_ruta_room_assignments').delete().eq('accommodation_id', acc.id);
+      const { error: deleteRoomsError } = await supabase
+        .from('hoja_de_ruta_room_assignments')
+        .delete()
+        .eq('accommodation_id', acc.id);
+      if (deleteRoomsError) {
+        console.error('Error deleting hoja_de_ruta_room_assignments:', deleteRoomsError);
+        throw deleteRoomsError;
+      }
     }
-    await supabase.from('hoja_de_ruta_accommodations').delete().eq('hoja_de_ruta_id', hojaId);
+
+    const { error: deleteAccError } = await supabase
+      .from('hoja_de_ruta_accommodations')
+      .delete()
+      .eq('hoja_de_ruta_id', hojaId);
+    if (deleteAccError) {
+      console.error('Error deleting hoja_de_ruta_accommodations:', deleteAccError);
+      throw deleteAccError;
+    }
   }
   
   // Insert new accommodations
   for (const accommodation of accommodations) {
     if (accommodation.hotel_name?.trim()) {
-      const { data: savedAccommodation } = await supabase
+      const { data: savedAccommodation, error: insertAccError } = await supabase
         .from('hoja_de_ruta_accommodations')
         .insert({
           hoja_de_ruta_id: hojaId,
@@ -271,7 +313,12 @@ const saveAccommodations = async (hojaId: string, accommodations: Accommodation[
         })
         .select()
         .single();
-      
+
+      if (insertAccError) {
+        console.error('Error inserting hoja_de_ruta_accommodations:', insertAccError);
+        throw insertAccError;
+      }
+
       if (savedAccommodation && accommodation.rooms.length > 0) {
         const roomsData = accommodation.rooms
           .filter(room => room.room_type?.trim())
@@ -282,9 +329,15 @@ const saveAccommodations = async (hojaId: string, accommodations: Accommodation[
             staff_member1_id: room.staff_member1_id,
             staff_member2_id: room.staff_member2_id
           }));
-        
+
         if (roomsData.length > 0) {
-          await supabase.from('hoja_de_ruta_room_assignments').insert(roomsData);
+          const { error: insertRoomsError } = await supabase
+            .from('hoja_de_ruta_room_assignments')
+            .insert(roomsData);
+          if (insertRoomsError) {
+            console.error('Error inserting hoja_de_ruta_room_assignments:', insertRoomsError);
+            throw insertRoomsError;
+          }
         }
       }
     }
@@ -293,8 +346,15 @@ const saveAccommodations = async (hojaId: string, accommodations: Accommodation[
 
 const saveRestaurants = async (hojaId: string, restaurants: Restaurant[]) => {
   // Delete existing restaurants
-  await supabase.from('hoja_de_ruta_restaurants').delete().eq('hoja_de_ruta_id', hojaId);
-  
+  const { error: deleteError } = await supabase
+    .from('hoja_de_ruta_restaurants')
+    .delete()
+    .eq('hoja_de_ruta_id', hojaId);
+  if (deleteError) {
+    console.error('Error deleting hoja_de_ruta_restaurants:', deleteError);
+    throw deleteError;
+  }
+
   // Insert new restaurants
   if (restaurants.length > 0) {
     const restaurantsData = restaurants
@@ -315,9 +375,13 @@ const saveRestaurants = async (hojaId: string, restaurants: Restaurant[]) => {
         photos: restaurant.photos || [],
         is_selected: restaurant.isSelected || false
       }));
-    
+
     if (restaurantsData.length > 0) {
-      await supabase.from('hoja_de_ruta_restaurants').insert(restaurantsData);
+      const { error: insertError } = await supabase.from('hoja_de_ruta_restaurants').insert(restaurantsData);
+      if (insertError) {
+        console.error('Error inserting hoja_de_ruta_restaurants:', insertError);
+        throw insertError;
+      }
     }
   }
 };
