@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { TourChips } from "@/components/dashboard/TourChips";
 import { supabase } from "@/lib/supabase";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 const Tours = () => {
   const [showTours, setShowTours] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
 
   // House techs have view-only access
   const readOnly = userRole === 'house_tech';

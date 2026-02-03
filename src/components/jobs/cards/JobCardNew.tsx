@@ -10,9 +10,9 @@ declare global {
 }
 import { useNavigate } from "react-router-dom";
 import { useFolderExistence } from "@/hooks/useFolderExistence";
-import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
+import { useJobCard } from '@/hooks/useJobCard';
 import { useDeletionState } from '@/hooks/useDeletionState';
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
 import { supabase } from "@/integrations/supabase/client";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
@@ -75,6 +75,13 @@ function JobCardNewDetailsOnlyCard({
   );
 }
 
+/**
+ * Render the full interactive job card view, wiring UI state, data fetching, and action handlers for managing a job.
+ *
+ * This component loads related data (artists, riders, transport requests, logistics events, timesheets, folder existence, WhatsApp group state), manages modal/dialog state (route sheet, tasks, transport, logistics, requirements, folder picker), and provides handlers for actions such as editing, optimistic deletion, creating/syncing Flex folders, creating local filesystem folders, transport request management, and WhatsApp group creation/retry.
+ *
+ * @returns The rendered full JobCardNew view as a JSX element.
+ */
 function JobCardNewFull({
   job,
   onEditClick,
@@ -194,7 +201,7 @@ function JobCardNewFull({
   const [requirementsDialogOpen, setRequirementsDialogOpen] = useState(false);
   const [selectedTransportRequest, setSelectedTransportRequest] = useState<any | null>(null);
   const [logisticsInitialEventType, setLogisticsInitialEventType] = useState<'load' | 'unload' | undefined>(undefined);
-  const { user, userDepartment: currentUserDepartment } = useOptimizedAuth();
+  const { user, userDepartment: currentUserDepartment } = useAuth();
 
   const {
     appliedBorderColor,
@@ -225,7 +232,7 @@ function JobCardNewFull({
     setVideoTaskDialogOpen,
     setEditJobDialogOpen,
     setAssignmentDialogOpen
-  } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick, {
+  } = useJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick, {
     enableRoleSummary: true,
     enableSoundTasks: !hideTasks,
   });

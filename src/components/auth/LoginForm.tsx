@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 interface LoginFormProps {
   onShowSignUp: () => void;
@@ -13,7 +13,7 @@ interface LoginFormProps {
 }
 
 export const LoginForm = ({ onShowSignUp, onShowForgotPassword }: LoginFormProps) => {
-  const { login, isLoading, error: authError } = useOptimizedAuth();
+  const { login, isLoading, error: authError } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",

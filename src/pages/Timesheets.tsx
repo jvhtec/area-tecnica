@@ -7,18 +7,25 @@ import { TimesheetView } from "@/components/timesheet/TimesheetView";
 import { downloadTimesheetPDF } from "@/utils/timesheet-pdf";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useTimesheets } from "@/hooks/useTimesheets";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
 import { useSearchParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+/**
+ * Renders the Timesheets management UI for selecting a job, viewing its details and timesheets, applying filters, and downloading PDFs when permitted.
+ *
+ * The component reads an optional `jobId` from the URL to preselect a job, fetches jobs and timesheets, and exposes controls for selecting jobs, departments, technicians, and dates. Management and admin users can filter timesheets and download a combined PDF; timesheets are disabled for certain job types (e.g., dryhire, tourdate).
+ *
+ * @returns The Timesheets React UI for managing and viewing technician timesheets and related job details.
+ */
 export default function Timesheets() {
   const [searchParams, setSearchParams] = useSearchParams();
   const jobIdFromUrl = searchParams.get('jobId');
   const [selectedJobId, setSelectedJobId] = useState<string>(jobIdFromUrl || "");
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
-  const { user, userRole } = useOptimizedAuth();
+  const { user, userRole } = useAuth();
   const { data: jobs = [], isLoading: jobsLoading } = useOptimizedJobs();
   const { timesheets } = useTimesheets(selectedJobId || "", { userRole });
 

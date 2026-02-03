@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,8 +9,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Minus } from 'lucide-react';
 import { StockMovementDialog } from './StockMovementDialog';
 
+/**
+ * Render the stock management UI that displays current equipment stock levels and provides controls to add or remove stock.
+ *
+ * Fetches current stock levels when a user session exists, shows a scrollable list of equipment with quantities, and opens a stock movement dialog for additions or removals.
+ *
+ * @returns The component's rendered JSX element containing the equipment list, quantity controls, and the StockMovementDialog when an item is selected.
+ */
 export function StockManagement() {
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);

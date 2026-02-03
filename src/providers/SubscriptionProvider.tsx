@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { TokenManager } from "@/lib/token-manager";
 import { UnifiedSubscriptionManager, type SubscriptionSnapshot } from "@/lib/unified-subscription-manager";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 interface SubscriptionContextType {
   connectionStatus: "connected" | "disconnected" | "connecting";
@@ -91,9 +91,19 @@ interface SubscriptionProviderProps {
   children: React.ReactNode;
 }
 
+/**
+ * Provides subscription management state and actions to descendant components via SubscriptionContext.
+ *
+ * The provider instantiates and exposes a UnifiedSubscriptionManager along with helper actions:
+ * refreshSubscriptions, invalidateQueries, forceRefresh, and forceSubscribe. It listens for token
+ * refresh events and reestablishes subscriptions when tokens are refreshed. When the current user
+ * has the "admin" role, refresh and force-refresh actions display success toasts.
+ *
+ * @param children - The React children that will receive the subscription context.
+ */
 export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   const queryClient = useQueryClient();
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const isAdmin = userRole === "admin";
 
   const manager = useMemo(() => UnifiedSubscriptionManager.getInstance(queryClient), [queryClient]);
@@ -180,4 +190,3 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 }
-

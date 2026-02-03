@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StockEntry, getCategoriesForDepartment } from '@/types/equipment';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { StockCreationManager } from '@/components/disponibilidad/StockCreationManager';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
@@ -10,8 +10,15 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
+/**
+ * Render the inventory management UI for the authenticated user's department.
+ *
+ * Displays current stock entries filtered by the user's department categories, allows editing and persisting stock updates, and shows contextual alerts when the department is missing or when fetch/update errors occur.
+ *
+ * @returns A React element that provides the equipment inventory management interface
+ */
 export function EquipmentManagement() {
-  const auth = useOptimizedAuth();
+  const auth = useAuth();
   const { session } = auth;
   const userDepartment = auth.userDepartment;
   const queryClient = useQueryClient();

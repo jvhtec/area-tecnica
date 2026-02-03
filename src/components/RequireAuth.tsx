@@ -1,14 +1,14 @@
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 
 interface RequireAuthProps {
   children: React.ReactNode;
 }
 
 export const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
-  const { session, isLoading } = useOptimizedAuth();
+  const { session, isLoading } = useAuth();
 
   if (isLoading) {
     return (

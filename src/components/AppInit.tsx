@@ -3,7 +3,7 @@ import { checkNetworkConnection, getRealtimeConnectionStatus, ensureRealtimeConn
 import { useQueryClient } from "@tanstack/react-query";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 import { useLocation } from "react-router-dom";
-import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscriptions";
+import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
 import { toast } from "sonner";
 import { TokenManager } from "@/lib/token-manager";
 import { MultiTabCoordinator } from "@/lib/multitab-coordinator";
@@ -15,7 +15,18 @@ const calculateBackoff = (attempt: number, baseMs: number = 1000, maxMs: number 
 };
 
 /**
- * Inner component that requires router context
+ * Initializes app-level subscription, connection, and multi-tab coordination tied to router context.
+ *
+ * Handles tab leadership changes and updates the query client role; when the tab is leader it:
+ * - Performs periodic connection health checks with exponential backoff while the page is visible.
+ * - Sets up visibility- and network-based global invalidation/refetching.
+ * - Refreshes stale subscriptions and retries missing route subscriptions with exponential backoff.
+ * - Responds to network reconnection by ensuring realtime connection and coordinating invalidation across tabs.
+ *
+ * Also requests subscription work from the leader when running as a follower, and attaches appropriate
+ * visibility/online event listeners. This component does not render any UI.
+ *
+ * @returns `null` (this component does not render any UI)
  */
 function AppInitWithRouter() {
   const queryClient = useQueryClient();
@@ -150,7 +161,7 @@ function AppInitWithRouter() {
   }, [isLeader, manager]);
   
   // Use the enhanced route subscriptions hook to manage subscriptions
-  const subscriptionStatus = useEnhancedRouteSubscriptions();
+  const subscriptionStatus = useRouteSubscriptions();
   
   // Handle subscription staleness (only for leader)
   useEffect(() => {

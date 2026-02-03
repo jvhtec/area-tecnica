@@ -1,8 +1,7 @@
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -26,8 +25,16 @@ type AvailabilityPreference = {
 
 type AvailabilityStatus = 'available' | 'tentative' | 'unavailable';
 
+/**
+ * Render UI for managing the current user's weekly availability presets.
+ *
+ * Displays each weekday with controls to set ("Available", "Tentative", "Unavailable") or clear a preset,
+ * synchronizes presets with the backend, and shows success or error toasts for create/delete actions.
+ *
+ * @returns A React element rendering the weekly presets management UI.
+ */
 export function PresetManagement() {
-  const { session, userDepartment } = useOptimizedAuth();
+  const { session, userDepartment } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

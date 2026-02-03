@@ -39,7 +39,7 @@ import { supabase } from "@/lib/supabase";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 import { useAvailableTechnicians } from "@/hooks/useAvailableTechnicians";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
@@ -153,7 +153,7 @@ const formatDepartmentName = (department: string) => {
 
 export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
-  const { user, userRole } = useOptimizedAuth();
+  const { user, userRole } = useAuth();
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [soundRole, setSoundRole] = useState<string>("none");
   const [lightsRole, setLightsRole] = useState<string>("none");

@@ -1,66 +1,79 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { Wifi, WifiOff, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "./button";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
 interface ConnectionStatusProps {
-  variant?: 'card' | 'inline';
+  variant?: 'card' | 'inline' | 'icon' | 'badge' | 'full';
   className?: string;
 }
 
-export function ConnectionStatus({ 
+/**
+ * Render a connection status UI that reflects real-time subscription state and offers a user-triggered refresh.
+ *
+ * Reads connection state, active subscriptions, and last refresh time from the subscription context and displays an icon and label for connecting, connected (fresh or stale), or disconnected states. Supports five display variants: 'card' (default, fixed overlay that auto-hides after brief visibility changes), 'inline', 'icon' (tooltip-wrapped), 'badge', and 'full'. Provides a refresh control that triggers a subscriptions refresh and shows loading and error feedback.
+ *
+ * @param variant - Display style: 'card' (default), 'inline', 'icon', 'badge', or 'full'.
+ * @param className - Optional CSS class names applied to the root element.
+ * @returns The connection status UI for the selected variant.
+ */
+export function ConnectionStatus({
   variant = 'card',
   className
 }: ConnectionStatusProps) {
-  const { 
-    connectionStatus, 
-    activeSubscriptions, 
+  const {
+    connectionStatus,
+    activeSubscriptions,
     lastRefreshTime,
     refreshSubscriptions
   } = useSubscriptionContext();
-  
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [hasError, setHasError] = useState(false);
-  
+
   // Calculate stale status
   const isStale = Date.now() - lastRefreshTime > 5 * 60 * 1000; // 5 minutes
-  
+
+  // Normalize status for display
+  const isConnected = connectionStatus === 'connected';
+  const isConnecting = connectionStatus === 'connecting';
+  const isDisconnected = !isConnected && !isConnecting;
+
   // Show connection status briefly when there's an issue or on initial load
   useEffect(() => {
-    if (connectionStatus === 'connecting') {
-      // Always show when connecting
+    // Auto-hide logic only applies to card variant
+    if (variant !== 'card') return;
+
+    if (isConnecting) {
       setIsVisible(true);
     }
-    else if (connectionStatus !== 'connected' || isStale) {
+    else if (isDisconnected || isStale) {
       setIsVisible(true);
       setHasError(true);
-      
-      // Keep visible while issues persist
     } else if (hasError) {
-      // If we've recovered from an error, show briefly then hide
       setIsVisible(true);
       setHasError(false);
-      
+
       const timeout = setTimeout(() => {
         setIsVisible(false);
       }, 5000);
-      
+
       return () => clearTimeout(timeout);
     } else {
-      // If everything is good, hide after 5 seconds
       const timeout = setTimeout(() => {
         setIsVisible(false);
       }, 5000);
-      
+
       return () => clearTimeout(timeout);
     }
-  }, [connectionStatus, isStale, hasError]);
-  
+  }, [connectionStatus, isStale, hasError, variant, isConnecting, isDisconnected]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -73,7 +86,7 @@ export function ConnectionStatus({
       setIsRefreshing(false);
     }
   };
-  
+
   // Format last refresh time
   let lastRefreshDisplay = "Unknown";
   try {
@@ -81,35 +94,113 @@ export function ConnectionStatus({
   } catch (error) {
     console.error("Error formatting time:", error);
   }
-  
-  // If using inline variant, render simpler version
+
+  // Status label helper
+  const statusLabel = isConnecting ? "Connecting..." :
+    isConnected ? (isStale ? "Data may be stale" : "Connected") : "Disconnected";
+
+  // Icon helper
+  const StatusIcon = ({ size = "h-4 w-4" }: { size?: string }) => {
+    if (isConnecting) return <Loader2 className={`${size} text-blue-500 animate-spin`} />;
+    if (isConnected && !isStale) return <Wifi className={`${size} text-green-500`} />;
+    if (isConnected && isStale) return <AlertCircle className={`${size} text-amber-500`} />;
+    return <WifiOff className={`${size} text-red-500`} />;
+  };
+
+  // Icon-only variant with tooltip
+  if (variant === 'icon') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className={`cursor-help ${className || ''}`}>
+              <StatusIcon />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>
+              {isConnected ? "Connected to real-time updates" :
+               isConnecting ? "Connecting..." :
+               "Disconnected from real-time updates"}
+            </p>
+            {!isConnected && (
+              <Button
+                variant="link"
+                className="p-0 h-auto text-xs"
+                onClick={handleRefresh}
+              >
+                Click to reconnect
+              </Button>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  // Badge variant
+  if (variant === 'badge') {
+    return (
+      <Badge
+        variant="outline"
+        className={`flex items-center gap-1 cursor-pointer ${className || ''}`}
+        onClick={handleRefresh}
+      >
+        <StatusIcon size="h-3 w-3" />
+        <span className="text-xs">{statusLabel}</span>
+        {isRefreshing ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <RefreshCw className="h-3 w-3" />
+        )}
+      </Badge>
+    );
+  }
+
+  // Full variant with reconnect button
+  if (variant === 'full') {
+    return (
+      <div className={`flex items-center gap-2 ${className || ''}`}>
+        <StatusIcon />
+        <span>
+          {isConnected ? "Connected to real-time updates" :
+           isConnecting ? "Connecting to real-time updates..." :
+           "Disconnected from real-time updates"}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="ml-2"
+        >
+          {isRefreshing ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Reconnecting
+            </>
+          ) : (
+            <>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Reconnect
+            </>
+          )}
+        </Button>
+      </div>
+    );
+  }
+
+  // Inline variant
   if (variant === 'inline') {
     return (
       <div className={`flex items-center gap-2 ${className || ''}`}>
-        {connectionStatus === 'connecting' ? (
-          <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-        ) : connectionStatus === 'connected' ? (
-          isStale ? (
-            <AlertCircle className="h-4 w-4 text-amber-500" />
-          ) : (
-            <Wifi className="h-4 w-4 text-green-500" />
-          )
-        ) : (
-          <WifiOff className="h-4 w-4 text-red-500" />
-        )}
-        
-        <span className="text-sm">
-          {connectionStatus === 'connecting' ? "Connecting..." :
-           connectionStatus === 'connected' 
-            ? (isStale ? "Data may be stale" : "Connected") 
-            : "Disconnected"}
-        </span>
-        
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <StatusIcon />
+        <span className="text-sm">{statusLabel}</span>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={handleRefresh}
-          disabled={isRefreshing || connectionStatus === 'connecting'}
+          disabled={isRefreshing || isConnecting}
           className="h-7 w-7 p-0"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -118,50 +209,34 @@ export function ConnectionStatus({
       </div>
     );
   }
-  
+
+  // Card variant (default) — fixed position overlay
   return (
     <div className={`fixed bottom-4 right-4 z-50 max-w-md transition-all duration-300 ease-in-out ${className || ''}`}>
       {isVisible && (
         <Card className={`shadow-lg ${
-          connectionStatus === 'connecting' ? 'bg-blue-50' :
-          connectionStatus === 'connected' && !isStale ? 'bg-green-50' : 'bg-red-50'
+          isConnecting ? 'bg-blue-50' :
+          isConnected && !isStale ? 'bg-green-50' : 'bg-red-50'
         }`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {connectionStatus === 'connecting' ? (
-                  <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
-                ) : connectionStatus === 'connected' ? (
-                  isStale ? (
-                    <AlertCircle className="h-5 w-5 text-amber-500" />
-                  ) : (
-                    <Wifi className="h-5 w-5 text-green-500" />
-                  )
-                ) : (
-                  <WifiOff className="h-5 w-5 text-red-500" />
-                )}
-                
+                <StatusIcon size="h-5 w-5" />
                 <div>
-                  <p className="text-sm font-medium">
-                    {connectionStatus === 'connecting' ? "Connecting..." :
-                     connectionStatus === 'connected' 
-                      ? (isStale ? "Data may be stale" : "Connected") 
-                      : "Connection issue"}
-                  </p>
+                  <p className="text-sm font-medium">{statusLabel}</p>
                   <p className="text-xs text-muted-foreground">
-                    {connectionStatus === 'connecting' ? "Establishing connection..." :
-                     connectionStatus === 'connected' 
-                      ? `Last updated: ${lastRefreshDisplay}` 
+                    {isConnecting ? "Establishing connection..." :
+                     isConnected
+                      ? `Last updated: ${lastRefreshDisplay}`
                       : "Attempting to reconnect..."}
                   </p>
                 </div>
               </div>
-              
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleRefresh}
-                disabled={isRefreshing || connectionStatus === 'connecting'}
+                disabled={isRefreshing || isConnecting}
                 className="h-8 w-8 p-0"
               >
                 <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -174,3 +249,6 @@ export function ConnectionStatus({
     </div>
   );
 }
+
+// Backward-compatible alias for ConnectionIndicator
+export const ConnectionIndicator = ConnectionStatus;

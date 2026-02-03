@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -13,8 +13,18 @@ import { CalendarDays, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+/**
+ * Manage and display the current user's technician unavailability blocks.
+ *
+ * Renders a responsive UI that lists existing unavailability blocks and provides controls to create
+ * new blocks (single-day or multi-day, full-day or time-range) and delete existing ones. The component
+ * handles fetching the user's blocks, form validation for date ranges, creation of per-day records,
+ * optimistic deletion UI, and responsive presentation (modal dialog on desktop, bottom sheet on mobile).
+ *
+ * @returns A React element that renders the unavailability management interface.
+ */
 export default function TechnicianUnavailability() {
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = React.useState(false);
   const [allDay, setAllDay] = React.useState(true);

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Image, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 interface FestivalLogoManagerProps {
   jobId: string;
@@ -12,7 +12,7 @@ interface FestivalLogoManagerProps {
 
 export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
   const { toast } = useToast();
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);

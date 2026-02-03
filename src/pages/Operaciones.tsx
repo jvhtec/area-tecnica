@@ -6,7 +6,7 @@ import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
@@ -29,7 +29,7 @@ const Operaciones = () => {
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const currentDepartment = "video";
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
 
   const queryClient = useQueryClient();
   const { toast } = useToast();

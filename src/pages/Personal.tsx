@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PersonalCalendar } from '@/components/personal/PersonalCalendar';
 import { MobilePersonalCalendar } from '@/components/personal/MobilePersonalCalendar';
 import { VacationRequestsTabs } from '@/components/personal/VacationRequestsTabs';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
 import { Card, CardContent } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [isVacationSectionOpen, setIsVacationSectionOpen] = useState(false);
-  const { user, userRole } = useOptimizedAuth();
+  const { user, userRole } = useAuth();
   const { submitRequest, isSubmitting } = useVacationRequests();
   const isMobile = useIsMobile();
   const navigate = useNavigate();

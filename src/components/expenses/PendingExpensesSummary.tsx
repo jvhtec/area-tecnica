@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Receipt, ArrowRight, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -24,7 +24,7 @@ interface PendingExpense {
 }
 
 export const PendingExpensesSummary: React.FC = () => {
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const { data: pendingExpenses = [], isLoading } = useQuery({

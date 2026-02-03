@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils';
 import {
   Card,
@@ -77,7 +77,7 @@ const statusOptions: Array<{ value: ExpenseStatus | 'all'; label: string }> = [
 ];
 
 const ExpensesPage: React.FC = () => {
-  const { userRole, isLoading } = useOptimizedAuth();
+  const { userRole, isLoading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 

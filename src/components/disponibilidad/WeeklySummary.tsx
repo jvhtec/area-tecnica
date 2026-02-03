@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, ChevronsUpDown, Download, Filter } from 'lucide-react';
@@ -7,7 +6,7 @@ import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase';
 import { SUPABASE_URL } from '@/lib/api-config';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
@@ -123,9 +122,18 @@ function FlexImage({
   );
 }
 
+/**
+ * Render a weekly equipment stock and usage summary for the current department, including week navigation, category filtering, per-day breakdowns, and PDF export.
+ *
+ * Displays equipment base stock, per-day usage from presets, sub‑rental boosts, shortages highlighting, and tooltips with detailed breakdowns. Supports toggling categories, navigating weeks (notifying the parent via `onDateChange`), reloading data, and exporting the visible rows to PDF (optionally only shortages).
+ *
+ * @param selectedDate - The date used to determine which week is shown (the week containing this date is displayed).
+ * @param onDateChange - Callback invoked with the new week start date when the user navigates to a different week.
+ * @returns The rendered WeeklySummary React element.
+ */
 export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps) {
   const { department } = useDepartment();
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(selectedDate));

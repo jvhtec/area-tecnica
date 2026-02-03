@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -131,12 +131,30 @@ const FALLBACK_EVENTS: EventInfo[] = [
   { code: 'changelog.updated', label: '📝 Changelog updated' },
 ];
 
+/**
+ * Build a stable string key that uniquely identifies a route by event, recipient type, and target.
+ *
+ * @param event - The event code
+ * @param type - The recipient type
+ * @param target - The recipient target id, or `null` when there is no target
+ * @returns A string in the form `"<event>|<type>|<target>"` where a `null` target becomes an empty string
+ */
 function routeKey(event: string, type: RecipientType, target: string | null) {
   return `${event}|${type}|${target ?? ''}`;
 }
 
+/**
+ * Render the Push Routing Matrix UI for viewing and editing notification routing rules.
+ *
+ * The component displays a responsive table (desktop) or collapsible panel (mobile) that lists events
+ * and provides toggles to route notifications to natural recipients, broadcast management, assigned
+ * technicians, departments, and individual management users. It performs optimistic client-side updates,
+ * persists changes via Supabase, shows inline save/remove feedback, and disables editing for non-management roles.
+ *
+ * @returns A React element presenting the push routing matrix with refresh controls, pending-save indicators, and role-based edit restrictions.
+ */
 export function PushNotificationMatrix() {
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const isManagement = ['admin', 'management'].includes(userRole || '');
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);

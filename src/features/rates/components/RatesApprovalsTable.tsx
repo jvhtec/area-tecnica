@@ -17,13 +17,23 @@ import { buildTourRatesExportPayload } from '@/services/tourRatesExport';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import type { RatesApprovalRow } from '@/services/ratesService';
 
 interface RatesApprovalsTableProps {
   onManageTour: (tourId: string) => void;
 }
 
+/**
+ * Render the rates approvals table with filtering, pagination, export and management actions for tours and jobs.
+ *
+ * Displays searchable and filterable rows of rate approvals, paginates results, and exposes actions:
+ * - Tour rows: export PDF summary and invoke tour management.
+ * - Job rows: view payout totals (management users) and navigate to timesheets.
+ *
+ * @param onManageTour - Callback invoked with a tour's id when the user chooses to manage a tour.
+ * @returns The RatesApprovalsTable component UI as a JSX element.
+ */
 export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) {
   const { data: rows = [], isLoading } = useRatesApprovals();
   const [search, setSearch] = React.useState('');
@@ -32,7 +42,7 @@ export function RatesApprovalsTable({ onManageTour }: RatesApprovalsTableProps) 
   const [page, setPage] = React.useState(1);
   const [selectedJob, setSelectedJob] = React.useState<RatesApprovalRow | null>(null);
   const PAGE_SIZE = 10;
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const isManagementUser = React.useMemo(() => ['management', 'admin'].includes(userRole || ''), [userRole]);
 
   const handleOpenJob = React.useCallback((row: RatesApprovalRow) => {

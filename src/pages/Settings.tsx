@@ -13,7 +13,7 @@ import { FilterBar } from "@/components/users/filters/FilterBar";
 import { ImportUsersDialog } from "@/components/users/import/ImportUsersDialog";
 import { CompanyLogoUploader } from "@/components/CompanyLogoUploader";
 import { DEPARTMENT_LABELS } from "@/types/department";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { supabase } from "@/integrations/supabase/client";
@@ -102,7 +102,7 @@ const Settings = () => {
   const [selectedDepartment, setSelectedDepartment] = useState("all");
 
 
-  const { userRole, isLoading: authLoading } = useOptimizedAuth();
+  const { userRole, isLoading: authLoading } = useAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
 
   // Early security check: Only allow admin, management

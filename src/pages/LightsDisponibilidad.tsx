@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { PresetManagementDialog } from '@/components/equipment/PresetManagementDialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { endOfDay, format, startOfDay } from 'date-fns';
 import { WeeklySummary } from '@/components/disponibilidad/WeeklySummary';
@@ -18,11 +18,18 @@ import { useOptimizedJobs } from '@/hooks/useOptimizedJobs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
+/**
+ * Render the LightsDisponibilidad page that presents and manages lighting equipment presets and availability for a selected date.
+ *
+ * Displays a calendar, job list for the selected day, preset assignments, weekly summary, sub-rental manager, and preset management dialog; provides navigation to equipment management and controls for opening the preset dialog.
+ *
+ * @returns The component's rendered JSX element.
+ */
 export default function LightsDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);
   const navigate = useNavigate();
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 

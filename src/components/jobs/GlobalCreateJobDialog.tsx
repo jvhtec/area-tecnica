@@ -12,11 +12,19 @@
 
 import { CreateJobDialog } from './CreateJobDialog';
 import { useCreateJobDialogStore } from '@/stores/useCreateJobDialogStore';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 
+/**
+ * Renders a globally accessible Create Job dialog driven by the global store and authentication context.
+ *
+ * The component reads dialog state and initial values from the create-job store and falls back to the current
+ * authenticated user's department or `"sound"` when no initial department is provided.
+ *
+ * @returns The React element for the global Create Job dialog.
+ */
 export function GlobalCreateJobDialog() {
   const { isOpen, closeDialog, initialDepartment, initialDate, initialJobType } = useCreateJobDialogStore();
-  const { userDepartment } = useOptimizedAuth();
+  const { userDepartment } = useAuth();
 
   // Use current user's department as default if not specified
   const currentDepartment = initialDepartment || userDepartment || 'sound';

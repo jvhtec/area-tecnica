@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StockEntry, getCategoriesForDepartment } from '@/types/equipment';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { StockCreationManager } from '@/components/disponibilidad/StockCreationManager';
 import { AlertCircle, Box } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -16,9 +16,16 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 
+/**
+ * Renders a dialog that allows the authenticated user to manage inventory for their department.
+ *
+ * The component fetches department-specific stock entries and displays a stock management UI when data is available; if the user has no associated department it renders `null`. On fetch errors it shows an error alert instead of the manager.
+ *
+ * @returns The dialog JSX element when the user has a department, otherwise `null`.
+ */
 export function InventoryManagementDialog() {
     const [open, setOpen] = useState(false);
-    const auth = useOptimizedAuth();
+    const auth = useAuth();
     const { session } = auth;
     const userDepartment = auth.userDepartment;
 

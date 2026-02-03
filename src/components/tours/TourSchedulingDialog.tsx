@@ -40,7 +40,7 @@ import {
   generateTravelDaySheet,
   generateCompleteDaySheetSet,
 } from "@/utils/tour-scheduling-pdf-enhanced";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TourSchedulingDialogProps {
   open: boolean;
@@ -58,7 +58,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
   tourName,
 }) => {
   const { toast } = useToast();
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const [activeTab, setActiveTab] = useState("timeline");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);

@@ -4,14 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ForgotPasswordFormProps {
   onBack: () => void;
 }
 
 export const ForgotPasswordForm = ({ onBack }: ForgotPasswordFormProps) => {
-  const { requestPasswordReset, isLoading } = useOptimizedAuth();
+  const { requestPasswordReset, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);

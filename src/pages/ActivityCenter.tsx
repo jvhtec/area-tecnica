@@ -3,12 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listActivity } from '@/features/activity/api';
 import { getActivityMeta } from '@/features/activity/catalog';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { getDashboardPath } from '@/utils/roleBasedRouting';
 
+/**
+ * Render the activity center UI for admin and management users, showing recent events, loading/error states, and a refresh control.
+ *
+ * @returns The component's JSX: a full-screen authorization spinner while authentication is loading; the activity dashboard (title, refresh button, list of activity items with timestamps and optional payloads) when the userRole is 'admin' or 'management'; `null` when the user is unauthorized or no role is present.
+ */
 export default function ActivityCenter() {
   const navigate = useNavigate();
-  const { userRole, isLoading: authLoading } = useOptimizedAuth();
+  const { userRole, isLoading: authLoading } = useAuth();
 
   // Early security check: Only allow admin, management
   useEffect(() => {

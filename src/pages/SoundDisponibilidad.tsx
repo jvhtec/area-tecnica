@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { PresetManagementDialog } from '@/components/equipment/PresetManagementDialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { endOfDay, format, startOfDay } from 'date-fns';
 import { WeeklySummary } from '@/components/disponibilidad/WeeklySummary';
@@ -19,12 +19,19 @@ import { useOptimizedTableSubscriptions } from '@/hooks/useOptimizedSubscription
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
+/**
+ * Render the Sound department presets availability view with calendar, job/preset listings, and management controls.
+ *
+ * Provides a date picker, daily and weekly summaries, quick assignment UI, sub-rental manager, and a dialog for managing presets; it also fetches and displays job logos and subscribes to relevant realtime updates for the "sound" department.
+ *
+ * @returns A React element containing the presets availability UI for the Sound department.
+ */
 export default function SoundDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);
   const [logoMap, setLogoMap] = useState<Record<string, string | undefined>>({});
   const navigate = useNavigate();
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 

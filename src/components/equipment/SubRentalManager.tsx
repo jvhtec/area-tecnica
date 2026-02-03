@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
@@ -45,8 +45,15 @@ interface SubRental {
   };
 }
 
+/**
+ * Renders the Sub-Rentals manager UI for creating, listing (grouped by batch), and removing temporary stock boosts.
+ *
+ * Manages form state, fetches equipment/jobs/sub-rentals for the current department, subscribes to realtime updates, and performs mutations to add or delete sub-rental items (optionally auto-creating a transport request when linked to a job).
+ *
+ * @returns The React element for the Sub-Rentals manager interface.
+ */
 export function SubRentalManager() {
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { department } = useDepartment();

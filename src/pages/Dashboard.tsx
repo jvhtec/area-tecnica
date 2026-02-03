@@ -4,7 +4,7 @@ import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Mail, Loader2 } from "lucide-react";
@@ -56,7 +56,7 @@ const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
 const Dashboard = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { userRole, user, isLoading: authLoading } = useOptimizedAuth();
+  const { userRole, user, isLoading: authLoading } = useAuth();
   const userId = user?.id ?? "";
   const lazyFallback = (
     <div className="flex items-center justify-center py-6">

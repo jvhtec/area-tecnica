@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useOptimizedAuth } from './useOptimizedAuth';
+import { useAuth } from './useAuth';
 import { expenseCopy } from '@/components/expenses/expenseCopy';
 import type { ExpenseStatus } from '@/components/expenses/ExpenseStatusBadge';
 
@@ -55,7 +55,7 @@ export interface UpdateExpenseData {
  * Hook to fetch job expenses for a specific job (filtered by technician for non-managers).
  */
 export const useJobExpenses = (jobId: string | null | undefined) => {
-  const { user, userRole } = useOptimizedAuth();
+  const { user, userRole } = useAuth();
 
   return useQuery({
     queryKey: ['job-expenses', jobId, user?.id],
@@ -110,7 +110,7 @@ export const useJobExpenses = (jobId: string | null | undefined) => {
  */
 export const useJobExpenseMutations = () => {
   const queryClient = useQueryClient();
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
 
   const createDraft = useMutation({
     mutationFn: async (data: CreateExpenseData) => {

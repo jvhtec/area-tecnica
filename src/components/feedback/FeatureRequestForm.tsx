@@ -16,8 +16,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/lib/supabase-client";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 import {
   Dialog,
   DialogContent,
@@ -35,9 +35,17 @@ const featureRequestSchema = z.object({
 
 type FeatureRequestFormData = z.infer<typeof featureRequestSchema>;
 
+/**
+ * Render a feature request form that validates input and submits requests to the backend.
+ *
+ * The form uses the `featureRequestSchema` for validation and pre-fills the reporter email from
+ * the current authenticated user when available. On submission the component invokes the
+ * Supabase edge function "submit-feature-request"; on success it shows a confirmation dialog and
+ * resets the form, and on failure it displays a destructive toast with an error message.
+ */
 export function FeatureRequestForm() {
   const { toast } = useToast();
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 

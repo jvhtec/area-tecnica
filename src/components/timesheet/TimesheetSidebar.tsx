@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, ChevronLeft, ChevronRight, Calendar, MapPin } from "lucide-react";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { format, isAfter, isBefore, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
@@ -18,7 +18,7 @@ const JOBS_PER_PAGE = 5;
 
 export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => {
   const { data: allJobs = [], isLoading } = useOptimizedJobs();
-  const { userRole, user } = useOptimizedAuth();
+  const { userRole, user } = useAuth();
   const navigate = useNavigate();
 
   // Filter jobs and exclude dry hire and tourdate jobs and jobs with only off/travel date types

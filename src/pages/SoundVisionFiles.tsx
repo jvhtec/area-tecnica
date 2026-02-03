@@ -1,7 +1,7 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SoundVisionAccessRequestDialog } from '@/components/soundvision/SoundVisionAccessRequestDialog';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, ArrowLeft, Lock } from 'lucide-react';
@@ -9,7 +9,7 @@ import { SoundVisionInteractiveMap } from '@/components/soundvision/SoundVisionI
 import { useTheme } from 'next-themes';
 
 const SoundVisionFiles = () => {
-  const { hasSoundVisionAccess, isLoading } = useOptimizedAuth();
+  const { hasSoundVisionAccess, isLoading } = useAuth();
   const navigate = useNavigate();
   const [showAccessDialog, setShowAccessDialog] = useState(false);
   const { theme: nextTheme } = useTheme();

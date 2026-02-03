@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/lib/supabase-client";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 import { ScreenshotCapture } from "./ScreenshotCapture";
 import { getRecentConsoleLogs } from "@/utils/consoleCapture";
 import {
@@ -47,9 +47,19 @@ const bugReportSchema = z.object({
 
 type BugReportFormData = z.infer<typeof bugReportSchema>;
 
+/**
+ * Render a bug report form UI that collects user-provided bug details and submits them to the backend.
+ *
+ * The form collects a title, description, optional reproduction steps, severity, an optional screenshot,
+ * an option to include recent console logs, and a reporter email. It validates input (including a 5MB
+ * approximate limit for screenshots), sends the data to a Supabase function, shows a success dialog
+ * with an optional GitHub issue link on success, and displays an error toast on failure.
+ *
+ * @returns The React element for the bug report form and its success dialog.
+ */
 export function BugReportForm() {
   const { toast } = useToast();
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [screenshotFilename, setScreenshotFilename] = useState<string | null>(null);

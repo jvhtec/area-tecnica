@@ -2,14 +2,14 @@
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import TourManagement from "@/pages/TourManagement";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
 export const TourManagementWrapper = () => {
   const { tourId } = useParams();
-  const { user } = useOptimizedAuth();
+  const { user } = useAuth();
 
   const {
     data: tourData,

@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { checkTimeConflictEnhanced } from '@/utils/technicianAvailability';
 import { useStaffingMatrixStatuses } from '@/features/staffing/hooks/useStaffingMatrixStatuses';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { throttle } from '@/utils/throttle';
 import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
@@ -69,7 +69,7 @@ export const OptimizedAssignmentMatrix = ({
   const syncInProgressRef = useRef(false);
   const lastKnownScrollRef = useRef({ left: 0, top: 0 });
   const [createUserOpen, setCreateUserOpen] = useState(false);
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const qc = useQueryClient();
   // Sorting focus by job

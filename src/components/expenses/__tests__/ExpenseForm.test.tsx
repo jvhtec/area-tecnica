@@ -14,8 +14,8 @@ vi.mock('@/hooks/useExpensePermissions', () => ({
 }));
 
 // Mock modules
-vi.mock('@/hooks/useOptimizedAuth', () => ({
-  useOptimizedAuth: () => ({
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({
     user: { id: 'test-user-id' },
     userRole: 'technician',
   }),

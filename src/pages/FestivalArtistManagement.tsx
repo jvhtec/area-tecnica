@@ -9,7 +9,7 @@ import { ArtistTableFilters } from "@/components/festival/ArtistTableFilters";
 import { FestivalDateNavigation } from "@/components/festival/FestivalDateNavigation";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/enhanced-supabase-client";
-import { ConnectionIndicator } from "@/components/ui/connection-indicator";
+import { ConnectionIndicator } from "@/components/ui/connection-status";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { format, eachDayOfInterval, isValid, addDays, parseISO, setHours, setMinutes } from "date-fns";
 import { ArtistTablePrintDialog } from "@/components/festival/ArtistTablePrintDialog";

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useMyTours } from '@/hooks/useMyTours';
 import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
 import { useTechnicianDashboardSubscriptions } from '@/hooks/useMobileRealtimeSubscriptions';
@@ -108,11 +108,20 @@ const getThemeStyles = (isDark: boolean) => ({
   cluster: isDark ? "bg-white text-black" : "bg-slate-900 text-white"
 });
 
-// --- MAIN APP SHELL ---
+/**
+ * Top-level technician application shell that manages theme, navigation tabs, real-time subscriptions,
+ * data fetching (profile and assignments), and modal/detail views for a field technician interface.
+ *
+ * This component wires together dashboard, jobs, availability, and profile screens, handles deep links,
+ * controls modal state (timesheet, details, sound/vision, oblique strategy, rates, messages, tour details, about),
+ * and provides callbacks to child views.
+ *
+ * @returns The rendered TechnicianSuperApp React element (the application's main UI shell).
+ */
 export default function TechnicianSuperApp() {
   const [tab, setTab] = useState('dashboard');
   const { theme: nextTheme, setTheme } = useTheme();
-  const { user, hasSoundVisionAccess } = useOptimizedAuth();
+  const { user, hasSoundVisionAccess } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();

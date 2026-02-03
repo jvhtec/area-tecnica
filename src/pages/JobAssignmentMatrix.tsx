@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
 import {
   AVAILABLE_DEPARTMENTS,
@@ -41,10 +40,15 @@ import {
   type StaffingSummaryRow,
 } from './job-assignment-matrix/utils';
 
+/**
+ * Render an interactive, filterable, date-virtualized job-to-technician assignment matrix with staffing reminders, real-time fridge state, and background prefetching.
+ *
+ * @returns A React element that displays the assignment matrix UI, controls for filtering and date navigation, staffing reminder dialogs, and related panels.
+ */
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
   const prefetchStatusRef = React.useRef<Map<string, 'pending' | 'done'>>(new Map<string, 'pending' | 'done'>());
-  const { userDepartment } = useOptimizedAuth();
+  const { userDepartment } = useAuth();
   const [defaultDepartment, setDefaultDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const hasManualDepartmentSelection = React.useRef(false);

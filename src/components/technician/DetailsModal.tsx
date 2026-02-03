@@ -15,7 +15,7 @@ import { useWeatherData } from '@/hooks/useWeatherData';
 import { PlacesRestaurantService } from '@/utils/hoja-de-ruta/services/places-restaurant-service';
 import { createSignedUrl } from '@/utils/jobDocuments';
 import { labelForCode } from '@/utils/roles';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import type { Restaurant, WeatherData } from '@/types/hoja-de-ruta';
 import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from '@/types/job';
 
@@ -29,7 +29,7 @@ interface DetailsModalProps {
 type TabId = 'Info' | 'Ubicación' | 'Personal' | 'Docs' | 'Restau.' | 'Clima';
 
 export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
-    const { user } = useOptimizedAuth();
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<TabId>('Info');
     const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
     const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);

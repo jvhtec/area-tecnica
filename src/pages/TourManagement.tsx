@@ -39,7 +39,7 @@ import { TourDocumentsDialog } from "@/components/tours/TourDocumentsDialog";
 import { TourPresetManagerDialog } from "@/components/tours/TourPresetManagerDialog";
 import { format } from "date-fns";
 import { useTourAssignments } from "@/hooks/useTourAssignments";
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { fetchTourLogo } from "@/utils/pdf/tourLogoUtils";
 import { exportTourPDF } from "@/lib/tourPdfExport";
 import { useToast } from "@/hooks/use-toast";
@@ -73,7 +73,7 @@ type QuickAction = {
 export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
   const isTechnicianView = mode === 'technician' || ['technician', 'house_tech'].includes(userRole || '');

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { getDashboardPath } from '@/utils/roleBasedRouting';
 import { UserRole } from '@/types/user';
 
@@ -13,7 +13,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children, 
   allowedRoles 
 }) => {
-  const { userRole, isLoading } = useOptimizedAuth();
+  const { userRole, isLoading } = useAuth();
 
   if (isLoading) {
     return (

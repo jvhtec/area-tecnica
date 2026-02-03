@@ -8,7 +8,7 @@ import { Plus, Trash2, Pencil, Search, ChevronDown, ChevronRight, Check, X, Load
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -33,7 +33,7 @@ type GroupedEquipment = {
 
 export const StockCreationManager = ({ stock, onStockUpdate, department }: StockManagerProps) => {
   const { toast } = useToast();
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const queryClient = useQueryClient();
 
   const [searchQuery, setSearchQuery] = useState('');

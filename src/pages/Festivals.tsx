@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
@@ -24,7 +24,7 @@ const ITEMS_PER_PAGE = 9; // 3x3 grid
  */
 const Festivals = () => {
   const navigate = useNavigate();
-  const { userRole, userDepartment, isLoading: authLoading } = useOptimizedAuth();
+  const { userRole, userDepartment, isLoading: authLoading } = useAuth();
   const {
     jobs,
     isLoading,

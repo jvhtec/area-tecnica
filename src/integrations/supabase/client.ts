@@ -1,6 +1,6 @@
 
 // Import the unified client from the canonical location
-import { supabase as baseClient } from '@/lib/supabase-client';
+import { supabase as baseClient } from '@/lib/supabase';
 import type { Database } from './types';
 
 /**
@@ -9,14 +9,11 @@ import type { Database } from './types';
  */
 export const supabase = baseClient as unknown as ReturnType<typeof import('@supabase/supabase-js').createClient<Database>>;
 
-// Re-export utility functions from all client modules
-export { 
-  checkNetworkConnection, 
-  getRealtimeConnectionStatus 
-} from '@/lib/supabase-client';
-
-export { 
+// Re-export utility functions from the canonical facade
+export {
+  checkNetworkConnection,
+  getRealtimeConnectionStatus,
   ensureRealtimeConnection,
   monitorConnectionHealth,
-  forceRefreshSubscriptions 
-} from '@/lib/enhanced-supabase-client';
+  forceRefreshSubscriptions
+} from '@/lib/supabase';

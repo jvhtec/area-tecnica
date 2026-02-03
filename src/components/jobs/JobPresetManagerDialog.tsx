@@ -11,7 +11,7 @@ import { PresetEditor } from '@/components/equipment/PresetEditor';
 import { PA_PRESET_ALLOWED_CATEGORIES, PresetItem, PresetWithItems, Department, mapPresetWithItemsRow } from '@/types/equipment';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
 import { format } from 'date-fns';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { AmplifierTool } from '@/components/sound/AmplifierTool';
 
 interface Props {
@@ -20,10 +20,20 @@ interface Props {
   jobId: string;
 }
 
+/**
+ * Render a dialog UI for managing and assigning equipment presets for a specific job.
+ *
+ * Provides listing, creation, copying, editing, deletion, and bulk assignment of presets scoped to a selected department (sound, lights, video). When creating or editing, exposes a preset editor and optionally an amplifier calculator for sound presets.
+ *
+ * @param open - Whether the dialog is open
+ * @param onOpenChange - Callback invoked when the dialog open state changes
+ * @param jobId - ID of the job whose presets are being managed
+ * @returns The Job Preset Manager dialog element
+ */
 export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { session } = useOptimizedAuth();
+  const { session } = useAuth();
   const [isCreating, setIsCreating] = useState(false);
   const [editingPreset, setEditingPreset] = useState<PresetWithItems | null>(null);
   const [copyingPreset, setCopyingPreset] = useState<PresetWithItems | null>(null);

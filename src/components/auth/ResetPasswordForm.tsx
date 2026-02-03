@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 
 interface ResetPasswordFormProps {
@@ -13,7 +13,7 @@ interface ResetPasswordFormProps {
 }
 
 export const ResetPasswordForm = ({ onSuccess }: ResetPasswordFormProps) => {
-  const { resetPassword, isLoading } = useOptimizedAuth();
+  const { resetPassword, isLoading } = useAuth();
   const [formData, setFormData] = useState({
     password: "",
     confirmPassword: "",

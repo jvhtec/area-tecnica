@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -8,7 +7,7 @@ import { Toaster as SonnerToaster } from 'sonner';
 import { queryClient } from '@/lib/react-query';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { OptimizedAuthProvider, useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useServiceWorkerUpdate } from '@/hooks/useServiceWorkerUpdate';
 import { usePushSubscriptionRecovery } from '@/hooks/usePushSubscriptionRecovery';
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
@@ -111,7 +110,7 @@ const SOUND_TOOL_ROLES = ["admin", "management", "house_tech"] as const;
 const SOUND_TOOL_ROLES_WITH_TECH = [...SOUND_TOOL_ROLES, "technician"] as const;
 
 const FestivalsAccessGuard = () => {
-  const { userRole, userDepartment, isLoading } = useOptimizedAuth();
+  const { userRole, userDepartment, isLoading } = useAuth();
 
   if (isLoading) {
     return null;
@@ -128,7 +127,7 @@ const FestivalsAccessGuard = () => {
 };
 
 const DisponibilidadAccessGuard = () => {
-  const { userRole, userDepartment, isLoading } = useOptimizedAuth();
+  const { userRole, userDepartment, isLoading } = useAuth();
 
   if (isLoading) {
     return null;
@@ -148,6 +147,13 @@ const DisponibilidadAccessGuard = () => {
   return <Disponibilidad />;
 };
 
+/**
+ * Root application component that configures providers, initializes startup services, and defines the application's routes and global UI.
+ *
+ * Initializes multi-tab coordination on mount and performs startup side-effects (service worker updates, push subscription recovery, and shortcut initialization).
+ *
+ * @returns The React element rendering the app's provider tree, route configuration, and global UI (toasters, global dialogs, devtools).
+ */
 export default function App() {
   // Initialize multi-tab coordinator
   React.useEffect(() => {
@@ -166,7 +172,7 @@ export default function App() {
             <TooltipProvider>
               <AppBadgeProvider>
                 <Router>
-                  <OptimizedAuthProvider>
+                  <AuthProvider>
                     <ServiceWorkerUpdateInit />
                     <PushSubscriptionRecoveryInit />
                     <ShortcutSystemInit />
@@ -282,7 +288,7 @@ export default function App() {
                       <Toaster />
                       <SonnerToaster richColors position="top-right" />
                     </div>
-                  </OptimizedAuthProvider>
+                  </AuthProvider>
                 </Router>
               </AppBadgeProvider>
             </TooltipProvider>

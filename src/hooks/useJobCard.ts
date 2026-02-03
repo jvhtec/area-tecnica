@@ -1,182 +1,309 @@
-import { useState, useEffect } from 'react';
-import { useTheme } from 'next-themes';
-import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
+
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useToast } from '@/hooks/use-toast';
-import { JobDocument } from '@/components/jobs/cards/JobCardDocuments';
-import { Department } from '@/types/department';
-import { useDeletionState } from './useDeletionState';
+import { useTheme } from 'next-themes';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import { createQueryKey } from '@/lib/optimized-react-query';
+import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
 
-export const useJobCard = (job: any, department: Department, userRole: string | null, onEditClick?: (job: any) => void, onDeleteClick?: (jobId: string) => void, onJobClick?: (jobId: string) => void) => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+type UseOptimizedJobCardOptions = {
+  enableRoleSummary?: boolean;
+  enableSoundTasks?: boolean;
+};
+
+export const useJobCard = (
+  job: any,
+  department: string,
+  userRole: string | null,
+  onEditClick: (job: any) => void,
+  onDeleteClick: (jobId: string) => void,
+  onJobClick: (jobId: string) => void,
+  options?: UseOptimizedJobCardOptions
+) => {
   const { theme } = useTheme();
-  const isDark = theme === "dark";
-  const { isDeletingJob } = useDeletionState();
+  const queryClient = useQueryClient();
+  const enableRoleSummary = options?.enableRoleSummary ?? true;
+  const enableSoundTasks = options?.enableSoundTasks ?? true;
+  
+  // Memoized styling calculations
+  const { appliedBorderColor, appliedBgColor } = useMemo(() => {
+    const isDark = theme === 'dark';
+    const borderColor = job.color || '#7E69AB';
+    const appliedBorderColor = isDark ? (job.darkColor || borderColor) : borderColor;
+    const bgColor = job.color ? `${job.color}05` : '#7E69AB05';
+    const appliedBgColor = isDark ? (job.darkColor ? `${job.darkColor}15` : bgColor) : bgColor;
+    
+    return { appliedBorderColor, appliedBgColor };
+  }, [job.color, job.darkColor, theme]);
 
-  // Card styling
-  const borderColor = job.color ? job.color : "#7E69AB";
-  const appliedBorderColor = isDark ? (job.darkColor ? job.darkColor : borderColor) : borderColor;
-  const bgColor = job.color ? `${job.color}05` : "#7E69AB05";
-  const appliedBgColor = isDark ? (job.darkColor ? `${job.darkColor}15` : bgColor) : bgColor;
-
-  // State
+  // Local state
   const [collapsed, setCollapsed] = useState(true);
   const [assignments, setAssignments] = useState(job.job_assignments || []);
-  const [documents, setDocuments] = useState<JobDocument[]>(job.job_documents || []);
-  const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
+  const [documents, setDocuments] = useState(job.job_documents || []);
   const [soundTaskDialogOpen, setSoundTaskDialogOpen] = useState(false);
   const [lightsTaskDialogOpen, setLightsTaskDialogOpen] = useState(false);
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
   const [editJobDialogOpen, setEditJobDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
 
-  // Role-based permissions
-  const isHouseTech = userRole === 'house_tech';
-  const canEditJobs = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const canManageArtists = ['admin', 'management', 'logistics', 'technician', 'house_tech'].includes(userRole || '');
-  const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
+  // Keep local state in sync with incoming job prop updates for instant UI
 
-  // Check if this job is being deleted to prevent queries
-  const isJobBeingDeleted = isDeletingJob(job.id);
 
-  // Optimized date types fetch - only if not already loaded
   useEffect(() => {
-    if (!job.job_date_types && !isJobBeingDeleted) {
-      async function fetchDateTypes() {
-        const { data, error } = await supabase
-          .from("job_date_types")
-          .select("*")
-          .eq("job_id", job.id);
-        if (!error && data && data.length > 0) {
-          const key = `${job.id}-${new Date(job.start_time).toISOString().split('T')[0]}`;
-          setDateTypes({ [key]: data[0] });
-        }
+    setDocuments(job.job_documents || []);
+  }, [job.job_documents]);
+
+  const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
+
+  // Helper to fetch and update assignments for this job
+  // job_assignments are the base; timesheets add per-day date info (with RLS-safe fallback)
+  const refreshAssignments = useCallback(async () => {
+    if (!job?.id) return;
+    try {
+      const baseAssignments: any[] = Array.isArray(job?.job_assignments) ? job.job_assignments : [];
+
+      const { data: directTimesheets, error: tsError } = await supabase
+        .from('timesheets')
+        .select(`
+          technician_id,
+          date,
+          profiles!fk_timesheets_technician_id (first_name, nickname, last_name, department)
+        `)
+        .eq('job_id', job.id)
+        .eq('is_active', true);
+
+      if (tsError) {
+        console.warn('Error fetching timesheets for job card:', tsError);
       }
-      fetchDateTypes();
-    } else if (job.job_date_types) {
-      // Use pre-loaded data
-      const processedDateTypes = job.job_date_types.reduce((acc: any, dt: any) => {
-        const key = `${job.id}-${dt.date}`;
-        acc[key] = dt;
-        return acc;
-      }, {});
-      setDateTypes(processedDateTypes);
+
+      // Fallback to visibility function to avoid RLS gaps (mirrors JobDetailsDialog)
+      let visibleTimesheets: any[] = [];
+      try {
+        const { data: visible, error: visErr } = await supabase
+          .rpc('get_timesheet_amounts_visible')
+          .eq('job_id', job.id);
+        if (!visErr && Array.isArray(visible)) {
+          visibleTimesheets = visible;
+        }
+      } catch (err) {
+        console.warn('Error fetching visible timesheets for job card:', err);
+      }
+
+      // Merge direct + visible and de-duplicate per technician
+      const timesheetsByTech = new Map<string, string[]>();
+      const timesheetProfileByTech = new Map<string, any>();
+      const addTimesheetRow = (t: any) => {
+        if (!t?.technician_id || !t?.date) return;
+        const existing = timesheetsByTech.get(t.technician_id) || [];
+        existing.push(t.date);
+        timesheetsByTech.set(t.technician_id, existing);
+        if (t.profiles) {
+          timesheetProfileByTech.set(t.technician_id, normalizeProfile(t.profiles));
+        }
+      };
+
+      (directTimesheets || []).forEach(addTimesheetRow);
+      visibleTimesheets.forEach(addTimesheetRow);
+
+      // Deduplicate and sort dates per technician
+      const normalizedTimesheetsByTech = new Map<string, string[]>();
+      timesheetsByTech.forEach((dates, techId) => {
+        const uniqueSorted = Array.from(new Set(dates)).sort();
+        normalizedTimesheetsByTech.set(techId, uniqueSorted);
+      });
+
+      const mergedAssignments: any[] = (baseAssignments || []).map((a: any) => ({
+        ...a,
+        profiles: normalizeProfile(a.profiles),
+        _timesheet_dates: normalizedTimesheetsByTech.get(a.technician_id) || [],
+      }));
+
+      // If timesheets exist for technicians not in job_assignments (edge cases), include them so badges still appear
+      const assignmentTechIds = new Set((baseAssignments || []).map((a: any) => a.technician_id));
+      normalizedTimesheetsByTech.forEach((dates, techId) => {
+        if (assignmentTechIds.has(techId)) return;
+        mergedAssignments.push({
+          job_id: job.id,
+          technician_id: techId,
+          profiles: timesheetProfileByTech.get(techId) || null,
+          sound_role: null,
+          lights_role: null,
+          video_role: null,
+          status: null,
+          single_day: null,
+          assignment_date: null,
+          assigned_at: null,
+          _timesheet_dates: dates,
+        });
+      });
+
+      setAssignments(mergedAssignments);
+    } catch (err) {
+      console.warn('Error refreshing assignments', err);
     }
-  }, [job.id, job.start_time, job.job_date_types, isJobBeingDeleted]);
+  }, [job?.id, job?.job_assignments]);
 
-  // Use pre-loaded data when available
-  const soundTasks = job.tasks?.sound || job.sound_job_tasks;
-  const personnel = job.personnel?.sound || job.sound_job_personnel?.[0];
+  // Keep local state in sync with incoming job prop updates for instant UI
+  useEffect(() => {
+    setAssignments(job.job_assignments || []);
+  }, [job.job_assignments]);
 
-  // Fallback queries only when data not pre-loaded
-  const shouldFetchSoundData = department === "sound" && !job.tasks?.sound && !isJobBeingDeleted;
-  
-  const { data: fallbackSoundTasks } = useQuery({
-    queryKey: ["sound-tasks", job.id],
+  const shouldEnrichAssignments = assignmentDialogOpen || !collapsed;
+  useEffect(() => {
+    if (!shouldEnrichAssignments) return;
+    void refreshAssignments();
+  }, [refreshAssignments, shouldEnrichAssignments]);
+
+  // Realtime: subscribe to timesheet changes for this job (source of truth) and refresh local state instantly
+  useEffect(() => {
+    if (!job?.id) return;
+    if (!shouldEnrichAssignments) return;
+    const channel = supabase
+      .channel(`job-card-timesheets-${job.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'timesheets',
+        filter: `job_id=eq.${job.id}`,
+      }, async () => { await refreshAssignments(); })
+      .subscribe();
+
+    // Also listen to global assignment-updated events as a safety net (manual actions)
+    const handler = () => { void refreshAssignments(); };
+    window.addEventListener('assignment-updated', handler);
+
+    return () => {
+      window.removeEventListener('assignment-updated', handler);
+      supabase.removeChannel(channel);
+    };
+  }, [job?.id, refreshAssignments, shouldEnrichAssignments]);
+
+  // Memoized permission checks
+  const permissions = useMemo(() => {
+    const isHouseTech = userRole === 'house_tech';
+    const canEditJobs = ['admin', 'management', 'logistics'].includes(userRole || '');
+    const canManageArtists = ['admin', 'management', 'logistics', 'technician', 'house_tech'].includes(userRole || '');
+    const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
+    const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
+    
+    return {
+      isHouseTech,
+      canEditJobs,
+      canManageArtists,
+      canUploadDocuments,
+      canCreateFlexFolders
+    };
+  }, [userRole]);
+
+  // Required roles summary for this job
+  const { data: reqSummary = [], byDepartment: reqByDept } = useRequiredRoleSummary(job?.id, enableRoleSummary);
+
+  // Compute assigned counts per department and per role code (for comparisons)
+  const assignedMetrics = useMemo(() => {
+    // De-duplicate by technician per department/role so multi-day rows count once
+    const soundSet = new Set<string>();
+    const lightsSet = new Set<string>();
+    const videoSet = new Set<string>();
+    const roleSets: Record<string, Set<string>> = {};
+
+    const rows = Array.isArray(assignments) ? assignments : [];
+    for (const a of rows) {
+      const techId = a.technician_id;
+      if (a.sound_role) {
+        soundSet.add(techId);
+        roleSets[a.sound_role] = roleSets[a.sound_role] || new Set<string>();
+        roleSets[a.sound_role].add(techId);
+      }
+      if (a.lights_role) {
+        lightsSet.add(techId);
+        roleSets[a.lights_role] = roleSets[a.lights_role] || new Set<string>();
+        roleSets[a.lights_role].add(techId);
+      }
+      if (a.video_role) {
+        videoSet.add(techId);
+        roleSets[a.video_role] = roleSets[a.video_role] || new Set<string>();
+        roleSets[a.video_role].add(techId);
+      }
+    }
+
+    const countsByDept: Record<string, number> = {
+      sound: soundSet.size,
+      lights: lightsSet.size,
+      video: videoSet.size
+    } as any;
+
+    const countsByRole: Record<string, number> = {};
+    Object.entries(roleSets).forEach(([role, set]) => countsByRole[role] = set.size);
+
+    return { countsByDept, countsByRole };
+  }, [assignments]);
+
+  // Compute shortages per department/role
+  const requiredVsAssigned = useMemo(() => {
+    const byDept: Record<string, { required: number; assigned: number; roles: Array<{ role_code: string; required: number; assigned: number }> }> = {};
+    for (const dept of ['sound', 'lights', 'video']) {
+      const sum = reqByDept.get?.(dept as any) || (reqSummary.find(r => r.department === dept) ?? null);
+      const required = sum?.total_required ?? 0;
+      const roles = (sum?.roles || []).map((r) => ({
+        role_code: r.role_code,
+        required: r.quantity,
+        assigned: assignedMetrics.countsByRole[r.role_code] || 0,
+      }));
+      const assigned = assignedMetrics.countsByDept[dept] || 0;
+      byDept[dept] = { required, assigned, roles };
+    }
+    return byDept;
+  }, [reqSummary, reqByDept, assignedMetrics]);
+
+  // Optimized sound tasks query with proper key
+  const { data: soundTasks } = useQuery({
+    queryKey: createQueryKey.tasks.byDepartment('sound', job.id),
     queryFn: async () => {
+      if (department !== 'sound') return null;
       const { data, error } = await supabase
-        .from("sound_job_tasks")
+        .from('sound_job_tasks')
         .select(`
           *,
-          assigned_to (
-            first_name,
-            last_name
-          ),
+          assigned_to (first_name, last_name),
           task_documents(*)
         `)
-        .eq("job_id", job.id);
+        .eq('job_id', job.id);
       if (error) throw error;
       return data;
     },
-    enabled: shouldFetchSoundData,
-    retry: 2,
-    retryDelay: 1000,
-    staleTime: 1000 * 60 * 5 // 5 minutes
+    enabled: enableSoundTasks && department === 'sound' && (soundTaskDialogOpen || !collapsed),
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
-  const { data: fallbackPersonnel } = useQuery({
-    queryKey: ["sound-personnel", job.id],
-    queryFn: async () => {
-      const { data: existingData, error: fetchError } = await supabase
-        .from("sound_job_personnel")
-        .select("*")
-        .eq("job_id", job.id)
-        .maybeSingle();
-      if (fetchError && fetchError.code !== "PGRST116") throw fetchError;
-      if (!existingData) {
-        const { data: newData, error: insertError } = await supabase
-          .from("sound_job_personnel")
-          .insert({
-            job_id: job.id,
-            foh_engineers: 0,
-            mon_engineers: 0,
-            pa_techs: 0,
-            rf_techs: 0
-          })
-          .select()
-          .single();
-        if (insertError) throw insertError;
-        return newData;
-      }
-      return existingData;
-    },
-    enabled: shouldFetchSoundData,
-    staleTime: 1000 * 60 * 5 // 5 minutes
-  });
-
-  // Update folder status mutation
-  const updateFolderStatus = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from("jobs")
-        .update({ flex_folders_created: true })
-        .eq("id", job.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-    }
-  });
-
-  // Event handlers
-  const toggleCollapse = (e: React.MouseEvent) => {
+  // Memoized event handlers
+  const toggleCollapse = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setCollapsed(!collapsed);
-  };
+    setCollapsed(prev => !prev);
+  }, []);
 
-  const handleEditButtonClick = (e: React.MouseEvent) => {
+  const handleEditButtonClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onEditClick) {
-      onEditClick(job);
-    } else {
-      setEditJobDialogOpen(true);
-    }
-  };
+    setEditJobDialogOpen(true);
+  }, []);
 
-  // Remove the duplicate deletion handler - use only the centralized one from JobCardNew
-  // This prevents race conditions and ensures consistency
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
     const file = e.target.files?.[0];
     if (!file || !department) return;
 
     try {
-      const fileExt = file.name.split(".").pop();
+      const fileExt = file.name.split('.').pop();
       const filePath = `${department}/${job.id}/${crypto.randomUUID()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("job_documents")
+        .from('job_documents')
         .upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      const { error: dbError } = await supabase
-        .from("job_documents")
+      const { data: inserted, error: dbError } = await supabase
+        .from('job_documents')
         .insert({
           job_id: job.id,
           file_name: file.name,
@@ -184,8 +311,15 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
           file_type: file.type,
           file_size: file.size,
           original_type: null
-        });
+        })
+        .select('*')
+        .single();
       if (dbError) throw dbError;
+
+      // Update local documents state immediately
+      if (inserted) {
+        setDocuments(prev => Array.isArray(prev) ? [...prev, inserted] : [inserted]);
+      }
 
       // Broadcast push: new document uploaded
       try {
@@ -193,62 +327,35 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
           body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
         });
       } catch {}
-
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-
-      toast({
-        title: "Document uploaded",
-        description: "The document has been successfully uploaded."
-      });
     } catch (err: any) {
-      toast({
-        title: "Upload failed",
-        description: err.message,
-        variant: "destructive"
-      });
+      console.error('Upload error:', err);
     }
-  };
+  }, [job.id, department]);
 
-  const handleDeleteDocument = async (doc: JobDocument) => {
-    if (doc.read_only) {
-      toast({
-        title: "Cannot delete read-only document",
-        description: "Template documents are attached automatically and cannot be removed manually.",
-        variant: "destructive",
-      });
+  const handleDeleteDocument = useCallback(async (doc: any) => {
+    if (doc?.read_only) {
+      console.error('Attempted to delete read-only document', doc);
       return;
     }
+    if (!window.confirm('Are you sure you want to delete this document?')) return;
 
-    if (!window.confirm("Are you sure you want to delete this document?")) return;
     try {
-      console.log("useJobCard: Starting document deletion:", doc);
       const { bucket, path } = resolveJobDocLocation(doc.file_path);
       const { error: storageError } = await supabase.storage
         .from(bucket)
         .remove([path]);
       
-      if (storageError) {
-        console.error("Storage deletion error:", storageError);
-        throw storageError;
-      }
+      if (storageError) throw storageError;
 
       const { error: dbError } = await supabase
-        .from("job_documents")
+        .from('job_documents')
         .delete()
-        .eq("id", doc.id);
+        .eq('id', doc.id);
       
-      if (dbError) {
-        console.error("Database deletion error:", dbError);
-        throw dbError;
-      }
+      if (dbError) throw dbError;
 
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-
-      toast({
-        title: "Document deleted",
-        description: "The document has been successfully deleted."
-      });
+      // Update local documents state immediately
+      setDocuments(prev => Array.isArray(prev) ? prev.filter((d: any) => d.id !== doc.id) : prev);
 
       // Broadcast push: document deleted
       try {
@@ -257,68 +364,54 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
         });
       } catch {}
     } catch (err: any) {
-      console.error("Error in handleDeleteDocument:", err);
-      toast({
-        title: "Error deleting document",
-        description: err.message,
-        variant: "destructive"
-      });
+      console.error('Delete error:', err);
     }
-  };
+  }, [job.id]);
 
-  const refreshData = async (e: React.MouseEvent) => {
+  const refreshData = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isJobBeingDeleted) return; // Don't refresh if job is being deleted
-    
-    await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-    await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-    await queryClient.invalidateQueries({ queryKey: ["sound-tasks", job.id] });
-    await queryClient.invalidateQueries({ queryKey: ["sound-personnel", job.id] });
+    try {
+      // Refresh job documents directly for instant UI
+      const { data, error } = await supabase
+        .from('job_documents')
+        .select('*')
+        .eq('job_id', job.id)
+        .order('uploaded_at', { ascending: false });
+      if (!error) {
+        setDocuments(data || []);
+      }
 
-    toast({
-      title: "Data refreshed",
-      description: "The job information has been updated."
-    });
-  };
+      void refreshAssignments();
 
-  // Sync with job prop updates
-  useEffect(() => {
-    setAssignments(job.job_assignments || []);
-  }, [job.job_assignments]);
-
-  useEffect(() => {
-    setDocuments(job.job_documents || []);
-  }, [job.job_documents]);
+      // Invalidate broader queries so the card and list re-fetch
+      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+    } catch (err) {
+      console.error('Refresh error:', err);
+    }
+  }, [job.id, queryClient, refreshAssignments]);
 
   return {
     // Styling
-    borderColor,
     appliedBorderColor,
-    bgColor, 
     appliedBgColor,
     
     // State
     collapsed,
     assignments,
     documents,
-    dateTypes,
+    reqSummary,
+    requiredVsAssigned,
     soundTaskDialogOpen,
     lightsTaskDialogOpen,
     videoTaskDialogOpen,
     editJobDialogOpen,
     assignmentDialogOpen,
-    isJobBeingDeleted,
     
-    // Data - use pre-loaded or fallback
-    soundTasks: soundTasks || fallbackSoundTasks,
-    personnel: personnel || fallbackPersonnel,
+    // Data
+    soundTasks,
     
     // Permissions
-    isHouseTech,
-    canEditJobs,
-    canManageArtists,
-    canUploadDocuments,
-    canCreateFlexFolders,
+    ...permissions,
     
     // Event handlers
     toggleCollapse,
@@ -332,9 +425,6 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     setLightsTaskDialogOpen,
     setVideoTaskDialogOpen,
     setEditJobDialogOpen,
-    setAssignmentDialogOpen,
-
-    // Folder handling
-    updateFolderStatus
+    setAssignmentDialogOpen
   };
 };

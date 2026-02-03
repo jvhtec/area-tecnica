@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Department } from "@/types/department";
@@ -42,7 +42,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [isMapLoading, setIsMapLoading] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
-  const { userRole } = useOptimizedAuth();
+  const { userRole } = useAuth();
   const [maxStages, setMaxStages] = useState(1);
   const { flexUuid, isLoading: isFlexLoading, error: flexError, folderExists, refetch: refetchFlexUuid } = useFlexUuid(jobId || "");
   const [jobDocuments, setJobDocuments] = useState<JobDocumentEntry[]>([]);

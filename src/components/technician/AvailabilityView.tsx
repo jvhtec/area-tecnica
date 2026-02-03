@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, parseISO } from 'date-fns';
@@ -26,7 +26,7 @@ interface AvailabilityViewProps {
 }
 
 export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
-    const { user } = useOptimizedAuth();
+    const { user } = useAuth();
     const queryClient = useQueryClient();
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [showAddSheet, setShowAddSheet] = useState(false);
