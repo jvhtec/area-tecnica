@@ -10,6 +10,13 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
+/**
+ * Render the inventory management UI for the authenticated user's department.
+ *
+ * Displays current stock entries filtered by the user's department categories, allows editing and persisting stock updates, and shows contextual alerts when the department is missing or when fetch/update errors occur.
+ *
+ * @returns A React element that provides the equipment inventory management interface
+ */
 export function EquipmentManagement() {
   const auth = useAuth();
   const { session } = auth;

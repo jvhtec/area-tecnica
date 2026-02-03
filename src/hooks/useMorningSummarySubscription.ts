@@ -12,6 +12,21 @@ export type MorningSummarySubscription = {
   updated_at: string;
 };
 
+/**
+ * Provides read and write operations for the current user's morning summary subscription.
+ *
+ * The hook fetches the authenticated user's subscription (if any) and exposes a mutation to
+ * create or update the subscription. On successful upsert the cached subscription for the
+ * current user is invalidated and a success toast is shown; on error an error toast is shown.
+ *
+ * @returns An object with the following properties:
+ * - `subscription` — The user's `MorningSummarySubscription` or `null` if none exists.
+ * - `isLoading` — `true` while the subscription query is loading, `false` otherwise.
+ * - `error` — The query error object if the fetch failed, otherwise `undefined`.
+ * - `upsertSubscription` — A function that accepts `{ subscribed_departments: string[]; enabled: boolean }`
+ *   to create or update the current user's subscription.
+ * - `isUpdating` — `true` while the upsert mutation is pending, `false` otherwise.
+ */
 export function useMorningSummarySubscription() {
   const { toast } = useToast();
   const queryClient = useQueryClient();

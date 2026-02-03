@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -148,6 +147,13 @@ const DisponibilidadAccessGuard = () => {
   return <Disponibilidad />;
 };
 
+/**
+ * Root application component that configures providers, initializes startup services, and defines the application's routes and global UI.
+ *
+ * Initializes multi-tab coordination on mount and performs startup side-effects (service worker updates, push subscription recovery, and shortcut initialization).
+ *
+ * @returns The React element rendering the app's provider tree, route configuration, and global UI (toasters, global dialogs, devtools).
+ */
 export default function App() {
   // Initialize multi-tab coordinator
   React.useEffect(() => {

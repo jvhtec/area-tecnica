@@ -45,6 +45,13 @@ interface SubRental {
   };
 }
 
+/**
+ * Renders the Sub-Rentals manager UI for creating, listing (grouped by batch), and removing temporary stock boosts.
+ *
+ * Manages form state, fetches equipment/jobs/sub-rentals for the current department, subscribes to realtime updates, and performs mutations to add or delete sub-rental items (optionally auto-creating a transport request when linked to a job).
+ *
+ * @returns The React element for the Sub-Rentals manager interface.
+ */
 export function SubRentalManager() {
   const { session } = useAuth();
   const { toast } = useToast();

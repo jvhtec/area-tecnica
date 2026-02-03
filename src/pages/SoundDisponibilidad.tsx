@@ -19,6 +19,13 @@ import { useOptimizedTableSubscriptions } from '@/hooks/useOptimizedSubscription
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
+/**
+ * Render the Sound department presets availability view with calendar, job/preset listings, and management controls.
+ *
+ * Provides a date picker, daily and weekly summaries, quick assignment UI, sub-rental manager, and a dialog for managing presets; it also fetches and displays job logos and subscribes to relevant realtime updates for the "sound" department.
+ *
+ * @returns A React element containing the presets availability UI for the Sound department.
+ */
 export default function SoundDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);

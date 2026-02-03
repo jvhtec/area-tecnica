@@ -8,6 +8,14 @@ import { AdminPanel } from "@/components/feedback/AdminPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { initConsoleCapture } from "@/utils/consoleCapture";
 
+/**
+ * Page component that provides a feedback interface for reporting bugs, requesting features, and accessing admin controls.
+ *
+ * Initializes console capture when mounted and restores original console behavior on unmount.
+ * Renders tabs for "Reportar error" and "Solicitar función", and conditionally includes a "Panel de gestión" tab when the current user role is `admin` or `management`.
+ *
+ * @returns The rendered feedback UI as a React element.
+ */
 export default function Feedback() {
   const { userRole } = useAuth();
   const [activeTab, setActiveTab] = useState("bug");

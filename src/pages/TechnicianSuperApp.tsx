@@ -108,7 +108,16 @@ const getThemeStyles = (isDark: boolean) => ({
   cluster: isDark ? "bg-white text-black" : "bg-slate-900 text-white"
 });
 
-// --- MAIN APP SHELL ---
+/**
+ * Top-level technician application shell that manages theme, navigation tabs, real-time subscriptions,
+ * data fetching (profile and assignments), and modal/detail views for a field technician interface.
+ *
+ * This component wires together dashboard, jobs, availability, and profile screens, handles deep links,
+ * controls modal state (timesheet, details, sound/vision, oblique strategy, rates, messages, tour details, about),
+ * and provides callbacks to child views.
+ *
+ * @returns The rendered TechnicianSuperApp React element (the application's main UI shell).
+ */
 export default function TechnicianSuperApp() {
   const [tab, setTab] = useState('dashboard');
   const { theme: nextTheme, setTheme } = useTheme();

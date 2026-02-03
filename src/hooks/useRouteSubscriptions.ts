@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
@@ -179,8 +178,28 @@ const SUBSCRIPTION_STALE_TIME = 5 * 60 * 1000; // 5 minutes
 const INACTIVITY_THRESHOLD = 3 * 60 * 1000; // 3 minutes
 
 /**
- * Enhanced hook to determine required subscriptions based on current route
- * and monitor their status with intelligent cleanup
+ * Determine which database tables to subscribe to for the current route, manage
+ * those subscriptions across tabs (leader/follower coordination), and surface
+ * real-time subscription status and controls.
+ *
+ * The hook resolves the most specific route subscription configuration, merges
+ * route-specific and global table requirements (taking priority into account),
+ * performs leader-only subscription management (with followers requesting the
+ * leader), refreshes subscriptions after inactivity or visibility changes, and
+ * exposes a manual refresh function.
+ *
+ * @returns An object containing:
+ * - `requiredTables` — array of table names that should be subscribed for the current route.
+ * - `subscribedTables` — subset of `requiredTables` that currently have active subscriptions.
+ * - `unsubscribedTables` — subset of `requiredTables` that currently lack active subscriptions.
+ * - `isFullySubscribed` — `true` if all `requiredTables` have active subscriptions and there is at least one required table, `false` otherwise.
+ * - `isStale` — `true` if the last refresh time is older than the configured staleness threshold, `false` otherwise.
+ * - `routeKey` — the resolved route key used to determine subscriptions (may be a parent route or a special mapped key).
+ * - `formattedLastActivity` — human-readable relative string for the last subscription refresh (or `"Unknown"` on error).
+ * - `connectionStatus` — current subscription connection status from the subscription context.
+ * - `lastRefreshTime` — timestamp of the last subscription refresh.
+ * - `wasInactive` — `true` if the page was detected as inactive long enough to trigger an automatic refresh upon return, `false` otherwise.
+ * - `forceRefresh` — function that requests an immediate refresh of all `requiredTables` (leader performs refresh; followers request leader).
  */
 export function useRouteSubscriptions() {
   const location = useLocation();
@@ -388,7 +407,12 @@ export function useRouteSubscriptions() {
     
   }, [location.pathname, manager, findRoutePath, lastRefreshTime, queryClient, isLeader, multiTabCoordinator]);
 
-  // Helper to get priority value for comparison
+  /**
+   * Convert a priority label into a numeric weight for comparison.
+   *
+   * @param priority - Priority label where `'high'` is highest and `'low'` is lowest
+   * @returns Numeric weight: `3` for `'high'`, `2` for `'medium'`, `1` for `'low'`
+   */
   function getPriorityValue(priority: 'high' | 'medium' | 'low'): number {
     switch (priority) {
       case 'high': return 3;

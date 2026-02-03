@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
@@ -14,6 +13,15 @@ interface ConnectionStatusProps {
   className?: string;
 }
 
+/**
+ * Render a connection status UI that reflects real-time subscription state and offers a user-triggered refresh.
+ *
+ * Reads connection state, active subscriptions, and last refresh time from the subscription context and displays an icon and label for connecting, connected (fresh or stale), or disconnected states. Supports five display variants: 'card' (default, fixed overlay that auto-hides after brief visibility changes), 'inline', 'icon' (tooltip-wrapped), 'badge', and 'full'. Provides a refresh control that triggers a subscriptions refresh and shows loading and error feedback.
+ *
+ * @param variant - Display style: 'card' (default), 'inline', 'icon', 'badge', or 'full'.
+ * @param className - Optional CSS class names applied to the root element.
+ * @returns The connection status UI for the selected variant.
+ */
 export function ConnectionStatus({
   variant = 'card',
   className

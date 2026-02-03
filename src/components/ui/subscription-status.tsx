@@ -1,4 +1,3 @@
-
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +8,13 @@ import { useResetSubscriptions } from "@/hooks/useResetSubscriptions";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 
+/**
+ * Displays a realtime subscription status card with expandable details and a reset action.
+ *
+ * Shows current connection status and active subscription count; when expanded, lists subscriptions grouped by table and provides a "Reset Subscriptions" button that invokes the reset action and, for admin users, shows success or error toasts.
+ *
+ * @returns The rendered subscription status Card element
+ */
 export function SubscriptionStatus() {
   const { connectionStatus, subscriptionCount, subscriptionsByTable } = useSubscriptionContext();
   const { userRole } = useAuth();

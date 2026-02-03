@@ -22,6 +22,15 @@ const DEPARTMENTS: Department[] = [
   { value: 'production', label: 'Producción', emoji: '🎬' },
 ];
 
+/**
+ * Render the morning summary subscription UI for authorized users.
+ *
+ * Shows controls to enable or disable the daily summary, select subscribed departments,
+ * and save preferences. Hides entirely for users without the required role and displays
+ * a loading placeholder while the subscription is being fetched.
+ *
+ * @returns A React element containing the subscription card UI, or `null` if the current user lacks access.
+ */
 export function MorningSummarySubscription() {
   const { userRole } = useAuth();
   const { subscription, isLoading, upsertSubscription, isUpdating } = useMorningSummarySubscription();

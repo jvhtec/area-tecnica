@@ -13,6 +13,16 @@ import { CalendarDays, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+/**
+ * Manage and display the current user's technician unavailability blocks.
+ *
+ * Renders a responsive UI that lists existing unavailability blocks and provides controls to create
+ * new blocks (single-day or multi-day, full-day or time-range) and delete existing ones. The component
+ * handles fetching the user's blocks, form validation for date ranges, creation of per-day records,
+ * optimistic deletion UI, and responsive presentation (modal dialog on desktop, bottom sheet on mobile).
+ *
+ * @returns A React element that renders the unavailability management interface.
+ */
 export default function TechnicianUnavailability() {
   const { user } = useAuth();
   const qc = useQueryClient();

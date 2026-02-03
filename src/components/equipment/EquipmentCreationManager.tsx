@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -235,6 +234,17 @@ interface EquipmentCreationManagerProps {
   department?: string;
 }
 
+/**
+ * Provides a UI to create, view, edit, and delete equipment for a given department or globally.
+ *
+ * The component renders a form for adding equipment, a scrollable list of existing equipment, an edit dialog,
+ * and a deletion confirmation. It optionally integrates with Flex to paste/extract a resource UUID and fetch
+ * equipment data, and it keeps data consistent by invalidating equipment queries after create/update/delete operations.
+ *
+ * @param onEquipmentChange - Optional callback invoked after equipment is created, updated, or deleted.
+ * @param department - Optional department to scope which categories and equipment are shown; if omitted the component will attempt to obtain a department from context or fall back to global categories.
+ * @returns The component's JSX element.
+ */
 export function EquipmentCreationManager({ onEquipmentChange, department: propDepartment }: EquipmentCreationManagerProps) {
   const { session } = useAuth();
   const { toast } = useToast();

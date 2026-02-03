@@ -23,6 +23,14 @@ const COVERED_CODES = new Set<string>([
   'flex.tourdate_folder.created',
 ])
 
+/**
+ * Subscribes to activity_log inserts and forwards uncaptured activity events to the server push function.
+ *
+ * When enabled by the VITE_ENABLE_ACTIVITY_PUSH_FALLBACK flag and the current userRole is `admin` or `management`,
+ * this hook listens for new rows in `public.activity_log`, deduplicates events by id, skips codes listed in COVERED_CODES,
+ * enriches `tourdate.*` events with tour context and changes when available, and invokes the Supabase edge function `push`
+ * with a broadcast payload. The subscription is removed on cleanup. Errors from the push invocation and channel removal are swallowed.
+ */
 export function useActivityPushFallback() {
   const { userRole } = useAuth()
   const enabled = (import.meta.env.VITE_ENABLE_ACTIVITY_PUSH_FALLBACK as any) === 'true'

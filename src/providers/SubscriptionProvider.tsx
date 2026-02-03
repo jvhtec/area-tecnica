@@ -91,6 +91,16 @@ interface SubscriptionProviderProps {
   children: React.ReactNode;
 }
 
+/**
+ * Provides subscription management state and actions to descendant components via SubscriptionContext.
+ *
+ * The provider instantiates and exposes a UnifiedSubscriptionManager along with helper actions:
+ * refreshSubscriptions, invalidateQueries, forceRefresh, and forceSubscribe. It listens for token
+ * refresh events and reestablishes subscriptions when tokens are refreshed. When the current user
+ * has the "admin" role, refresh and force-refresh actions display success toasts.
+ *
+ * @param children - The React children that will receive the subscription context.
+ */
 export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   const queryClient = useQueryClient();
   const { userRole } = useAuth();
@@ -180,4 +190,3 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 }
-

@@ -75,6 +75,13 @@ function JobCardNewDetailsOnlyCard({
   );
 }
 
+/**
+ * Render the full interactive job card view, wiring UI state, data fetching, and action handlers for managing a job.
+ *
+ * This component loads related data (artists, riders, transport requests, logistics events, timesheets, folder existence, WhatsApp group state), manages modal/dialog state (route sheet, tasks, transport, logistics, requirements, folder picker), and provides handlers for actions such as editing, optimistic deletion, creating/syncing Flex folders, creating local filesystem folders, transport request management, and WhatsApp group creation/retry.
+ *
+ * @returns The rendered full JobCardNew view as a JSX element.
+ */
 function JobCardNewFull({
   job,
   onEditClick,

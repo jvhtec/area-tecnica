@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -18,6 +17,14 @@ interface AvailabilityActionsProps {
   selectedDate?: Date;
 }
 
+/**
+ * Render a card with buttons to set the current user's availability for a given date.
+ *
+ * The buttons update the availability schedule in the backend and display success or error toasts. If no date is provided, nothing is rendered.
+ *
+ * @param selectedDate - The date for which availability should be set.
+ * @returns The availability controls card for `selectedDate`, or `null` when `selectedDate` is not provided.
+ */
 export function AvailabilityActions({ selectedDate }: AvailabilityActionsProps) {
   const { session, userDepartment } = useAuth();
   const { toast } = useToast();

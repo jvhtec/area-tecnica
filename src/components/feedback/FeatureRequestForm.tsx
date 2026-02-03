@@ -35,6 +35,14 @@ const featureRequestSchema = z.object({
 
 type FeatureRequestFormData = z.infer<typeof featureRequestSchema>;
 
+/**
+ * Render a feature request form that validates input and submits requests to the backend.
+ *
+ * The form uses the `featureRequestSchema` for validation and pre-fills the reporter email from
+ * the current authenticated user when available. On submission the component invokes the
+ * Supabase edge function "submit-feature-request"; on success it shows a confirmation dialog and
+ * resets the form, and on failure it displays a destructive toast with an error message.
+ */
 export function FeatureRequestForm() {
   const { toast } = useToast();
   const { user } = useAuth();
