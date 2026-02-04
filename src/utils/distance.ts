@@ -113,5 +113,13 @@ export function parseCoordinates(
     return null;
   }
 
+  // Validate geographic coordinate ranges
+  if (parsedLat < -90 || parsedLat > 90) {
+    return null;
+  }
+  if (parsedLng < -180 || parsedLng > 180) {
+    return null;
+  }
+
   return { lat: parsedLat, lng: parsedLng };
 }

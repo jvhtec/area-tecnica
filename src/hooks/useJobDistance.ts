@@ -11,7 +11,7 @@ interface LocationData {
 }
 
 interface JobWithLocation {
-  locations?: LocationData | null;
+  locations?: LocationData | LocationData[] | null;
   location?: LocationData | null;
 }
 
@@ -30,7 +30,22 @@ export function useJobDistance(job: JobWithLocation | null | undefined): string 
     if (!job) return null;
 
     // Try to get location from either 'locations' or 'location' field
-    const locationData = job.locations || job.location;
+    let locationData: LocationData | null = null;
+
+    if (job.locations) {
+      // Handle array of locations (pick first non-null element)
+      if (Array.isArray(job.locations)) {
+        locationData = job.locations.find(loc => loc && (loc.latitude || loc.longitude)) || null;
+      } else {
+        locationData = job.locations;
+      }
+    }
+
+    // Fall back to job.location if locations is absent/empty
+    if (!locationData && job.location) {
+      locationData = job.location;
+    }
+
     if (!locationData) return null;
 
     // Parse coordinates (handles both string and number types)
@@ -47,5 +62,12 @@ export function useJobDistance(job: JobWithLocation | null | undefined): string 
 
     // Format for display
     return formatDistance(distanceKm);
-  }, [job?.locations?.latitude, job?.locations?.longitude, job?.location?.latitude, job?.location?.longitude]);
+  }, [
+    // Handle both array and object locations
+    Array.isArray(job?.locations) ? job?.locations?.[0]?.latitude : job?.locations?.latitude,
+    Array.isArray(job?.locations) ? job?.locations?.[0]?.longitude : job?.locations?.longitude,
+    Array.isArray(job?.locations) ? job?.locations?.length : undefined,
+    job?.location?.latitude,
+    job?.location?.longitude
+  ]);
 }
