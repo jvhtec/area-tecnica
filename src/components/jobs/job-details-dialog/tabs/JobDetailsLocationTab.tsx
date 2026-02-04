@@ -7,6 +7,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { useJobDistance } from "@/hooks/useJobDistance";
 
 interface JobDetailsLocationTabProps {
   open: boolean;
@@ -19,6 +20,9 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
   const [googleStaticKey, setGoogleStaticKey] = useState<string | null>(null);
   const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
   const [isMapLoading, setIsMapLoading] = useState<boolean>(false);
+
+  // Calculate distance from home base
+  const distance = useJobDistance({ locations: jobDetails?.locations });
 
   useEffect(() => {
     const loadStaticMap = async () => {
@@ -103,6 +107,11 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
                 <h3 className="font-semibold">{jobDetails.locations.name}</h3>
                 {jobDetails.locations.formatted_address && (
                   <p className="text-muted-foreground">{jobDetails.locations.formatted_address}</p>
+                )}
+                {distance && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    📍 {distance} desde la base
+                  </p>
                 )}
               </div>
               <Button onClick={openGoogleMaps} size="sm">
