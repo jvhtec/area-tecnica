@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle, Search, Filter, X } from "lucide-react";
+import { Loader2, CheckCircle, Search, Filter, X, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
 import { startOfMonth, endOfMonth, addMonths } from "date-fns";
@@ -21,6 +21,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useCreateJobDialogStore } from "@/stores/useCreateJobDialogStore";
 
 const ProjectManagement = () => {
   const navigate = useNavigate();
