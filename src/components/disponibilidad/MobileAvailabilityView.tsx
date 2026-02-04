@@ -11,6 +11,7 @@ import { PresetManagementDialog } from '@/components/equipment/PresetManagementD
 import { SubRentalDialog } from '@/components/equipment/SubRentalDialog';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
 
 type DisponibilidadDepartment = 'sound' | 'lights';
 
@@ -41,6 +42,7 @@ export function MobileAvailabilityView({
     onDepartmentChange
 }: MobileAvailabilityViewProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
+    const { theme, isDark } = useTechnicianTheme();
     const [showActionsMenu, setShowActionsMenu] = useState(false);
     const [showPresetDialog, setShowPresetDialog] = useState(false);
     const [showWeeklySummary, setShowWeeklySummary] = useState(false);
@@ -60,11 +62,11 @@ export function MobileAvailabilityView({
     };
 
     return (
-        <div className="flex flex-col min-h-screen bg-[#05070a] -mx-3 -mt-4 -mb-[calc(4.5rem+env(safe-area-inset-bottom))]">
+        <div className={cn("flex flex-col min-h-screen -mx-3 -mt-4 -mb-[calc(4.5rem+env(safe-area-inset-bottom))]", theme.bg)}>
             {/* Header */}
-            <div className="bg-[#0f1219] border-b border-[#1f232e] p-4 sticky top-0 z-20">
+            <div className={cn("border-b p-4 sticky top-0 z-20", theme.card, theme.divider)}>
                 <div className="flex items-center justify-between mb-3">
-                    <h1 className="text-lg font-bold text-white">
+                    <h1 className={cn("text-lg font-bold", theme.textMain)}>
                         Disponibilidad · {DEPARTMENT_LABELS[department]}
                     </h1>
                     <div className="flex items-center gap-2">
@@ -109,7 +111,7 @@ export function MobileAvailabilityView({
                                     </div>
                                 )}
                                 <div className="space-y-2">
-                                    <p className="text-xs text-slate-400 font-medium uppercase mb-3">Gestión</p>
+                                    <p className={cn("text-xs font-medium uppercase mb-3", theme.textMuted)}>Gestión</p>
                                     <div onClick={() => setShowActionsMenu(false)}>
                                         <InventoryManagementDialog />
                                     </div>
@@ -137,7 +139,7 @@ export function MobileAvailabilityView({
             </div>
 
             {/* Date Strip */}
-            <div className="bg-[#0f1219] border-b border-[#1f232e] px-2 py-3 sticky top-[64px] z-10">
+            <div className={cn("border-b px-2 py-3 sticky top-[64px] z-10", theme.card, theme.divider)}>
                 <div className="flex items-center justify-between mb-3 px-2">
                     <Button variant="ghost" size="icon" onClick={handlePrevDay} className="h-8 w-8">
                         <ChevronLeft className="h-4 w-4" />
@@ -166,7 +168,8 @@ export function MobileAvailabilityView({
                                     "flex flex-col items-center justify-center min-w-[50px] h-[70px] rounded-xl transition-all snap-center border",
                                     isSelected
                                         ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20"
-                                        : "bg-[#1a1d24] border-[#2a2e3b] text-slate-400 hover:bg-[#252932]",
+                                        : isDark ? "bg-[#1a1d24] border-[#2a2e3b] hover:bg-[#252932]" : "bg-white border-slate-200 hover:bg-slate-50",
+                                    isSelected ? "" : theme.textMuted,
                                     isToday && !isSelected && "border-blue-500/50 text-blue-400"
                                 )}
                             >
@@ -175,7 +178,7 @@ export function MobileAvailabilityView({
                                 </span>
                                 <span className={cn(
                                     "text-xl font-bold",
-                                    isSelected ? "text-white" : "text-slate-200"
+                                    isSelected ? "text-white" : theme.textMain
                                 )}>
                                     {format(date, 'd')}
                                 </span>
@@ -190,10 +193,10 @@ export function MobileAvailabilityView({
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto p-4 pb-32 space-y-4">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-white">
+                    <h2 className={cn("text-lg font-semibold", theme.textMain)}>
                         {format(selectedDate, 'EEEE, d MMMM', { locale: es })}
                     </h2>
-                    <Badge variant="outline" className="bg-[#1a1d24] border-[#2a2e3b]">
+                    <Badge variant="outline" className={cn(isDark ? "bg-[#1a1d24] border-[#2a2e3b]" : "bg-white border-slate-200")}>
                         {jobs.length + (assignedPresets?.length || 0)} Eventos
                     </Badge>
                 </div>
@@ -205,7 +208,7 @@ export function MobileAvailabilityView({
                             return (
                                 <div
                                     key={job.id}
-                                    className="bg-[#0f1219] border border-[#1f232e] rounded-lg p-3 flex items-start gap-3 shadow-sm"
+                                    className={cn("border rounded-lg p-3 flex items-start gap-3 shadow-sm", theme.card)}
                                 >
                                     {logo ? (
                                         <img
@@ -215,17 +218,17 @@ export function MobileAvailabilityView({
                                             height={40}
                                             loading="lazy"
                                             decoding="async"
-                                            className="h-10 w-10 rounded-md object-cover border border-[#2a2e3b]"
+                                            className="h-10 w-10 rounded-md object-cover border"
                                         />
                                     ) : (
-                                        <div className="h-10 w-10 rounded-md bg-[#1a1d24] flex items-center justify-center border border-[#2a2e3b] text-base font-bold text-slate-500">
+                                        <div className={cn("h-10 w-10 rounded-md flex items-center justify-center border text-base font-bold", isDark ? "bg-[#1a1d24] text-slate-500" : "bg-slate-100 text-slate-600")}>
                                             {String(job.title || '?').slice(0, 1).toUpperCase()}
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="text-[15px] font-semibold text-white truncate">{job.title}</h3>
+                                        <h3 className={cn("text-[15px] font-semibold truncate", theme.textMain)}>{job.title}</h3>
                                         {job.location?.name && (
-                                            <p className="text-xs text-slate-400 truncate">{job.location.name}</p>
+                                            <p className="text-xs truncate">{job.location.name}</p>
                                         )}
                                         <div className="flex items-center gap-2 mt-1.5">
                                             <Badge variant="secondary" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20">
@@ -253,7 +256,7 @@ export function MobileAvailabilityView({
                             return (
                                 <div
                                     key={assignment.id}
-                                    className="bg-[#0f1219] border border-[#1f232e] rounded-lg p-3 flex items-start gap-3 shadow-sm"
+                                    className={cn("border rounded-lg p-3 flex items-start gap-3 shadow-sm", theme.card)}
                                 >
                                     {logo ? (
                                         <img
@@ -263,17 +266,17 @@ export function MobileAvailabilityView({
                                             height={40}
                                             loading="lazy"
                                             decoding="async"
-                                            className="h-10 w-10 rounded-md object-cover border border-[#2a2e3b]"
+                                            className="h-10 w-10 rounded-md object-cover border"
                                         />
                                     ) : (
-                                        <div className="h-10 w-10 rounded-md bg-[#1a1d24] flex items-center justify-center border border-[#2a2e3b] text-base font-bold text-slate-500">
+                                        <div className="h-10 w-10 rounded-md bg-[#1a1d24] flex items-center justify-center border text-base font-bold text-slate-500">
                                             {String(title || '?').slice(0, 1).toUpperCase()}
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="text-[15px] font-semibold text-white truncate">{title}</h3>
+                                        <h3 className="text-[15px] font-semibold truncate">{title}</h3>
                                         {location && (
-                                            <p className="text-xs text-slate-400 truncate">{location}</p>
+                                            <p className="text-xs truncate">{location}</p>
                                         )}
                                         <div className="mt-1.5">
                                             <Badge variant="secondary" className="text-[10px] bg-purple-500/10 text-purple-400 border-purple-500/20">

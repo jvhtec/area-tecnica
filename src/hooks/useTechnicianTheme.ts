@@ -4,7 +4,19 @@ import { useUserPreferences } from './useUserPreferences';
 
 export const useTechnicianTheme = () => {
   const { preferences } = useUserPreferences();
-  const [isDark, setIsDark] = useState(true); // Default to dark until preferences load
+
+  // Get initial theme from document class or system preference to avoid flash
+  const getInitialDarkMode = () => {
+    if (typeof document !== 'undefined' && document.documentElement.classList.contains('dark')) {
+      return true;
+    }
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true; // Default to dark
+  };
+
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
 
   // Sync with user preferences
   useEffect(() => {
