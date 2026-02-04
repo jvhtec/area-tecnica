@@ -28,6 +28,7 @@ const ProjectManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { openDialog } = useCreateJobDialogStore();
   const { userDepartment, isLoading: authLoading } = useOptimizedAuth();
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>((userDepartment as Department) ?? "sound");
