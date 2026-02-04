@@ -126,23 +126,24 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
         console.error("Error updating job record:", updateError);
       }
 
-      // Broadcast push: Flex folders created for job
-      try {
-        void supabase.functions.invoke('push', {
-          body: { action: 'broadcast', type: 'flex.folders.created', job_id: job.id }
-        });
-      } catch (pushError) {
+      // Broadcast push: Flex folders created for job (fire-and-forget with error logging)
+      void supabase.functions.invoke('push', {
+        body: { action: 'broadcast', type: 'flex.folders.created', job_id: job.id }
+      }).catch((pushError) => {
         console.error("useJobActions: Failed to send push notification:", pushError);
-      }
+      });
 
       toast({
         title: "Success!",
         description: "Flex folders have been created successfully."
       });
 
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
+      // Parallelize independent query invalidations
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["folder-existence"] })
+      ]);
 
     } catch (error: any) {
       console.error("useJobActions: Error creating flex folders:", error);
