@@ -5,8 +5,15 @@ import { useUserPreferences } from './useUserPreferences';
 export const useTechnicianTheme = () => {
   const { preferences } = useUserPreferences();
 
-  // Get initial theme from document class or system preference to avoid flash
+  // Get initial theme from localStorage (synchronous, no flash!)
   const getInitialDarkMode = () => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('theme-preference');
+      if (stored !== null) {
+        return stored === 'dark';
+      }
+    }
+    // Fallback to document class or system preference
     if (typeof document !== 'undefined' && document.documentElement.classList.contains('dark')) {
       return true;
     }
@@ -18,7 +25,7 @@ export const useTechnicianTheme = () => {
 
   const [isDark, setIsDark] = useState(getInitialDarkMode);
 
-  // Sync with user preferences
+  // Sync with user preferences when they load from database
   useEffect(() => {
     if (preferences?.dark_mode !== undefined) {
       setIsDark(preferences.dark_mode);
