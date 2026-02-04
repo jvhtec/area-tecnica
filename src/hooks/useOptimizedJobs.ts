@@ -42,10 +42,12 @@ export const useOptimizedJobs = (
       .from('jobs')
       .select(`
         *,
-        location_data:locations(
+        location:locations(
           id,
           name,
-          formatted_address
+          formatted_address,
+          latitude,
+          longitude
         ),
         job_departments!inner(
           department
