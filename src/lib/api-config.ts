@@ -1,38 +1,40 @@
 // Supabase configuration is injected via Vite env vars.
-// In tests (Vitest/Node), we also allow falling back to process.env.
-// Falls back to VITE_SUPABASE_PUBLISHABLE_KEY for compatibility.
+// IMPORTANT: Vite requires STATIC property access (import.meta.env.VITE_XXX)
+// to properly inline values at bundle time. Dynamic access like env[name] won't work.
 
-type EnvSource = Record<string, string | undefined>;
+// Check if we're in a test environment (Vitest)
+const isTestEnv =
+  typeof process !== 'undefined' && (process.env?.VITEST || process.env?.NODE_ENV === 'test');
 
-const getEnv = (name: string): string | undefined => {
-  // In non-Vite contexts (Vitest/Node), `import.meta.env` may be missing.
-  const metaEnv = (import.meta as any)?.env as EnvSource | undefined;
-  // In Vite client bundles, `process` may be undefined.
-  const processEnv = typeof process !== 'undefined' ? process.env?.[name] : undefined;
-  return metaEnv?.[name] ?? processEnv;
+// Get URL - use static access so Vite can inline the value
+const getSupabaseUrl = (): string => {
+  // Vite inlines this during dev/build
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  if (url) return url;
+  
+  // Fallback for test environment
+  if (isTestEnv) return 'http://localhost:54321';
+  
+  throw new Error('Missing required environment variable: VITE_SUPABASE_URL');
 };
 
-const requireEnv = (name: string, value: string | undefined) => {
-  if (!value || value.trim() === '') {
-    // Vitest runs in Node and does not automatically inject Vite env vars.
-    // Provide safe placeholders so modules can import without crashing.
-    const isTestEnv =
-      typeof process !== 'undefined' && (process.env?.VITEST || process.env?.NODE_ENV === 'test');
-    if (isTestEnv) {
-      if (name.includes('VITE_SUPABASE_URL')) return 'http://localhost:54321';
-      return 'test-key';
-    }
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
+// Get anon key - try both names for compatibility
+const getSupabaseAnonKey = (): string => {
+  // Vite inlines these during dev/build
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  
+  if (anonKey) return anonKey;
+  if (publishableKey) return publishableKey;
+  
+  // Fallback for test environment
+  if (isTestEnv) return 'test-key';
+  
+  throw new Error('Missing required environment variable: VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY)');
 };
 
-export const SUPABASE_URL = requireEnv('VITE_SUPABASE_URL', getEnv('VITE_SUPABASE_URL'));
-
-export const SUPABASE_ANON_KEY = requireEnv(
-  'VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY)',
-  getEnv('VITE_SUPABASE_ANON_KEY') || getEnv('VITE_SUPABASE_PUBLISHABLE_KEY')
-);
+export const SUPABASE_URL = getSupabaseUrl();
+export const SUPABASE_ANON_KEY = getSupabaseAnonKey();
 
 // Base URLs for different APIs (keep as-is; not secret)
 export const FLEX_API_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/api';
