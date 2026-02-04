@@ -131,16 +131,18 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
         void supabase.functions.invoke('push', {
           body: { action: 'broadcast', type: 'flex.folders.created', job_id: job.id }
         });
-      } catch {}
+      } catch (pushError) {
+        console.error("useJobActions: Failed to send push notification:", pushError);
+      }
 
       toast({
         title: "Success!",
         description: "Flex folders have been created successfully."
       });
 
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
+      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
 
     } catch (error: any) {
       console.error("useJobActions: Error creating flex folders:", error);
@@ -195,25 +197,27 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
       // Get current user's custom folder structure or use default
       const { data: { user } } = await supabase.auth.getUser();
       let folderStructure = null;
-      
+      let usedCustomStructure = false;
+
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('custom_folder_structure, role')
           .eq('id', user.id)
           .single();
-        
+
         // Only use custom structure for management users
         if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_folder_structure) {
           folderStructure = profile.custom_folder_structure;
+          usedCustomStructure = true;
         }
       }
-      
+
       // Default structure if no custom one exists
       if (!folderStructure) {
         folderStructure = [
           "CAD",
-          "QT", 
+          "QT",
           "Material",
           "Documentación",
           "Rentals",
@@ -250,10 +254,9 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
         }
       }
 
-      const isCustom = user && folderStructure !== null;
       toast({
         title: "Success!",
-        description: `${isCustom ? 'Custom' : 'Default'} folder structure created at "${rootFolderName}"`
+        description: `${usedCustomStructure ? 'Custom' : 'Default'} folder structure created at "${rootFolderName}"`
       });
 
     } catch (error: any) {
