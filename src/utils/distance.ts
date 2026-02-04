@@ -41,6 +41,12 @@ export function calculateDistance(
   if (!Number.isFinite(coord1.lat) || !Number.isFinite(coord1.lng)) return null;
   if (!Number.isFinite(coord2.lat) || !Number.isFinite(coord2.lng)) return null;
 
+  // Validate geographic coordinate ranges
+  if (coord1.lat < -90 || coord1.lat > 90) return null;
+  if (coord1.lng < -180 || coord1.lng > 180) return null;
+  if (coord2.lat < -90 || coord2.lat > 90) return null;
+  if (coord2.lng < -180 || coord2.lng > 180) return null;
+
   const R = 6371; // Earth's radius in kilometers
   const dLat = deg2rad(coord2.lat - coord1.lat);
   const dLng = deg2rad(coord2.lng - coord1.lng);
