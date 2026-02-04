@@ -421,7 +421,7 @@ const ProjectManagement = () => {
           department: selectedDepartment,
           date: currentDate
         })}
-        className="fixed bottom-6 right-6 md:bottom-8 md:right-8
+        className="fixed bottom-20 right-6 md:bottom-8 md:right-8
                    w-12 h-12 md:w-14 md:h-14
                    bg-blue-600 hover:bg-blue-500
                    text-white rounded-full shadow-lg
