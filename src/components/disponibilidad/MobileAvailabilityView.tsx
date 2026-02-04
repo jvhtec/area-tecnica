@@ -228,14 +228,14 @@ export function MobileAvailabilityView({
                                     <div className="flex-1 min-w-0">
                                         <h3 className={cn("text-[15px] font-semibold truncate", theme.textMain)}>{job.title}</h3>
                                         {job.location?.name && (
-                                            <p className="text-xs truncate">{job.location.name}</p>
+                                            <p className={cn("text-xs truncate", theme.textMuted)}>{job.location.name}</p>
                                         )}
                                         <div className="flex items-center gap-2 mt-1.5">
                                             <Badge variant="secondary" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20">
                                                 {format(new Date(job.start_time), 'HH:mm')}
                                             </Badge>
                                             {job.status && (
-                                                <Badge variant="outline" className="text-[10px] border-[#2a2e3b] text-slate-400">
+                                                <Badge variant="outline" className={cn("text-[10px]", theme.textMuted)}>
                                                     {job.status}
                                                 </Badge>
                                             )}
@@ -269,14 +269,14 @@ export function MobileAvailabilityView({
                                             className="h-10 w-10 rounded-md object-cover border"
                                         />
                                     ) : (
-                                        <div className="h-10 w-10 rounded-md bg-[#1a1d24] flex items-center justify-center border text-base font-bold text-slate-500">
+                                        <div className={cn("h-10 w-10 rounded-md flex items-center justify-center border text-base font-bold", isDark ? "bg-[#1a1d24] text-slate-500" : "bg-slate-100 text-slate-600")}>
                                             {String(title || '?').slice(0, 1).toUpperCase()}
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="text-[15px] font-semibold truncate">{title}</h3>
+                                        <h3 className={cn("text-[15px] font-semibold truncate", theme.textMain)}>{title}</h3>
                                         {location && (
-                                            <p className="text-xs truncate">{location}</p>
+                                            <p className={cn("text-xs truncate", theme.textMuted)}>{location}</p>
                                         )}
                                         <div className="mt-1.5">
                                             <Badge variant="secondary" className="text-[10px] bg-purple-500/10 text-purple-400 border-purple-500/20">
