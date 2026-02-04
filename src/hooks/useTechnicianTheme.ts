@@ -1,15 +1,17 @@
-import { useTheme } from 'next-themes';
+import { useEffect, useState } from 'react';
 import { Theme } from '@/components/technician/types';
+import { useUserPreferences } from './useUserPreferences';
 
 export const useTechnicianTheme = () => {
-  const { theme: nextTheme, setTheme } = useTheme();
+  const { preferences } = useUserPreferences();
+  const [isDark, setIsDark] = useState(true); // Default to dark until preferences load
 
-  // Determine if dark mode
-  const isDark = nextTheme === 'dark' || (nextTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-  const toggleTheme = () => {
-    setTheme(isDark ? 'light' : 'dark');
-  };
+  // Sync with user preferences
+  useEffect(() => {
+    if (preferences?.dark_mode !== undefined) {
+      setIsDark(preferences.dark_mode);
+    }
+  }, [preferences]);
 
   const theme: Theme = {
     bg: isDark ? "bg-[#05070a]" : "bg-slate-50",
@@ -27,5 +29,5 @@ export const useTechnicianTheme = () => {
     cluster: isDark ? "bg-white text-black" : "bg-slate-900 text-white"
   };
 
-  return { theme, isDark, toggleTheme };
+  return { theme, isDark };
 };
