@@ -825,7 +825,7 @@ const LightsConsumosTool: React.FC = () => {
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[300px] p-0" align="start">
-                          <Command>
+                          <Command shouldFilter={false}>
                             <CommandInput
                               placeholder="Buscar componente..."
                               value={componentSearches[index] ?? ''}
