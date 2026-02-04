@@ -264,15 +264,10 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         });
       } catch { }
 
-      // Redirect to management page
-      try {
-        const dest = job.job_type === 'festival'
-          ? `/festival-management/${job.id}`
-          : `/festival-management/${job.id}?singleJob=true`;
-        navigate(dest);
-      } catch { }
-
-      // We navigate to management; skip parent callbacks to avoid state updates on unmounted pages
+      // Call onCreated callback if provided
+      if (onCreated) {
+        onCreated(job);
+      }
 
       reset();
       setRequirements({});

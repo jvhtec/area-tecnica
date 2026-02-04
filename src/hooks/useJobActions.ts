@@ -86,21 +86,9 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
     try {
       setIsCreatingFolders(true);
 
-      const { data: existingFolders } = await supabase
-        .from("flex_folders")
-        .select("id")
-        .eq("job_id", job.id)
-        .limit(1);
-
-      if (existingFolders && existingFolders.length > 0) {
-        console.log("useJobActions: Found existing folders in final check:", existingFolders);
-        toast({
-          title: "Folders already exist",
-          description: "Flex folders have already been created for this job.",
-          variant: "destructive"
-        });
-        return;
-      }
+      // Note: createAllFoldersForJob handles existing folders gracefully by checking
+      // what exists and only creating what's missing. This allows adding more folders
+      // to jobs that already have some folders created.
 
       const startDate = new Date(job.start_time);
       const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
