@@ -264,9 +264,18 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         });
       } catch { }
 
-      // Call onCreated callback if provided
+      // Call onCreated callback if provided (wrapped to prevent propagation of callback errors)
       if (onCreated) {
-        onCreated(job);
+        try {
+          // Handle both sync and async callbacks
+          await Promise.resolve(onCreated(job)).catch((callbackError) => {
+            console.error("CreateJobDialog: onCreated callback failed:", callbackError);
+            // Don't propagate callback errors to job creation error handler
+          });
+        } catch (callbackError) {
+          console.error("CreateJobDialog: onCreated callback threw synchronously:", callbackError);
+          // Don't propagate callback errors to job creation error handler
+        }
       }
 
       reset();
