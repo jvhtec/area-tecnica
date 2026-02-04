@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTechnicianTheme } from "@/hooks/useTechnicianTheme";
 import { cn } from "@/lib/utils";
 import { addDays, endOfDay, format, isToday, isWithinInterval, startOfDay, subDays } from "date-fns";
 import {
@@ -96,7 +97,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
 }) => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const [isDark, setIsDark] = useState(true);
+  const { isDark } = useTechnicianTheme();
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
   const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([]);
   const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);

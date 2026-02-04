@@ -19,6 +19,7 @@ const Personal = () => {
   const { submitRequest, isSubmitting } = useVacationRequests();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const { theme, isDark } = useTechnicianTheme();
 
   console.log('Personal page: Rendering with date:', date);
 
@@ -80,9 +81,6 @@ const Personal = () => {
 
   // House techs have read-only access (can't mark dates)
   const canEditDates = userRole === 'admin' || userRole === 'management';
-
-  // Use technician theme
-  const { theme, isDark } = useTechnicianTheme();
 
   return (
     <div className={`min-h-screen flex flex-col ${theme.bg} transition-colors duration-300 font-sans`}>
