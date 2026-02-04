@@ -264,15 +264,19 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         });
       } catch { }
 
-      // Redirect to management page
-      try {
-        const dest = job.job_type === 'festival'
-          ? `/festival-management/${job.id}`
-          : `/festival-management/${job.id}?singleJob=true`;
-        navigate(dest);
-      } catch { }
-
-      // We navigate to management; skip parent callbacks to avoid state updates on unmounted pages
+      // Call onCreated callback if provided (wrapped to prevent propagation of callback errors)
+      if (onCreated) {
+        try {
+          // Handle both sync and async callbacks
+          await Promise.resolve(onCreated(job)).catch((callbackError) => {
+            console.error("CreateJobDialog: onCreated callback failed:", callbackError);
+            // Don't propagate callback errors to job creation error handler
+          });
+        } catch (callbackError) {
+          console.error("CreateJobDialog: onCreated callback threw synchronously:", callbackError);
+          // Don't propagate callback errors to job creation error handler
+        }
+      }
 
       reset();
       setRequirements({});
