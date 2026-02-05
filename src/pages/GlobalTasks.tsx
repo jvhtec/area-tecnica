@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Plus,
   Upload,
@@ -28,12 +28,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+type Dept = 'sound' | 'lights' | 'video';
+
 const DEPARTMENT_LABELS: Record<string, string> = {
   sound: 'Sonido',
   lights: 'Luces',
   video: 'Vídeo',
-  production: 'Producción',
-  logistics: 'Logística',
 };
 
 const PRIORITY_LABELS: Record<number, { label: string; class: string }> = {
@@ -48,29 +48,42 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
   completed: <CheckCircle2 className="h-4 w-4 text-green-500" />,
 };
 
-function useManagementUsers() {
+function useDepartmentUsers(userDepartment: string | null) {
   return useQuery({
-    queryKey: ['management-users'],
+    queryKey: ['dept-users', userDepartment],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('profiles')
         .select('id, first_name, last_name')
         .in('role', ['management', 'admin', 'logistics', 'house_tech']);
+
+      if (userDepartment) {
+        q = q.eq('department', userDepartment);
+      }
+
+      const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
   });
 }
 
+function normalizeDept(raw: string | null): Dept {
+  const lower = raw?.toLowerCase() ?? '';
+  if (lower === 'lights' || lower === 'luces') return 'lights';
+  if (lower === 'video' || lower === 'vídeo') return 'video';
+  return 'sound';
+}
+
 export default function GlobalTasks() {
-  const { userRole, userId } = useOptimizedAuth();
+  const { userRole, userId, userDepartment } = useOptimizedAuth();
+  const dept = normalizeDept(userDepartment);
   const canEdit = canEditTasks(userRole);
   const canAssign = canAssignTasks(userRole);
   const { toast } = useToast();
 
   // Filters
   const [statusFilter, setStatusFilter] = React.useState<string>('active');
-  const [departmentFilter, setDepartmentFilter] = React.useState<string>('all');
   const [assigneeFilter, setAssigneeFilter] = React.useState<string>('all');
   const [showFilters, setShowFilters] = React.useState(false);
 
@@ -79,31 +92,20 @@ export default function GlobalTasks() {
   const [linkTask, setLinkTask] = React.useState<any>(null);
 
   const filters: GlobalTaskFilters = {};
-  if (statusFilter === 'active') {
-    // We'll filter client-side for "active" (not_started + in_progress)
-  } else if (statusFilter && statusFilter !== 'all') {
+  if (statusFilter && statusFilter !== 'all' && statusFilter !== 'active') {
     filters.status = statusFilter as any;
-  }
-  if (departmentFilter && departmentFilter !== 'all') {
-    filters.department = departmentFilter;
   }
   if (assigneeFilter && assigneeFilter !== 'all') {
     if (assigneeFilter === 'me') {
       filters.assignedTo = userId;
-    } else if (assigneeFilter === 'unassigned') {
-      // We'll filter client-side
-    } else {
-      filters.assignedTo = assigneeFilter;
     }
   }
 
-  const { tasks, loading, refetch } = useGlobalTasks(
-    Object.keys(filters).length > 0 ? filters : undefined,
-  );
-  const mutations = useGlobalTaskMutations();
-  const { data: managementUsers } = useManagementUsers();
+  const { tasks, loading, refetch } = useGlobalTasks(dept, Object.keys(filters).length > 0 ? filters : undefined);
+  const mutations = useGlobalTaskMutations(dept);
+  const { data: deptUsers } = useDepartmentUsers(userDepartment);
 
-  // Client-side filter for "active" and "unassigned"
+  // Client-side filter
   const filteredTasks = React.useMemo(() => {
     let result = tasks;
     if (statusFilter === 'active') {
@@ -116,15 +118,12 @@ export default function GlobalTasks() {
   }, [tasks, statusFilter, assigneeFilter]);
 
   // Stats
-  const stats = React.useMemo(() => {
-    const all = tasks;
-    return {
-      total: all.length,
-      notStarted: all.filter((t: any) => t.status === 'not_started').length,
-      inProgress: all.filter((t: any) => t.status === 'in_progress').length,
-      completed: all.filter((t: any) => t.status === 'completed').length,
-    };
-  }, [tasks]);
+  const stats = React.useMemo(() => ({
+    total: tasks.length,
+    notStarted: tasks.filter((t: any) => t.status === 'not_started').length,
+    inProgress: tasks.filter((t: any) => t.status === 'in_progress').length,
+    completed: tasks.filter((t: any) => t.status === 'completed').length,
+  }), [tasks]);
 
   const onUpload = async (taskId: string, file?: File) => {
     if (!file) return;
@@ -149,9 +148,7 @@ export default function GlobalTasks() {
 
   const viewDoc = async (doc: { file_path: string }) => {
     const { data } = await supabase.storage.from('task_documents').createSignedUrl(doc.file_path, 3600);
-    if (data?.signedUrl) {
-      window.open(data.signedUrl, '_blank', 'noopener');
-    }
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
   };
 
   return (
@@ -161,15 +158,11 @@ export default function GlobalTasks() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Tareas</h1>
           <p className="text-muted-foreground text-sm">
-            Gestiona tareas globales y vincúlalas a trabajos o giras
+            {DEPARTMENT_LABELS[dept] || dept} — tareas de departamento y tareas globales
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
             <Filter className="h-4 w-4 mr-1" />
             Filtros
           </Button>
@@ -182,7 +175,7 @@ export default function GlobalTasks() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setStatusFilter('all')}>
           <CardContent className="p-4">
@@ -214,7 +207,7 @@ export default function GlobalTasks() {
       {showFilters && (
         <Card>
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Estado</label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -229,20 +222,6 @@ export default function GlobalTasks() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Departamento</label>
-                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="sound">Sonido</SelectItem>
-                    <SelectItem value="lights">Luces</SelectItem>
-                    <SelectItem value="video">Vídeo</SelectItem>
-                    <SelectItem value="production">Producción</SelectItem>
-                    <SelectItem value="logistics">Logística</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Asignado a</label>
                 <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -250,7 +229,7 @@ export default function GlobalTasks() {
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="me">Mis tareas</SelectItem>
                     <SelectItem value="unassigned">Sin asignar</SelectItem>
-                    {managementUsers?.map((u: any) => (
+                    {deptUsers?.map((u: any) => (
                       <SelectItem key={u.id} value={u.id}>{u.first_name} {u.last_name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -298,22 +277,15 @@ export default function GlobalTasks() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-medium text-sm">{task.title}</div>
+                        <div className="font-medium text-sm">{task.task_type}</div>
                         {task.description && (
                           <div className="text-xs text-muted-foreground line-clamp-1">{task.description}</div>
                         )}
-                        <div className="flex gap-1 mt-1">
-                          {task.department && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                              {DEPARTMENT_LABELS[task.department] || task.department}
-                            </Badge>
-                          )}
-                          {priorityInfo && (
-                            <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', priorityInfo.class)}>
-                              {priorityInfo.label}
-                            </Badge>
-                          )}
-                        </div>
+                        {priorityInfo && (
+                          <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0 mt-1', priorityInfo.class)}>
+                            {priorityInfo.label}
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -329,7 +301,7 @@ export default function GlobalTasks() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="unassigned">Sin asignar</SelectItem>
-                            {managementUsers?.map((u: any) => (
+                            {deptUsers?.map((u: any) => (
                               <SelectItem key={u.id} value={u.id}>
                                 {u.first_name} {u.last_name}
                               </SelectItem>
@@ -405,21 +377,11 @@ export default function GlobalTasks() {
                               {doc.file_name}
                             </span>
                             <div className="flex gap-0.5">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5"
-                                onClick={() => viewDoc(doc)}
-                              >
+                              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => viewDoc(doc)}>
                                 <Download className="h-3 w-3" />
                               </Button>
                               {canEdit && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-5 w-5"
-                                  onClick={() => onDeleteAttachment(doc.id, doc.file_path)}
-                                >
+                                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onDeleteAttachment(doc.id, doc.file_path)}>
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               )}
@@ -445,9 +407,7 @@ export default function GlobalTasks() {
                             size="sm"
                             variant="ghost"
                             className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                            onClick={() =>
-                              mutations.deleteTask(task.id).then(() => refetch())
-                            }
+                            onClick={() => mutations.deleteTask(task.id).then(() => refetch())}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -475,6 +435,8 @@ export default function GlobalTasks() {
       <CreateGlobalTaskDialog
         open={showCreate}
         onOpenChange={setShowCreate}
+        department={dept}
+        userDepartment={userDepartment}
         onCreated={() => refetch()}
       />
       {linkTask && (
@@ -482,6 +444,7 @@ export default function GlobalTasks() {
           open={!!linkTask}
           onOpenChange={(open) => !open && setLinkTask(null)}
           taskId={linkTask.id}
+          department={dept}
           currentJobId={linkTask.job_id}
           currentTourId={linkTask.tour_id}
           onLinked={() => { setLinkTask(null); refetch(); }}

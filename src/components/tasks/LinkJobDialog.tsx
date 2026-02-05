@@ -8,10 +8,13 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useQuery } from '@tanstack/react-query';
 
+type Dept = 'sound' | 'lights' | 'video';
+
 interface LinkJobDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   taskId: string;
+  department: Dept;
   currentJobId?: string | null;
   currentTourId?: string | null;
   onLinked?: () => void;
@@ -21,12 +24,13 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
   open,
   onOpenChange,
   taskId,
+  department,
   currentJobId,
   currentTourId,
   onLinked,
 }) => {
   const { toast } = useToast();
-  const { linkToJob, linkToTour } = useGlobalTaskMutations();
+  const { linkToJob, linkToTour } = useGlobalTaskMutations(department);
   const [linkType, setLinkType] = React.useState<'job' | 'tour'>(currentTourId ? 'tour' : 'job');
   const [selectedId, setSelectedId] = React.useState<string>(currentJobId || currentTourId || '');
   const [loading, setLoading] = React.useState(false);
@@ -37,7 +41,7 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
       const { data, error } = await supabase
         .from('jobs')
         .select('id, title')
-        .in('status', ['tentativa', 'confirmado'])
+        .in('status', ['Tentativa', 'Confirmado'])
         .order('start_time', { ascending: false })
         .limit(100);
       if (error) throw error;

@@ -1,106 +1,57 @@
--- Global Tasks table
--- Unlike department-specific task tables, global tasks do NOT require a job_id or tour_id.
--- They can optionally be linked to a job or tour at any point.
+-- Enable global tasks: allow department task rows with no job_id / tour_id
+-- by relaxing the CHECK constraint that currently requires exactly one.
+-- Also add created_by and description columns for richer task metadata.
 
-CREATE TABLE IF NOT EXISTS "public"."global_tasks" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "title" "text" NOT NULL,
-    "description" "text",
-    "job_id" "uuid",
-    "tour_id" "uuid",
-    "department" "text",
-    "assigned_to" "uuid",
-    "created_by" "uuid",
-    "status" "public"."task_status" DEFAULT 'not_started'::"public"."task_status",
-    "priority" integer,
-    "progress" integer DEFAULT 0,
-    "due_at" timestamp with time zone,
-    "completed_at" timestamp with time zone,
-    "completed_by" "uuid",
-    "completion_source" "text",
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
-    CONSTRAINT "global_tasks_pkey" PRIMARY KEY ("id")
-);
+-- 1. Drop the CHECK constraints that require exactly one of job_id/tour_id
+ALTER TABLE "public"."sound_job_tasks"
+    DROP CONSTRAINT IF EXISTS "sound_job_tasks_source_check";
 
-ALTER TABLE ONLY "public"."global_tasks" REPLICA IDENTITY FULL;
-ALTER TABLE "public"."global_tasks" OWNER TO "postgres";
+ALTER TABLE "public"."lights_job_tasks"
+    DROP CONSTRAINT IF EXISTS "lights_job_tasks_source_check";
 
--- Foreign keys
-ALTER TABLE ONLY "public"."global_tasks"
-    ADD CONSTRAINT "global_tasks_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE SET NULL;
+ALTER TABLE "public"."video_job_tasks"
+    DROP CONSTRAINT IF EXISTS "video_job_tasks_source_check";
 
-ALTER TABLE ONLY "public"."global_tasks"
-    ADD CONSTRAINT "global_tasks_tour_id_fkey" FOREIGN KEY ("tour_id") REFERENCES "public"."tours"("id") ON DELETE SET NULL;
+-- 2. Add created_by column (tracks who created the task / assigner)
+ALTER TABLE "public"."sound_job_tasks"
+    ADD COLUMN IF NOT EXISTS "created_by" "uuid" REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
-ALTER TABLE ONLY "public"."global_tasks"
-    ADD CONSTRAINT "global_tasks_assigned_to_fkey" FOREIGN KEY ("assigned_to") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+ALTER TABLE "public"."lights_job_tasks"
+    ADD COLUMN IF NOT EXISTS "created_by" "uuid" REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
-ALTER TABLE ONLY "public"."global_tasks"
-    ADD CONSTRAINT "global_tasks_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+ALTER TABLE "public"."video_job_tasks"
+    ADD COLUMN IF NOT EXISTS "created_by" "uuid" REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
 
-ALTER TABLE ONLY "public"."global_tasks"
-    ADD CONSTRAINT "global_tasks_completed_by_fkey" FOREIGN KEY ("completed_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+-- 3. Add description column (free-text details for global tasks)
+ALTER TABLE "public"."sound_job_tasks"
+    ADD COLUMN IF NOT EXISTS "description" "text";
 
--- Indexes
-CREATE INDEX "idx_global_tasks_job_id" ON "public"."global_tasks" USING "btree" ("job_id");
-CREATE INDEX "idx_global_tasks_tour_id" ON "public"."global_tasks" USING "btree" ("tour_id");
-CREATE INDEX "idx_global_tasks_assigned_to" ON "public"."global_tasks" USING "btree" ("assigned_to");
-CREATE INDEX "idx_global_tasks_created_by" ON "public"."global_tasks" USING "btree" ("created_by");
-CREATE INDEX "idx_global_tasks_status" ON "public"."global_tasks" USING "btree" ("status");
+ALTER TABLE "public"."lights_job_tasks"
+    ADD COLUMN IF NOT EXISTS "description" "text";
 
--- Add global_task_id to task_documents for attachment support
-ALTER TABLE "public"."task_documents"
-    ADD COLUMN IF NOT EXISTS "global_task_id" "uuid";
+ALTER TABLE "public"."video_job_tasks"
+    ADD COLUMN IF NOT EXISTS "description" "text";
 
-ALTER TABLE ONLY "public"."task_documents"
-    ADD CONSTRAINT "task_documents_global_task_id_fkey" FOREIGN KEY ("global_task_id") REFERENCES "public"."global_tasks"("id") ON DELETE CASCADE;
+-- 4. Index created_by for efficient lookups
+CREATE INDEX IF NOT EXISTS "idx_sound_job_tasks_created_by" ON "public"."sound_job_tasks" USING "btree" ("created_by");
+CREATE INDEX IF NOT EXISTS "idx_lights_job_tasks_created_by" ON "public"."lights_job_tasks" USING "btree" ("created_by");
+CREATE INDEX IF NOT EXISTS "idx_video_job_tasks_created_by" ON "public"."video_job_tasks" USING "btree" ("created_by");
 
-CREATE INDEX "idx_task_documents_global_task_id" ON "public"."task_documents" USING "btree" ("global_task_id");
-
--- RLS policies
-ALTER TABLE "public"."global_tasks" ENABLE ROW LEVEL SECURITY;
-
--- Allow authenticated users to read all global tasks
-CREATE POLICY "global_tasks_select_policy" ON "public"."global_tasks"
-    FOR SELECT TO "authenticated"
-    USING (true);
-
--- Allow admin/management/logistics/house_tech to insert global tasks
-CREATE POLICY "global_tasks_insert_policy" ON "public"."global_tasks"
-    FOR INSERT TO "authenticated"
-    WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM "public"."profiles"
-            WHERE "profiles"."id" = "auth"."uid"()
-            AND "profiles"."role" IN ('admin', 'management', 'logistics', 'house_tech')
-        )
-    );
-
--- Allow admin/management/logistics/house_tech to update any global task;
--- also allow assigned users or the task creator (assigner) to update
-CREATE POLICY "global_tasks_update_policy" ON "public"."global_tasks"
+-- 5. Update RLS: allow created_by (assigner) to update their own tasks
+-- Sound
+DROP POLICY IF EXISTS "sound_tasks_creator_update" ON "public"."sound_job_tasks";
+CREATE POLICY "sound_tasks_creator_update" ON "public"."sound_job_tasks"
     FOR UPDATE TO "authenticated"
-    USING (
-        "assigned_to" = "auth"."uid"()
-        OR "created_by" = "auth"."uid"()
-        OR EXISTS (
-            SELECT 1 FROM "public"."profiles"
-            WHERE "profiles"."id" = "auth"."uid"()
-            AND "profiles"."role" IN ('admin', 'management', 'logistics', 'house_tech')
-        )
-    );
+    USING ("created_by" = "auth"."uid"());
 
--- Allow admin/management/logistics/house_tech to delete global tasks
-CREATE POLICY "global_tasks_delete_policy" ON "public"."global_tasks"
-    FOR DELETE TO "authenticated"
-    USING (
-        EXISTS (
-            SELECT 1 FROM "public"."profiles"
-            WHERE "profiles"."id" = "auth"."uid"()
-            AND "profiles"."role" IN ('admin', 'management', 'logistics', 'house_tech')
-        )
-    );
+-- Lights
+DROP POLICY IF EXISTS "lights_tasks_creator_update" ON "public"."lights_job_tasks";
+CREATE POLICY "lights_tasks_creator_update" ON "public"."lights_job_tasks"
+    FOR UPDATE TO "authenticated"
+    USING ("created_by" = "auth"."uid"());
 
--- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE "public"."global_tasks";
+-- Video
+DROP POLICY IF EXISTS "video_tasks_creator_update" ON "public"."video_job_tasks";
+CREATE POLICY "video_tasks_creator_update" ON "public"."video_job_tasks"
+    FOR UPDATE TO "authenticated"
+    USING ("created_by" = "auth"."uid"());

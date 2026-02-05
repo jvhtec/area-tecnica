@@ -1,11 +1,28 @@
 import { supabase } from '@/lib/supabase';
+import { completeTask, revertTask, Department } from '@/services/taskCompletion';
 
-export function useGlobalTaskMutations() {
+type Dept = 'sound' | 'lights' | 'video';
+
+const TASK_TABLE: Record<Dept, string> = {
+  sound: 'sound_job_tasks',
+  lights: 'lights_job_tasks',
+  video: 'video_job_tasks',
+};
+
+const DOC_FK: Record<Dept, string> = {
+  sound: 'sound_task_id',
+  lights: 'lights_task_id',
+  video: 'video_task_id',
+};
+
+export function useGlobalTaskMutations(department: Dept) {
+  const table = TASK_TABLE[department];
+  const docFk = DOC_FK[department];
+
   const createTask = async (params: {
-    title: string;
+    task_type: string;
     description?: string | null;
     assigned_to?: string | null;
-    department?: string | null;
     job_id?: string | null;
     tour_id?: string | null;
     due_at?: string | null;
@@ -14,28 +31,28 @@ export function useGlobalTaskMutations() {
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData?.user?.id ?? null;
 
-    const payload = {
-      title: params.title,
+    const payload: Record<string, any> = {
+      task_type: params.task_type,
       description: params.description || null,
       assigned_to: params.assigned_to || null,
-      department: params.department || null,
-      job_id: params.job_id || null,
-      tour_id: params.tour_id || null,
       due_at: params.due_at || null,
       priority: params.priority ?? null,
-      status: 'not_started' as const,
+      status: 'not_started',
       progress: 0,
       created_by: userId,
     };
+    // Only set job_id / tour_id if provided (global tasks leave both null)
+    if (params.job_id) payload.job_id = params.job_id;
+    if (params.tour_id) payload.tour_id = params.tour_id;
 
     const { data, error } = await supabase
-      .from('global_tasks')
+      .from(table)
       .insert(payload)
       .select()
       .single();
     if (error) throw error;
 
-    // Notify assignee
+    // Notify assignee + creator
     if (payload.assigned_to && userId) {
       try {
         await supabase.functions.invoke('push', {
@@ -45,7 +62,7 @@ export function useGlobalTaskMutations() {
             recipient_id: payload.assigned_to,
             user_ids: [userId, payload.assigned_to],
             task_id: data.id,
-            task_type: payload.title,
+            task_type: params.task_type,
           },
         });
       } catch (e) {
@@ -58,12 +75,12 @@ export function useGlobalTaskMutations() {
 
   const updateTask = async (id: string, fields: Record<string, any>) => {
     const sanitized: Record<string, any> = { ...fields, updated_at: new Date().toISOString() };
-    const { error } = await supabase.from('global_tasks').update(sanitized).eq('id', id);
+    const { error } = await supabase.from(table).update(sanitized).eq('id', id);
     if (error) throw error;
   };
 
   const deleteTask = async (id: string) => {
-    const { error } = await supabase.from('global_tasks').delete().eq('id', id);
+    const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) throw error;
   };
 
@@ -72,14 +89,13 @@ export function useGlobalTaskMutations() {
     const assignerId = authData?.user?.id ?? null;
 
     const { data, error } = await supabase
-      .from('global_tasks')
+      .from(table)
       .update({ assigned_to: userId, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select('id, title, created_by')
+      .select('id, task_type, created_by')
       .maybeSingle();
     if (error) throw error;
 
-    // Notify both the assigner and the assignee (and the task creator)
     if (assignerId && userId) {
       const recipients = new Set<string>();
       recipients.add(assignerId);
@@ -94,7 +110,7 @@ export function useGlobalTaskMutations() {
             recipient_id: userId,
             user_ids: Array.from(recipients),
             task_id: id,
-            task_type: data?.title,
+            task_type: data?.task_type,
           },
         });
       } catch (e) {
@@ -107,37 +123,35 @@ export function useGlobalTaskMutations() {
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData?.user?.id ?? null;
 
-    // Fetch task for notification context before updating
+    // Fetch task before updating for notification context
     const { data: task } = await supabase
-      .from('global_tasks')
-      .select('id, title, assigned_to, created_by, job_id, tour_id')
+      .from(table)
+      .select('id, task_type, assigned_to, created_by, job_id, tour_id')
       .eq('id', id)
       .maybeSingle();
 
-    const updates: Record<string, any> = {
-      status,
-      updated_at: new Date().toISOString(),
-    };
-
     if (status === 'completed') {
-      updates.progress = 100;
-      updates.completed_at = new Date().toISOString();
-      updates.completed_by = userId;
-      updates.completion_source = 'manual';
+      const result = await completeTask({
+        taskId: id,
+        department: department as Department,
+        source: 'manual',
+        jobId: task?.job_id || undefined,
+        tourId: task?.tour_id || undefined,
+      });
+      if (!result.success) throw new Error(result.error || 'Failed to complete task');
     } else {
-      updates.progress = status === 'in_progress' ? 50 : 0;
-      updates.completed_at = null;
-      updates.completed_by = null;
-      updates.completion_source = null;
+      const result = await revertTask({
+        taskId: id,
+        department: department as Department,
+        newStatus: status,
+      });
+      if (!result.success) throw new Error(result.error || 'Failed to revert task');
     }
 
-    const { error } = await supabase.from('global_tasks').update(updates).eq('id', id);
-    if (error) throw error;
-
-    // Push notification to both assigner (created_by) and assignee
+    // Push notification to assigner (created_by) + assignee
     if (task && userId) {
       const recipients = new Set<string>();
-      if (userId) recipients.add(userId);
+      recipients.add(userId);
       if (task.assigned_to) recipients.add(task.assigned_to);
       if (task.created_by) recipients.add(task.created_by);
 
@@ -152,8 +166,7 @@ export function useGlobalTaskMutations() {
             recipient_id: task.assigned_to || task.created_by || undefined,
             user_ids: Array.from(recipients),
             task_id: id,
-            task_type: task.title,
-            completion_source: status === 'completed' ? 'manual' : undefined,
+            task_type: task.task_type,
           },
         });
       } catch (e) {
@@ -164,7 +177,7 @@ export function useGlobalTaskMutations() {
 
   const setDueDate = async (id: string, due_at: string | null) => {
     const { error } = await supabase
-      .from('global_tasks')
+      .from(table)
       .update({ due_at, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (error) throw error;
@@ -172,7 +185,7 @@ export function useGlobalTaskMutations() {
 
   const linkToJob = async (id: string, jobId: string | null) => {
     const { error } = await supabase
-      .from('global_tasks')
+      .from(table)
       .update({ job_id: jobId, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (error) throw error;
@@ -180,7 +193,7 @@ export function useGlobalTaskMutations() {
 
   const linkToTour = async (id: string, tourId: string | null) => {
     const { error } = await supabase
-      .from('global_tasks')
+      .from(table)
       .update({ tour_id: tourId, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (error) throw error;
@@ -188,11 +201,11 @@ export function useGlobalTaskMutations() {
 
   const uploadAttachment = async (taskId: string, file: File) => {
     const sanitized = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const key = `global/${taskId}/${Date.now()}_${sanitized}`;
+    const key = `${taskId}/${Date.now()}_${sanitized}`;
     const { error: upErr } = await supabase.storage.from('task_documents').upload(key, file, { upsert: false });
     if (upErr) throw upErr;
     const { error: insErr } = await supabase.from('task_documents').insert({
-      global_task_id: taskId,
+      [docFk]: taskId,
       file_name: file.name,
       file_path: key,
     });

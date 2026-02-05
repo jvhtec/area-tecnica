@@ -2139,102 +2139,6 @@ export type Database = {
           },
         ]
       }
-      global_tasks: {
-        Row: {
-          id: string
-          title: string
-          description: string | null
-          job_id: string | null
-          tour_id: string | null
-          department: string | null
-          assigned_to: string | null
-          created_by: string | null
-          status: Database["public"]["Enums"]["task_status"] | null
-          priority: number | null
-          progress: number | null
-          due_at: string | null
-          completed_at: string | null
-          completed_by: string | null
-          completion_source: string | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          title: string
-          description?: string | null
-          job_id?: string | null
-          tour_id?: string | null
-          department?: string | null
-          assigned_to?: string | null
-          created_by?: string | null
-          status?: Database["public"]["Enums"]["task_status"] | null
-          priority?: number | null
-          progress?: number | null
-          due_at?: string | null
-          completed_at?: string | null
-          completed_by?: string | null
-          completion_source?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          title?: string
-          description?: string | null
-          job_id?: string | null
-          tour_id?: string | null
-          department?: string | null
-          assigned_to?: string | null
-          created_by?: string | null
-          status?: Database["public"]["Enums"]["task_status"] | null
-          priority?: number | null
-          progress?: number | null
-          due_at?: string | null
-          completed_at?: string | null
-          completed_by?: string | null
-          completion_source?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "global_tasks_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "global_tasks_tour_id_fkey"
-            columns: ["tour_id"]
-            isOneToOne: false
-            referencedRelation: "tours"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "global_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "global_tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "global_tasks_completed_by_fkey"
-            columns: ["completed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       hoja_de_ruta: {
         Row: {
           alerts: Json | null
@@ -4152,6 +4056,8 @@ export type Database = {
           completed_by: string | null
           completion_source: string | null
           created_at: string | null
+          created_by: string | null
+          description: string | null
           due_at: string | null
           id: string
           job_id: string | null
@@ -4168,6 +4074,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null
@@ -4184,6 +4092,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null
@@ -5418,6 +5328,8 @@ export type Database = {
           completed_by: string | null
           completion_source: string | null
           created_at: string | null
+          created_by: string | null
+          description: string | null
           due_at: string | null
           id: string
           job_id: string | null
@@ -5434,6 +5346,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null
@@ -5450,6 +5364,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null
@@ -5923,7 +5839,6 @@ export type Database = {
         Row: {
           file_name: string
           file_path: string
-          global_task_id: string | null
           id: string
           lights_task_id: string | null
           sound_task_id: string | null
@@ -5934,7 +5849,6 @@ export type Database = {
         Insert: {
           file_name: string
           file_path: string
-          global_task_id?: string | null
           id?: string
           lights_task_id?: string | null
           sound_task_id?: string | null
@@ -5945,7 +5859,6 @@ export type Database = {
         Update: {
           file_name?: string
           file_path?: string
-          global_task_id?: string | null
           id?: string
           lights_task_id?: string | null
           sound_task_id?: string | null
@@ -5954,13 +5867,6 @@ export type Database = {
           video_task_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "task_documents_global_task_id_fkey"
-            columns: ["global_task_id"]
-            isOneToOne: false
-            referencedRelation: "global_tasks"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "task_documents_lights_task_id_fkey"
             columns: ["lights_task_id"]
@@ -7771,6 +7677,8 @@ export type Database = {
           completed_by: string | null
           completion_source: string | null
           created_at: string | null
+          created_by: string | null
+          description: string | null
           due_at: string | null
           id: string
           job_id: string | null
@@ -7787,6 +7695,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null
@@ -7803,6 +7713,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null
