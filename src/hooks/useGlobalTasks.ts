@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -25,10 +25,52 @@ export interface GlobalTaskFilters {
   unlinked?: boolean;
 }
 
-export function useGlobalTasks(department: Dept | undefined, filters?: GlobalTaskFilters) {
+interface ProfileRef {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+}
+
+interface TaskDocument {
+  id: string;
+  file_name: string;
+  file_path: string;
+}
+
+export interface GlobalTask {
+  id: string;
+  task_type: string;
+  description: string | null;
+  status: string | null;
+  progress: number | null;
+  priority: number | null;
+  due_at: string | null;
+  assigned_to: string | null;
+  created_by: string | null;
+  job_id: string | null;
+  tour_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
+  completed_by: string | null;
+  completion_source: string | null;
+  assigned_to_profile: ProfileRef | null;
+  created_by_profile: ProfileRef | null;
+  job: { id: string; title: string } | null;
+  tour: { id: string; name: string } | null;
+  task_documents: TaskDocument[];
+}
+
+export function useGlobalTasks(department: Dept | undefined, filters?: GlobalTaskFilters): {
+  tasks: GlobalTask[];
+  loading: boolean;
+  error: Error | null;
+  refetch: () => void;
+} {
   const dept: Dept = department && TASK_TABLE[department] ? department : 'sound';
   const table = TASK_TABLE[dept];
   const docFk = DOC_FK[dept];
+  const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ['global-tasks', dept, filters],
@@ -62,24 +104,26 @@ export function useGlobalTasks(department: Dept | undefined, filters?: GlobalTas
 
       const { data, error } = await q.order('created_at', { ascending: false });
       if (error) throw error;
-      return data || [];
+      return (data || []) as GlobalTask[];
     },
   });
 
+  // Invalidate by query-key prefix so the *current* filter combination is
+  // always refreshed, regardless of which filters were active when the
+  // subscription was created.
   useEffect(() => {
     const channel = supabase
       .channel(`rtm-global-${table}`)
       .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
-        query.refetch();
+        queryClient.invalidateQueries({ queryKey: ['global-tasks', dept] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'task_documents' }, () => {
-        query.refetch();
+        queryClient.invalidateQueries({ queryKey: ['global-tasks', dept] });
       })
       .subscribe();
 
     return () => { void supabase.removeChannel(channel); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [table]);
+  }, [table, dept, queryClient]);
 
   return {
     tasks: query.data || [],

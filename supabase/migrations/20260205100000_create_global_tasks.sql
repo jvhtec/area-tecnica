@@ -37,7 +37,20 @@ CREATE INDEX IF NOT EXISTS "idx_sound_job_tasks_created_by" ON "public"."sound_j
 CREATE INDEX IF NOT EXISTS "idx_lights_job_tasks_created_by" ON "public"."lights_job_tasks" USING "btree" ("created_by");
 CREATE INDEX IF NOT EXISTS "idx_video_job_tasks_created_by" ON "public"."video_job_tasks" USING "btree" ("created_by");
 
--- 5. Update RLS: allow created_by (assigner) to update their own tasks
+-- 5. Prevent both job_id and tour_id from being non-null simultaneously
+ALTER TABLE "public"."sound_job_tasks"
+    ADD CONSTRAINT "sound_job_tasks_job_tour_exclusive"
+    CHECK (NOT ("job_id" IS NOT NULL AND "tour_id" IS NOT NULL));
+
+ALTER TABLE "public"."lights_job_tasks"
+    ADD CONSTRAINT "lights_job_tasks_job_tour_exclusive"
+    CHECK (NOT ("job_id" IS NOT NULL AND "tour_id" IS NOT NULL));
+
+ALTER TABLE "public"."video_job_tasks"
+    ADD CONSTRAINT "video_job_tasks_job_tour_exclusive"
+    CHECK (NOT ("job_id" IS NOT NULL AND "tour_id" IS NOT NULL));
+
+-- 6. Update RLS: allow created_by (assigner) to update their own tasks
 -- Sound
 DROP POLICY IF EXISTS "sound_tasks_creator_update" ON "public"."sound_job_tasks";
 CREATE POLICY "sound_tasks_creator_update" ON "public"."sound_job_tasks"

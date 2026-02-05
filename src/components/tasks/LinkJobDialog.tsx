@@ -5,10 +5,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 
 type Dept = 'sound' | 'lights' | 'video';
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  return String(err);
+}
 
 interface LinkJobDialogProps {
   open: boolean;
@@ -30,7 +36,7 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
   onLinked,
 }) => {
   const { toast } = useToast();
-  const { linkToJob, linkToTour } = useGlobalTaskMutations(department);
+  const { linkTask } = useGlobalTaskMutations(department);
   const [linkType, setLinkType] = React.useState<'job' | 'tour'>(currentTourId ? 'tour' : 'job');
   const [selectedId, setSelectedId] = React.useState<string>(currentJobId || currentTourId || '');
   const [loading, setLoading] = React.useState(false);
@@ -66,17 +72,15 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
     setLoading(true);
     try {
       if (linkType === 'job') {
-        await linkToJob(taskId, selectedId || null);
-        await linkToTour(taskId, null);
+        await linkTask(taskId, selectedId || null, null);
       } else {
-        await linkToTour(taskId, selectedId || null);
-        await linkToJob(taskId, null);
+        await linkTask(taskId, null, selectedId || null);
       }
       toast({ title: 'Vinculación actualizada' });
       onOpenChange(false);
       onLinked?.();
-    } catch (err: any) {
-      toast({ title: 'Error', description: err?.message || 'No se pudo vincular', variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(err) || 'No se pudo vincular', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -85,14 +89,13 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
   const handleUnlink = async () => {
     setLoading(true);
     try {
-      await linkToJob(taskId, null);
-      await linkToTour(taskId, null);
+      await linkTask(taskId, null, null);
       toast({ title: 'Vinculación eliminada' });
       setSelectedId('');
       onOpenChange(false);
       onLinked?.();
-    } catch (err: any) {
-      toast({ title: 'Error', description: err?.message || 'No se pudo desvincular', variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(err) || 'No se pudo desvincular', variant: 'destructive' });
     } finally {
       setLoading(false);
     }

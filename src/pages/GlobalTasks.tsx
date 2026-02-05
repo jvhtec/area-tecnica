@@ -1,5 +1,5 @@
 import React from 'react';
-import { useGlobalTasks, GlobalTaskFilters } from '@/hooks/useGlobalTasks';
+import { useGlobalTasks, GlobalTaskFilters, GlobalTask } from '@/hooks/useGlobalTasks';
 import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { canEditTasks, canAssignTasks } from '@/utils/tasks';
@@ -23,12 +23,20 @@ import {
   Clock,
   CircleDashed,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { format, parseISO, isPast } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 
 type Dept = 'sound' | 'lights' | 'video';
+
+interface DeptUser {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+}
 
 const DEPARTMENT_LABELS: Record<string, string> = {
   sound: 'Sonido',
@@ -48,8 +56,14 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
   completed: <CheckCircle2 className="h-4 w-4 text-green-500" />,
 };
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  return String(err);
+}
+
 function useDepartmentUsers(userDepartment: string | null) {
-  return useQuery({
+  return useQuery<DeptUser[]>({
     queryKey: ['dept-users', userDepartment],
     queryFn: async () => {
       let q = supabase
@@ -63,7 +77,7 @@ function useDepartmentUsers(userDepartment: string | null) {
 
       const { data, error } = await q;
       if (error) throw error;
-      return data || [];
+      return (data || []) as DeptUser[];
     },
   });
 }
@@ -73,6 +87,20 @@ function normalizeDept(raw: string | null): Dept {
   if (lower === 'lights' || lower === 'luces') return 'lights';
   if (lower === 'video' || lower === 'vídeo') return 'video';
   return 'sound';
+}
+
+const MADRID_TZ = 'Europe/Madrid';
+
+function formatDateMadrid(isoDate: string): string {
+  return format(toZonedTime(parseISO(isoDate), MADRID_TZ), 'dd/MM/yyyy');
+}
+
+function dateInputValue(isoDate: string): string {
+  return format(toZonedTime(parseISO(isoDate), MADRID_TZ), 'yyyy-MM-dd');
+}
+
+function isOverdueMadrid(isoDate: string): boolean {
+  return isPast(toZonedTime(parseISO(isoDate), MADRID_TZ));
 }
 
 export default function GlobalTasks() {
@@ -89,11 +117,11 @@ export default function GlobalTasks() {
 
   // Dialogs
   const [showCreate, setShowCreate] = React.useState(false);
-  const [linkTask, setLinkTask] = React.useState<any>(null);
+  const [linkTask, setLinkTask] = React.useState<GlobalTask | null>(null);
 
   const filters: GlobalTaskFilters = {};
   if (statusFilter && statusFilter !== 'all' && statusFilter !== 'active') {
-    filters.status = statusFilter as any;
+    filters.status = statusFilter as GlobalTaskFilters['status'];
   }
   if (assigneeFilter && assigneeFilter !== 'all') {
     if (assigneeFilter === 'me') {
@@ -109,10 +137,10 @@ export default function GlobalTasks() {
   const filteredTasks = React.useMemo(() => {
     let result = tasks;
     if (statusFilter === 'active') {
-      result = result.filter((t: any) => t.status !== 'completed');
+      result = result.filter((t) => t.status !== 'completed');
     }
     if (assigneeFilter === 'unassigned') {
-      result = result.filter((t: any) => !t.assigned_to);
+      result = result.filter((t) => !t.assigned_to);
     }
     return result;
   }, [tasks, statusFilter, assigneeFilter]);
@@ -120,9 +148,9 @@ export default function GlobalTasks() {
   // Stats
   const stats = React.useMemo(() => ({
     total: tasks.length,
-    notStarted: tasks.filter((t: any) => t.status === 'not_started').length,
-    inProgress: tasks.filter((t: any) => t.status === 'in_progress').length,
-    completed: tasks.filter((t: any) => t.status === 'completed').length,
+    notStarted: tasks.filter((t) => t.status === 'not_started').length,
+    inProgress: tasks.filter((t) => t.status === 'in_progress').length,
+    completed: tasks.filter((t) => t.status === 'completed').length,
   }), [tasks]);
 
   const onUpload = async (taskId: string, file?: File) => {
@@ -131,8 +159,8 @@ export default function GlobalTasks() {
       await mutations.uploadAttachment(taskId, file);
       toast({ title: 'Archivo subido' });
       await refetch();
-    } catch (e: any) {
-      toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 
@@ -141,8 +169,8 @@ export default function GlobalTasks() {
       await mutations.deleteAttachment(docId, filePath);
       toast({ title: 'Archivo eliminado' });
       await refetch();
-    } catch (e: any) {
-      toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     }
   };
 
@@ -229,7 +257,7 @@ export default function GlobalTasks() {
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="me">Mis tareas</SelectItem>
                     <SelectItem value="unassigned">Sin asignar</SelectItem>
-                    {deptUsers?.map((u: any) => (
+                    {deptUsers?.map((u) => (
                       <SelectItem key={u.id} value={u.id}>{u.first_name} {u.last_name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -258,7 +286,7 @@ export default function GlobalTasks() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredTasks.map((task: any) => {
+              {filteredTasks.map((task) => {
                 const priorityInfo = task.priority ? PRIORITY_LABELS[task.priority] : null;
                 const assignee = task.assigned_to_profile;
                 const job = task.job;
@@ -268,12 +296,12 @@ export default function GlobalTasks() {
                 const isOverdue =
                   task.due_at &&
                   task.status !== 'completed' &&
-                  new Date(task.due_at) < new Date();
+                  isOverdueMadrid(task.due_at);
 
                 return (
                   <TableRow key={task.id} className={cn(task.status === 'completed' && 'opacity-60')}>
                     <TableCell className="px-2">
-                      {STATUS_ICONS[task.status] || null}
+                      {STATUS_ICONS[task.status || ''] || null}
                     </TableCell>
                     <TableCell>
                       <div>
@@ -301,7 +329,7 @@ export default function GlobalTasks() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="unassigned">Sin asignar</SelectItem>
-                            {deptUsers?.map((u: any) => (
+                            {deptUsers?.map((u) => (
                               <SelectItem key={u.id} value={u.id}>
                                 {u.first_name} {u.last_name}
                               </SelectItem>
@@ -316,9 +344,9 @@ export default function GlobalTasks() {
                     </TableCell>
                     <TableCell>
                       <Select
-                        value={task.status}
+                        value={task.status || 'not_started'}
                         onValueChange={(v) =>
-                          mutations.setStatus(task.id, v as any).then(() => refetch())
+                          mutations.setStatus(task.id, v as 'not_started' | 'in_progress' | 'completed').then(() => refetch())
                         }
                       >
                         <SelectTrigger className="w-[130px] h-8 text-xs" disabled={!canUpdate}>
@@ -341,7 +369,7 @@ export default function GlobalTasks() {
                       {canEdit ? (
                         <Input
                           type="date"
-                          value={task.due_at ? new Date(task.due_at).toISOString().slice(0, 10) : ''}
+                          value={task.due_at ? dateInputValue(task.due_at) : ''}
                           onChange={(e) =>
                             mutations
                               .setDueDate(task.id, e.target.value ? new Date(e.target.value).toISOString() : null)
@@ -351,7 +379,7 @@ export default function GlobalTasks() {
                         />
                       ) : (
                         <span className={cn('text-sm', isOverdue && 'text-red-500 font-medium')}>
-                          {task.due_at ? new Date(task.due_at).toLocaleDateString('es-ES') : '-'}
+                          {task.due_at ? formatDateMadrid(task.due_at) : '-'}
                         </span>
                       )}
                     </TableCell>
@@ -368,7 +396,7 @@ export default function GlobalTasks() {
                     </TableCell>
                     <TableCell className="min-w-[180px]">
                       <div className="max-h-20 overflow-auto space-y-1">
-                        {docs.map((doc: any) => (
+                        {docs.map((doc) => (
                           <div
                             key={doc.id}
                             className="flex items-center justify-between text-xs p-1 rounded hover:bg-accent/40"

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 
 type Dept = 'sound' | 'lights' | 'video';
@@ -127,8 +127,9 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
       resetForm();
       onOpenChange(false);
       onCreated?.();
-    } catch (err: any) {
-      toast({ title: 'Error', description: err?.message || 'No se pudo crear la tarea', variant: 'destructive' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : String(err);
+      toast({ title: 'Error', description: msg || 'No se pudo crear la tarea', variant: 'destructive' });
     } finally {
       setLoading(false);
     }

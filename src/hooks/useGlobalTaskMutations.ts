@@ -1,7 +1,15 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { completeTask, revertTask, Department } from '@/services/taskCompletion';
+import type { Database } from '@/integrations/supabase/types';
+import { formatISO } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 
 type Dept = 'sound' | 'lights' | 'video';
+
+type SoundTaskUpdate = Database['public']['Tables']['sound_job_tasks']['Update'];
+type LightsTaskUpdate = Database['public']['Tables']['lights_job_tasks']['Update'];
+type VideoTaskUpdate = Database['public']['Tables']['video_job_tasks']['Update'];
+type TaskUpdate = SoundTaskUpdate | LightsTaskUpdate | VideoTaskUpdate;
 
 const TASK_TABLE: Record<Dept, string> = {
   sound: 'sound_job_tasks',
@@ -14,6 +22,10 @@ const DOC_FK: Record<Dept, string> = {
   lights: 'lights_task_id',
   video: 'video_task_id',
 };
+
+function nowMadrid(): string {
+  return formatISO(toZonedTime(new Date(), 'Europe/Madrid'));
+}
 
 export function useGlobalTaskMutations(department: Dept) {
   const table = TASK_TABLE[department];
@@ -31,7 +43,7 @@ export function useGlobalTaskMutations(department: Dept) {
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData?.user?.id ?? null;
 
-    const payload: Record<string, any> = {
+    const payload: TaskUpdate & { task_type: string; status: string; progress: number } = {
       task_type: params.task_type,
       description: params.description || null,
       assigned_to: params.assigned_to || null,
@@ -41,7 +53,6 @@ export function useGlobalTaskMutations(department: Dept) {
       progress: 0,
       created_by: userId,
     };
-    // Only set job_id / tour_id if provided (global tasks leave both null)
     if (params.job_id) payload.job_id = params.job_id;
     if (params.tour_id) payload.tour_id = params.tour_id;
 
@@ -52,7 +63,6 @@ export function useGlobalTaskMutations(department: Dept) {
       .single();
     if (error) throw error;
 
-    // Notify assignee + creator
     if (payload.assigned_to && userId) {
       try {
         await supabase.functions.invoke('push', {
@@ -73,8 +83,8 @@ export function useGlobalTaskMutations(department: Dept) {
     return data;
   };
 
-  const updateTask = async (id: string, fields: Record<string, any>) => {
-    const sanitized: Record<string, any> = { ...fields, updated_at: new Date().toISOString() };
+  const updateTask = async (id: string, fields: TaskUpdate) => {
+    const sanitized: TaskUpdate = { ...fields, updated_at: nowMadrid() };
     const { error } = await supabase.from(table).update(sanitized).eq('id', id);
     if (error) throw error;
   };
@@ -90,7 +100,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     const { data, error } = await supabase
       .from(table)
-      .update({ assigned_to: userId, updated_at: new Date().toISOString() })
+      .update({ assigned_to: userId, updated_at: nowMadrid() })
       .eq('id', id)
       .select('id, task_type, created_by')
       .maybeSingle();
@@ -123,7 +133,6 @@ export function useGlobalTaskMutations(department: Dept) {
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData?.user?.id ?? null;
 
-    // Fetch task before updating for notification context
     const { data: task } = await supabase
       .from(table)
       .select('id, task_type, assigned_to, created_by, job_id, tour_id')
@@ -148,7 +157,6 @@ export function useGlobalTaskMutations(department: Dept) {
       if (!result.success) throw new Error(result.error || 'Failed to revert task');
     }
 
-    // Push notification to assigner (created_by) + assignee
     if (task && userId) {
       const recipients = new Set<string>();
       recipients.add(userId);
@@ -178,23 +186,20 @@ export function useGlobalTaskMutations(department: Dept) {
   const setDueDate = async (id: string, due_at: string | null) => {
     const { error } = await supabase
       .from(table)
-      .update({ due_at, updated_at: new Date().toISOString() })
+      .update({ due_at, updated_at: nowMadrid() })
       .eq('id', id);
     if (error) throw error;
   };
 
-  const linkToJob = async (id: string, jobId: string | null) => {
+  /**
+   * Atomically set both job_id and tour_id in a single update.
+   * Guarantees mutual exclusivity — the caller sets one to a value and the
+   * other to null.
+   */
+  const linkTask = async (id: string, jobId: string | null, tourId: string | null) => {
     const { error } = await supabase
       .from(table)
-      .update({ job_id: jobId, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) throw error;
-  };
-
-  const linkToTour = async (id: string, tourId: string | null) => {
-    const { error } = await supabase
-      .from(table)
-      .update({ tour_id: tourId, updated_at: new Date().toISOString() })
+      .update({ job_id: jobId, tour_id: tourId, updated_at: nowMadrid() })
       .eq('id', id);
     if (error) throw error;
   };
@@ -212,11 +217,18 @@ export function useGlobalTaskMutations(department: Dept) {
     if (insErr) throw insErr;
   };
 
+  /**
+   * Delete attachment: DB row first, then storage file.
+   * If the DB delete succeeds but storage fails, the orphaned file is
+   * harmless; the reverse (storage-first) would leave a dangling DB record.
+   */
   const deleteAttachment = async (docId: string, filePath: string) => {
-    const { error: sErr } = await supabase.storage.from('task_documents').remove([filePath]);
-    if (sErr) throw sErr;
     const { error: dErr } = await supabase.from('task_documents').delete().eq('id', docId);
     if (dErr) throw dErr;
+    const { error: sErr } = await supabase.storage.from('task_documents').remove([filePath]);
+    if (sErr) {
+      console.warn('[useGlobalTaskMutations] storage cleanup failed (DB row already deleted)', sErr);
+    }
   };
 
   return {
@@ -226,8 +238,7 @@ export function useGlobalTaskMutations(department: Dept) {
     assignUser,
     setStatus,
     setDueDate,
-    linkToJob,
-    linkToTour,
+    linkTask,
     uploadAttachment,
     deleteAttachment,
   };

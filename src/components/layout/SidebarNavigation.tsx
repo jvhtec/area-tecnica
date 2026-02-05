@@ -321,7 +321,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     label: "Tareas",
     mobileLabel: "Tareas",
     icon: ListTodo,
-    mobilePriority: 9,
+    mobilePriority: 10,
     mobileSlot: "secondary",
     getPath: () => "/tasks",
     isVisible: ({ userRole }) =>
