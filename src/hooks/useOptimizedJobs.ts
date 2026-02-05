@@ -14,7 +14,7 @@ export const useOptimizedJobs = (
   department?: Department,
   startDate?: Date,
   endDate?: Date,
-  includeDryhire: boolean = false
+  includeDryhire: boolean = true
 ) => {
   // Subscribe only to tables that affect this hook's query results
   useMultiTableSubscription([
