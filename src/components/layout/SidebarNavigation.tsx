@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Clock,
   Database,
+  ListTodo,
   Euro,
   FileText,
   Grid3X3,
@@ -310,6 +311,19 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 8,
     mobileSlot: "secondary",
     getPath: () => "/project-management",
+    isVisible: ({ userRole }) =>
+      userRole === "admin" ||
+      userRole === "management" ||
+      userRole === "logistics",
+  },
+  {
+    id: "global-tasks",
+    label: "Tareas",
+    mobileLabel: "Tareas",
+    icon: ListTodo,
+    mobilePriority: 9,
+    mobileSlot: "secondary",
+    getPath: () => "/tasks",
     isVisible: ({ userRole }) =>
       userRole === "admin" ||
       userRole === "management" ||
