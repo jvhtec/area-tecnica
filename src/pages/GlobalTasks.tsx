@@ -55,7 +55,7 @@ function useManagementUsers() {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
-        .in('role', ['management', 'admin', 'logistics']);
+        .in('role', ['management', 'admin', 'logistics', 'house_tech']);
       if (error) throw error;
       return data || [];
     },
@@ -285,7 +285,7 @@ export default function GlobalTasks() {
                 const job = task.job;
                 const tour = task.tour;
                 const docs = task.task_documents || [];
-                const canUpdate = canEdit || (!!userId && task.assigned_to === userId);
+                const canUpdate = canEdit || (!!userId && (task.assigned_to === userId || task.created_by === userId));
                 const isOverdue =
                   task.due_at &&
                   task.status !== 'completed' &&

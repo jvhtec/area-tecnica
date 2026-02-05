@@ -66,38 +66,39 @@ CREATE POLICY "global_tasks_select_policy" ON "public"."global_tasks"
     FOR SELECT TO "authenticated"
     USING (true);
 
--- Allow admin/management/logistics to insert global tasks
+-- Allow admin/management/logistics/house_tech to insert global tasks
 CREATE POLICY "global_tasks_insert_policy" ON "public"."global_tasks"
     FOR INSERT TO "authenticated"
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM "public"."profiles"
             WHERE "profiles"."id" = "auth"."uid"()
-            AND "profiles"."role" IN ('admin', 'management', 'logistics')
+            AND "profiles"."role" IN ('admin', 'management', 'logistics', 'house_tech')
         )
     );
 
--- Allow admin/management/logistics to update any global task;
--- also allow assigned users to update their own tasks
+-- Allow admin/management/logistics/house_tech to update any global task;
+-- also allow assigned users or the task creator (assigner) to update
 CREATE POLICY "global_tasks_update_policy" ON "public"."global_tasks"
     FOR UPDATE TO "authenticated"
     USING (
         "assigned_to" = "auth"."uid"()
+        OR "created_by" = "auth"."uid"()
         OR EXISTS (
             SELECT 1 FROM "public"."profiles"
             WHERE "profiles"."id" = "auth"."uid"()
-            AND "profiles"."role" IN ('admin', 'management', 'logistics')
+            AND "profiles"."role" IN ('admin', 'management', 'logistics', 'house_tech')
         )
     );
 
--- Allow admin/management to delete global tasks
+-- Allow admin/management/logistics/house_tech to delete global tasks
 CREATE POLICY "global_tasks_delete_policy" ON "public"."global_tasks"
     FOR DELETE TO "authenticated"
     USING (
         EXISTS (
             SELECT 1 FROM "public"."profiles"
             WHERE "profiles"."id" = "auth"."uid"()
-            AND "profiles"."role" IN ('admin', 'management', 'logistics')
+            AND "profiles"."role" IN ('admin', 'management', 'logistics', 'house_tech')
         )
     );
 

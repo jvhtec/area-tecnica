@@ -327,7 +327,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     isVisible: ({ userRole }) =>
       userRole === "admin" ||
       userRole === "management" ||
-      userRole === "logistics",
+      userRole === "logistics" ||
+      userRole === "house_tech",
   },
   {
     id: "logistics",

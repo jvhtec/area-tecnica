@@ -75,18 +75,24 @@ export function useGlobalTaskMutations() {
       .from('global_tasks')
       .update({ assigned_to: userId, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select('id, title')
+      .select('id, title, created_by')
       .maybeSingle();
     if (error) throw error;
 
+    // Notify both the assigner and the assignee (and the task creator)
     if (assignerId && userId) {
+      const recipients = new Set<string>();
+      recipients.add(assignerId);
+      recipients.add(userId);
+      if (data?.created_by) recipients.add(data.created_by);
+
       try {
         await supabase.functions.invoke('push', {
           body: {
             action: 'broadcast',
             type: 'task.assigned',
             recipient_id: userId,
-            user_ids: [assignerId, userId],
+            user_ids: Array.from(recipients),
             task_id: id,
             task_type: data?.title,
           },
@@ -100,6 +106,13 @@ export function useGlobalTaskMutations() {
   const setStatus = async (id: string, status: 'not_started' | 'in_progress' | 'completed') => {
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData?.user?.id ?? null;
+
+    // Fetch task for notification context before updating
+    const { data: task } = await supabase
+      .from('global_tasks')
+      .select('id, title, assigned_to, created_by, job_id, tour_id')
+      .eq('id', id)
+      .maybeSingle();
 
     const updates: Record<string, any> = {
       status,
@@ -120,6 +133,33 @@ export function useGlobalTaskMutations() {
 
     const { error } = await supabase.from('global_tasks').update(updates).eq('id', id);
     if (error) throw error;
+
+    // Push notification to both assigner (created_by) and assignee
+    if (task && userId) {
+      const recipients = new Set<string>();
+      if (userId) recipients.add(userId);
+      if (task.assigned_to) recipients.add(task.assigned_to);
+      if (task.created_by) recipients.add(task.created_by);
+
+      const notificationType = status === 'completed' ? 'task.completed' : 'task.updated';
+      try {
+        await supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: notificationType,
+            job_id: task.job_id || undefined,
+            tour_id: task.tour_id || undefined,
+            recipient_id: task.assigned_to || task.created_by || undefined,
+            user_ids: Array.from(recipients),
+            task_id: id,
+            task_type: task.title,
+            completion_source: status === 'completed' ? 'manual' : undefined,
+          },
+        });
+      } catch (e) {
+        console.warn('[useGlobalTaskMutations] push failed', e);
+      }
+    }
   };
 
   const setDueDate = async (id: string, due_at: string | null) => {

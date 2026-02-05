@@ -37,7 +37,7 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
       const { data, error } = await supabase
         .from('jobs')
         .select('id, title')
-        .in('status', ['pendiente', 'tentativa', 'confirmado'])
+        .in('status', ['tentativa', 'confirmado'])
         .order('start_time', { ascending: false })
         .limit(100);
       if (error) throw error;
