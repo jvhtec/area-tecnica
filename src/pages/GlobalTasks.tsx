@@ -8,6 +8,7 @@ import { LinkJobDialog } from '@/components/tasks/LinkJobDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Combobox, ComboboxGroup, ComboboxItem } from '@/components/ui/combobox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +25,7 @@ import {
   CircleDashed,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveTaskDocBucket } from '@/hooks/useGlobalTaskMutations';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -62,22 +64,35 @@ function getErrorMessage(err: unknown): string {
   return String(err);
 }
 
-function useDepartmentUsers(userDepartment: string | null) {
-  return useQuery<DeptUser[]>({
-    queryKey: ['dept-users', userDepartment],
+function useAllEligibleUsers(userDepartment: string | null) {
+  return useQuery<{ flat: DeptUser[]; groups: ComboboxGroup[]; items: ComboboxItem[] }>({
+    queryKey: ['all-eligible-users', userDepartment],
     queryFn: async () => {
-      let q = supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name')
-        .in('role', ['management', 'admin', 'logistics', 'house_tech']);
-
-      if (userDepartment) {
-        q = q.eq('department', userDepartment);
-      }
-
-      const { data, error } = await q;
+        .select('id, first_name, last_name, department')
+        .in('role', ['management', 'admin', 'logistics', 'house_tech'])
+        .order('first_name');
       if (error) throw error;
-      return (data || []) as DeptUser[];
+      const all = (data || []) as (DeptUser & { department: string | null })[];
+      const mine: ComboboxGroup = { heading: 'Tu departamento', items: [] };
+      const others: ComboboxGroup = { heading: 'Otros departamentos', items: [] };
+      const flat: DeptUser[] = [];
+      const items: ComboboxItem[] = [];
+      for (const u of all) {
+        const label = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.id;
+        flat.push(u);
+        items.push({ value: u.id, label });
+        if (userDepartment && u.department === userDepartment) {
+          mine.items.push({ value: u.id, label });
+        } else {
+          others.items.push({ value: u.id, label });
+        }
+      }
+      const groups: ComboboxGroup[] = [];
+      if (mine.items.length > 0) groups.push(mine);
+      if (others.items.length > 0) groups.push(others);
+      return { flat, groups, items };
     },
   });
 }
@@ -131,7 +146,10 @@ export default function GlobalTasks() {
 
   const { tasks, loading, refetch } = useGlobalTasks(dept, Object.keys(filters).length > 0 ? filters : undefined);
   const mutations = useGlobalTaskMutations(dept);
-  const { data: deptUsers } = useDepartmentUsers(userDepartment);
+  const { data: usersData } = useAllEligibleUsers(userDepartment);
+  const userGroups = usersData?.groups || [];
+  const allUsers = usersData?.flat || [];
+  const allUserItems = usersData?.items || [];
 
   // Client-side filter
   const filteredTasks = React.useMemo(() => {
@@ -153,10 +171,13 @@ export default function GlobalTasks() {
     completed: tasks.filter((t) => t.status === 'completed').length,
   }), [tasks]);
 
-  const onUpload = async (taskId: string, file?: File) => {
+  const onUpload = async (task: GlobalTask, file?: File) => {
     if (!file) return;
     try {
-      await mutations.uploadAttachment(taskId, file);
+      await mutations.uploadAttachment(task.id, file, {
+        jobId: task.job_id,
+        tourId: task.tour_id,
+      });
       toast({ title: 'Archivo subido' });
       await refetch();
     } catch (err: unknown) {
@@ -164,9 +185,13 @@ export default function GlobalTasks() {
     }
   };
 
-  const onDeleteAttachment = async (docId: string, filePath: string) => {
+  const onDeleteAttachment = async (task: GlobalTask, docId: string, filePath: string) => {
     try {
-      await mutations.deleteAttachment(docId, filePath);
+      await mutations.deleteAttachment(docId, filePath, {
+        taskId: task.id,
+        jobId: task.job_id,
+        tourId: task.tour_id,
+      });
       toast({ title: 'Archivo eliminado' });
       await refetch();
     } catch (err: unknown) {
@@ -175,7 +200,8 @@ export default function GlobalTasks() {
   };
 
   const viewDoc = async (doc: { file_path: string }) => {
-    const { data } = await supabase.storage.from('task_documents').createSignedUrl(doc.file_path, 3600);
+    const bucket = resolveTaskDocBucket(doc.file_path);
+    const { data } = await supabase.storage.from(bucket).createSignedUrl(doc.file_path, 3600);
     if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
   };
 
@@ -251,17 +277,20 @@ export default function GlobalTasks() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Asignado a</label>
-                <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="me">Mis tareas</SelectItem>
-                    <SelectItem value="unassigned">Sin asignar</SelectItem>
-                    {deptUsers?.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>{u.first_name} {u.last_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  groups={[
+                    { heading: 'Filtros', items: [
+                      { value: 'all', label: 'Todos' },
+                      { value: 'me', label: 'Mis tareas' },
+                      { value: 'unassigned', label: 'Sin asignar' },
+                    ]},
+                    ...userGroups,
+                  ]}
+                  value={assigneeFilter}
+                  onValueChange={(v) => setAssigneeFilter(v || 'all')}
+                  placeholder="Todos"
+                  searchPlaceholder="Buscar persona..."
+                />
               </div>
             </div>
           </CardContent>
@@ -318,24 +347,16 @@ export default function GlobalTasks() {
                     </TableCell>
                     <TableCell>
                       {canAssign ? (
-                        <Select
-                          value={task.assigned_to || 'unassigned'}
+                        <Combobox
+                          groups={userGroups}
+                          value={task.assigned_to || ''}
                           onValueChange={(v) =>
-                            mutations.assignUser(task.id, v === 'unassigned' ? null : v).then(() => refetch())
+                            mutations.assignUser(task.id, v || null).then(() => refetch())
                           }
-                        >
-                          <SelectTrigger className="w-[160px] h-8 text-xs">
-                            <SelectValue placeholder="Asignar" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">Sin asignar</SelectItem>
-                            {deptUsers?.map((u) => (
-                              <SelectItem key={u.id} value={u.id}>
-                                {u.first_name} {u.last_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          placeholder="Sin asignar"
+                          searchPlaceholder="Buscar..."
+                          triggerClassName="w-[160px] h-8 text-xs"
+                        />
                       ) : (
                         <span className="text-sm">
                           {assignee ? `${assignee.first_name} ${assignee.last_name}` : '-'}
@@ -409,7 +430,7 @@ export default function GlobalTasks() {
                                 <Download className="h-3 w-3" />
                               </Button>
                               {canEdit && (
-                                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onDeleteAttachment(doc.id, doc.file_path)}>
+                                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onDeleteAttachment(task, doc.id, doc.file_path)}>
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               )}
@@ -424,7 +445,7 @@ export default function GlobalTasks() {
                           <input
                             type="file"
                             className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                            onChange={(e) => onUpload(task.id, e.target.files?.[0])}
+                            onChange={(e) => onUpload(task, e.target.files?.[0])}
                           />
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
                             <Upload className="h-3.5 w-3.5" />

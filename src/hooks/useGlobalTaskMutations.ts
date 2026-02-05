@@ -27,6 +27,30 @@ function nowMadrid(): string {
   return formatISO(toZonedTime(new Date(), 'Europe/Madrid'));
 }
 
+function sanitizeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9.-]/g, '_');
+}
+
+/**
+ * Determine which storage bucket a task document lives in based on its file_path.
+ * Paths starting with a department prefix (sound/, lights/, video/) live in
+ * the `job_documents` bucket.  Paths starting with `schedules/` live in
+ * `tour-documents`.  Everything else is in `task_documents`.
+ */
+function resolveTaskDocBucket(filePath: string): string {
+  const normalized = (filePath || '').replace(/^\/+/, '');
+  const first = normalized.split('/')[0] ?? '';
+  if (['sound', 'lights', 'video', 'production', 'logistics', 'administrative'].includes(first)) {
+    return 'job_documents';
+  }
+  if (first === 'schedules') {
+    return 'tour-documents';
+  }
+  return 'task_documents';
+}
+
+export { resolveTaskDocBucket };
+
 export function useGlobalTaskMutations(department: Dept) {
   const table = TASK_TABLE[department];
   const docFk = DOC_FK[department];
@@ -193,41 +217,184 @@ export function useGlobalTaskMutations(department: Dept) {
 
   /**
    * Atomically set both job_id and tour_id in a single update.
-   * Guarantees mutual exclusivity — the caller sets one to a value and the
-   * other to null.
+   * After updating the link, mirrors any existing task documents to the
+   * job/tour documents table so they're visible from the job card.
    */
   const linkTask = async (id: string, jobId: string | null, tourId: string | null) => {
+    // Get the previous link state so we can clean up old mirrors
+    const { data: prevTask } = await supabase
+      .from(table)
+      .select('job_id, tour_id')
+      .eq('id', id)
+      .maybeSingle();
+
     const { error } = await supabase
       .from(table)
       .update({ job_id: jobId, tour_id: tourId, updated_at: nowMadrid() })
       .eq('id', id);
     if (error) throw error;
+
+    // Fetch existing task documents
+    const { data: taskDocs } = await supabase
+      .from('task_documents')
+      .select('id, file_name, file_path')
+      .eq(docFk, id);
+
+    const docs = taskDocs || [];
+
+    // Clean up old mirrors from previous link
+    if (prevTask?.job_id && prevTask.job_id !== jobId) {
+      for (const doc of docs) {
+        const mirrorPath = `${department}/${prevTask.job_id}/task-${id}/${sanitizeFileName(doc.file_name)}`;
+        await supabase.from('job_documents').delete().eq('file_path', mirrorPath);
+        await supabase.storage.from('job_documents').remove([mirrorPath]).catch(() => {});
+      }
+    }
+    if (prevTask?.tour_id && prevTask.tour_id !== tourId) {
+      for (const doc of docs) {
+        const mirrorPath = `schedules/${prevTask.tour_id}/task-${id}/${sanitizeFileName(doc.file_name)}`;
+        await supabase.from('tour_documents').delete().eq('file_path', mirrorPath);
+        await supabase.storage.from('tour-documents').remove([mirrorPath]).catch(() => {});
+      }
+    }
+
+    // Create new mirrors for the new link
+    if (docs.length > 0 && (jobId || tourId)) {
+      for (const doc of docs) {
+        try {
+          await mirrorDocToLinkedEntity(id, doc, jobId, tourId);
+        } catch (e) {
+          console.warn('[useGlobalTaskMutations] mirror doc failed', e);
+        }
+      }
+    }
   };
 
-  const uploadAttachment = async (taskId: string, file: File) => {
-    const sanitized = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const key = `${taskId}/${Date.now()}_${sanitized}`;
-    const { error: upErr } = await supabase.storage.from('task_documents').upload(key, file, { upsert: false });
+  /**
+   * Copy a task document file into the linked job/tour bucket and create
+   * a corresponding record so it appears on the job card / tour view.
+   */
+  const mirrorDocToLinkedEntity = async (
+    taskId: string,
+    doc: { file_name: string; file_path: string },
+    jobId: string | null,
+    tourId: string | null,
+  ) => {
+    // Download from whichever bucket the file currently lives in
+    const srcBucket = resolveTaskDocBucket(doc.file_path);
+    const { data: blob } = await supabase.storage.from(srcBucket).download(doc.file_path);
+    if (!blob) return;
+
+    const safeName = sanitizeFileName(doc.file_name);
+
+    if (jobId) {
+      const destPath = `${department}/${jobId}/task-${taskId}/${safeName}`;
+      await supabase.storage.from('job_documents').upload(destPath, blob, { upsert: true });
+      // Idempotent: delete any existing row first, then insert
+      await supabase.from('job_documents').delete().eq('file_path', destPath);
+      await supabase.from('job_documents').insert({
+        job_id: jobId,
+        file_name: doc.file_name,
+        file_path: destPath,
+        visible_to_tech: false,
+      });
+    }
+
+    if (tourId) {
+      const destPath = `schedules/${tourId}/task-${taskId}/${safeName}`;
+      await supabase.storage.from('tour-documents').upload(destPath, blob, { upsert: true });
+      await supabase.from('tour_documents').delete().eq('file_path', destPath);
+      await supabase.from('tour_documents').insert({
+        tour_id: tourId,
+        file_name: doc.file_name,
+        file_path: destPath,
+      });
+    }
+  };
+
+  /**
+   * Upload a document attached to a task.
+   * When the task is linked to a job or tour the file is ALSO stored in the
+   * corresponding job/tour document bucket and table so it's visible from
+   * the job card.
+   */
+  const uploadAttachment = async (
+    taskId: string,
+    file: File,
+    context?: { jobId?: string | null; tourId?: string | null },
+  ) => {
+    const safeName = sanitizeFileName(file.name);
+    const jobId = context?.jobId ?? null;
+    const tourId = context?.tourId ?? null;
+
+    // 1. Always store in task_documents bucket + table
+    const taskKey = `${taskId}/${Date.now()}_${safeName}`;
+    const { error: upErr } = await supabase.storage
+      .from('task_documents')
+      .upload(taskKey, file, { upsert: false });
     if (upErr) throw upErr;
+
     const { error: insErr } = await supabase.from('task_documents').insert({
       [docFk]: taskId,
       file_name: file.name,
-      file_path: key,
+      file_path: taskKey,
     });
     if (insErr) throw insErr;
+
+    // 2. Mirror to job bucket if linked
+    if (jobId) {
+      const jobPath = `${department}/${jobId}/task-${taskId}/${safeName}`;
+      await supabase.storage.from('job_documents').upload(jobPath, file, { upsert: true });
+      await supabase.from('job_documents').insert({
+        job_id: jobId,
+        file_name: file.name,
+        file_path: jobPath,
+        visible_to_tech: false,
+      });
+    }
+
+    // 3. Mirror to tour bucket if linked
+    if (tourId) {
+      const tourPath = `schedules/${tourId}/task-${taskId}/${safeName}`;
+      await supabase.storage.from('tour-documents').upload(tourPath, file, { upsert: true });
+      await supabase.from('tour_documents').insert({
+        tour_id: tourId,
+        file_name: file.name,
+        file_path: tourPath,
+      });
+    }
   };
 
   /**
    * Delete attachment: DB row first, then storage file.
-   * If the DB delete succeeds but storage fails, the orphaned file is
-   * harmless; the reverse (storage-first) would leave a dangling DB record.
+   * Also cleans up any mirrored copies in job/tour document buckets.
    */
-  const deleteAttachment = async (docId: string, filePath: string) => {
+  const deleteAttachment = async (
+    docId: string,
+    filePath: string,
+    context?: { taskId?: string; jobId?: string | null; tourId?: string | null },
+  ) => {
+    // Delete from task_documents table
     const { error: dErr } = await supabase.from('task_documents').delete().eq('id', docId);
     if (dErr) throw dErr;
-    const { error: sErr } = await supabase.storage.from('task_documents').remove([filePath]);
-    if (sErr) {
-      console.warn('[useGlobalTaskMutations] storage cleanup failed (DB row already deleted)', sErr);
+
+    // Delete from task_documents storage
+    await supabase.storage.from('task_documents').remove([filePath]).catch(() => {});
+
+    // Clean up mirrored copy in job_documents if linked
+    if (context?.jobId && context?.taskId) {
+      const safeName = sanitizeFileName(filePath.split('/').pop() || '');
+      const jobPath = `${department}/${context.jobId}/task-${context.taskId}/${safeName}`;
+      await supabase.from('job_documents').delete().eq('file_path', jobPath);
+      await supabase.storage.from('job_documents').remove([jobPath]).catch(() => {});
+    }
+
+    // Clean up mirrored copy in tour_documents if linked
+    if (context?.tourId && context?.taskId) {
+      const safeName = sanitizeFileName(filePath.split('/').pop() || '');
+      const tourPath = `schedules/${context.tourId}/task-${context.taskId}/${safeName}`;
+      await supabase.from('tour_documents').delete().eq('file_path', tourPath);
+      await supabase.storage.from('tour-documents').remove([tourPath]).catch(() => {});
     }
   };
 

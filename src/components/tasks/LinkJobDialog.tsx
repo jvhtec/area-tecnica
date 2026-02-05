@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Combobox } from '@/components/ui/combobox';
 import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,7 +42,7 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
   const [selectedId, setSelectedId] = React.useState<string>(currentJobId || currentTourId || '');
   const [loading, setLoading] = React.useState(false);
 
-  const { data: jobs } = useQuery({
+  const { data: jobItems } = useQuery({
     queryKey: ['jobs-for-linking'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -49,22 +50,22 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
         .select('id, title')
         .in('status', ['Tentativa', 'Confirmado'])
         .order('start_time', { ascending: false })
-        .limit(100);
+        .limit(200);
       if (error) throw error;
-      return data || [];
+      return (data || []).map((j) => ({ value: j.id, label: j.title || j.id }));
     },
   });
 
-  const { data: tours } = useQuery({
+  const { data: tourItems } = useQuery({
     queryKey: ['tours-for-linking'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tours')
         .select('id, name')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(200);
       if (error) throw error;
-      return data || [];
+      return (data || []).map((t) => ({ value: t.id, label: t.name || t.id }));
     },
   });
 
@@ -120,18 +121,14 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
           </div>
           <div className="space-y-2">
             <Label>{linkType === 'job' ? 'Trabajo' : 'Gira'}</Label>
-            <Select value={selectedId} onValueChange={setSelectedId}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-              <SelectContent>
-                {linkType === 'job'
-                  ? jobs?.map((j) => (
-                      <SelectItem key={j.id} value={j.id}>{j.title}</SelectItem>
-                    ))
-                  : tours?.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              items={linkType === 'job' ? (jobItems || []) : (tourItems || [])}
+              value={selectedId}
+              onValueChange={setSelectedId}
+              placeholder="Seleccionar..."
+              searchPlaceholder={linkType === 'job' ? 'Buscar trabajo...' : 'Buscar gira...'}
+              emptyMessage="Sin resultados."
+            />
           </div>
         </div>
         <DialogFooter className="gap-2">

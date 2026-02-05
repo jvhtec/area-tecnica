@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Combobox, ComboboxGroup } from '@/components/ui/combobox';
 import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,27 +46,35 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   const [jobId, setJobId] = React.useState<string>('');
   const [tourId, setTourId] = React.useState<string>('');
 
-  // Assignable users: restricted to the assigner's department
-  const { data: users } = useQuery({
-    queryKey: ['assignable-users-dept', userDepartment],
+  // All eligible users, grouped by department-first vs others
+  const { data: userGroups } = useQuery<ComboboxGroup[]>({
+    queryKey: ['assignable-users-grouped', userDepartment],
     queryFn: async () => {
-      let q = supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, role, department')
         .in('role', ['management', 'admin', 'logistics', 'house_tech'])
         .order('first_name');
-
-      if (userDepartment) {
-        q = q.eq('department', userDepartment);
-      }
-
-      const { data, error } = await q;
       if (error) throw error;
-      return data || [];
+      const all = data || [];
+      const mine: ComboboxGroup = { heading: 'Tu departamento', items: [] };
+      const others: ComboboxGroup = { heading: 'Otros departamentos', items: [] };
+      for (const u of all) {
+        const item = { value: u.id, label: `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.id };
+        if (userDepartment && u.department === userDepartment) {
+          mine.items.push(item);
+        } else {
+          others.items.push(item);
+        }
+      }
+      const groups: ComboboxGroup[] = [];
+      if (mine.items.length > 0) groups.push(mine);
+      if (others.items.length > 0) groups.push(others);
+      return groups;
     },
   });
 
-  const { data: jobs } = useQuery({
+  const { data: jobItems } = useQuery({
     queryKey: ['jobs-for-linking'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -73,22 +82,22 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
         .select('id, title')
         .in('status', ['Tentativa', 'Confirmado'])
         .order('start_time', { ascending: false })
-        .limit(100);
+        .limit(200);
       if (error) throw error;
-      return data || [];
+      return (data || []).map((j) => ({ value: j.id, label: j.title || j.id }));
     },
   });
 
-  const { data: tours } = useQuery({
+  const { data: tourItems } = useQuery({
     queryKey: ['tours-for-linking'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tours')
         .select('id, name')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(200);
       if (error) throw error;
-      return data || [];
+      return (data || []).map((t) => ({ value: t.id, label: t.name || t.id }));
     },
   });
 
@@ -113,15 +122,14 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
 
     setLoading(true);
     try {
-      const clean = (v: string) => (v && v !== 'none' ? v : null);
       await createTask({
         task_type: resolvedType,
         description: description.trim() || null,
-        assigned_to: clean(assignedTo),
+        assigned_to: assignedTo || null,
         due_at: dueAt ? new Date(dueAt).toISOString() : null,
         priority: priority ? parseInt(priority, 10) : null,
-        job_id: clean(jobId),
-        tour_id: clean(tourId),
+        job_id: jobId || null,
+        tour_id: tourId || null,
       });
       toast({ title: 'Tarea creada', description: 'La tarea se ha creado correctamente' });
       resetForm();
@@ -175,17 +183,14 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Asignar a</Label>
-              <Select value={assignedTo} onValueChange={setAssignedTo}>
-                <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin asignar</SelectItem>
-                  {users?.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.first_name} {u.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                groups={userGroups || []}
+                value={assignedTo}
+                onValueChange={setAssignedTo}
+                placeholder="Sin asignar"
+                searchPlaceholder="Buscar persona..."
+                emptyMessage="Sin resultados."
+              />
             </div>
             <div className="space-y-2">
               <Label>Prioridad</Label>
@@ -211,27 +216,25 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Vincular a trabajo</Label>
-              <Select value={jobId} onValueChange={(v) => { setJobId(v); if (v && v !== 'none') setTourId('none'); }}>
-                <SelectTrigger><SelectValue placeholder="Ninguno" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Ninguno</SelectItem>
-                  {jobs?.map((j) => (
-                    <SelectItem key={j.id} value={j.id}>{j.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                items={jobItems || []}
+                value={jobId}
+                onValueChange={(v) => { setJobId(v); if (v) setTourId(''); }}
+                placeholder="Ninguno"
+                searchPlaceholder="Buscar trabajo..."
+                emptyMessage="Sin trabajos disponibles."
+              />
             </div>
             <div className="space-y-2">
               <Label>Vincular a gira</Label>
-              <Select value={tourId} onValueChange={(v) => { setTourId(v); if (v && v !== 'none') setJobId('none'); }}>
-                <SelectTrigger><SelectValue placeholder="Ninguna" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Ninguna</SelectItem>
-                  {tours?.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                items={tourItems || []}
+                value={tourId}
+                onValueChange={(v) => { setTourId(v); if (v) setJobId(''); }}
+                placeholder="Ninguna"
+                searchPlaceholder="Buscar gira..."
+                emptyMessage="Sin giras disponibles."
+              />
             </div>
           </div>
           <DialogFooter>
