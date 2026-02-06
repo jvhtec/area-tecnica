@@ -13,6 +13,8 @@ import { useQuery } from '@tanstack/react-query';
 import { fromZonedTime } from 'date-fns-tz';
 
 type Dept = 'sound' | 'lights' | 'video';
+const ASSIGN_ALL_DEPARTMENT = '__all_department__';
+const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
 
 const TASK_TYPES: Record<Dept, string[]> = {
   sound: ['QT', 'Rigging Plot', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
@@ -36,7 +38,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   onCreated,
 }) => {
   const { toast } = useToast();
-  const { createTask } = useGlobalTaskMutations(department);
+  const { createTask, createTasksForUsers } = useGlobalTaskMutations(department);
   const [loading, setLoading] = React.useState(false);
   const [taskType, setTaskType] = React.useState<string>('');
   const [customType, setCustomType] = React.useState('');
@@ -72,6 +74,18 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
       if (mine.items.length > 0) groups.push(mine);
       if (others.items.length > 0) groups.push(others);
       return groups;
+    },
+  });
+
+  const { data: departmentUsers } = useQuery<Array<{ id: string; role: string | null }>>({
+    queryKey: ['department-users-global-task', department],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, role')
+        .eq('department', department);
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -123,18 +137,70 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
 
     setLoading(true);
     try {
-      await createTask({
+      const dueAtIso = dueAt
+        ? fromZonedTime(dueAt + 'T00:00:00', 'Europe/Madrid').toISOString()
+        : null;
+      const payload = {
         task_type: resolvedType,
         description: description.trim() || null,
-        assigned_to: assignedTo || null,
-        due_at: dueAt
-          ? fromZonedTime(dueAt + 'T00:00:00', 'Europe/Madrid').toISOString()
-          : null,
+        due_at: dueAtIso,
         priority: priority ? parseInt(priority, 10) : null,
         job_id: jobId || null,
         tour_id: tourId || null,
-      });
-      toast({ title: 'Tarea creada', description: 'La tarea se ha creado correctamente' });
+      };
+
+      if (assignedTo === ASSIGN_ALL_DEPARTMENT) {
+        const assigneeIds = (departmentUsers || [])
+          .filter((u) => u.role !== 'house_tech')
+          .map((u) => u.id);
+        if (!assigneeIds.length) {
+          toast({
+            title: 'No se encontraron usuarios',
+            description: 'No hay usuarios disponibles en este departamento (sin incluir house tech).',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
+        const skippedText =
+          skippedAssigneeIds.length > 0
+            ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
+            : '';
+        toast({
+          title: 'Asignación de departamento completada',
+          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.${skippedText}`,
+        });
+      } else if (assignedTo === ASSIGN_ALL_DEPARTMENT_HOUSE_TECH) {
+        const assigneeIds = (departmentUsers || [])
+          .filter((u) => u.role === 'house_tech')
+          .map((u) => u.id);
+        if (!assigneeIds.length) {
+          toast({
+            title: 'No se encontraron house techs',
+            description: 'No hay house techs disponibles en este departamento.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
+        const skippedText =
+          skippedAssigneeIds.length > 0
+            ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
+            : '';
+        toast({
+          title: 'Asignación de house techs completada',
+          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.${skippedText}`,
+        });
+      } else {
+        await createTask({
+          ...payload,
+          assigned_to: assignedTo || null,
+        });
+        toast({ title: 'Tarea creada', description: 'La tarea se ha creado correctamente' });
+      }
+
       resetForm();
       onOpenChange(false);
       onCreated?.();
@@ -187,7 +253,16 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
             <div className="space-y-2">
               <Label>Asignar a</Label>
               <Combobox
-                groups={userGroups || []}
+                groups={[
+                  {
+                    heading: 'Opciones',
+                    items: [
+                      { value: ASSIGN_ALL_DEPARTMENT, label: `Todo ${department} (sin house tech)` },
+                      { value: ASSIGN_ALL_DEPARTMENT_HOUSE_TECH, label: `Todo ${department} (solo house techs)` },
+                    ],
+                  },
+                  ...(userGroups || []),
+                ]}
                 value={assignedTo}
                 onValueChange={setAssignedTo}
                 placeholder="Sin asignar"

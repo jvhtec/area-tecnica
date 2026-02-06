@@ -165,6 +165,49 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     return data;
   };
 
+  const createTaskForUsers = async (
+    task_type: string,
+    assigneeIds: string[],
+    due_at?: string | null
+  ) => {
+    if (!assigneeIds.length) {
+      return { created: [], skippedAssigneeIds: [] as string[] };
+    }
+
+    const payloadBase: any = { task_type, status: 'not_started', progress: 0 };
+    if (tourId) {
+      payloadBase.tour_id = tourId;
+    } else if (jobId) {
+      payloadBase.job_id = jobId;
+    }
+    if (due_at) payloadBase.due_at = due_at;
+
+    const payloads = assigneeIds.map((assigneeId) => ({
+      ...payloadBase,
+      assigned_to: assigneeId,
+    }));
+
+    const { data, error } = await supabase
+      .from(table)
+      .upsert(payloads, {
+        onConflict: 'task_type,assigned_to,job_id,tour_id',
+        ignoreDuplicates: true,
+      })
+      .select('id, assigned_to');
+
+    if (error) throw error;
+
+    const created = data || [];
+    const createdAssigneeIds = new Set(
+      created
+        .map((row: any) => row.assigned_to)
+        .filter((id: string | null) => Boolean(id))
+    );
+    const skippedAssigneeIds = assigneeIds.filter((id) => !createdAssigneeIds.has(id));
+
+    return { created, skippedAssigneeIds };
+  };
+
   const updateTask = async (id: string, fields: Record<string, any>) => {
     await updateTaskWithNotification(id, fields);
   };
@@ -259,6 +302,15 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     if (dErr) throw dErr;
   };
 
-  return { createTask, updateTask, deleteTask, assignUser, setStatus, setDueDate, uploadAttachment, deleteAttachment };
+  return {
+    createTask,
+    createTaskForUsers,
+    updateTask,
+    deleteTask,
+    assignUser,
+    setStatus,
+    setDueDate,
+    uploadAttachment,
+    deleteAttachment,
+  };
 }
-

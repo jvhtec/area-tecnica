@@ -19,6 +19,8 @@ const TASK_TYPES: Record<'sound'|'lights'|'video', string[]> = {
 };
 
 type Dept = 'sound'|'lights'|'video';
+const ASSIGN_ALL_DEPARTMENT = '__all_department__';
+const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
 
 interface TaskListProps {
   jobId?: string;
@@ -31,7 +33,16 @@ interface TaskListProps {
 
 export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, canEdit, canAssign }) => {
   const { tasks, loading, refetch } = useJobTasks(jobId, department, tourId);
-  const { createTask, assignUser, setStatus, setDueDate, deleteTask, uploadAttachment, deleteAttachment } = useTaskMutations(jobId, department, tourId);
+  const {
+    createTask,
+    createTaskForUsers,
+    assignUser,
+    setStatus,
+    setDueDate,
+    deleteTask,
+    uploadAttachment,
+    deleteAttachment,
+  } = useTaskMutations(jobId, department, tourId);
   const [newType, setNewType] = React.useState<string | undefined>(TASK_TYPES[department][0]);
   const [newAssignee, setNewAssignee] = React.useState<string | undefined>(undefined);
   const { toast } = useToast();
@@ -45,11 +56,74 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
   }, []);
 
   const { data: managementUsers } = useManagementUsers();
+  const { data: departmentUsers } = useDepartmentUsers(department);
+  const getUserNameById = React.useCallback((id: string) => {
+    const user = (departmentUsers || []).find((u: any) => u.id === id);
+    if (!user) return null;
+    const name = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+    return name || null;
+  }, [departmentUsers]);
 
   const addTask = async () => {
     if (!newType) return;
     try {
-      await createTask(newType, newAssignee || null, null);
+      if (newAssignee === ASSIGN_ALL_DEPARTMENT) {
+        const assigneeIds = (departmentUsers || [])
+          .filter((u: any) => u.role !== 'house_tech')
+          .map((u: any) => u.id);
+        if (assigneeIds.length === 0) {
+          toast({
+            title: 'No se encontraron usuarios',
+            description: 'No hay usuarios disponibles en este departamento (sin incluir house tech).',
+            variant: 'destructive',
+          });
+          return;
+        }
+        const { created, skippedAssigneeIds } = await createTaskForUsers(newType, assigneeIds, null);
+        const createdCount = created.length;
+        const skippedCount = skippedAssigneeIds.length;
+        const skippedNames = skippedAssigneeIds
+          .map((id) => getUserNameById(id))
+          .filter((name): name is string => Boolean(name));
+        const skippedInfo = skippedCount > 0
+          ? skippedNames.length > 0
+            ? ` Omitidas por duplicado: ${skippedNames.join(', ')}.`
+            : ` Omitidas ${skippedCount} por duplicado.`
+          : '';
+        toast({
+          title: 'Asignación de departamento completada',
+          description: `Creadas ${createdCount} tarea(s) para ${department}.${skippedInfo}`,
+        });
+      } else if (newAssignee === ASSIGN_ALL_DEPARTMENT_HOUSE_TECH) {
+        const assigneeIds = (departmentUsers || [])
+          .filter((u: any) => u.role === 'house_tech')
+          .map((u: any) => u.id);
+        if (assigneeIds.length === 0) {
+          toast({
+            title: 'No se encontraron house techs',
+            description: 'No hay house techs disponibles en este departamento.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        const { created, skippedAssigneeIds } = await createTaskForUsers(newType, assigneeIds, null);
+        const createdCount = created.length;
+        const skippedCount = skippedAssigneeIds.length;
+        const skippedNames = skippedAssigneeIds
+          .map((id) => getUserNameById(id))
+          .filter((name): name is string => Boolean(name));
+        const skippedInfo = skippedCount > 0
+          ? skippedNames.length > 0
+            ? ` Omitidas por duplicado: ${skippedNames.join(', ')}.`
+            : ` Omitidas ${skippedCount} por duplicado.`
+          : '';
+        toast({
+          title: 'Asignación de house techs completada',
+          description: `Creadas ${createdCount} tarea(s) para house techs de ${department}.${skippedInfo}`,
+        });
+      } else {
+        await createTask(newType, newAssignee || null, null);
+      }
       setNewAssignee(undefined);
       await refetch();
     } catch (e: any) {
@@ -93,6 +167,12 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
           <Select value={newAssignee} onValueChange={setNewAssignee}>
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="Assign to" /></SelectTrigger>
             <SelectContent>
+              <SelectItem value={ASSIGN_ALL_DEPARTMENT}>
+                Todo el departamento de {department} (sin house tech)
+              </SelectItem>
+              <SelectItem value={ASSIGN_ALL_DEPARTMENT_HOUSE_TECH}>
+                Todo el departamento de {department} (solo house techs)
+              </SelectItem>
               {managementUsers?.map((u: any) => (
                 <SelectItem key={u.id} value={u.id}>{u.first_name} {u.last_name}</SelectItem>
               ))}
@@ -220,6 +300,20 @@ function useManagementUsers() {
         .from('profiles')
         .select('id, first_name, last_name')
         .in('role', ['management','admin','logistics']);
+      if (error) throw error;
+      return data || [];
+    }
+  });
+}
+
+function useDepartmentUsers(department: Dept) {
+  return useQuery({
+    queryKey: ['department-users', department],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role')
+        .eq('department', department);
       if (error) throw error;
       return data || [];
     }
