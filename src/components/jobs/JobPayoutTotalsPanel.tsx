@@ -28,6 +28,7 @@ import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-ex
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToggleTechnicianPayoutApproval } from '@/hooks/useToggleTechnicianPayoutApproval';
+import { useToggleJobRehearsalRate } from '@/hooks/useToggleJobRehearsalRate';
 import type { JobExpenseBreakdownItem, JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { JobPayoutOverrideSection, type JobPayoutOverride } from './JobPayoutOverrideSection';
@@ -55,7 +56,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, title, start_time, tour_id, rates_approved, job_type, invoicing_company')
+        .select('id, title, start_time, tour_id, rates_approved, job_type, invoicing_company, use_rehearsal_rate')
         .eq('id', jobId)
         .maybeSingle();
       if (error) throw error;
@@ -67,6 +68,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         rates_approved: boolean | null;
         job_type: string | null;
         invoicing_company: string | null;
+        use_rehearsal_rate: boolean;
       };
     },
     staleTime: 60_000,
@@ -298,6 +300,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const setOverrideMutation = useSetTechnicianPayoutOverride();
   const removeOverrideMutation = useRemoveTechnicianPayoutOverride();
   const toggleApprovalMutation = useToggleTechnicianPayoutApproval();
+  const toggleRehearsalRateMutation = useToggleJobRehearsalRate();
 
   const [editingTechId, setEditingTechId] = React.useState<string | null>(null);
   const [editingAmount, setEditingAmount] = React.useState('');
@@ -850,6 +853,33 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             </Button>
           </div>
         </div>
+        {/* Rehearsal rate toggle - managers only */}
+        {isManager && (
+          <div className="mt-3 flex items-center gap-3 bg-muted/40 border border-border rounded-md px-3 py-2">
+            <Switch
+              id="rehearsal-rate-toggle"
+              checked={!!jobMeta?.use_rehearsal_rate}
+              onCheckedChange={(checked) =>
+                toggleRehearsalRateMutation.mutate({ jobId, enabled: checked })
+              }
+              disabled={toggleRehearsalRateMutation.isPending}
+            />
+            <label
+              htmlFor="rehearsal-rate-toggle"
+              className="text-sm cursor-pointer select-none"
+            >
+              Tarifa de ensayo
+            </label>
+            <span className="text-xs text-muted-foreground">
+              {jobMeta?.use_rehearsal_rate
+                ? 'Tarifa plana de ensayo activada para este trabajo'
+                : 'Activar tarifa plana de ensayo (€180/día)'}
+            </span>
+            {toggleRehearsalRateMutation.isPending && (
+              <span className="text-xs text-muted-foreground animate-pulse">Recalculando…</span>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4 w-full overflow-hidden">
         {payoutTotals.map((payout) => (

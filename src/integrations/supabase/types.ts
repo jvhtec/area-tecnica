@@ -3928,6 +3928,7 @@ export type Database = {
           title: string
           tour_date_id: string | null
           tour_id: string | null
+          use_rehearsal_rate: boolean
         }
         Insert: {
           color?: string | null
@@ -3948,6 +3949,7 @@ export type Database = {
           title: string
           tour_date_id?: string | null
           tour_id?: string | null
+          use_rehearsal_rate?: boolean
         }
         Update: {
           color?: string | null
@@ -3968,6 +3970,7 @@ export type Database = {
           title?: string
           tour_date_id?: string | null
           tour_id?: string | null
+          use_rehearsal_rate?: boolean
         }
         Relationships: [
           {
