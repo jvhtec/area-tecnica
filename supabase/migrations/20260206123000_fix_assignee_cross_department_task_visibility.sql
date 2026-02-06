@@ -124,11 +124,7 @@ USING (
   OR assigned_to = auth.uid()
 )
 WITH CHECK (
-  (
-    (tour_id IS NOT NULL)
-    AND (public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'logistics'::text]))
-  )
-  OR public.is_admin_or_management()
-  OR (public.get_current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'house_tech'::text, 'technician'::text, 'logistics'::text]))
+  public.is_admin_or_management()
+  OR (public.current_user_role() = ANY (ARRAY['admin'::text, 'management'::text, 'house_tech'::text, 'technician'::text, 'logistics'::text]))
   OR assigned_to = auth.uid()
 );

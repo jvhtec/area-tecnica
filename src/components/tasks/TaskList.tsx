@@ -57,6 +57,12 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
 
   const { data: managementUsers } = useManagementUsers();
   const { data: departmentUsers } = useDepartmentUsers(department);
+  const getUserNameById = React.useCallback((id: string) => {
+    const user = (departmentUsers || []).find((u: any) => u.id === id);
+    if (!user) return null;
+    const name = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+    return name || null;
+  }, [departmentUsers]);
 
   const addTask = async () => {
     if (!newType) return;
@@ -76,12 +82,17 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
         const { created, skippedAssigneeIds } = await createTaskForUsers(newType, assigneeIds, null);
         const createdCount = created.length;
         const skippedCount = skippedAssigneeIds.length;
+        const skippedNames = skippedAssigneeIds
+          .map((id) => getUserNameById(id))
+          .filter((name): name is string => Boolean(name));
         const skippedInfo = skippedCount > 0
-          ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
+          ? skippedNames.length > 0
+            ? ` Omitidas por duplicado: ${skippedNames.join(', ')}.`
+            : ` Omitidas ${skippedCount} por duplicado.`
           : '';
         toast({
           title: 'Asignación de departamento completada',
-          description: `Creadas ${createdCount} tarea(s) para ${department}. Omitidas ${skippedCount} por duplicado.${skippedInfo}`,
+          description: `Creadas ${createdCount} tarea(s) para ${department}.${skippedInfo}`,
         });
       } else if (newAssignee === ASSIGN_ALL_DEPARTMENT_HOUSE_TECH) {
         const assigneeIds = (departmentUsers || [])
@@ -98,12 +109,17 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
         const { created, skippedAssigneeIds } = await createTaskForUsers(newType, assigneeIds, null);
         const createdCount = created.length;
         const skippedCount = skippedAssigneeIds.length;
+        const skippedNames = skippedAssigneeIds
+          .map((id) => getUserNameById(id))
+          .filter((name): name is string => Boolean(name));
         const skippedInfo = skippedCount > 0
-          ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
+          ? skippedNames.length > 0
+            ? ` Omitidas por duplicado: ${skippedNames.join(', ')}.`
+            : ` Omitidas ${skippedCount} por duplicado.`
           : '';
         toast({
           title: 'Asignación de house techs completada',
-          description: `Creadas ${createdCount} tarea(s) para house techs de ${department}. Omitidas ${skippedCount} por duplicado.${skippedInfo}`,
+          description: `Creadas ${createdCount} tarea(s) para house techs de ${department}.${skippedInfo}`,
         });
       } else {
         await createTask(newType, newAssignee || null, null);
