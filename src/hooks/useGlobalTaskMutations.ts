@@ -124,6 +124,51 @@ export function useGlobalTaskMutations(department: Dept) {
   };
 
   const deleteTask = async (id: string) => {
+    // First, get the task to know job_id/tour_id for mirror cleanup
+    const { data: task } = await supabase
+      .from(table)
+      .select('job_id, tour_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    // Fetch all attachments for this task
+    const { data: docs } = await supabase
+      .from('task_documents')
+      .select('id, file_path')
+      .eq(docFk, id);
+
+    // Delete each attachment (storage files + mirrored copies)
+    if (docs && docs.length > 0) {
+      for (const doc of docs) {
+        // Delete from task_documents table
+        await supabase.from('task_documents').delete().eq('id', doc.id);
+
+        // Delete from task_documents storage
+        await supabase.storage.from('task_documents').remove([doc.file_path]).catch(() => {});
+
+        // Extract safeName for mirror cleanup
+        const basename = doc.file_path.split('/').pop() || '';
+        const underscoreIdx = basename.indexOf('_');
+        const originalSafeName = underscoreIdx >= 0 ? basename.slice(underscoreIdx + 1) : basename;
+        const safeName = sanitizeFileName(originalSafeName);
+
+        // Clean up mirrored copy in job_documents
+        if (task?.job_id) {
+          const jobPath = `${department}/${task.job_id}/task-${id}/${safeName}`;
+          await supabase.from('job_documents').delete().eq('file_path', jobPath);
+          await supabase.storage.from('job_documents').remove([jobPath]).catch(() => {});
+        }
+
+        // Clean up mirrored copy in tour_documents
+        if (task?.tour_id) {
+          const tourPath = `schedules/${task.tour_id}/task-${id}/${safeName}`;
+          await supabase.from('tour_documents').delete().eq('file_path', tourPath);
+          await supabase.storage.from('tour-documents').remove([tourPath]).catch(() => {});
+        }
+      }
+    }
+
+    // Finally, delete the task row
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) throw error;
   };
@@ -334,6 +379,10 @@ export function useGlobalTaskMutations(department: Dept) {
     file: File,
     context?: { jobId?: string | null; tourId?: string | null },
   ) => {
+    const { data: authData } = await supabase.auth.getUser();
+    const uploaderId = authData?.user?.id;
+    if (!uploaderId) throw new Error('User must be authenticated to upload attachments');
+
     const safeName = sanitizeFileName(file.name);
     const jobId = context?.jobId ?? null;
     const tourId = context?.tourId ?? null;
@@ -349,6 +398,7 @@ export function useGlobalTaskMutations(department: Dept) {
       [docFk]: taskId,
       file_name: file.name,
       file_path: taskKey,
+      uploaded_by: uploaderId,
     });
     if (insErr) throw insErr;
 

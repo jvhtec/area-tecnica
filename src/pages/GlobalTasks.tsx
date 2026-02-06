@@ -219,9 +219,23 @@ export default function GlobalTasks() {
   };
 
   const viewDoc = async (doc: { file_path: string }) => {
-    const bucket = resolveTaskDocBucket(doc.file_path);
-    const { data } = await supabase.storage.from(bucket).createSignedUrl(doc.file_path, 3600);
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+    try {
+      const bucket = resolveTaskDocBucket(doc.file_path);
+      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(doc.file_path, 3600);
+      if (error) {
+        console.error('[GlobalTasks] createSignedUrl error:', error);
+        toast({ title: 'Error', description: 'No se pudo abrir el archivo', variant: 'destructive' });
+        return;
+      }
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank', 'noopener');
+      } else {
+        toast({ title: 'Error', description: 'No se pudo generar la URL del archivo', variant: 'destructive' });
+      }
+    } catch (err: unknown) {
+      console.error('[GlobalTasks] viewDoc error:', err);
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
+    }
   };
 
   return (
@@ -482,7 +496,11 @@ export default function GlobalTasks() {
                           <input
                             type="file"
                             className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                            onChange={(e) => onUpload(task, e.target.files?.[0])}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = ''; // Clear so same file can be re-selected
+                              onUpload(task, file);
+                            }}
                           />
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
                             <Upload className="h-3.5 w-3.5" />
