@@ -121,7 +121,10 @@ function dateInputValue(isoDate: string): string {
 }
 
 function isOverdueMadrid(isoDate: string): boolean {
-  return isPast(toZonedTime(parseISO(isoDate), MADRID_TZ));
+  // Compare both dates in Madrid timezone to get correct overdue status
+  const madridNow = toZonedTime(new Date(), MADRID_TZ);
+  const madridDue = toZonedTime(parseISO(isoDate), MADRID_TZ);
+  return madridDue < madridNow;
 }
 
 export default function GlobalTasks() {
@@ -367,7 +370,12 @@ export default function GlobalTasks() {
                           groups={userGroups}
                           value={task.assigned_to || ''}
                           onValueChange={(v) =>
-                            mutations.assignUser(task.id, v || null).then(() => refetch())
+                            mutations
+                              .assignUser(task.id, v || null)
+                              .then(() => refetch())
+                              .catch((err: unknown) =>
+                                toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' })
+                              )
                           }
                           placeholder="Sin asignar"
                           searchPlaceholder="Buscar..."
@@ -383,7 +391,12 @@ export default function GlobalTasks() {
                       <Select
                         value={task.status || 'not_started'}
                         onValueChange={(v) =>
-                          mutations.setStatus(task.id, v as 'not_started' | 'in_progress' | 'completed').then(() => refetch())
+                          mutations
+                            .setStatus(task.id, v as 'not_started' | 'in_progress' | 'completed')
+                            .then(() => refetch())
+                            .catch((err: unknown) =>
+                              toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' })
+                            )
                         }
                       >
                         <SelectTrigger className="w-[130px] h-8 text-xs" disabled={!canUpdate}>
@@ -416,6 +429,9 @@ export default function GlobalTasks() {
                                   : null
                               )
                               .then(() => refetch())
+                              .catch((err: unknown) =>
+                                toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' })
+                              )
                           }
                           className={cn('w-[140px] h-8 text-xs', isOverdue && 'border-red-500 text-red-500')}
                         />
@@ -477,7 +493,19 @@ export default function GlobalTasks() {
                             size="sm"
                             variant="ghost"
                             className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                            onClick={() => mutations.deleteTask(task.id).then(() => refetch())}
+                            onClick={() => {
+                              if (window.confirm('¿Eliminar esta tarea? Esta acción no se puede deshacer.')) {
+                                mutations
+                                  .deleteTask(task.id)
+                                  .then(() => {
+                                    toast({ title: 'Tarea eliminada' });
+                                    refetch();
+                                  })
+                                  .catch((err: unknown) =>
+                                    toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' })
+                                  );
+                              }
+                            }}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>

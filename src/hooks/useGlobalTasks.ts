@@ -128,9 +128,10 @@ export function useGlobalTasks(department: Dept | undefined, filters?: GlobalTas
   // Also monitors connection health and ensures reconnection.
   useEffect(() => {
     let isMounted = true;
+    let channelRef: ReturnType<typeof supabase.channel> | undefined;
 
     // Check network and ensure realtime connection before subscribing
-    const setupSubscription = async () => {
+    (async () => {
       const isOnline = await checkNetworkConnection();
       if (!isOnline || !isMounted) return;
 
@@ -147,20 +148,21 @@ export function useGlobalTasks(department: Dept | undefined, filters?: GlobalTas
         })
         .subscribe();
 
+      // If unmount happened while awaiting, clean up immediately
+      if (!isMounted) {
+        void supabase.removeChannel(channel);
+        return;
+      }
+
+      channelRef = channel;
+
       // Monitor connection health and refetch on reconnection
       healthCleanupRef.current = monitorConnectionHealth((isConnected) => {
         if (isConnected && isMounted) {
           queryClient.invalidateQueries({ queryKey: ['global-tasks', dept] });
         }
       });
-
-      return channel;
-    };
-
-    let channelRef: ReturnType<typeof supabase.channel> | undefined;
-    setupSubscription().then((channel) => {
-      channelRef = channel;
-    });
+    })();
 
     return () => {
       isMounted = false;

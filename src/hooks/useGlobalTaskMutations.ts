@@ -1,8 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { completeTask, revertTask, Department } from '@/services/taskCompletion';
 import type { Database } from '@/integrations/supabase/types';
-import { formatISO } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -23,8 +21,11 @@ const DOC_FK: Record<Dept, string> = {
   video: 'video_task_id',
 };
 
-function nowMadrid(): string {
-  return formatISO(toZonedTime(new Date(), 'Europe/Madrid'));
+/**
+ * Returns the current UTC instant as an ISO string for timestamptz columns.
+ */
+function nowUTC(): string {
+  return new Date().toISOString();
 }
 
 function sanitizeFileName(name: string): string {
@@ -117,7 +118,7 @@ export function useGlobalTaskMutations(department: Dept) {
   };
 
   const updateTask = async (id: string, fields: TaskUpdate) => {
-    const sanitized: TaskUpdate = { ...fields, updated_at: nowMadrid() };
+    const sanitized: TaskUpdate = { ...fields, updated_at: nowUTC() };
     const { error } = await supabase.from(table).update(sanitized).eq('id', id);
     if (error) throw error;
   };
@@ -133,7 +134,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     const { data, error } = await supabase
       .from(table)
-      .update({ assigned_to: userId, updated_at: nowMadrid() })
+      .update({ assigned_to: userId, updated_at: nowUTC() })
       .eq('id', id)
       .select('id, task_type, created_by')
       .maybeSingle();
@@ -220,7 +221,7 @@ export function useGlobalTaskMutations(department: Dept) {
   const setDueDate = async (id: string, due_at: string | null) => {
     const { error } = await supabase
       .from(table)
-      .update({ due_at, updated_at: nowMadrid() })
+      .update({ due_at, updated_at: nowUTC() })
       .eq('id', id);
     if (error) throw error;
   };
@@ -240,7 +241,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     const { error } = await supabase
       .from(table)
-      .update({ job_id: jobId, tour_id: tourId, updated_at: nowMadrid() })
+      .update({ job_id: jobId, tour_id: tourId, updated_at: nowUTC() })
       .eq('id', id);
     if (error) throw error;
 
@@ -351,10 +352,12 @@ export function useGlobalTaskMutations(department: Dept) {
     });
     if (insErr) throw insErr;
 
-    // 2. Mirror to job bucket if linked
+    // 2. Mirror to job bucket if linked (idempotent: delete-before-insert)
     if (jobId) {
       const jobPath = `${department}/${jobId}/task-${taskId}/${safeName}`;
       await supabase.storage.from('job_documents').upload(jobPath, file, { upsert: true });
+      // Remove any existing row to avoid duplicates
+      await supabase.from('job_documents').delete().eq('file_path', jobPath);
       await supabase.from('job_documents').insert({
         job_id: jobId,
         file_name: file.name,
@@ -363,10 +366,12 @@ export function useGlobalTaskMutations(department: Dept) {
       });
     }
 
-    // 3. Mirror to tour bucket if linked
+    // 3. Mirror to tour bucket if linked (idempotent: delete-before-insert)
     if (tourId) {
       const tourPath = `schedules/${tourId}/task-${taskId}/${safeName}`;
       await supabase.storage.from('tour-documents').upload(tourPath, file, { upsert: true });
+      // Remove any existing row to avoid duplicates
+      await supabase.from('tour_documents').delete().eq('file_path', tourPath);
       await supabase.from('tour_documents').insert({
         tour_id: tourId,
         file_name: file.name,
@@ -391,9 +396,17 @@ export function useGlobalTaskMutations(department: Dept) {
     // Delete from task_documents storage
     await supabase.storage.from('task_documents').remove([filePath]).catch(() => {});
 
+    // Extract the original filename from the stored path.
+    // uploadAttachment stores as `${taskId}/${timestamp}_${safeName}`, so
+    // basename is `timestamp_safeName`. Strip the timestamp prefix (everything
+    // up to and including the first underscore) to get the original safeName.
+    const basename = filePath.split('/').pop() || '';
+    const underscoreIdx = basename.indexOf('_');
+    const originalSafeName = underscoreIdx >= 0 ? basename.slice(underscoreIdx + 1) : basename;
+    const safeName = sanitizeFileName(originalSafeName);
+
     // Clean up mirrored copy in job_documents if linked
     if (context?.jobId && context?.taskId) {
-      const safeName = sanitizeFileName(filePath.split('/').pop() || '');
       const jobPath = `${department}/${context.jobId}/task-${context.taskId}/${safeName}`;
       await supabase.from('job_documents').delete().eq('file_path', jobPath);
       await supabase.storage.from('job_documents').remove([jobPath]).catch(() => {});
@@ -401,7 +414,6 @@ export function useGlobalTaskMutations(department: Dept) {
 
     // Clean up mirrored copy in tour_documents if linked
     if (context?.tourId && context?.taskId) {
-      const safeName = sanitizeFileName(filePath.split('/').pop() || '');
       const tourPath = `schedules/${context.tourId}/task-${context.taskId}/${safeName}`;
       await supabase.from('tour_documents').delete().eq('file_path', tourPath);
       await supabase.storage.from('tour-documents').remove([tourPath]).catch(() => {});
