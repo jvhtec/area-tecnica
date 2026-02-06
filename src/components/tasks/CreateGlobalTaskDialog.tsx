@@ -18,6 +18,11 @@ const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
 const ASSIGN_SELECTED_DEPARTMENTS = '__selected_departments__';
 const ASSIGN_SELECTED_USERS = '__selected_users__';
 const TECHNICIAN_LEVEL_ROLES = new Set(['technician', 'house_tech']);
+const DEPARTMENT_NAME: Record<Dept, string> = {
+  sound: 'sonido',
+  lights: 'luces',
+  video: 'video',
+};
 
 const TASK_TYPES: Record<Dept, string[]> = {
   sound: ['QT', 'Rigging Plot', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
@@ -132,6 +137,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   });
 
   const types = TASK_TYPES[department] || TASK_TYPES.sound;
+  const deptName = DEPARTMENT_NAME[department];
   const isCustom = taskType === '__custom__';
   const resolvedType = isCustom ? customType.trim() : taskType;
 
@@ -330,8 +336,8 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
                   {
                     heading: 'Opciones',
                     items: [
-                      { value: ASSIGN_ALL_DEPARTMENT, label: `Todo ${department} (sin technician/house_tech)` },
-                      { value: ASSIGN_ALL_DEPARTMENT_HOUSE_TECH, label: `Todo ${department} (solo house techs)` },
+                      { value: ASSIGN_ALL_DEPARTMENT, label: `Oficina ${deptName}` },
+                      { value: ASSIGN_ALL_DEPARTMENT_HOUSE_TECH, label: `Almacen ${deptName}` },
                       { value: ASSIGN_SELECTED_DEPARTMENTS, label: 'Departamentos seleccionados (masivo)' },
                       { value: ASSIGN_SELECTED_USERS, label: 'Usuarios seleccionados (masivo)' },
                     ],

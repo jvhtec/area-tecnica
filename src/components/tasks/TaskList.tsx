@@ -17,6 +17,11 @@ const TASK_TYPES: Record<'sound'|'lights'|'video', string[]> = {
   lights: ["QT","Rigging Plot","Pesos","Consumos","PS"],
   video: ["QT","Prediccion","Pesos","Consumos","PS"],
 };
+const DEPARTMENT_NAME: Record<'sound' | 'lights' | 'video', string> = {
+  sound: 'sonido',
+  lights: 'luces',
+  video: 'video',
+};
 
 type Dept = 'sound'|'lights'|'video';
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
@@ -33,6 +38,7 @@ interface TaskListProps {
 }
 
 export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, canEdit, canAssign }) => {
+  const deptName = DEPARTMENT_NAME[department];
   const { tasks, loading, refetch } = useJobTasks(jobId, department, tourId);
   const {
     createTask,
@@ -222,10 +228,10 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="Assign to" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ASSIGN_ALL_DEPARTMENT}>
-                Todo el departamento de {department} (sin technician/house_tech)
+                Oficina {deptName}
               </SelectItem>
               <SelectItem value={ASSIGN_ALL_DEPARTMENT_HOUSE_TECH}>
-                Todo el departamento de {department} (solo house techs)
+                Almacen {deptName}
               </SelectItem>
               {managementUsers?.map((u: any) => (
                 <SelectItem key={u.id} value={u.id}>{u.first_name} {u.last_name}</SelectItem>
