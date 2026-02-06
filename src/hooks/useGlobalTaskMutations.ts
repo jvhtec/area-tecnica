@@ -74,6 +74,10 @@ export function useGlobalTaskMutations(department: Dept) {
     due_at?: string | null;
     priority?: number | null;
   }) => {
+    if (params.job_id != null && params.tour_id != null) {
+      throw new Error('Validation error: job_id and tour_id are mutually exclusive');
+    }
+
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData?.user?.id ?? null;
 
@@ -124,6 +128,8 @@ export function useGlobalTaskMutations(department: Dept) {
   };
 
   const deleteTask = async (id: string) => {
+    const failures: string[] = [];
+
     // First, get the task to know job_id/tour_id for mirror cleanup
     const { data: task } = await supabase
       .from(table)
@@ -140,37 +146,70 @@ export function useGlobalTaskMutations(department: Dept) {
     // Delete each attachment (storage files + mirrored copies)
     if (docs && docs.length > 0) {
       for (const doc of docs) {
-        // Delete from task_documents table
-        await supabase.from('task_documents').delete().eq('id', doc.id);
+        try {
+          // Delete from task_documents table
+          const { error: taskDocDeleteError } = await supabase.from('task_documents').delete().eq('id', doc.id);
+          if (taskDocDeleteError) {
+            failures.push(`doc ${doc.id}: failed to delete task_documents row (${taskDocDeleteError.message})`);
+          }
 
-        // Delete from task_documents storage
-        await supabase.storage.from('task_documents').remove([doc.file_path]).catch(() => {});
+          // Delete from task_documents storage
+          const { error: taskStorageDeleteError } = await supabase.storage.from('task_documents').remove([doc.file_path]);
+          if (taskStorageDeleteError) {
+            failures.push(`doc ${doc.id}: failed to delete task_documents file (${taskStorageDeleteError.message})`);
+          }
 
-        // Extract safeName for mirror cleanup
-        const basename = doc.file_path.split('/').pop() || '';
-        const underscoreIdx = basename.indexOf('_');
-        const originalSafeName = underscoreIdx >= 0 ? basename.slice(underscoreIdx + 1) : basename;
-        const safeName = sanitizeFileName(originalSafeName);
+          // Extract safeName for mirror cleanup
+          const basename = doc.file_path.split('/').pop() || '';
+          const underscoreIdx = basename.indexOf('_');
+          const originalSafeName = underscoreIdx >= 0 ? basename.slice(underscoreIdx + 1) : basename;
+          const safeName = sanitizeFileName(originalSafeName);
 
-        // Clean up mirrored copy in job_documents
-        if (task?.job_id) {
-          const jobPath = `${department}/${task.job_id}/task-${id}/${safeName}`;
-          await supabase.from('job_documents').delete().eq('file_path', jobPath);
-          await supabase.storage.from('job_documents').remove([jobPath]).catch(() => {});
-        }
+          // Clean up mirrored copy in job_documents
+          if (task?.job_id) {
+            const jobPath = `${department}/${task.job_id}/task-${id}/${safeName}`;
+            const { error: jobDocDeleteError } = await supabase.from('job_documents').delete().eq('file_path', jobPath);
+            if (jobDocDeleteError) {
+              failures.push(`doc ${doc.id}: failed to delete job_documents row (${jobDocDeleteError.message})`);
+            }
+            const { error: jobStorageDeleteError } = await supabase.storage.from('job_documents').remove([jobPath]);
+            if (jobStorageDeleteError) {
+              failures.push(`doc ${doc.id}: failed to delete job_documents file (${jobStorageDeleteError.message})`);
+            }
+          }
 
-        // Clean up mirrored copy in tour_documents
-        if (task?.tour_id) {
-          const tourPath = `schedules/${task.tour_id}/task-${id}/${safeName}`;
-          await supabase.from('tour_documents').delete().eq('file_path', tourPath);
-          await supabase.storage.from('tour-documents').remove([tourPath]).catch(() => {});
+          // Clean up mirrored copy in tour_documents
+          if (task?.tour_id) {
+            const tourPath = `schedules/${task.tour_id}/task-${id}/${safeName}`;
+            const { error: tourDocDeleteError } = await supabase.from('tour_documents').delete().eq('file_path', tourPath);
+            if (tourDocDeleteError) {
+              failures.push(`doc ${doc.id}: failed to delete tour_documents row (${tourDocDeleteError.message})`);
+            }
+            const { error: tourStorageDeleteError } = await supabase.storage.from('tour-documents').remove([tourPath]);
+            if (tourStorageDeleteError) {
+              failures.push(`doc ${doc.id}: failed to delete tour-documents file (${tourStorageDeleteError.message})`);
+            }
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          failures.push(`doc ${doc.id}: unexpected cleanup failure (${message})`);
         }
       }
     }
 
     // Finally, delete the task row
     const { error } = await supabase.from(table).delete().eq('id', id);
-    if (error) throw error;
+    if (error) {
+      failures.push(`task ${id}: failed to delete task row (${error.message})`);
+    }
+
+    if (failures.length > 0) {
+      const aggregatedError = new Error(
+        `Task deletion completed with ${failures.length} failure(s): ${failures.join('; ')}`,
+      ) as Error & { failures: string[] };
+      aggregatedError.failures = failures;
+      throw aggregatedError;
+    }
   };
 
   const assignUser = async (id: string, userId: string | null) => {
@@ -277,6 +316,10 @@ export function useGlobalTaskMutations(department: Dept) {
    * job/tour documents table so they're visible from the job card.
    */
   const linkTask = async (id: string, jobId: string | null, tourId: string | null) => {
+    if (jobId != null && tourId != null) {
+      throw new Error('Validation error: job_id and tour_id are mutually exclusive');
+    }
+
     // Get the previous link state so we can clean up old mirrors
     const { data: prevTask } = await supabase
       .from(table)
