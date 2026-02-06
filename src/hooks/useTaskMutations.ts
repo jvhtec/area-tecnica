@@ -165,6 +165,62 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     return data;
   };
 
+  const createTaskForUsers = async (
+    task_type: string,
+    assigneeIds: string[],
+    due_at?: string | null
+  ) => {
+    if (!assigneeIds.length) {
+      return { created: [], skippedAssigneeIds: [] as string[] };
+    }
+
+    const payloadBase: any = { task_type, status: 'not_started', progress: 0 };
+    if (tourId) {
+      payloadBase.tour_id = tourId;
+    } else if (jobId) {
+      payloadBase.job_id = jobId;
+    }
+    if (due_at) payloadBase.due_at = due_at;
+
+    // Avoid duplicate task rows for the same assignee + task type + context.
+    let existingQuery = supabase
+      .from(table)
+      .select('assigned_to')
+      .eq('task_type', task_type)
+      .in('assigned_to', assigneeIds);
+
+    if (tourId) {
+      existingQuery = existingQuery.eq('tour_id', tourId);
+    } else if (jobId) {
+      existingQuery = existingQuery.eq('job_id', jobId);
+    }
+
+    const { data: existingTasks, error: existingError } = await existingQuery;
+    if (existingError) throw existingError;
+
+    const existingAssignees = new Set(
+      (existingTasks || [])
+        .map((row: any) => row.assigned_to)
+        .filter((id: string | null) => Boolean(id))
+    );
+
+    const assigneeIdsToCreate = assigneeIds.filter((id) => !existingAssignees.has(id));
+    const skippedAssigneeIds = assigneeIds.filter((id) => existingAssignees.has(id));
+
+    if (!assigneeIdsToCreate.length) {
+      return { created: [], skippedAssigneeIds };
+    }
+
+    const payloads = assigneeIdsToCreate.map((assigneeId) => ({
+      ...payloadBase,
+      assigned_to: assigneeId,
+    }));
+
+    const { data, error } = await supabase.from(table).insert(payloads).select();
+    if (error) throw error;
+    return { created: data || [], skippedAssigneeIds };
+  };
+
   const updateTask = async (id: string, fields: Record<string, any>) => {
     await updateTaskWithNotification(id, fields);
   };
@@ -259,6 +315,15 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     if (dErr) throw dErr;
   };
 
-  return { createTask, updateTask, deleteTask, assignUser, setStatus, setDueDate, uploadAttachment, deleteAttachment };
+  return {
+    createTask,
+    createTaskForUsers,
+    updateTask,
+    deleteTask,
+    assignUser,
+    setStatus,
+    setDueDate,
+    uploadAttachment,
+    deleteAttachment,
+  };
 }
-
