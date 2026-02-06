@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send, Receipt } from 'lucide-react';
+import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send, Receipt, Music } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import {
@@ -28,7 +30,7 @@ import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-ex
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToggleTechnicianPayoutApproval } from '@/hooks/useToggleTechnicianPayoutApproval';
-import { useToggleJobRehearsalRate } from '@/hooks/useToggleJobRehearsalRate';
+import { useJobRehearsalDates, useToggleDateRehearsalRate, useToggleAllDatesRehearsalRate } from '@/hooks/useToggleJobRehearsalRate';
 import type { JobExpenseBreakdownItem, JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { JobPayoutOverrideSection, type JobPayoutOverride } from './JobPayoutOverrideSection';
@@ -56,7 +58,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, title, start_time, tour_id, rates_approved, job_type, invoicing_company, use_rehearsal_rate')
+        .select('id, title, start_time, tour_id, rates_approved, job_type, invoicing_company')
         .eq('id', jobId)
         .maybeSingle();
       if (error) throw error;
@@ -68,7 +70,6 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         rates_approved: boolean | null;
         job_type: string | null;
         invoicing_company: string | null;
-        use_rehearsal_rate: boolean;
       };
     },
     staleTime: 60_000,
@@ -300,7 +301,32 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const setOverrideMutation = useSetTechnicianPayoutOverride();
   const removeOverrideMutation = useRemoveTechnicianPayoutOverride();
   const toggleApprovalMutation = useToggleTechnicianPayoutApproval();
-  const toggleRehearsalRateMutation = useToggleJobRehearsalRate();
+  const { data: rehearsalDates = [] } = useJobRehearsalDates(jobId);
+  const toggleDateRehearsalMutation = useToggleDateRehearsalRate();
+  const toggleAllDatesRehearsalMutation = useToggleAllDatesRehearsalRate();
+
+  // Build a set of dates currently marked as rehearsal for quick lookup
+  const rehearsalDateSet = React.useMemo(
+    () => new Set(rehearsalDates.map(r => r.date)),
+    [rehearsalDates]
+  );
+
+  // Collect all unique timesheet dates for this job (used for the per-date UI)
+  const { data: jobTimesheetDates = [] } = useQuery({
+    queryKey: ['job-timesheet-dates', jobId],
+    enabled: !!jobId && !jobMetaLoading,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('date')
+        .eq('job_id', jobId)
+        .eq('is_active', true);
+      if (error) throw error;
+      const uniqueDates = Array.from(new Set((data || []).map(t => t.date).filter(Boolean))) as string[];
+      return uniqueDates.sort();
+    },
+    staleTime: 60_000,
+  });
 
   const [editingTechId, setEditingTechId] = React.useState<string | null>(null);
   const [editingAmount, setEditingAmount] = React.useState('');
@@ -853,29 +879,65 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             </Button>
           </div>
         </div>
-        {/* Rehearsal rate toggle - managers only */}
-        {isManager && (
-          <div className="mt-3 flex items-center gap-3 bg-muted/40 border border-border rounded-md px-3 py-2">
-            <Switch
-              id="rehearsal-rate-toggle"
-              checked={!!jobMeta?.use_rehearsal_rate}
-              onCheckedChange={(checked) =>
-                toggleRehearsalRateMutation.mutate({ jobId, enabled: checked })
-              }
-              disabled={toggleRehearsalRateMutation.isPending}
-            />
-            <label
-              htmlFor="rehearsal-rate-toggle"
-              className="text-sm cursor-pointer select-none"
-            >
-              Tarifa de ensayo
-            </label>
-            <span className="text-xs text-muted-foreground">
-              {jobMeta?.use_rehearsal_rate
-                ? 'Tarifa plana de ensayo activada para este trabajo'
-                : 'Activar tarifa plana de ensayo (€180/día)'}
-            </span>
-            {toggleRehearsalRateMutation.isPending && (
+        {/* Per-date rehearsal rate toggles - managers only */}
+        {isManager && jobTimesheetDates.length > 0 && (
+          <div className="mt-3 bg-muted/40 border border-border rounded-md px-3 py-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Music className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Tarifa de ensayo (€180/día)</span>
+              </div>
+              {jobTimesheetDates.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7 px-2"
+                    disabled={toggleAllDatesRehearsalMutation.isPending}
+                    onClick={() => toggleAllDatesRehearsalMutation.mutate({
+                      jobId,
+                      dates: jobTimesheetDates,
+                      enabled: rehearsalDateSet.size < jobTimesheetDates.length,
+                    })}
+                  >
+                    {rehearsalDateSet.size >= jobTimesheetDates.length ? 'Desmarcar todas' : 'Marcar todas'}
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {jobTimesheetDates.map(dateStr => {
+                const isActive = rehearsalDateSet.has(dateStr);
+                const isPending = toggleDateRehearsalMutation.isPending || toggleAllDatesRehearsalMutation.isPending;
+                return (
+                  <button
+                    key={dateStr}
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => toggleDateRehearsalMutation.mutate({
+                      jobId,
+                      date: dateStr,
+                      enabled: !isActive,
+                    })}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer select-none',
+                      isActive
+                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-200'
+                        : 'bg-muted/30 border-border text-muted-foreground hover:bg-muted/50',
+                      isPending && 'opacity-60'
+                    )}
+                  >
+                    <Switch
+                      checked={isActive}
+                      className="scale-75 pointer-events-none"
+                      tabIndex={-1}
+                    />
+                    {format(parseISO(dateStr), 'd MMM', { locale: es })}
+                  </button>
+                );
+              })}
+            </div>
+            {(toggleDateRehearsalMutation.isPending || toggleAllDatesRehearsalMutation.isPending) && (
               <span className="text-xs text-muted-foreground animate-pulse">Recalculando…</span>
             )}
           </div>

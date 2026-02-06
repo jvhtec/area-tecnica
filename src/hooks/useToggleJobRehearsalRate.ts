@@ -1,41 +1,73 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-interface ToggleRehearsalRateParams {
+interface RehearsalDateRow {
+  id: string;
+  job_id: string;
+  date: string;
+}
+
+/**
+ * Fetches the set of dates marked as rehearsal for a given job.
+ */
+export function useJobRehearsalDates(jobId: string) {
+  return useQuery({
+    queryKey: ['job-rehearsal-dates', jobId],
+    enabled: !!jobId,
+    queryFn: async (): Promise<RehearsalDateRow[]> => {
+      const { data, error } = await supabase
+        .from('job_rehearsal_dates')
+        .select('id, job_id, date')
+        .eq('job_id', jobId);
+      if (error) throw error;
+      return (data || []) as RehearsalDateRow[];
+    },
+    staleTime: 30_000,
+  });
+}
+
+interface ToggleDateRehearsalParams {
   jobId: string;
+  date: string;        // ISO date string (yyyy-MM-dd)
   enabled: boolean;
 }
 
 /**
- * Toggles the use_rehearsal_rate flag on a job and recalculates all timesheets.
- * After toggling, it persists the new timesheet amounts via compute_timesheet_amount_2025.
+ * Toggles rehearsal rate for a single date on a job.
+ * Inserts or deletes from job_rehearsal_dates and recalculates affected timesheets.
  */
-export function useToggleJobRehearsalRate() {
+export function useToggleDateRehearsalRate() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ jobId, enabled }: ToggleRehearsalRateParams) => {
-      // 1. Update the job flag
-      const { error: updateError } = await supabase
-        .from('jobs')
-        .update({ use_rehearsal_rate: enabled })
-        .eq('id', jobId);
+    mutationFn: async ({ jobId, date, enabled }: ToggleDateRehearsalParams) => {
+      if (enabled) {
+        // Insert the date (upsert-safe via unique constraint)
+        const { error } = await supabase
+          .from('job_rehearsal_dates')
+          .insert({ job_id: jobId, date });
+        if (error && error.code !== '23505') throw error; // ignore duplicate
+      } else {
+        const { error } = await supabase
+          .from('job_rehearsal_dates')
+          .delete()
+          .eq('job_id', jobId)
+          .eq('date', date);
+        if (error) throw error;
+      }
 
-      if (updateError) throw updateError;
-
-      // 2. Fetch all active timesheets for this job
+      // Recalculate timesheets for this job + date
       const { data: timesheets, error: tsError } = await supabase
         .from('timesheets')
         .select('id')
         .eq('job_id', jobId)
+        .eq('date', date)
         .eq('is_active', true);
-
       if (tsError) throw tsError;
 
-      // 3. Recalculate each timesheet with the new flag
       if (timesheets && timesheets.length > 0) {
-        const results = await Promise.allSettled(
+        await Promise.allSettled(
           timesheets.map(ts =>
             supabase.rpc('compute_timesheet_amount_2025', {
               _timesheet_id: ts.id,
@@ -43,36 +75,95 @@ export function useToggleJobRehearsalRate() {
             })
           )
         );
-
-        const failures = results.filter(r => r.status === 'rejected');
-        if (failures.length > 0) {
-          console.warn(
-            `[useToggleJobRehearsalRate] ${failures.length}/${timesheets.length} timesheet recalculations failed`
-          );
-        }
       }
 
-      return { jobId, enabled, timesheetsRecalculated: timesheets?.length ?? 0 };
+      return { jobId, date, enabled, recalculated: timesheets?.length ?? 0 };
     },
     onSuccess: (result) => {
-      // Invalidate all related queries
-      queryClient.invalidateQueries({ queryKey: ['job-payout-metadata', result.jobId] });
+      queryClient.invalidateQueries({ queryKey: ['job-rehearsal-dates', result.jobId] });
       queryClient.invalidateQueries({ queryKey: ['job-tech-payout', result.jobId] });
       queryClient.invalidateQueries({ queryKey: ['job-tech-days', result.jobId] });
       queryClient.invalidateQueries({ queryKey: ['manager-job-quotes', result.jobId] });
       queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', result.jobId, 'tour-timesheet-data'] });
+    },
+    onError: (error) => {
+      console.error('[useToggleDateRehearsalRate] Error:', error);
+      toast.error('No se pudo cambiar la tarifa de ensayo para esta fecha');
+    },
+  });
+}
+
+interface ToggleAllDatesRehearsalParams {
+  jobId: string;
+  dates: string[];     // All date strings to toggle
+  enabled: boolean;
+}
+
+/**
+ * Toggles rehearsal rate for ALL dates of a job at once.
+ */
+export function useToggleAllDatesRehearsalRate() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ jobId, dates, enabled }: ToggleAllDatesRehearsalParams) => {
+      if (dates.length === 0) return { jobId, enabled, recalculated: 0 };
+
+      if (enabled) {
+        // Insert all dates (ignore duplicates)
+        const rows = dates.map(date => ({ job_id: jobId, date }));
+        const { error } = await supabase
+          .from('job_rehearsal_dates')
+          .upsert(rows, { onConflict: 'job_id,date', ignoreDuplicates: true });
+        if (error) throw error;
+      } else {
+        // Delete all dates for this job
+        const { error } = await supabase
+          .from('job_rehearsal_dates')
+          .delete()
+          .eq('job_id', jobId);
+        if (error) throw error;
+      }
+
+      // Recalculate all timesheets for this job
+      const { data: timesheets, error: tsError } = await supabase
+        .from('timesheets')
+        .select('id')
+        .eq('job_id', jobId)
+        .eq('is_active', true);
+      if (tsError) throw tsError;
+
+      if (timesheets && timesheets.length > 0) {
+        await Promise.allSettled(
+          timesheets.map(ts =>
+            supabase.rpc('compute_timesheet_amount_2025', {
+              _timesheet_id: ts.id,
+              _persist: true,
+            })
+          )
+        );
+      }
+
+      return { jobId, enabled, recalculated: timesheets?.length ?? 0 };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['job-rehearsal-dates', result.jobId] });
+      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', result.jobId] });
+      queryClient.invalidateQueries({ queryKey: ['job-tech-days', result.jobId] });
+      queryClient.invalidateQueries({ queryKey: ['manager-job-quotes', result.jobId] });
+      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', result.jobId, 'tour-timesheet-data'] });
 
       toast.success(
         result.enabled
-          ? 'Tarifa de ensayo activada'
-          : 'Tarifa de ensayo desactivada',
-        {
-          description: `${result.timesheetsRecalculated} partes recalculados`,
-        }
+          ? 'Tarifa de ensayo activada para todas las fechas'
+          : 'Tarifa de ensayo desactivada para todas las fechas',
+        { description: `${result.recalculated} partes recalculados` }
       );
     },
     onError: (error) => {
-      console.error('[useToggleJobRehearsalRate] Error:', error);
+      console.error('[useToggleAllDatesRehearsalRate] Error:', error);
       toast.error('No se pudo cambiar la tarifa de ensayo');
     },
   });

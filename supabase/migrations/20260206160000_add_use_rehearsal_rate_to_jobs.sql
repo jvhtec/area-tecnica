@@ -1,16 +1,40 @@
--- Allow admin/management users to force rehearsal flat rate on any job type.
--- Previously, rehearsal rate was only applied when tour_date_type = 'rehearsal'.
--- This adds a `use_rehearsal_rate` boolean flag to the jobs table so managers can
--- enable rehearsal rate from the payout panel for any job, regardless of type.
+-- Allow admin/management users to force rehearsal flat rate on specific dates
+-- of any job type, not just tour dates with tour_date_type = 'rehearsal'.
+--
+-- Uses a per-date model: job_rehearsal_dates stores (job_id, date) pairs.
+-- Both RPC functions check this table in addition to the existing
+-- tour_date_type = 'rehearsal' trigger.
 
--- 1. Add column
-ALTER TABLE public.jobs
-  ADD COLUMN IF NOT EXISTS use_rehearsal_rate boolean NOT NULL DEFAULT false;
+-- 1. Create per-date rehearsal rate table
+CREATE TABLE IF NOT EXISTS public.job_rehearsal_dates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id uuid NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
+  date date NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  created_by uuid REFERENCES public.profiles(id),
+  UNIQUE(job_id, date)
+);
 
-COMMENT ON COLUMN public.jobs.use_rehearsal_rate IS
-  'When true, forces rehearsal flat rate calculation for this job regardless of tour_date_type.';
+CREATE INDEX IF NOT EXISTS idx_job_rehearsal_dates_job
+  ON public.job_rehearsal_dates(job_id);
 
--- 2. Update compute_timesheet_amount_2025 to also check jobs.use_rehearsal_rate
+ALTER TABLE public.job_rehearsal_dates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "job_rehearsal_dates_select"
+  ON public.job_rehearsal_dates FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "job_rehearsal_dates_insert"
+  ON public.job_rehearsal_dates FOR INSERT TO authenticated
+  WITH CHECK (public.is_admin_or_management());
+
+CREATE POLICY "job_rehearsal_dates_delete"
+  ON public.job_rehearsal_dates FOR DELETE TO authenticated
+  USING (public.is_admin_or_management());
+
+COMMENT ON TABLE public.job_rehearsal_dates IS
+  'Per-date overrides that force rehearsal flat rate on specific dates of any job.';
+
+-- 2. Update compute_timesheet_amount_2025 — check job_rehearsal_dates per timesheet date
 CREATE OR REPLACE FUNCTION public.compute_timesheet_amount_2025(
   _timesheet_id uuid,
   _persist boolean DEFAULT false
@@ -41,14 +65,13 @@ DECLARE
   v_rehearsal_flat_rate NUMERIC := NULL;
   v_is_autonomo BOOLEAN := TRUE;
   v_autonomo_discount NUMERIC := 0;
-  v_use_rehearsal_rate BOOLEAN := FALSE;
+  v_forced_rehearsal BOOLEAN := FALSE;
 BEGIN
   -- Fetch timesheet with job info, category, and autonomo status
   SELECT
     t.*,
     j.job_type,
     j.tour_date_id,
-    COALESCE(j.use_rehearsal_rate, false) as job_use_rehearsal_rate,
     COALESCE(p.autonomo, true) as is_autonomo,
     COALESCE(
       t.category,
@@ -81,10 +104,17 @@ BEGIN
 
   v_job_type := v_timesheet.job_type;
   v_category := v_timesheet.category;
-  v_use_rehearsal_rate := v_timesheet.job_use_rehearsal_rate;
 
-  -- Check if job is a rehearsal (via tour_date_type OR manual override)
-  IF v_use_rehearsal_rate THEN
+  -- Check if this specific date is marked as rehearsal via job_rehearsal_dates
+  IF v_timesheet.date IS NOT NULL AND v_timesheet.job_id IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM public.job_rehearsal_dates
+      WHERE job_id = v_timesheet.job_id AND date = v_timesheet.date
+    ) INTO v_forced_rehearsal;
+  END IF;
+
+  -- Check if job is a rehearsal (via forced override, or tour_date_type)
+  IF v_forced_rehearsal THEN
     v_is_rehearsal := TRUE;
   ELSIF v_timesheet.tour_date_id IS NOT NULL THEN
     SELECT td.tour_date_type INTO v_tour_date_type
@@ -152,7 +182,7 @@ BEGIN
       'overtime_amount_eur', 0,
       'total_eur', v_total_amount,
       'category', 'rehearsal',
-      'forced_rehearsal_rate', v_use_rehearsal_rate
+      'forced_rehearsal_rate', v_forced_rehearsal
     );
 
     v_result := jsonb_build_object(
@@ -297,9 +327,9 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.compute_timesheet_amount_2025(uuid,boolean) IS
-  'Calculates timesheet amounts based on rate cards. Special rules: (1) Rehearsal jobs use flat €180 rate - triggered by tour_date_type=rehearsal OR jobs.use_rehearsal_rate=true, (2) Extended shifts over 20.5 hours use double base rate with no plus/overtime. Checks custom_tech_rates first for overrides, falls back to rate_cards_2025.';
+  'Calculates timesheet amounts based on rate cards. Rehearsal flat €180 rate triggered by tour_date_type=rehearsal OR a matching row in job_rehearsal_dates for the timesheet date. Extended shifts >20.5h use double base rate. Checks custom_tech_rates first, falls back to rate_cards_2025.';
 
--- 3. Update compute_tour_job_rate_quote_2025 to also check jobs.use_rehearsal_rate
+-- 3. Update compute_tour_job_rate_quote_2025 — check job_rehearsal_dates for the job start date
 CREATE OR REPLACE FUNCTION public.compute_tour_job_rate_quote_2025(_job_id uuid, _tech_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -331,15 +361,15 @@ DECLARE
   tour_date_type text := NULL;
   rehearsal_flat_rate numeric := NULL;
   has_custom_rate boolean := FALSE;
-  v_use_rehearsal_rate boolean := FALSE;
+  v_forced_rehearsal boolean := FALSE;
 BEGIN
   IF NOT (auth.role() = 'service_role' OR public.is_admin_or_management()) THEN
     RAISE EXCEPTION 'permission denied' USING ERRCODE = '42501';
   END IF;
 
-  -- Fetch job info (including use_rehearsal_rate flag)
-  SELECT job_type, start_time, tour_id, COALESCE(use_rehearsal_rate, false)
-  INTO jtype, st, tour_group, v_use_rehearsal_rate
+  -- Fetch job info
+  SELECT job_type, start_time, tour_id
+  INTO jtype, st, tour_group
   FROM public.jobs
   WHERE id = _job_id;
 
@@ -357,6 +387,12 @@ BEGIN
   WHERE j.id = _job_id
   LIMIT 1;
 
+  -- Check if any date for this job is forced as rehearsal via job_rehearsal_dates
+  SELECT EXISTS (
+    SELECT 1 FROM public.job_rehearsal_dates
+    WHERE job_id = _job_id
+  ) INTO v_forced_rehearsal;
+
   -- Check if house tech and autonomo status
   SELECT
     (role = 'house_tech'),
@@ -366,8 +402,8 @@ BEGIN
   WHERE id = _tech_id;
 
   -- Handle rehearsal flat rate for tour dates
-  -- Triggered by tour_date_type = 'rehearsal' OR jobs.use_rehearsal_rate = true
-  IF tour_date_type = 'rehearsal' OR v_use_rehearsal_rate THEN
+  -- Triggered by tour_date_type = 'rehearsal' OR presence in job_rehearsal_dates
+  IF tour_date_type = 'rehearsal' OR v_forced_rehearsal THEN
     -- Check for custom rehearsal rate (works for both house_tech and technician roles)
     SELECT rehearsal_day_eur INTO rehearsal_flat_rate
     FROM public.custom_tech_rates
@@ -413,7 +449,7 @@ BEGIN
       'vehicle_disclaimer', disclaimer,
       'vehicle_disclaimer_text', CASE WHEN disclaimer THEN 'Se requiere vehículo propio' ELSE NULL END,
       'category', 'rehearsal',
-      'forced_rehearsal_rate', v_use_rehearsal_rate,
+      'forced_rehearsal_rate', v_forced_rehearsal,
       'breakdown', jsonb_build_object('notes', ARRAY['Rehearsal flat rate applied'])
     );
   END IF;
@@ -604,4 +640,4 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.compute_tour_job_rate_quote_2025(uuid,uuid) IS
-  'Calculates tour job rate quotes for technicians. Supports rehearsal flat rate via tour_date_type=rehearsal OR jobs.use_rehearsal_rate=true. Checks custom_tech_rates first (category-aware), then falls back to rate_cards_tour_2025.';
+  'Calculates tour job rate quotes for technicians. Rehearsal flat rate via tour_date_type=rehearsal OR job_rehearsal_dates table. Checks custom_tech_rates first (category-aware), then falls back to rate_cards_tour_2025.';
