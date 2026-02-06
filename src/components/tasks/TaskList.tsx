@@ -20,6 +20,7 @@ const TASK_TYPES: Record<'sound'|'lights'|'video', string[]> = {
 
 type Dept = 'sound'|'lights'|'video';
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
+const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
 
 interface TaskListProps {
   jobId?: string;
@@ -61,7 +62,9 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
     if (!newType) return;
     try {
       if (newAssignee === ASSIGN_ALL_DEPARTMENT) {
-        const assigneeIds = (departmentUsers || []).map((u: any) => u.id);
+        const assigneeIds = (departmentUsers || [])
+          .filter((u: any) => u.role !== 'house_tech')
+          .map((u: any) => u.id);
         if (assigneeIds.length === 0) {
           toast({
             title: 'No se encontraron usuarios',
@@ -79,6 +82,28 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
         toast({
           title: 'Asignación de departamento completada',
           description: `Creadas ${createdCount} tarea(s) para ${department}. Omitidas ${skippedCount} por duplicado.${skippedInfo}`,
+        });
+      } else if (newAssignee === ASSIGN_ALL_DEPARTMENT_HOUSE_TECH) {
+        const assigneeIds = (departmentUsers || [])
+          .filter((u: any) => u.role === 'house_tech')
+          .map((u: any) => u.id);
+        if (assigneeIds.length === 0) {
+          toast({
+            title: 'No se encontraron house techs',
+            description: 'No hay house techs disponibles en este departamento.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        const { created, skippedAssigneeIds } = await createTaskForUsers(newType, assigneeIds, null);
+        const createdCount = created.length;
+        const skippedCount = skippedAssigneeIds.length;
+        const skippedInfo = skippedCount > 0
+          ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
+          : '';
+        toast({
+          title: 'Asignación de house techs completada',
+          description: `Creadas ${createdCount} tarea(s) para house techs de ${department}. Omitidas ${skippedCount} por duplicado.${skippedInfo}`,
         });
       } else {
         await createTask(newType, newAssignee || null, null);
@@ -128,6 +153,9 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
             <SelectContent>
               <SelectItem value={ASSIGN_ALL_DEPARTMENT}>
                 Todo el departamento de {department} (sin house tech)
+              </SelectItem>
+              <SelectItem value={ASSIGN_ALL_DEPARTMENT_HOUSE_TECH}>
+                Todo el departamento de {department} (solo house techs)
               </SelectItem>
               {managementUsers?.map((u: any) => (
                 <SelectItem key={u.id} value={u.id}>{u.first_name} {u.last_name}</SelectItem>
@@ -268,9 +296,8 @@ function useDepartmentUsers(department: Dept) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('department', department)
-        .neq('role', 'house_tech');
+        .select('id, first_name, last_name, role')
+        .eq('department', department);
       if (error) throw error;
       return data || [];
     }
