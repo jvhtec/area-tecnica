@@ -15,6 +15,7 @@ import { fromZonedTime } from 'date-fns-tz';
 type Dept = 'sound' | 'lights' | 'video';
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
 const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
+const TECHNICIAN_LEVEL_ROLES = new Set(['technician', 'house_tech']);
 
 const TASK_TYPES: Record<Dept, string[]> = {
   sound: ['QT', 'Rigging Plot', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
@@ -153,7 +154,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
         const assigneeIds = Array.from(
           new Set(
             (departmentUsers || [])
-              .filter((u) => u.role !== 'house_tech')
+              .filter((u) => !TECHNICIAN_LEVEL_ROLES.has(String(u.role || '')))
               .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
               .filter((id): id is string => id.length > 0)
           )
@@ -161,7 +162,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
         if (!assigneeIds.length) {
           toast({
             title: 'No se encontraron usuarios',
-            description: 'No hay usuarios disponibles en este departamento (sin incluir house tech).',
+            description: 'No hay usuarios disponibles en este departamento (excluyendo technician y house_tech).',
             variant: 'destructive',
           });
           return;
@@ -267,7 +268,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
                   {
                     heading: 'Opciones',
                     items: [
-                      { value: ASSIGN_ALL_DEPARTMENT, label: `Todo ${department} (sin house tech)` },
+                      { value: ASSIGN_ALL_DEPARTMENT, label: `Todo ${department} (sin technician/house_tech)` },
                       { value: ASSIGN_ALL_DEPARTMENT_HOUSE_TECH, label: `Todo ${department} (solo house techs)` },
                     ],
                   },

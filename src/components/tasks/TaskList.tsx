@@ -21,6 +21,7 @@ const TASK_TYPES: Record<'sound'|'lights'|'video', string[]> = {
 type Dept = 'sound'|'lights'|'video';
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
 const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
+const TECHNICIAN_LEVEL_ROLES = new Set(['technician', 'house_tech']);
 
 interface TaskListProps {
   jobId?: string;
@@ -73,7 +74,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
         const assigneeIds = Array.from(
           new Set(
             (departmentUsers || [])
-              .filter((u: any) => u.role !== 'house_tech')
+              .filter((u: any) => !TECHNICIAN_LEVEL_ROLES.has(String(u.role || '')))
               .map((u: any) => (typeof u.id === 'string' ? u.id.trim() : ''))
               .filter((id: string) => id.length > 0)
           )
@@ -81,7 +82,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
         if (assigneeIds.length === 0) {
           toast({
             title: 'No se encontraron usuarios',
-            description: 'No hay usuarios disponibles en este departamento (sin incluir house tech).',
+            description: 'No hay usuarios disponibles en este departamento (excluyendo technician y house_tech).',
             variant: 'destructive',
           });
           return;
@@ -221,7 +222,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="Assign to" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ASSIGN_ALL_DEPARTMENT}>
-                Todo el departamento de {department} (sin house tech)
+                Todo el departamento de {department} (sin technician/house_tech)
               </SelectItem>
               <SelectItem value={ASSIGN_ALL_DEPARTMENT_HOUSE_TECH}>
                 Todo el departamento de {department} (solo house techs)
