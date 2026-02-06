@@ -51,6 +51,15 @@ function resolveTaskDocBucket(filePath: string): string {
 
 export { resolveTaskDocBucket };
 
+/**
+ * Provides mutation functions for managing global tasks in a specific department.
+ * Handles task CRUD operations, assignments, status changes, linking to jobs/tours,
+ * and document attachments with mirroring to linked entities.
+ *
+ * @param department - The department ('sound', 'lights', or 'video') to operate on
+ * @returns Object containing mutation functions: createTask, updateTask, deleteTask,
+ *          assignUser, setStatus, setDueDate, linkTask, uploadAttachment, deleteAttachment
+ */
 export function useGlobalTaskMutations(department: Dept) {
   const table = TASK_TABLE[department];
   const docFk = DOC_FK[department];
@@ -181,18 +190,19 @@ export function useGlobalTaskMutations(department: Dept) {
       if (!result.success) throw new Error(result.error || 'Failed to revert task');
     }
 
-    if (task && userId) {
+    // Only send push notification for non-completed status changes.
+    // completeTask() already emits a completion push, so skip here to avoid duplicates.
+    if (task && userId && status !== 'completed') {
       const recipients = new Set<string>();
       recipients.add(userId);
       if (task.assigned_to) recipients.add(task.assigned_to);
       if (task.created_by) recipients.add(task.created_by);
 
-      const notificationType = status === 'completed' ? 'task.completed' : 'task.updated';
       try {
         await supabase.functions.invoke('push', {
           body: {
             action: 'broadcast',
-            type: notificationType,
+            type: 'task.updated',
             job_id: task.job_id || undefined,
             tour_id: task.tour_id || undefined,
             recipient_id: task.assigned_to || task.created_by || undefined,

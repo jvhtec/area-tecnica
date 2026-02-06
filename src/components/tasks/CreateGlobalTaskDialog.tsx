@@ -10,6 +10,7 @@ import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { fromZonedTime } from 'date-fns-tz';
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -126,7 +127,9 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
         task_type: resolvedType,
         description: description.trim() || null,
         assigned_to: assignedTo || null,
-        due_at: dueAt ? new Date(dueAt).toISOString() : null,
+        due_at: dueAt
+          ? fromZonedTime(dueAt + 'T00:00:00', 'Europe/Madrid').toISOString()
+          : null,
         priority: priority ? parseInt(priority, 10) : null,
         job_id: jobId || null,
         tour_id: tourId || null,

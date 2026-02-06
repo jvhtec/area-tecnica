@@ -29,8 +29,13 @@ import { resolveTaskDocBucket } from '@/hooks/useGlobalTaskMutations';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { format, parseISO, isPast } from 'date-fns';
+import { isPast, parseISO } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
+import {
+  formatInJobTimezone,
+  utcToLocalInput,
+  localInputToUTC,
+} from '@/utils/timezoneUtils';
 
 type Dept = 'sound' | 'lights' | 'video';
 
@@ -107,11 +112,12 @@ function normalizeDept(raw: string | null): Dept {
 const MADRID_TZ = 'Europe/Madrid';
 
 function formatDateMadrid(isoDate: string): string {
-  return format(toZonedTime(parseISO(isoDate), MADRID_TZ), 'dd/MM/yyyy');
+  return formatInJobTimezone(isoDate, 'dd/MM/yyyy', MADRID_TZ);
 }
 
 function dateInputValue(isoDate: string): string {
-  return format(toZonedTime(parseISO(isoDate), MADRID_TZ), 'yyyy-MM-dd');
+  // utcToLocalInput returns 'yyyy-MM-ddTHH:mm', we only need the date part
+  return utcToLocalInput(isoDate, MADRID_TZ).slice(0, 10);
 }
 
 function isOverdueMadrid(isoDate: string): boolean {
@@ -141,6 +147,9 @@ export default function GlobalTasks() {
   if (assigneeFilter && assigneeFilter !== 'all') {
     if (assigneeFilter === 'me') {
       filters.assignedTo = userId;
+    } else if (assigneeFilter !== 'unassigned') {
+      // assigneeFilter is an explicit user id
+      filters.assignedTo = assigneeFilter;
     }
   }
 
@@ -159,6 +168,13 @@ export default function GlobalTasks() {
     }
     if (assigneeFilter === 'unassigned') {
       result = result.filter((t) => !t.assigned_to);
+    } else if (
+      assigneeFilter &&
+      assigneeFilter !== 'all' &&
+      assigneeFilter !== 'me'
+    ) {
+      // assigneeFilter is an explicit user id
+      result = result.filter((t) => t.assigned_to === assigneeFilter);
     }
     return result;
   }, [tasks, statusFilter, assigneeFilter]);
@@ -393,7 +409,12 @@ export default function GlobalTasks() {
                           value={task.due_at ? dateInputValue(task.due_at) : ''}
                           onChange={(e) =>
                             mutations
-                              .setDueDate(task.id, e.target.value ? new Date(e.target.value).toISOString() : null)
+                              .setDueDate(
+                                task.id,
+                                e.target.value
+                                  ? localInputToUTC(e.target.value + 'T00:00', MADRID_TZ).toISOString()
+                                  : null
+                              )
                               .then(() => refetch())
                           }
                           className={cn('w-[140px] h-8 text-xs', isOverdue && 'border-red-500 text-red-500')}

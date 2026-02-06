@@ -42,6 +42,14 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
   const [selectedId, setSelectedId] = React.useState<string>(currentJobId || currentTourId || '');
   const [loading, setLoading] = React.useState(false);
 
+  // Reset dialog state when it opens or when the current task links change
+  React.useEffect(() => {
+    if (open) {
+      setLinkType(currentTourId ? 'tour' : 'job');
+      setSelectedId(currentJobId || currentTourId || '');
+    }
+  }, [open, currentJobId, currentTourId]);
+
   const { data: jobItems } = useQuery({
     queryKey: ['jobs-for-linking'],
     queryFn: async () => {
