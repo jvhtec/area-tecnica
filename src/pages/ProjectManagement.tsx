@@ -91,7 +91,8 @@ const ProjectManagement = () => {
     selectedDepartment,
     isSearching ? undefined : startDate,
     isSearching ? undefined : endDate,
-    true // include dryhire jobs in project management
+    true, // include dryhire jobs in project management
+    { refetchOnMount: "always" }
   );
 
   // Check user permissions early

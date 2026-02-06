@@ -344,16 +344,40 @@ export function useGlobalTaskMutations(department: Dept) {
     // Clean up old mirrors from previous link
     if (prevTask?.job_id && prevTask.job_id !== jobId) {
       for (const doc of docs) {
-        const mirrorPath = `${department}/${prevTask.job_id}/task-${id}/${sanitizeFileName(doc.file_name)}`;
-        await supabase.from('job_documents').delete().eq('file_path', mirrorPath);
-        await supabase.storage.from('job_documents').remove([mirrorPath]).catch(() => {});
+        try {
+          const mirrorPath = `${department}/${prevTask.job_id}/task-${id}/${sanitizeFileName(doc.file_name)}`;
+          const { error: jobDocDeleteError } = await supabase
+            .from('job_documents')
+            .delete()
+            .eq('file_path', mirrorPath);
+          if (jobDocDeleteError) throw jobDocDeleteError;
+
+          const { error: jobStorageDeleteError } = await supabase.storage
+            .from('job_documents')
+            .remove([mirrorPath]);
+          if (jobStorageDeleteError) throw jobStorageDeleteError;
+        } catch (e) {
+          console.warn('[useGlobalTaskMutations] old job mirror cleanup failed', e);
+        }
       }
     }
     if (prevTask?.tour_id && prevTask.tour_id !== tourId) {
       for (const doc of docs) {
-        const mirrorPath = `schedules/${prevTask.tour_id}/task-${id}/${sanitizeFileName(doc.file_name)}`;
-        await supabase.from('tour_documents').delete().eq('file_path', mirrorPath);
-        await supabase.storage.from('tour-documents').remove([mirrorPath]).catch(() => {});
+        try {
+          const mirrorPath = `schedules/${prevTask.tour_id}/task-${id}/${sanitizeFileName(doc.file_name)}`;
+          const { error: tourDocDeleteError } = await supabase
+            .from('tour_documents')
+            .delete()
+            .eq('file_path', mirrorPath);
+          if (tourDocDeleteError) throw tourDocDeleteError;
+
+          const { error: tourStorageDeleteError } = await supabase.storage
+            .from('tour-documents')
+            .remove([mirrorPath]);
+          if (tourStorageDeleteError) throw tourStorageDeleteError;
+        } catch (e) {
+          console.warn('[useGlobalTaskMutations] old tour mirror cleanup failed', e);
+        }
       }
     }
 
