@@ -146,9 +146,8 @@ export default function GlobalTasks() {
   const [linkTask, setLinkTask] = React.useState<GlobalTask | null>(null);
 
   const filters: GlobalTaskFilters = {};
-  if (statusFilter && statusFilter !== 'all' && statusFilter !== 'active') {
-    filters.status = statusFilter as GlobalTaskFilters['status'];
-  }
+  // Status filtering is handled entirely client-side so that the `tasks`
+  // array always contains every task and the stats cards stay accurate.
   if (assigneeFilter && assigneeFilter !== 'all') {
     if (assigneeFilter === 'me') {
       filters.assignedTo = userId;
@@ -170,6 +169,8 @@ export default function GlobalTasks() {
     let result = tasks;
     if (statusFilter === 'active') {
       result = result.filter((t) => t.status !== 'completed');
+    } else if (statusFilter && statusFilter !== 'all') {
+      result = result.filter((t) => t.status === statusFilter);
     }
     if (assigneeFilter === 'unassigned') {
       result = result.filter((t) => !t.assigned_to);
