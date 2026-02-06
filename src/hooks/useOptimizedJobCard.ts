@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,6 +11,7 @@ import { resolveJobDocLocation } from '@/utils/jobDocuments';
 type UseOptimizedJobCardOptions = {
   enableRoleSummary?: boolean;
   enableSoundTasks?: boolean;
+  refreshAssignmentsOnMount?: boolean;
 };
 
 export const useOptimizedJobCard = (
@@ -26,6 +27,7 @@ export const useOptimizedJobCard = (
   const queryClient = useQueryClient();
   const enableRoleSummary = options?.enableRoleSummary ?? true;
   const enableSoundTasks = options?.enableSoundTasks ?? true;
+  const refreshAssignmentsOnMount = options?.refreshAssignmentsOnMount ?? false;
   
   // Memoized styling calculations
   const { appliedBorderColor, appliedBgColor } = useMemo(() => {
@@ -47,6 +49,7 @@ export const useOptimizedJobCard = (
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
   const [editJobDialogOpen, setEditJobDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
+  const initialAssignmentRefreshJobIdRef = useRef<string | null>(null);
 
   // Keep local state in sync with incoming job prop updates for instant UI
 
@@ -149,6 +152,17 @@ export const useOptimizedJobCard = (
   useEffect(() => {
     setAssignments(job.job_assignments || []);
   }, [job.job_assignments]);
+
+  // One-time load refresh for contexts that must show current assignment badges immediately
+  useEffect(() => {
+    if (!refreshAssignmentsOnMount) return;
+    if (!job?.id) return;
+    if (job.job_type === 'dryhire') return;
+    if (initialAssignmentRefreshJobIdRef.current === job.id) return;
+
+    initialAssignmentRefreshJobIdRef.current = job.id;
+    void refreshAssignments();
+  }, [job?.id, job?.job_type, refreshAssignments, refreshAssignmentsOnMount]);
 
   const shouldEnrichAssignments = assignmentDialogOpen || !collapsed;
   useEffect(() => {

@@ -228,6 +228,7 @@ function JobCardNewFull({
   } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick, {
     enableRoleSummary: true,
     enableSoundTasks: !hideTasks,
+    refreshAssignmentsOnMount: isProjectManagementPage,
   });
 
   const isJobBeingDeleted = isDeletingJob(job.id);
