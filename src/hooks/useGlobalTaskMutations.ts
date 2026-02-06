@@ -121,6 +121,64 @@ export function useGlobalTaskMutations(department: Dept) {
     return data;
   };
 
+  const createTasksForUsers = async (
+    params: {
+      task_type: string;
+      description?: string | null;
+      job_id?: string | null;
+      tour_id?: string | null;
+      due_at?: string | null;
+      priority?: number | null;
+    },
+    assigneeIds: string[],
+  ) => {
+    if (params.job_id != null && params.tour_id != null) {
+      throw new Error('Validation error: job_id and tour_id are mutually exclusive');
+    }
+    if (!assigneeIds.length) {
+      return { created: [], skippedAssigneeIds: [] as string[] };
+    }
+
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData?.user?.id ?? null;
+
+    const payloadBase: TaskUpdate & { task_type: string; status: string; progress: number } = {
+      task_type: params.task_type,
+      description: params.description || null,
+      due_at: params.due_at || null,
+      priority: params.priority ?? null,
+      status: 'not_started',
+      progress: 0,
+      created_by: userId,
+    };
+    if (params.job_id) payloadBase.job_id = params.job_id;
+    if (params.tour_id) payloadBase.tour_id = params.tour_id;
+
+    const payloads = assigneeIds.map((assigneeId) => ({
+      ...payloadBase,
+      assigned_to: assigneeId,
+    }));
+
+    const { data, error } = await supabase
+      .from(table)
+      .upsert(payloads, {
+        onConflict: 'task_type,assigned_to,job_id,tour_id',
+        ignoreDuplicates: true,
+      })
+      .select('id, assigned_to');
+    if (error) throw error;
+
+    const created = data || [];
+    const createdAssigneeIds = new Set(
+      created
+        .map((row: any) => row.assigned_to)
+        .filter((id: string | null) => Boolean(id))
+    );
+    const skippedAssigneeIds = assigneeIds.filter((id) => !createdAssigneeIds.has(id));
+
+    return { created, skippedAssigneeIds };
+  };
+
   const updateTask = async (id: string, fields: TaskUpdate) => {
     const sanitized: TaskUpdate = { ...fields, updated_at: nowUTC() };
     const { error } = await supabase.from(table).update(sanitized).eq('id', id);
@@ -539,6 +597,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
   return {
     createTask,
+    createTasksForUsers,
     updateTask,
     deleteTask,
     assignUser,
