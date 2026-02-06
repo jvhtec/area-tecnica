@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle, Search, Filter, X } from "lucide-react";
+import { Loader2, CheckCircle, Search, Filter, X, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
 import { startOfMonth, endOfMonth, addMonths } from "date-fns";
@@ -21,12 +21,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useCreateJobDialogStore } from "@/stores/useCreateJobDialogStore";
 
 const ProjectManagement = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { openDialog } = useCreateJobDialogStore();
   const { userDepartment, isLoading: authLoading } = useOptimizedAuth();
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>((userDepartment as Department) ?? "sound");
@@ -89,7 +91,8 @@ const ProjectManagement = () => {
     selectedDepartment,
     isSearching ? undefined : startDate,
     isSearching ? undefined : endDate,
-    true // include dryhire jobs in project management
+    true, // include dryhire jobs in project management
+    { refetchOnMount: "always" }
   );
 
   // Check user permissions early
@@ -411,6 +414,26 @@ const ProjectManagement = () => {
         </CardContent>
       </Card>
     </div>
+
+    {/* Floating Action Button for Create Job */}
+    {canCreateItems && (
+      <button
+        onClick={() => openDialog({
+          department: selectedDepartment,
+          date: currentDate
+        })}
+        className="fixed bottom-20 right-6 md:bottom-8 md:right-8
+                   w-12 h-12 md:w-14 md:h-14
+                   bg-blue-600 hover:bg-blue-500
+                   text-white rounded-full shadow-lg
+                   flex items-center justify-center
+                   transition-all hover:scale-110
+                   z-50"
+        aria-label="Create new job"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+    )}
     </div>
   );
 };

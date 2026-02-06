@@ -12,9 +12,27 @@ vi.mock('@/hooks/useTourJobRateQuotes', () => ({
 
 const useQueryMock = vi.fn();
 
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: (options: any) => useQueryMock(options),
-}));
+vi.mock('@tanstack/react-query', async () => {
+  const actual = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
+
+  return {
+    ...actual,
+    useQuery: (options: any) => useQueryMock(options),
+    useQueryClient: () => ({
+      invalidateQueries: vi.fn(),
+      setQueryData: vi.fn(),
+      getQueryData: vi.fn(),
+    }),
+    useMutation: (opts: any) => ({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn(),
+      isPending: false,
+      isError: false,
+      error: null,
+      ...opts,
+    }),
+  };
+});
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {},

@@ -107,7 +107,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
           (timesheetData ?? []).forEach((row) => {
             const key = `${row.job_id}-${row.technician_id}`;
-            
+
             if (!assignmentsMap.has(key)) {
               const jobData = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs;
               if (jobData) {
@@ -131,6 +131,8 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
               ? jobData.locations[0]
               : jobData.locations;
 
+            const datesArray = Array.from(entry.dates).sort();
+
             return {
               technician_id: entry.technician_id,
               sound_role: null,
@@ -138,7 +140,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
               video_role: null,
               single_day: false,
               assignment_date: null,
-              dates: Array.from(entry.dates).sort(),
+              dates: datesArray,
               job: {
                 id: jobData.id,
                 title: jobData.title,

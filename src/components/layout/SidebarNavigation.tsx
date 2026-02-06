@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Clock,
   Database,
+  ListTodo,
   Euro,
   FileText,
   Grid3X3,
@@ -314,6 +315,20 @@ const baseNavigationConfig: NavigationItemConfig[] = [
       userRole === "admin" ||
       userRole === "management" ||
       userRole === "logistics",
+  },
+  {
+    id: "global-tasks",
+    label: "Tareas",
+    mobileLabel: "Tareas",
+    icon: ListTodo,
+    mobilePriority: 10,
+    mobileSlot: "secondary",
+    getPath: () => "/tasks",
+    isVisible: ({ userRole }) =>
+      userRole === "admin" ||
+      userRole === "management" ||
+      userRole === "logistics" ||
+      userRole === "house_tech",
   },
   {
     id: "logistics",

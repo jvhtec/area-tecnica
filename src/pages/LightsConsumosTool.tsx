@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, ArrowLeft, Trash2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { FileText, ArrowLeft, Check, ChevronsUpDown, Trash2 } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 type FixtureType = 'incandescent' | 'discharge' | 'led' | 'led-pro';
 
@@ -91,7 +94,9 @@ const lightComponentDatabase: LightComponent[] = [
   { id: 54, name: 'AROLA AQUA S-LT', watts: 600, fixtureType: 'led' },
   { id: 55, name: 'AROLA AQUA HP', watts: 1900, fixtureType: 'led' },
   { id: 56, name: 'HY B-EYE K15 AQUA', watts: 680, fixtureType: 'led' },
-  { id: 57, name: 'CLUSTER B2 FC', watts: 600, fixtureType: 'led' }
+  { id: 57, name: 'CLUSTER B2 FC', watts: 600, fixtureType: 'led' },
+  { id: 58, name: 'ACME TORNADO', watts: 935, fixtureType: 'led' },
+  { id: 59, name: 'CLAY PAKY A-LEDA K15', watts: 760, fixtureType: 'led' }
 ];
 
 const SQRT3 = Math.sqrt(3);
@@ -156,6 +161,8 @@ const LightsConsumosTool: React.FC = () => {
   const [customPduType, setCustomPduType] = useState<string>('');
   const [phaseMode, setPhaseMode] = useState<'single' | 'three'>('three');
   const [voltage, setVoltage] = useState<number>(400);
+  const [componentSearches, setComponentSearches] = useState<Record<number, string>>({});
+  const [componentDropdowns, setComponentDropdowns] = useState<Record<number, boolean>>({});
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
@@ -270,6 +277,17 @@ const LightsConsumosTool: React.FC = () => {
       ...prev,
       rows: newRows,
     }));
+  };
+
+  const updateComponentSearch = (index: number, value: string) => {
+    setComponentSearches((prev) => ({ ...prev, [index]: value }));
+  };
+
+  const updateComponentDropdown = (index: number, open: boolean) => {
+    setComponentDropdowns((prev) => ({ ...prev, [index]: open }));
+    if (!open) {
+      setComponentSearches((prev) => ({ ...prev, [index]: '' }));
+    }
   };
 
   const handleJobSelect = (jobId: string) => {
@@ -786,21 +804,64 @@ const LightsConsumosTool: React.FC = () => {
                       />
                     </td>
                     <td className="p-4">
-                      <Select
-                        value={row.componentId}
-                        onValueChange={(value) => updateInput(index, 'componentId', value)}
+                      <Popover
+                        open={componentDropdowns[index] ?? false}
+                        onOpenChange={(open) => updateComponentDropdown(index, open)}
                       >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Seleccione componente" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {lightComponentDatabase.map((component) => (
-                            <SelectItem key={component.id} value={component.id.toString()}>
-                              {component.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={componentDropdowns[index] ?? false}
+                            className="w-full justify-between font-normal"
+                          >
+                            <span className={cn('truncate', !row.componentId && 'text-muted-foreground')}>
+                              {row.componentId
+                                ? lightComponentDatabase.find((component) => component.id.toString() === row.componentId)
+                                  ?.name
+                                : 'Seleccione componente'}
+                            </span>
+                            <ChevronsUpDown className="h-4 w-4 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px] p-0" align="start">
+                          <Command shouldFilter={false}>
+                            <CommandInput
+                              placeholder="Buscar componente..."
+                              value={componentSearches[index] ?? ''}
+                              onValueChange={(value) => updateComponentSearch(index, value)}
+                            />
+                            <CommandList className="max-h-[240px]">
+                              <CommandEmpty>No se encontraron componentes.</CommandEmpty>
+                              <CommandGroup>
+                                {lightComponentDatabase
+                                  .filter((component) =>
+                                    component.name.toLowerCase().includes((componentSearches[index] ?? '').toLowerCase())
+                                  )
+                                  .map((component) => (
+                                    <CommandItem
+                                      key={component.id}
+                                      onSelect={() => {
+                                        updateInput(index, 'componentId', component.id.toString());
+                                        updateComponentDropdown(index, false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          'mr-2 h-4 w-4',
+                                          row.componentId === component.id.toString()
+                                            ? 'opacity-100'
+                                            : 'opacity-0'
+                                        )}
+                                      />
+                                      <span>{component.name}</span>
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </td>
                     <td className="p-4">
                       <Input

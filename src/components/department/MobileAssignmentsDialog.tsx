@@ -13,6 +13,7 @@ import { format, eachDayOfInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
 
 interface MobileAssignmentsDialogProps {
   open: boolean;
@@ -31,6 +32,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
 }) => {
   const jobId = job?.id;
   const { toast } = useToast();
+  const { theme, isDark } = useTechnicianTheme();
   const [selectedTech, setSelectedTech] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [singleDay, setSingleDay] = useState(false);
@@ -172,12 +174,12 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 border-none bg-transparent shadow-none">
-        <div className="bg-[#05070a] text-white rounded-2xl border border-[#1f232e] w-[95vw] max-w-xl max-h-[85vh] overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b border-[#1f232e]">
+        <div className={`${theme.bg} ${theme.textMain} rounded-2xl border ${theme.card} w-[95vw] max-w-xl max-h-[85vh] overflow-hidden flex flex-col`}>
+          <div className={`flex items-center justify-between p-4 border-b ${theme.divider}`}>
             <div>
-              <p className="text-xs text-slate-400 uppercase tracking-[0.08em]">Asignaciones</p>
+              <p className={`text-xs ${theme.textMuted} uppercase tracking-[0.08em]`}>Asignaciones</p>
               <h3 className="text-lg font-semibold leading-tight">{job?.title}</h3>
-              <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+              <p className={`text-xs ${theme.textMuted} flex items-center gap-1 mt-1`}>
                 <CalendarIcon className="h-3 w-3" />
                 {job?.start_time ? format(new Date(job.start_time), "d 'de' MMMM yyyy", { locale: es }) : 'Fecha sin definir'}
                 {timeRange && ` • ${timeRange}`}

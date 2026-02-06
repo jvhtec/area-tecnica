@@ -4056,6 +4056,8 @@ export type Database = {
           completed_by: string | null
           completion_source: string | null
           created_at: string | null
+          created_by: string | null
+          description: string | null
           due_at: string | null
           id: string
           job_id: string | null
@@ -4072,6 +4074,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null
@@ -4088,6 +4092,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null
@@ -5322,6 +5328,8 @@ export type Database = {
           completed_by: string | null
           completion_source: string | null
           created_at: string | null
+          created_by: string | null
+          description: string | null
           due_at: string | null
           id: string
           job_id: string | null
@@ -5338,6 +5346,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null
@@ -5354,6 +5364,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null
@@ -7665,6 +7677,8 @@ export type Database = {
           completed_by: string | null
           completion_source: string | null
           created_at: string | null
+          created_by: string | null
+          description: string | null
           due_at: string | null
           id: string
           job_id: string | null
@@ -7681,6 +7695,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null
@@ -7697,6 +7713,8 @@ export type Database = {
           completed_by?: string | null
           completion_source?: string | null
           created_at?: string | null
+          created_by?: string | null
+          description?: string | null
           due_at?: string | null
           id?: string
           job_id?: string | null

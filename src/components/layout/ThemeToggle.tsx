@@ -16,18 +16,34 @@ export const ThemeToggle = ({
   className,
   ariaLabel,
 }: ThemeToggleProps = {}) => {
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  // Initialize from localStorage to avoid flash
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('theme-preference')
+      if (stored !== null) {
+        return stored === 'dark'
+      }
+    }
+    // Default to dark if no preference stored
+    return true
+  })
   const { preferences, updatePreferences } = useUserPreferences()
 
+  // Apply theme on mount and when it changes
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark")
+    } else {
+      document.documentElement.classList.remove("dark")
+    }
+  }, [isDarkMode])
+
+  // Sync with database preferences when they load
   useEffect(() => {
     if (preferences?.dark_mode !== undefined) {
       const prefersDark = preferences.dark_mode
       setIsDarkMode(prefersDark)
-      if (prefersDark) {
-        document.documentElement.classList.add("dark")
-      } else {
-        document.documentElement.classList.remove("dark")
-      }
+      localStorage.setItem('theme-preference', prefersDark ? 'dark' : 'light')
     }
   }, [preferences])
 
@@ -35,12 +51,16 @@ export const ThemeToggle = ({
     const newDarkMode = !isDarkMode
     setIsDarkMode(newDarkMode)
 
+    // Update localStorage immediately for instant feedback
+    localStorage.setItem('theme-preference', newDarkMode ? 'dark' : 'light')
+
     if (newDarkMode) {
       document.documentElement.classList.add("dark")
     } else {
       document.documentElement.classList.remove("dark")
     }
 
+    // Update database in background
     updatePreferences({ dark_mode: newDarkMode })
   }
 

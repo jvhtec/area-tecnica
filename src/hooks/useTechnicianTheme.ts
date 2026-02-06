@@ -1,15 +1,36 @@
-import { useTheme } from 'next-themes';
+import { useEffect, useState } from 'react';
 import { Theme } from '@/components/technician/types';
+import { useUserPreferences } from './useUserPreferences';
 
 export const useTechnicianTheme = () => {
-  const { theme: nextTheme, setTheme } = useTheme();
+  const { preferences } = useUserPreferences();
 
-  // Determine if dark mode
-  const isDark = nextTheme === 'dark' || (nextTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-  const toggleTheme = () => {
-    setTheme(isDark ? 'light' : 'dark');
+  // Get initial theme from localStorage (synchronous, no flash!)
+  const getInitialDarkMode = () => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('theme-preference');
+      if (stored !== null) {
+        return stored === 'dark';
+      }
+    }
+    // Fallback to document class or system preference
+    if (typeof document !== 'undefined' && document.documentElement.classList.contains('dark')) {
+      return true;
+    }
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true; // Default to dark
   };
+
+  const [isDark, setIsDark] = useState(getInitialDarkMode);
+
+  // Sync with user preferences when they load from database
+  useEffect(() => {
+    if (preferences?.dark_mode !== undefined) {
+      setIsDark(preferences.dark_mode);
+    }
+  }, [preferences]);
 
   const theme: Theme = {
     bg: isDark ? "bg-[#05070a]" : "bg-slate-50",
@@ -27,5 +48,5 @@ export const useTechnicianTheme = () => {
     cluster: isDark ? "bg-white text-black" : "bg-slate-900 text-white"
   };
 
-  return { theme, isDark, toggleTheme };
+  return { theme, isDark };
 };

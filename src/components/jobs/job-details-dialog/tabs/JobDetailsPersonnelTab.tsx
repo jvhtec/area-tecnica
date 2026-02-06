@@ -89,7 +89,7 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
                         : "EX"}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium break-words">
                       {assignment.profiles
                         ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`

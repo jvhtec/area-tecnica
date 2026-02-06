@@ -359,9 +359,18 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
   // Delete equipment mutation
   const deleteEquipmentMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Delete stock entries first
-      await supabase.from('global_stock_entries').delete().eq('equipment_id', id);
-      await supabase.from('stock_movements').delete().eq('equipment_id', id);
+      // Delete dependent rows first (do not ignore failures)
+      const { error: stockEntriesError } = await supabase
+        .from('global_stock_entries')
+        .delete()
+        .eq('equipment_id', id);
+      if (stockEntriesError) throw stockEntriesError;
+
+      const { error: stockMovementsError } = await supabase
+        .from('stock_movements')
+        .delete()
+        .eq('equipment_id', id);
+      if (stockMovementsError) throw stockMovementsError;
 
       const { error } = await supabase.from('equipment').delete().eq('id', id);
       if (error) throw error;

@@ -83,7 +83,7 @@ describe('rates-pdf-export', () => {
       const renderedItems = mockExpenseBreakdown.map((category) => {
         const label = categoryLabels[category.category_slug] || category.category_slug;
         const amount = category.approved_total_eur || 0;
-        return \`• \${label}: €\${amount.toFixed(2)}\`;
+        return `• ${label}: €${amount.toFixed(2)}`;
       });
 
       expect(renderedItems).toHaveLength(2);
@@ -166,12 +166,12 @@ describe('rates-pdf-export', () => {
 
       // Simulate the summary lines
       const summaryLines = [
-        \`Total Partes: €500.00\`,
-        \`Total Extras: €100.00\`,
+        `Total Partes: €500.00`, 
+        `Total Extras: €100.00`, 
       ];
 
       if (totalExpenses > 0) {
-        summaryLines.push(\`Total Gastos: €\${totalExpenses.toFixed(2)}\`);
+        summaryLines.push(`Total Gastos: €${totalExpenses.toFixed(2)}`);
       }
 
       expect(summaryLines).toHaveLength(3);

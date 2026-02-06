@@ -23,7 +23,9 @@ const DEFAULT_TTL_SECONDS = Number.isFinite(envTtl) ? envTtl : MIN_TTL_SECONDS;
 function cors() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
   } as Record<string, string>;
 }
 

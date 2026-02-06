@@ -22,6 +22,7 @@ import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
 import { IncidentReport } from "@/components/sound/tools";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useTechnicianTheme } from "@/hooks/useTechnicianTheme";
 import { SoundVisionAccessRequestDialog } from "@/components/soundvision/SoundVisionAccessRequestDialog";
 import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
@@ -96,16 +97,8 @@ const Sound = () => {
     const used = new Set(primaryItems.map((item) => item.id));
     return sortedMobileItems.filter((item) => !used.has(item.id));
   }, [sortedMobileItems, primaryItems]);
-  const mobileTheme = useMemo(() => ({
-    bg: "bg-[#05070a]",
-    card: "bg-[#0f1219] border-[#1f232e]",
-    textMain: "text-white",
-    textMuted: "text-[#94a3b8]",
-    divider: "border-[#1f232e]",
-    toolBg: "bg-[#151820] border-[#2a2e3b]",
-    accent: "bg-blue-600 text-white",
-    modalOverlay: "bg-black/90 backdrop-blur-md",
-  }), []);
+
+  const { theme: mobileTheme, isDark } = useTechnicianTheme();
 
   const handleSignOut = async () => {
     if (isLoggingOut) return;
@@ -513,7 +506,7 @@ const Sound = () => {
       {isMobile && selectedJobForDetails && showJobDetails && (
         <EnhancedJobDetailsModal
           theme={mobileTheme}
-          isDark
+          isDark={isDark}
           job={selectedJobForDetails}
           onClose={() => {
             setShowJobDetails(false);

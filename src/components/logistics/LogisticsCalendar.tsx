@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, isValid } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, isValid, isToday } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Plus, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -182,6 +182,7 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
             {allDays.map((day, i) => {
               const dayEvents = getDayEvents(day);
               const isCurrentMonth = isSameMonth(day, currentMonth);
+              const isTodayDate = isToday(day);
               const maxVisibleEvents = 7;
 
               return (
@@ -189,11 +190,13 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
                   key={i}
                   className={cn(
                     "bg-background p-2 min-h-[200px] border-t relative cursor-pointer hover:bg-accent/50 transition-colors",
+                    isTodayDate && "ring-2 ring-inset ring-primary bg-primary/5 hover:bg-primary/10",
                     !isCurrentMonth && "text-muted-foreground/50"
                   )}
+                  aria-current={isTodayDate ? "date" : undefined}
                   onClick={() => handleDayClick(day)}
                 >
-                  <span className="text-sm">{format(day, "d")}</span>
+                  <span className={cn("text-sm", isTodayDate && "text-primary font-medium")}>{format(day, "d")}</span>
                   <div className="space-y-1 mt-1">
                     {dayEvents?.slice(0, maxVisibleEvents).map((event) => (
                       <Tooltip key={event.id}>

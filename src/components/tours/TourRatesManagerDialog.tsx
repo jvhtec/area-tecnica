@@ -26,7 +26,7 @@ import { invalidateRatesContext } from '@/services/ratesService';
 import { syncFlexWorkOrdersForJob, FlexWorkOrderSyncResult } from '@/services/flexWorkOrders';
 import { toast } from 'sonner';
 import { generateRateQuotePDF, generateTourRatesSummaryPDF } from '@/utils/rates-pdf-export';
-import { sendTourJobEmails } from '@/lib/tour-payout-email';
+import { adjustRehearsalQuotesForMultiDay, sendTourJobEmails } from '@/lib/tour-payout-email';
 import { buildTourRatesExportPayload } from '@/services/tourRatesExport';
 
 type TourRatesManagerDialogProps = {
@@ -79,7 +79,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, default_timesheet_category, role')
+        .select('id, first_name, last_name, email, default_timesheet_category, role, assignable_as_tech')
         .in('id', techIds);
       if (error) throw error;
       return data || [];
@@ -90,6 +90,11 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   const getTechName = (id: string) => {
     const p = profiles.find((x: any) => x.id === id);
     return p ? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unknown' : 'Unknown';
+  };
+
+  const isAssignableManagement = (id: string) => {
+    const p = profiles.find((x: any) => x.id === id);
+    return p && ['admin', 'management'].includes(p.role || '') && Boolean(p.assignable_as_tech);
   };
 
   // Debug logging for manager view
@@ -408,7 +413,26 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                         (lpoRows || []).map(r => [r.technician_id, r.lpo_number])
                       );
                       
-                      await generateRateQuotePDF(quotes, job, profiles as any, lpoMap);
+                      const { data: ts, error: tsError } = await supabase
+                        .from('timesheets')
+                        .select('technician_id, date')
+                        .eq('job_id', selectedJobId)
+                        .eq('is_active', true);
+                      if (tsError) {
+                        console.error('[TourRatesManagerDialog] Failed loading timesheets for PDF', tsError);
+                      }
+
+                      const techDates = new Map<string, Set<string>>();
+                      (ts || []).forEach((row: any) => {
+                        if (!row?.technician_id || !row?.date) return;
+                        if (!techDates.has(row.technician_id)) techDates.set(row.technician_id, new Set());
+                        techDates.get(row.technician_id)!.add(row.date);
+                      });
+                      const daysCounts = new Map<string, number>();
+                      techDates.forEach((dates, techId) => daysCounts.set(techId, dates.size));
+                      const adjustedQuotes = adjustRehearsalQuotesForMultiDay(quotes, daysCounts);
+
+                      await generateRateQuotePDF(adjustedQuotes, job, profiles as any, lpoMap);
                       toast.success('PDF generado');
                     }}
                   >
@@ -659,6 +683,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                           technicianName={name}
                           isManager={true}
                           isHouseTech={Boolean(q.is_house_tech)}
+                          isAssignableManagement={isAssignableManagement(q.technician_id)}
                           showVehicleDisclaimer={Boolean(q.vehicle_disclaimer)}
                           vehicleDisclaimerText={q.vehicle_disclaimer_text}
                         />

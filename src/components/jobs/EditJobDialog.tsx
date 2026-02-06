@@ -205,29 +205,35 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       if (jobError) throw jobError;
 
       // Update departments
-      const { data: currentDepts } = await supabase
+      const { data: currentDepts, error: currentDeptsError } = await supabase
         .from("job_departments")
         .select("department")
         .eq("job_id", job.id);
 
-      const currentDepartments = currentDepts?.map(d => d.department) || [];
+      if (currentDeptsError) throw currentDeptsError;
+
+      const currentDepartments = currentDepts?.map((d) => d.department) || [];
 
       // Remove deselected departments
-      const toRemove = currentDepartments.filter(dept => !selectedDepartments.includes(dept as Department));
+      const toRemove = currentDepartments.filter(
+        (dept) => !selectedDepartments.includes(dept as Department)
+      );
       if (toRemove.length > 0) {
-        await supabase
+        const { error: deleteDeptError } = await supabase
           .from("job_departments")
           .delete()
           .eq("job_id", job.id)
           .in("department", toRemove);
+        if (deleteDeptError) throw deleteDeptError;
       }
 
       // Add new departments
-      const toAdd = selectedDepartments.filter(dept => !currentDepartments.includes(dept));
+      const toAdd = selectedDepartments.filter((dept) => !currentDepartments.includes(dept));
       if (toAdd.length > 0) {
-        await supabase
+        const { error: insertDeptError } = await supabase
           .from("job_departments")
-          .insert(toAdd.map(department => ({ job_id: job.id, department })));
+          .insert(toAdd.map((department) => ({ job_id: job.id, department })));
+        if (insertDeptError) throw insertDeptError;
       }
 
       // Broadcast push notification about update (summarized changes)

@@ -86,6 +86,9 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
     try {
       setIsCreatingFolders(true);
 
+      // Check if folders already exist - createAllFoldersForJob is NOT fully idempotent
+      // and will create duplicates if run again (e.g., hojaInfo elements are created
+      // unconditionally without checking for existing flex_folders rows)
       const { data: existingFolders } = await supabase
         .from("flex_folders")
         .select("id")
@@ -93,11 +96,10 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
         .limit(1);
 
       if (existingFolders && existingFolders.length > 0) {
-        console.log("useJobActions: Found existing folders in final check:", existingFolders);
+        console.log("useJobActions: Found existing folders, guiding user to add mode:", existingFolders);
         toast({
           title: "Folders already exist",
-          description: "Flex folders have already been created for this job.",
-          variant: "destructive"
+          description: "To add more folders or elements to this job, use the 'Add Folders' button (+ icon) instead.",
         });
         return;
       }
@@ -124,21 +126,24 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
         console.error("Error updating job record:", updateError);
       }
 
-      // Broadcast push: Flex folders created for job
-      try {
-        void supabase.functions.invoke('push', {
-          body: { action: 'broadcast', type: 'flex.folders.created', job_id: job.id }
-        });
-      } catch {}
+      // Broadcast push: Flex folders created for job (fire-and-forget with error logging)
+      void supabase.functions.invoke('push', {
+        body: { action: 'broadcast', type: 'flex.folders.created', job_id: job.id }
+      }).catch((pushError) => {
+        console.error("useJobActions: Failed to send push notification:", pushError);
+      });
 
       toast({
         title: "Success!",
         description: "Flex folders have been created successfully."
       });
 
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
+      // Parallelize independent query invalidations
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["folder-existence"] })
+      ]);
 
     } catch (error: any) {
       console.error("useJobActions: Error creating flex folders:", error);
@@ -193,25 +198,27 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
       // Get current user's custom folder structure or use default
       const { data: { user } } = await supabase.auth.getUser();
       let folderStructure = null;
-      
+      let usedCustomStructure = false;
+
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('custom_folder_structure, role')
           .eq('id', user.id)
           .single();
-        
+
         // Only use custom structure for management users
         if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_folder_structure) {
           folderStructure = profile.custom_folder_structure;
+          usedCustomStructure = true;
         }
       }
-      
+
       // Default structure if no custom one exists
       if (!folderStructure) {
         folderStructure = [
           "CAD",
-          "QT", 
+          "QT",
           "Material",
           "Documentación",
           "Rentals",
@@ -248,10 +255,9 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
         }
       }
 
-      const isCustom = user && folderStructure !== null;
       toast({
         title: "Success!",
-        description: `${isCustom ? 'Custom' : 'Default'} folder structure created at "${rootFolderName}"`
+        description: `${usedCustomStructure ? 'Custom' : 'Default'} folder structure created at "${rootFolderName}"`
       });
 
     } catch (error: any) {

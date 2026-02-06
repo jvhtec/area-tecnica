@@ -18,6 +18,7 @@ import { mergePDFs } from "@/utils/pdf/pdfMerge";
 import { generateTimesheetPDF } from "@/utils/timesheet-pdf";
 import { generateJobPayoutPDF, generateRateQuotePDF } from "@/utils/rates-pdf-export";
 import { sendJobPayoutEmails } from "@/lib/job-payout-email";
+import { adjustRehearsalQuotesForMultiDay } from "@/lib/tour-payout-email";
 import { JobPayoutTotalsPanel } from "@/components/jobs/JobPayoutTotalsPanel";
 import { useJobApprovalStatus } from "@/hooks/useJobApprovalStatus";
 
@@ -373,19 +374,31 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                 onClick={async () => {
                   if (!resolvedJobId) return;
                   try {
-                    // 1) Fetch approved timesheets for this job
-                    const { data: ts } = await supabase
+                    const isTourDateJob = (jobDetails?.job_type || job?.job_type) === "tourdate";
+
+                    // 1) Fetch timesheets for this job (tourdate is fixed-rate and doesn't require approvals)
+                    let tsQuery = supabase
                       .from("timesheets")
                       .select("*")
                       .eq("job_id", resolvedJobId)
-                      .eq("is_active", true)
-                      .eq("approved_by_manager", true);
+                      .eq("is_active", true);
+                    if (!isTourDateJob) {
+                      tsQuery = tsQuery.eq("approved_by_manager", true);
+                    }
+
+                    const { data: ts } = await tsQuery;
 
                     // Fallback to visibility function when RLS blocks
                     let timesheets = ts || [];
                     if (!timesheets.length) {
                       const { data: visible } = await supabase.rpc("get_timesheet_amounts_visible");
-                      timesheets = (visible as any[] | null)?.filter((r) => r.job_id === resolvedJobId) || [];
+                      timesheets =
+                        (visible as any[] | null)?.filter(
+                          (r) =>
+                            r.job_id === resolvedJobId &&
+                            (r.is_active == null || r.is_active === true) &&
+                            (isTourDateJob || r.approved_by_manager === true)
+                        ) || [];
                     }
 
                     const { timesheets: enrichedTimesheets, profileMap } = await enrichTimesheetsWithProfiles(
@@ -442,7 +455,6 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     });
 
                     let payoutBlob: Blob;
-                    const isTourDateJob = (jobDetails?.job_type || job?.job_type) === "tourdate";
                     if (isTourDateJob) {
                       // Compute quotes via RPC per technician for this tour date job
                       const { data: jobAssignments, error: jaErr } = await supabase
@@ -514,8 +526,17 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       }
 
                       const payoutProfiles = Array.from(profileMap.values());
+                      const techDates = new Map<string, Set<string>>();
+                      (timesheets || []).forEach((row: any) => {
+                        if (!row?.technician_id || !row?.date) return;
+                        if (!techDates.has(row.technician_id)) techDates.set(row.technician_id, new Set());
+                        techDates.get(row.technician_id)!.add(row.date);
+                      });
+                      const daysCounts = new Map<string, number>();
+                      techDates.forEach((dates, techId) => daysCounts.set(techId, dates.size));
+                      const adjustedQuotes = adjustRehearsalQuotesForMultiDay(quotes as any, daysCounts);
                       const quoteBlob = (await generateRateQuotePDF(
-                        quotes as any,
+                        adjustedQuotes as any,
                         {
                           id: jobObj.id,
                           title: jobObj.title,
@@ -657,4 +678,3 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
     </TabsContent>
   );
 };
-

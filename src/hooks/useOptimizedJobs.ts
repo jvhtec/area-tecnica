@@ -14,7 +14,10 @@ export const useOptimizedJobs = (
   department?: Department,
   startDate?: Date,
   endDate?: Date,
-  includeDryhire: boolean = false
+  includeDryhire: boolean = true,
+  options?: {
+    refetchOnMount?: boolean | "always";
+  }
 ) => {
   // Subscribe only to tables that affect this hook's query results
   useMultiTableSubscription([
@@ -42,10 +45,12 @@ export const useOptimizedJobs = (
       .from('jobs')
       .select(`
         *,
-        location_data:locations(
+        location:locations(
           id,
           name,
-          formatted_address
+          formatted_address,
+          latitude,
+          longitude
         ),
         job_departments!inner(
           department
@@ -183,6 +188,7 @@ export const useOptimizedJobs = (
     queryFn: fetchOptimizedJobs,
     staleTime: 1000 * 60 * 5, // 5 minutes - increased for better caching
     gcTime: 1000 * 60 * 10, // 10 minutes - cache jobs longer
+    refetchOnMount: options?.refetchOnMount,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     retry: 2,

@@ -79,6 +79,7 @@ const AuthenticatedShell = lazy(() => import('@/routes/AuthenticatedShell'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
 const StagePlot = lazy(() => import('@/pages/StagePlot'));
 const SysCalc = lazy(() => import('@/pages/SysCalc'));
+const GlobalTasks = lazy(() => import('@/pages/GlobalTasks'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -215,6 +216,7 @@ export default function App() {
                               <Route path="/profile" element={<Profile />} />
                               <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin', 'management']}><Settings /></ProtectedRoute>} />
                               <Route path="/project-management" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><ProjectManagement /></ProtectedRoute>} />
+                              <Route path="/tasks" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><GlobalTasks /></ProtectedRoute>} />
                               <Route path="/equipment-management" element={<EquipmentManagement />} />
                               <Route path="/job-assignment-matrix" element={<ProtectedRoute allowedRoles={['admin', 'management']}><JobAssignmentMatrix /></ProtectedRoute>} />
                               <Route path="/activity" element={<ProtectedRoute allowedRoles={['admin']}><ActivityCenter /></ProtectedRoute>} />

@@ -8,6 +8,7 @@ import { ChevronDown, ChevronUp, Clock, MapPin, Plane, Wrench, Star, Moon, Mic }
 import { Department } from "@/types/department";
 import { JobStatusSelector } from "@/components/jobs/JobStatusSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useJobDistance } from "@/hooks/useJobDistance";
 
 interface JobCardHeaderProps {
   job: any;
@@ -33,6 +34,7 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
   userRole
 }) => {
   const isMobile = useIsMobile();
+  const distance = useJobDistance(job);
 
   const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
@@ -124,7 +126,10 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
         {job.location?.name && (
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className={cn("font-medium line-clamp-2", isMobile && "text-xs")}>{job.location.name}</span>
+            <span className={cn("font-medium line-clamp-2", isMobile && "text-xs")}>
+              {job.location.name}
+              {distance && <span className="text-muted-foreground font-normal"> · {distance}</span>}
+            </span>
           </div>
         )}
       </div>

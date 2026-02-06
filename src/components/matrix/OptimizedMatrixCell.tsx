@@ -793,7 +793,10 @@ export const OptimizedMatrixCell = memo(({
 
           {multiDateRemoval.isOpen && (
             <Dialog open={true} onOpenChange={(v) => !v && setMultiDateRemoval(prev => ({ ...prev, isOpen: false }))}>
-              <DialogContent>
+              <DialogContent
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
                 <DialogHeader>
                   <DialogTitle>¿Eliminar asignación?</DialogTitle>
                   <DialogDescription>
@@ -841,14 +844,20 @@ export const OptimizedMatrixCell = memo(({
                 <DialogFooter>
                   <Button
                     variant="outline"
-                    onClick={() => setMultiDateRemoval(prev => ({ ...prev, isOpen: false }))}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setMultiDateRemoval(prev => ({ ...prev, isOpen: false }));
+                    }}
                     disabled={isRemovingAssignment}
                   >
                     Cancelar
                   </Button>
                   <Button
                     variant="destructive"
-                    onClick={() => handleRemoveAssignment(multiDateRemoval.removeOption === 'all')}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handleRemoveAssignment(multiDateRemoval.removeOption === 'all');
+                    }}
                     disabled={multiDateRemoval.isLoading || isRemovingAssignment}
                   >
                     {isRemovingAssignment ? (
