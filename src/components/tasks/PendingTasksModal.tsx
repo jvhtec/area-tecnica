@@ -16,6 +16,7 @@ import { usePendingTasks, GroupedPendingTask } from '@/hooks/usePendingTasks';
 import { useCompleteTask, Department } from '@/hooks/useCompleteTask';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface PendingTasksModalProps {
   open: boolean;
@@ -31,8 +32,8 @@ const DEPARTMENT_COLORS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  not_started: 'Not Started',
-  in_progress: 'In Progress',
+  not_started: 'Sin empezar',
+  in_progress: 'En progreso',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -80,15 +81,15 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
       <DialogContent className="max-w-5xl w-[96vw] max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            Pending Tasks
+            Tareas Pendientes
             {totalTaskCount > 0 && (
               <Badge variant="secondary" className="ml-2">
-                {totalTaskCount} {totalTaskCount === 1 ? 'task' : 'tasks'}
+                {totalTaskCount} {totalTaskCount === 1 ? 'tarea' : 'tareas'}
               </Badge>
             )}
           </DialogTitle>
           <DialogDescription>
-            Tasks assigned to you that are not yet completed
+            Tareas asignadas a ti que aún no están completadas
           </DialogDescription>
         </DialogHeader>
 
@@ -96,14 +97,14 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
           {isLoading && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-sm text-muted-foreground">Loading pending tasks...</span>
+              <span className="ml-2 text-sm text-muted-foreground">Cargando tareas pendientes...</span>
             </div>
           )}
 
           {error && (
             <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
               <AlertCircle className="h-4 w-4" />
-              <span>Failed to load pending tasks. Please try again later.</span>
+              <span>Error al cargar las tareas pendientes. Inténtalo de nuevo más tarde.</span>
             </div>
           )}
 
@@ -112,9 +113,9 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
               <div className="rounded-full bg-muted p-3 mb-4">
                 <AlertCircle className="h-8 w-8 text-muted-foreground" />
               </div>
-              <p className="text-lg font-medium">No pending tasks</p>
+              <p className="text-lg font-medium">Sin tareas pendientes</p>
               <p className="text-sm text-muted-foreground mt-1">
-                You're all caught up! No incomplete tasks assigned to you.
+                ¡Estás al día! No tienes tareas incompletas asignadas.
               </p>
             </div>
           )}
@@ -139,7 +140,7 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
                         )}
                       </div>
                       <Badge variant="secondary">
-                        {group.tasks.length} {group.tasks.length === 1 ? 'task' : 'tasks'}
+                        {group.tasks.length} {group.tasks.length === 1 ? 'tarea' : 'tareas'}
                       </Badge>
                     </div>
                   </div>
@@ -148,12 +149,12 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[120px]">Department</TableHead>
-                          <TableHead>Task Type</TableHead>
-                          <TableHead className="w-[140px]">Status</TableHead>
-                          <TableHead className="w-[160px]">Progress</TableHead>
-                          <TableHead className="w-[140px]">Due Date</TableHead>
-                          <TableHead className="w-[200px]">Actions</TableHead>
+                          <TableHead className="w-[120px]">Departamento</TableHead>
+                          <TableHead>Tipo de Tarea</TableHead>
+                          <TableHead className="w-[140px]">Estado</TableHead>
+                          <TableHead className="w-[160px]">Progreso</TableHead>
+                          <TableHead className="w-[140px]">Fecha Límite</TableHead>
+                          <TableHead className="w-[200px]">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -204,6 +205,7 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
                                   >
                                     {formatDistanceToNow(new Date(task.dueDate), {
                                       addSuffix: true,
+                                      locale: es,
                                     })}
                                   </span>
                                 </div>
@@ -219,10 +221,10 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
                                     variant="outline"
                                     onClick={() => handleViewDetails(task.detailLink)}
                                     className="h-8"
-                                    aria-label={`View details for ${task.taskType} task`}
+                                    aria-label={`Ver detalles de la tarea ${task.taskType}`}
                                   >
                                     <ExternalLink className="h-3 w-3 mr-1" />
-                                    View
+                                    Ver
                                   </Button>
                                 )}
                                 {canCompleteTask && (
@@ -232,17 +234,17 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
                                     onClick={() => handleCompleteTask(task.id, task.department)}
                                     disabled={completingTaskId === task.id}
                                     className="h-8"
-                                    aria-label={`Mark ${task.taskType} task as complete`}
+                                    aria-label={`Marcar tarea ${task.taskType} como completada`}
                                   >
                                     {completingTaskId === task.id ? (
                                       <>
                                         <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                        Completing...
+                                        Completando...
                                       </>
                                     ) : (
                                       <>
                                         <CheckCircle className="h-3 w-3 mr-1" />
-                                        Complete
+                                        Completar
                                       </>
                                     )}
                                   </Button>

@@ -129,12 +129,12 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
 
         if (isJob) {
           groupId = `job-${task.job_id}`;
-          name = task.job_name || 'Unknown Job';
+          name = task.job_name || 'Trabajo desconocido';
           type = 'job';
           detailLink = `/festival-management/${task.job_id}`;
         } else if (isTour) {
           groupId = `tour-${task.tour_id}`;
-          name = task.tour_name || 'Unknown Tour';
+          name = task.tour_name || 'Gira desconocida';
           type = 'tour';
           detailLink = `/tour-management/${task.tour_id}`;
         } else {

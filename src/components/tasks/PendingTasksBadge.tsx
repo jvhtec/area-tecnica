@@ -40,8 +40,8 @@ export const PendingTasksBadge: React.FC<PendingTasksBadgeProps> = ({
       )}
       aria-label={
         hasPendingTasks
-          ? `${totalTaskCount} pending ${totalTaskCount === 1 ? 'task' : 'tasks'}`
-          : 'No pending tasks'
+          ? `${totalTaskCount} ${totalTaskCount === 1 ? 'tarea pendiente' : 'tareas pendientes'}`
+          : 'Sin tareas pendientes'
       }
     >
       <ListTodo className="h-5 w-5" aria-hidden="true" />
