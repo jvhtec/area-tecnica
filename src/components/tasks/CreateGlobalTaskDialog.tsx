@@ -15,6 +15,8 @@ import { fromZonedTime } from 'date-fns-tz';
 type Dept = 'sound' | 'lights' | 'video';
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
 const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
+const ASSIGN_SELECTED_DEPARTMENTS = '__selected_departments__';
+const ASSIGN_SELECTED_USERS = '__selected_users__';
 const TECHNICIAN_LEVEL_ROLES = new Set(['technician', 'house_tech']);
 
 const TASK_TYPES: Record<Dept, string[]> = {
@@ -29,6 +31,14 @@ interface CreateGlobalTaskDialogProps {
   department: Dept;
   userDepartment: string | null;
   onCreated?: () => void;
+}
+
+interface EligibleUser {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: string | null;
+  department: string | null;
 }
 
 export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
@@ -49,9 +59,11 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   const [priority, setPriority] = React.useState<string>('');
   const [jobId, setJobId] = React.useState<string>('');
   const [tourId, setTourId] = React.useState<string>('');
+  const [selectedDepartments, setSelectedDepartments] = React.useState<Dept[]>([department]);
+  const [selectedUserIds, setSelectedUserIds] = React.useState<string[]>([]);
 
   // All eligible users, grouped by department-first vs others
-  const { data: userGroups } = useQuery<ComboboxGroup[]>({
+  const { data: usersData } = useQuery<{ groups: ComboboxGroup[]; users: EligibleUser[] }>({
     queryKey: ['assignable-users-grouped', userDepartment],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -74,9 +86,11 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
       const groups: ComboboxGroup[] = [];
       if (mine.items.length > 0) groups.push(mine);
       if (others.items.length > 0) groups.push(others);
-      return groups;
+      return { groups, users: all as EligibleUser[] };
     },
   });
+  const userGroups = usersData?.groups || [];
+  const eligibleUsers = usersData?.users || [];
 
   const { data: departmentUsers } = useQuery<Array<{ id: string; role: string | null }>>({
     queryKey: ['department-users-global-task', department],
@@ -130,6 +144,8 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
     setPriority('');
     setJobId('');
     setTourId('');
+    setSelectedDepartments([department]);
+    setSelectedUserIds([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -204,6 +220,52 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
           title: 'Asignación de house techs completada',
           description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.${skippedText}`,
         });
+      } else if (assignedTo === ASSIGN_SELECTED_DEPARTMENTS) {
+        const assigneeIds = Array.from(
+          new Set(
+            eligibleUsers
+              .filter((u) => selectedDepartments.includes((u.department || '').toLowerCase() as Dept))
+              .filter((u) => !TECHNICIAN_LEVEL_ROLES.has(String(u.role || '')))
+              .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
+              .filter((id): id is string => id.length > 0)
+          )
+        );
+        if (!assigneeIds.length) {
+          toast({
+            title: 'Sin usuarios válidos',
+            description: 'No hay usuarios válidos en los departamentos seleccionados (se excluyen technician y house_tech).',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
+        toast({
+          title: 'Asignación por departamentos completada',
+          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.`,
+        });
+      } else if (assignedTo === ASSIGN_SELECTED_USERS) {
+        const assigneeIds = Array.from(
+          new Set(
+            selectedUserIds
+              .map((id) => (typeof id === 'string' ? id.trim() : ''))
+              .filter((id): id is string => id.length > 0)
+          )
+        );
+        if (!assigneeIds.length) {
+          toast({
+            title: 'Sin usuarios seleccionados',
+            description: 'Selecciona al menos un usuario para asignación masiva.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
+        toast({
+          title: 'Asignación por usuarios completada',
+          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.`,
+        });
       } else {
         await createTask({
           ...payload,
@@ -270,9 +332,11 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
                     items: [
                       { value: ASSIGN_ALL_DEPARTMENT, label: `Todo ${department} (sin technician/house_tech)` },
                       { value: ASSIGN_ALL_DEPARTMENT_HOUSE_TECH, label: `Todo ${department} (solo house techs)` },
+                      { value: ASSIGN_SELECTED_DEPARTMENTS, label: 'Departamentos seleccionados (masivo)' },
+                      { value: ASSIGN_SELECTED_USERS, label: 'Usuarios seleccionados (masivo)' },
                     ],
                   },
-                  ...(userGroups || []),
+                  ...userGroups,
                 ]}
                 value={assignedTo}
                 onValueChange={setAssignedTo}
@@ -280,6 +344,50 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
                 searchPlaceholder="Buscar persona..."
                 emptyMessage="Sin resultados."
               />
+              {assignedTo === ASSIGN_SELECTED_DEPARTMENTS && (
+                <div className="mt-2 rounded-md border p-2 space-y-2">
+                  <p className="text-xs text-muted-foreground">Selecciona departamentos para asignación masiva</p>
+                  <div className="grid grid-cols-1 gap-1 text-sm">
+                    {(['sound', 'lights', 'video'] as Dept[]).map((dep) => (
+                      <label key={dep} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedDepartments.includes(dep)}
+                          onChange={(e) =>
+                            setSelectedDepartments((prev) =>
+                              e.target.checked ? Array.from(new Set([...prev, dep])) : prev.filter((d) => d !== dep)
+                            )
+                          }
+                        />
+                        <span>{dep}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {assignedTo === ASSIGN_SELECTED_USERS && (
+                <div className="mt-2 rounded-md border p-2 space-y-2 max-h-40 overflow-auto">
+                  <p className="text-xs text-muted-foreground">Selecciona usuarios para asignación masiva</p>
+                  {eligibleUsers.map((u) => {
+                    const label = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.id;
+                    return (
+                      <label key={u.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.includes(u.id)}
+                          onChange={(e) =>
+                            setSelectedUserIds((prev) =>
+                              e.target.checked ? Array.from(new Set([...prev, u.id])) : prev.filter((id) => id !== u.id)
+                            )
+                          }
+                        />
+                        <span>{label}</span>
+                        <span className="text-xs text-muted-foreground">({u.department || 'sin dept'})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Prioridad</Label>
