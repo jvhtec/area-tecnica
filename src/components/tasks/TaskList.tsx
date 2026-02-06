@@ -64,16 +64,21 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
         const assigneeIds = (departmentUsers || []).map((u: any) => u.id);
         if (assigneeIds.length === 0) {
           toast({
-            title: 'No users found',
-            description: 'No department users available (excluding house tech).',
+            title: 'No se encontraron usuarios',
+            description: 'No hay usuarios disponibles en este departamento (sin incluir house tech).',
             variant: 'destructive',
           });
           return;
         }
-        await createTaskForUsers(newType, assigneeIds, null);
+        const { created, skippedAssigneeIds } = await createTaskForUsers(newType, assigneeIds, null);
+        const createdCount = created.length;
+        const skippedCount = skippedAssigneeIds.length;
+        const skippedInfo = skippedCount > 0
+          ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
+          : '';
         toast({
-          title: 'Tasks created',
-          description: `Created ${assigneeIds.length} tasks for ${department} department.`,
+          title: 'Asignación de departamento completada',
+          description: `Creadas ${createdCount} tarea(s) para ${department}. Omitidas ${skippedCount} por duplicado.${skippedInfo}`,
         });
       } else {
         await createTask(newType, newAssignee || null, null);
@@ -122,7 +127,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="Assign to" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ASSIGN_ALL_DEPARTMENT}>
-                All {department} users (no house tech)
+                Todo el departamento de {department} (sin house tech)
               </SelectItem>
               {managementUsers?.map((u: any) => (
                 <SelectItem key={u.id} value={u.id}>{u.first_name} {u.last_name}</SelectItem>
