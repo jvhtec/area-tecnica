@@ -17,10 +17,16 @@ const TASK_TYPES: Record<'sound'|'lights'|'video', string[]> = {
   lights: ["QT","Rigging Plot","Pesos","Consumos","PS"],
   video: ["QT","Prediccion","Pesos","Consumos","PS"],
 };
+const DEPARTMENT_NAME: Record<'sound' | 'lights' | 'video', string> = {
+  sound: 'sonido',
+  lights: 'luces',
+  video: 'video',
+};
 
 type Dept = 'sound'|'lights'|'video';
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
 const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
+const TECHNICIAN_LEVEL_ROLES = new Set(['technician', 'house_tech']);
 
 interface TaskListProps {
   jobId?: string;
@@ -32,6 +38,7 @@ interface TaskListProps {
 }
 
 export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, canEdit, canAssign }) => {
+  const deptName = DEPARTMENT_NAME[department];
   const { tasks, loading, refetch } = useJobTasks(jobId, department, tourId);
   const {
     createTask,
@@ -40,11 +47,13 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
     setStatus,
     setDueDate,
     deleteTask,
+    deleteTasks,
     uploadAttachment,
     deleteAttachment,
   } = useTaskMutations(jobId, department, tourId);
   const [newType, setNewType] = React.useState<string | undefined>(TASK_TYPES[department][0]);
   const [newAssignee, setNewAssignee] = React.useState<string | undefined>(undefined);
+  const [bulkDeleteMode, setBulkDeleteMode] = React.useState<'all' | 'unassigned'>('all');
   const { toast } = useToast();
   const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
 
@@ -68,13 +77,18 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
     if (!newType) return;
     try {
       if (newAssignee === ASSIGN_ALL_DEPARTMENT) {
-        const assigneeIds = (departmentUsers || [])
-          .filter((u: any) => u.role !== 'house_tech')
-          .map((u: any) => u.id);
+        const assigneeIds = Array.from(
+          new Set(
+            (departmentUsers || [])
+              .filter((u: any) => !TECHNICIAN_LEVEL_ROLES.has(String(u.role || '')))
+              .map((u: any) => (typeof u.id === 'string' ? u.id.trim() : ''))
+              .filter((id: string) => id.length > 0)
+          )
+        );
         if (assigneeIds.length === 0) {
           toast({
             title: 'No se encontraron usuarios',
-            description: 'No hay usuarios disponibles en este departamento (sin incluir house tech).',
+            description: 'No hay usuarios disponibles en este departamento (excluyendo technician y house_tech).',
             variant: 'destructive',
           });
           return;
@@ -95,9 +109,14 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
           description: `Creadas ${createdCount} tarea(s) para ${department}.${skippedInfo}`,
         });
       } else if (newAssignee === ASSIGN_ALL_DEPARTMENT_HOUSE_TECH) {
-        const assigneeIds = (departmentUsers || [])
-          .filter((u: any) => u.role === 'house_tech')
-          .map((u: any) => u.id);
+        const assigneeIds = Array.from(
+          new Set(
+            (departmentUsers || [])
+              .filter((u: any) => u.role === 'house_tech')
+              .map((u: any) => (typeof u.id === 'string' ? u.id.trim() : ''))
+              .filter((id: string) => id.length > 0)
+          )
+        );
         if (assigneeIds.length === 0) {
           toast({
             title: 'No se encontraron house techs',
@@ -128,6 +147,47 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
       await refetch();
     } catch (e: any) {
       toast({ title: 'Create failed', description: e?.message || String(e), variant: 'destructive' });
+    }
+  };
+
+  const bulkDeleteByType = async () => {
+    if (!newType) return;
+    const candidates = (tasks || []).filter((task: any) => {
+      if (task.task_type !== newType) return false;
+      if (bulkDeleteMode === 'all') return true;
+      const assigneeId = typeof task.assigned_to === 'string' ? task.assigned_to : task.assigned_to?.id;
+      return !assigneeId;
+    });
+    const ids = candidates
+      .map((task: any) => task.id)
+      .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
+
+    if (!ids.length) {
+      toast({
+        title: 'Sin tareas para borrar',
+        description:
+          bulkDeleteMode === 'unassigned'
+            ? `No hay tareas sin asignar de tipo ${newType}.`
+            : `No hay tareas de tipo ${newType}.`,
+      });
+      return;
+    }
+
+    const scopeLabel = bulkDeleteMode === 'unassigned' ? 'sin asignar' : 'todas';
+    const confirmed = window.confirm(
+      `Vas a borrar ${ids.length} tarea(s) ${scopeLabel} de tipo "${newType}". Esta acción no se puede deshacer.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const deletedCount = await deleteTasks(ids);
+      toast({
+        title: 'Borrado masivo completado',
+        description: `Se borraron ${deletedCount} tarea(s) de tipo ${newType}.`,
+      });
+      await refetch();
+    } catch (e: any) {
+      toast({ title: 'Bulk delete failed', description: e?.message || String(e), variant: 'destructive' });
     }
   };
 
@@ -168,10 +228,10 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="Assign to" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ASSIGN_ALL_DEPARTMENT}>
-                Todo el departamento de {department} (sin house tech)
+                Oficina {deptName}
               </SelectItem>
               <SelectItem value={ASSIGN_ALL_DEPARTMENT_HOUSE_TECH}>
-                Todo el departamento de {department} (solo house techs)
+                Almacen {deptName}
               </SelectItem>
               {managementUsers?.map((u: any) => (
                 <SelectItem key={u.id} value={u.id}>{u.first_name} {u.last_name}</SelectItem>
@@ -182,6 +242,20 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
         <Button size="sm" variant="outline" onClick={addTask} disabled={!canEdit && !canAssign}>
           <Plus className="h-4 w-4 mr-1" /> Add Task
         </Button>
+        {canEdit && (
+          <>
+            <Select value={bulkDeleteMode} onValueChange={(v) => setBulkDeleteMode(v as 'all' | 'unassigned')}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Delete scope" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Delete all by type</SelectItem>
+                <SelectItem value="unassigned">Delete unassigned by type</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="destructive" onClick={bulkDeleteByType} disabled={!newType}>
+              <Trash2 className="h-4 w-4 mr-1" /> Bulk Delete
+            </Button>
+          </>
+        )}
       </div>
 
       <div className="border rounded">

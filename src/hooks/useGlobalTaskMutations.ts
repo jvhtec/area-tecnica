@@ -138,6 +138,16 @@ export function useGlobalTaskMutations(department: Dept) {
     if (!assigneeIds.length) {
       return { created: [], skippedAssigneeIds: [] as string[] };
     }
+    const normalizedAssigneeIds = Array.from(
+      new Set(
+        assigneeIds
+          .map((id) => (typeof id === 'string' ? id.trim() : ''))
+          .filter((id): id is string => id.length > 0)
+      )
+    );
+    if (!normalizedAssigneeIds.length) {
+      return { created: [], skippedAssigneeIds: assigneeIds };
+    }
 
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData?.user?.id ?? null;
@@ -154,29 +164,43 @@ export function useGlobalTaskMutations(department: Dept) {
     if (params.job_id) payloadBase.job_id = params.job_id;
     if (params.tour_id) payloadBase.tour_id = params.tour_id;
 
-    const payloads = assigneeIds.map((assigneeId) => ({
+    let existingQuery = supabase
+      .from(table)
+      .select('assigned_to')
+      .eq('task_type', params.task_type)
+      .in('assigned_to', normalizedAssigneeIds);
+
+    if (params.job_id) {
+      existingQuery = existingQuery.eq('job_id', params.job_id);
+    } else if (params.tour_id) {
+      existingQuery = existingQuery.eq('tour_id', params.tour_id);
+    }
+
+    const { data: existingTasks, error: existingError } = await existingQuery;
+    if (existingError) throw existingError;
+
+    const existingAssignees = new Set(
+      (existingTasks || [])
+        .map((row: any) => row.assigned_to)
+        .filter((id: string | null) => Boolean(id))
+    );
+
+    const assigneeIdsToCreate = normalizedAssigneeIds.filter((id) => !existingAssignees.has(id));
+    const skippedAssigneeIds = normalizedAssigneeIds.filter((id) => existingAssignees.has(id));
+
+    if (!assigneeIdsToCreate.length) {
+      return { created: [], skippedAssigneeIds };
+    }
+
+    const payloads = assigneeIdsToCreate.map((assigneeId) => ({
       ...payloadBase,
       assigned_to: assigneeId,
     }));
 
-    const { data, error } = await supabase
-      .from(table)
-      .upsert(payloads, {
-        onConflict: 'task_type,assigned_to,job_id,tour_id',
-        ignoreDuplicates: true,
-      })
-      .select('id, assigned_to');
+    const { data, error } = await supabase.from(table).insert(payloads).select('id, assigned_to');
     if (error) throw error;
 
-    const created = data || [];
-    const createdAssigneeIds = new Set(
-      created
-        .map((row: any) => row.assigned_to)
-        .filter((id: string | null) => Boolean(id))
-    );
-    const skippedAssigneeIds = assigneeIds.filter((id) => !createdAssigneeIds.has(id));
-
-    return { created, skippedAssigneeIds };
+    return { created: data || [], skippedAssigneeIds };
   };
 
   const updateTask = async (id: string, fields: TaskUpdate) => {
