@@ -31,7 +31,7 @@ interface SingleTaskPopupProps {
   onOpenChange: (open: boolean) => void;
   task: Task | null;
   jobOrTourName: string;
-  jobOrTourType: 'job' | 'tour';
+  jobOrTourType: 'job' | 'tour' | 'global';
   client?: string;
   onDismiss: () => void;
   onViewAll: () => void;
@@ -72,8 +72,10 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
   if (!task) return null;
 
   const handleViewTask = () => {
-    navigate(task.detailLink);
-    onOpenChange(false);
+    if (task.detailLink) {
+      navigate(task.detailLink);
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -98,9 +100,11 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
           {/* Job/Tour Context */}
           <div className="rounded-lg border bg-muted/40 p-4">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs font-mono">
-                {jobOrTourType.toUpperCase()}
-              </Badge>
+              {jobOrTourType !== 'global' && (
+                <Badge variant="outline" className="text-xs font-mono">
+                  {jobOrTourType.toUpperCase()}
+                </Badge>
+              )}
               <h3 className="font-semibold">{jobOrTourName}</h3>
             </div>
             {client && (
@@ -189,13 +193,15 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
               View All Tasks ({totalPendingCount})
             </Button>
           )}
-          <Button
-            onClick={handleViewTask}
-            className="w-full sm:w-auto"
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            View Task Details
-          </Button>
+          {task.detailLink && (
+            <Button
+              onClick={handleViewTask}
+              className="w-full sm:w-auto"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              View Task Details
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

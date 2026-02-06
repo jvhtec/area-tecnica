@@ -127,9 +127,11 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs font-mono">
-                            {group.type.toUpperCase()}
-                          </Badge>
+                          {group.type !== 'global' && (
+                            <Badge variant="outline" className="text-xs font-mono">
+                              {group.type.toUpperCase()}
+                            </Badge>
+                          )}
                           <h3 className="font-semibold">{group.name}</h3>
                         </div>
                         {group.client && (
@@ -211,16 +213,18 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleViewDetails(task.detailLink)}
-                                  className="h-8"
-                                  aria-label={`View details for ${task.taskType} task`}
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  View
-                                </Button>
+                                {task.detailLink && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleViewDetails(task.detailLink)}
+                                    className="h-8"
+                                    aria-label={`View details for ${task.taskType} task`}
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    View
+                                  </Button>
+                                )}
                                 {canCompleteTask && (
                                   <Button
                                     size="sm"

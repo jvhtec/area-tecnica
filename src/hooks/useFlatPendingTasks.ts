@@ -12,7 +12,7 @@ export interface FlatPendingTask {
   detailLink: string;
   // Context from parent group
   jobOrTourName: string;
-  jobOrTourType: 'job' | 'tour';
+  jobOrTourType: 'job' | 'tour' | 'global';
   client?: string;
 }
 

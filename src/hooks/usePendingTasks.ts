@@ -26,7 +26,7 @@ export interface PendingTask {
 
 export interface GroupedPendingTask {
   id: string;
-  type: 'job' | 'tour';
+  type: 'job' | 'tour' | 'global';
   name: string;
   client?: string;
   tasks: Array<{
@@ -119,18 +119,37 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
 
       (data || []).forEach((task: PendingTask) => {
         const isJob = !!task.job_id;
-        const groupId = isJob ? `job-${task.job_id}` : `tour-${task.tour_id}`;
-        const name = isJob ? task.job_name || 'Unknown Job' : task.tour_name || 'Unknown Tour';
-        const detailLink = isJob
-          ? `/festival-management/${task.job_id}`
-          : `/tour-management/${task.tour_id}`;
+        const isTour = !!task.tour_id;
+        const isGlobal = !isJob && !isTour;
+
+        let groupId: string;
+        let name: string;
+        let type: 'job' | 'tour' | 'global';
+        let detailLink: string;
+
+        if (isJob) {
+          groupId = `job-${task.job_id}`;
+          name = task.job_name || 'Unknown Job';
+          type = 'job';
+          detailLink = `/festival-management/${task.job_id}`;
+        } else if (isTour) {
+          groupId = `tour-${task.tour_id}`;
+          name = task.tour_name || 'Unknown Tour';
+          type = 'tour';
+          detailLink = `/tour-management/${task.tour_id}`;
+        } else {
+          groupId = 'global';
+          name = 'Tareas Globales';
+          type = 'global';
+          detailLink = '';
+        }
 
         if (!grouped.has(groupId)) {
           grouped.set(groupId, {
             id: groupId,
-            type: isJob ? 'job' : 'tour',
+            type,
             name,
-            client: task.client || undefined,
+            client: isGlobal ? undefined : (task.client || undefined),
             tasks: [],
           });
         }
