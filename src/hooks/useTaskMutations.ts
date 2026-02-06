@@ -182,43 +182,30 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     }
     if (due_at) payloadBase.due_at = due_at;
 
-    // Avoid duplicate task rows for the same assignee + task type + context.
-    let existingQuery = supabase
-      .from(table)
-      .select('assigned_to')
-      .eq('task_type', task_type)
-      .in('assigned_to', assigneeIds);
-
-    if (tourId) {
-      existingQuery = existingQuery.eq('tour_id', tourId);
-    } else if (jobId) {
-      existingQuery = existingQuery.eq('job_id', jobId);
-    }
-
-    const { data: existingTasks, error: existingError } = await existingQuery;
-    if (existingError) throw existingError;
-
-    const existingAssignees = new Set(
-      (existingTasks || [])
-        .map((row: any) => row.assigned_to)
-        .filter((id: string | null) => Boolean(id))
-    );
-
-    const assigneeIdsToCreate = assigneeIds.filter((id) => !existingAssignees.has(id));
-    const skippedAssigneeIds = assigneeIds.filter((id) => existingAssignees.has(id));
-
-    if (!assigneeIdsToCreate.length) {
-      return { created: [], skippedAssigneeIds };
-    }
-
-    const payloads = assigneeIdsToCreate.map((assigneeId) => ({
+    const payloads = assigneeIds.map((assigneeId) => ({
       ...payloadBase,
       assigned_to: assigneeId,
     }));
 
-    const { data, error } = await supabase.from(table).insert(payloads).select();
+    const { data, error } = await supabase
+      .from(table)
+      .upsert(payloads, {
+        onConflict: 'task_type,assigned_to,job_id,tour_id',
+        ignoreDuplicates: true,
+      })
+      .select('id, assigned_to');
+
     if (error) throw error;
-    return { created: data || [], skippedAssigneeIds };
+
+    const created = data || [];
+    const createdAssigneeIds = new Set(
+      created
+        .map((row: any) => row.assigned_to)
+        .filter((id: string | null) => Boolean(id))
+    );
+    const skippedAssigneeIds = assigneeIds.filter((id) => !createdAssigneeIds.has(id));
+
+    return { created, skippedAssigneeIds };
   };
 
   const updateTask = async (id: string, fields: Record<string, any>) => {
