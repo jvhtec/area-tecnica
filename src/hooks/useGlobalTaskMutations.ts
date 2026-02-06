@@ -138,6 +138,16 @@ export function useGlobalTaskMutations(department: Dept) {
     if (!assigneeIds.length) {
       return { created: [], skippedAssigneeIds: [] as string[] };
     }
+    const normalizedAssigneeIds = Array.from(
+      new Set(
+        assigneeIds
+          .map((id) => (typeof id === 'string' ? id.trim() : ''))
+          .filter((id): id is string => id.length > 0)
+      )
+    );
+    if (!normalizedAssigneeIds.length) {
+      return { created: [], skippedAssigneeIds: assigneeIds };
+    }
 
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData?.user?.id ?? null;
@@ -158,7 +168,7 @@ export function useGlobalTaskMutations(department: Dept) {
       .from(table)
       .select('assigned_to')
       .eq('task_type', params.task_type)
-      .in('assigned_to', assigneeIds);
+      .in('assigned_to', normalizedAssigneeIds);
 
     if (params.job_id) {
       existingQuery = existingQuery.eq('job_id', params.job_id);
@@ -175,8 +185,8 @@ export function useGlobalTaskMutations(department: Dept) {
         .filter((id: string | null) => Boolean(id))
     );
 
-    const assigneeIdsToCreate = assigneeIds.filter((id) => !existingAssignees.has(id));
-    const skippedAssigneeIds = assigneeIds.filter((id) => existingAssignees.has(id));
+    const assigneeIdsToCreate = normalizedAssigneeIds.filter((id) => !existingAssignees.has(id));
+    const skippedAssigneeIds = normalizedAssigneeIds.filter((id) => existingAssignees.has(id));
 
     if (!assigneeIdsToCreate.length) {
       return { created: [], skippedAssigneeIds };

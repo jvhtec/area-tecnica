@@ -150,9 +150,14 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
       };
 
       if (assignedTo === ASSIGN_ALL_DEPARTMENT) {
-        const assigneeIds = (departmentUsers || [])
-          .filter((u) => u.role !== 'house_tech')
-          .map((u) => u.id);
+        const assigneeIds = Array.from(
+          new Set(
+            (departmentUsers || [])
+              .filter((u) => u.role !== 'house_tech')
+              .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
+              .filter((id): id is string => id.length > 0)
+          )
+        );
         if (!assigneeIds.length) {
           toast({
             title: 'No se encontraron usuarios',
@@ -172,9 +177,14 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
           description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.${skippedText}`,
         });
       } else if (assignedTo === ASSIGN_ALL_DEPARTMENT_HOUSE_TECH) {
-        const assigneeIds = (departmentUsers || [])
-          .filter((u) => u.role === 'house_tech')
-          .map((u) => u.id);
+        const assigneeIds = Array.from(
+          new Set(
+            (departmentUsers || [])
+              .filter((u) => u.role === 'house_tech')
+              .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
+              .filter((id): id is string => id.length > 0)
+          )
+        );
         if (!assigneeIds.length) {
           toast({
             title: 'No se encontraron house techs',

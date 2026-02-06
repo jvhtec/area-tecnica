@@ -173,6 +173,16 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     if (!assigneeIds.length) {
       return { created: [], skippedAssigneeIds: [] as string[] };
     }
+    const normalizedAssigneeIds = Array.from(
+      new Set(
+        assigneeIds
+          .map((id) => (typeof id === 'string' ? id.trim() : ''))
+          .filter((id): id is string => id.length > 0)
+      )
+    );
+    if (!normalizedAssigneeIds.length) {
+      return { created: [], skippedAssigneeIds: assigneeIds };
+    }
 
     const payloadBase: any = { task_type, status: 'not_started', progress: 0 };
     if (tourId) {
@@ -187,7 +197,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
       .from(table)
       .select('assigned_to')
       .eq('task_type', task_type)
-      .in('assigned_to', assigneeIds);
+      .in('assigned_to', normalizedAssigneeIds);
 
     if (tourId) {
       existingQuery = existingQuery.eq('tour_id', tourId);
@@ -204,8 +214,8 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
         .filter((id: string | null) => Boolean(id))
     );
 
-    const assigneeIdsToCreate = assigneeIds.filter((id) => !existingAssignees.has(id));
-    const skippedAssigneeIds = assigneeIds.filter((id) => existingAssignees.has(id));
+    const assigneeIdsToCreate = normalizedAssigneeIds.filter((id) => !existingAssignees.has(id));
+    const skippedAssigneeIds = normalizedAssigneeIds.filter((id) => existingAssignees.has(id));
 
     if (!assigneeIdsToCreate.length) {
       return { created: [], skippedAssigneeIds };
@@ -228,6 +238,20 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
   const deleteTask = async (id: string) => {
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) throw error;
+  };
+
+  const deleteTasks = async (ids: string[]) => {
+    const taskIds = Array.from(
+      new Set(
+        ids
+          .map((id) => (typeof id === 'string' ? id.trim() : ''))
+          .filter((id): id is string => id.length > 0)
+      )
+    );
+    if (!taskIds.length) return 0;
+    const { data, error } = await supabase.from(table).delete().in('id', taskIds).select('id');
+    if (error) throw error;
+    return (data || []).length;
   };
 
   const assignUser = async (id: string, userId: string | null) => {
@@ -320,6 +344,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     createTaskForUsers,
     updateTask,
     deleteTask,
+    deleteTasks,
     assignUser,
     setStatus,
     setDueDate,
