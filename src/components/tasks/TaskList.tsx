@@ -19,6 +19,7 @@ const TASK_TYPES: Record<'sound'|'lights'|'video', string[]> = {
 };
 
 type Dept = 'sound'|'lights'|'video';
+const ASSIGN_ALL_DEPARTMENT = '__all_department__';
 
 interface TaskListProps {
   jobId?: string;
@@ -31,7 +32,16 @@ interface TaskListProps {
 
 export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, canEdit, canAssign }) => {
   const { tasks, loading, refetch } = useJobTasks(jobId, department, tourId);
-  const { createTask, assignUser, setStatus, setDueDate, deleteTask, uploadAttachment, deleteAttachment } = useTaskMutations(jobId, department, tourId);
+  const {
+    createTask,
+    createTaskForUsers,
+    assignUser,
+    setStatus,
+    setDueDate,
+    deleteTask,
+    uploadAttachment,
+    deleteAttachment,
+  } = useTaskMutations(jobId, department, tourId);
   const [newType, setNewType] = React.useState<string | undefined>(TASK_TYPES[department][0]);
   const [newAssignee, setNewAssignee] = React.useState<string | undefined>(undefined);
   const { toast } = useToast();
@@ -45,11 +55,29 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
   }, []);
 
   const { data: managementUsers } = useManagementUsers();
+  const { data: departmentUsers } = useDepartmentUsers(department);
 
   const addTask = async () => {
     if (!newType) return;
     try {
-      await createTask(newType, newAssignee || null, null);
+      if (newAssignee === ASSIGN_ALL_DEPARTMENT) {
+        const assigneeIds = (departmentUsers || []).map((u: any) => u.id);
+        if (assigneeIds.length === 0) {
+          toast({
+            title: 'No users found',
+            description: 'No department users available (excluding house tech).',
+            variant: 'destructive',
+          });
+          return;
+        }
+        await createTaskForUsers(newType, assigneeIds, null);
+        toast({
+          title: 'Tasks created',
+          description: `Created ${assigneeIds.length} tasks for ${department} department.`,
+        });
+      } else {
+        await createTask(newType, newAssignee || null, null);
+      }
       setNewAssignee(undefined);
       await refetch();
     } catch (e: any) {
@@ -93,6 +121,9 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
           <Select value={newAssignee} onValueChange={setNewAssignee}>
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="Assign to" /></SelectTrigger>
             <SelectContent>
+              <SelectItem value={ASSIGN_ALL_DEPARTMENT}>
+                All {department} users (no house tech)
+              </SelectItem>
               {managementUsers?.map((u: any) => (
                 <SelectItem key={u.id} value={u.id}>{u.first_name} {u.last_name}</SelectItem>
               ))}
@@ -220,6 +251,21 @@ function useManagementUsers() {
         .from('profiles')
         .select('id, first_name, last_name')
         .in('role', ['management','admin','logistics']);
+      if (error) throw error;
+      return data || [];
+    }
+  });
+}
+
+function useDepartmentUsers(department: Dept) {
+  return useQuery({
+    queryKey: ['department-users', department],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .eq('department', department)
+        .neq('role', 'house_tech');
       if (error) throw error;
       return data || [];
     }
