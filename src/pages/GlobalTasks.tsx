@@ -138,6 +138,8 @@ export default function GlobalTasks() {
   const [statusFilter, setStatusFilter] = React.useState<string>('active');
   const [assigneeFilter, setAssigneeFilter] = React.useState<string>('all');
   const [showFilters, setShowFilters] = React.useState(false);
+  const [bulkDeleteType, setBulkDeleteType] = React.useState<string>('');
+  const [bulkDeleteScope, setBulkDeleteScope] = React.useState<'all' | 'unassigned'>('all');
 
   // Dialogs
   const [showCreate, setShowCreate] = React.useState(false);
@@ -181,6 +183,21 @@ export default function GlobalTasks() {
     }
     return result;
   }, [tasks, statusFilter, assigneeFilter]);
+
+  const taskTypeOptions = React.useMemo(
+    () => Array.from(new Set(tasks.map((t) => t.task_type).filter((t): t is string => Boolean(t)))).sort(),
+    [tasks]
+  );
+
+  React.useEffect(() => {
+    if (!taskTypeOptions.length) {
+      setBulkDeleteType('');
+      return;
+    }
+    if (!bulkDeleteType || !taskTypeOptions.includes(bulkDeleteType)) {
+      setBulkDeleteType(taskTypeOptions[0]);
+    }
+  }, [taskTypeOptions, bulkDeleteType]);
 
   // Stats
   const stats = React.useMemo(() => ({
@@ -238,6 +255,47 @@ export default function GlobalTasks() {
     }
   };
 
+  const bulkDeleteTasks = async () => {
+    if (!bulkDeleteType) return;
+    const candidates = filteredTasks.filter((task) => {
+      if (task.task_type !== bulkDeleteType) return false;
+      if (bulkDeleteScope === 'all') return true;
+      return !task.assigned_to;
+    });
+
+    if (!candidates.length) {
+      toast({
+        title: 'Sin tareas para borrar',
+        description:
+          bulkDeleteScope === 'unassigned'
+            ? `No hay tareas sin asignar de tipo ${bulkDeleteType} con los filtros actuales.`
+            : `No hay tareas de tipo ${bulkDeleteType} con los filtros actuales.`,
+      });
+      return;
+    }
+
+    const scopeLabel = bulkDeleteScope === 'unassigned' ? 'sin asignar' : 'todas';
+    const confirmed = window.confirm(
+      `Vas a borrar ${candidates.length} tarea(s) ${scopeLabel} de tipo "${bulkDeleteType}". Esta acción no se puede deshacer.`
+    );
+    if (!confirmed) return;
+
+    const results = await Promise.allSettled(candidates.map((task) => mutations.deleteTask(task.id)));
+    const deleted = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - deleted;
+
+    if (failed === 0) {
+      toast({ title: 'Borrado masivo completado', description: `Se borraron ${deleted} tarea(s).` });
+    } else {
+      toast({
+        title: 'Borrado masivo parcial',
+        description: `Se borraron ${deleted} tarea(s) y fallaron ${failed}.`,
+        variant: 'destructive',
+      });
+    }
+    await refetch();
+  };
+
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6 max-w-7xl">
       {/* Header */}
@@ -261,6 +319,41 @@ export default function GlobalTasks() {
           )}
         </div>
       </div>
+
+      {canEdit && taskTypeOptions.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
+              <div className="text-xs font-medium text-muted-foreground min-w-[110px]">Borrado masivo</div>
+              <Select value={bulkDeleteType} onValueChange={setBulkDeleteType}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Tipo de tarea" />
+                </SelectTrigger>
+                <SelectContent>
+                  {taskTypeOptions.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={bulkDeleteScope} onValueChange={(v) => setBulkDeleteScope(v as 'all' | 'unassigned')}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas por tipo (filtro actual)</SelectItem>
+                  <SelectItem value="unassigned">Solo sin asignar (filtro actual)</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button size="sm" variant="destructive" onClick={bulkDeleteTasks} disabled={!bulkDeleteType}>
+                <Trash2 className="h-4 w-4 mr-1" />
+                Borrar en lote
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
