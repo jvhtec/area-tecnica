@@ -891,7 +891,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Music className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Tarifa de ensayo (€180/día)</span>
+                <span className="text-sm font-medium">Tarifa de ensayo</span>
               </div>
               {jobTimesheetDates.length > 1 && (
                 <div className="flex items-center gap-2">
