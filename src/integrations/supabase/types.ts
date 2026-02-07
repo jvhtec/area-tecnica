@@ -3908,6 +3908,45 @@ export type Database = {
           },
         ]
       }
+      job_rehearsal_dates: {
+        Row: {
+          id: string
+          job_id: string
+          date: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          job_id: string
+          date: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          job_id?: string
+          date?: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_rehearsal_dates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_rehearsal_dates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           color: string | null

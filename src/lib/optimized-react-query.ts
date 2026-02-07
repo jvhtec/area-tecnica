@@ -117,5 +117,12 @@ export const optimizedInvalidation = {
     jobIds.forEach(jobId => {
       optimizedInvalidation.invalidateJobRelated(queryClient, jobId);
     });
-  }
+  },
+
+  // Batch invalidation for arbitrary query keys
+  invalidateQueryKeys: (queryClient: QueryClient, queryKeys: QueryKey[]) => {
+    queryKeys.forEach(queryKey => {
+      queryClient.invalidateQueries({ queryKey });
+    });
+  },
 };

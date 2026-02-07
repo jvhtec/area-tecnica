@@ -3,7 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send, Receipt } from 'lucide-react';
+import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send, Receipt, Music } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+import { es } from 'date-fns/locale';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import {
@@ -28,6 +31,7 @@ import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-ex
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToggleTechnicianPayoutApproval } from '@/hooks/useToggleTechnicianPayoutApproval';
+import { useJobRehearsalDates, useToggleDateRehearsalRate, useToggleAllDatesRehearsalRate } from '@/hooks/useToggleJobRehearsalRate';
 import type { JobExpenseBreakdownItem, JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { JobPayoutOverrideSection, type JobPayoutOverride } from './JobPayoutOverrideSection';
@@ -298,6 +302,37 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const setOverrideMutation = useSetTechnicianPayoutOverride();
   const removeOverrideMutation = useRemoveTechnicianPayoutOverride();
   const toggleApprovalMutation = useToggleTechnicianPayoutApproval();
+  const { data: rehearsalDates = [] } = useJobRehearsalDates(jobId, { enabled: isManager && !jobMetaLoading });
+  const toggleDateRehearsalMutation = useToggleDateRehearsalRate();
+  const toggleAllDatesRehearsalMutation = useToggleAllDatesRehearsalRate();
+
+  // Build a set of dates currently marked as rehearsal for quick lookup
+  const rehearsalDateSet = React.useMemo(
+    () => new Set(rehearsalDates.map(r => r.date)),
+    [rehearsalDates]
+  );
+
+  // Collect all unique timesheet dates for this job (used for the per-date UI)
+  const { data: jobTimesheetDates = [] } = useQuery({
+    queryKey: ['job-timesheet-dates', jobId],
+    enabled: !!jobId && !jobMetaLoading && isManager,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('date')
+        .eq('job_id', jobId)
+        .eq('is_active', true);
+      if (error) throw error;
+      const uniqueDates = Array.from(new Set((data || []).map(t => t.date).filter(Boolean))) as string[];
+      return uniqueDates.sort();
+    },
+    staleTime: 60_000,
+  });
+
+  const allDatesMarked = React.useMemo(
+    () => jobTimesheetDates.length > 0 && jobTimesheetDates.every(date => rehearsalDateSet.has(date)),
+    [jobTimesheetDates, rehearsalDateSet]
+  );
 
   const [editingTechId, setEditingTechId] = React.useState<string | null>(null);
   const [editingAmount, setEditingAmount] = React.useState('');
@@ -850,6 +885,76 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             </Button>
           </div>
         </div>
+        {/* Per-date rehearsal rate toggles - managers only */}
+        {isManager && jobTimesheetDates.length > 0 && (
+          <div className="mt-3 bg-muted/40 border border-border rounded-md px-3 py-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Music className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Tarifa de ensayo (€180/día)</span>
+              </div>
+              {jobTimesheetDates.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7 px-2"
+                    disabled={toggleAllDatesRehearsalMutation.isPending}
+                    onClick={() => toggleAllDatesRehearsalMutation.mutate({
+                      jobId,
+                      dates: jobTimesheetDates,
+                      enabled: !allDatesMarked,
+                    })}
+                  >
+                    {allDatesMarked ? 'Desmarcar todas' : 'Marcar todas'}
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {jobTimesheetDates.map(dateStr => {
+                const isActive = rehearsalDateSet.has(dateStr);
+                const isPending = toggleDateRehearsalMutation.isPending || toggleAllDatesRehearsalMutation.isPending;
+                const label = formatInTimeZone(parseISO(dateStr), 'Europe/Madrid', 'd MMM', { locale: es });
+                return (
+                  <button
+                    key={dateStr}
+                    type="button"
+                    aria-pressed={isActive}
+                    disabled={isPending}
+                    onClick={() => toggleDateRehearsalMutation.mutate({
+                      jobId,
+                      date: dateStr,
+                      enabled: !isActive,
+                    })}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer select-none',
+                      isActive
+                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-200'
+                        : 'bg-muted/30 border-border text-muted-foreground hover:bg-muted/50',
+                      isPending && 'opacity-60'
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      data-state={isActive ? 'checked' : 'unchecked'}
+                      className="pointer-events-none scale-75 inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
+                    >
+                      <span
+                        data-state={isActive ? 'checked' : 'unchecked'}
+                        className="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+                      />
+                    </span>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            {(toggleDateRehearsalMutation.isPending || toggleAllDatesRehearsalMutation.isPending) && (
+              <span className="text-xs text-muted-foreground animate-pulse">Recalculando…</span>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4 w-full overflow-hidden">
         {payoutTotals.map((payout) => (
