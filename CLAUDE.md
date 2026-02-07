@@ -244,11 +244,14 @@ The database is extensive with 85+ migrations. Key tables:
 - `backline` - Backline department
 - `stage` - Stage/rigging department
 
-#### Roles (User Permissions)
-- `super_admin` - Full system access
-- `admin` - Department admin access
-- `jefe` - Department head/manager
-- `tech` - Technician (read-only portal access)
+#### Roles (User Permissions) — `user_role` enum
+- `admin` - Admin access
+- `management` - Management access
+- `house_tech` - In-house technician
+- `technician` - Freelance technician
+- `user` - Basic user
+- `logistics` - Logistics role
+- `wallboard` - Digital signage display
 
 ### Flex Rental Solutions Integration
 
