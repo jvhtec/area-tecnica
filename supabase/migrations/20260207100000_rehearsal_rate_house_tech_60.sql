@@ -1,7 +1,7 @@
--- House techs and management/admin users assignable as techs get a reduced
--- rehearsal flat rate of €60 (instead of €180 for regular technicians).
--- Both RPC functions are updated to detect the user type and apply the
--- appropriate default when no custom rehearsal rate exists.
+-- House techs, admin, and management users get a reduced rehearsal flat rate
+-- of €60 (instead of €180 for regular technicians).
+-- Both RPC functions are updated to check role IN ('house_tech','admin','management')
+-- and apply the appropriate default when no custom rehearsal rate exists.
 
 -- 1. Update compute_timesheet_amount_2025
 CREATE OR REPLACE FUNCTION public.compute_timesheet_amount_2025(
@@ -34,21 +34,18 @@ DECLARE
   v_rehearsal_flat_rate NUMERIC := NULL;
   v_is_autonomo BOOLEAN := TRUE;
   v_is_house_tech BOOLEAN := FALSE;
-  v_is_assignable_admin BOOLEAN := FALSE;
+  v_is_reduced_rehearsal BOOLEAN := FALSE;
   v_autonomo_discount NUMERIC := 0;
   v_forced_rehearsal BOOLEAN := FALSE;
 BEGIN
-  -- Fetch timesheet with job info, category, autonomo status, and assignable_as_tech
+  -- Fetch timesheet with job info, category, autonomo status, and role-based flags
   SELECT
     t.*,
     j.job_type,
     j.tour_date_id,
     COALESCE(p.autonomo, true) as is_autonomo,
     COALESCE(p.role = 'house_tech', false) as is_house_tech,
-    COALESCE(
-      p.role NOT IN ('technician', 'house_tech') AND p.assignable_as_tech = true,
-      false
-    ) as is_assignable_admin,
+    COALESCE(p.role IN ('house_tech', 'admin', 'management'), false) as is_reduced_rehearsal,
     COALESCE(
       t.category,
       CASE
@@ -102,10 +99,10 @@ BEGIN
     END IF;
   END IF;
 
-  -- Get autonomo / house_tech / assignable_admin status from the main query
+  -- Get autonomo / house_tech / reduced rehearsal status from the main query
   v_is_autonomo := v_timesheet.is_autonomo;
   v_is_house_tech := v_timesheet.is_house_tech;
-  v_is_assignable_admin := v_timesheet.is_assignable_admin;
+  v_is_reduced_rehearsal := v_timesheet.is_reduced_rehearsal;
 
   -- Calculate worked hours once for both rehearsal and standard paths
   IF v_timesheet.end_time < v_timesheet.start_time OR COALESCE(v_timesheet.ends_next_day, false) THEN
@@ -126,9 +123,10 @@ BEGIN
     FROM public.custom_tech_rates
     WHERE profile_id = v_timesheet.technician_id;
 
-    -- If no custom rate, use role-based defaults
+    -- If no custom rate, use role-based defaults:
+    -- house_tech / admin / management → €60, regular technicians → €180
     IF v_rehearsal_flat_rate IS NULL THEN
-      IF v_is_house_tech OR v_is_assignable_admin THEN
+      IF v_is_reduced_rehearsal THEN
         v_rehearsal_flat_rate := 60.00;
       ELSE
         v_rehearsal_flat_rate := 180.00;
@@ -136,8 +134,8 @@ BEGIN
     END IF;
 
     -- Apply discount for non-autonomo regular technicians only.
-    -- House techs and assignable admins are exempt from the autonomo discount.
-    IF NOT v_is_autonomo AND NOT v_is_house_tech AND NOT v_is_assignable_admin THEN
+    -- House techs, admin, and management are exempt from the autonomo discount.
+    IF NOT v_is_autonomo AND NOT v_is_reduced_rehearsal THEN
       v_autonomo_discount := 30.00;
       v_rehearsal_flat_rate := v_rehearsal_flat_rate - v_autonomo_discount;
     END IF;
@@ -297,7 +295,7 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.compute_timesheet_amount_2025(uuid,boolean) IS
-  'Calculates timesheet amounts based on rate cards. Rehearsal flat rate: €60 for house_tech and management/admin assignable_as_tech users, €180 for regular technicians. Triggered by tour_date_type=rehearsal OR job_rehearsal_dates. Custom rehearsal_day_eur in custom_tech_rates overrides defaults.';
+  'Calculates timesheet amounts based on rate cards. Rehearsal flat rate: €60 for house_tech/admin/management roles, €180 for regular technicians. Triggered by tour_date_type=rehearsal OR job_rehearsal_dates. Custom rehearsal_day_eur in custom_tech_rates overrides defaults.';
 
 -- 2. Update compute_tour_job_rate_quote_2025
 CREATE OR REPLACE FUNCTION public.compute_tour_job_rate_quote_2025(_job_id uuid, _tech_id uuid)
@@ -314,7 +312,7 @@ DECLARE
   cat text;
   house boolean := false;
   is_autonomo boolean := true;
-  is_assignable_admin boolean := false;
+  is_reduced_rehearsal boolean := false;
   autonomo_discount numeric := 0;
   base_day_before_discount numeric;
   base_after_discount numeric(10,2);
@@ -368,12 +366,12 @@ BEGIN
       AND date = job_start_date
   ) INTO v_forced_rehearsal;
 
-  -- Check if house tech, autonomo status, and assignable_as_tech
+  -- Check house tech, autonomo status, and reduced-rehearsal role
   SELECT
     (role = 'house_tech'),
     CASE WHEN role = 'technician' THEN COALESCE(autonomo, true) ELSE true END,
-    COALESCE(role NOT IN ('technician', 'house_tech') AND assignable_as_tech = true, false)
-  INTO house, is_autonomo, is_assignable_admin
+    COALESCE(role IN ('house_tech', 'admin', 'management'), false)
+  INTO house, is_autonomo, is_reduced_rehearsal
   FROM public.profiles
   WHERE id = _tech_id;
 
@@ -385,9 +383,10 @@ BEGIN
     FROM public.custom_tech_rates
     WHERE profile_id = _tech_id;
 
-    -- If no custom rate, use role-based defaults
+    -- If no custom rate, use role-based defaults:
+    -- house_tech / admin / management → €60, regular technicians → €180
     IF rehearsal_flat_rate IS NULL THEN
-      IF house OR is_assignable_admin THEN
+      IF is_reduced_rehearsal THEN
         rehearsal_flat_rate := 60.00;
         base_day_before_discount := 60.00;
       ELSE
@@ -396,14 +395,14 @@ BEGIN
       END IF;
 
       -- Apply discount for non-autonomo regular technicians only.
-      -- House techs and assignable admins are exempt.
-      IF NOT is_autonomo AND NOT house AND NOT is_assignable_admin THEN
+      -- House techs, admin, and management are exempt.
+      IF NOT is_autonomo AND NOT is_reduced_rehearsal THEN
         autonomo_discount := 30.00;
         rehearsal_flat_rate := rehearsal_flat_rate - autonomo_discount;
       END IF;
     ELSE
       base_day_before_discount := rehearsal_flat_rate;
-      IF NOT is_autonomo AND NOT house AND NOT is_assignable_admin THEN
+      IF NOT is_autonomo AND NOT is_reduced_rehearsal THEN
         autonomo_discount := 30.00;
         rehearsal_flat_rate := rehearsal_flat_rate - autonomo_discount;
       END IF;
@@ -625,4 +624,4 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.compute_tour_job_rate_quote_2025(uuid,uuid) IS
-  'Calculates tour job rate quotes. Rehearsal flat rate: €60 for house_tech and management/admin assignable_as_tech users, €180 for regular technicians. Custom rehearsal_day_eur in custom_tech_rates overrides defaults. Checks job_rehearsal_dates and tour_date_type for rehearsal detection.';
+  'Calculates tour job rate quotes. Rehearsal flat rate: €60 for house_tech/admin/management roles, €180 for regular technicians. Custom rehearsal_day_eur in custom_tech_rates overrides defaults. Checks job_rehearsal_dates and tour_date_type for rehearsal detection.';
