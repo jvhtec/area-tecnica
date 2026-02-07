@@ -176,7 +176,7 @@ export default function JobAssignmentMatrix() {
         if (tech.role === 'technician' || tech.role === 'house_tech') {
           return true;
         }
-        if (tech.role === 'management') {
+        if (tech.role === 'management' || tech.role === 'admin') {
           return !!tech.assignable_as_tech;
         }
         return false;
