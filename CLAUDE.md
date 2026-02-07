@@ -237,14 +237,15 @@ The database is extensive with 85+ migrations. Key tables:
 - `declined` - Technician declined
 - `cancelled` - Assignment cancelled
 
-#### Departments
-- `sound` - Audio/Sound department
-- `lights` - Lighting department
-- `video` - Video department
-- `backline` - Backline department
-- `stage` - Stage/rigging department
+#### Departments — `department` enum
+- `sound` - Audio/Sound
+- `lights` - Lighting
+- `video` - Video
+- `logistics` - Logistics
+- `production` - Production
+- `administrative` - Administrative
 
-#### Roles (User Permissions) — `user_role` enum
+#### Roles — `user_role` enum
 - `admin` - Admin access
 - `management` - Management access
 - `house_tech` - In-house technician
