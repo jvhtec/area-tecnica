@@ -43,7 +43,7 @@ BEGIN
     t.*,
     j.job_type,
     j.tour_date_id,
-    COALESCE(p.autonomo, true) as is_autonomo,
+    CASE WHEN p.role = 'technician' THEN COALESCE(p.autonomo, true) ELSE true END as is_autonomo,
     COALESCE(p.role = 'house_tech', false) as is_house_tech,
     COALESCE(p.role IN ('house_tech', 'admin', 'management'), false) as is_reduced_rehearsal,
     COALESCE(
@@ -153,6 +153,7 @@ BEGIN
       'is_rehearsal_flat_rate', true,
       'rehearsal_rate_eur', v_rehearsal_flat_rate,
       'autonomo_discount_eur', v_autonomo_discount,
+      'base_day_before_discount_eur', CASE WHEN v_autonomo_discount > 0 THEN v_rehearsal_flat_rate + v_autonomo_discount ELSE v_rehearsal_flat_rate END,
       'base_amount_eur', v_rehearsal_flat_rate,
       'base_day_eur', v_rehearsal_flat_rate,
       'plus_10_12_hours', 0,
@@ -374,6 +375,10 @@ BEGIN
   INTO house, is_autonomo, is_reduced_rehearsal
   FROM public.profiles
   WHERE id = _tech_id;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('error','profile_not_found','technician_id',_tech_id);
+  END IF;
 
   -- Handle rehearsal flat rate for tour dates
   -- Triggered by tour_date_type = 'rehearsal' OR presence in job_rehearsal_dates
