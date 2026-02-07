@@ -1,36 +1,90 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
+import { createEntityQueryOptions, optimizedInvalidation } from '@/lib/react-query';
 import { toast } from 'sonner';
 
-interface RehearsalDateRow {
-  id: string;
-  job_id: string;
-  date: string;
+type RehearsalDateRow = Tables<'job_rehearsal_dates'>;
+
+interface UseJobRehearsalDatesOptions {
+  enabled?: boolean;
 }
 
 /**
  * Fetches the set of dates marked as rehearsal for a given job.
  */
-export function useJobRehearsalDates(jobId: string) {
-  return useQuery({
-    queryKey: ['job-rehearsal-dates', jobId],
-    enabled: !!jobId,
-    queryFn: async (): Promise<RehearsalDateRow[]> => {
-      const { data, error } = await supabase
-        .from('job_rehearsal_dates')
-        .select('id, job_id, date')
-        .eq('job_id', jobId);
-      if (error) throw error;
-      return (data || []) as RehearsalDateRow[];
-    },
-    staleTime: 30_000,
-  });
+export function useJobRehearsalDates(jobId: string, options: UseJobRehearsalDatesOptions = {}) {
+  const { enabled = true } = options;
+
+  return useQuery(
+    createEntityQueryOptions<RehearsalDateRow[]>(
+      'job-rehearsal-dates',
+      jobId,
+      {
+        enabled: !!jobId && enabled,
+        queryFn: async (): Promise<RehearsalDateRow[]> => {
+          const { data, error } = await supabase
+            .from('job_rehearsal_dates')
+            .select('id, job_id, date')
+            .eq('job_id', jobId);
+          if (error) throw error;
+          return (data || []) as RehearsalDateRow[];
+        },
+        staleTime: 30_000,
+      }
+    )
+  );
 }
 
 interface ToggleDateRehearsalParams {
   jobId: string;
   date: string;        // ISO date string (yyyy-MM-dd)
   enabled: boolean;
+}
+
+const invalidateRehearsalRateQueries = (queryClient: QueryClient, jobId: string) => {
+  optimizedInvalidation.invalidateQueryKeys(queryClient, [
+    ['job-rehearsal-dates', jobId],
+    ['job-tech-payout', jobId],
+    ['job-tech-days', jobId],
+    ['manager-job-quotes', jobId],
+    ['timesheets'],
+    ['job-tech-payout', jobId, 'tour-timesheet-data'],
+  ]);
+};
+
+/**
+ * Recalculates timesheet amounts for multiple timesheets.
+ * Uses Promise.allSettled to attempt all recalculations even if some fail.
+ * @returns The number of successfully recalculated timesheets
+ * @throws Error if any recalculations fail
+ */
+async function recalculateTimesheets(timesheetIds: string[]): Promise<number> {
+  if (timesheetIds.length === 0) return 0;
+
+  const results = await Promise.allSettled(
+    timesheetIds.map((id) =>
+      supabase.rpc('compute_timesheet_amount_2025', {
+        _timesheet_id: id,
+        _persist: true,
+      })
+    )
+  );
+
+  // Check for any failures (rejected promises or RPC errors)
+  const failures = results.filter((r) => r.status === 'rejected');
+  const rpcErrors = results.filter(
+    (r) => r.status === 'fulfilled' && r.value.error != null
+  );
+
+  if (failures.length > 0 || rpcErrors.length > 0) {
+    const totalErrors = failures.length + rpcErrors.length;
+    throw new Error(
+      `Failed to recalculate ${totalErrors} of ${timesheetIds.length} timesheet(s)`
+    );
+  }
+
+  return timesheetIds.length;
 }
 
 /**
@@ -66,26 +120,14 @@ export function useToggleDateRehearsalRate() {
         .eq('is_active', true);
       if (tsError) throw tsError;
 
-      if (timesheets && timesheets.length > 0) {
-        await Promise.allSettled(
-          timesheets.map(ts =>
-            supabase.rpc('compute_timesheet_amount_2025', {
-              _timesheet_id: ts.id,
-              _persist: true,
-            })
-          )
-        );
-      }
+      const recalculated = await recalculateTimesheets(
+        timesheets?.map((ts) => ts.id) ?? []
+      );
 
-      return { jobId, date, enabled, recalculated: timesheets?.length ?? 0 };
+      return { jobId, date, enabled, recalculated };
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['job-rehearsal-dates', result.jobId] });
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', result.jobId] });
-      queryClient.invalidateQueries({ queryKey: ['job-tech-days', result.jobId] });
-      queryClient.invalidateQueries({ queryKey: ['manager-job-quotes', result.jobId] });
-      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', result.jobId, 'tour-timesheet-data'] });
+      invalidateRehearsalRateQueries(queryClient, result.jobId);
     },
     onError: (error) => {
       console.error('[useToggleDateRehearsalRate] Error:', error);
@@ -134,26 +176,14 @@ export function useToggleAllDatesRehearsalRate() {
         .eq('is_active', true);
       if (tsError) throw tsError;
 
-      if (timesheets && timesheets.length > 0) {
-        await Promise.allSettled(
-          timesheets.map(ts =>
-            supabase.rpc('compute_timesheet_amount_2025', {
-              _timesheet_id: ts.id,
-              _persist: true,
-            })
-          )
-        );
-      }
+      const recalculated = await recalculateTimesheets(
+        timesheets?.map((ts) => ts.id) ?? []
+      );
 
-      return { jobId, enabled, recalculated: timesheets?.length ?? 0 };
+      return { jobId, enabled, recalculated };
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['job-rehearsal-dates', result.jobId] });
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', result.jobId] });
-      queryClient.invalidateQueries({ queryKey: ['job-tech-days', result.jobId] });
-      queryClient.invalidateQueries({ queryKey: ['manager-job-quotes', result.jobId] });
-      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', result.jobId, 'tour-timesheet-data'] });
+      invalidateRehearsalRateQueries(queryClient, result.jobId);
 
       toast.success(
         result.enabled

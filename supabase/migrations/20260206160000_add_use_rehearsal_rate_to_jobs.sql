@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.job_rehearsal_dates (
   job_id uuid NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
   date date NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES public.profiles(id),
+  created_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   UNIQUE(job_id, date)
 );
 
@@ -64,6 +64,7 @@ DECLARE
   v_is_extended_shift BOOLEAN := FALSE;
   v_rehearsal_flat_rate NUMERIC := NULL;
   v_is_autonomo BOOLEAN := TRUE;
+  v_is_house_tech BOOLEAN := FALSE;
   v_autonomo_discount NUMERIC := 0;
   v_forced_rehearsal BOOLEAN := FALSE;
 BEGIN
@@ -73,6 +74,7 @@ BEGIN
     j.job_type,
     j.tour_date_id,
     COALESCE(p.autonomo, true) as is_autonomo,
+    COALESCE(p.role = 'house_tech', false) as is_house_tech,
     COALESCE(
       t.category,
       CASE
@@ -128,6 +130,19 @@ BEGIN
 
   -- Get autonomo status from the main query
   v_is_autonomo := v_timesheet.is_autonomo;
+  v_is_house_tech := v_timesheet.is_house_tech;
+
+  -- Calculate worked hours once for both rehearsal and standard paths
+  IF v_timesheet.end_time < v_timesheet.start_time OR COALESCE(v_timesheet.ends_next_day, false) THEN
+    v_worked_hours := EXTRACT(EPOCH FROM (
+      v_timesheet.end_time - v_timesheet.start_time + INTERVAL '24 hours'
+    )) / 3600.0 - (COALESCE(v_timesheet.break_minutes, 0) / 60.0);
+  ELSE
+    v_worked_hours := EXTRACT(EPOCH FROM (
+      v_timesheet.end_time - v_timesheet.start_time
+    )) / 3600.0 - (COALESCE(v_timesheet.break_minutes, 0) / 60.0);
+  END IF;
+  v_worked_hours := ROUND(v_worked_hours * 2) / 2.0;
 
   -- Handle rehearsal flat rate
   IF v_is_rehearsal THEN
@@ -141,23 +156,11 @@ BEGIN
       v_rehearsal_flat_rate := 180.00;
     END IF;
 
-    -- Apply autonomo discount if applicable (for both custom and default rates)
-    IF NOT v_is_autonomo THEN
+    -- Apply discount for non-autonomo non-house technicians.
+    IF NOT v_is_autonomo AND NOT v_is_house_tech THEN
       v_autonomo_discount := 30.00;
       v_rehearsal_flat_rate := v_rehearsal_flat_rate - v_autonomo_discount;
     END IF;
-
-    -- Calculate worked hours for breakdown info only
-    IF v_timesheet.end_time < v_timesheet.start_time OR COALESCE(v_timesheet.ends_next_day, false) THEN
-      v_worked_hours := EXTRACT(EPOCH FROM (
-        v_timesheet.end_time - v_timesheet.start_time + INTERVAL '24 hours'
-      )) / 3600.0 - (COALESCE(v_timesheet.break_minutes, 0) / 60.0);
-    ELSE
-      v_worked_hours := EXTRACT(EPOCH FROM (
-        v_timesheet.end_time - v_timesheet.start_time
-      )) / 3600.0 - (COALESCE(v_timesheet.break_minutes, 0) / 60.0);
-    END IF;
-    v_worked_hours := ROUND(v_worked_hours * 2) / 2.0;
 
     v_total_amount := v_rehearsal_flat_rate;
     v_billable_hours := v_worked_hours;
@@ -229,19 +232,6 @@ BEGIN
       RAISE EXCEPTION 'Rate card not found for category: %', v_category;
     END IF;
   END IF;
-
-  -- Calculate worked hours
-  IF v_timesheet.end_time < v_timesheet.start_time OR COALESCE(v_timesheet.ends_next_day, false) THEN
-    v_worked_hours := EXTRACT(EPOCH FROM (
-      v_timesheet.end_time - v_timesheet.start_time + INTERVAL '24 hours'
-    )) / 3600.0 - (COALESCE(v_timesheet.break_minutes, 0) / 60.0);
-  ELSE
-    v_worked_hours := EXTRACT(EPOCH FROM (
-      v_timesheet.end_time - v_timesheet.start_time
-    )) / 3600.0 - (COALESCE(v_timesheet.break_minutes, 0) / 60.0);
-  END IF;
-
-  v_worked_hours := ROUND(v_worked_hours * 2) / 2.0;
 
   -- Handle evento jobs (fixed 12-hour rate)
   IF v_job_type = 'evento' THEN
@@ -339,6 +329,7 @@ AS $function$
 DECLARE
   jtype job_type;
   st timestamptz;
+  job_start_date date;
   tour_group uuid;
   cat text;
   house boolean := false;
@@ -380,6 +371,8 @@ BEGIN
     RETURN jsonb_build_object('error','not_tour_date');
   END IF;
 
+  job_start_date := (st AT TIME ZONE 'Europe/Madrid')::date;
+
   -- Check for rehearsal tour date type
   SELECT td.tour_date_type INTO tour_date_type
   FROM public.tour_dates td
@@ -387,10 +380,11 @@ BEGIN
   WHERE j.id = _job_id
   LIMIT 1;
 
-  -- Check if any date for this job is forced as rehearsal via job_rehearsal_dates
+  -- Check if this job start date is forced as rehearsal via job_rehearsal_dates
   SELECT EXISTS (
     SELECT 1 FROM public.job_rehearsal_dates
     WHERE job_id = _job_id
+      AND date = job_start_date
   ) INTO v_forced_rehearsal;
 
   -- Check if house tech and autonomo status
@@ -414,7 +408,7 @@ BEGIN
       rehearsal_flat_rate := 180.00;
       base_day_before_discount := 180.00;
 
-      IF NOT is_autonomo THEN
+      IF NOT is_autonomo AND NOT house THEN
         autonomo_discount := 30.00;
         rehearsal_flat_rate := rehearsal_flat_rate - autonomo_discount;
       END IF;
@@ -571,6 +565,8 @@ BEGIN
       IF tech_assigned_dates = total_tour_dates THEN
         cnt := total_tour_dates;
 
+        -- Full-week tour team multiplier tiers: 1 date=1.5x, 2 dates=2.25x total,
+        -- 3+ dates use baseline 1.0x to avoid over-scaling longer runs.
         IF cnt <= 1 THEN
           mult := 1.5;
           per_job_multiplier := 1.5;

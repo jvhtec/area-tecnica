@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Euro, AlertCircle, Clock, CheckCircle, FileDown, ExternalLink, Send, Receipt, Music } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
@@ -301,7 +302,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const setOverrideMutation = useSetTechnicianPayoutOverride();
   const removeOverrideMutation = useRemoveTechnicianPayoutOverride();
   const toggleApprovalMutation = useToggleTechnicianPayoutApproval();
-  const { data: rehearsalDates = [] } = useJobRehearsalDates(jobId);
+  const { data: rehearsalDates = [] } = useJobRehearsalDates(jobId, { enabled: isManager && !jobMetaLoading });
   const toggleDateRehearsalMutation = useToggleDateRehearsalRate();
   const toggleAllDatesRehearsalMutation = useToggleAllDatesRehearsalRate();
 
@@ -314,7 +315,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   // Collect all unique timesheet dates for this job (used for the per-date UI)
   const { data: jobTimesheetDates = [] } = useQuery({
     queryKey: ['job-timesheet-dates', jobId],
-    enabled: !!jobId && !jobMetaLoading,
+    enabled: !!jobId && !jobMetaLoading && isManager,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('timesheets')
@@ -327,6 +328,11 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     },
     staleTime: 60_000,
   });
+
+  const allDatesMarked = React.useMemo(
+    () => jobTimesheetDates.length > 0 && jobTimesheetDates.every(date => rehearsalDateSet.has(date)),
+    [jobTimesheetDates, rehearsalDateSet]
+  );
 
   const [editingTechId, setEditingTechId] = React.useState<string | null>(null);
   const [editingAmount, setEditingAmount] = React.useState('');
@@ -897,10 +903,10 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                     onClick={() => toggleAllDatesRehearsalMutation.mutate({
                       jobId,
                       dates: jobTimesheetDates,
-                      enabled: rehearsalDateSet.size < jobTimesheetDates.length,
+                      enabled: !allDatesMarked,
                     })}
                   >
-                    {rehearsalDateSet.size >= jobTimesheetDates.length ? 'Desmarcar todas' : 'Marcar todas'}
+                    {allDatesMarked ? 'Desmarcar todas' : 'Marcar todas'}
                   </Button>
                 </div>
               )}
@@ -909,10 +915,12 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
               {jobTimesheetDates.map(dateStr => {
                 const isActive = rehearsalDateSet.has(dateStr);
                 const isPending = toggleDateRehearsalMutation.isPending || toggleAllDatesRehearsalMutation.isPending;
+                const label = formatInTimeZone(parseISO(dateStr), 'Europe/Madrid', 'd MMM', { locale: es });
                 return (
                   <button
                     key={dateStr}
                     type="button"
+                    aria-pressed={isActive}
                     disabled={isPending}
                     onClick={() => toggleDateRehearsalMutation.mutate({
                       jobId,
@@ -927,12 +935,17 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                       isPending && 'opacity-60'
                     )}
                   >
-                    <Switch
-                      checked={isActive}
-                      className="scale-75 pointer-events-none"
-                      tabIndex={-1}
-                    />
-                    {format(parseISO(dateStr), 'd MMM', { locale: es })}
+                    <span
+                      aria-hidden="true"
+                      data-state={isActive ? 'checked' : 'unchecked'}
+                      className="pointer-events-none scale-75 inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
+                    >
+                      <span
+                        data-state={isActive ? 'checked' : 'unchecked'}
+                        className="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+                      />
+                    </span>
+                    {label}
                   </button>
                 );
               })}
