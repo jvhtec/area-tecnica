@@ -73,74 +73,72 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
             {filteredAssignments.map((assignment: any) => (
               <div
                 key={assignment.technician_id}
-                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-muted rounded min-w-0"
+                className="flex items-start gap-3 p-3 bg-muted rounded min-w-0"
               >
-                <div className="min-w-0 flex-1 flex items-center gap-3">
-                  <Avatar className="h-10 w-10 shrink-0">
-                    {assignment.profiles?.profile_picture_url && (
-                      <AvatarImage
-                        src={assignment.profiles.profile_picture_url}
-                        alt={`${assignment.profiles.first_name} ${assignment.profiles.last_name}`}
-                      />
+                <Avatar className="h-10 w-10 shrink-0">
+                  {assignment.profiles?.profile_picture_url && (
+                    <AvatarImage
+                      src={assignment.profiles.profile_picture_url}
+                      alt={`${assignment.profiles.first_name} ${assignment.profiles.last_name}`}
+                    />
+                  )}
+                  <AvatarFallback className="text-sm">
+                    {assignment.profiles
+                      ? `${assignment.profiles.first_name?.[0] || ""}${assignment.profiles.last_name?.[0] || ""}`.toUpperCase()
+                      : "EX"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">
+                    {assignment.profiles
+                      ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
+                      : assignment.external_technician_name || "Desconocido"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{assignment.profiles?.department || "Externo"}</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {assignment.sound_role && (
+                      <Badge variant="outline" className="text-xs">
+                        Sonido: {labelForCode(assignment.sound_role)}
+                      </Badge>
                     )}
-                    <AvatarFallback className="text-sm">
-                      {assignment.profiles
-                        ? `${assignment.profiles.first_name?.[0] || ""}${assignment.profiles.last_name?.[0] || ""}`.toUpperCase()
-                        : "EX"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium break-words">
-                      {assignment.profiles
-                        ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
-                        : assignment.external_technician_name || "Desconocido"}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{assignment.profiles?.department || "Externo"}</p>
+                    {assignment.lights_role && (
+                      <Badge variant="outline" className="text-xs">
+                        Luces: {labelForCode(assignment.lights_role)}
+                      </Badge>
+                    )}
+                    {assignment.video_role && (
+                      <Badge variant="outline" className="text-xs">
+                        Vídeo: {labelForCode(assignment.video_role)}
+                      </Badge>
+                    )}
                     {assignment.single_day && (
-                      <p className="text-xs text-muted-foreground break-words">
+                      <Badge variant="secondary" className="text-xs">
                         {(() => {
                           const dates = technicianDatesMap.get(assignment.technician_id);
                           if (dates && dates.size > 0) {
-                            const sortedDates = Array.from(dates).sort();
-                            if (sortedDates.length === 1) {
-                              return `Solo día: ${format(new Date(sortedDates[0]), "PPP", { locale: es })}`;
-                            }
-                            return `Días: ${sortedDates.map((d) => format(new Date(d), "dd/MM")).join(", ")}`;
+                            return dates.size === 1 ? "Día único" : "Varios días";
                           }
-                          return assignment.assignment_date
-                            ? `Solo día: ${format(new Date(assignment.assignment_date), "PPP", { locale: es })}`
-                            : "Sin fecha definida";
+                          return "Día único";
                         })()}
-                      </p>
+                      </Badge>
                     )}
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-1 w-full sm:w-auto sm:shrink-0">
-                  {assignment.sound_role && (
-                    <Badge variant="outline" className="text-xs">
-                      Sonido: {labelForCode(assignment.sound_role)}
-                    </Badge>
-                  )}
-                  {assignment.lights_role && (
-                    <Badge variant="outline" className="text-xs">
-                      Luces: {labelForCode(assignment.lights_role)}
-                    </Badge>
-                  )}
-                  {assignment.video_role && (
-                    <Badge variant="outline" className="text-xs">
-                      Vídeo: {labelForCode(assignment.video_role)}
-                    </Badge>
-                  )}
                   {assignment.single_day && (
-                    <Badge variant="secondary" className="text-xs">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {(() => {
                         const dates = technicianDatesMap.get(assignment.technician_id);
                         if (dates && dates.size > 0) {
-                          return dates.size === 1 ? "Día único" : "Varios días";
+                          const sortedDates = Array.from(dates).sort();
+                          if (sortedDates.length === 1) {
+                            return `Solo día: ${format(new Date(sortedDates[0]), "PPP", { locale: es })}`;
+                          }
+                          return `Días: ${sortedDates.map((d) => format(new Date(d), "dd/MM")).join(", ")}`;
                         }
-                        return "Día único";
+                        return assignment.assignment_date
+                          ? `Solo día: ${format(new Date(assignment.assignment_date), "PPP", { locale: es })}`
+                          : "Sin fecha definida";
                       })()}
-                    </Badge>
+                    </p>
                   )}
                 </div>
               </div>
