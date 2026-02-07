@@ -1,7 +1,9 @@
 import React, { useMemo } from "react";
-import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatInTimeZone } from "date-fns-tz";
 import { Users } from "lucide-react";
+
+const TZ = "Europe/Madrid";
 
 import { TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -130,12 +132,12 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
                         if (dates && dates.size > 0) {
                           const sortedDates = Array.from(dates).sort();
                           if (sortedDates.length === 1) {
-                            return `Solo día: ${format(new Date(sortedDates[0]), "PPP", { locale: es })}`;
+                            return `Solo día: ${formatInTimeZone(sortedDates[0], TZ, "PPP", { locale: es })}`;
                           }
-                          return `Días: ${sortedDates.map((d) => format(new Date(d), "dd/MM")).join(", ")}`;
+                          return `Días: ${sortedDates.map((d) => formatInTimeZone(d, TZ, "dd/MM", { locale: es })).join(", ")}`;
                         }
                         return assignment.assignment_date
-                          ? `Solo día: ${format(new Date(assignment.assignment_date), "PPP", { locale: es })}`
+                          ? `Solo día: ${formatInTimeZone(assignment.assignment_date, TZ, "PPP", { locale: es })}`
                           : "Sin fecha definida";
                       })()}
                     </p>
