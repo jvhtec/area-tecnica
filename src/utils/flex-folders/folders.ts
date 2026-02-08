@@ -245,7 +245,10 @@ export async function createAllFoldersForJob(
     department: string | null;
   };
 
-  const { data: existingFolders, error: existingFoldersError } = await supabase
+  // Query existing folders by job_id first
+  let allExistingFolders: FlexFolderRow[] = [];
+
+  const { data: existingByJobId, error: existingFoldersError } = await supabase
     .from("flex_folders")
     .select("id, element_id, parent_id, folder_type, department")
     .eq("job_id", job.id);
@@ -255,6 +258,31 @@ export async function createAllFoldersForJob(
     throw existingFoldersError;
   }
 
+  allExistingFolders = existingByJobId ?? [];
+
+  // For tourdate jobs, also query by tour_date_id to catch folders created via createFoldersForDate
+  if (job.job_type === "tourdate" && job.tour_date_id) {
+    const { data: existingByTourDateId, error: tourDateFoldersError } = await supabase
+      .from("flex_folders")
+      .select("id, element_id, parent_id, folder_type, department")
+      .eq("tour_date_id", job.tour_date_id);
+
+    if (tourDateFoldersError) {
+      console.warn("Failed to load existing Flex folders by tour_date_id:", tourDateFoldersError);
+    } else if (existingByTourDateId && existingByTourDateId.length > 0) {
+      // Merge, deduplicating by id
+      const existingIds = new Set(allExistingFolders.map(f => f.id));
+      for (const folder of existingByTourDateId) {
+        if (!existingIds.has(folder.id)) {
+          allExistingFolders.push(folder);
+          existingIds.add(folder.id);
+        }
+      }
+    }
+  }
+
+  const existingFolders = allExistingFolders;
+
   const existingMainFolder =
     existingFolders?.find(folder => folder.folder_type === "main_event") ??
     existingFolders?.find(folder => folder.folder_type === "main");
@@ -262,6 +290,11 @@ export async function createAllFoldersForJob(
 
   const existingDepartmentMap = new Map<string, FlexFolderRow>();
   const existingWorkOrderMap = new Map<string, FlexFolderRow>();
+  // Map of existing tourdate folders per department
+  const existingTourdateMap = new Map<string, FlexFolderRow>();
+  // Map of ALL existing subfolder types per department: dept -> Set of folder_type strings
+  const existingSubfolderTypes = new Map<string, Set<string>>();
+
   for (const folder of existingFolders ?? []) {
     if (folder.folder_type === "department" && folder.department) {
       existingDepartmentMap.set(folder.department, folder);
@@ -269,11 +302,23 @@ export async function createAllFoldersForJob(
     if (folder.folder_type === "work_orders" && folder.department) {
       existingWorkOrderMap.set(folder.department, folder);
     }
+    if (folder.folder_type === "tourdate" && folder.department) {
+      existingTourdateMap.set(folder.department, folder);
+    }
+    // Track all folder types per department for sub-element deduplication
+    if (folder.department && folder.folder_type) {
+      if (!existingSubfolderTypes.has(folder.department)) {
+        existingSubfolderTypes.set(folder.department, new Set());
+      }
+      existingSubfolderTypes.get(folder.department)!.add(folder.folder_type);
+    }
   }
 
   if (isLegacyMainFolder) {
     existingDepartmentMap.clear();
     existingWorkOrderMap.clear();
+    existingTourdateMap.clear();
+    existingSubfolderTypes.clear();
   }
 
   const safeJobTitle = job?.title?.trim?.() || job?.title || "Sin título";
@@ -665,82 +710,101 @@ export async function createAllFoldersForJob(
         personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
       };
 
-      console.log(`Creating tour date folder for ${dept}:`, tourDateFolderPayload);
-      const tourDateFolder = await createFlexFolder(tourDateFolderPayload);
+      // Check if a tourdate folder already exists for this department
+      const existingTourdate = existingTourdateMap.get(dept);
+      let deptFolderId: string;
+      let childRow: FlexFolderRow;
 
-      const { data: [childRow], error: childErr } = await supabase
-        .from("flex_folders")
-        .insert({
-          job_id: job.id,
-          parent_id: parentRow.id,
-          element_id: tourDateFolder.elementId,
-          department: dept,
-          folder_type: "tourdate",
-        })
-        .select("*");
+      if (existingTourdate?.element_id) {
+        console.log(`Reusing existing tourdate folder for ${dept}:`, existingTourdate.element_id);
+        deptFolderId = existingTourdate.element_id;
+        childRow = existingTourdate;
+      } else {
+        console.log(`Creating tour date folder for ${dept}:`, tourDateFolderPayload);
+        const tourDateFolder = await createFlexFolder(tourDateFolderPayload);
 
-      if (childErr) {
-        console.error("Error inserting child folder row:", childErr);
-        continue;
+        const { data: [insertedRow], error: childErr } = await supabase
+          .from("flex_folders")
+          .insert({
+            job_id: job.id,
+            parent_id: parentRow.id,
+            element_id: tourDateFolder.elementId,
+            department: dept,
+            folder_type: "tourdate",
+          })
+          .select("*");
+
+        if (childErr) {
+          console.error("Error inserting child folder row:", childErr);
+          continue;
+        }
+
+        deptFolderId = insertedRow.element_id;
+        childRow = insertedRow as FlexFolderRow;
+        // Track the newly created folder so subsequent checks work
+        existingTourdateMap.set(dept, childRow);
       }
 
-      const deptFolderId = childRow.element_id;
       const parentName = tourDateFolderPayload.name;
       const parentDocumentNumber = tourDateFolderPayload.documentNumber;
+      const deptExistingSubs = existingSubfolderTypes.get(dept) ?? new Set<string>();
 
       // Create department-specific hojaInfo elements for sound, lights, and video
       if (
         ["sound", "lights", "video"].includes(dept) &&
         shouldCreateItem(dept, "hojaInfo", options)
       ) {
-        const hojaInfoType = dept === "sound"
-          ? FLEX_FOLDER_IDS.hojaInfoSx
-          : dept === "lights"
-            ? FLEX_FOLDER_IDS.hojaInfoLx
-            : FLEX_FOLDER_IDS.hojaInfoVx;
-        
-        const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
-        
-        const hojaInfoPayload = {
-          definitionId: hojaInfoType,
-          parentElementId: deptFolderId,
-          open: true,
-          locked: false,
-          name: `Hoja de Información - ${locationName} - ${formattedDate}`,
-          plannedStartDate: formattedStartDate,
-          plannedEndDate: formattedEndDate,
-          locationId: FLEX_FOLDER_IDS.location,
-          departmentId: DEPARTMENT_IDS[dept as Department],
-          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${hojaInfoSuffix}`,
-          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
-        };
-
-        console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
-        const hojaInfoResponse = await createFlexFolder(hojaInfoPayload);
-
-        // Persist hojaInfo element ID
         const hojaInfoFolderType = dept === "sound"
           ? "hoja_info_sx"
           : dept === "lights"
             ? "hoja_info_lx"
             : "hoja_info_vx";
 
-        try {
-          await supabase.from("flex_folders").insert({
-            job_id: job.id,
-            parent_id: childRow.id,
-            element_id: hojaInfoResponse.elementId,
-            department: dept,
-            folder_type: hojaInfoFolderType,
-          });
-          console.log(`Persisted hojaInfo for ${dept} with element_id: ${hojaInfoResponse.elementId}`);
-        } catch (err) {
-          console.error(`Failed to persist hojaInfo for ${dept}:`, err);
-          console.error(`Orphaned Flex folder created with element_id: ${hojaInfoResponse.elementId}`);
-          throw new Error(
-            `Failed to persist hojaInfo for ${dept} (element_id: ${hojaInfoResponse.elementId}). ` +
-            `Flex folder was created but could not be recorded in database. Original error: ${err}`
-          );
+        if (deptExistingSubs.has(hojaInfoFolderType)) {
+          console.log(`Skipping hojaInfo for ${dept} - already exists`);
+        } else {
+          const hojaInfoType = dept === "sound"
+            ? FLEX_FOLDER_IDS.hojaInfoSx
+            : dept === "lights"
+              ? FLEX_FOLDER_IDS.hojaInfoLx
+              : FLEX_FOLDER_IDS.hojaInfoVx;
+
+          const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
+
+          const hojaInfoPayload = {
+            definitionId: hojaInfoType,
+            parentElementId: deptFolderId,
+            open: true,
+            locked: false,
+            name: `Hoja de Información - ${locationName} - ${formattedDate}`,
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            departmentId: DEPARTMENT_IDS[dept as Department],
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${hojaInfoSuffix}`,
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+          };
+
+          console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
+          const hojaInfoResponse = await createFlexFolder(hojaInfoPayload);
+
+          try {
+            await supabase.from("flex_folders").insert({
+              job_id: job.id,
+              parent_id: childRow.id,
+              element_id: hojaInfoResponse.elementId,
+              department: dept,
+              folder_type: hojaInfoFolderType,
+            });
+            console.log(`Persisted hojaInfo for ${dept} with element_id: ${hojaInfoResponse.elementId}`);
+          } catch (err) {
+            console.error(`Failed to persist hojaInfo for ${dept}:`, err);
+            console.error(`Orphaned Flex folder created with element_id: ${hojaInfoResponse.elementId}`);
+            throw new Error(
+              `Failed to persist hojaInfo for ${dept} (element_id: ${hojaInfoResponse.elementId}). ` +
+              `Flex folder was created but could not be recorded in database. Original error: ${err}`
+            );
+          }
         }
       }
 
@@ -751,23 +815,32 @@ export async function createAllFoldersForJob(
             name: `${tourData.name} - ${locationName} - ${formattedDate} - Documentación Técnica - ${deptLabel}`,
             suffix: "DT",
             key: "documentacionTecnica" as const,
+            folderType: "doc_tecnica",
           },
           {
             definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
             name: `${tourData.name} - ${locationName} - ${formattedDate} - Presupuestos Recibidos - ${deptLabel}`,
             suffix: "PR",
             key: "presupuestosRecibidos" as const,
+            folderType: "presupuestos_recibidos",
           },
           {
             definitionId: FLEX_FOLDER_IDS.hojaGastos,
             name: `${tourData.name} - ${locationName} - ${formattedDate} - Hoja de Gastos - ${deptLabel}`,
             suffix: "HG",
             key: "hojaGastos" as const,
+            folderType: "hoja_gastos",
           },
         ];
 
         for (const sf of subfolders) {
           if (!shouldCreateItem(dept, sf.key, options)) continue;
+
+          if (deptExistingSubs.has(sf.folderType)) {
+            console.log(`Skipping ${sf.key} for ${dept} - already exists`);
+            continue;
+          }
+
           const subPayload = {
             definitionId: sf.definitionId,
             parentElementId: deptFolderId,
@@ -784,20 +857,13 @@ export async function createAllFoldersForJob(
 
           const subFolderResponse = await createFlexFolder(subPayload);
 
-          // Persist subfolder element ID
-          const folderTypeMap: Record<string, string> = {
-            documentacionTecnica: "doc_tecnica",
-            presupuestosRecibidos: "presupuestos_recibidos",
-            hojaGastos: "hoja_gastos",
-          };
-
           try {
             await supabase.from("flex_folders").insert({
               job_id: job.id,
               parent_id: childRow.id,
               element_id: subFolderResponse.elementId,
               department: dept,
-              folder_type: folderTypeMap[sf.key],
+              folder_type: sf.folderType,
             });
             console.log(`Persisted ${sf.key} for ${dept} with element_id: ${subFolderResponse.elementId}`);
           } catch (err) {
@@ -810,91 +876,102 @@ export async function createAllFoldersForJob(
           }
         }
       } else if (dept === "comercial") {
-        await createComercialExtras(
-          deptFolderId,
-          parentName,
-          parentDocumentNumber,
-          safeJobTitle
-        );
+        // Only create comercial extras if none exist yet for this department
+        const hasComercialExtras = deptExistingSubs.has("comercial_extras") || deptExistingSubs.has("comercial_presupuesto");
+        if (!hasComercialExtras) {
+          await createComercialExtras(
+            deptFolderId,
+            parentName,
+            parentDocumentNumber,
+            safeJobTitle
+          );
+        } else {
+          console.log(`Skipping comercial extras for ${dept} - already exist`);
+        }
       }
       if (["sound", "lights", "video"].includes(dept)) {
-        const metadataEntries = getDepartmentCustomPullsheetMetadata(options?.[dept]);
-        const defaultPullsheets: PullsheetTemplate[] = [];
+        // Skip pullsheets if any already exist for this department
+        if (deptExistingSubs.has("pull_sheet")) {
+          console.log(`Skipping pullsheets for ${dept} - already exist`);
+        } else {
+          const metadataEntries = getDepartmentCustomPullsheetMetadata(options?.[dept]);
+          const defaultPullsheets: PullsheetTemplate[] = [];
 
-        if (dept === "sound") {
-          const isTourPackOnly = tourDateInfo?.is_tour_pack_only || false;
-          console.log(`Tour pack only setting for sound folder:`, isTourPackOnly);
+          if (dept === "sound") {
+            const isTourPackOnly = tourDateInfo?.is_tour_pack_only || false;
+            console.log(`Tour pack only setting for sound folder:`, isTourPackOnly);
 
-          if (shouldCreateItem("sound", "pullSheetTP", options)) {
-            defaultPullsheets.push({
-              name: `${safeJobTitle} - Tour Pack`,
-              suffix: "TP",
-              plannedStartDate: formattedStartDate,
-              plannedEndDate: formattedEndDate,
-            });
+            if (shouldCreateItem("sound", "pullSheetTP", options)) {
+              defaultPullsheets.push({
+                name: `${safeJobTitle} - Tour Pack`,
+                suffix: "TP",
+                plannedStartDate: formattedStartDate,
+                plannedEndDate: formattedEndDate,
+              });
+            }
+
+            if (!isTourPackOnly && shouldCreateItem("sound", "pullSheetPA", options)) {
+              defaultPullsheets.push({
+                name: `${safeJobTitle} - PA`,
+                suffix: "PA",
+                plannedStartDate: formattedStartDate,
+                plannedEndDate: formattedEndDate,
+              });
+            }
           }
 
-          if (!isTourPackOnly && shouldCreateItem("sound", "pullSheetPA", options)) {
-            defaultPullsheets.push({
-              name: `${safeJobTitle} - PA`,
-              suffix: "PA",
-              plannedStartDate: formattedStartDate,
-              plannedEndDate: formattedEndDate,
-            });
-          }
-        }
-
-        if (defaultPullsheets.length > 0 || metadataEntries.length > 0) {
-          const fallbackNameForIndex = (index: number, defaultEntry?: PullsheetTemplate) => {
-            if (defaultEntry?.name) return defaultEntry.name;
-            const base = `${parentName} - Pullsheet`;
-            return `${base}${index > 0 ? ` ${index + 1}` : ""}`;
-          };
-
-          const templates = buildPullsheetTemplates(
-            defaultPullsheets,
-            metadataEntries,
-            formattedStartDate,
-            formattedEndDate,
-            fallbackNameForIndex
-          );
-
-          const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
-
-          for (const template of templates) {
-            const pullsheetPayload = {
-              definitionId: FLEX_FOLDER_IDS.pullSheet,
-              parentElementId: deptFolderId,
-              open: true,
-              locked: false,
-              name: template.name,
-              plannedStartDate: template.plannedStartDate,
-              plannedEndDate: template.plannedEndDate,
-              locationId: FLEX_FOLDER_IDS.location,
-              departmentId: DEPARTMENT_IDS[dept as Department],
-              documentNumber: `${documentPrefix}${template.suffix}`,
-              personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+          if (defaultPullsheets.length > 0 || metadataEntries.length > 0) {
+            const fallbackNameForIndex = (index: number, defaultEntry?: PullsheetTemplate) => {
+              if (defaultEntry?.name) return defaultEntry.name;
+              const base = `${parentName} - Pullsheet`;
+              return `${base}${index > 0 ? ` ${index + 1}` : ""}`;
             };
 
-            const pullsheetResponse = await createFlexFolder(pullsheetPayload);
+            const templates = buildPullsheetTemplates(
+              defaultPullsheets,
+              metadataEntries,
+              formattedStartDate,
+              formattedEndDate,
+              fallbackNameForIndex
+            );
 
-            // Persist pullsheet element ID to database
-            try {
-              await supabase.from("flex_folders").insert({
-                job_id: job.id,
-                parent_id: childRow.id,
-                element_id: pullsheetResponse.elementId,
-                department: dept,
-                folder_type: "pull_sheet",
-              });
-              console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
-            } catch (err) {
-              console.error(`Failed to persist pullsheet ${template.name}:`, err);
-              console.error(`Orphaned Flex folder created with element_id: ${pullsheetResponse.elementId}`);
-              throw new Error(
-                `Failed to persist pullsheet ${template.name} (element_id: ${pullsheetResponse.elementId}). ` +
-                `Flex folder was created but could not be recorded in database. Original error: ${err}`
-              );
+            const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
+
+            for (const template of templates) {
+              const pullsheetPayload = {
+                definitionId: FLEX_FOLDER_IDS.pullSheet,
+                parentElementId: deptFolderId,
+                open: true,
+                locked: false,
+                name: template.name,
+                plannedStartDate: template.plannedStartDate,
+                plannedEndDate: template.plannedEndDate,
+                locationId: FLEX_FOLDER_IDS.location,
+                departmentId: DEPARTMENT_IDS[dept as Department],
+                documentNumber: `${documentPrefix}${template.suffix}`,
+                personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+              };
+
+              const pullsheetResponse = await createFlexFolder(pullsheetPayload);
+
+              // Persist pullsheet element ID to database
+              try {
+                await supabase.from("flex_folders").insert({
+                  job_id: job.id,
+                  parent_id: childRow.id,
+                  element_id: pullsheetResponse.elementId,
+                  department: dept,
+                  folder_type: "pull_sheet",
+                });
+                console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
+              } catch (err) {
+                console.error(`Failed to persist pullsheet ${template.name}:`, err);
+                console.error(`Orphaned Flex folder created with element_id: ${pullsheetResponse.elementId}`);
+                throw new Error(
+                  `Failed to persist pullsheet ${template.name} (element_id: ${pullsheetResponse.elementId}). ` +
+                  `Flex folder was created but could not be recorded in database. Original error: ${err}`
+                );
+              }
             }
           }
         }
@@ -904,12 +981,14 @@ export async function createAllFoldersForJob(
           name: string;
           suffix: string;
           definitionId: string;
+          folderType: string;
         }[] = [];
         if (shouldCreateItem("personnel", "workOrder", options)) {
           personnelSubfolders.push({
             name: `Orden de Trabajo - ${job.title}`,
             suffix: "OT",
             definitionId: FLEX_FOLDER_IDS.ordenTrabajo,
+            folderType: "work_orders",
           });
         }
         if (shouldCreateItem("personnel", "gastosDePersonal", options)) {
@@ -917,10 +996,16 @@ export async function createAllFoldersForJob(
             name: `Gastos de Personal - ${job.title}`,
             suffix: "GP",
             definitionId: FLEX_FOLDER_IDS.hojaGastos,
+            folderType: "hoja_gastos",
           });
         }
 
         for (const sf of personnelSubfolders) {
+          if (deptExistingSubs.has(sf.folderType)) {
+            console.log(`Skipping ${sf.folderType} for personnel - already exists`);
+            continue;
+          }
+
           const subPayload = {
             definitionId: sf.definitionId,
             parentElementId: deptFolderId,
@@ -1080,140 +1165,149 @@ export async function createAllFoldersForJob(
     }
     const parentName = deptPayload.name;
     const parentDocumentNumber = deptPayload.documentNumber;
+    const deptExistingSubs = existingSubfolderTypes.get(dept) ?? new Set<string>();
 
     // Create department-specific hojaInfo elements for sound, lights, and video
     if (
       ["sound", "lights", "video"].includes(dept) &&
       shouldCreateItem(dept, "hojaInfo", options)
     ) {
-      const hojaInfoType = dept === "sound"
-        ? FLEX_FOLDER_IDS.hojaInfoSx
-        : dept === "lights"
-          ? FLEX_FOLDER_IDS.hojaInfoLx
-          : FLEX_FOLDER_IDS.hojaInfoVx;
-      
-      const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
-      
-      const hojaInfoPayload = {
-        definitionId: hojaInfoType,
-        parentElementId: deptFolderId,
-        open: true,
-        locked: false,
-        name: `Hoja de Información - ${job.title}`,
-        plannedStartDate: formattedStartDate,
-        plannedEndDate: formattedEndDate,
-        locationId: FLEX_FOLDER_IDS.location,
-        departmentId: DEPARTMENT_IDS[dept as Department],
-        documentNumber: `${documentNumber}${hojaInfoSuffix}`,
-        personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
-      };
-
-      console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
-      const hojaInfoResponse = await createFlexFolder(hojaInfoPayload);
-
-      // Persist hojaInfo element ID
       const hojaInfoFolderType = dept === "sound"
         ? "hoja_info_sx"
         : dept === "lights"
           ? "hoja_info_lx"
           : "hoja_info_vx";
 
-      const parentFolderRow = existingDepartmentMap.get(dept);
-      try {
-        await supabase.from("flex_folders").insert({
-          job_id: job.id,
-          parent_id: parentFolderRow?.id ?? null,
-          element_id: hojaInfoResponse.elementId,
-          department: dept,
-          folder_type: hojaInfoFolderType,
-        });
-        console.log(`Persisted hojaInfo for ${dept} with element_id: ${hojaInfoResponse.elementId}`);
-      } catch (err) {
-        console.error(`Failed to persist hojaInfo for ${dept}:`, err);
-        console.error(`Orphaned Flex folder created with element_id: ${hojaInfoResponse.elementId}`);
-        throw new Error(
-          `Failed to persist hojaInfo for ${dept} (job_id: ${job.id}, element_id: ${hojaInfoResponse.elementId}). ` +
-          `Flex folder was created but could not be recorded in database. Original error: ${err}`
-        );
+      if (deptExistingSubs.has(hojaInfoFolderType)) {
+        console.log(`Skipping hojaInfo for ${dept} - already exists`);
+      } else {
+        const hojaInfoType = dept === "sound"
+          ? FLEX_FOLDER_IDS.hojaInfoSx
+          : dept === "lights"
+            ? FLEX_FOLDER_IDS.hojaInfoLx
+            : FLEX_FOLDER_IDS.hojaInfoVx;
+
+        const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
+
+        const hojaInfoPayload = {
+          definitionId: hojaInfoType,
+          parentElementId: deptFolderId,
+          open: true,
+          locked: false,
+          name: `Hoja de Información - ${job.title}`,
+          plannedStartDate: formattedStartDate,
+          plannedEndDate: formattedEndDate,
+          locationId: FLEX_FOLDER_IDS.location,
+          departmentId: DEPARTMENT_IDS[dept as Department],
+          documentNumber: `${documentNumber}${hojaInfoSuffix}`,
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+        };
+
+        console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
+        const hojaInfoResponse = await createFlexFolder(hojaInfoPayload);
+
+        const parentFolderRow = existingDepartmentMap.get(dept);
+        try {
+          await supabase.from("flex_folders").insert({
+            job_id: job.id,
+            parent_id: parentFolderRow?.id ?? null,
+            element_id: hojaInfoResponse.elementId,
+            department: dept,
+            folder_type: hojaInfoFolderType,
+          });
+          console.log(`Persisted hojaInfo for ${dept} with element_id: ${hojaInfoResponse.elementId}`);
+        } catch (err) {
+          console.error(`Failed to persist hojaInfo for ${dept}:`, err);
+          console.error(`Orphaned Flex folder created with element_id: ${hojaInfoResponse.elementId}`);
+          throw new Error(
+            `Failed to persist hojaInfo for ${dept} (job_id: ${job.id}, element_id: ${hojaInfoResponse.elementId}). ` +
+            `Flex folder was created but could not be recorded in database. Original error: ${err}`
+          );
+        }
       }
     }
 
     if (["sound", "lights", "video"].includes(dept)) {
-      const metadataEntries = getDepartmentCustomPullsheetMetadata(options?.[dept]);
-      const defaultPullsheets: PullsheetTemplate[] = [];
+      // Skip pullsheets if any already exist for this department
+      if (deptExistingSubs.has("pull_sheet")) {
+        console.log(`Skipping pullsheets for ${dept} - already exist`);
+      } else {
+        const metadataEntries = getDepartmentCustomPullsheetMetadata(options?.[dept]);
+        const defaultPullsheets: PullsheetTemplate[] = [];
 
-      if (dept === "sound") {
-        if (shouldCreateItem("sound", "pullSheetTP", options)) {
-          defaultPullsheets.push({
-            name: `${safeJobTitle} - Tour Pack`,
-            suffix: "TP",
-            plannedStartDate: formattedStartDate,
-            plannedEndDate: formattedEndDate,
-          });
+        if (dept === "sound") {
+          if (shouldCreateItem("sound", "pullSheetTP", options)) {
+            defaultPullsheets.push({
+              name: `${safeJobTitle} - Tour Pack`,
+              suffix: "TP",
+              plannedStartDate: formattedStartDate,
+              plannedEndDate: formattedEndDate,
+            });
+          }
+
+          if (shouldCreateItem("sound", "pullSheetPA", options)) {
+            defaultPullsheets.push({
+              name: `${safeJobTitle} - PA`,
+              suffix: "PA",
+              plannedStartDate: formattedStartDate,
+              plannedEndDate: formattedEndDate,
+            });
+          }
         }
 
-        if (shouldCreateItem("sound", "pullSheetPA", options)) {
-          defaultPullsheets.push({
-            name: `${safeJobTitle} - PA`,
-            suffix: "PA",
-            plannedStartDate: formattedStartDate,
-            plannedEndDate: formattedEndDate,
-          });
-        }
-      }
-
-      if (defaultPullsheets.length > 0 || metadataEntries.length > 0) {
-        const fallbackNameForIndex = (index: number, defaultEntry?: PullsheetTemplate) => {
-          if (defaultEntry?.name) return defaultEntry.name;
-          const base = `${safeJobTitle} - ${deptLabel} Pullsheet`;
-          return `${base}${index > 0 ? ` ${index + 1}` : ""}`;
-        };
-
-        const templates = buildPullsheetTemplates(
-          defaultPullsheets,
-          metadataEntries,
-          formattedStartDate,
-          formattedEndDate,
-          fallbackNameForIndex
-        );
-
-        const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
-
-        for (const template of templates) {
-          const pullsheetPayload = {
-            definitionId: FLEX_FOLDER_IDS.pullSheet,
-            parentElementId: deptFolderId,
-            open: true,
-            locked: false,
-            name: template.name,
-            plannedStartDate: template.plannedStartDate,
-            plannedEndDate: template.plannedEndDate,
-            locationId: FLEX_FOLDER_IDS.location,
-            departmentId: DEPARTMENT_IDS[dept as Department],
-            documentNumber: `${documentPrefix}${template.suffix}`,
-            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+        if (defaultPullsheets.length > 0 || metadataEntries.length > 0) {
+          const fallbackNameForIndex = (index: number, defaultEntry?: PullsheetTemplate) => {
+            if (defaultEntry?.name) return defaultEntry.name;
+            const base = `${safeJobTitle} - ${deptLabel} Pullsheet`;
+            return `${base}${index > 0 ? ` ${index + 1}` : ""}`;
           };
 
-          const pullsheetResponse = await createFlexFolder(pullsheetPayload);
+          const templates = buildPullsheetTemplates(
+            defaultPullsheets,
+            metadataEntries,
+            formattedStartDate,
+            formattedEndDate,
+            fallbackNameForIndex
+          );
 
-          // Persist pullsheet element ID to database
-          const parentFolderRow = existingDepartmentMap.get(dept);
-          try {
-            await supabase.from("flex_folders").insert({
-              job_id: job.id,
-              parent_id: parentFolderRow?.id ?? null,
-              element_id: pullsheetResponse.elementId,
-              department: dept,
-              folder_type: "pull_sheet",
-            });
-            console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
-          } catch (err) {
-            console.error(`Failed to persist pullsheet ${template.name}:`, err);
-            console.error(`Orphaned Flex folder created with element_id: ${pullsheetResponse.elementId}`);
-            throw new Error(
-              `Failed to persist pullsheet ${template.name} (element_id: ${pullsheetResponse.elementId}). ` +
-              `Flex folder was created but could not be recorded in database. Original error: ${err}`
-            );
+          const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
+
+          for (const template of templates) {
+            const pullsheetPayload = {
+              definitionId: FLEX_FOLDER_IDS.pullSheet,
+              parentElementId: deptFolderId,
+              open: true,
+              locked: false,
+              name: template.name,
+              plannedStartDate: template.plannedStartDate,
+              plannedEndDate: template.plannedEndDate,
+              locationId: FLEX_FOLDER_IDS.location,
+              departmentId: DEPARTMENT_IDS[dept as Department],
+              documentNumber: `${documentPrefix}${template.suffix}`,
+              personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+            };
+
+            const pullsheetResponse = await createFlexFolder(pullsheetPayload);
+
+            // Persist pullsheet element ID to database
+            const parentFolderRow = existingDepartmentMap.get(dept);
+            try {
+              await supabase.from("flex_folders").insert({
+                job_id: job.id,
+                parent_id: parentFolderRow?.id ?? null,
+                element_id: pullsheetResponse.elementId,
+                department: dept,
+                folder_type: "pull_sheet",
+              });
+              console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
+            } catch (err) {
+              console.error(`Failed to persist pullsheet ${template.name}:`, err);
+              console.error(`Orphaned Flex folder created with element_id: ${pullsheetResponse.elementId}`);
+              throw new Error(
+                `Failed to persist pullsheet ${template.name} (element_id: ${pullsheetResponse.elementId}). ` +
+                `Flex folder was created but could not be recorded in database. Original error: ${err}`
+              );
+            }
           }
         }
       }
@@ -1226,23 +1320,32 @@ export async function createAllFoldersForJob(
           name: `${job.title} - Documentación Técnica - ${deptLabel}`,
           suffix: "DT",
           key: "documentacionTecnica" as const,
+          folderType: "doc_tecnica",
         },
         {
           definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
           name: `${job.title} - Presupuestos Recibidos - ${deptLabel}`,
           suffix: "PR",
           key: "presupuestosRecibidos" as const,
+          folderType: "presupuestos_recibidos",
         },
         {
           definitionId: FLEX_FOLDER_IDS.hojaGastos,
           name: `${job.title} - Hoja de Gastos - ${deptLabel}`,
           suffix: "HG",
           key: "hojaGastos" as const,
+          folderType: "hoja_gastos",
         },
       ];
 
       for (const sf of subfolders) {
         if (!shouldCreateItem(dept, sf.key, options)) continue;
+
+        if (deptExistingSubs.has(sf.folderType)) {
+          console.log(`Skipping ${sf.key} for ${dept} - already exists`);
+          continue;
+        }
+
         const subPayload = {
           definitionId: sf.definitionId,
           parentElementId: deptFolderId,
@@ -1259,13 +1362,6 @@ export async function createAllFoldersForJob(
 
         const created = await createFlexFolder(subPayload);
 
-        // Persist subfolder element ID
-        const folderTypeMap: Record<string, string> = {
-          documentacionTecnica: "doc_tecnica",
-          presupuestosRecibidos: "presupuestos_recibidos",
-          hojaGastos: "hoja_gastos",
-        };
-
         const parentFolderRow = existingDepartmentMap.get(dept);
         try {
           await supabase.from("flex_folders").insert({
@@ -1273,7 +1369,7 @@ export async function createAllFoldersForJob(
             parent_id: parentFolderRow?.id ?? null,
             element_id: created.elementId,
             department: dept,
-            folder_type: folderTypeMap[sf.key],
+            folder_type: sf.folderType,
           });
           console.log(`Persisted ${sf.key} for ${dept} with element_id: ${created.elementId}`);
         } catch (err) {
@@ -1286,12 +1382,18 @@ export async function createAllFoldersForJob(
         }
       }
     } else if (dept === "comercial") {
-      await createComercialExtras(
-        deptFolderId,
-        parentName,
-        parentDocumentNumber,
-        safeJobTitle
-      );
+      // Only create comercial extras if none exist yet for this department
+      const hasComercialExtras = deptExistingSubs.has("comercial_extras") || deptExistingSubs.has("comercial_presupuesto");
+      if (!hasComercialExtras) {
+        await createComercialExtras(
+          deptFolderId,
+          parentName,
+          parentDocumentNumber,
+          safeJobTitle
+        );
+      } else {
+        console.log(`Skipping comercial extras for ${dept} - already exist`);
+      }
     } else if (dept === "personnel") {
       const personnelSubfolders = [
         {
@@ -1333,6 +1435,10 @@ export async function createAllFoldersForJob(
             );
             continue;
           }
+        }
+        if (sf.key === "gastosDePersonal" && deptExistingSubs.has("hoja_gastos")) {
+          console.log(`Skipping gastos de personal for ${dept} - already exists`);
+          continue;
         }
         const subPayload = {
           definitionId: sf.definitionId,
