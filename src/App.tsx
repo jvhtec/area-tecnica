@@ -80,6 +80,7 @@ const Privacy = lazy(() => import('@/pages/Privacy'));
 const StagePlot = lazy(() => import('@/pages/StagePlot'));
 const SysCalc = lazy(() => import('@/pages/SysCalc'));
 const GlobalTasks = lazy(() => import('@/pages/GlobalTasks'));
+const Achievements = lazy(() => import('@/pages/Achievements'));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -200,6 +201,9 @@ export default function App() {
                                 </ProtectedRoute>
                               }
                             />
+
+                            {/* Achievements: accessible to all authenticated users, no Layout */}
+                            <Route path="/achievements" element={<Achievements />} />
 
                             {/* Layout Routes */}
                             <Route element={<Layout />}>
