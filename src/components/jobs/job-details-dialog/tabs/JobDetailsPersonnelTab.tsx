@@ -73,9 +73,9 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
             {filteredAssignments.map((assignment: any) => (
               <div
                 key={assignment.technician_id}
-                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-muted rounded min-w-0"
+                className="flex flex-col md:flex-row md:items-start md:justify-between gap-2 p-3 bg-muted rounded min-w-0"
               >
-                <div className="min-w-0 flex-1 flex items-center gap-3">
+                <div className="min-w-0 flex-1 flex items-center gap-3 md:min-w-[200px]">
                   <Avatar className="h-10 w-10 shrink-0">
                     {assignment.profiles?.profile_picture_url && (
                       <AvatarImage
@@ -115,7 +115,7 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
                     )}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1 w-full sm:w-auto sm:shrink-0">
+                <div className="flex flex-wrap gap-1 md:justify-end">
                   {assignment.sound_role && (
                     <Badge variant="outline" className="text-xs">
                       Sonido: {labelForCode(assignment.sound_role)}
