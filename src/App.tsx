@@ -18,6 +18,7 @@ import { Loader2 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { GlobalCreateJobDialog } from '@/components/jobs/GlobalCreateJobDialog';
 import { useShortcutInitialization } from '@/hooks/useShortcutInitialization';
+import { UserPreferencesProvider } from '@/providers/UserPreferencesProvider';
 
 const ReactQueryDevtoolsLazy = import.meta.env.DEV
   ? lazy(() =>
@@ -169,9 +170,10 @@ export default function App() {
               <AppBadgeProvider>
                 <Router>
                   <OptimizedAuthProvider>
-                    <ServiceWorkerUpdateInit />
-                    <PushSubscriptionRecoveryInit />
-                    <ShortcutSystemInit />
+                    <UserPreferencesProvider>
+                      <ServiceWorkerUpdateInit />
+                      <PushSubscriptionRecoveryInit />
+                      <ShortcutSystemInit />
                     <div className="app">
                       <Suspense fallback={<PageLoader />}>
                         <Routes>
@@ -288,6 +290,7 @@ export default function App() {
                       <Toaster />
                       <SonnerToaster richColors position="top-right" />
                     </div>
+                    </UserPreferencesProvider>
                   </OptimizedAuthProvider>
                 </Router>
               </AppBadgeProvider>
