@@ -603,35 +603,35 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="flex gap-1 shrink-0">
+                                                    <div className="flex gap-3 shrink-0">
                                                         <Button
                                                             variant="outline"
-                                                            size="sm"
+                                                            size="icon"
                                                             onClick={() => handleViewDocument(doc)}
                                                             disabled={documentLoading.has(doc.id)}
-                                                            className="h-8 w-8 p-0"
+                                                            className="h-10 w-10 p-0"
                                                             title={`Ver ${doc.file_name}`}
                                                             aria-label={`Ver ${doc.file_name}`}
                                                         >
                                                             {documentLoading.has(doc.id) ? (
                                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                                             ) : (
-                                                                <Eye size={16} />
+                                                                <Eye size={18} />
                                                             )}
                                                         </Button>
                                                         <Button
                                                             variant="outline"
-                                                            size="sm"
+                                                            size="icon"
                                                             onClick={() => handleDownload(doc)}
                                                             disabled={documentLoading.has(doc.id)}
-                                                            className="h-8 w-8 p-0"
+                                                            className="h-10 w-10 p-0"
                                                             title={`Descargar ${doc.file_name}`}
                                                             aria-label={`Descargar ${doc.file_name}`}
                                                         >
                                                             {documentLoading.has(doc.id) ? (
                                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                                             ) : (
-                                                                <Download size={16} />
+                                                                <Download size={18} />
                                                             )}
                                                         </Button>
                                                     </div>
