@@ -29,10 +29,10 @@ export function AchievementsGrid({ targetUserId }: AchievementsGridProps) {
     let list: AchievementWithStatus[] =
       filter === 'all' ? achievements : achievements.filter((a) => a.category === filter);
 
-    // Unlocked first, then by sort_order
-    return list.sort((a, b) => {
-      if (a.unlocked !== b.unlocked) return a.unlocked ? -1 : 1;
-      return a.sort_order - b.sort_order;
+    // Only show unlocked achievements — locked ones stay hidden until earned
+    return list.filter((a) => a.unlocked).sort((a, b) => {
+      if (!a.unlocked_at || !b.unlocked_at) return 0;
+      return new Date(b.unlocked_at).getTime() - new Date(a.unlocked_at).getTime();
     });
   }, [achievements, filter]);
 
@@ -46,6 +46,8 @@ export function AchievementsGrid({ targetUserId }: AchievementsGridProps) {
       </div>
     );
   }
+
+  const lockedCount = achievements?.filter((a) => !a.unlocked).length ?? 0;
 
   if (!achievements || achievements.length === 0) {
     return (
@@ -70,11 +72,26 @@ export function AchievementsGrid({ targetUserId }: AchievementsGridProps) {
       <AchievementsFilters selected={filter} onChange={setFilter} counts={counts} />
 
       {/* Grid */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((a) => (
-          <AchievementCard key={a.id} achievement={a} />
-        ))}
-      </div>
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <Trophy className="h-12 w-12 mb-3 opacity-50" />
+          <p className="text-sm">Aún no has desbloqueado logros en esta categoría.</p>
+          <p className="text-xs mt-1">¡Sigue trabajando para descubrirlos!</p>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((a) => (
+            <AchievementCard key={a.id} achievement={a} />
+          ))}
+        </div>
+      )}
+
+      {/* Hidden hint */}
+      {lockedCount > 0 && (
+        <p className="text-center text-xs text-muted-foreground pt-2">
+          {lockedCount} {lockedCount === 1 ? 'logro por descubrir' : 'logros por descubrir'}
+        </p>
+      )}
     </div>
   );
 }
