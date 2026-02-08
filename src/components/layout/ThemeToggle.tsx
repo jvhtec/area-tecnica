@@ -3,7 +3,7 @@ import { Moon, Sun } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { useUserPreferences } from "@/hooks/useUserPreferences"
+import { useUserPreferencesValue } from "@/providers/UserPreferencesProvider"
 
 interface ThemeToggleProps {
   display?: "sidebar" | "icon"
@@ -27,7 +27,7 @@ export const ThemeToggle = ({
     // Default to dark if no preference stored
     return true
   })
-  const { preferences, updatePreferences } = useUserPreferences()
+  const { preferences, updatePreferences } = useUserPreferencesValue()
 
   // Apply theme on mount and when it changes
   useEffect(() => {
