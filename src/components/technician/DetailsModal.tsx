@@ -579,58 +579,60 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                         {job.job_documents.filter((d: JobDocument) => d.visible_to_tech).map((doc) => (
                                             <div
                                                 key={doc.id}
-                                                className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3`}
+                                                className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-3`}
                                             >
-                                                <div className="flex-1 min-w-0 overflow-hidden">
-                                                    <div
-                                                        className={`text-sm font-bold ${theme.textMain} leading-snug break-words line-clamp-2 sm:truncate mb-1`}
-                                                        title={doc.file_name}
-                                                    >
-                                                        {doc.file_name}
+                                                <div className="flex items-start gap-3">
+                                                    <div className="min-w-0 flex-1">
+                                                        <div
+                                                            className={`text-sm font-bold ${theme.textMain} leading-snug break-words line-clamp-2 mb-1`}
+                                                            title={doc.file_name}
+                                                        >
+                                                            {doc.file_name}
+                                                        </div>
+                                                        <div className={`text-xs ${theme.textMuted}`}>
+                                                            {doc.uploaded_at && `Subido el ${format(new Date(doc.uploaded_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`}
+                                                        </div>
+                                                        {(doc.template_type === 'soundvision' || doc.read_only) && (
+                                                            <div className="flex gap-1 mt-1 flex-wrap">
+                                                                {doc.template_type === 'soundvision' && (
+                                                                    <Badge variant="outline" className="text-[10px]">SoundVision</Badge>
+                                                                )}
+                                                                {doc.read_only && (
+                                                                    <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/50">Solo lectura</Badge>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <div className={`text-xs ${theme.textMuted}`}>
-                                                        {doc.uploaded_at && `Subido el ${format(new Date(doc.uploaded_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`}
+                                                    <div className="flex gap-1 shrink-0">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleViewDocument(doc)}
+                                                            disabled={documentLoading.has(doc.id)}
+                                                            className="h-8 w-8 p-0"
+                                                            title={`Ver ${doc.file_name}`}
+                                                        >
+                                                            {documentLoading.has(doc.id) ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <Eye size={16} />
+                                                            )}
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleDownload(doc)}
+                                                            disabled={documentLoading.has(doc.id)}
+                                                            className="h-8 w-8 p-0"
+                                                            title={`Descargar ${doc.file_name}`}
+                                                        >
+                                                            {documentLoading.has(doc.id) ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <Download size={16} />
+                                                            )}
+                                                        </Button>
                                                     </div>
-                                                    <div className="flex gap-1 mt-1 flex-wrap">
-                                                        {doc.template_type === 'soundvision' && (
-                                                            <Badge variant="outline" className="text-[10px]">SoundVision</Badge>
-                                                        )}
-                                                        {doc.read_only && (
-                                                            <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/50">Solo lectura</Badge>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleViewDocument(doc)}
-                                                        disabled={documentLoading.has(doc.id)}
-                                                        className="w-full sm:min-w-[90px]"
-                                                    >
-                                                        {documentLoading.has(doc.id) ? (
-                                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                            <>
-                                                                <Eye size={14} className="mr-1" /> Ver
-                                                            </>
-                                                        )}
-                                                    </Button>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleDownload(doc)}
-                                                        disabled={documentLoading.has(doc.id)}
-                                                        className="w-full sm:min-w-[90px]"
-                                                    >
-                                                        {documentLoading.has(doc.id) ? (
-                                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                            <>
-                                                                <Download size={14} className="mr-1" /> Descargar
-                                                            </>
-                                                        )}
-                                                    </Button>
                                                 </div>
                                             </div>
                                         ))}
