@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -20,11 +20,13 @@ export const ThemeToggle = ({
   const { resolvedTheme, setTheme } = useTheme()
   const { preferences, updatePreferences } = useUserPreferences()
   const [mounted, setMounted] = useState(false)
+  const hasManuallyToggled = useRef(false)
 
   useEffect(() => setMounted(true), [])
 
-  // Sync with database preferences when they load
+  // Sync with database preferences on initial load only
   useEffect(() => {
+    if (hasManuallyToggled.current) return
     if (preferences?.dark_mode !== undefined) {
       const preferred = preferences.dark_mode ? 'dark' : 'light'
       setTheme(preferred)
@@ -35,7 +37,8 @@ export const ThemeToggle = ({
 
   const isDarkMode = mounted ? resolvedTheme === 'dark' : true
 
-  const toggleDarkMode = () => {
+  const toggleDarkMode = useCallback(() => {
+    hasManuallyToggled.current = true
     const newTheme = isDarkMode ? 'light' : 'dark'
     setTheme(newTheme)
 
@@ -44,7 +47,7 @@ export const ThemeToggle = ({
 
     // Update database in background
     updatePreferences({ dark_mode: !isDarkMode })
-  }
+  }, [isDarkMode, setTheme, updatePreferences])
 
   // Global keyboard shortcut: Ctrl+Shift+D (Cmd+Shift+D on Mac)
   useEffect(() => {
@@ -85,7 +88,7 @@ export const ThemeToggle = ({
         <Sun className={iconSizeClass} aria-hidden="true" />
       )}
       {!isIconDisplay && (
-        <span>{isDarkMode ? "Dark Mode" : "Light Mode"}</span>
+        <span>{isDarkMode ? "Modo oscuro" : "Modo claro"}</span>
       )}
     </Button>
   )
