@@ -611,6 +611,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                                             disabled={documentLoading.has(doc.id)}
                                                             className="h-8 w-8 p-0"
                                                             title={`Ver ${doc.file_name}`}
+                                                            aria-label={`Ver ${doc.file_name}`}
                                                         >
                                                             {documentLoading.has(doc.id) ? (
                                                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -625,6 +626,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                                             disabled={documentLoading.has(doc.id)}
                                                             className="h-8 w-8 p-0"
                                                             title={`Descargar ${doc.file_name}`}
+                                                            aria-label={`Descargar ${doc.file_name}`}
                                                         >
                                                             {documentLoading.has(doc.id) ? (
                                                                 <Loader2 className="h-4 w-4 animate-spin" />
