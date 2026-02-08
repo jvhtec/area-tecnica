@@ -125,7 +125,10 @@ export default function TechnicianSuperApp() {
   );
 
   const toggleTheme = () => {
-    setTheme(isDark ? 'light' : 'dark');
+    const newTheme = isDark ? 'light' : 'dark';
+    setTheme(newTheme);
+    // Keep legacy key in sync for backward compat with useTechnicianTheme
+    localStorage.setItem('theme-preference', newTheme);
   };
 
   // Modal state
