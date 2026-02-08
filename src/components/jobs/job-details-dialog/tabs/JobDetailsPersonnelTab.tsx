@@ -115,7 +115,7 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
                     )}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1 md:justify-end">
+                <div className="flex flex-wrap gap-1 w-full md:w-auto md:justify-end">
                   {assignment.sound_role && (
                     <Badge variant="outline" className="text-xs">
                       Sonido: {labelForCode(assignment.sound_role)}
