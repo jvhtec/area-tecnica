@@ -281,6 +281,8 @@ BEGIN
   DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
 
   -- ---- Metric: no_cancel_streak ----
+  -- Count consecutive confirmed assignments on completed jobs (most recent first).
+  -- The streak breaks at the first declined assignment.
   WITH ordered_assignments AS (
     SELECT ja.status AS assign_status,
       ROW_NUMBER() OVER (ORDER BY j.start_time DESC) AS rn
@@ -288,7 +290,8 @@ BEGIN
     JOIN jobs j ON j.id = ja.job_id
     WHERE ja.technician_id = p_user_id
       AND j.start_time::date <= CURRENT_DATE
-      AND j.status != 'Cancelado'
+      AND ja.status IN ('confirmed', 'declined')
+      AND j.status = 'Completado'
   ),
   first_decline AS (
     SELECT MIN(rn) AS decline_rn
