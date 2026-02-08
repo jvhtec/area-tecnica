@@ -1,6 +1,8 @@
 -- Fix timesheet rounding: round to nearest whole hour instead of nearest half hour.
 -- Previous formula ROUND(v_worked_hours * 2) / 2.0 rounds to 0.5 increments,
 -- e.g. 17.7h → 17.5h. Correct behavior: 17.7h → 18h, 17.4h → 17h.
+-- Also preserves raw fractional hours in breakdown for auditability,
+-- simplifies overtime calc, and backfills stale persisted timesheets.
 
 CREATE OR REPLACE FUNCTION public.compute_timesheet_amount_2025(
   _timesheet_id uuid,
@@ -17,6 +19,7 @@ DECLARE
   v_category TEXT;
   v_rate_card RECORD;
   v_worked_hours NUMERIC;
+  v_raw_worked_hours NUMERIC;
   v_billable_hours NUMERIC;
   v_base_day_amount NUMERIC := 0;
   v_plus_10_12_hours NUMERIC := 0;
@@ -112,7 +115,9 @@ BEGIN
       v_timesheet.end_time - v_timesheet.start_time
     )) / 3600.0 - (COALESCE(v_timesheet.break_minutes, 0) / 60.0);
   END IF;
-  -- Round to nearest whole hour (17.7 → 18, 17.4 → 17)
+  -- Preserve raw fractional hours for audit trail, then round to nearest whole hour
+  -- IMPORTANT: Do NOT change this to half-hour rounding (ROUND(x*2)/2). See PR #467.
+  v_raw_worked_hours := v_worked_hours;
   v_worked_hours := ROUND(v_worked_hours);
 
   -- Handle rehearsal flat rate
@@ -144,7 +149,7 @@ BEGIN
     v_base_day_amount := v_rehearsal_flat_rate;
 
     v_breakdown := jsonb_build_object(
-      'worked_hours', v_worked_hours,
+      'worked_hours', v_raw_worked_hours,
       'worked_hours_rounded', v_worked_hours,
       'hours_rounded', v_worked_hours,
       'billable_hours', v_billable_hours,
@@ -245,8 +250,7 @@ BEGIN
       v_plus_10_12_hours := 0;
       v_plus_10_12_amount := v_rate_card.plus_10_12_eur;
 
-      v_overtime_hours := v_worked_hours - 12.5;
-      v_overtime_hours := CEILING(v_overtime_hours);
+      v_overtime_hours := v_worked_hours - 12;
 
       v_overtime_amount := v_rate_card.overtime_hour_eur * v_overtime_hours;
       v_total_amount := v_base_day_amount + v_plus_10_12_amount + v_overtime_amount;
@@ -254,7 +258,7 @@ BEGIN
   END IF;
 
   v_breakdown := jsonb_build_object(
-    'worked_hours', v_worked_hours,
+    'worked_hours', v_raw_worked_hours,
     'worked_hours_rounded', v_worked_hours,
     'hours_rounded', v_worked_hours,
     'billable_hours', v_billable_hours,
@@ -296,3 +300,20 @@ $function$;
 
 COMMENT ON FUNCTION public.compute_timesheet_amount_2025(uuid,boolean) IS
   'Calculates timesheet amounts based on rate cards. Hours rounded to nearest whole number (not half hour). Rehearsal flat rate: €60 for house_tech/admin/management roles, €180 for regular technicians.';
+
+-- Backfill: recompute all timesheets that have persisted amount_breakdown
+-- so they reflect whole-hour rounding instead of stale half-hour values.
+DO $$
+DECLARE
+  rec RECORD;
+BEGIN
+  FOR rec IN
+    SELECT id FROM public.timesheets
+    WHERE amount_breakdown IS NOT NULL
+      AND start_time IS NOT NULL
+      AND end_time IS NOT NULL
+  LOOP
+    PERFORM public.compute_timesheet_amount_2025(rec.id, true);
+  END LOOP;
+END;
+$$;
