@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Department, ALL_DEPARTMENTS, DEPARTMENT_LABELS, getDepartmentLabel } from "@/types/department";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, RefreshCcw, Shield, ExternalLink } from "lucide-react";
+import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, RefreshCcw, Shield, ExternalLink, Trophy } from "lucide-react";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
@@ -497,6 +497,29 @@ export const Profile = () => {
                     )}
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Achievements */}
+          {['technician', 'house_tech', 'admin', 'management'].includes(profile?.role) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5" />
+                  Logros
+                </CardTitle>
+                <CardDescription>
+                  Tus logros profesionales como técnico.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link to="/achievements">
+                  <Button className="w-full" variant="outline">
+                    <Trophy className="mr-2 h-4 w-4" />
+                    Ver mis logros
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           )}
