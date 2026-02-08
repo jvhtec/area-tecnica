@@ -312,7 +312,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
     }, [jobDateTypes]);
 
     return (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
             <div className={`w-full max-w-md md:max-w-lg lg:max-w-xl h-[85vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200`}>
 
                 {/* Header */}

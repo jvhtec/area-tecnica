@@ -164,7 +164,7 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ViewportProvider>
-          <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme">
+          <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme" attribute="class">
             <TooltipProvider>
               <AppBadgeProvider>
                 <Router>
