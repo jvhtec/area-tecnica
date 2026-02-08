@@ -6,6 +6,7 @@ import { AppInit } from "@/components/AppInit";
 import { useActivityPushFallback } from "@/hooks/useActivityPushFallback";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { AchievementBanner } from "@/components/achievements/AchievementBanner";
+import { ThemeInitializer } from "@/components/ThemeInitializer";
 
 function ActivityPushFallbackInit() {
   useActivityPushFallback();
@@ -46,6 +47,7 @@ export default function AuthenticatedShell() {
         <AppInit />
         <ActivityPushFallbackInit />
         <TechnicianRouteGuard />
+        <ThemeInitializer />
         <AchievementBanner />
         <Outlet />
       </SubscriptionProvider>
