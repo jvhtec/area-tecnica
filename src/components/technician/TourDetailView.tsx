@@ -158,7 +158,7 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
     return (
         <div className={`fixed inset-0 z-[60] ${theme.bg} overflow-y-auto`}>
             {/* Hero Header */}
-            <div className={`relative pt-6 pb-5 px-5 border-b ${theme.divider} overflow-hidden`}>
+            <div className={`relative pt-[max(1.5rem,calc(env(safe-area-inset-top)+1.5rem))] pb-5 px-5 border-b ${theme.divider} overflow-hidden`}>
                 <div
                     className="absolute inset-0 opacity-30"
                     style={{ background: `linear-gradient(to bottom, ${tourData.color || '#3b82f6'}40, transparent)` }}
@@ -204,7 +204,7 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
             </div>
 
             {/* Content */}
-            <div className="p-5 space-y-5">
+            <div className="p-5 space-y-5 pb-[max(1.5rem,calc(env(safe-area-inset-bottom)+1.5rem))]">
                 {/* Stats Row */}
                 <div className="grid grid-cols-2 gap-3">
                     <div className={`p-4 rounded-xl border ${theme.card}`}>

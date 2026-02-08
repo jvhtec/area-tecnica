@@ -10,7 +10,7 @@ interface SoundVisionModalProps {
 
 export const SoundVisionModal = ({ theme, isDark, onClose }: SoundVisionModalProps) => {
   return (
-    <div className="fixed inset-0 z-[60] bg-black">
+    <div className="fixed inset-0 z-[60] bg-black pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <SoundVisionInteractiveMap theme={theme} isDark={isDark} onClose={onClose} />
     </div>
   );
