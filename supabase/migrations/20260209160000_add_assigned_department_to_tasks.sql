@@ -40,13 +40,13 @@ CREATE INDEX IF NOT EXISTS idx_administrative_job_tasks_assigned_dept ON public.
 
 -- Recreate pending_tasks_view to:
 -- 1. Include tasks with assigned_department (department-shared tasks)
--- 2. Add the assigned_department column to the view output
+-- 2. Add the assigned_department column to the view output (appended to end for CREATE OR REPLACE compatibility)
 -- 3. Include production and administrative department tables
 -- 4. Include tour_id properly from the task rows
 CREATE OR REPLACE VIEW public.pending_tasks_view
 WITH (security_invoker = true) AS
 
--- Sound: individually assigned
+-- Sound
 SELECT
   t.id,
   t.job_id,
@@ -54,7 +54,6 @@ SELECT
   'sound'::text AS department,
   t.task_type,
   t.assigned_to,
-  t.assigned_department,
   t.status,
   t.progress,
   t.due_at,
@@ -67,7 +66,8 @@ SELECT
   p.first_name AS assignee_first_name,
   p.last_name AS assignee_last_name,
   p.role AS assignee_role,
-  t.description
+  t.description,
+  t.assigned_department
 FROM public.sound_job_tasks t
 LEFT JOIN public.jobs j ON j.id = t.job_id
 LEFT JOIN public.tours tr ON tr.id = t.tour_id
@@ -81,7 +81,7 @@ WHERE
 
 UNION ALL
 
--- Lights: individually assigned
+-- Lights
 SELECT
   t.id,
   t.job_id,
@@ -89,7 +89,6 @@ SELECT
   'lights'::text AS department,
   t.task_type,
   t.assigned_to,
-  t.assigned_department,
   t.status,
   t.progress,
   t.due_at,
@@ -102,7 +101,8 @@ SELECT
   p.first_name AS assignee_first_name,
   p.last_name AS assignee_last_name,
   p.role AS assignee_role,
-  t.description
+  t.description,
+  t.assigned_department
 FROM public.lights_job_tasks t
 LEFT JOIN public.jobs j ON j.id = t.job_id
 LEFT JOIN public.tours tr ON tr.id = t.tour_id
@@ -116,7 +116,7 @@ WHERE
 
 UNION ALL
 
--- Video: individually assigned
+-- Video
 SELECT
   t.id,
   t.job_id,
@@ -124,7 +124,6 @@ SELECT
   'video'::text AS department,
   t.task_type,
   t.assigned_to,
-  t.assigned_department,
   t.status,
   t.progress,
   t.due_at,
@@ -137,7 +136,8 @@ SELECT
   p.first_name AS assignee_first_name,
   p.last_name AS assignee_last_name,
   p.role AS assignee_role,
-  t.description
+  t.description,
+  t.assigned_department
 FROM public.video_job_tasks t
 LEFT JOIN public.jobs j ON j.id = t.job_id
 LEFT JOIN public.tours tr ON tr.id = t.tour_id
@@ -159,7 +159,6 @@ SELECT
   'production'::text AS department,
   t.task_type,
   t.assigned_to,
-  t.assigned_department,
   t.status,
   t.progress,
   t.due_at,
@@ -172,7 +171,8 @@ SELECT
   p.first_name AS assignee_first_name,
   p.last_name AS assignee_last_name,
   p.role AS assignee_role,
-  t.description
+  t.description,
+  t.assigned_department
 FROM public.production_job_tasks t
 LEFT JOIN public.jobs j ON j.id = t.job_id
 LEFT JOIN public.tours tr ON tr.id = t.tour_id
@@ -194,7 +194,6 @@ SELECT
   'administrative'::text AS department,
   t.task_type,
   t.assigned_to,
-  t.assigned_department,
   t.status,
   t.progress,
   t.due_at,
@@ -207,7 +206,8 @@ SELECT
   p.first_name AS assignee_first_name,
   p.last_name AS assignee_last_name,
   p.role AS assignee_role,
-  t.description
+  t.description,
+  t.assigned_department
 FROM public.administrative_job_tasks t
 LEFT JOIN public.jobs j ON j.id = t.job_id
 LEFT JOIN public.tours tr ON tr.id = t.tour_id
